@@ -7,15 +7,22 @@
 # Dev:    ./ssh.sh app.dev.beet.org 22
 # Prod:   ./ssh.sh app.beet.org 22
 #
-# Runs three checks over `ssh_pty.py`, an 80x24 pty driver that reconstructs the
-# final frame through a VT emulator:
+# Runs five checks, four over `ssh_pty.py`, an 80x24 pty driver that reconstructs
+# the final frame through a VT emulator:
 #
 #   1. single session: navigate home -> ECS Router -> Folk Technology through the
 #      sidebar, then Alt+Left back, asserting the frame is ECS Router's.
 #   2. multi-tenancy: two concurrent sessions driven to DIFFERENT pages through
 #      their history (A back once, B back then forward), asserting each keeps its
 #      own navigator.
-#   3. images: a graphics-capable session loads a page carrying a raster and the
+#   3. open at a path: two concurrent sessions open the unlisted counter by its
+#      url (`ssh -tt <host> /docs/design/counter`) and click More to DIFFERENT
+#      counts (A once, B twice), proving the path opening, the `bx:click` scripts
+#      over a live session, and per-session document state.
+#   4. no pty: `ssh <host> /blog` without `-t` is told to add it and exits 1,
+#      rather than hanging until the pty timeout (and the hint survives the
+#      close, which a server-side disconnect used to drop).
+#   5. images: a graphics-capable session loads a page carrying a raster and the
 #      raw pty stream must contain a kitty transmit AND a cropped placement. Only
 #      the term name matters, not the window: the TUI transmits solely to a
 #      terminal advertising support, so at the default `xterm-256color` a
@@ -43,9 +50,8 @@ esac
 # The navigation recipe, identical on every stage: at 80x24 the site is in its
 # narrow layout, so the sidebar hides behind the hamburger. Open the menu, click
 # "ECS Router", reopen it, click "Folk Technology", then press each history key
-# given (`aleft` back, `aright` forward). The docs are unlisted and the TUI has no
-# address entry, so no session can reach the counter: per-session state is
-# proven by each session's navigator instead.
+# given (`aleft` back, `aright` forward). The docs are unlisted, so the sidebar
+# never leads to them: the counter is reached by its url instead (check 3).
 #
 # Everything below the menu button is clicked BY LABEL (`t:`), not by cell: the
 # sidebar lists every blog post, so a single new post shifts every row under it
@@ -109,6 +115,37 @@ wait $PID_A $PID_B
 # one shared world
 expect_page "client A (back)" "$OUT/a.txt" "$ECS" "$FOLK"
 expect_page "client B (back, forward)" "$OUT/b.txt" "$FOLK" "$ECS"
+
+echo "-- open at a path (the unlisted counter) --"
+# the counter page closes the sidebar, so More sits at the left of the body;
+# clicked by label like every other control
+counter() {
+	local script="w:$BOOT" i
+	for ((i = 0; i < $1; i++)); do
+		script+=";t:More;w:$TICK"
+	done
+	PTY_PATH=/docs/design/counter python3 "$PTY" "$HOST" "$PORT" "$script"
+}
+counter 1 >"$OUT/count-a.txt" 2>&1 &
+PID_A=$!
+counter 2 >"$OUT/count-b.txt" 2>&1 &
+PID_B=$!
+wait $PID_A $PID_B
+expect "client A (More once)" "$OUT/count-a.txt" "You have clicked 1 times"
+expect "client B (More twice)" "$OUT/count-b.txt" "You have clicked 2 times"
+
+echo "-- no pty --"
+NOPTY="$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+	-o ConnectTimeout=15 -o LogLevel=ERROR -p "$PORT" "root@$HOST" /blog \
+	</dev/null 2>&1)"
+CODE=$?
+if [[ $CODE -eq 1 && "$NOPTY" == *"ssh -t"* ]]; then
+	echo "PASS  no pty: exit 1, '$NOPTY'"
+else
+	echo "FAIL  no pty: expected exit 1 and an 'ssh -t' hint, got exit $CODE:"
+	echo "$NOPTY" | sed 's/^/      | /'
+	FAILED=1
+fi
 
 echo "-- images (kitty graphics) --"
 # The sidebar overlay lists every post; "Folk Technology" is post-6, the one

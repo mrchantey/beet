@@ -493,6 +493,12 @@ impl Navigator {
 pub struct OpeningRoute(pub Url);
 
 impl OpeningRoute {
+	/// An opening route at `path`, ie `docs/form` or `/docs/form`: a page in the
+	/// server's url space, so it is rooted however it was spelled.
+	pub fn at(path: impl AsRef<str>) -> Self {
+		Self(Url::coerce(path).with_rooted(true))
+	}
+
 	/// The opening route for the terminal server on `entity`, from its start
 	/// request's `parts`.
 	pub async fn resolve(
@@ -520,14 +526,12 @@ impl OpeningRoute {
 	/// binary's own args open the page they name (`beet --entry=chat.bsx
 	/// docs/form`).
 	pub fn from_parts(parts: &RequestParts, mounted: bool) -> Result<Self> {
-		// an opening route addresses a page in the server's url space, so it is
-		// rooted however the flag spelled it (`--path=docs/form` or `=/docs/form`)
-		let url = match ServerParams::from_parts(parts)?.path {
-			Some(path) => Url::coerce(path).with_rooted(true),
-			None if mounted => Url::ROOT,
-			None => Url::ROOT.with_path(parts.path().clone()),
-		};
-		Self(url).xok()
+		match ServerParams::from_parts(parts)?.path {
+			Some(path) => Self::at(path),
+			None if mounted => Self(Url::ROOT),
+			None => Self(Url::ROOT.with_path(parts.path().clone())),
+		}
+		.xok()
 	}
 }
 

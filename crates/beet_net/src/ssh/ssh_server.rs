@@ -538,43 +538,48 @@ mod tests {
 		poll_until(|| live.get() == 0, "connection outlived its client").await;
 	}
 
-	/// Verifies that a client can connect and data flows bidirectionally.
-	#[beet_core::test]
-	async fn server_accepts_and_echoes() {
+	/// Serve a test server that answers each event its client sends with the
+	/// events `reply` returns, returning its address once it is up.
+	async fn serve_replies(reply: fn(&SshEvent) -> Vec<SshEvent>) -> String {
 		let server = SshServer::new_test();
 		let addr = server.0.local_address();
-		let store = Store::<Option<String>>::default();
-		let store_clone = store.clone();
-
-		// start the bevy app with an echo server
 		std::thread::spawn(move || {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, SshServerPlugin))
-				.add_observer(|ev: On<SshRecv>, mut commands: Commands| {
-					if let Some(text) = ev.event().as_str() {
-						commands.entity(ev.target()).trigger_target(SshSend(
-							SshEvent::text(format!("echo:{}", text)),
-						));
+				.add_observer(move |ev: On<SshRecv>, mut commands: Commands| {
+					for answer in reply(&ev) {
+						commands
+							.entity(ev.target())
+							.trigger_target(SshSend(answer));
 					}
 				})
 				.world_mut()
 				.spawn(server);
 			app.run();
 		});
-
 		// give the server time to start
 		time_ext::sleep_millis(300).await;
+		addr
+	}
 
-		let store_inner = store_clone.clone();
+	/// [`serve_replies`], then have a client send `first` once connected and
+	/// return the first text it gets back.
+	async fn first_reply(
+		reply: fn(&SshEvent) -> Vec<SshEvent>,
+		first: SshEvent,
+	) -> Option<String> {
+		let addr = serve_replies(reply).await;
+		let store = Store::<Option<String>>::default();
+		let store_inner = store.clone();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, AsyncPlugin::default()));
 		app.world_mut()
 			.spawn(SshSession::insert_on_connect(&addr, "guest", "beet"))
-			.observe_any(|ev: On<SshRecv>, mut commands: Commands| {
+			.observe_any(move |ev: On<SshRecv>, mut commands: Commands| {
 				if matches!(**ev, SshEvent::Connect) {
 					commands
 						.entity(ev.target())
-						.trigger_target(SshSend(SshEvent::text("hello")));
+						.trigger_target(SshSend(first.clone()));
 				}
 			})
 			.observe_any(move |ev: On<SshRecv>, mut commands: Commands| {
@@ -584,8 +589,123 @@ mod tests {
 				}
 			});
 		app.run();
+		store.get()
+	}
 
-		store.get().as_deref().xpect_eq(Some("echo:hello"));
+	/// Verifies that a client can connect and data flows bidirectionally.
+	#[beet_core::test]
+	async fn server_accepts_and_echoes() {
+		first_reply(
+			|ev| {
+				ev.as_str()
+					.map(|text| SshEvent::text(format!("echo:{text}")))
+					.into_iter()
+					.collect()
+			},
+			SshEvent::text("hello"),
+		)
+		.await
+		.as_deref()
+		.xpect_eq(Some("echo:hello"));
+	}
+
+	/// An exec request carries its command across the transport, ie the
+	/// `/docs` of `ssh -t <host> /docs`.
+	#[beet_core::test]
+	async fn server_receives_the_exec_command() {
+		first_reply(
+			|ev| match ev {
+				SshEvent::RequestExec(command) => {
+					vec![SshEvent::text(format!("exec:{command}"))]
+				}
+				_ => vec![],
+			},
+			SshEvent::RequestExec("/docs".into()),
+		)
+		.await
+		.as_deref()
+		.xpect_eq(Some("exec:/docs"));
+	}
+
+	/// A russh client handler recording whether the server sent a disconnect.
+	struct DisconnectRecorder(Store<bool>);
+
+	impl russh::client::Handler for DisconnectRecorder {
+		type Error = russh::Error;
+
+		async fn check_server_key(
+			&mut self,
+			_key: &russh::keys::ssh_key::PublicKey,
+		) -> std::result::Result<bool, Self::Error> {
+			Ok(true)
+		}
+
+		async fn disconnected(
+			&mut self,
+			reason: russh::client::DisconnectReason<Self::Error>,
+		) -> std::result::Result<(), Self::Error> {
+			match reason {
+				russh::client::DisconnectReason::ReceivedDisconnect(_) => {
+					self.0.set(true);
+					Ok(())
+				}
+				russh::client::DisconnectReason::Error(err) => Err(err),
+			}
+		}
+	}
+
+	/// Regression: a session the server closes leaves the hang-up to its client.
+	/// A disconnect is fatal to OpenSSH, which exits 255 and drops output it has
+	/// not yet written, so disconnecting straight after the close lost both the
+	/// hint a pty-less `ssh <host> /blog` is sent and its exit code. This client
+	/// answers the close, as OpenSSH does, then holds the connection past it, so
+	/// a premature disconnect would reach it.
+	#[beet_core::test]
+	async fn a_closed_session_leaves_the_hang_up_to_its_client() {
+		let addr = serve_replies(|ev| match ev {
+			SshEvent::RequestExec(_) => vec![
+				SshEvent::text("bye"),
+				SshEvent::Close(Some(SshCloseFrame {
+					code: 3,
+					reason: default(),
+				})),
+			],
+			_ => vec![],
+		})
+		.await;
+		let disconnected = Store::<bool>::default();
+		let recorder = DisconnectRecorder(disconnected.clone());
+
+		let (output, exit) = async_ext::on_tokio(async move {
+			let config = std::sync::Arc::new(russh::client::Config::default());
+			let mut session =
+				russh::client::connect(config, addr, recorder).await?;
+			session.authenticate_none("guest").await?;
+			let mut channel = session.channel_open_session().await?;
+			channel.exec(true, "/blog").await?;
+			let (mut output, mut exit) = (String::new(), None);
+			while let Some(msg) = channel.wait().await {
+				match msg {
+					russh::ChannelMsg::Data { data } => {
+						output.push_str(&String::from_utf8_lossy(&data));
+					}
+					russh::ChannelMsg::ExitStatus { exit_status } => {
+						exit = Some(exit_status);
+					}
+					russh::ChannelMsg::Close => break,
+					_ => {}
+				}
+			}
+			// a client still draining its output holds the connection open
+			time_ext::sleep_millis(500).await;
+			(output, exit).xok()
+		})
+		.await
+		.unwrap();
+
+		output.xpect_eq("bye");
+		exit.xpect_eq(Some(3));
+		disconnected.get().xpect_false();
 	}
 
 	/// Verifies that optional credentials are enforced.

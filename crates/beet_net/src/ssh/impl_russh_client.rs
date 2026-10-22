@@ -164,6 +164,9 @@ async fn run_data_loop(
 					Ok(SshEvent::RequestShell) => {
 						channel.request_shell(true).await.ok();
 					}
+					Ok(SshEvent::RequestExec(command)) => {
+						channel.exec(true, command.as_bytes()).await.ok();
+					}
 					Ok(SshEvent::Close(_)) | Err(_) => break,
 					_ => {}
 				}

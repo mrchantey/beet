@@ -30,6 +30,9 @@ Env:
   PTY_RULER=1   print 1-indexed col/row guides around the frame, for
                 rediscovering cell coordinates when the layout shifts
   PTY_USER      ssh user (default `root`; the server accepts any)
+  PTY_PATH      the page to open at, sent as the ssh command
+                (`ssh -tt <host> /docs/design/counter`); the server's home
+                when unset. How a session reaches an unlisted page.
   PTY_TERM      terminal name to advertise (default `xterm-256color`). Set
                 `xterm-kitty` to exercise the kitty graphics path: the TUI only
                 transmits rasters to a terminal that advertises support, so with
@@ -307,7 +310,7 @@ class Session:
 		self.master, slave = pty.openpty()
 		fcntl.ioctl(self.master, termios.TIOCSWINSZ, struct.pack("HHHH", ROWS, COLS, 0, 0))
 		self.proc = subprocess.Popen(
-			["ssh", *self.SSH_ARGS, "-p", str(port), f"{user}@{host}"],
+			["ssh", *self.SSH_ARGS, "-p", str(port), f"{user}@{host}", *self.command()],
 			stdin=slave,
 			stdout=slave,
 			stderr=slave,
@@ -315,6 +318,12 @@ class Session:
 			env={**os.environ, "TERM": TERM},
 		)
 		os.close(slave)
+
+	@staticmethod
+	def command() -> list:
+		"""The ssh command naming the page to open at, if `PTY_PATH` sets one."""
+		path = os.environ.get("PTY_PATH")
+		return [path] if path else []
 
 	def drain(self, seconds: float, until=None):
 		"""Pump the pty into the emulator for `seconds`, or until the raw stream

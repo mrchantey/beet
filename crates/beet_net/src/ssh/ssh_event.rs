@@ -20,6 +20,9 @@ pub enum SshEvent {
 	Resize(SshWindowSize),
 	/// Client requests a shell session.
 	RequestShell,
+	/// Client requests a command in place of a shell, ie the
+	/// `/docs` of `ssh -t <host> /docs`.
+	RequestExec(SmolStr),
 	/// Client requests X11 forwarding.
 	RequestX11(RequestX11),
 	/// Session closed, optionally with an exit code and reason.

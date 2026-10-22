@@ -13,6 +13,10 @@ use russh::server::Session;
 use std::sync::Arc;
 use std::time::Duration;
 
+/// How long a server-closed session waits for its client to answer the close
+/// before disconnecting it.
+const CLOSE_GRACE: Duration = Duration::from_secs(5);
+
 /// Info passed from the russh tokio task to the beet accept loop per connection.
 pub(crate) struct NewConnectionInfo {
 	pub to_client: async_channel::Sender<SshEvent>,
@@ -265,6 +269,7 @@ impl RusshServer for BeetSshApp {
 			credentials: self.credentials.clone(),
 			authenticated_user: None,
 			from_client_tx: None,
+			client_closed_tx: None,
 			channel_id: None,
 			peer_addr: addr,
 		}
@@ -295,6 +300,9 @@ struct BeetSshHandler {
 	credentials: Option<SshCredentials>,
 	authenticated_user: Option<String>,
 	from_client_tx: Option<async_channel::Sender<SshEvent>>,
+	/// Dropped when the client answers a close with its own (or the session
+	/// ends), how the forwarding task learns the client hung up by itself.
+	client_closed_tx: Option<async_channel::Sender<()>>,
 	channel_id: Option<ChannelId>,
 	/// The client's network address, forwarded by russh's `new_client`.
 	peer_addr: Option<std::net::SocketAddr>,
@@ -314,7 +322,10 @@ impl russh::server::Handler for BeetSshHandler {
 		let (from_client_tx, from_client_rx) =
 			async_channel::unbounded::<SshEvent>();
 
+		let (client_closed_tx, client_closed_rx) =
+			async_channel::bounded::<()>(1);
 		self.from_client_tx = Some(from_client_tx);
+		self.client_closed_tx = Some(client_closed_tx);
 		self.channel_id = Some(channel.id());
 
 		// Forward bevy → SSH client in a dedicated tokio task.
@@ -339,18 +350,28 @@ impl russh::server::Handler for BeetSshHandler {
 			};
 			// Send exit status before closing so the SSH client exits cleanly.
 			handle.exit_status_request(channel_id, exit_code).await.ok();
+			handle.eof(channel_id).await.ok();
 			handle.close(channel_id).await.ok();
-			// One channel per connection, so the session has nothing left to serve:
-			// disconnect rather than wait out the inactivity timeout, which is what
-			// makes a reap decisive against a peer that ignores the channel close.
-			handle
-				.disconnect(
-					russh::Disconnect::ByApplication,
-					String::new(),
-					String::new(),
-				)
-				.await
-				.ok();
+			// One channel per connection, so the session ends with it. A client
+			// answers the close with its own and hangs up, keeping its exit status
+			// and every byte before it: a disconnect is fatal to OpenSSH, which
+			// exits 255 and drops output it has not yet written. Only a peer that
+			// ignores the close is disconnected, after a grace, which keeps a reap
+			// decisive rather than waiting out the inactivity timeout.
+			let answered =
+				tokio::time::timeout(CLOSE_GRACE, client_closed_rx.recv())
+					.await
+					.is_ok();
+			if !answered {
+				handle
+					.disconnect(
+						russh::Disconnect::ByApplication,
+						String::new(),
+						String::new(),
+					)
+					.await
+					.ok();
+			}
 		});
 
 		self.new_conn_tx
@@ -428,15 +449,17 @@ impl russh::server::Handler for BeetSshHandler {
 
 	async fn pty_request(
 		&mut self,
-		_channel: ChannelId,
+		channel: ChannelId,
 		term: &str,
 		col_width: u32,
 		row_height: u32,
 		pix_width: u32,
 		pix_height: u32,
 		_modes: &[(russh::Pty, u32)],
-		_session: &mut Session,
+		session: &mut Session,
 	) -> std::result::Result<(), Self::Error> {
+		// a reply only goes out when the client asked for one
+		session.channel_success(channel)?;
 		if let Some(tx) = &self.from_client_tx {
 			tx.send(SshEvent::RequestPty(RequestPty {
 				terminal: term.into(),
@@ -474,11 +497,28 @@ impl russh::server::Handler for BeetSshHandler {
 
 	async fn shell_request(
 		&mut self,
-		_channel: ChannelId,
-		_session: &mut Session,
+		channel: ChannelId,
+		session: &mut Session,
 	) -> std::result::Result<(), Self::Error> {
+		session.channel_success(channel)?;
 		if let Some(tx) = &self.from_client_tx {
 			tx.send(SshEvent::RequestShell).await.ok();
+		}
+		Ok(())
+	}
+
+	async fn exec_request(
+		&mut self,
+		channel: ChannelId,
+		data: &[u8],
+		session: &mut Session,
+	) -> std::result::Result<(), Self::Error> {
+		session.channel_success(channel)?;
+		if let Some(tx) = &self.from_client_tx {
+			let command = String::from_utf8_lossy(data);
+			tx.send(SshEvent::RequestExec(command.as_ref().into()))
+				.await
+				.ok();
 		}
 		Ok(())
 	}
@@ -509,9 +549,11 @@ impl russh::server::Handler for BeetSshHandler {
 		channel: ChannelId,
 		_session: &mut Session,
 	) -> std::result::Result<(), Self::Error> {
-		// Drop the sender so the beet recv loop gets the disconnect signal.
+		// Drop the senders so the beet recv loop gets the disconnect signal and
+		// the forwarding task knows the client answered its close.
 		if self.channel_id == Some(channel) {
 			self.from_client_tx.take();
+			self.client_closed_tx.take();
 		}
 		Ok(())
 	}

@@ -27,6 +27,9 @@ use bevy::math::UVec2;
 /// [`Running<Response>`](beet_action::prelude::Running) parks the process up.
 /// Reads `--ssh-port` / `--host` from the boot request (defaulting from
 /// `BEET_SSH_PORT` / `BEET_HOST`) and the opening `--path` (default home `/`).
+/// A client opens elsewhere by naming the path as its command, ie
+/// `ssh -t <host> /docs/design/counter`; one that asks without a pty is told
+/// to add `-t`.
 /// Presents the key an [`SshHostKeyRef`] beside it declares, failing the run
 /// when that key cannot be read (see [`SshHostKey`] for the default without
 /// one). Add [`SshTuiPlugin`] once for the per-connection behavior. Coexists with an
@@ -191,7 +194,8 @@ fn on_ssh_recv(
 		.map(|(router, _)| router)
 		.unwrap_or(host);
 	match ev.event().inner() {
-		// wait for the pty before building the surface; its size sizes the buffer.
+		// a session is a pty then a shell or exec request: the pty sizes the
+		// surface, the request that follows opens its first page.
 		SshEvent::Connect => {}
 		SshEvent::RequestPty(pty) => {
 			// diagnostic: everything the pty request carries about the client
@@ -219,9 +223,9 @@ fn on_ssh_recv(
 			} else {
 				pty.window.cells
 			};
-			// the surface: a channel terminal + the page-host buffer + the
-			// in-world navigator, all co-located on the connection entity,
-			// browsing this router from the recorded opening route.
+			// the surface: a channel terminal + the page-host buffer, co-located
+			// on the connection entity. Its navigator waits for the shell or
+			// exec request that follows, which names the page to open at.
 			let (channel, terminal) =
 				ChannelTerminal::new(TerminalConfig::default());
 			// try_insert, not insert: the accept loop owns this entity's lifetime
@@ -232,12 +236,49 @@ fn on_ssh_recv(
 				channel,
 				terminal,
 				PageHost::bundle(size),
-				Navigator::in_world(router, opening.0.clone()),
 				// graphics support is the *client's* capability: detect it from the
 				// pty's forwarded terminal name, not the server's own env, so a kitty
 				// client renders rasters while a plain terminal keeps the alt marker.
 				graphics,
 			));
+		}
+		// a plain `ssh -t <host>` opens at the server's opening route
+		SshEvent::RequestShell => {
+			commands
+				.entity(connection)
+				.try_insert(Navigator::in_world(router, opening.0.clone()));
+		}
+		// `ssh -t <host> /docs/design/counter` opens at the path it names, so an
+		// unlisted page is reachable by its url here as on the web. Decided in a
+		// queued command, behind the pty's own insert: a trigger does not flush,
+		// so the surface may not have landed when this request arrives.
+		SshEvent::RequestExec(command) => {
+			let path = command.trim().to_owned();
+			let url = match path.as_str() {
+				"" => opening.0.clone(),
+				path => OpeningRoute::at(path).0,
+			};
+			commands.entity(connection).queue_silenced(
+				move |mut entity: EntityWorldMut| {
+					if entity.contains::<ChannelTerminal>() {
+						entity.insert(Navigator::in_world(router, url));
+						return;
+					}
+					// without a pty there is no terminal to draw into: say so and
+					// exit, rather than hold the client silent until the pty timeout
+					let hint = format!(
+						"a terminal is required, add -t: ssh -t <host> {path}\n"
+					);
+					entity
+						.trigger_target(SshSend(SshEvent::text(hint)))
+						.trigger_target(SshSend(SshEvent::Close(Some(
+							SshCloseFrame {
+								code: 1,
+								reason: SmolStr::new_static("no pty"),
+							},
+						))));
+				},
+			);
 		}
 		SshEvent::Data(bytes) => {
 			if let Ok(mut terminal) = terminals.get_mut(connection) {
@@ -417,7 +458,8 @@ mod test {
 	}
 
 	/// Spawn a simulated SSH connection (a child of `server` with [`SshPeerInfo`])
-	/// and request a pty of `size` on a plain `xterm`, as the russh accept loop would.
+	/// and open a shell on a plain `xterm` pty of `size`, as the russh accept loop
+	/// would.
 	fn open_connection(app: &mut App, server: Entity, size: UVec2) -> Entity {
 		open_connection_with(app, server, size, "xterm")
 	}
@@ -430,22 +472,53 @@ mod test {
 		size: UVec2,
 		terminal: &str,
 	) -> Entity {
+		open_session(app, server, size, terminal, SshEvent::RequestShell)
+	}
+
+	/// Spawn a simulated SSH connection, then request a pty of `size` on
+	/// `terminal` followed by `start` (a shell or exec request), in the order a
+	/// real client sends them.
+	fn open_session(
+		app: &mut App,
+		server: Entity,
+		size: UVec2,
+		terminal: &str,
+		start: SshEvent,
+	) -> Entity {
 		let connection = app
 			.world_mut()
 			.spawn((SshPeerInfo::default(), ChildOf(server)))
 			.id();
-		app.world_mut()
-			.entity_mut(connection)
-			.trigger_target(SshRecv(SshEvent::RequestPty(RequestPty {
-				terminal: terminal.into(),
-				window: SshWindowSize {
-					cells: size,
-					pixels: UVec2::ZERO,
-				},
-				terminal_modes: Vec::new(),
-			})));
+		let pty = SshEvent::RequestPty(RequestPty {
+			terminal: terminal.into(),
+			window: SshWindowSize {
+				cells: size,
+				pixels: UVec2::ZERO,
+			},
+			terminal_modes: Vec::new(),
+		});
+		for ev in [pty, start] {
+			app.world_mut()
+				.entity_mut(connection)
+				.trigger_target(SshRecv(ev));
+		}
 		app.update();
 		connection
+	}
+
+	/// Record, in order, every event the session on `connection` sends its client.
+	fn record_sent(
+		app: &mut App,
+		connection: Entity,
+	) -> std::sync::Arc<std::sync::Mutex<Vec<SshEvent>>> {
+		let sent = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+		let recorder = sent.clone();
+		app.world_mut().entity_mut(connection).observe_any(
+			move |ev: On<SshSend>| {
+				recorder.lock().unwrap().push(ev.event().inner().clone());
+			},
+		);
+		sent
 	}
 
 	/// The frame painted into a connection surface's buffer, as plain text.
@@ -760,6 +833,59 @@ mod test {
 		enabled(&app, plain).xpect_eq(Some(false));
 	}
 
+	/// A client names its opening page as the ssh command (`ssh -t <host> /beta`)
+	/// and the session opens straight there: one navigation, with no home page
+	/// loaded first or left behind it in history.
+	#[beet_core::test]
+	async fn exec_opens_at_the_named_page() {
+		let mut app = ssh_tui_app();
+		let server = spawn_server(&mut app);
+		let start = SshEvent::RequestExec("/beta".into());
+		let connection =
+			open_session(&mut app, server, UVec2::new(40, 8), "xterm", start);
+		drive_until(&mut app, connection, "Beta page")
+			.await
+			.xnot()
+			.xpect_contains("Alpha page");
+		app.world()
+			.entity(connection)
+			.get::<Navigator>()
+			.unwrap()
+			.can_go_back()
+			.xpect_false();
+	}
+
+	/// A client asking for a page without a pty (`ssh <host> /beta`, no `-t`) has
+	/// nothing to draw into, so it is told to add `-t` and exits non-zero, rather
+	/// than hanging silent until the pty timeout reaps it.
+	#[beet_core::test]
+	async fn exec_without_a_pty_asks_for_one() {
+		let mut app = ssh_tui_app();
+		let server = spawn_server(&mut app);
+		let connection = app
+			.world_mut()
+			.spawn((SshPeerInfo::default(), ChildOf(server)))
+			.id();
+		let sent = record_sent(&mut app, connection);
+		app.world_mut()
+			.entity_mut(connection)
+			.trigger_target(SshRecv(SshEvent::RequestExec("/beta".into())));
+		app.update();
+
+		let events = sent.lock().unwrap().clone();
+		events
+			.iter()
+			.find_map(SshEvent::as_str)
+			.unwrap()
+			.xpect_contains("ssh -t <host> /beta");
+		matches!(events.last(), Some(SshEvent::Close(Some(frame))) if frame.code == 1)
+			.xpect_true();
+		app.world()
+			.entity(connection)
+			.contains::<Navigator>()
+			.xpect_false();
+	}
+
 	/// Two concurrent connections each get their own surface and navigate
 	/// independently: one stays on home while the other moves to a second route.
 	#[beet_core::test]
@@ -847,15 +973,7 @@ mod test {
 		let connection = open_connection(&mut app, server, UVec2::new(40, 8));
 		drive_until(&mut app, connection, "Alpha page").await;
 
-		// record, in order, every event the session would send to its client.
-		let sent =
-			std::sync::Arc::new(std::sync::Mutex::new(Vec::<SshEvent>::new()));
-		let recorder = sent.clone();
-		app.world_mut().entity_mut(connection).observe_any(
-			move |ev: On<SshSend>| {
-				recorder.lock().unwrap().push(ev.event().inner().clone());
-			},
-		);
+		let sent = record_sent(&mut app, connection);
 
 		// ctrl+c from this connection's window (ctrl and c pressed together).
 		for key_code in [KeyCode::ControlLeft, KeyCode::KeyC] {

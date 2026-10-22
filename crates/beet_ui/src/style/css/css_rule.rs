@@ -198,7 +198,9 @@ impl CssRule {
 				}
 				'-' if ident.len() == 1 => out.push_str("\\-"),
 				'-' | '_' => out.push(ch),
-				_ if ch.is_ascii_alphanumeric() || !ch.is_ascii() => out.push(ch),
+				_ if ch.is_ascii_alphanumeric() || !ch.is_ascii() => {
+					out.push(ch)
+				}
 				_ => {
 					out.push('\\');
 					out.push(ch);
