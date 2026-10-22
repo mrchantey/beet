@@ -7,13 +7,14 @@
 # Dev:    ./ssh.sh app.dev.beet.org 22
 # Prod:   ./ssh.sh app.beet.org 22
 #
-# Runs two checks over `ssh_pty.py`, an 80x24 pty driver that reconstructs the
+# Runs three checks over `ssh_pty.py`, an 80x24 pty driver that reconstructs the
 # final frame through a VT emulator:
 #
-#   1. single session: navigate home -> Design -> counter and click "More" twice,
-#      asserting "You have clicked 2 times."
-#   2. multi-tenancy: two concurrent sessions driven to DIFFERENT counts (A once,
-#      B twice), asserting each keeps its own state.
+#   1. single session: navigate home -> ECS Router -> Folk Technology through the
+#      sidebar, then Alt+Left back, asserting the frame is ECS Router's.
+#   2. multi-tenancy: two concurrent sessions driven to DIFFERENT pages through
+#      their history (A back once, B back then forward), asserting each keeps its
+#      own navigator.
 #   3. images: a graphics-capable session loads a page carrying a raster and the
 #      raw pty stream must contain a kitty transmit AND a cropped placement. Only
 #      the term name matters, not the window: the TUI transmits solely to a
@@ -39,23 +40,30 @@ case "$HOST" in
 	*) BOOT=10; NAV=6; TICK=4 ;;
 esac
 
-# The navigation recipe, discovered locally and identical on every stage: at
-# 80x24 the site is in its narrow layout, so the sidebar hides behind the
-# hamburger. Open the menu, click Design, reopen the menu (Design has since
-# auto-expanded), click counter, then click "More" `$1` times.
+# The navigation recipe, identical on every stage: at 80x24 the site is in its
+# narrow layout, so the sidebar hides behind the hamburger. Open the menu, click
+# "ECS Router", reopen it, click "Folk Technology", then press each history key
+# given (`aleft` back, `aright` forward). The docs are unlisted and the TUI has no
+# address entry, so no session can reach the counter: per-session state is
+# proven by each session's navigator instead.
 #
 # Everything below the menu button is clicked BY LABEL (`t:`), not by cell: the
-# sidebar lists every doc and every blog post, so a single new page shifts every
-# row under it and a pinned `m:` silently clicks its neighbour. The hamburger
-# keeps its cell, being the one control whose position no content can move.
+# sidebar lists every blog post, so a single new post shifts every row under it
+# and a pinned `m:` silently clicks its neighbour. The hamburger keeps its cell,
+# being the one control whose position no content can move.
 recipe() {
-	local clicks="$1" script
-	script="w:$BOOT;m:3,1;w:$TICK;t:Design;w:$NAV;m:3,1;w:$TICK;t:counter;w:$NAV"
-	for ((i = 0; i < clicks; i++)); do
-		script+=";t:More;w:$TICK"
+	local script key
+	script="w:$BOOT;m:3,1;w:$TICK;t:ECS Router;w:$NAV;m:3,1;w:$TICK;t:Folk Technology;w:$NAV"
+	for key in "$@"; do
+		script+=";k:$key;w:$NAV"
 	done
 	echo "$script"
 }
+
+# A body word on each post's first screen, single words so no wrap can split
+# them (the titles render fullwidth, so an ASCII title never matches).
+ECS="bevyfication"
+FOLK="Wollongong"
 
 # Assert `$3` appears in the frame `$2`, labelling the result with `$1`.
 expect() {
@@ -74,22 +82,33 @@ expect() {
 	fi
 }
 
+# Assert the frame `$2` shows `$3` and not `$4`, labelling the result with `$1`.
+expect_page() {
+	local label="$1" file="$2" other="$4"
+	expect "$label" "$file" "$3"
+	if grep -qF "$other" "$file"; then
+		echo "FAIL  $label: '$other' also in frame, so it is not one page"
+		FAILED=1
+	fi
+}
+
 FAILED=0
 echo "== ssh $HOST:$PORT =="
 
 echo "-- single session --"
-python3 "$PTY" "$HOST" "$PORT" "$(recipe 2)" >"$OUT/single.txt" 2>&1
-expect "single" "$OUT/single.txt" "You have clicked 2 times."
+python3 "$PTY" "$HOST" "$PORT" "$(recipe aleft)" >"$OUT/single.txt" 2>&1
+expect_page "single (back to ECS Router)" "$OUT/single.txt" "$ECS" "$FOLK"
 
 echo "-- two concurrent sessions --"
-python3 "$PTY" "$HOST" "$PORT" "$(recipe 1)" >"$OUT/a.txt" 2>&1 &
+python3 "$PTY" "$HOST" "$PORT" "$(recipe aleft)" >"$OUT/a.txt" 2>&1 &
 PID_A=$!
-python3 "$PTY" "$HOST" "$PORT" "$(recipe 2)" >"$OUT/b.txt" 2>&1 &
+python3 "$PTY" "$HOST" "$PORT" "$(recipe aleft aright)" >"$OUT/b.txt" 2>&1 &
 PID_B=$!
 wait $PID_A $PID_B
-# independent counts prove per-session state, not one shared world
-expect "client A" "$OUT/a.txt" "You have clicked 1 times."
-expect "client B" "$OUT/b.txt" "You have clicked 2 times."
+# different pages through one shared prefix prove per-session navigators, not
+# one shared world
+expect_page "client A (back)" "$OUT/a.txt" "$ECS" "$FOLK"
+expect_page "client B (back, forward)" "$OUT/b.txt" "$FOLK" "$ECS"
 
 echo "-- images (kitty graphics) --"
 # The sidebar overlay lists every post; "Folk Technology" is post-6, the one

@@ -12,7 +12,8 @@ The script is a `;`-separated list of ops applied in order:
                 whose position depends on page content: a sidebar entry moves
                 every time a doc or a blog post is added, and a stale `m:` clicks
                 whatever slid into that cell instead of failing.
-  k:<keys>      send raw keys (`tab`, `enter`, `esc`, `down`, `up`, or literal text)
+  k:<keys>      send raw keys (`tab`, `enter`, `esc`, `down`, `up`, `aleft` /
+                `aright` for Alt+arrow history, or literal text)
   u:<secs>:<re> drain until the raw stream matches the bytes regex `re` (python
                 syntax, so `\x1b` is ESC; no `;`), or `secs` pass. For output
                 whose duration is the link's, not the server's: a 2.7MB kitty
@@ -289,6 +290,10 @@ class Session:
 		"down": b"\x1b[B",
 		"right": b"\x1b[C",
 		"left": b"\x1b[D",
+		# Alt+arrow, the navigator's history keys; named because a literal
+		# `\x1b[1;3D` would split on the script's `;`
+		"aleft": b"\x1b[1;3D",
+		"aright": b"\x1b[1;3C",
 		"space": b" ",
 	}
 
