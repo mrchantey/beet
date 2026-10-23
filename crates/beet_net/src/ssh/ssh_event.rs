@@ -14,6 +14,9 @@ pub enum SshEvent {
 	Connect,
 	/// Raw binary data payload.
 	Data(Bytes),
+	/// Diagnostic bytes for the client's stderr, ie SSH extended data, kept
+	/// apart from the [`Data`](Self::Data) a pipe captures as the answer.
+	Stderr(Bytes),
 	/// Client requests a pseudo-terminal from the server.
 	RequestPty(RequestPty),
 	/// Terminal window resize notification.
@@ -33,9 +36,18 @@ pub enum SshEvent {
 }
 
 impl SshEvent {
+	/// The SSH extended data type a [`Stderr`](Self::Stderr) payload travels
+	/// as (RFC 4254 §5.2).
+	pub(crate) const STDERR_EXTENDED_DATA: u32 = 1;
+
 	/// Create a [`SshEvent::Data`] payload from a UTF-8 string.
 	pub fn text(text: impl Into<String>) -> Self {
 		Self::Data(Bytes::from(text.into().into_bytes()))
+	}
+
+	/// Create a [`SshEvent::Stderr`] payload from a UTF-8 string.
+	pub fn stderr(text: impl Into<String>) -> Self {
+		Self::Stderr(Bytes::from(text.into().into_bytes()))
 	}
 
 	/// Create a [`SshEvent::Data`] payload from raw bytes.

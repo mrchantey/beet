@@ -1,7 +1,7 @@
 +++
 title = "Standardizing Standard Site Content"
 slug = "standardizing-standard-site-content"
-description = "The Standard Site 'content' field is swappable but opaque, lets fix that."
+description = "Standard Site unifies discovery but content is fractured, lets explore some options."
 tags = ["standard-site", "malleable-software", "atproto"]
 created = "2026-10-21"
 authors = ["Pete Hayman"]

@@ -340,6 +340,19 @@ impl russh::server::Handler for BeetSshHandler {
 							break 0u32;
 						}
 					}
+					Ok(SshEvent::Stderr(bytes)) => {
+						if handle
+							.extended_data(
+								channel_id,
+								SshEvent::STDERR_EXTENDED_DATA,
+								bytes,
+							)
+							.await
+							.is_err()
+						{
+							break 0u32;
+						}
+					}
 					Ok(SshEvent::Close(frame)) => {
 						break frame.map(|f| f.code).unwrap_or(0);
 					}

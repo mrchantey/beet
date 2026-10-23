@@ -563,13 +563,13 @@ mod tests {
 	}
 
 	/// [`serve_replies`], then have a client send `first` once connected and
-	/// return the first text it gets back.
+	/// return the first output it gets back, on either stream.
 	async fn first_reply(
 		reply: fn(&SshEvent) -> Vec<SshEvent>,
 		first: SshEvent,
-	) -> Option<String> {
+	) -> Option<SshEvent> {
 		let addr = serve_replies(reply).await;
-		let store = Store::<Option<String>>::default();
+		let store = Store::<Option<SshEvent>>::default();
 		let store_inner = store.clone();
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, AsyncPlugin::default()));
@@ -583,8 +583,8 @@ mod tests {
 				}
 			})
 			.observe_any(move |ev: On<SshRecv>, mut commands: Commands| {
-				if let Some(text) = ev.event().as_str() {
-					store_inner.set(Some(text.to_owned()));
+				if matches!(**ev, SshEvent::Data(_) | SshEvent::Stderr(_)) {
+					store_inner.set(Some(ev.event().inner().clone()));
 					commands.write_message(AppExit::Success);
 				}
 			});
@@ -605,7 +605,8 @@ mod tests {
 			SshEvent::text("hello"),
 		)
 		.await
-		.as_deref()
+		.unwrap()
+		.as_str()
 		.xpect_eq(Some("echo:hello"));
 	}
 
@@ -623,8 +624,25 @@ mod tests {
 			SshEvent::RequestExec("/docs".into()),
 		)
 		.await
-		.as_deref()
+		.unwrap()
+		.as_str()
 		.xpect_eq(Some("exec:/docs"));
+	}
+
+	/// A diagnostic reaches the client's stderr as SSH extended data, apart
+	/// from the stdout a pipe captures as the answer.
+	#[beet_core::test]
+	async fn stderr_reaches_the_client_apart_from_stdout() {
+		let reply = first_reply(
+			|ev| match ev {
+				SshEvent::RequestExec(_) => vec![SshEvent::stderr("oops")],
+				_ => vec![],
+			},
+			SshEvent::RequestExec("/docs".into()),
+		)
+		.await;
+		matches!(reply, Some(SshEvent::Stderr(bytes)) if bytes.as_ref() == b"oops")
+			.xpect_true();
 	}
 
 	/// A russh client handler recording whether the server sent a disconnect.

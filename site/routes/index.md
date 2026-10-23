@@ -48,9 +48,7 @@ title = "Beet"
 <!--- The scene format is built for standardization, so other software can read what you made.-->
 <!--- Use a git repo as the source of truth if that is how you like to work.-->
 
-## Presentations
-
-At this stage the best place to learn more is by checking out a past presentation.
+A great way to learn more at this stage is by checking out a past presentation.
 
 > ### Tool Engines
 > 

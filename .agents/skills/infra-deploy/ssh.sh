@@ -19,9 +19,10 @@
 #      url (`ssh -tt <host> /docs/design/counter`) and click More to DIFFERENT
 #      counts (A once, B twice), proving the path opening, the `bx:click` scripts
 #      over a live session, and per-session document state.
-#   4. no pty: `ssh <host> /blog` without `-t` is told to add it and exits 1,
-#      rather than hanging until the pty timeout (and the hint survives the
-#      close, which a server-side disconnect used to drop).
+#   4. no pty: `ssh -T <host>` and `ssh <host> /blog` are told on stderr to add
+#      `-t` and exit 1, with nothing on stdout, rather than hanging until the
+#      pty timeout (and the hint survives the close, which a server-side
+#      disconnect used to drop).
 #   5. images: a graphics-capable session loads a page carrying a raster and the
 #      raw pty stream must contain a kitty transmit AND a cropped placement. Only
 #      the term name matters, not the window: the TUI transmits solely to a
@@ -135,17 +136,26 @@ expect "client A (More once)" "$OUT/count-a.txt" "You have clicked 1 times"
 expect "client B (More twice)" "$OUT/count-b.txt" "You have clicked 2 times"
 
 echo "-- no pty --"
-NOPTY="$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-	-o ConnectTimeout=15 -o LogLevel=ERROR -p "$PORT" "root@$HOST" /blog \
-	</dev/null 2>&1)"
-CODE=$?
-if [[ $CODE -eq 1 && "$NOPTY" == *"ssh -t"* ]]; then
-	echo "PASS  no pty: exit 1, '$NOPTY'"
-else
-	echo "FAIL  no pty: expected exit 1 and an 'ssh -t' hint, got exit $CODE:"
-	echo "$NOPTY" | sed 's/^/      | /'
-	FAILED=1
-fi
+# no terminal to draw into: the hint is a diagnostic, so stderr, never the
+# stdout a pipe would capture as the answer
+no_pty() {
+	local label="$1" code
+	shift
+	ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+		-o ConnectTimeout=15 -o LogLevel=ERROR -p "$PORT" "$@" \
+		</dev/null >"$OUT/nopty.out" 2>"$OUT/nopty.err"
+	code=$?
+	if [[ $code -eq 1 && ! -s "$OUT/nopty.out" ]] && grep -qF "ssh -t" "$OUT/nopty.err"; then
+		echo "PASS  no pty ($label): exit 1, stderr '$(cat "$OUT/nopty.err")'"
+	else
+		echo "FAIL  no pty ($label): expected exit 1, an 'ssh -t' hint on stderr and empty stdout, got exit $code:"
+		sed 's/^/      stdout | /' "$OUT/nopty.out"
+		sed 's/^/      stderr | /' "$OUT/nopty.err"
+		FAILED=1
+	fi
+}
+no_pty "shell" -T "root@$HOST"
+no_pty "path" "root@$HOST" /blog
 
 echo "-- images (kitty graphics) --"
 # The sidebar overlay lists every post; "Folk Technology" is post-6, the one

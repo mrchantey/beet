@@ -28,7 +28,7 @@ use bevy::math::UVec2;
 /// Reads `--ssh-port` / `--host` from the boot request (defaulting from
 /// `BEET_SSH_PORT` / `BEET_HOST`) and the opening `--path` (default home `/`).
 /// A client opens elsewhere by naming the path as its command, ie
-/// `ssh -t <host> /docs/design/counter`; one that asks without a pty is told
+/// `ssh -t <host> /docs/design/counter`; one without a pty is told on stderr
 /// to add `-t`.
 /// Presents the key an [`SshHostKeyRef`] beside it declares, failing the run
 /// when that key cannot be read (see [`SshHostKey`] for the default without
@@ -242,43 +242,12 @@ fn on_ssh_recv(
 				graphics,
 			));
 		}
-		// a plain `ssh -t <host>` opens at the server's opening route
+		// a shell is an exec naming no page
 		SshEvent::RequestShell => {
-			commands
-				.entity(connection)
-				.try_insert(Navigator::in_world(router, opening.0.clone()));
+			start_session(&mut commands, connection, router, opening, "");
 		}
-		// `ssh -t <host> /docs/design/counter` opens at the path it names, so an
-		// unlisted page is reachable by its url here as on the web. Decided in a
-		// queued command, behind the pty's own insert: a trigger does not flush,
-		// so the surface may not have landed when this request arrives.
 		SshEvent::RequestExec(command) => {
-			let path = command.trim().to_owned();
-			let url = match path.as_str() {
-				"" => opening.0.clone(),
-				path => OpeningRoute::at(path).0,
-			};
-			commands.entity(connection).queue_silenced(
-				move |mut entity: EntityWorldMut| {
-					if entity.contains::<ChannelTerminal>() {
-						entity.insert(Navigator::in_world(router, url));
-						return;
-					}
-					// without a pty there is no terminal to draw into: say so and
-					// exit, rather than hold the client silent until the pty timeout
-					let hint = format!(
-						"a terminal is required, add -t: ssh -t <host> {path}\n"
-					);
-					entity
-						.trigger_target(SshSend(SshEvent::text(hint)))
-						.trigger_target(SshSend(SshEvent::Close(Some(
-							SshCloseFrame {
-								code: 1,
-								reason: SmolStr::new_static("no pty"),
-							},
-						))));
-				},
-			);
+			start_session(&mut commands, connection, router, opening, command);
 		}
 		SshEvent::Data(bytes) => {
 			if let Ok(mut terminal) = terminals.get_mut(connection) {
@@ -300,6 +269,52 @@ fn on_ssh_recv(
 		_ => {}
 	}
 	Ok(())
+}
+
+/// Start a session once its client asks for one: a shell (`ssh -t <host>`)
+/// opens at the server's opening route, an exec at the path it names
+/// (`ssh -t <host> /docs/design/counter`), so an unlisted page is reachable by
+/// its url here as on the web.
+///
+/// A session without a pty (`ssh -T <host>`, or a path without `-t`) has no
+/// terminal to draw into, so it is told on stderr to ask for one and exits 1,
+/// rather than building a page nothing shows and holding the client silent
+/// until the pty timeout. Decided in a queued command, behind the pty's own
+/// insert: a trigger does not flush, so the surface may not have landed when
+/// the request arrives.
+fn start_session(
+	commands: &mut Commands,
+	connection: Entity,
+	router: Entity,
+	opening: &OpeningRoute,
+	command: &str,
+) {
+	let path = command.trim().to_owned();
+	let url = match path.as_str() {
+		"" => opening.0.clone(),
+		path => OpeningRoute::at(path).0,
+	};
+	commands.entity(connection).queue_silenced(
+		move |mut entity: EntityWorldMut| {
+			if entity.contains::<ChannelTerminal>() {
+				entity.insert(Navigator::in_world(router, url));
+				return;
+			}
+			let usage = format!("ssh -t <host> {path}");
+			let hint = format!(
+				"a terminal is required, add -t: {}\n",
+				usage.trim_end()
+			);
+			entity
+				.trigger_target(SshSend(SshEvent::stderr(hint)))
+				.trigger_target(SshSend(SshEvent::Close(Some(
+					SshCloseFrame {
+						code: 1,
+						reason: SmolStr::new_static("no pty"),
+					},
+				))));
+		},
+	);
 }
 
 /// System: drain each connection surface's painted frame and send it to the
@@ -855,35 +870,44 @@ mod test {
 			.xpect_false();
 	}
 
-	/// A client asking for a page without a pty (`ssh <host> /beta`, no `-t`) has
-	/// nothing to draw into, so it is told to add `-t` and exits non-zero, rather
-	/// than hanging silent until the pty timeout reaps it.
+	/// A client asking for a session without a pty, a shell (`ssh -T <host>`) or
+	/// a page (`ssh <host> /beta`, no `-t`), has nothing to draw into: it is told
+	/// on stderr to add `-t` and exits 1, and no page is built for it, rather
+	/// than one nothing shows while the client hangs until the pty timeout.
 	#[beet_core::test]
-	async fn exec_without_a_pty_asks_for_one() {
-		let mut app = ssh_tui_app();
-		let server = spawn_server(&mut app);
-		let connection = app
-			.world_mut()
-			.spawn((SshPeerInfo::default(), ChildOf(server)))
-			.id();
-		let sent = record_sent(&mut app, connection);
-		app.world_mut()
-			.entity_mut(connection)
-			.trigger_target(SshRecv(SshEvent::RequestExec("/beta".into())));
-		app.update();
+	async fn a_session_without_a_pty_asks_for_one() {
+		for (start, usage) in [
+			(SshEvent::RequestShell, "ssh -t <host>\n"),
+			(
+				SshEvent::RequestExec("/beta".into()),
+				"ssh -t <host> /beta\n",
+			),
+		] {
+			let mut app = ssh_tui_app();
+			let server = spawn_server(&mut app);
+			let connection = app
+				.world_mut()
+				.spawn((SshPeerInfo::default(), ChildOf(server)))
+				.id();
+			let sent = record_sent(&mut app, connection);
+			app.world_mut()
+				.entity_mut(connection)
+				.trigger_target(SshRecv(start));
+			app.update();
 
-		let events = sent.lock().unwrap().clone();
-		events
-			.iter()
-			.find_map(SshEvent::as_str)
-			.unwrap()
-			.xpect_contains("ssh -t <host> /beta");
-		matches!(events.last(), Some(SshEvent::Close(Some(frame))) if frame.code == 1)
-			.xpect_true();
-		app.world()
-			.entity(connection)
-			.contains::<Navigator>()
-			.xpect_false();
+			let events = sent.lock().unwrap().clone();
+			let [SshEvent::Stderr(hint), SshEvent::Close(Some(frame))] =
+				&events[..]
+			else {
+				panic!("expected a stderr hint then a close, sent {events:?}");
+			};
+			String::from_utf8_lossy(hint).xpect_contains(usage);
+			frame.code.xpect_eq(1);
+			app.world()
+				.entity(connection)
+				.contains::<Navigator>()
+				.xpect_false();
+		}
 	}
 
 	/// Two concurrent connections each get their own surface and navigate

@@ -181,6 +181,14 @@ async fn run_data_loop(
 							.await
 							.ok();
 					}
+					Some(ChannelMsg::ExtendedData { data, ext })
+						if ext == SshEvent::STDERR_EXTENDED_DATA =>
+					{
+						from_server_tx
+							.send(SshEvent::Stderr(Bytes::copy_from_slice(&data)))
+							.await
+							.ok();
+					}
 					Some(ChannelMsg::ExitStatus { exit_status }) => {
 						from_server_tx
 							.send(SshEvent::Close(Some(SshCloseFrame {
