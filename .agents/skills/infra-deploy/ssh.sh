@@ -18,7 +18,10 @@
 #   3. open at a path: two concurrent sessions open the unlisted counter by its
 #      url (`ssh -tt <host> /docs/design/counter`) and click More to DIFFERENT
 #      counts (A once, B twice), proving the path opening, the `bx:click` scripts
-#      over a live session, and per-session document state.
+#      over a live session, and per-session document state. A renamed post's
+#      old url (`/blog/post-6`) must land on the post its `<Redirect/>` names,
+#      and an unknown url show the site's not-found page, as the web answers
+#      both.
 #   4. no pty: `ssh -T <host>` and `ssh <host> /blog` are told on stderr to add
 #      `-t` and exit 1, with nothing on stdout, rather than hanging until the
 #      pty timeout (and the hint survives the close, which a server-side
@@ -134,6 +137,13 @@ PID_B=$!
 wait $PID_A $PID_B
 expect "client A (More once)" "$OUT/count-a.txt" "You have clicked 1 times"
 expect "client B (More twice)" "$OUT/count-b.txt" "You have clicked 2 times"
+PTY_PATH=/blog/post-6 python3 "$PTY" "$HOST" "$PORT" "w:$BOOT" >"$OUT/renamed.txt" 2>&1 &
+PID_A=$!
+PTY_PATH=/no-such-page python3 "$PTY" "$HOST" "$PORT" "w:$BOOT" >"$OUT/unknown.txt" 2>&1 &
+PID_B=$!
+wait $PID_A $PID_B
+expect "renamed url (follows its redirect)" "$OUT/renamed.txt" "$FOLK"
+expect "unknown url (not found)" "$OUT/unknown.txt" "Route /no-such-page not found."
 
 echo "-- no pty --"
 # no terminal to draw into: the hint is a diagnostic, so stderr, never the

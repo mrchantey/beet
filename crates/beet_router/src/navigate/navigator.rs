@@ -6,6 +6,10 @@ use beet_net::prelude::*;
 /// Maximum number of history entries to retain.
 const HISTORY_LIMIT: usize = 100;
 
+/// Maximum number of redirects one in-world navigation follows, as many as a
+/// browser does.
+const REDIRECT_LIMIT: usize = 20;
+
 const DEFAULT_HOME: &str = "about:blank";
 
 /// How a [`Navigator`] request travels to reach a page.
@@ -76,11 +80,13 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 			// world handle kept before `navigate_to` consumes `entity`, for the
 			// error-page render below.
 			let world = entity.world().clone();
-			// a failed home load (eg network down) renders a user-facing error
-			// page in place of the missing page rather than crashing the host or
-			// leaving it blank, while still logging the cause.
-			if let Err(err) = Navigator::navigate_to(entity, home_url).await {
-				error!("Navigator failed to load home page: {err}");
+			// a failed opening load (eg network down) renders a user-facing
+			// error page in place of the missing page rather than crashing the
+			// host or leaving it blank, while still logging the cause.
+			if let Err(err) =
+				Navigator::navigate_to(entity, home_url.clone()).await
+			{
+				error!("Navigator failed to open {home_url}: {err}");
 				let message = err.to_string();
 				world
 					.with(move |world| match PageHost::of(world, navigator) {
@@ -221,6 +227,14 @@ impl Navigator {
 		self.history_cursor = self.history.len() - 1;
 	}
 
+	/// Replace the current history entry with `url`, so a followed redirect
+	/// records where it led rather than the url that redirected.
+	fn replace_current(&mut self, url: Url) {
+		if let Some(current) = self.history.get_mut(self.history_cursor) {
+			*current = url;
+		}
+	}
+
 	/// Navigate to `url`, pushing it onto the history stack.
 	///
 	/// ## Errors
@@ -359,16 +373,14 @@ impl Navigator {
 				.await;
 		}
 
-		// remember the url for the page-view analytics record after binding, since
-		// the http branch consumes `url`.
-		let record_url = url.clone();
-
-		match transport {
+		// the url of the page shown, which a followed redirect moves
+		let shown = match transport {
 			NavigatorTransport::Http => {
 				// a real network fetch, then parse the bytes into a living tree and
 				// bind it under one access, so nothing is orphaned if this task is
 				// cancelled between the two
-				let bytes = Self::http_fetch(user_agent, url, accepts).await?;
+				let bytes =
+					Self::http_fetch(user_agent, url.clone(), accepts).await?;
 				entity
 					.world()
 					.with(move |world| -> Result {
@@ -377,27 +389,61 @@ impl Navigator {
 						Ok(())
 					})
 					.await?;
+				url
 			}
 			NavigatorTransport::InWorld { router } => {
-				// dispatch in-world to the local router, keeping the built tree
-				let request = Request::get(&url)
-					.with_header::<header::UserAgent>(user_agent)
-					.with_header::<header::Accept>(accepts);
-				Self::build_and_bind(&entity, router, request).await?;
+				Self::follow_in_world(&entity, router, user_agent, url, accepts)
+					.await?
 			}
-		}
+		};
 
 		// record the page-view analytics: finalize the previous page's dwell and
 		// open the new one. A no-op for network browsing and without an observer.
-		record_page_view(&entity, &record_url).await?;
+		record_page_view(&entity, &shown).await?;
 		entity
 			.get_mut(|mut nav: Mut<Navigator>| nav.loading = false)
 			.await?;
 		Ok(())
 	}
 
+	/// Dispatch `url` in-world to the local `router`, keeping the built tree
+	/// and following redirects as a browser does, the history recording where
+	/// they lead. Answers the url of the page bound.
+	async fn follow_in_world(
+		entity: &AsyncEntity,
+		router: Entity,
+		user_agent: SmolStr,
+		mut url: Url,
+		accepts: Vec<MediaType>,
+	) -> Result<Url> {
+		for _ in 0..=REDIRECT_LIMIT {
+			let request = Request::get(&url)
+				.with_header::<header::UserAgent>(user_agent.clone())
+				.with_header::<header::Accept>(accepts.clone());
+			let Some(location) =
+				Self::build_and_bind(entity, router, request).await?
+			else {
+				return url.xok();
+			};
+			let next = url.join(location);
+			// the router serves its own url space alone
+			if next.authority() != url.authority() {
+				bevybail!("{url} redirects off-site to {next}");
+			}
+			url = next;
+			let current = url.clone();
+			entity
+				.get_mut(move |mut nav: Mut<Navigator>| {
+					nav.replace_current(current)
+				})
+				.await?;
+		}
+		bevybail!("{url} redirected more than {REDIRECT_LIMIT} times")
+	}
+
 	/// Build the page in-world and bind it to this navigator's surface, as a
-	/// world task.
+	/// world task, answering the `Location` to follow when the url redirects
+	/// instead.
 	///
 	/// The build spawns entities across several awaits, and this navigator's
 	/// own task is cancelled if it despawns mid-flight (an ssh client
@@ -407,7 +453,7 @@ impl Navigator {
 		entity: &AsyncEntity,
 		router: Entity,
 		request: Request,
-	) -> Result {
+	) -> Result<Option<Url>> {
 		let navigator = entity.id();
 		let world = entity.world().clone();
 		let (send, recv) = OnceValue::oneshot();
@@ -416,12 +462,17 @@ impl Navigator {
 				let bound =
 					match build_live_page(&world.entity(router), request).await
 					{
-						Ok(page) => world
-							.with(move |world| {
-								bind_or_reclaim(world, navigator, page)
-							})
-							.await
-							.xok(),
+						Ok(LiveNavigation::Page(page)) => {
+							world
+								.with(move |world| {
+									bind_or_reclaim(world, navigator, page)
+								})
+								.await;
+							Ok(None)
+						}
+						Ok(LiveNavigation::Redirect(location)) => {
+							Ok(Some(location))
+						}
 						Err(err) => Err(err),
 					};
 				send.signal(bound);
@@ -593,61 +644,15 @@ mod test {
 	#[beet_core::test]
 	async fn records_terminal_page_views() {
 		use beet_net::prelude::*;
-		use beet_ui::prelude::*;
-		use bevy::math::UVec2;
 		use std::sync::Arc;
 		use std::sync::Mutex;
 
-		let mut app = App::new();
-		app.add_plugins((
-			MinimalPlugins,
-			RouterPlugin,
-			RealtimeParsePlugin,
-			PageHostPlugin,
-			NavigatorPlugin,
-		));
+		let (mut app, host) = navigator_app("alpha");
 		let events = Arc::new(Mutex::new(Vec::<AnalyticsEvent>::new()));
 		let captor = events.clone();
 		app.world_mut().add_observer(move |ev: On<AnalyticsEvent>| {
 			captor.lock().unwrap().push(ev.event().clone());
 		});
-		let router = app
-			.world_mut()
-			.spawn((Router, children![
-				render_action::fixed_func_route("alpha", || rsx! {
-					<p>"Alpha page"</p>
-				}),
-				render_action::fixed_func_route("beta", || rsx! {
-					<p>"Beta page"</p>
-				}),
-			]))
-			.flush();
-		let host = app
-			.world_mut()
-			.spawn((
-				PageHost::bundle(UVec2::new(40, 8)),
-				Navigator::in_world(router, "alpha"),
-			))
-			.id();
-
-		// yields between updates so async work (the navigation task, the bridge)
-		// progresses at top-level tick depth rather than starving inside this
-		// test's own poll under a loaded suite
-		async fn drive_until(app: &mut App, host: Entity, needle: &str) {
-			for _ in 0..200 {
-				app.update();
-				AsyncRunner::tick(app.world()).await;
-				let frame = app
-					.world()
-					.get::<DoubleBuffer>(host)
-					.map(|buffer| buffer.current_buffer().render_plain())
-					.unwrap_or_default();
-				if frame.contains(needle) {
-					return;
-				}
-			}
-			panic!("frame never contained '{needle}'");
-		}
 
 		// the home page renders; still on the first page, so nothing recorded yet.
 		drive_until(&mut app, host, "Alpha page").await;
@@ -673,5 +678,110 @@ mod test {
 		let all = events.lock().unwrap().clone();
 		all.len().xpect_eq(2);
 		all[1].path.as_str().xpect_eq("/beta");
+	}
+
+	/// An in-world navigation to a renamed page's old url lands on the page it
+	/// redirects to, the history recording the destination in its place, as a
+	/// browser's does.
+	///
+	/// Regression: a session opened at a `<Redirect/>` route's url
+	/// (`ssh -t <host> /blog/post-6`) showed `No Action<Request, PageRequest>`.
+	#[beet_core::test]
+	async fn follows_a_redirect_into_history() {
+		let (mut app, host) = navigator_app("beta");
+		drive_until(&mut app, host, "Beta page").await;
+
+		let url = Url::coerce("old-alpha");
+		app.world_mut()
+			.entity_mut(host)
+			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
+		drive_until(&mut app, host, "Alpha page").await;
+		let navigator = app.world().get::<Navigator>(host).unwrap();
+		navigator.current_url().path_string().xpect_eq("/alpha");
+
+		// back leaves the destination for the page before it, not the redirect
+		app.world_mut()
+			.entity_mut(host)
+			.run_async_local(Navigator::back);
+		drive_until(&mut app, host, "Beta page").await;
+		app.world()
+			.get::<Navigator>(host)
+			.unwrap()
+			.can_go_back()
+			.xpect_false();
+	}
+
+	/// A session opened at a url the router serves nothing at shows the site's
+	/// not-found page, as an http request for it does.
+	///
+	/// Regression: it showed the raw `no route matched /nowhere` error.
+	#[beet_core::test]
+	async fn opens_an_unknown_url_on_not_found() {
+		let (mut app, host) = navigator_app("nowhere");
+		drive_until(&mut app, host, "/nowhere not found.").await;
+	}
+
+	/// An app whose in-world navigator opens at `home`, over a router serving
+	/// `alpha` and `beta` pages and an `old-alpha` redirect to `alpha`,
+	/// answering the app and the navigator's surface.
+	fn navigator_app(home: &str) -> (App, Entity) {
+		use beet_ui::prelude::*;
+		use bevy::math::UVec2;
+
+		let mut app = App::new();
+		app.add_plugins((
+			MinimalPlugins,
+			RouterPlugin,
+			RealtimeParsePlugin,
+			PageHostPlugin,
+			NavigatorPlugin,
+		));
+		let router = app
+			.world_mut()
+			.spawn((Router, children![
+				render_action::fixed_func_route("alpha", || rsx! {
+					<p>"Alpha page"</p>
+				}),
+				render_action::fixed_func_route("beta", || rsx! {
+					<p>"Beta page"</p>
+				}),
+			]))
+			.flush();
+		app.world_mut()
+			.spawn_template(Snippet::from_bundle((ChildOf(router), rsx! {
+				<Redirect path="old-alpha" redirect="alpha"/>
+			})))
+			.unwrap();
+		app.world_mut().flush();
+		let host = app
+			.world_mut()
+			.spawn((
+				PageHost::bundle(UVec2::new(80, 12)),
+				Navigator::in_world(router, home),
+			))
+			.id();
+		(app, host)
+	}
+
+	/// Update `app` until the frame `host` paints contains `needle`, yielding
+	/// between updates so async work (the navigation task, the bridge)
+	/// progresses at top-level tick depth rather than starving inside the
+	/// test's own poll under a loaded suite.
+	async fn drive_until(app: &mut App, host: Entity, needle: &str) {
+		use beet_ui::prelude::*;
+
+		for _ in 0..200 {
+			app.update();
+			AsyncRunner::tick(app.world()).await;
+			let frame = app
+				.world()
+				.get::<DoubleBuffer>(host)
+				.map(|buffer| buffer.current_buffer().render_plain())
+				.unwrap_or_default();
+			if frame.contains(needle) {
+				return;
+			}
+		}
+		panic!("frame never contained '{needle}'");
 	}
 }

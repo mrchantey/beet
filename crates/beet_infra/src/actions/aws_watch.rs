@@ -96,7 +96,10 @@ pub async fn AwsWatch(
 
 	info!("tailing CloudWatch log group: {log_group} (region: {region})");
 
-	// spawn aws logs tail with inherited stdout/stderr for streaming output
+	// spawn aws logs tail with inherited stdout/stderr for streaming output.
+	// The cli is python, which block-buffers a stdout that is not a terminal,
+	// so a deploy logging to a file saw nothing until the buffer filled, and
+	// the timeout's kill discarded it: unbuffered, each line lands as it comes.
 	let mut child = aws_cli_ext::service("logs", &region, [
 		"tail",
 		log_group.as_str(),
@@ -104,6 +107,7 @@ pub async fn AwsWatch(
 		"--format",
 		"short",
 	])
+	.with_env("PYTHONUNBUFFERED", "1")
 	.spawn()?;
 
 	// if timeout is set, wait then kill; otherwise follow indefinitely

@@ -109,20 +109,9 @@ async fn prescan_entries(caller: &AsyncEntity) -> Result<Vec<PrescanEntry>> {
 pub(crate) async fn ContextualNotFound(
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
-	let path = cx.input.path().clone();
-
-	let notice = cx
-		.caller
-		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
-			move |entity, query| {
-				nearest_ancestor_notice(query.get(entity)?, &path).xok()
-			},
-		)
-		.await??;
-
-	let root = spawn_not_found(&cx.caller, cx.input.parts(), notice).await?;
-	let mut response =
-		LivePage::respond(root, &cx.caller, cx.input.parts().clone()).await?;
+	let parts = cx.input.parts().clone();
+	let root = NotFoundNotice::spawn_page(&cx.caller, &parts).await?;
+	let mut response = LivePage::respond(root, &cx.caller, parts).await?;
 	response.parts.status = StatusCode::NOT_FOUND;
 	Ok(response)
 }
@@ -136,6 +125,27 @@ pub struct NotFoundNotice {
 	/// The nearest ancestor scene-route path whose help covers this miss, if
 	/// any. `None` sends the caller to the root help.
 	pub ancestor_path: Option<String>,
+}
+
+impl NotFoundNotice {
+	/// Spawn the [`NotFoundPage`] for the path `parts` names, which `router`
+	/// serves nothing at, ready for [`LivePage::prepare`] to wrap in the
+	/// router's layouts: rendered and released for an http miss, bound live
+	/// for a terminal one.
+	pub(crate) async fn spawn_page(
+		router: &AsyncEntity,
+		parts: &RequestParts,
+	) -> Result<Entity> {
+		let path = parts.path().clone();
+		let notice = router
+			.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
+				move |entity, query| {
+					nearest_ancestor_notice(query.get(entity)?, &path).xok()
+				},
+			)
+			.await??;
+		spawn_not_found(router, parts, notice).await
+	}
 }
 
 /// What a help lists: the routes in scope, each with the params only it takes,

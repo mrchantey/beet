@@ -113,19 +113,78 @@ fn despawn_page_with_surface(
 	});
 }
 
-/// Resolve `request` against the router's [`RouteTree`] and build the matched
-/// scene route into a living page: [`LivePage::prepare_request`] alone, the
-/// same route build, layout middleware and `--root` cascade a request's
-/// [`LivePage::respond`] runs, its tree bound to a surface via
-/// [`bind_surface_page`] instead of rendered and released.
+/// What an in-world navigation to a url resolves to.
+pub(crate) enum LiveNavigation {
+	/// A living page to bind to the navigator's surface.
+	Page(SurfacePage),
+	/// The `Location` a redirect sends the navigator on to, as authored, so
+	/// a relative one resolves against the url that redirected.
+	Redirect(Url),
+}
+
+/// Resolve `request` against the router's [`RouteTree`] into what a
+/// navigator shows, as a browser would for the same url:
+/// - A scene route builds into a living page: [`LivePage::prepare_route`],
+///   the same route build, layout middleware and `--root` cascade a
+///   request's [`LivePage::respond`] runs, its tree bound to a surface via
+///   [`bind_surface_page`] instead of rendered and released.
+/// - A url the router serves nothing at, or a draft in production, builds
+///   the [`NotFoundPage`] an http miss renders, live so its chrome stays
+///   interactive.
+/// - Any other route ([`Redirect`], a feed, the analytics beacon) answers
+///   through the router as a request would: a redirect is followed, any
+///   other body parsed as a network fetch is ([`parse_page`]).
 pub(crate) async fn build_live_page(
 	router: &AsyncEntity,
 	request: Request,
-) -> Result<SurfacePage> {
-	LivePage::prepare_request(router, request)
-		.await?
-		.into_surface()
-		.xok()
+) -> Result<LiveNavigation> {
+	let node =
+		match LivePage::find_route(router, request.path().clone()).await? {
+			// a draft is invisible in production however the site is served
+			Some(node)
+				if hides_draft(
+					router.world(),
+					node.entity,
+					BootstrapConfig::get().is_prod(),
+				)
+				.await =>
+			{
+				None
+			}
+			node => node,
+		};
+	let page = match node {
+		Some(node) if node.is_scene() => {
+			LivePage::prepare_route(router, node, request).await?
+		}
+		None => {
+			let parts = request.parts().clone();
+			let page = NotFoundNotice::spawn_page(router, &parts).await?;
+			LivePage::prepare(page, router, parts).await?
+		}
+		Some(_) => {
+			let response = router.exchange(request).await;
+			if response.status().is_redirect_location() {
+				let location = response
+					.parts
+					.headers
+					.get::<header::Location>()
+					.ok_or_else(|| {
+						bevyhow!("a {} with no `Location`", response.status())
+					})??;
+				return LiveNavigation::Redirect(Url::coerce(location)).xok();
+			}
+			let bytes = response.into_media_bytes().await?;
+			return router
+				.world()
+				.with(move |world| parse_page(world, bytes))
+				.await?
+				.xmap(SurfacePage::from)
+				.xmap(LiveNavigation::Page)
+				.xok();
+		}
+	};
+	page.into_surface().xmap(LiveNavigation::Page).xok()
 }
 
 /// Parse fetched [`MediaBytes`] (markdown/html) into a living entity tree on a

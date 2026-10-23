@@ -179,8 +179,43 @@ impl LivePage {
 		router: &AsyncEntity,
 		request: Request,
 	) -> Result<Self> {
-		let (route, page, parts) = Self::build(router, request).await?;
+		let node = Self::find_route(router, request.path().clone())
+			.await?
+			.ok_or_else(|| {
+				bevyhow!("no route matched {}", request.path_string())
+			})?;
+		Self::prepare_route(router, node, request).await
+	}
+
+	/// Build the scene route `node`, matched for `request` in the tree
+	/// `router` sits in, and [`prepare`](Self::prepare) it.
+	pub(crate) async fn prepare_route(
+		router: &AsyncEntity,
+		node: ActionNode,
+		request: Request,
+	) -> Result<Self> {
+		let (route, page, parts) = Self::build(router, node, request).await?;
 		Self::prepare(page, &route, parts).await
+	}
+
+	/// The route `path` matches in the route tree `router` sits in, `None`
+	/// for no match.
+	pub(crate) async fn find_route(
+		router: &AsyncEntity,
+		path: Vec<SmolStr>,
+	) -> Result<Option<ActionNode>> {
+		router
+			.with_state::<AncestorQuery<&RouteTree>, _>(move |entity, query| {
+				query
+					.get(entity)
+					.map(|tree| tree.find(&path).cloned())
+					.map_err(|_| {
+						bevyhow!(
+							"route tree not found, was the RouterPlugin added?"
+						)
+					})
+			})
+			.await?
 	}
 
 	/// Prepare the page `request` names, hand it to `func` to render through
@@ -299,33 +334,14 @@ impl LivePage {
 		}
 	}
 
-	/// Match `request` against the route tree `router` sits in and build the
-	/// matched scene route, answering the route, the page it built and the
-	/// request's parts with the matched path params merged in.
+	/// Build the scene route `node` matched for `request`, answering the
+	/// route, the page it built and the request's parts with the matched path
+	/// params merged in.
 	async fn build(
 		router: &AsyncEntity,
+		node: ActionNode,
 		mut request: Request,
 	) -> Result<(AsyncEntity, Entity, RequestParts)> {
-		let path = request.path().clone();
-		let router_id = router.id();
-		let node = router
-			.world()
-			.with_state::<AncestorQuery<&RouteTree>, Result<Option<ActionNode>>>(
-				move |query| {
-					query
-						.get(router_id)
-						.map(|tree| tree.find(&path).cloned())
-						.map_err(|_| {
-							bevyhow!(
-								"route tree not found, was the RouterPlugin added?"
-							)
-						})
-				},
-			)
-			.await?
-			.ok_or_else(|| {
-				bevyhow!("no route matched {}", request.path_string())
-			})?;
 		// surface matched dynamic segments (`:id`) to the handler
 		node.merge_path_params(&mut request);
 		let parts = request.parts().clone();

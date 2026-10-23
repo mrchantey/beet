@@ -280,14 +280,28 @@ impl RusshServer for BeetSshApp {
 		error: <Self::Handler as russh::server::Handler>::Error,
 	) {
 		// a client going away is normal, whether it says goodbye (`Disconnect`)
-		// or just drops the socket (`UnexpectedEof`); neither is an error, and
-		// logging them as one buries real faults in a deployed service's logs.
+		// or just drops the socket (`UnexpectedEof`, `ConnectionReset`); neither
+		// is an error, and logging them as one buries real faults in a deployed
+		// service's logs.
+		use std::io::ErrorKind;
 		match &error {
-			russh::Error::Disconnect => debug!("SSH client disconnected"),
-			russh::Error::IO(e)
-				if e.kind() == std::io::ErrorKind::UnexpectedEof =>
+			russh::Error::Disconnect | russh::Error::HUP => {
+				debug!("SSH client disconnected")
+			}
+			russh::Error::IO(err)
+				if matches!(
+					err.kind(),
+					ErrorKind::UnexpectedEof
+						| ErrorKind::ConnectionReset
+						| ErrorKind::BrokenPipe
+				) =>
 			{
-				debug!("SSH client disconnected (eof)");
+				debug!("SSH client disconnected ({})", err.kind());
+			}
+			// a public port 22 is probed constantly: a peer speaking no ssh, or
+			// only algorithms this server refuses, failed its own handshake
+			russh::Error::Version | russh::Error::NoCommonAlgo { .. } => {
+				info!("SSH handshake refused: {error}")
 			}
 			_ => error!("SSH session error: {:?}", error),
 		}
