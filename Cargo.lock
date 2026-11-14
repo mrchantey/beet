@@ -1792,6 +1792,7 @@ dependencies = [
  "beet_net",
  "beet_spatial",
  "bevy",
+ "branches",
  "burn",
  "burn-store",
  "console_error_panic_hook",
