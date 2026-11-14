@@ -228,7 +228,7 @@ serde_json = { version = "1", default-features = false, features = ["alloc"] }
 # QuickJS engine via high-level bindings to the bundled C engine. `rust-alloc`
 # routes allocation through Rust's global allocator instead of libc's malloc; the
 # std vs bare-metal mode is selected on beet_action's `quickjs` feature edge.
-rquickjs = { version = "0.12", default-features = false, features = ["rust-alloc"] }
+rquickjs = { version = "0.14", default-features = false, features = ["rust-alloc"] }
 postcard = { version = "1", features = ["alloc"] }
 serde_plain = "1"
 # no_std by default (alloc only); std consumers re-enable `base64/std`.

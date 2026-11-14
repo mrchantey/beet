@@ -44,11 +44,9 @@ scripting = [
 	"dep:async-channel",
 	"dep:web-sys",
 ]
-# The embedded QuickJS engine, the primary backend, plus `exports::rquickjs`.
-# Serves every target including wasm, from the same engine code: the two `dep:`
-# entries are the same crate from two sources (see the target tables below), and
-# a `dep:` naming a dependency whose target table does not apply is inert.
-quickjs = ["scripting", "dep:rquickjs", "dep:rquickjs_wasm"]
+# The embedded QuickJS engine, the primary backend on every target including
+# wasm, plus `exports::rquickjs`.
+quickjs = ["scripting", "dep:rquickjs"]
 
 [dependencies]
 beet_core = { workspace = true, default-features = false, features = ["bevy_async"] }
@@ -61,25 +59,9 @@ extend.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
-
-# QuickJS on native: pristine crates.io rquickjs.
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rquickjs = { workspace = true, optional = true }
 
-# QuickJS on wasm: a fork adding `wasm32-unknown-unknown` (the upstream crate
-# builds its C engine for native and wasi only). Cargo forbids one dependency
-# name having different sources per target, so the wasm arm is a renamed key
-# aliased back in `quickjs_backend.rs` — every line of engine code reads
-# `rquickjs::` on both targets.
-#
-# Declared here rather than in the workspace table for the same name-collision
-# reason, and no other crate consumes it. Cargo fetches the git dep and its
-# submodules itself, so a beet developer sets up nothing.
-#
-# Swap this line in to develop against a local clone of the fork:
-# rquickjs_wasm = { package = "rquickjs", path = "../../../quickjs", optional = true, default-features = false, features = ["rust-alloc"] }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-rquickjs_wasm = { package = "rquickjs", git = "https://github.com/mrchantey/rquickjs", branch = "wasm32-unknown-unknown", optional = true, default-features = false, features = ["rust-alloc"] }
 # `js-sys` covers both scripting axes on wasm: the embedded engine's one host
 # import (the clock) and the host backends' JS plumbing.
 js-sys = { workspace = true, optional = true }

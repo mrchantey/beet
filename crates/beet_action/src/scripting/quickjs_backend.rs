@@ -1,17 +1,12 @@
 //! The embedded QuickJS engine, the primary [`Script`] backend on every target.
 //!
-//! One body of engine code serves native and wasm. Native links pristine
-//! crates.io `rquickjs`; wasm links a fork adding `wasm32-unknown-unknown`,
-//! declared under a renamed key because cargo forbids per-target sources for one
-//! dependency name, and aliased straight back here so nothing below has to know.
+//! One body of engine code serves native and wasm, `rquickjs` building its C
+//! engine for `wasm32-unknown-unknown` as well as native.
 //!
 //! The wasm engine has zero ambient authority by construction: it is the C
 //! engine compiled to wasm inside beet's own module, with no host bindings at
 //! all. Its one import is a clock, which beet satisfies in-module (see
 //! [`__rquickjs_host_now_us`]), so the final artifact imports nothing custom.
-
-#[cfg(target_arch = "wasm32")]
-use rquickjs_wasm as rquickjs;
 
 use crate::prelude::ConsoleStream;
 use crate::prelude::ScriptConfig;
@@ -35,7 +30,7 @@ use serde_json::Value as JsonValue;
 /// The engine's single host import on wasm: microseconds since the unix epoch.
 ///
 /// The wasm build of quickjs has no OS beneath it, so its `Date` implementation
-/// reaches out through this one extern, which the fork's shim declares and beet
+/// reaches out through this one extern, which rquickjs's wasm shim declares and beet
 /// defines here. Defining it *in-module* is what leaves the final artifact with
 /// no imports of its own to satisfy.
 ///

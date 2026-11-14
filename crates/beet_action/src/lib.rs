@@ -28,14 +28,8 @@ pub mod prelude {
 /// Re-exported third-party crates, so downstream consumers (eg `no_std`
 /// embedded targets) can reach the [`rquickjs`] engine through beet rather than
 /// declaring their own pinned dependency.
-///
-/// The wasm engine comes from a fork declared under a renamed key (see
-/// `beet_action/Cargo.toml`), aliased back here so consumers name `rquickjs` on
-/// either target.
 #[allow(unused)]
 pub mod exports {
-	#[cfg(all(feature = "quickjs", not(target_arch = "wasm32")))]
+	#[cfg(feature = "quickjs")]
 	pub use rquickjs;
-	#[cfg(all(feature = "quickjs", target_arch = "wasm32"))]
-	pub use rquickjs_wasm as rquickjs;
 }

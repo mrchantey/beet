@@ -494,7 +494,7 @@ build-wasm-render: _cli
 # with, ie the example surface, the render stack and ml backend, the perceive-act
 # head, the thread runtime, the tui host, infra definitions and the embedded
 # JavaScript engine; see the `web_full` comment in crates/beet-cli/Cargo.toml.
-# Slower to build (the JS engine's wasi sysroot downloads once) and several times
+# Slower to build (the JS engine compiles its C sources) and several times
 # the floor's size, so a page mounts it only when its program needs more than it.
 build-wasm-full: _cli
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_full --out=target/wasm/beet-full.wasm
