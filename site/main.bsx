@@ -246,6 +246,10 @@ token (plus AWS for the social stack's state bucket).
 		homepage="https://beet.org"
 		repository="https://github.com/mrchantey/beet"
 		social_image="https://beet.org/assets/branding/social-card.png"/>
+	<!-- the tag vocabulary every page's metadata draws from, each tag earning
+	     its place by sitting on two or more posts; `beet check` fails a page
+	     carrying any other, or breaking a limit `DocMetaRules` carries -->
+	<DocMetaRules tags={["malleable-software", "ecs", "bevy", "web", "terminal", "architecture", "release-notes", "atproto", "local-first", "behavior-trees", "talks"]}/>
 	<!-- the atproto accounts this entry reads and writes, each declared once
 	     and named by `bx:ref` wherever a declaration needs one (the handle
 	     block below). Plain data, outside every `bx:cfg`: the served site and

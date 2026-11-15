@@ -41,6 +41,9 @@ impl Plugin for ParsePlugin {
 		// a document's root metadata and its route's, which frontmatter
 		// declares and writes
 		app.register_type::<DocMeta>().register_type::<RouteMeta>();
+		// the limits and vocabulary `beet check` holds every page's metadata to
+		app.register_type::<DocMetaRules>()
+			.register_type::<TextLimit>();
 		#[cfg(feature = "bsx")]
 		app.register_type::<FrontmatterType>();
 		// the cell addresses every parsed document's tables carry, numbered

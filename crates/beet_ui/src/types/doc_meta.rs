@@ -34,7 +34,13 @@
 //!   vocabulary its site declares. Lowercase kebab because a tag is a url
 //!   segment of its own listing page and a plain string in a syndicated record,
 //!   and a closed vocabulary because an open one drifts into synonyms that
-//!   split one topic across two names nobody browses.
+//!   split one topic across two names nobody browses. At most 128 graphemes
+//!   each, the `site.standard.document` tag limit; a site declaring no
+//!   vocabulary checks the shape and length alone.
+//!
+//! [`DocMetaRules`] carries these limits and the site's vocabulary, and
+//! [`DocMeta::validate`] checks a page against them; `beet check` raises each
+//! [`DocMetaViolation`] as a diagnostic on the page that authored it.
 
 #[cfg(feature = "serde")]
 use crate::prelude::ReflectFrontmatter;
@@ -90,7 +96,155 @@ pub struct DocMeta {
 	pub video_url: Option<Url>,
 }
 
+/// The limits and the tag vocabulary every [`DocMeta`] is checked against,
+/// whose reasons are the module docs' metadata rules.
+///
+/// A reflected resource, so a site declares its vocabulary in markup like
+/// [`PackageConfig`](beet_core::prelude::PackageConfig), ie
+/// `<DocMetaRules tags={["ecs", "web"]}/>`.
+#[derive(Debug, Clone, PartialEq, Eq, Resource, Reflect)]
+#[reflect(Resource, Default)]
+pub struct DocMetaRules {
+	/// The [`title`](DocMeta::title) limit, default 500 graphemes and 5000 bytes.
+	pub title: TextLimit,
+	/// The [`description`](DocMeta::description) limit, default 300
+	/// graphemes and 3000 bytes.
+	pub description: TextLimit,
+	/// The limit on each of the [`tags`](DocMeta::tags), default 128
+	/// graphemes and 1280 bytes.
+	pub tag: TextLimit,
+	/// The vocabulary every tag is drawn from; empty declares none, so any
+	/// well-formed tag passes.
+	pub tags: Vec<SmolStr>,
+}
+
+impl Default for DocMetaRules {
+	fn default() -> Self {
+		Self {
+			title: TextLimit::new(500, 5000),
+			description: TextLimit::new(300, 3000),
+			tag: TextLimit::new(128, 1280),
+			tags: Vec::new(),
+		}
+	}
+}
+
+/// A cap on a string's length in graphemes and in utf-8 bytes, the pair every
+/// atproto lexicon string limit is expressed as.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
+#[reflect(Default)]
+pub struct TextLimit {
+	/// The most graphemes, ie the units a reader sees.
+	pub graphemes: usize,
+	/// The most utf-8 bytes.
+	pub bytes: usize,
+}
+
+impl TextLimit {
+	/// A limit of `graphemes` and `bytes`.
+	pub const fn new(graphemes: usize, bytes: usize) -> Self {
+		Self { graphemes, bytes }
+	}
+
+	/// The [`TextLength`] of `text` when it exceeds this limit.
+	pub fn exceeded_by(&self, text: &str) -> Option<TextLength> {
+		let length = TextLength::of(text);
+		(length.graphemes > self.graphemes || length.bytes > self.bytes)
+			.then_some(length)
+	}
+}
+
+/// A string's length in both units a [`TextLimit`] caps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextLength {
+	/// The extended grapheme clusters.
+	pub graphemes: usize,
+	/// The utf-8 bytes.
+	pub bytes: usize,
+}
+
+impl TextLength {
+	/// The length of `text`.
+	pub fn of(text: &str) -> Self {
+		use unicode_segmentation::UnicodeSegmentation;
+		Self {
+			graphemes: text.graphemes(true).count(),
+			bytes: text.len(),
+		}
+	}
+}
+
+/// One way a [`DocMeta`] breaks its [`DocMetaRules`].
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum DocMetaViolation {
+	/// A field longer than its limit.
+	#[error(
+		"`{field}` is {} graphemes and {} bytes, over the limit of {} graphemes and {} bytes",
+		length.graphemes,
+		length.bytes,
+		limit.graphemes,
+		limit.bytes
+	)]
+	TooLong {
+		/// The frontmatter key, ie `description`, or `tags` for a single tag.
+		field: &'static str,
+		/// The limit it breaks.
+		limit: TextLimit,
+		/// Its actual length.
+		length: TextLength,
+	},
+	/// A tag that is not lowercase kebab.
+	#[error("tag `{0}` is not lowercase kebab, ie `local-first`")]
+	MalformedTag(SmolStr),
+	/// A tag outside the site's vocabulary.
+	#[error("tag `{0}` is not in the site's vocabulary")]
+	UnknownTag(SmolStr),
+}
+
 impl DocMeta {
+	/// Every way this page breaks `rules`, empty when it satisfies them.
+	pub fn validate(&self, rules: &DocMetaRules) -> Vec<DocMetaViolation> {
+		let too_long = |field: &'static str, limit: TextLimit, text: &str| {
+			limit
+				.exceeded_by(text)
+				.map(|length| DocMetaViolation::TooLong {
+					field,
+					limit,
+					length,
+				})
+		};
+		let mut violations = Vec::new();
+		violations.extend(
+			self.title
+				.as_deref()
+				.and_then(|title| too_long("title", rules.title, title)),
+		);
+		violations.extend(self.description.as_deref().and_then(
+			|description| {
+				too_long("description", rules.description, description)
+			},
+		));
+		for tag in &self.tags {
+			if !Self::is_kebab(tag) {
+				violations.push(DocMetaViolation::MalformedTag(tag.clone()));
+			} else if !rules.tags.is_empty() && !rules.tags.contains(tag) {
+				violations.push(DocMetaViolation::UnknownTag(tag.clone()));
+			}
+			violations.extend(too_long("tags", rules.tag, tag));
+		}
+		violations
+	}
+
+	/// Whether `tag` matches `^[a-z0-9]+(-[a-z0-9]+)*$`.
+	fn is_kebab(tag: &str) -> bool {
+		tag.split('-').all(|segment| {
+			!segment.is_empty()
+				&& segment.bytes().all(|byte| {
+					byte.is_ascii_lowercase() || byte.is_ascii_digit()
+				})
+		})
+	}
+
 	/// The authors as one line, joined by `, `, or `None` when there are none:
 	/// the byline a header, a feed item or a search result shows.
 	pub fn byline(&self) -> Option<String> {
@@ -231,6 +385,53 @@ mod test {
 		.unwrap()
 		.to_string()
 		.xpect_eq("/assets/card.png");
+	}
+
+	#[beet_core::test]
+	fn validates_against_rules() {
+		let rules = DocMetaRules {
+			tags: vec!["ecs".into(), "local-first".into()],
+			..default()
+		};
+		DocMeta {
+			title: Some("Title".into()),
+			// a skin-toned emoji is one grapheme of two chars, so 300 fit the
+			// description budget where a char count would refuse them
+			description: Some("👍🏽".repeat(300)),
+			tags: vec!["ecs".into(), "local-first".into()],
+			..default()
+		}
+		.validate(&rules)
+		.xpect_empty();
+		let violations = DocMeta {
+			description: Some("a".repeat(301)),
+			tags: vec!["Ecs".into(), "web".into(), "a--b".into()],
+			..default()
+		}
+		.validate(&rules);
+		violations.len().xpect_eq(4);
+		violations[0]
+			.to_string()
+			.xpect_contains("`description` is 301");
+		violations[1].xpect_eq(DocMetaViolation::MalformedTag("Ecs".into()));
+		violations[2].xpect_eq(DocMetaViolation::UnknownTag("web".into()));
+		violations[3].xpect_eq(DocMetaViolation::MalformedTag("a--b".into()));
+		// the byte cap binds where graphemes do not: a family emoji is one
+		// grapheme of 25 bytes
+		DocMeta {
+			description: Some("👨‍👩‍👧‍👦".repeat(150)),
+			..default()
+		}
+		.validate(&rules)
+		.len()
+		.xpect_eq(1);
+		// no declared vocabulary checks the shape alone
+		DocMeta {
+			tags: vec!["anything-1".into()],
+			..default()
+		}
+		.validate(&DocMetaRules::default())
+		.xpect_empty();
 	}
 
 	#[beet_core::test]

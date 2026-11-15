@@ -1,6 +1,7 @@
 //! The route driver behind `beet check`, `export-static` and the `--watch` dev
 //! serve: render every static route's content into a persistent tree, run
-//! [`render_diagnostics`] over it, and aggregate the results, then, for the
+//! [`render_diagnostics`] over it and check its [`DocMeta`] against the
+//! [`DocMetaRules`], and aggregate the results, then, for the
 //! whole-document pass, check every derived file the document declares.
 //!
 //! Each scene route's own `Action<Request, PageRequest>` builds its content
@@ -14,6 +15,8 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_ui::prelude::DocMeta;
+use beet_ui::prelude::DocMetaRules;
 use beet_ui::prelude::RuleSet;
 use std::sync::Arc;
 
@@ -380,6 +383,7 @@ async fn build_and_scan(
 						&config,
 					)
 					.into_iter()
+					.chain(doc_meta_diagnostics(world, content, &config))
 					.map(|diagnostic| diagnostic.with_route(path.clone()))
 					.collect::<Vec<_>>();
 					despawn_ephemerals(world, content);
@@ -401,6 +405,37 @@ async fn build_and_scan(
 			],
 		},
 	}
+}
+
+/// A [`DocMeta`](DiagnosticKind::DocMeta) diagnostic for each way the
+/// `content` root's [`DocMeta`] breaks the world's [`DocMetaRules`].
+fn doc_meta_diagnostics(
+	world: &World,
+	content: Entity,
+	config: &RenderDiagnostics,
+) -> Vec<Diagnostic> {
+	let severity = config.severity(DiagnosticKind::DocMeta);
+	let Some(meta) = world.get::<DocMeta>(content) else {
+		return Vec::new();
+	};
+	if severity == DiagnosticSeverity::Off {
+		return Vec::new();
+	}
+	meta.validate(
+		&world
+			.get_resource::<DocMetaRules>()
+			.cloned()
+			.unwrap_or_default(),
+	)
+	.into_iter()
+	.map(|violation| {
+		Diagnostic::new(
+			DiagnosticKind::DocMeta,
+			severity,
+			format!("page metadata: {violation}"),
+		)
+	})
+	.collect()
 }
 
 /// Clean up exactly what a real render would: the route's
@@ -666,6 +701,43 @@ mod test {
 			.unwrap_str()
 			.await
 			.xpect_contains("body");
+	}
+
+	/// A page whose metadata breaks the rules fails the check, one
+	/// diagnostic per violation, and the vocabulary is the site's to declare.
+	#[beet_core::test]
+	async fn doc_meta_violations_fail() {
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&"post.md".into(),
+				"+++\ntags = [\"ecs\", \"Web\"]\n+++\n# Title\n\nbody"
+					.to_owned(),
+			)
+			.await
+			.unwrap();
+		let mut world = check_world();
+		world.insert_resource(DocMetaRules {
+			tags: vec!["ecs".into()],
+			..default()
+		});
+		let router = world
+			.spawn((store, Router, children![route::new(
+				"post",
+				BlobPage::new("post.md")
+			)]))
+			.flush();
+		let report = check(&mut world, router).await;
+		report.has_errors().xpect_true();
+		report
+			.diagnostics
+			.iter()
+			.filter(|diagnostic| diagnostic.kind == DiagnosticKind::DocMeta)
+			.map(|diagnostic| diagnostic.message.as_str())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![
+				"page metadata: tag `Web` is not lowercase kebab, ie `local-first`",
+			]);
 	}
 
 	/// A declared derived file is an error while missing, silent once fresh,

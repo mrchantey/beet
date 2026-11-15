@@ -1978,6 +1978,7 @@ dependencies = [
  "tree-sitter-json",
  "tree-sitter-rust",
  "tree-sitter-typescript",
+ "unicode-segmentation",
  "variadics_please",
  "vte",
  "wasm-bindgen",
