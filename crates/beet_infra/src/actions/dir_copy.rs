@@ -11,7 +11,7 @@ use beet_net::prelude::*;
 /// Two directories can share files without either owning the other: the site's
 /// assets are its own, but a few workspace-owned files (a geoip database, a
 /// set of images) are served from the site too. This names exactly those.
-/// Under a [`RepoStage`] it borrows into the staging dir the deploy publishes,
+/// Under a [`RepoAssemble`] it borrows into the assembled copy the deploy publishes,
 /// so an updated file cannot go stale on the far side and nothing is written
 /// into the checkout; elsewhere (the local `assets` verb) `dest` is
 /// workspace-relative. Only source files are borrowed: a build output is built
@@ -27,8 +27,8 @@ pub async fn DirCopy(
 	/// The workspace-relative source directory.
 	#[field]
 	src: WsPath,
-	/// The destination directory: inside the staging dir under a
-	/// [`RepoStage`] ancestor, else workspace-relative.
+	/// The destination directory: inside the assembled copy under a
+	/// [`RepoAssemble`] ancestor, else workspace-relative.
 	#[field]
 	dest: WsPath,
 	/// Comma-separated paths to copy, each relative to both ends and naming
@@ -38,14 +38,14 @@ pub async fn DirCopy(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let src_dir = src.into_abs();
-	// under a stage the destination is the staging dir's, so the borrow lands
+	// under an assemble the destination is in the assembled copy, so the borrow lands
 	// where the mirror reads rather than in the checkout
 	let dest_dir = cx
 		.caller
-		.with_state::<(AncestorQuery<&RepoStage>, StackQuery), _>(
-			move |entity, (stages, stacks)| -> Result<AbsPath> {
-				match stages.get(entity) {
-					Ok(_) => RepoStage::dir(&stacks, entity)?
+		.with_state::<(AncestorQuery<&RepoAssemble>, StackQuery), _>(
+			move |entity, (assembles, stacks)| -> Result<AbsPath> {
+				match assembles.get(entity) {
+					Ok(_) => RepoAssemble::dir(&stacks, entity)?
 						.join(dest.to_string())
 						.xok(),
 					Err(_) => dest.into_abs().xok(),

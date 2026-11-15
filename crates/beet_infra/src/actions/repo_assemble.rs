@@ -1,37 +1,37 @@
-//! Staging the tree a deploy publishes, so one mirror publishes it whole.
+//! Assembling the tree a deploy publishes, so one mirror publishes it whole.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<RepoStage src="site">` — assemble the tree this deploy publishes as its
-/// document, in the staging dir [`RepoSync`] mirrors from.
+/// `<RepoAssemble src="site">` — assemble the tree this deploy publishes as its
+/// document, in the assembled copy [`RepoSync`] mirrors from.
 ///
 /// A published document is rarely one checkout directory: the site's own tree
-/// plus a few files owned elsewhere in the workspace. Staging composes them
-/// OUTSIDE the checkout, so no deploy step writes into source, and the staging
-/// dir IS the store's contents, so a test compares the two directly. A build
+/// plus a few files owned elsewhere in the workspace. The assemble composes them
+/// OUTSIDE the checkout, so no deploy step writes into source, and the
+/// assembled copy IS the store's contents, so a test compares the two directly. A build
 /// output the document serves is never borrowed: a [`WasmRuntime`] declared
-/// before the stage builds it, and the stage reads what was just built.
+/// before the assemble builds it, and the assemble reads what was just built.
 ///
 /// `src` is copied whole (or its `paths` alone, for an entry at a checkout's
 /// root whose siblings are crates and a `target/`), then the children run in
-/// order: a [`DirCopy`] under a stage resolves its `dest` inside the staging
-/// dir, so the borrow manifest is the same tag the local `assets` verb uses,
+/// order: a [`DirCopy`] under an assemble resolves its `dest` inside the
+/// assembled copy, so the borrow manifest is the same tag the local `assets` verb uses,
 /// and a [`Derive`] ensures the document's derived files there, after the
 /// borrows a derivation may read.
 ///
 /// ```bsx
-/// <RepoStage src="site">
+/// <RepoAssemble src="site">
 ///     <DirCopy src="assets" dest="assets" paths="databases/country.mmdb"/>
 ///     <Derive/>
-/// </RepoStage>
+/// </RepoAssemble>
 /// <RepoSync/>
 /// ```
 ///
 /// The dir lives under the deploy work directory (`target/infra/<app>/repo`)
 /// and is emptied first, so a file removed from the source leaves the mirror
-/// rather than lingering from an earlier stage.
+/// rather than lingering from an earlier assemble.
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -40,7 +40,7 @@ use beet_net::prelude::*;
 		ChildError::NO_ACTION | ChildError::ACTION_MISMATCH | ChildError::NONE_VALID
 	)
 )]
-pub async fn RepoStage(
+pub async fn RepoAssemble(
 	/// The workspace-relative directory to publish.
 	#[field]
 	src: WsPath,
@@ -55,14 +55,16 @@ pub async fn RepoStage(
 	let dir = cx
 		.caller
 		.with_state::<StackQuery, _>(|entity, stacks| {
-			RepoStage::dir(&stacks, entity)
+			RepoAssemble::dir(&stacks, entity)
 		})
 		.await??;
 	let src = src.into_abs();
 	if fs_ext::is_dir_empty(&src)? {
-		bevybail!("nothing to stage at {src}: the source is missing or empty");
+		bevybail!(
+			"nothing to assemble at {src}: the source is missing or empty"
+		);
 	}
-	// a fresh copy, so nothing from an earlier stage survives
+	// a fresh copy, so nothing from an earlier assemble survives
 	fs_ext::remove(&dir).ok();
 	match paths.is_empty() {
 		true => fs_ext::copy_recursive(&src, &dir)?,
@@ -70,13 +72,13 @@ pub async fn RepoStage(
 			DirCopy::copy_paths(&src, &dir, &paths)?;
 		}
 	}
-	info!("staged {src} -> {dir}");
+	info!("assembled {src} -> {dir}");
 
-	// then the borrowed paths, each resolving the staging dir by ancestry
+	// then the borrowed paths, each resolving the assembled copy by ancestry
 	let children = BehaviourChildren::valid_for::<
 		Request,
 		Outcome<Request, Response>,
-	>(&cx.world(), cx.id(), "repo stage")
+	>(&cx.world(), cx.id(), "repo assemble")
 	.await?;
 	let world = cx.world();
 	let mut input = cx.input;
@@ -93,8 +95,8 @@ pub async fn RepoStage(
 	Outcome::Pass(input).xok()
 }
 
-impl RepoStage {
-	/// A stage of the workspace-relative `src`, whole.
+impl RepoAssemble {
+	/// An assemble of the workspace-relative `src`, whole.
 	pub fn new(src: impl Into<WsPath>) -> Self {
 		Self {
 			src: src.into(),
@@ -102,13 +104,13 @@ impl RepoStage {
 		}
 	}
 
-	/// A stage of the `paths` under `src` alone, see the `paths` field.
+	/// An assemble of the `paths` under `src` alone, see the `paths` field.
 	pub fn with_paths(mut self, paths: impl Into<SmolStr>) -> Self {
 		self.paths = paths.into();
 		self
 	}
 
-	/// The staging dir of the stack `entity` belongs to: `repo/` under the
+	/// The assembled copy of the stack `entity` belongs to: `repo/` under the
 	/// deploy work directory, so a teardown removes it with the rest.
 	pub fn dir(stacks: &StackQuery, entity: Entity) -> Result<AbsPath> {
 		let (_, stack) = stacks.root(entity)?;

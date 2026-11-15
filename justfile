@@ -91,7 +91,7 @@ beet-watch *args:
   cargo run -p beet-cli --features infra,extra -- --entry=site site/watch {{ args }}
 # Refresh the files site/assets borrows from the workspace tree (the geoip
 # database, the robot faces), and regenerate any of the site's derived files
-# that is stale or missing. Every publish does the same into its stage.
+# that is stale or missing. Every publish does the same into its assembled copy.
 beet-assets *args:
   cargo run -p beet-cli --features infra,extra -- --entry=site site/assets {{ args }}
 # Tear the deployed stage stack down (pass --stage=prod for the prod stack).

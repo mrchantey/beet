@@ -172,11 +172,11 @@ fn repo_store(deploy: &TestDeploy) -> ErasedStoreBlock {
 		.unwrap()
 }
 
-/// The publish steps of a deploy: stage `site_dir` and mirror it into the
+/// The publish steps of a deploy: assemble `site_dir` and mirror it into the
 /// repo store, so the test's isolated copy of the site is what gets served.
 pub fn publish_site(site_dir: &AbsPath) -> Result<impl Bundle> {
 	(
-		RepoStage::new(site_dir.into_ws_path()?),
+		RepoAssemble::new(site_dir.into_ws_path()?),
 		RepoSync::default(),
 	)
 		.xok()

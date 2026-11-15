@@ -468,16 +468,16 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::DirSync>()
 			.add_observer(crate::actions::attach_dir_sync_store);
 
-		// publishing the document: the stage assembling it, the mirror of
-		// that stage into the repo store, the borrowed-paths copy
+		// publishing the document: the assemble composing it, the mirror of
+		// the assembled copy into the repo store, the borrowed-paths copy
 		// (`<DirCopy src=".." dest=".." paths=".."/>`) and the derived files
-		// (`<Derive/>`) the stage hosts, the wasm runtime a deploy builds
+		// (`<Derive/>`) the assemble hosts, the wasm runtime a deploy builds
 		// before publishing it (`<WasmRuntime/>`), the store-to-store mirror
 		// (`<StoreSync src=".." dest=".."/>`), and the retention window over
 		// the versions the store holds. Plain fs and `BlobStore` work, so
 		// none needs a cloud backend.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-		app.register_type::<crate::prelude::RepoStage>()
+		app.register_type::<crate::prelude::RepoAssemble>()
 			.register_type::<crate::prelude::RepoSync>()
 			.register_type::<crate::prelude::DirCopy>()
 			.register_type::<crate::prelude::Derive>()

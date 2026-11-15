@@ -86,16 +86,16 @@ its ancestors' paths either way.
 bucket (`beet-site--shared--assets`), hydrated with `just site-shared pull`. A
 few files it serves are owned by the workspace tree (the geoip database, the
 perceive-act robot faces); `<DirCopy/>` is the one declaration of what is
-borrowed. Under the deploy's `<RepoStage>` it borrows into the staging dir the
-mirror publishes, so nothing is written into the checkout; the `assets` verb
+borrowed. Under the deploy's `<RepoAssemble>` it borrows into the assembled copy
+the mirror publishes, so nothing is written into the checkout; the `assets` verb
 borrows into `site/assets` for a local `serve`. Only source files are borrowed,
 never a build output: the site boots no wasm, and a deploy that ships one
-builds it right before its stage (`<WasmRuntime/>`).
+builds it right before its assemble (`<WasmRuntime/>`).
 
 A derived file (one computed from declared sources and stored beside the
 provenance naming them, regenerated only when stale) is ensured the same way,
-by `<Derive/>` beside each `<DirCopy/>`: into the staging dir under a
-`<RepoStage>`, and into the site's own tree for the `assets` verb and the asset
+by `<Derive/>` beside each `<DirCopy/>`: into the assembled copy under a
+`<RepoAssemble>`, and into the site's own tree for the `assets` verb and the asset
 publish. `beet check site` reports a declared one that is missing as an error
 and a stale one as a warning, since a stale one still serves.
 
@@ -123,7 +123,7 @@ with the verbs it hosts) adds the tofu lifecycle routes
 stack hosts it, plus the two lifecycle verbs that run the `<Group>`s it names:
 `deploy` forward and `destroy` in reverse.
 
-The deploy group applies once per layer, and the order is the point: `<TofuApply layer="storage"/>` brings up the repo, analytics, rollup, and archive stores. `<RepoStage>` assembles the site, its borrowed files and its derived files in `target/infra/beet-site/repo`, `<RepoSync/>` mirrors that dir into this deploy's version of the repo store (`<id>/repo/`), and a bare `<TofuApply/>` converges the whole stack:
+The deploy group applies once per layer, and the order is the point: `<TofuApply layer="storage"/>` brings up the repo, analytics, rollup, and archive stores. `<RepoAssemble>` assembles the site, its borrowed files and its derived files in `target/infra/beet-site/repo`, `<RepoSync/>` mirrors that dir into this deploy's version of the repo store (`<id>/repo/`), and a bare `<TofuApply/>` converges the whole stack:
 it builds and uploads the binary beside that document (`<id>/bin/`), publishes
 the release pointer naming both, and converges the instance against a bucket
 that already holds the site. One apply boots the new instance first, so it finds
@@ -396,11 +396,11 @@ token (plus AWS for the social stack's state bucket).
 			<Group bx:ref="site_up">
 				<TofuApply layer="storage"/>
 				<!-- the published document: the site plus what it borrows from the
-				     workspace, staged outside the checkout and mirrored whole -->
-				<RepoStage src="site">
+				     workspace, assembled outside the checkout and mirrored whole -->
+				<RepoAssemble src="site">
 					<DirCopy src="assets" dest="assets" paths="extra/robot-eyes,databases/country.mmdb"/>
 					<Derive/>
-				</RepoStage>
+				</RepoAssemble>
 				<RepoSync/>
 				<TofuApply/>
 				<PruneVersions/>
@@ -422,10 +422,10 @@ token (plus AWS for the social stack's state bucket).
 				<!-- publish into the version the RUNNING box reads, rather than
 				     minting one of this launch's own that nothing serves -->
 				<AdoptCurrentDeploy/>
-				<RepoStage src="site">
+				<RepoAssemble src="site">
 					<DirCopy src="assets" dest="assets" paths="extra/robot-eyes,databases/country.mmdb"/>
 					<Derive/>
-				</RepoStage>
+				</RepoAssemble>
 				<RepoSync/>
 				<!-- content is read from the store per request, so the sync above is
 				     already live; the restart is for what the box resolves ONCE at

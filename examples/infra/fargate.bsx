@@ -40,12 +40,12 @@ and a container engine.
 			<!-- bake the freshly built binary into the container image; the block's
 			     bootstrap config (`--repo=s3://<bucket> --server=http`) rides the CMD -->
 			<BuildDockerImage/>
-			<!-- publish the site: stage it, then one mirror into this deploy's
+			<!-- publish the site: assemble it, then one mirror into this deploy's
 			     version of the repo store -->
 			<!-- the wasm runtime the site's pages boot, built by this verb rather
-			     than borrowed: the stage reads it through the site's `wasm/` links -->
+			     than borrowed: the assemble reads it through the site's `wasm/` links -->
 			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<RepoStage src="examples/bsx_site"/>
+			<RepoAssemble src="examples/bsx_site"/>
 			<RepoSync/>
 			<!-- the full apply rolls the service, onto an image that is pushed and a
 			     bucket that is filled -->
@@ -62,9 +62,9 @@ and a container engine.
 		<Route path="sync" {ExchangeSequence}>
 			<AdoptCurrentDeploy/>
 			<!-- the wasm runtime the site's pages boot, built by this verb rather
-			     than borrowed: the stage reads it through the site's `wasm/` links -->
+			     than borrowed: the assemble reads it through the site's `wasm/` links -->
 			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<RepoStage src="examples/bsx_site"/>
+			<RepoAssemble src="examples/bsx_site"/>
 			<RepoSync/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>

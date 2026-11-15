@@ -1,14 +1,14 @@
-//! Publishing the staged document into the repo store.
+//! Publishing the assembled document into the repo store.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<RepoSync/>` — mirror the staging dir into this launch's version of the
+/// `<RepoSync/>` — mirror the assembled copy into this launch's version of the
 /// repo store, `<root>/<id>/repo/`.
 ///
 /// One [`BlobSync`] with `delete`, so the store holds exactly what
-/// [`RepoStage`] assembled: a page renamed or removed at the source is
+/// [`RepoAssemble`] assembled: a page renamed or removed at the source is
 /// removed here rather than lingering (two routes for `/` is a boot panic),
 /// and an object already matching by size and digest is not re-sent. Which
 /// version it publishes into is the launch's answer: `deploy` mints one, and
@@ -29,14 +29,17 @@ pub async fn RepoSync(
 		.caller
 		.with_state::<(StackQuery, RepoStoreQuery), _>(
 			|entity, (stacks, repos)| -> Result<_> {
-				(RepoStage::dir(&stacks, entity)?, repos.store_uri(entity)?)
+				(
+					RepoAssemble::dir(&stacks, entity)?,
+					repos.store_uri(entity)?,
+				)
 					.xok()
 			},
 		)
 		.await??;
 	if fs_ext::is_dir_empty(&dir)? {
 		bevybail!(
-			"nothing staged at {dir}: declare a `<RepoStage src=\"..\"/>` \
+			"nothing assembled at {dir}: declare a `<RepoAssemble src=\"..\"/>` \
 			 before this sync"
 		);
 	}
@@ -59,9 +62,9 @@ mod test {
 	use beet_router::prelude::*;
 
 	/// A site tree and a workspace tree it borrows from, both under `target/`
-	/// so the stage and the copy can name them workspace-relative. The site
+	/// so the assemble and the copy can name them workspace-relative. The site
 	/// carries a `target/` of its own, as a checkout-root entry does, which a
-	/// staged allowlist leaves behind.
+	/// assembled allowlist leaves behind.
 	fn trees() -> (TempDir, WsPath, WsPath) {
 		let dir = TempDir::new_ws().unwrap();
 		let site = dir.path().join("site");
@@ -80,7 +83,7 @@ mod test {
 
 	/// Run the deploy's publish steps of `deployment` against a memory repo
 	/// store, returning the store's document root for that launch and the
-	/// staging dir.
+	/// assembled copy.
 	async fn publish(
 		deployment: &Deployment,
 		site: &WsPath,
@@ -89,7 +92,7 @@ mod test {
 		publish_paths(deployment, site, workspace, "main.bsx,routes").await
 	}
 
-	/// [`publish`] staging the `paths` under `site` alone.
+	/// [`publish`] assembling the `paths` under `site` alone.
 	async fn publish_paths(
 		deployment: &Deployment,
 		site: &WsPath,
@@ -113,26 +116,27 @@ mod test {
 						.with_deploy_versioned(true),
 					RepoStoreBlock
 				),
-				(RepoStage::new(site.clone()).with_paths(paths), children![
-					DirCopy::new(
+				(
+					RepoAssemble::new(site.clone()).with_paths(paths),
+					children![DirCopy::new(
 						workspace.clone(),
 						"assets",
 						"databases/country.mmdb"
-					)
-				]),
+					)]
+				),
 				RepoSync::default(),
 			]))
 			.exchange(Request::get(""))
 			.await
 			.into_result()
 			.await?;
-		let staging = deployment
+		let assembled = deployment
 			.work_directory(
 				&Stack::new("app").resolve(&PackageConfig::default()),
 			)
 			.into_abs()
 			.join("repo");
-		(document, staging).xok()
+		(document, assembled).xok()
 	}
 
 	fn sorted_stats(
@@ -142,15 +146,15 @@ mod test {
 		stats
 	}
 
-	/// The staging dir IS the store's contents: the site plus what it borrows
+	/// The assembled copy IS the store's contents: the site plus what it borrows
 	/// lands under this launch's `<id>/repo/`, the allowlist keeps the site's
 	/// own `target/` out, nothing is written into the source tree, and a file
 	/// removed from the source leaves the mirror.
 	#[beet_core::test]
-	async fn the_staging_dir_is_the_published_document() {
+	async fn the_assembled_copy_is_the_published_document() {
 		let (dir, site, workspace) = trees();
 		let (deployment, _work_dir) = Deployment::default_local();
-		let (document, staging) =
+		let (document, assembled) =
 			publish(&deployment, &site, &workspace).await.unwrap();
 		let mut published = document.list().await.unwrap();
 		published.sort();
@@ -161,13 +165,13 @@ mod test {
 		]);
 		sorted_stats(document.list_stats().await.unwrap()).xpect_eq(
 			sorted_stats(
-				BlobStore::new(FsStore::new(staging))
+				BlobStore::new(FsStore::new(assembled))
 					.list_stats()
 					.await
 					.unwrap(),
 			),
 		);
-		// the borrow landed in the stage, never in the checkout
+		// the borrow landed in the assembled copy, never in the checkout
 		fs_ext::exists(dir.path().join("site/assets"))
 			.unwrap()
 			.xpect_false();
@@ -184,10 +188,10 @@ mod test {
 			.xpect_false();
 	}
 
-	/// With no allowlist the source is staged whole, and an allowlisted path
-	/// that is absent fails the stage rather than publishing without it.
+	/// With no allowlist the source is assembled whole, and an allowlisted path
+	/// that is absent fails the assemble rather than publishing without it.
 	#[beet_core::test]
-	async fn a_stage_without_paths_publishes_the_source_whole() {
+	async fn an_assemble_without_paths_publishes_the_source_whole() {
 		let (_dir, site, workspace) = trees();
 		let (deployment, _work_dir) = Deployment::default_local();
 		let (document, _) = publish_paths(&deployment, &site, &workspace, "")

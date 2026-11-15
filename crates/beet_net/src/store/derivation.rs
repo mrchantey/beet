@@ -11,8 +11,8 @@ use beet_core::prelude::*;
 ///
 /// The producing action is an `Action<BlobStore, EntityBody>`. Handed the
 /// store the file is ensured in, it reads what it needs (its file sources from
-/// that same store, so a derivation ensured into a deploy's stage reads the
-/// staged copy) and answers the document: an [`EntityBody`] carrying a
+/// that same store, so a derivation ensured into a deploy's assembled copy
+/// reads that copy) and answers the document: an [`EntityBody`] carrying a
 /// [`Provenance`] that names each source with the digest it read.
 /// [`Derivation::ensure`] stamps the time and the declared `ttl` onto that
 /// provenance and writes the body in the format `path`'s extension names,

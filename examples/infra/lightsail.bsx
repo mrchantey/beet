@@ -31,12 +31,12 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 			<!-- the bucket first, so the site is in place before the instance that
 			     serves it boots -->
 			<TofuApply layer="storage"/>
-			<!-- publish the site: stage it, then one mirror into this deploy's
+			<!-- publish the site: assemble it, then one mirror into this deploy's
 			     version of the repo store -->
 			<!-- the wasm runtime the site's pages boot, built by this verb rather
-			     than borrowed: the stage reads it through the site's `wasm/` links -->
+			     than borrowed: the assemble reads it through the site's `wasm/` links -->
 			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<RepoStage src="examples/bsx_site"/>
+			<RepoAssemble src="examples/bsx_site"/>
 			<RepoSync/>
 			<TofuApply/>
 			<LightsailWatch timeout="30s"/>
@@ -51,9 +51,9 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 		<Route path="sync" {ExchangeSequence}>
 			<AdoptCurrentDeploy/>
 			<!-- the wasm runtime the site's pages boot, built by this verb rather
-			     than borrowed: the stage reads it through the site's `wasm/` links -->
+			     than borrowed: the assemble reads it through the site's `wasm/` links -->
 			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<RepoStage src="examples/bsx_site"/>
+			<RepoAssemble src="examples/bsx_site"/>
 			<RepoSync/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>

@@ -11,7 +11,7 @@ use beet_net::prelude::*;
 /// A runtime is never borrowed as a stored file: whatever an earlier build
 /// (or a bucket pull) left at `out` is overwritten here, immediately before
 /// the publish reads it. Declare it directly before the step that reads `out`,
-/// ie a `<RepoStage>` whose source links to it, or an R2 sync of that source.
+/// ie a `<RepoAssemble>` whose source links to it, or an R2 sync of that source.
 ///
 /// The build is a release [`BuildWasm::build`], the same one the
 /// `build-wasm` command and the `just build-wasm-*` recipes run.
