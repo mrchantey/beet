@@ -1,7 +1,7 @@
 +++
 title = "Standardizing Standard Site Content"
 description = "Standard Site unifies discovery but content is fractured, lets explore some options."
-tags = ["standard-site", "malleable-software", "atproto"]
+tags = ["malleable-software", "atproto"]
 created = "2026-10-21"
 authors = ["Pete Hayman"]
 
