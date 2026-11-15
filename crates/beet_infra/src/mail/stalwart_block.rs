@@ -255,6 +255,10 @@ impl StalwartBlock {
 	/// append-only by construction.
 	pub const COLD_BLOBS_PREFIX: &'static str = "blobs";
 
+	/// The unit the nightly snapshot runs as, and its script's name under
+	/// `/usr/local/bin`.
+	pub const BACKUP_UNIT: &'static str = "stalwart-backup";
+
 	/// The unit the cold copy runs as, which is also what a deploy starts by
 	/// hand to prove the path before the timer ever fires.
 	pub const COLD_UNIT: &'static str = "stalwart-cold-backup";
@@ -1428,9 +1432,10 @@ RequiresMountsFor=/var/lib/stalwart
 Type=oneshot
 User=stalwart
 Group=stalwart
-ExecStart=/usr/local/bin/stalwart-backup
+ExecStart=/usr/local/bin/{unit}
 StandardOutput=append:{log}
 StandardError=append:{log}"#,
+			unit = Self::BACKUP_UNIT,
 			log = Self::UNIT_LOG
 		);
 		let timer = format!(
@@ -1563,28 +1568,31 @@ WantedBy=multi-user.target"#,
 		format!(
 			r#"# the nightly snapshot: the box holds the live database and network path, so
 # the backup runs here rather than from whatever machine last deployed
-cat > /usr/local/bin/stalwart-backup <<'BACKUP_EOF'
+cat > /usr/local/bin/{unit} <<'BACKUP_EOF'
 {script}
 BACKUP_EOF
-chmod 0755 /usr/local/bin/stalwart-backup
+chmod 0755 /usr/local/bin/{unit}
 
-cat > /etc/systemd/system/stalwart-backup.service <<'BACKUP_UNIT_EOF'
+cat > /etc/systemd/system/{unit}.service <<'BACKUP_UNIT_EOF'
 {service}
 BACKUP_UNIT_EOF
 
-cat > /etc/systemd/system/stalwart-backup.timer <<'BACKUP_TIMER_EOF'
+cat > /etc/systemd/system/{unit}.timer <<'BACKUP_TIMER_EOF'
 {timer}
 BACKUP_TIMER_EOF
-"#
+"#,
+			unit = Self::BACKUP_UNIT
 		)
 		.xok()
 	}
 
 	/// The line that starts the backup timer, or nothing when there is none.
-	fn backup_enable(&self) -> &'static str {
+	fn backup_enable(&self) -> String {
 		match self.backup_bucket.is_empty() {
-			true => "",
-			false => "systemctl enable --now stalwart-backup.timer",
+			true => String::new(),
+			false => {
+				format!("systemctl enable --now {}.timer", Self::BACKUP_UNIT)
+			}
 		}
 	}
 
@@ -1702,7 +1710,7 @@ echo "cold copy: __PREFIX__/$newest read-verified in __COLD_BUCKET__ ($(stat -c 
 		let service = format!(
 			r#"[Unit]
 Description=Nightly cold copy of the mail snapshot and blobs into the off-account store
-After=network-online.target stalwart-backup.service
+After=network-online.target {backup}.service
 RequiresMountsFor=/var/lib/stalwart
 
 [Service]
@@ -1712,6 +1720,7 @@ Group=stalwart
 ExecStart=/usr/local/bin/{unit}
 StandardOutput=append:{log}
 StandardError=append:{log}"#,
+			backup = Self::BACKUP_UNIT,
 			unit = Self::COLD_UNIT,
 			log = Self::UNIT_LOG
 		);

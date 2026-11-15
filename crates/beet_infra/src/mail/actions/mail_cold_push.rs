@@ -5,31 +5,37 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 impl MailColdPush {
-	/// What a deploy runs on the box: the unit the timer runs, started by
-	/// hand. `systemctl start` on a oneshot blocks until it exits, so a
-	/// failure is this command's exit status, and the script's own log line
-	/// is read back so the deploy log says what was copied.
+	/// What a deploy runs on the box: the snapshot unit then the cold-copy
+	/// unit, as a night where both timers fire runs them, started by hand.
+	/// `systemctl start` on a oneshot blocks until it exits, so a failure is
+	/// this command's exit status, and each script's own log line is read
+	/// back so the deploy log says what was snapshotted and copied.
 	pub fn command() -> String {
 		format!(
-			"sudo -n systemctl start {unit}.service && sudo -n grep -F 'cold \
-			copy:' /var/log/stalwart/stalwart.log | tail -n 1",
-			unit = StalwartBlock::COLD_UNIT
+			"sudo -n systemctl start {backup}.service && sudo -n systemctl \
+			start {cold}.service && sudo -n grep -E 'mail database backed \
+			up|cold copy:' {log} | tail -n 2",
+			backup = StalwartBlock::BACKUP_UNIT,
+			cold = StalwartBlock::COLD_UNIT,
+			log = StalwartBlock::UNIT_LOG
 		)
 	}
 }
 
-/// Starts the cold-copy unit over ssh and waits for it.
-/// `<MailColdPush/>` — run the box's nightly cold copy now.
+/// Starts the snapshot and cold-copy units over ssh and waits for them.
+/// `<MailColdPush/>` — run the box's nightly snapshot and cold copy now.
 ///
-/// The timer is the schedule; this is the proof. A deploy that arms a timer
+/// The timers are the schedule; this is the proof. A deploy that arms a timer
 /// and walks away has proven that a timer exists, which is what the first
 /// restore drill found the backup timer had been doing for a fortnight with
-/// every check green. So a deploy runs the unit itself, once, and the probe
+/// every check green. So a deploy runs the units itself, once, and the probe
 /// after it reads the cold bucket back: the path is exercised end to end
 /// before the first scheduled run, and again on every deploy after.
 ///
-/// The unit is the same one the timer runs, so nothing here can pass that the
-/// nightly run would fail.
+/// The snapshot runs first so a new box, whose archive holds nothing until
+/// its first night, has one to copy, and so the copy the probe reads is
+/// today's. The units are the ones the timers run, so nothing here can pass
+/// that the nightly run would fail.
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
@@ -70,13 +76,17 @@ pub async fn MailColdPush(
 mod tests {
 	use super::*;
 
-	/// The deploy starts the SAME unit the timer does, so nothing can pass
-	/// here that the nightly run would fail, and reads the script's own log
-	/// line back rather than trusting the exit status alone.
+	/// The deploy starts the SAME units the timers do, the snapshot before
+	/// the copy, so nothing can pass here that the nightly run would fail,
+	/// and reads each script's own log line back rather than trusting the
+	/// exit status alone.
 	#[beet_core::test]
-	fn the_push_runs_the_timers_unit() {
+	fn the_push_runs_the_timers_units() {
 		MailColdPush::command()
-			.xpect_contains("systemctl start stalwart-cold-backup.service")
-			.xpect_contains("grep -F 'cold copy:'");
+			.xpect_contains(
+				"systemctl start stalwart-backup.service && sudo -n systemctl \
+				start stalwart-cold-backup.service",
+			)
+			.xpect_contains("'mail database backed up|cold copy:'");
 	}
 }

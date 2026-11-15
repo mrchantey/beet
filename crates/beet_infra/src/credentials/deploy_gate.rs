@@ -6,6 +6,7 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
+use std::sync::Arc;
 
 /// Request params every gated deploy and destroy route takes beside its own,
 /// declared by [`DeployGate`] at route reach from [`InfraPlugin`].
@@ -410,7 +411,8 @@ impl DeployGate {
 	/// Elevate every credential that needs it (or every needed one on
 	/// `roll`), then run this deploy as this launch in a child holding what
 	/// each elevation produced, and undo the temporary credentials however
-	/// the child exits.
+	/// the run ends: the child failing, or a later credential's elevation
+	/// failing before the child starts.
 	async fn run_elevated(
 		cx: ActionContext<Request>,
 		declared: &ParamsPattern,
@@ -430,29 +432,58 @@ impl DeployGate {
 		}
 		let relay = Self::relay(&cx.input, declared);
 		let mut report = Vec::new();
-		let mut env = Vec::<(SmolStr, SmolStr)>::new();
 		let mut cleanups = Vec::new();
-		let mut stripped = Vec::<&'static str>::new();
+		let mut child = ElevatedChild {
+			args: Self::request_args(&cx.input, declared),
+			stripped: Vec::new(),
+			env: Vec::new(),
+		};
+		// elevate in turn, keeping every cleanup produced so far
+		let mut failed = None;
 		for one in elevating {
-			let elevation = one
+			let elevation = match one
 				.credential
 				.elevate(&cx.caller, ElevationAsk {
 					roll,
 					run: !one.protected.is_empty(),
 					relay: relay.clone(),
 				})
-				.await?;
+				.await
+			{
+				Ok(elevation) => elevation,
+				Err(err) => {
+					failed = Some(err);
+					break;
+				}
+			};
 			report.extend(
 				elevation
 					.report
 					.into_iter()
 					.map(|line| format!("{}: {line}", one.credential.id())),
 			);
-			env.extend(elevation.env);
+			child.env.extend(elevation.env);
 			cleanups.extend(elevation.cleanup);
-			stripped.extend(one.credential.records());
+			child.stripped.extend(one.credential.records());
 		}
-		let ran = Self::run_child(&cx.input, declared, &stripped, &env).await;
+		// run the child only when every elevation held
+		let ran = match failed {
+			Some(err) => Err(err),
+			None => {
+				cx.caller
+					.world()
+					.with(|world| {
+						world
+							.get_resource::<ElevatedChildRunner>()
+							.cloned()
+							.unwrap_or_default()
+					})
+					.await
+					.run(child)
+					.await
+			}
+		};
+		// undo every temporary credential, however the run ended
 		for cleanup in cleanups {
 			match cleanup.await {
 				Ok(line) => report.push(line),
@@ -463,40 +494,6 @@ impl DeployGate {
 		match ran {
 			Ok(()) => Response::ok_text(format!("{report}\n")).xok(),
 			Err(err) => bevybail!("{err}\n{report}"),
-		}
-	}
-
-	/// Re-run this request as this launch, less this gate's own params: every
-	/// `stripped` record removed from the child's environment, so the child's
-	/// launch loads the values the elevation just sealed rather than
-	/// inheriting the ones this launch loaded before them, then `env` set.
-	async fn run_child(
-		input: &Request,
-		declared: &ParamsPattern,
-		stripped: &[&'static str],
-		env: &[(SmolStr, SmolStr)],
-	) -> Result {
-		let args = Self::request_args(input, declared);
-		let process = env.iter().fold(
-			stripped
-				.iter()
-				.fold(ChildProcess::this_launch(&args)?, |process, record| {
-					process.without_env(*record)
-				}),
-			|process, (key, value)| {
-				process
-					.with_secret(value.clone())
-					.with_env(key.clone(), value.clone())
-			},
-		);
-		let status = process.spawn()?.status().await?;
-		match status.success() {
-			true => OK,
-			false => bevybail!(
-				"`{}` exited with {}",
-				args.join(" "),
-				status.code().unwrap_or(-1)
-			),
 		}
 	}
 
@@ -557,6 +554,70 @@ impl DeployGate {
 			true => arg.to_string(),
 			false => format!("'{}'", arg.replace('\'', r"'\''")),
 		}
+	}
+}
+
+/// The child an elevated deploy runs in: the request re-run as this launch,
+/// less the gate's own params.
+pub(crate) struct ElevatedChild {
+	/// The route and its params, see [`DeployGate::request_args`].
+	args: Vec<String>,
+	/// The records removed from the child's environment, so its launch loads
+	/// the values the elevation just sealed rather than inheriting the ones
+	/// this launch loaded before them.
+	stripped: Vec<&'static str>,
+	/// What the child runs as, set after `stripped` is removed.
+	env: Vec<(SmolStr, SmolStr)>,
+}
+
+impl ElevatedChild {
+	/// Spawn this launch with the child's args and environment, failing when
+	/// it exits unsuccessfully.
+	async fn spawn(self) -> Result {
+		let process = self.env.iter().fold(
+			self.stripped.iter().fold(
+				ChildProcess::this_launch(&self.args)?,
+				|process, record| process.without_env(*record),
+			),
+			|process, (key, value)| {
+				process
+					.with_secret(value.clone())
+					.with_env(key.clone(), value.clone())
+			},
+		);
+		let status = process.spawn()?.status().await?;
+		match status.success() {
+			true => OK,
+			false => bevybail!(
+				"`{}` exited with {}",
+				self.args.join(" "),
+				status.code().unwrap_or(-1)
+			),
+		}
+	}
+}
+
+/// What runs an elevated deploy's [`ElevatedChild`]: a spawned process
+/// ([`ElevatedChild::spawn`]) unless the world holds another, which is how a
+/// test stands in for the child without spawning one.
+#[derive(Clone, Resource)]
+pub(crate) struct ElevatedChildRunner(
+	Arc<
+		dyn 'static
+			+ Send
+			+ Sync
+			+ Fn(ElevatedChild) -> SendBoxedFuture<Result>,
+	>,
+);
+
+impl Default for ElevatedChildRunner {
+	fn default() -> Self { Self(Arc::new(|child| Box::pin(child.spawn()))) }
+}
+
+impl ElevatedChildRunner {
+	/// Run `child` to its exit.
+	async fn run(&self, child: ElevatedChild) -> Result {
+		(self.0)(child).await
 	}
 }
 
@@ -626,29 +687,36 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
+	use std::sync::Arc;
 
 	/// A credential answering with fixed reasons that counts how often it is
 	/// asked, guarding nothing so no stack is planned, and held as `holding`.
 	#[derive(Clone)]
 	struct Counted {
+		id: &'static str,
 		stale: Vec<String>,
 		asked: Store<usize>,
 		holding: Holding,
+		/// Where elevating logs `elevated <id>` and its cleanup `cleaned <id>`,
+		/// or `None` for an elevation that fails.
+		elevates: Option<Store<Vec<String>>>,
 	}
 
 	impl Counted {
 		/// Held sealed, so its reasons block.
 		fn sealed(stale: &[&str], asked: Store<usize>) -> Self {
 			Self {
+				id: "counted",
 				stale: stale.iter().map(ToString::to_string).collect(),
 				asked,
 				holding: Holding::Sealed,
+				elevates: None,
 			}
 		}
 	}
 
 	impl DeployCredentialProvider for Counted {
-		fn id(&self) -> &'static str { "counted" }
+		fn id(&self) -> &'static str { self.id }
 
 		fn human_factor(&self) -> &'static str { "a counted code" }
 
@@ -685,7 +753,22 @@ mod test {
 			_caller: AsyncEntity,
 			_ask: ElevationAsk,
 		) -> SendBoxedFuture<Result<CredentialElevation>> {
-			Box::pin(async { bevybail!("a test elevates nothing") })
+			let id = self.id;
+			let Some(log) = self.elevates else {
+				return Box::pin(async move { bevybail!("{id} refused") });
+			};
+			log.push(format!("elevated {id}"));
+			Box::pin(async move {
+				CredentialElevation {
+					report: vec!["converged".into()],
+					env: vec![(id.to_uppercase().into(), "temporary".into())],
+					cleanup: Some(Box::pin(async move {
+						log.push(format!("cleaned {id}"));
+						format!("{id} deleted").xok()
+					})),
+				}
+				.xok()
+			})
 		}
 
 		fn describe(
@@ -706,18 +789,18 @@ mod test {
 
 	/// A package as an entry declares one: the stacks `site` and `mail`, each
 	/// with a lifecycle and its state kept locally, a plain `other/deploy`,
-	/// and `all` over `matrix`, settled as a load settles it, `counted` its
-	/// one declared credential.
+	/// and `all` over `matrix`, settled as a load settles it, `credentials`
+	/// its declared ones.
 	fn package(
-		counted: Option<Counted>,
+		credentials: impl IntoIterator<Item = Counted>,
 		matrix: RouteMatrix,
 	) -> (World, Entity, TempDir) {
 		let mut world = (AsyncPlugin, RouterPlugin, InfraPlugin).into_world();
 		let (deployment, dir) = Deployment::default_local();
 		world.insert_resource(deployment);
 		world.init_resource::<PackageConfig>();
-		if let Some(counted) = counted {
-			world.spawn(DeployCredential::new(counted));
+		for credential in credentials {
+			world.spawn(DeployCredential::new(credential));
 		}
 		let stack = |name: &str| {
 			(
@@ -893,6 +976,100 @@ mod test {
 		deploy(Holding::Another).await.xpect_eq(StatusCode::OK);
 		deploy(Holding::Sealed).await.is_ok().xpect_false();
 		deploy(Holding::None).await.is_ok().xpect_false();
+	}
+
+	/// Deploy `site/deploy --elevated` with `credentials`, each blocking, and
+	/// the child standing in for the process answering `child`: the
+	/// response, then what the run logged in order, the child's args and
+	/// environment included.
+	async fn deploy_elevated(
+		credentials: impl IntoIterator<Item = Counted>,
+		log: Store<Vec<String>>,
+		child: fn() -> Result,
+	) -> (Response, Vec<String>) {
+		let (mut world, root, _dir) =
+			package(credentials, RouteMatrix::new(["site"], ["deploy"]));
+		world.insert_resource(super::ElevatedChildRunner(Arc::new(
+			move |ran: super::ElevatedChild| {
+				log.push(format!(
+					"child {} without {} with {}",
+					ran.args.join(" "),
+					ran.stripped.join(","),
+					ran.env
+						.iter()
+						.map(|(key, value)| format!("{key}={value}"))
+						.collect::<Vec<_>>()
+						.join(",")
+				));
+				Box::pin(async move { child() })
+			},
+		)));
+		let response = world
+			.entity_mut(root)
+			.exchange(Request::from_cli_str("site/deploy --elevated"))
+			.await;
+		(response, log.get())
+	}
+
+	/// A credential that elevates into `log`, blocking on a stale grant.
+	fn elevating(id: &'static str, log: Store<Vec<String>>) -> Counted {
+		Counted {
+			id,
+			elevates: Some(log),
+			..Counted::sealed(&["needs `x`"], Store::new(0))
+		}
+	}
+
+	/// An elevated run deletes its temporary credentials however the run
+	/// ends: after a child that succeeds, after one that fails, and when a
+	/// later credential's elevation fails, which then never starts the child.
+	#[beet_core::test]
+	async fn cleans_up_however_an_elevated_run_ends() {
+		let log = Store::new_vec();
+		let (response, logged) =
+			deploy_elevated([elevating("first", log)], log, || OK).await;
+		response.status().xpect_eq(StatusCode::OK);
+		logged.xpect_eq(vec![
+			"elevated first".to_string(),
+			"child site/deploy without COUNTED with FIRST=temporary".into(),
+			"cleaned first".into(),
+		]);
+
+		let log = Store::new_vec();
+		let (response, logged) =
+			deploy_elevated([elevating("first", log)], log, || {
+				bevybail!("the child exited with 1")
+			})
+			.await;
+		response.status().is_ok().xpect_false();
+		response
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("the child exited with 1")
+			.xpect_contains("first deleted");
+		logged.last().unwrap().xpect_eq("cleaned first");
+
+		let log = Store::new_vec();
+		let (response, logged) = deploy_elevated(
+			[elevating("first", log), Counted {
+				id: "second",
+				..Counted::sealed(&["needs `y`"], Store::new(0))
+			}],
+			log,
+			|| OK,
+		)
+		.await;
+		response
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("second refused")
+			.xpect_contains("first deleted");
+		logged.xpect_eq(vec![
+			"elevated first".to_string(),
+			"cleaned first".into(),
+		]);
 	}
 
 	/// A package's dry run names every stack it lists, in order, and answers

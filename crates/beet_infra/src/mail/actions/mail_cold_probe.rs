@@ -45,6 +45,53 @@ impl MailColdProbe {
 			.strip_prefix('/')
 	}
 
+	/// The blobs the newest cold run owed, checked against the `cold`
+	/// listing: every `live` blob written before the snapshot that run copied
+	/// was `taken`, since the run copies every blob it finds after the
+	/// snapshot. Answers the newest owed blob, to compare byte for byte, or
+	/// `None` while no live blob predates the snapshot. A cold blob with no
+	/// live counterpart owes nothing: it is history, ie a previous store's
+	/// bodies in an adopted bucket.
+	pub fn owed_blob<'a>(
+		live: &'a Listing,
+		cold: &Listing,
+		taken: Timestamp,
+	) -> Result<Option<&'a ListedObject>> {
+		let held = cold
+			.0
+			.iter()
+			.filter_map(|object| Self::live_blob_key(&object.key))
+			.collect::<HashSet<_>>();
+		// a date that does not parse is owed, so it is checked rather than
+		// passed over
+		let owed = live
+			.0
+			.iter()
+			.filter(|object| {
+				Timestamp::parse_rfc3339(&object.last_modified)
+					.is_none_or(|modified| modified < taken)
+			})
+			.collect::<Vec<_>>();
+		let missing = owed
+			.iter()
+			.filter(|object| !held.contains(object.key.as_str()))
+			.collect::<Vec<_>>();
+		if let Some(first) = missing.first() {
+			bevybail!(
+				"{} of the {} live blob(s) written before the newest cold \
+				snapshot was taken are not in the cold copy, {} ({}) among \
+				them: the copy stopped short of the message bodies",
+				missing.len(),
+				owed.len(),
+				first.key,
+				first.last_modified
+			);
+		}
+		owed.into_iter()
+			.max_by(|left, right| left.last_modified.cmp(&right.last_modified))
+			.xok()
+	}
+
 	/// Whether an export is this stack's: its `origin` names the app and
 	/// stage, so a document copied from another stage (a drill's, another
 	/// account's) cannot pass as the one a restore would read.
@@ -99,13 +146,15 @@ impl ColdExportQuery<'_, '_> {
 ///
 /// Three prefixes, three questions. The newest snapshot under `sqlite/` must
 /// have been TAKEN within `max_age` (by the clock in its key, not by when it
-/// landed) and must hash to the same bytes as the live archive's copy. One
-/// blob under `blobs/` must hash to the same bytes as the live blob bucket's
-/// object at the same key, and a live bucket with blobs beside a cold prefix
-/// with none is the copy having never run. And an export must exist under
-/// `secrets/`, since a restore into a fresh account starts by reading it.
+/// landed) and must hash to the same bytes as the live archive's copy. Every
+/// live blob written before that snapshot was taken must be under `blobs/`
+/// ([`MailColdProbe::owed_blob`]), the newest hashing to the same bytes as
+/// the live object, while a cold blob with no live counterpart is a previous
+/// store's history and passes. And an export must exist under `secrets/`,
+/// since a restore into a fresh account starts by reading it.
 ///
-/// Read-only against both sides, cheap (three small downloads), and made from
+/// Read-only against both sides, cheap (two listings and three small
+/// downloads), and made from
 /// the deploy machine with the same parked token the box copies with, so it
 /// proves what a restore would find rather than what the box believes it
 /// wrote. It is the tail of every deploy, after [`MailColdPush`], and a verb
@@ -187,42 +236,31 @@ pub async fn MailColdProbe(
 		time_ext::pretty_print_duration(Duration::from_secs(age as u64))
 	);
 
-	// one blob, byte for byte; none at all is the copy having never reached
-	// the blobs, unless the live store is empty too
+	// every blob that copy owed, by listing, and the newest byte for byte
 	let blob_prefix = format!("{}/", StalwartBlock::COLD_BLOBS_PREFIX);
+	let live_blobs = blobs.list("").await?;
 	let cold_blobs = cold.list(&blob_prefix).await?;
-	match cold_blobs.newest("") {
+	match MailColdProbe::owed_blob(&live_blobs, &cold_blobs, taken)? {
 		Some(sample) => {
-			let live_key = MailColdProbe::live_blob_key(&sample.key)
-				.ok_or_else(|| {
-					bevyhow!(
-						"cold blob {} is outside {blob_prefix}",
-						sample.key
-					)
-				})?;
-			compare(&cold, &blobs, &sample.key, live_key, &work_dir, "blob")
-				.await?;
+			compare(
+				&cold,
+				&blobs,
+				&format!("{blob_prefix}{}", sample.key),
+				&sample.key,
+				&work_dir,
+				"blob",
+			)
+			.await?;
 			info!(
-				"cold blob {} ({} bytes) matches the live blob store byte for \
-				byte, {} blob(s) listed on the first page",
-				sample.key,
-				sample.size,
-				cold_blobs.0.len()
+				"every live blob written before {} is in the cold copy, and \
+				the newest, {} ({} bytes), matches byte for byte",
+				newest.key, sample.key, sample.size
 			);
 		}
-		None => {
-			let live = blobs.list("").await?;
-			if !live.0.is_empty() {
-				bevybail!(
-					"s3://{}/{blob_prefix} holds no blob while the live store \
-					holds {}: the cold copy has never reached the message \
-					bodies",
-					cold.bucket,
-					live.0.len()
-				);
-			}
-			info!("no blobs on either side yet, which is a new mail store");
-		}
+		None => info!(
+			"no live blob predates {}, so the cold copy owes none yet",
+			newest.key
+		),
 	}
 
 	// the export: the newest of the dated series is this stack's and opens
@@ -356,6 +394,53 @@ mod tests {
 			.unwrap()
 			.xpect_eq("ab/cdef");
 		MailColdProbe::live_blob_key("sqlite/x.db").xpect_none();
+	}
+
+	/// A listing of `(key, last modified)` pairs.
+	fn listing(objects: &[(&str, &str)]) -> Listing {
+		objects
+			.iter()
+			.map(|(key, modified)| ListedObject {
+				key: key.to_string(),
+				last_modified: modified.to_string(),
+				size: 1,
+			})
+			.collect::<Vec<_>>()
+			.xmap(Listing)
+	}
+
+	/// The copy owes every live blob older than the snapshot it copied, and
+	/// nothing else: a newer live blob waits for the next run, and a cold
+	/// blob with no live counterpart (an adopted bucket's previous store) is
+	/// history rather than a mismatch.
+	#[beet_core::test]
+	fn owes_every_live_blob_older_than_the_snapshot() {
+		let taken = Timestamp::parse_iso8601("2026-11-16T03:00:00Z").unwrap();
+		let live = listing(&[
+			("a", "2026-11-16T01:00:00+00:00"),
+			("b", "2026-11-16T02:00:00+00:00"),
+			("c", "2026-11-16T04:00:00+00:00"),
+		]);
+		let cold = listing(&[
+			("blobs/old", "2026-10-01T00:00:00+00:00"),
+			("blobs/a", "2026-11-16T03:05:00+00:00"),
+			("blobs/b", "2026-11-16T03:05:00+00:00"),
+		]);
+		MailColdProbe::owed_blob(&live, &cold, taken)
+			.unwrap()
+			.unwrap()
+			.key
+			.as_str()
+			.xpect_eq("b");
+		MailColdProbe::owed_blob(&live, &listing(&[("blobs/a", "")]), taken)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("1 of the 2 live blob(s)")
+			.xpect_contains("b (2026-11-16T02:00:00+00:00)");
+		// a new store beside an adopted bucket's history owes nothing yet
+		MailColdProbe::owed_blob(&listing(&[]), &cold, taken)
+			.unwrap()
+			.xpect_none();
 	}
 
 	/// An export from another stage, or with no origin, is not this stack's.

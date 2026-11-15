@@ -614,13 +614,15 @@ impl CloudflareDeployCredential {
 		let name = Self::elevated_name()?;
 		let elevated = lowered.elevate();
 		let terms = terms.elevated(Timestamp::now());
+		// settled before the mint, so nothing fallible but the proof, which
+		// discards on failure, comes between the token and its deletion
+		let (url, what) = Self::deploy_proof(&elevated)?;
 		// a token a crash left behind is never the one this run holds
 		let leftover = mint.find_tokens(&account, &name).await?;
 		mint.delete_others(&account, &leftover, "").await?;
 		let (id, value) = mint
 			.create_token(&account, terms.body(&name, elevated.to_json()))
 			.await?;
-		let (url, what) = Self::deploy_proof(&elevated)?;
 		mint.prove_or_discard(&account, &id, &value, url, what)
 			.await?;
 		let line = format!(
