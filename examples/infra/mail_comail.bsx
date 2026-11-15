@@ -142,7 +142,7 @@ inbound assertion rather than failing the deploy.
 		<StalwartBlock label="mail" hostname="mail.example.com"
 			blob_bucket="mail-blobs" backup_bucket="archive"
 			{VpcRef($net)}
-			ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"/>
+			ssh_public_keys={["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"]}/>
 
 		<!-- one enrolled domain, one DID. `{ComailRelay}` takes the hosted relay
 		     by default; the relay is AGPL, so a self-hosted one is

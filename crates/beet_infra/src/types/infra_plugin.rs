@@ -575,7 +575,7 @@ mod test {
 					mta_sts={{mode:Enforce}}/>
 				<StalwartBlock label="mail" hostname="mail.beetmash.com"
 					blob_bucket="mail-blobs"
-					ssh_public_key="ssh-ed25519 AAAA pete"
+					ssh_public_keys={["ssh-ed25519 AAAA pete"]}
 					{VpcRef($net)}/>
 				<VpcBlock bx:ref="net" label="net"/>
 			</Fragment>"#,
@@ -784,7 +784,7 @@ mod test {
 				<StalwartBlock label="mail" hostname="mail.beetmash.com"
 					blob_bucket="mail-blobs" backup_bucket="mail-backups"
 					cold_bucket="cold-backups"
-					ssh_public_key="ssh-ed25519 AAAA pete"/>
+					ssh_public_keys={["ssh-ed25519 AAAA pete"]}/>
 				<MailRestoreDrill source_domain="beetmash.com" mailbox="probe"
 					source_snapshot="Cold"/>
 				<Secrets bx:ref="cold_export" label="mail-cold" path="secrets/export.toml"/>

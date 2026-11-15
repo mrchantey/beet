@@ -107,9 +107,14 @@ pub struct StalwartBlock {
 	/// which is right for a stack whose domain nothing else serves.
 	#[set_with(unwrap_option, into)]
 	dns_stage: Option<SmolStr>,
-	/// The SSH public key installed as the box's key pair. A public half only;
-	/// the private key never touches this stack.
-	ssh_public_key: SmolStr,
+	/// The SSH public keys that log in as `ec2-user`, one per device that
+	/// deploys, since provision, the DANE pin and the cold push all reach the
+	/// box over ssh from wherever the deploy runs. The first is the box's EC2
+	/// key pair and the rest are added to its `authorized_keys` on first boot
+	/// ([`Self::authorized_keys_stanza`]); either way a key is installed only
+	/// at launch, so changing the list replaces the box. Public halves only;
+	/// no private key touches this stack.
+	ssh_public_keys: Vec<SmolStr>,
 	instance_type: SmolStr,
 	/// Root EBS volume size in GB, encrypted gp3.
 	volume_gb: i64,
@@ -288,7 +293,7 @@ impl StalwartBlock {
 			cold_bucket: SmolStr::default(),
 			dns: None,
 			dns_stage: None,
-			ssh_public_key: SmolStr::default(),
+			ssh_public_keys: Vec::new(),
 			instance_type: Self::INSTANCE_TYPE.into(),
 			volume_gb: 30,
 			data_volume_gb: 20,
@@ -512,9 +517,17 @@ impl StalwartBlock {
 				self.label
 			);
 		}
-		if self.ssh_public_key.is_empty() {
+		if self.ssh_public_keys.is_empty() {
 			bevybail!(
 				"mail box '{}' has no ssh public key: port 22 is keypair-only, so a box without one is unreachable",
+				self.label
+			);
+		}
+		if let Some(key) = self.ssh_public_keys.iter().find(|key| {
+			key.trim().is_empty() || key.contains(['\n', '\r', '\''])
+		}) {
+			bevybail!(
+				"mail box '{}' declares the ssh public key `{key}`, which is blank or spans lines or quotes: each entry is one `<type> <key> <comment>` line",
 				self.label
 			);
 		}
@@ -1024,7 +1037,11 @@ impl StalwartBlock {
 				key_name_prefix: Some(
 					keypair_ident.primary_identifier().clone(),
 				),
-				public_key: self.ssh_public_key.clone(),
+				public_key: self
+					.ssh_public_keys
+					.first()
+					.cloned()
+					.unwrap_or_default(),
 				..default()
 			},
 		);
@@ -1555,6 +1572,25 @@ WantedBy=multi-user.target"#,
 		.xok()
 	}
 
+	/// The cloud-init stanza adding every key after the first to `ec2-user`'s
+	/// `authorized_keys`, which the key pair's has already been written to by
+	/// the time user data runs; nothing for a box declaring one key, so a
+	/// single-key box's user data is unchanged by the list.
+	fn authorized_keys_stanza(&self) -> String {
+		match self.ssh_public_keys.get(1..) {
+			Some(rest) if !rest.is_empty() => format!(
+				r#"
+# the deploy keys beyond the key pair's, one per device that deploys
+cat >> /home/ec2-user/.ssh/authorized_keys <<'KEYS_EOF'
+{}
+KEYS_EOF
+"#,
+				rest.join("\n")
+			),
+			_ => String::new(),
+		}
+	}
+
 	/// The cloud-init stanza that installs the backup script and its units, or
 	/// nothing at all when no [`backup_bucket`](Self::backup_bucket) is
 	/// declared.
@@ -1815,6 +1851,7 @@ COLD_TIMER_EOF
 		cold: Option<&R2BucketBlock>,
 	) -> Result<SmolStr> {
 		let hostname = &self.hostname;
+		let authorized_keys = self.authorized_keys_stanza();
 		let version = Self::STALWART_VERSION;
 		let tarball = Self::STALWART_TARBALL;
 		let sha256 = Self::STALWART_SHA256;
@@ -1840,7 +1877,7 @@ set -euo pipefail
 
 # the box's own name, ie what its SMTP banner and HELO identify as
 hostnamectl set-hostname '{hostname}'
-
+{authorized_keys}
 # Terraform may attach the data volume after cloud-init starts. Nitro exposes an
 # EBS attachment by its volume id, not reliably by the requested /dev/sdf name,
 # so wait for that exact by-id path and never risk formatting another disk.
@@ -1970,9 +2007,9 @@ mod tests {
 	fn mail_box() -> StalwartBlock {
 		StalwartBlock::new("mail", "mail.beetmash.com")
 			.with_blob_bucket("mail-blobs")
-			.with_ssh_public_key(
-				"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITESTKEY pete",
-			)
+			.with_ssh_public_keys(vec![
+				"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITESTKEY pete".into(),
+			])
 	}
 
 	/// The blocks the box is deployed beside, whose grants it lowers.
@@ -2267,7 +2304,7 @@ mod tests {
 		user_data(&mail_box()).xpect_not_eq(user_data(
 			&StalwartBlock::new("mail", "mx.beetmash.com")
 				.with_blob_bucket("mail-blobs")
-				.with_ssh_public_key("ssh-ed25519 KEY pete"),
+				.with_ssh_public_keys(vec!["ssh-ed25519 KEY pete".into()]),
 		));
 	}
 
@@ -2562,6 +2599,31 @@ mod tests {
 			.unwrap()
 			.xpect_contains("aws_instance")
 			.xpect_contains(".id");
+	}
+
+	/// One key per device that deploys: the first is the EC2 key pair, the
+	/// rest are appended to `authorized_keys` at first boot, and a box with
+	/// one key renders no stanza at all.
+	#[beet_core::test]
+	fn every_declared_key_logs_in() {
+		let both = mail_box().with_ssh_public_keys(vec![
+			"ssh-ed25519 AAAAFIRST one".into(),
+			"ssh-ed25519 AAAASECOND two".into(),
+		]);
+		let (_stack, _deployment, config) = build_config(&both);
+		resource(&config, "aws_key_pair")["public_key"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("ssh-ed25519 AAAAFIRST one");
+		user_data(&both)
+			.xpect_contains(
+				"cat >> /home/ec2-user/.ssh/authorized_keys <<'KEYS_EOF'\nssh-ed25519 AAAASECOND two\nKEYS_EOF",
+			)
+			.xnot()
+			.xpect_contains("AAAAFIRST");
+		user_data(&mail_box())
+			.xnot()
+			.xpect_contains("authorized_keys");
 	}
 
 	/// Non-production stages are disposable by default so a restore drill can
@@ -3336,14 +3398,22 @@ mod tests {
 			.to_string()
 			.xpect_contains("names no blob bucket");
 		mail_box()
-			.with_ssh_public_key("")
+			.with_ssh_public_keys(Vec::new())
 			.validate()
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("no ssh public key");
+		mail_box()
+			.with_ssh_public_keys(vec![
+				"ssh-ed25519 A one\nssh-ed25519 B two".into(),
+			])
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("spans lines");
 		StalwartBlock::new("mail", "Mail.Beetmash.Com")
 			.with_blob_bucket("mail-blobs")
-			.with_ssh_public_key("ssh-ed25519 KEY")
+			.with_ssh_public_keys(vec!["ssh-ed25519 KEY".into()])
 			.validate()
 			.unwrap_err()
 			.to_string()

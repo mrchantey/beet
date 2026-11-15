@@ -266,7 +266,7 @@ Now the automated part. One `.bsx` file declares the whole system, and the bound
 	<StalwartBlock label="mail" hostname="mail.example.com"
 		blob_bucket="mail-blobs" backup_bucket="archive" dns_stage="prod"
 		{VpcRef($net)}
-		ssh_public_key="ssh-ed25519 AAAA... deploy"/>
+		ssh_public_keys={["ssh-ed25519 AAAA... deploy"]}/>
 
 	<MailDomainBlock
 		domain="stalwart.example.com"
@@ -360,7 +360,7 @@ Two subtleties in writing one. Match DKIM selector names as *patterns*, because 
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_mail -N '' -C mail-deploy
 ```
 
-The public half goes into `<StalwartBlock ssh_public_key=..>` and the path to the private half into `<StalwartProvision ssh_key=..>`. A dedicated key is the right answer here: reusing one that already authenticates somewhere else means one compromise reaches both.
+The public half goes into `<StalwartBlock ssh_public_keys={[..]}>` and the path to the private half into `<StalwartProvision ssh_key=..>`. A dedicated key is the right answer here: reusing one that already authenticates somewhere else means one compromise reaches both. Every device that deploys mints its own and lists its public half, since provision and the cold push reach the box over ssh from wherever the deploy runs; the first is the box's key pair, the rest are added at first boot, and a change to the list replaces the box.
 
 **Hand step, if you did section 5 by hand.** Reconcile what you built by hand with what the stack now declares. SESv2 will not let terraform adopt an existing identity or configuration set silently, so the path is delete-and-let-the-apply-recreate: `aws sesv2 delete-email-identity`, `aws sesv2 delete-configuration-set`, and delete the hand-added zone records over the DNS API. Capture the configuration sets' event destinations first if you want to re-add them, and note that event destinations are create-only from terraform's point of view, so a hand-made one that exists in AWS but not in state fails the apply with `AlreadyExistsException`.
 
