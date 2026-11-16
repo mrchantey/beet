@@ -230,6 +230,11 @@ impl Plugin for RouterPlugin {
 					)
 						.in_set(BlobReactions),
 				);
+			// the declaration resolves in every build, so an entry loaded by
+			// a binary that never reads secrets (a cloud box's) builds it
+			// inert rather than warning it unregistered; `vault` adds the
+			// prescan load
+			app.register_type::<Secrets>();
 			#[cfg(feature = "vault")]
 			app.install_type::<Secrets>();
 			// the no-code static-asset mount: `ServeBlobs` owns its mount prefix and
@@ -668,6 +673,33 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_ui::prelude::*;
+
+	/// REGRESSION: the beet.org box's binary, built without `vault`, warned
+	/// `<Secrets>` unregistered on every load of the site entry, which
+	/// declares it at its top so a deploy loads the repo's document. The
+	/// declaration is registered in every build, `vault` adding only its
+	/// load.
+	#[beet_core::test]
+	fn every_build_knows_the_secrets_declaration() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let mut root = world.spawn(Router);
+		DocParsers::parse(ParseContext::new(
+			&mut root,
+			&MediaBytes::new_bsx(r#"<Secrets path="../secrets.toml"/>"#),
+		))
+		.unwrap();
+		let root = root.flush();
+		let declared = world
+			.query_filtered::<Entity, With<Secrets>>()
+			.iter(&world)
+			.collect::<Vec<_>>();
+		declared.len().xpect_eq(1);
+		world
+			.entity(declared[0])
+			.contains::<UnregisteredTag>()
+			.xpect_false();
+		world.entity(root).get::<TemplateError>().xpect_none();
+	}
 
 	/// The store-file routes are authored in markup, as an entry declares them,
 	/// so each must be registered: an unregistered tag builds inert and its

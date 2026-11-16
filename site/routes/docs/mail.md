@@ -420,7 +420,7 @@ beet secrets/exec -- aws ssm get-parameter --region ap-southeast-2 \
 
 ### Setting up a client
 
-Thunderbird took the address and the password and discovered everything else from the autoconfig records, and ticking its address book and calendar sync worked against the same 443 with the same credentials, so CardDAV and CalDAV came along for free. The one prompt that needs explaining is the bare "mail.example.com requests username and password" from the DAV sync: it wants the *full address* as the username, with the same password.
+Thunderbird took the address and the password and discovered everything else from the autoconfig records, and ticking its address book and calendar sync worked against the same 443 with the same credentials, so CardDAV and CalDAV came along for free. The document advertises only what the box serves (IMAP on 993, submission on 465, and the 443 protocols), since provision writes Stalwart's advertised services from the same port list the listeners and the security group come from; Stalwart's own default also offers POP3 and ManageSieve, which nothing here serves. The one prompt that needs explaining is the bare "mail.example.com requests username and password" from the DAV sync: it wants the *full address* as the username, with the same password.
 
 ### The soak, and a realistic expectation
 

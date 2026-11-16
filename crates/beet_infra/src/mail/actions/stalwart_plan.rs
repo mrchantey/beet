@@ -522,12 +522,42 @@ impl StalwartPlan {
 	}
 
 	/// The system settings patch: the box's own name, which is what its SMTP
-	/// greeting, its reports and its discovery documents all publish.
+	/// greeting, its reports and its discovery documents all publish, and the
+	/// protocols those documents advertise ([`Self::advertised_services`]).
 	pub fn system_settings(&self, default_domain_id: &str) -> Value {
 		json!({
 			"defaultHostname": self.hostname,
 			"defaultDomainId": default_domain_id,
+			"services": Self::advertised_services(),
 		})
+	}
+
+	/// The protocols the discovery documents (autoconfig, autodiscover)
+	/// advertise, each TLS only, derived from [`StalwartBlock::OPEN_PORTS`] so
+	/// a client is never pointed at a port the box does not serve.
+	///
+	/// Stalwart builds those documents from `x:SystemSettings.services`
+	/// alone, not from its listeners (`common/src/network/autoconfig` in the
+	/// pinned tag), and its default lists all eight protocols: found live
+	/// advertising POP3 on 995 after provision had retired `pop3s`. Patching
+	/// the property replaces the whole map.
+	pub fn advertised_services() -> Value {
+		let served = |service: &str| {
+			StalwartBlock::OPEN_PORTS
+				.iter()
+				.any(|(_, name)| *name == service)
+		};
+		[
+			("imaps", &["imap"][..]),
+			("submissions", &["smtp"][..]),
+			("https", &["jmap", "caldav", "carddav", "webdav"][..]),
+		]
+		.into_iter()
+		.filter(|(service, _)| served(service))
+		.flat_map(|(_, protocols)| protocols.iter())
+		.map(|protocol| (protocol.to_string(), json!({ "cleartext": false })))
+		.collect::<serde_json::Map<_, _>>()
+		.xmap(Value::Object)
 	}
 }
 
@@ -871,6 +901,35 @@ mod tests {
 			)]),
 		)
 		.unwrap()
+	}
+
+	/// The discovery documents advertise only what the box serves: POP3 and
+	/// ManageSieve, which Stalwart's default lists and whose listeners
+	/// provision retires, are gone, and nothing is offered in cleartext.
+	#[beet_core::test]
+	fn advertises_only_the_served_protocols() {
+		let services = StalwartPlan::advertised_services();
+		let mut protocols = services
+			.as_object()
+			.unwrap()
+			.keys()
+			.cloned()
+			.collect::<Vec<_>>();
+		protocols.sort();
+		protocols.xpect_eq(vec![
+			"caldav".to_string(),
+			"carddav".into(),
+			"imap".into(),
+			"jmap".into(),
+			"smtp".into(),
+			"webdav".into(),
+		]);
+		services
+			.as_object()
+			.unwrap()
+			.values()
+			.all(|service| service["cleartext"] == false)
+			.xpect_true();
 	}
 
 	/// Every open port that carries a Stalwart protocol gets a listener, and
