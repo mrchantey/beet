@@ -107,14 +107,6 @@ pub struct StalwartBlock {
 	/// which is right for a stack whose domain nothing else serves.
 	#[set_with(unwrap_option, into)]
 	dns_stage: Option<SmolStr>,
-	/// The SSH public keys that log in as `ec2-user`, one per device that
-	/// deploys, since provision, the DANE pin and the cold push all reach the
-	/// box over ssh from wherever the deploy runs. The first is the box's EC2
-	/// key pair and the rest are added to its `authorized_keys` on first boot
-	/// ([`Self::authorized_keys_stanza`]); either way a key is installed only
-	/// at launch, so changing the list replaces the box. Public halves only;
-	/// no private key touches this stack.
-	ssh_public_keys: Vec<SmolStr>,
 	instance_type: SmolStr,
 	/// Root EBS volume size in GB, encrypted gp3.
 	volume_gb: i64,
@@ -156,13 +148,15 @@ impl Default for StalwartBlock {
 impl Block for StalwartBlock {
 	fn label(&self) -> &SmolStr { &self.label }
 
-	/// The DANE pin, when declared: read from the secret store by every
-	/// render, empty until `MailDane` has parked one.
+	/// The user authority the box's sshd trusts, and the DANE pin when
+	/// declared: both read from the secret store by every render, the pin
+	/// empty until `MailDane` has parked one.
 	fn variables(&self, _stack: &ResolvedStack) -> Vec<Variable> {
-		match self.dane {
-			true => vec![self.tlsa_variable()],
-			false => Vec::new(),
+		let mut variables = vec![SshAuthority::user_ca_variable()];
+		if self.dane {
+			variables.push(self.tlsa_variable());
 		}
+		variables
 	}
 }
 
@@ -293,7 +287,6 @@ impl StalwartBlock {
 			cold_bucket: SmolStr::default(),
 			dns: None,
 			dns_stage: None,
-			ssh_public_keys: Vec::new(),
 			instance_type: Self::INSTANCE_TYPE.into(),
 			volume_gb: 30,
 			data_volume_gb: 20,
@@ -380,6 +373,23 @@ impl StalwartBlock {
 		SecretRef::new(format!("{}-{suffix}", self.label))
 	}
 
+	/// The tofu output holding the box's elastic address, ie
+	/// `mail_public_ip`.
+	pub fn public_ip_output(&self) -> String {
+		format!("{}_public_ip", self.label)
+	}
+
+	/// The box's ssh identity under its stack's [`SshAuthority`]: certified
+	/// as its `hostname`, signed into as `ec2-user`. Provision, the DANE pin,
+	/// the cold push and an operator's session all reach it through this.
+	pub fn ssh_host(&self) -> SshHost {
+		SshHost::new(
+			self.label.clone(),
+			self.hostname.clone(),
+			SshAuthority::EC2_USER,
+			self.public_ip_output(),
+		)
+	}
 
 	/// Where `EnsureSecret` puts the bootstrap admin password and the boot
 	/// script reads it back.
@@ -514,20 +524,6 @@ impl StalwartBlock {
 		if self.blob_bucket.is_empty() {
 			bevybail!(
 				"mail box '{}' names no blob bucket: `with_blob_bucket` the S3BucketBlock holding message bodies",
-				self.label
-			);
-		}
-		if self.ssh_public_keys.is_empty() {
-			bevybail!(
-				"mail box '{}' has no ssh public key: port 22 is keypair-only, so a box without one is unreachable",
-				self.label
-			);
-		}
-		if let Some(key) = self.ssh_public_keys.iter().find(|key| {
-			key.trim().is_empty() || key.contains(['\n', '\r', '\''])
-		}) {
-			bevybail!(
-				"mail box '{}' declares the ssh public key `{key}`, which is blank or spans lines or quotes: each entry is one `<type> <key> <comment>` line",
 				self.label
 			);
 		}
@@ -812,8 +808,9 @@ impl StalwartBlock {
 	}
 
 	/// The inline policy document, lowered through the shared [`IamPolicy`]
-	/// core, seeded with the two statements this block owns: its bootstrap-admin
-	/// parameter and its CloudWatch log group. The blob store multiparts, so the
+	/// core, seeded with the statements this block owns: its bootstrap-admin
+	/// parameter, its ssh host key and certificate, and its CloudWatch log
+	/// group. The blob store multiparts, so the
 	/// write statement carries `s3:AbortMultipartUpload` through the
 	/// per-compute knob.
 	///
@@ -838,6 +835,8 @@ impl StalwartBlock {
 					self.admin_secret_name(stack)
 				)
 			}))
+			// the host key and certificate its sshd serves, read at first boot
+			.read_secrets(stack, &self.ssh_host().host_secrets())
 			.decrypt_secure_strings()
 			.write_action("s3:AbortMultipartUpload")
 			.lower(access)?
@@ -1004,10 +1003,13 @@ impl StalwartBlock {
 		)
 	}
 
-	/// The box itself: AMI resolved from the public AL2023 arm64 pointer, key
-	/// pair, encrypted root, IMDSv2 required, user_data as machine identity,
-	/// an EIP so the address (and its rDNS) survives every rebuild, the log
-	/// group its agent forwards to, and the `A` record naming it.
+	/// The box itself: AMI resolved from the public AL2023 arm64 pointer,
+	/// encrypted root, IMDSv2 required, user_data as machine identity, an EIP
+	/// so the address (and its rDNS) survives every rebuild, the log group its
+	/// agent forwards to, and the `A` record naming it.
+	///
+	/// No key pair: the box admits certificates from its stack's
+	/// [`SshAuthority`] alone, so there is no key for EC2 to install.
 	fn emit_instance(
 		&self,
 		stack: &ResolvedStack,
@@ -1026,25 +1028,6 @@ impl StalwartBlock {
 			&ami_label,
 			&json!({ "name": Self::AMI_PARAMETER }),
 		)?;
-
-		// `key_name_prefix` so a rolled public key is a NEW key pair name,
-		// which forces instance replacement: EC2 only installs the key at
-		// launch, so an in-place key update would be silently ignored.
-		let keypair_ident = stack.resource_ident(self.build_label("keypair"));
-		let keypair = ResourceDef::new_secondary(
-			keypair_ident.clone(),
-			AwsKeyPairDetails {
-				key_name_prefix: Some(
-					keypair_ident.primary_identifier().clone(),
-				),
-				public_key: self
-					.ssh_public_keys
-					.first()
-					.cloned()
-					.unwrap_or_default(),
-				..default()
-			},
-		);
 
 		// declared so `tofu destroy` removes it; the agent writes into the
 		// existing group rather than auto-creating an unmanaged one.
@@ -1065,6 +1048,7 @@ impl StalwartBlock {
 			.resource_ident(self.build_label("user_data"))
 			.label()
 			.to_string();
+		SshAuthority::declare_variable(config);
 		config.add_local(
 			&user_data_local,
 			self.build_user_data(stack, cold)?.as_str(),
@@ -1084,7 +1068,6 @@ impl StalwartBlock {
 				vpc_security_group_ids: Some(vec![
 					group.field_ref("id").into(),
 				]),
-				key_name: Some(keypair.field_ref("key_name").into()),
 				iam_instance_profile: Some(profile.field_ref("name").into()),
 				// one address out of the subnet's /64; the listeners already
 				// bind `::`, so this is the whole of the box's side of v6
@@ -1143,7 +1126,6 @@ impl StalwartBlock {
 			self.data_volume_attachment(stack, &data_volume, &instance);
 
 		config
-			.add_resource(&keypair)?
 			.add_resource(&log_group)?
 			.add_resource(&data_volume)?
 			.add_resource(&instance)?
@@ -1222,7 +1204,7 @@ impl StalwartBlock {
 		}
 
 		config
-			.add_output(format!("{}_public_ip", self.label), terra::Output {
+			.add_output(self.public_ip_output(), terra::Output {
 				value: eip.field_ref("public_ip").into(),
 				description: Some("The mail box public address".into()),
 				sensitive: None,
@@ -1572,25 +1554,6 @@ WantedBy=multi-user.target"#,
 		.xok()
 	}
 
-	/// The cloud-init stanza adding every key after the first to `ec2-user`'s
-	/// `authorized_keys`, which the key pair's has already been written to by
-	/// the time user data runs; nothing for a box declaring one key, so a
-	/// single-key box's user data is unchanged by the list.
-	fn authorized_keys_stanza(&self) -> String {
-		match self.ssh_public_keys.get(1..) {
-			Some(rest) if !rest.is_empty() => format!(
-				r#"
-# the deploy keys beyond the key pair's, one per device that deploys
-cat >> /home/ec2-user/.ssh/authorized_keys <<'KEYS_EOF'
-{}
-KEYS_EOF
-"#,
-				rest.join("\n")
-			),
-			_ => String::new(),
-		}
-	}
-
 	/// The cloud-init stanza that installs the backup script and its units, or
 	/// nothing at all when no [`backup_bucket`](Self::backup_bucket) is
 	/// declared.
@@ -1851,7 +1814,7 @@ COLD_TIMER_EOF
 		cold: Option<&R2BucketBlock>,
 	) -> Result<SmolStr> {
 		let hostname = &self.hostname;
-		let authorized_keys = self.authorized_keys_stanza();
+		let ssh_trust = self.ssh_host().trust_stanza(stack)?;
 		let version = Self::STALWART_VERSION;
 		let tarball = Self::STALWART_TARBALL;
 		let sha256 = Self::STALWART_SHA256;
@@ -1877,7 +1840,7 @@ set -euo pipefail
 
 # the box's own name, ie what its SMTP banner and HELO identify as
 hostnamectl set-hostname '{hostname}'
-{authorized_keys}
+{ssh_trust}
 # Terraform may attach the data volume after cloud-init starts. Nitro exposes an
 # EBS attachment by its volume id, not reliably by the requested /dev/sdf name,
 # so wait for that exact by-id path and never risk formatting another disk.
@@ -1994,7 +1957,7 @@ systemctl enable --now stalwart
 		let script = script.replace("${", "$${");
 		let script =
 			script.replace("__DATA_VOLUME_ID__", &self.data_volume_id(stack));
-		SmolStr::from(script).xok()
+		SshAuthority::interpolate(&script).xmap(SmolStr::from).xok()
 	}
 }
 
@@ -2007,9 +1970,6 @@ mod tests {
 	fn mail_box() -> StalwartBlock {
 		StalwartBlock::new("mail", "mail.beetmash.com")
 			.with_blob_bucket("mail-blobs")
-			.with_ssh_public_keys(vec![
-				"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITESTKEY pete".into(),
-			])
 	}
 
 	/// The blocks the box is deployed beside, whose grants it lowers.
@@ -2303,8 +2263,7 @@ mod tests {
 		// ..and a changed hostname IS a changed machine
 		user_data(&mail_box()).xpect_not_eq(user_data(
 			&StalwartBlock::new("mail", "mx.beetmash.com")
-				.with_blob_bucket("mail-blobs")
-				.with_ssh_public_keys(vec!["ssh-ed25519 KEY pete".into()]),
+				.with_blob_bucket("mail-blobs"),
 		));
 	}
 
@@ -2328,8 +2287,9 @@ mod tests {
 	}
 
 	/// No secret exists in machine config or transits it: the only terraform
-	/// interpolation in rendered user_data is the data volume ID, while the
-	/// script holds the bootstrap admin's SSM parameter name, never its value.
+	/// interpolations in rendered user_data are the data volume ID and the
+	/// ssh user authority's PUBLIC half, while the script holds the bootstrap
+	/// admin's and the host key's SSM parameter names, never their values.
 	/// The SES SMTP secret appears only as the `aws_ssm_parameter` resource's
 	/// interpolation, which is state-bound, never user_data-bound.
 	#[beet_core::test]
@@ -2348,7 +2308,7 @@ mod tests {
 				script[index..].split('}').next().unwrap().to_string()
 			})
 			.collect::<Vec<_>>()
-			.xpect_eq(vec![volume]);
+			.xpect_eq(vec!["${var.ssh_user_ca".to_string(), volume]);
 		script
 			.as_str()
 			.xnot()
@@ -2601,29 +2561,51 @@ mod tests {
 			.xpect_contains(".id");
 	}
 
-	/// One key per device that deploys: the first is the EC2 key pair, the
-	/// rest are appended to `authorized_keys` at first boot, and a box with
-	/// one key renders no stanza at all.
+	/// The box admits its stack's ssh authority and no device: no key pair
+	/// for EC2 to install, the user authority read into `user_data` as a
+	/// content variable, and a grant on exactly the host key and certificate
+	/// its sshd fetches at first boot, before anything else it installs.
 	#[beet_core::test]
-	fn every_declared_key_logs_in() {
-		let both = mail_box().with_ssh_public_keys(vec![
-			"ssh-ed25519 AAAAFIRST one".into(),
-			"ssh-ed25519 AAAASECOND two".into(),
-		]);
-		let (_stack, _deployment, config) = build_config(&both);
-		resource(&config, "aws_key_pair")["public_key"]
+	fn trusts_only_its_ssh_authority() {
+		let (stack, _deployment, config) = build_config(&mail_box());
+		let json = config.to_json().into_json();
+		json["resource"]["aws_key_pair"].is_null().xpect_true();
+		instance(&config)["key_name"].is_null().xpect_true();
+		json["variable"]["ssh_user_ca"]["default"]
+			.is_null()
+			.xpect_true();
+		let script = rendered_user_data(&config);
+		script
+			.as_str()
+			.xpect_contains("<<'SSH_CA_EOF'\n${var.ssh_user_ca}\nSSH_CA_EOF")
+			.xpect_contains("AuthorizedKeysFile none");
+		script
+			.find("TrustedUserCAKeys")
+			.unwrap()
+			.xpect_less_than(script.find("dnf install").unwrap());
+		runtime_statements(&config)
+			.into_iter()
+			.find(|statement| statement["Sid"] == "StackSecrets")
+			.unwrap()["Resource"]
+			.xpect_eq(json!(
+				mail_box().ssh_host().parameter_names(&stack).map(
+					|name| format!(
+						"arn:aws:ssm:ap-southeast-2:*:parameter{name}"
+					)
+				)
+			));
+	}
+
+	/// Every statement of the box's runtime policy.
+	fn runtime_statements(config: &terra::Config) -> Vec<serde_json::Value> {
+		let policy = resource(config, "aws_iam_role_policy")["policy"]
 			.as_str()
 			.unwrap()
-			.xpect_eq("ssh-ed25519 AAAAFIRST one");
-		user_data(&both)
-			.xpect_contains(
-				"cat >> /home/ec2-user/.ssh/authorized_keys <<'KEYS_EOF'\nssh-ed25519 AAAASECOND two\nKEYS_EOF",
-			)
-			.xnot()
-			.xpect_contains("AAAAFIRST");
-		user_data(&mail_box())
-			.xnot()
-			.xpect_contains("authorized_keys");
+			.to_string();
+		serde_json::from_str::<serde_json::Value>(&policy).unwrap()["Statement"]
+			.as_array()
+			.unwrap()
+			.clone()
 	}
 
 	/// Non-production stages are disposable by default so a restore drill can
@@ -3233,24 +3215,10 @@ mod tests {
 	#[beet_core::test]
 	fn the_box_may_decrypt_its_own_secure_strings() {
 		let (_stack, _deployment, config) = build_config(&mail_box());
-		let json = config.to_json().into_json();
-		let policy = json["resource"]["aws_iam_role_policy"]
-			.as_object()
-			.unwrap()
-			.values()
-			.next()
-			.unwrap()["policy"]
-			.as_str()
-			.unwrap()
-			.to_string();
-		let decrypt = serde_json::from_str::<serde_json::Value>(&policy)
-			.unwrap()["Statement"]
-			.as_array()
-			.unwrap()
-			.iter()
+		let decrypt = runtime_statements(&config)
+			.into_iter()
 			.find(|statement| statement["Sid"] == "SsmSecureStringDecrypt")
-			.unwrap()
-			.clone();
+			.unwrap();
 		decrypt["Action"].to_string().xpect_contains("kms:Decrypt");
 		// bounded by the service that asks rather than by an arn, since the
 		// account's `aws/ssm` key id is not knowable at render time
@@ -3295,10 +3263,11 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_eq("${var.tlsa_mail == \"\" ? 0 : 1}");
-		// declared as optional content, with no terraform default
+		// declared as optional content, with no terraform default, beside the
+		// ssh authority every box reads
 		let variables = mail_box().with_dane(true).variables(&stack);
-		variables.len().xpect_eq(1);
-		variables[0].absent_is_empty().xpect_true();
+		variables.len().xpect_eq(2);
+		variables[1].absent_is_empty().xpect_true();
 		json["variable"]["tlsa_mail"]
 			.as_object()
 			.unwrap()
@@ -3320,7 +3289,11 @@ mod tests {
 			.xpect_contains("TLSA")
 			.xnot()
 			.xpect_contains("tlsa_mail");
-		mail_box().variables(&stack).is_empty().xpect_true();
+		mail_box()
+			.variables(&stack)
+			.iter()
+			.any(|variable| variable.key() == "tlsa_mail")
+			.xpect_false();
 	}
 
 	/// A dual-stack network gives the box one address out of the subnet's
@@ -3397,23 +3370,8 @@ mod tests {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("names no blob bucket");
-		mail_box()
-			.with_ssh_public_keys(Vec::new())
-			.validate()
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("no ssh public key");
-		mail_box()
-			.with_ssh_public_keys(vec![
-				"ssh-ed25519 A one\nssh-ed25519 B two".into(),
-			])
-			.validate()
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("spans lines");
 		StalwartBlock::new("mail", "Mail.Beetmash.Com")
 			.with_blob_bucket("mail-blobs")
-			.with_ssh_public_keys(vec!["ssh-ed25519 KEY".into()])
 			.validate()
 			.unwrap_err()
 			.to_string()

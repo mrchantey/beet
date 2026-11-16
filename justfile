@@ -86,6 +86,10 @@ site-stage *args:
 # Re-publish the site to S3 without a redeploy (site assets: `site-shared push`).
 beet-sync *args:
   cargo run -p beet-cli --features infra,extra -- --entry=site site/sync {{ args }}
+# A shell on the deployed box's management sshd, or one command with
+# `--command=..`, logged in through the stack's ssh authority.
+beet-ssh *args:
+  cargo run -p beet-cli --features infra,extra -- --entry=site site/ssh {{ args }}
 # Tail the deployed instance's logs.
 beet-watch *args:
   cargo run -p beet-cli --features infra,extra -- --entry=site site/watch {{ args }}

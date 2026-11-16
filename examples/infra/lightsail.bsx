@@ -16,6 +16,7 @@ watch shape and the served content are identical (see `crates/beet_extra/src/inf
     beet --entry=examples/infra/lightsail.bsx deploy
     beet --entry=examples/infra/lightsail.bsx sync
     beet --entry=examples/infra/lightsail.bsx watch
+    beet --entry=examples/infra/lightsail.bsx ssh
     beet --entry=examples/infra/lightsail.bsx destroy --force
 
 Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zigbuild`.
@@ -28,6 +29,8 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 			<LightsailSiteBlock features="aws_sdk"/>
 			<S3BucketBlock label="repo" {RepoStoreBlock}/>
+			<!-- the ssh authority the box trusts, before the apply that boots it -->
+			<EnsureSshAuthority/>
 			<!-- the bucket first, so the site is in place before the instance that
 			     serves it boots -->
 			<TofuApply layer="storage"/>
@@ -46,6 +49,8 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 			<TofuDestroy/>
 		</Group>
 		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
+		<!-- a shell on the box, logged in through the stack's ssh authority -->
+		<Route path="ssh" {SshShell}/>
 		<!-- a content-only republish, into the version the running service was
 		     built against rather than a fresh one nothing reads -->
 		<Route path="sync" {ExchangeSequence}>

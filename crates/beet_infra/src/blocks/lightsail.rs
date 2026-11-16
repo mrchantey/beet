@@ -14,7 +14,8 @@ pub enum LightsailNetworking {
 }
 
 /// Opinionated terraform configuration for a Lightsail instance:
-/// - Key pair for SSH access
+/// - SSH that admits its stack's [`SshAuthority`] alone, and answers with a
+///   host certificate it signed
 /// - IAM user with a least-privilege inline policy for runtime persistence,
 ///   and read on exactly the stack secrets its entity's [`ReadsSecrets`] names
 /// - Static IP with attachment (configurable via networking mode)
@@ -51,8 +52,8 @@ pub struct LightsailBlock {
 	/// [`management_ssh_port`](Self::management_ssh_port) before the unit
 	/// starts, and the firewall opens both. The unit runs as root (no `User=`
 	/// line), so binding 22 needs no extra capability. Note the Lightsail
-	/// browser console only dials 22, so management becomes your own client
-	/// plus the key pair on the new port.
+	/// browser console only dials 22, so management becomes an
+	/// [`SshShell`](crate::prelude::SshShell) on the new port.
 	#[serde(default)]
 	allow_ssh: bool,
 	/// Where the management sshd listens once [`allow_ssh`](Self::allow_ssh)
@@ -157,6 +158,32 @@ impl LightsailBlock {
 		format!("{}--{}", self.label, suffix)
 	}
 
+	/// The port the box's own sshd answers on: the
+	/// [`management_ssh_port`](Self::management_ssh_port) once
+	/// [`allow_ssh`](Self::allow_ssh) gives 22 to the app, else 22.
+	pub fn sshd_port(&self) -> u16 {
+		match self.allow_ssh {
+			true => self.management_ssh_port,
+			false => 22,
+		}
+	}
+
+	/// The box's ssh identity under its stack's [`SshAuthority`]: certified
+	/// as its stack-composed name, ie `beet-site--prod--site`, signed into as
+	/// the blueprint's user on its [`sshd_port`](Self::sshd_port).
+	pub fn ssh_host(&self, stack: &ResolvedStack) -> SshHost {
+		SshHost::new(
+			self.label.clone(),
+			stack.resource_name(self.label.clone()),
+			self.ssh_user(),
+			Self::ADDRESS_OUTPUT,
+		)
+		.with_port(self.sshd_port())
+	}
+
+	/// The tofu output holding the box's public address.
+	pub const ADDRESS_OUTPUT: &'static str = "public_address";
+
 	/// Resolve the SSH user based on the blueprint.
 	/// Amazon Linux uses `ec2-user`, Ubuntu uses `ubuntu`.
 	pub fn ssh_user(&self) -> &str {
@@ -229,7 +256,8 @@ impl LightsailBlock {
 	/// binary from at boot, its own log group, (with hostnames) the prefix
 	/// of that bucket it saves Caddy's certificate store to, write-only so a
 	/// compromised box still cannot touch a release, and read on exactly the
-	/// stack `secrets` its [`ReadsSecrets`] names.
+	/// `secrets` it fetches: the ones its [`ReadsSecrets`] names and its ssh
+	/// host key and certificate.
 	fn runtime_policy(
 		&self,
 		stack: &ResolvedStack,
@@ -606,6 +634,10 @@ if rpm -q amazon-ssm-agent >/dev/null 2>&1; then
 fi
 "#;
 
+		// the box's sshd trusts the stack's authority, read with the
+		// credentials written just before it
+		let ssh_trust = self.ssh_host(stack).trust_stanza(stack)?;
+
 		// the two release scripts, the whole of the machine's knowledge about
 		// finding its binary. Neither names a version.
 		let fetch_script = self.fetch_script(stack, repo_bucket);
@@ -628,7 +660,7 @@ cat > /root/.aws/config <<CONF
 [default]
 region = {region}
 CONF
-
+{ssh_trust}
 mkdir -p /opt/{app_name} /etc/{app_name}
 
 # install the release scripts: the unit resolves the current binary at every
@@ -712,7 +744,7 @@ systemctl enable --now {app_name}.service
 			);
 		}
 
-		SmolStr::from(script).xok()
+		SshAuthority::interpolate(&script).xmap(SmolStr::from).xok()
 	}
 
 	/// The release fetcher installed at `/usr/local/bin/<app>-fetch`: read the
@@ -1076,9 +1108,13 @@ impl Block for LightsailBlock {
 	fn label(&self) -> &SmolStr { &self.label }
 
 	/// Tofu variables the box's environment reads, ie the
-	/// [`env_vars`](Self::env_vars).
+	/// [`env_vars`](Self::env_vars), and the user authority its sshd trusts.
 	fn variables(&self, _stack: &ResolvedStack) -> Vec<Variable> {
-		self.env_vars.clone()
+		self.env_vars
+			.iter()
+			.cloned()
+			.chain([SshAuthority::user_ca_variable()])
+			.collect()
 	}
 
 	fn artifact_label(&self) -> Option<&SmolStr> { Some(&self.label) }
@@ -1191,6 +1227,7 @@ impl LightsailBlock {
 						&secrets
 							.iter()
 							.map(SecretBlock::secret)
+							.chain(self.ssh_host(stack).host_secrets())
 							.collect::<Vec<_>>(),
 					)?
 					.into(),
@@ -1240,12 +1277,19 @@ impl LightsailBlock {
 			}),
 		)?;
 
-		// key pair for SSH access
+		// The key pair a Lightsail instance requires, which grants nothing:
+		// it imports the user authority's PUBLIC half, so no private key
+		// exists to land in the state, and its holder can sign a login
+		// anyway. The box's sshd never reads it (`AuthorizedKeysFile none`).
+		// A rolled authority is a new pair name, as it is a new box.
 		let keypair_ident = stack.resource_ident(self.build_label("keypair"));
 		let keypair = terra::ResourceDef::new_secondary(
 			keypair_ident.clone(),
 			AwsLightsailKeyPairDetails {
 				name_prefix: Some(keypair_ident.primary_identifier().clone()),
+				public_key: Some(
+					SshAuthority::user_ca_variable().tf_var_ref().into(),
+				),
 				..default()
 			},
 		);
@@ -1269,13 +1313,14 @@ impl LightsailBlock {
 			},
 		);
 
-		// declare terraform variables for env_vars
+		// declare terraform variables for env_vars, and the ssh authority
 		for variable in &self.env_vars {
 			config.ensure_variable(
 				variable.key().as_str(),
 				variable.tf_declaration(),
 			);
 		}
+		SshAuthority::declare_variable(config);
 
 		// instance with self-provisioning user data
 		let instance_ident = stack.resource_ident(self.build_label("instance"));
@@ -1443,11 +1488,6 @@ impl LightsailBlock {
 				description: Some("The public address of the instance".into()),
 				sensitive: None,
 			})?
-			.add_output("ssh_private_key", terra::Output {
-				value: keypair.field_ref("private_key").into(),
-				description: Some("SSH private key for the instance".into()),
-				sensitive: Some(true),
-			})?
 			.add_output("ssh_user", terra::Output {
 				value: self.ssh_user().into(),
 				description: Some("SSH user for the instance".into()),
@@ -1580,24 +1620,28 @@ mod tests {
 	}
 
 	/// `allow_ssh`: the TUI takes 22 (`BEET_SSH_PORT=22`), cloud-init relocates
-	/// the management sshd before the unit starts, and the firewall opens the
-	/// management port. Without it the sshd keeps 22 untouched.
+	/// the management sshd before the unit starts, the firewall opens the
+	/// management port and the box's ssh identity names it. Without it the
+	/// sshd keeps 22.
 	#[beet_core::test]
 	fn allow_ssh_takes_22_and_relocates_management() {
 		let block = LightsailBlock::default().with_allow_ssh(true);
 		let (script, _dir) = build_user_data(&block);
+		let relocation = "sshd_config.d/90-beet-management.conf";
 		script
 			.as_str()
 			.xpect_contains("Environment=BEET_SSH_PORT=22")
-			.xpect_contains("Port 2222")
-			.xpect_contains("systemctl restart sshd");
+			.xpect_contains("echo 'Port 2222' > /etc/ssh/")
+			.xpect_contains(relocation);
 		// the relocation runs before the unit claims 22
-		let sshd_move = script.find("systemctl restart sshd").unwrap();
+		let sshd_move = script.find(relocation).unwrap();
 		let unit_start = script.find("systemctl enable --now").unwrap();
 		(sshd_move < unit_start).xpect_true();
 		build_json(&block).xpect_contains("2222");
+		block.sshd_port().xpect_eq(2222);
 		let (script, _dir) = build_user_data(&LightsailBlock::default());
-		script.as_str().xnot().xpect_contains("sshd");
+		script.as_str().xnot().xpect_contains(relocation);
+		LightsailBlock::default().sshd_port().xpect_eq(22);
 	}
 
 	/// A code-only deploy renders the SAME box, so terraform plans no change to
@@ -1828,6 +1872,7 @@ mod tests {
 			.xpect_eq(vec![
 				"${key_id",
 				"${key_secret",
+				"${var.ssh_user_ca",
 				"${key_id",
 				"${key_secret",
 			]);
@@ -2007,11 +2052,12 @@ mod tests {
 			.xpect_contains("Environment=AWS_REGION=");
 	}
 
-	/// The box reads exactly the stack secrets its `ReadsSecrets` names: one
-	/// parameter, decrypted through parameter store alone, in its own policy
-	/// and in the stage's runtime boundary. Never the stack's prefix, never a
-	/// secret it does not name, and never a sibling compute's grant. It also
-	/// boots after that parameter, and after no other.
+	/// The box reads exactly the stack secrets its `ReadsSecrets` names, and
+	/// the ssh host key and certificate its sshd serves: decrypted through
+	/// parameter store alone, in its own policy and in the stage's runtime
+	/// boundary. Never the stack's prefix, never a secret it does not name,
+	/// and never a sibling compute's grant. It also boots after that
+	/// parameter, and after no other.
 	#[beet_core::test]
 	fn the_box_reads_exactly_its_secrets() {
 		let host_key = SecretBlock::new("ssh-host-key", "BEET_SSH_HOST_KEY");
@@ -2036,11 +2082,22 @@ mod tests {
 			.xpect_contains(&host_key.parameter_address(&stack))
 			.xnot()
 			.xpect_contains(&other.parameter_address(&stack));
-		let parameter = format!(
-			"arn:aws:ssm:{}:*:parameter{}",
-			stack.aws_region().unwrap(),
-			stack.secret_path(&SecretRef::new("ssh-host-key"))
-		);
+		let arn = |name: String| {
+			format!(
+				"arn:aws:ssm:{}:*:parameter{name}",
+				stack.aws_region().unwrap()
+			)
+		};
+		let parameter = [stack.secret_path(&SecretRef::new("ssh-host-key"))]
+			.into_iter()
+			.chain(
+				LightsailBlock::default()
+					.ssh_host(&stack)
+					.parameter_names(&stack),
+			)
+			.map(arn)
+			.collect::<Vec<_>>()
+			.join(r#"",""#);
 		let policies = |resource_type: &str| {
 			config
 				.resources_of_type(resource_type)

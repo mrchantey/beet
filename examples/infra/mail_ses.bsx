@@ -60,6 +60,10 @@ simulator address it sends to is always permitted.
 	<Stack app_name="mail-ses-example" {(AwsRegion("us-west-2"), CloudflareZone{domain:"example.com", id:"0123456789abcdef0123456789abcdef"})}>
 		<Group bx:ref="deploy_up">
 			<EnsureSecret secret="mail-admin-password"/>
+			<!-- the ssh authority the box trusts instead of any device's key:
+			     every deploy step that reaches the box logs in with a
+			     certificate it signs for minutes -->
+			<EnsureSshAuthority/>
 			<EnsureDkimKey/>
 			<StalwartSnapshot/>
 			<TofuApply/>
@@ -73,6 +77,8 @@ simulator address it sends to is always permitted.
 			<Group bx:ref="attach_down"/>
 		</Group>
 		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
+		<!-- a shell on the box, or `--command=..`, through the same authority -->
+		<Route path="ssh" {SshShell}/>
 
 		<VpcBlock bx:ref="net" label="net" zones={["a"]} private_tier=false/>
 		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
@@ -91,8 +97,7 @@ simulator address it sends to is always permitted.
 
 		<StalwartBlock label="mail" hostname="mail.example.com"
 			blob_bucket="mail-blobs" backup_bucket="archive"
-			{VpcRef($net)}
-			ssh_public_keys={["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"]}/>
+			{VpcRef($net)}/>
 
 		<!-- the whole delta. `{SesRelay}` on the domain relays this one; put it
 		     on the `<Stack>` above and every domain under it inherits, which is

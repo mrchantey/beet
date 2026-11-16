@@ -33,6 +33,8 @@ mod s3_storage_class;
 // the providers a stack's secrets live in, in every build: a deployed box
 // reads its secrets through them
 mod secret_store;
+// the ssh certificate authority a stack's boxes trust, as a render reads it.
+mod ssh_authority;
 mod stack;
 mod stack_backend;
 mod state_encryption;
@@ -56,6 +58,7 @@ pub use resource_scope::*;
 pub use runtime_boundary::*;
 pub use s3_storage_class::*;
 pub use secret_store::*;
+pub use ssh_authority::*;
 pub use stack::*;
 pub use stack_backend::*;
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]

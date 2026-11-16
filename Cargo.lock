@@ -1775,10 +1775,12 @@ dependencies = [
  "prettyplease 0.2.37",
  "proc-macro2",
  "quote",
+ "rand 0.10.3",
  "semver",
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "ssh-key",
  "syn 2.0.117",
  "thiserror 2.0.21",
 ]

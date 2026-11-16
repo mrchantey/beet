@@ -356,7 +356,12 @@ impl Plugin for InfraPlugin {
 		// the create-if-missing secret step, which every stack holding a
 		// generated credential runs before its apply.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-		app.register_type::<crate::prelude::EnsureSecret>();
+		app.register_type::<crate::prelude::EnsureSecret>()
+			// the stack's ssh certificate authority, minted before the apply
+			// that boots a box trusting it, and the session a stack's
+			// `<stack>/ssh` route opens on one of its boxes through it
+			.register_type::<crate::prelude::EnsureSshAuthority>()
+			.register_type::<crate::prelude::SshShell>();
 		// the repo's deploy credentials, declared at an entry's root since one
 		// credential document holds one per provider however many stacks it
 		// deploys, each landing its handle for the deploy gate. The AWS one is
@@ -575,7 +580,6 @@ mod test {
 					mta_sts={{mode:Enforce}}/>
 				<StalwartBlock label="mail" hostname="mail.beetmash.com"
 					blob_bucket="mail-blobs"
-					ssh_public_keys={["ssh-ed25519 AAAA pete"]}
 					{VpcRef($net)}/>
 				<VpcBlock bx:ref="net" label="net"/>
 			</Fragment>"#,
@@ -783,8 +787,7 @@ mod test {
 					expire_prefixes={[{prefix:"sqlite/", expire_days:180}]}/>
 				<StalwartBlock label="mail" hostname="mail.beetmash.com"
 					blob_bucket="mail-blobs" backup_bucket="mail-backups"
-					cold_bucket="cold-backups"
-					ssh_public_keys={["ssh-ed25519 AAAA pete"]}/>
+					cold_bucket="cold-backups"/>
 				<MailRestoreDrill source_domain="beetmash.com" mailbox="probe"
 					source_snapshot="Cold"/>
 				<Secrets bx:ref="cold_export" label="mail-cold" path="secrets/export.toml"/>
@@ -833,6 +836,8 @@ mod test {
 		let mut world = spawn(
 			r#"<Fragment>
 				<EnsureSecret secret="db-password" variable="db_password"/>
+				<EnsureSshAuthority/>
+				<SshShell/>
 				<MailProbe mailbox="probe" sender_domain="news.beetmash.com"/>
 				<ZoneAudit allowed={[{name:"beetmash.com", record_type:"MX", reason:"fastmail"}]}/>
 			</Fragment>"#,
@@ -840,6 +845,11 @@ mod test {
 		let secret = world.query::<&EnsureSecret>().single(&world).unwrap();
 		secret.secret.label().as_str().xpect_eq("db-password");
 		secret.variable.as_deref().unwrap().xpect_eq("db_password");
+		world
+			.query::<&EnsureSshAuthority>()
+			.single(&world)
+			.xpect_ok();
+		world.query::<&SshShell>().single(&world).xpect_ok();
 		world
 			.query::<&MailProbe>()
 			.single(&world)

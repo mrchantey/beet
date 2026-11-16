@@ -40,7 +40,7 @@ impl MailRestoreDrill {
 	/// crosses into the login user's own directory and is moved across with the
 	/// service account's ownership.
 	pub fn upload_path() -> String {
-		format!("/home/{}/mail-restore.db", StalwartProvision::SSH_USER)
+		format!("/home/{}/mail-restore.db", SshAuthority::EC2_USER)
 	}
 
 	/// Put the uploaded snapshot where the service account can read it, and leave
@@ -126,10 +126,6 @@ pub async fn MailRestoreDrill(
 	/// and the account this signs in as is one of those.
 	#[field]
 	source_domain: SmolStr,
-	/// The private half of the key pair the box imported, as
-	/// [`StalwartProvision`] takes it.
-	#[field(default = StalwartProvision::SSH_KEY)]
-	ssh_key: SmolStr,
 	/// The restored mailbox the assertion signs in as, by localpart. The probe
 	/// mailbox by default, since it is the one account whose credential exists
 	/// to be used by a deploy step.
@@ -162,7 +158,6 @@ pub async fn MailRestoreDrill(
 	restore_onto(&mail, &source, Restore {
 		source_snapshot,
 		key: None,
-		ssh_key: &ssh_key,
 		source_domain: &source_domain,
 		mailbox: &mailbox,
 		timeout,
@@ -202,10 +197,6 @@ pub async fn MailRestore(
 	/// serves.
 	#[field]
 	source_domain: SmolStr,
-	/// The private half of the key pair the box imported, as
-	/// [`StalwartProvision`] takes it.
-	#[field(default = StalwartProvision::SSH_KEY)]
-	ssh_key: SmolStr,
 	/// The restored mailbox the assertion signs in as, by localpart.
 	#[field]
 	mailbox: SmolStr,
@@ -228,7 +219,6 @@ pub async fn MailRestore(
 	restore_onto(&mail, &source, Restore {
 		source_snapshot,
 		key: Some(&key),
-		ssh_key: &ssh_key,
 		source_domain: &source_domain,
 		mailbox: &mailbox,
 		timeout,
@@ -264,7 +254,6 @@ struct Restore<'a> {
 	source_snapshot: SnapshotSource,
 	/// The snapshot by key, the newest when `None`.
 	key: Option<&'a str>,
-	ssh_key: &'a str,
 	source_domain: &'a str,
 	mailbox: &'a str,
 	timeout: Duration,
@@ -344,12 +333,7 @@ async fn restore_onto(
 		}
 	};
 
-	let connection = SshConnection {
-		host: mail.public_ip().await?,
-		user: StalwartProvision::SSH_USER.to_string(),
-		port: 22,
-		key_path: StalwartProvision::key_path(ask.ssh_key)?,
-	};
+	let connection = mail.ssh().await?;
 	connection
 		.wait_for_ready(Duration::from_secs(300), Duration::from_secs(5))
 		.await?;
@@ -645,7 +629,7 @@ mod tests {
 	#[beet_core::test]
 	fn snapshot_is_installed_rather_than_delivered() {
 		let upload = MailRestoreDrill::upload_path();
-		upload.as_str().xpect_contains(StalwartProvision::SSH_USER);
+		upload.as_str().xpect_contains(SshAuthority::EC2_USER);
 		(upload.as_str() == MailRestoreDrill::REMOTE_PATH).xpect_false();
 		MailRestoreDrill::stage_command()
 			.as_str()

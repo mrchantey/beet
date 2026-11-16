@@ -23,7 +23,7 @@ tokens = ["proc-macro2", "quote", "syn"]
 aws_sdk = ["beet_net/aws_sdk", "bindings_aws_common"]
 # A deployer renders every always-compiled declaration, so it carries the
 # binding `<SecretBlock/>`'s parameter renders through.
-deploy = ["beet_router", "dep:base64", "vault", "bindings_aws_ssm"]
+deploy = ["beet_router", "dep:base64", "vault", "bindings_aws_ssm", "dep:ssh-key", "dep:rand"]
 # A secrets document as a stack's secret store (`<DocumentSecrets/>`) and the
 # store's export, restore and revoke verbs, on the secrets document in
 # `beet_net/secrets`. The seam, parameter store and `<SecretBlock/>` need none
@@ -150,6 +150,11 @@ prettyplease = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-process = { workspace = true }
+# the stack's ssh certificate authority: minting its keys and signing a
+# deploy's login and a box's host key. `thread_rng` for `rand::rng()`, the rng
+# `ssh-key` takes.
+ssh-key = { workspace = true, optional = true }
+rand = { workspace = true, optional = true, features = ["thread_rng"] }
 blocking = { workspace = true, optional = true }
 brotli = { workspace = true, optional = true }
 

@@ -838,7 +838,6 @@ mod tests {
 	fn mail_box() -> StalwartBlock {
 		StalwartBlock::new("mail", "mail.beetmash.com")
 			.with_blob_bucket("mail-blobs")
-			.with_ssh_public_keys(vec!["ssh-ed25519 AAAAC3TESTKEY pete".into()])
 	}
 
 	/// The staging domain as the plan declares it, with the mailbox set from

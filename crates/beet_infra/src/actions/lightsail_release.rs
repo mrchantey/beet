@@ -43,7 +43,7 @@ pub async fn LightsailRelease(
 	poll: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let (project, block, serves_repo) =
+	let (project, block, serves_repo, store) =
 		resolve_box(&cx, "LightsailRelease").await?;
 
 	let deploy_id = project.deployment().deploy_id().to_string();
@@ -55,7 +55,8 @@ pub async fn LightsailRelease(
 		poll,
 	);
 	info!("releasing {deploy_id}");
-	run_gate_script(&project, &block, "release", script, timeout, poll).await?;
+	run_gate_script(&project, &block, &store, "release", script, timeout, poll)
+		.await?;
 
 	Pass(cx.input).xok()
 }
@@ -87,34 +88,35 @@ pub async fn LightsailRestart(
 	poll: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let (project, block, _) = resolve_box(&cx, "<LightsailRestart/>").await?;
+	let (project, block, _, store) =
+		resolve_box(&cx, "<LightsailRestart/>").await?;
 
 	let script = block.restart_script(project.stack(), timeout, poll);
-	run_gate_script(&project, &block, "restart", script, timeout, poll).await?;
+	run_gate_script(&project, &block, &store, "restart", script, timeout, poll)
+		.await?;
 
 	Pass(cx.input).xok()
 }
 
-/// The box a step drives: the tofu project holding its address and key pair,
-/// the one [`LightsailBlock`] declared under the same stack, and whether that
-/// stack declares a repo store ([`RepoStoreBlock`]) for it to serve.
+/// The box a step drives: the tofu project holding its address, the one
+/// [`LightsailBlock`] declared under the same stack, whether that stack
+/// declares a repo store ([`RepoStoreBlock`]) for it to serve, and the secret
+/// store holding the ssh authority it trusts.
 async fn resolve_box(
 	cx: &ActionContext<Request>,
 	tag: &'static str,
-) -> Result<(terra::Project, LightsailBlock, bool)> {
+) -> Result<(terra::Project, LightsailBlock, bool, SecretStore)> {
 	let backend = terra::Project::resolve_backend(&cx.caller).await?;
-	let (project, block, serves_repo) = cx
-		.caller
+	cx.caller
 		.with_world(move |world, entity| -> Result<_> {
 			let project = terra::Project::resolve_in(world, entity, backend)?;
-			let (block, serves_repo) =
-				world.with_state::<ReleaseQuery, _>(|query| {
+			let (block, serves_repo, store) = world
+				.with_state::<ReleaseQuery, _>(|query| {
 					query.resolve(entity, tag)
 				})?;
-			(project, block, serves_repo).xok()
+			(project, block, serves_repo, store).xok()
 		})
-		.await??;
-	(project, block, serves_repo).xok()
+		.await?
 }
 
 /// scp `script` to the box's management sshd and run it as root, narrating its
@@ -122,13 +124,14 @@ async fn resolve_box(
 async fn run_gate_script(
 	project: &terra::Project,
 	block: &LightsailBlock,
+	store: &SecretStore,
 	name: &str,
 	script: String,
 	timeout: Duration,
 	poll: Duration,
 ) -> Result<()> {
 	let connection =
-		SshConnection::from_project(project, block.management_ssh_port())
+		SshConnection::to(project, store, block.ssh_host(project.stack()))
 			.await?;
 	connection.wait_for_ready(timeout, poll).await?;
 
@@ -152,15 +155,14 @@ async fn run_gate_script(
 	}
 	info!(
 		"{} is serving release {}",
-		connection.host,
+		connection.address(),
 		String::from_utf8_lossy(&output.stdout).trim()
 	);
 	Ok(())
 }
 
-/// The deploy tree these steps read: the tofu project holding the box's address
-/// and key pair, and the single [`LightsailBlock`] declared under the same
-/// stack.
+/// The deploy tree these steps read: the single [`LightsailBlock`] declared
+/// under the stack, the repo store it serves and the stack's secret store.
 #[derive(SystemParam)]
 struct ReleaseQuery<'w, 's> {
 	stacks: StackQuery<'w, 's>,
@@ -170,7 +172,8 @@ struct ReleaseQuery<'w, 's> {
 
 impl ReleaseQuery<'_, '_> {
 	/// The box to drive (the project to read outputs from comes from a
-	/// [`RenderScope`] render) and whether it serves a repo store. Several
+	/// [`RenderScope`] render), whether it serves a repo store, and the
+	/// stack's secret store. Several
 	/// blocks under one stack is an error rather than a guess: they would have
 	/// different management ports and different units. `tag` names the calling
 	/// step, since both resolve here.
@@ -178,7 +181,7 @@ impl ReleaseQuery<'_, '_> {
 		&self,
 		entity: Entity,
 		tag: &str,
-	) -> Result<(LightsailBlock, bool)> {
+	) -> Result<(LightsailBlock, bool, SecretStore)> {
 		let mut blocks = self
 			.stacks
 			.declared(entity)?
@@ -199,6 +202,11 @@ impl ReleaseQuery<'_, '_> {
 		// the box serves the repo store its stack declares, if any: the
 		// release pointer carries the uri, so the gate checks it arrived
 		let serves_repo = self.repos.find(entity)?.is_some();
-		(block.clone(), serves_repo).xok()
+		(
+			block.clone(),
+			serves_repo,
+			self.stacks.secret_store(entity)?,
+		)
+			.xok()
 	}
 }

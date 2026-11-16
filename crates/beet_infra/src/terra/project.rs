@@ -103,9 +103,19 @@ impl Project {
 	/// them would be lying in the other direction. Content variables carry no
 	/// terraform default, so an unresolved one refuses rather than renders.
 	async fn content_vars(&self) -> Result<Vec<TofuVar>> {
+		self.content_vars_or(AbsentContent::Refuse).await
+	}
+
+	/// [`content_vars`](Self::content_vars), an absent required secret
+	/// read as `absent` says.
+	async fn content_vars_or(
+		&self,
+		absent: AbsentContent,
+	) -> Result<Vec<TofuVar>> {
 		let mut resolved = Vec::new();
 		for variable in self.variables.iter() {
-			let Some(value) = self.resolve_content(variable).await? else {
+			let Some(value) = self.resolve_content(variable, absent).await?
+			else {
 				continue;
 			};
 			resolved.push(Self::tofu_var(variable, value));
@@ -148,12 +158,13 @@ impl Project {
 	/// Read one content variable's value, or `None` if it is ambient and so
 	/// falls through to its declared default.
 	///
-	/// An absent secret is a hard error: a content variable has no default,
-	/// so there is nothing to fall back to, and inventing one is how a `p=`
-	/// revocation gets published.
+	/// An absent secret is a hard error unless `absent` says otherwise: a
+	/// content variable has no default, so there is nothing to fall back to,
+	/// and inventing one is how a `p=` revocation gets published.
 	async fn resolve_content(
 		&self,
 		variable: &crate::types::Variable,
+		absent: AbsentContent,
 	) -> Result<Option<SmolStr>> {
 		if let Some(value) = variable.fixed_value() {
 			return Ok(Some(value.clone()));
@@ -173,6 +184,15 @@ impl Project {
 					variable.key()
 				);
 				Ok(Some(SmolStr::default()))
+			}
+			None if absent == AbsentContent::Placeholder => {
+				info!(
+					"no value at secret `{}` yet, which this deploy mints, so \
+					its assessment plans variable `{}` with a placeholder",
+					secret.label(),
+					variable.key()
+				);
+				Ok(Some(AbsentContent::PLACEHOLDER.into()))
 			}
 			None => bevybail!(
 				"no value at secret `{}`, which variable `{}` is the content \
@@ -239,7 +259,7 @@ impl Project {
 		let mut vars = self.required_vars().unwrap_or_default();
 		for variable in self.variables.iter().filter(|var| var.is_content()) {
 			let value = self
-				.resolve_content(variable)
+				.resolve_content(variable, AbsentContent::Refuse)
 				.await
 				.ok()
 				.flatten()
@@ -362,14 +382,27 @@ impl Project {
 
 	/// The writes [`apply_with_vars`](Self::apply_with_vars) would make with
 	/// the same `vars` and `targets`, planned against the state alone, see
-	/// [`tofu::planned_changes`].
+	/// [`tofu::planned_changes`]: what a deploy gate assesses BEFORE the
+	/// deploy runs.
+	///
+	/// So a required content secret the store does not hold yet is planned
+	/// with a placeholder rather than refused: the deploy being assessed is
+	/// what mints it, ahead of its apply, and refusing here would refuse the
+	/// one run that can. The assessment is sound with any value, since a
+	/// resource reading a secret that does not exist yet changes whatever
+	/// the minted value turns out to be, and only WHICH resources change,
+	/// and how, decides the assessment. `plan` stays strict: its output is
+	/// read as the truth.
 	pub async fn planned_changes(
 		&self,
 		vars: &[TofuVar],
 		targets: &[String],
 	) -> Result<Vec<tofu::PlannedChange>> {
 		self.init().await?;
-		let mut all_vars = self.render_vars().await?;
+		let mut all_vars = self.required_vars()?;
+		all_vars
+			.extend(self.content_vars_or(AbsentContent::Placeholder).await?);
+		all_vars.extend(self.write_only_vars(false)?);
 		all_vars.extend_from_slice(vars);
 		tofu::planned_changes(&self.dir(), &all_vars, targets).await
 	}
@@ -664,6 +697,23 @@ impl Project {
 	}
 }
 
+/// How a render reads a required content secret the store does not hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AbsentContent {
+	/// Refuse, naming the deploy that mints it: every verb whose output is
+	/// read as the truth.
+	Refuse,
+	/// Plan with [`PLACEHOLDER`](Self::PLACEHOLDER): a deploy gate's
+	/// assessment of the deploy that mints it
+	/// ([`Project::planned_changes`]).
+	Placeholder,
+}
+
+impl AbsentContent {
+	/// What an assessment plans an absent content secret as.
+	const PLACEHOLDER: &'static str = "minted-by-this-deploy";
+}
+
 #[cfg(all(test, feature = "vault"))]
 mod test {
 	use super::*;
@@ -734,6 +784,12 @@ mod test {
 			.await
 			.contains(&TofuVar::new("other", ""))
 			.xpect_true();
+		// and the deploy that mints it is assessed with a placeholder
+		project
+			.content_vars_or(AbsentContent::Placeholder)
+			.await
+			.unwrap()
+			.xpect_eq(vec![TofuVar::new("other", AbsentContent::PLACEHOLDER)]);
 	}
 
 	/// A write-only variable reaches an apply alone: every verb that plans

@@ -6,9 +6,6 @@ use beet_net::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
-
-
-
 impl StalwartProvision {
 	/// The management port Stalwart serves in bootstrap mode, on loopback at
 	/// the far end of the tunnel.
@@ -17,44 +14,12 @@ impl StalwartProvision {
 	/// The near end of the tunnel.
 	pub const LOCAL_PORT: u16 = 18080;
 
-	/// The ssh user of the box's AMI.
-	pub const SSH_USER: &'static str = "ec2-user";
-
-	/// Where the operator's key usually is, which is only a default: a box
-	/// whose declared public key came from elsewhere names the private half
-	/// here.
-	pub const SSH_KEY: &'static str = "~/.ssh/id_ed25519";
-
 	/// The unit the box runs, restarted once the objects exist: the mail
 	/// listeners only bind at start, so a server configured while running is
 	/// still a server serving nothing.
 	pub const UNIT: &'static str = "stalwart";
-
-	/// A declared private key path, with a leading `~` expanded.
-	///
-	/// The mail box imports a public key rather than generating a pair, so the
-	/// private half is the operator's own: there is no `ssh_private_key` output
-	/// to read it from the way a Lightsail release does. Every mail step that
-	/// reaches the box reads it through here.
-	pub fn key_path(key: &str) -> Result<AbsPath> {
-		let expanded = match key.strip_prefix("~/") {
-			Some(rest) => {
-				let home = env_ext::var("HOME").map_err(|_| {
-					bevyhow!(
-						"ssh key '{key}' starts with ~ but HOME is unset: name \
-						the path in full"
-					)
-				})?;
-				format!("{home}/{rest}")
-			}
-			None => key.to_string(),
-		};
-		AbsPath::new(expanded).map_err(Into::into)
-	}
 }
 
-/// Applies the plan, restarts the unit and waits for the server to answer on
-/// its public port.
 /// `<StalwartProvision/>` — after the apply, make the box that terraform built
 /// serve the mail the blocks declared.
 ///
@@ -66,8 +31,9 @@ impl StalwartProvision {
 ///
 /// `8080` is deliberately NOT in the security group. The management endpoint
 /// serves plaintext HTTP and answers to a password that provisions the whole
-/// server, so it is reached through an ssh port forward over the box's key pair
-/// and is unreachable from the internet at any point.
+/// server, so it is reached through an ssh port forward, logged in with a
+/// certificate from the stack's [`SshAuthority`], and is unreachable from the
+/// internet at any point.
 ///
 /// Idempotent and additive: every object is matched against what the server
 /// already has and patched rather than recreated, and nothing is ever deleted.
@@ -77,11 +43,6 @@ impl StalwartProvision {
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn StalwartProvision(
-	/// The private half of the key pair the box imported. The box declares a
-	/// PUBLIC key and generates nothing, so the private half is the operator's
-	/// own and is never an output of the stack; a leading `~` expands.
-	#[field(default = Self::SSH_KEY)]
-	ssh_key: SmolStr,
 	/// The local port the management endpoint is forwarded to. Not 8080, so a
 	/// developer running a local Stalwart is not quietly provisioned instead.
 	#[field(default = Self::LOCAL_PORT)]
@@ -124,12 +85,7 @@ pub async fn StalwartProvision(
 
 	// ssh is needed either way: the unit is restarted over it, and the tunnel
 	// (if one is opened at all) rides the same connection.
-	let connection = SshConnection {
-		host: mail.public_ip().await?,
-		user: StalwartProvision::SSH_USER.to_string(),
-		port: 22,
-		key_path: StalwartProvision::key_path(&ssh_key)?,
-	};
+	let connection = mail.ssh().await?;
 	connection.wait_for_ready(timeout, poll).await?;
 
 	let mut management =
@@ -265,7 +221,7 @@ impl Management {
 
 		// else the box is not serving its public endpoint yet, so management is
 		// the plaintext port the security group deliberately does not admit,
-		// reached through a forward over the box's key pair.
+		// reached through a forward over the certified ssh connection.
 		let tunnel = connection
 			.tunnel(local_port, StalwartProvision::MANAGEMENT_PORT)
 			.await?;

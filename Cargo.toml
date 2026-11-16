@@ -196,6 +196,13 @@ russh = { version = "0.62", default-features = false, features = [
 	"flate2",
 	"rsa",
 ] }
+# the ssh certificate authority a deploy signs its logins and its boxes' host
+# keys with: the exact `ssh-key` release russh pins, so one copy rides the graph,
+# and ed25519 alone.
+ssh-key = { version = "=0.7.0-rc.11", default-features = false, features = [
+	"std",
+	"ed25519",
+] }
 
 #💡 macros
 

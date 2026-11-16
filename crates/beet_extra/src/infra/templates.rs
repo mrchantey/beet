@@ -284,8 +284,8 @@ pub fn FargateWatch(timeout: Option<Duration>) -> impl Bundle {
 /// hostname (`ssh app.beet.org` / `ssh app.dev.beet.org`), since Cloudflare
 /// does not proxy raw TCP. Caddy terminates TLS at the origin with a Let's
 /// Encrypt cert covering every hostname, which the edge verifies (the zone
-/// runs Full strict). The box's own sshd moves to port 2222, reachable with
-/// the stack's key pair.
+/// runs Full strict). The box's own sshd moves to port 2222, reachable
+/// through the stack's ssh authority (`site/ssh`).
 ///
 /// SAFETY / stage-aware DNS: `dev` publishes ONLY `dev.beet.org`; `prod`
 /// publishes the production apex `beet.org` + `www.beet.org`. This is REQUIRED so a

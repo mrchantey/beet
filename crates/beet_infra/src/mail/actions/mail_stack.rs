@@ -60,11 +60,19 @@ impl MailStack {
 
 	/// The address of the box, from the apply's output.
 	pub async fn public_ip(&self) -> Result<String> {
-		self.project
-			.output(&format!("{}_public_ip", self.mail_box.label()))
-			.await
+		self.project.output(&self.mail_box.public_ip_output()).await
 	}
 
+	/// An ssh connection to the box, logged in and verified through the
+	/// stack's [`SshAuthority`].
+	pub async fn ssh(&self) -> Result<SshConnection> {
+		SshConnection::to(
+			&self.project,
+			&self.secrets,
+			self.mail_box.ssh_host(),
+		)
+		.await
+	}
 
 	/// The EIP allocation id, ie what a reverse-dns request names.
 	pub async fn eip_allocation(&self) -> Result<String> {

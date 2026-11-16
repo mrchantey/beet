@@ -414,6 +414,9 @@ token (plus AWS for the social stack's state bucket).
 			<!-- 💡 what a deploy DOES, as an ordered group rather than a route: the
 			     `deploy` verb `<DeployRoutes/>` spawns runs this list forward. -->
 			<Group bx:ref="site_up">
+				<!-- the ssh authority the box's management sshd trusts, before
+				     the first apply renders the box that reads it -->
+				<EnsureSshAuthority/>
 				<TofuApply layer="storage"/>
 				<!-- the published document: the site plus what it borrows from the
 				     workspace, assembled outside the checkout and mirrored whole -->
@@ -458,6 +461,9 @@ token (plus AWS for the social stack's state bucket).
 			<Route path="watch" {ExchangeSequence}>
 				<LightsailWatch timeout="300s"/>
 			</Route>
+			<!-- a shell on the box's management sshd, or `--command=..`,
+			     logged in with a certificate the stack's authority signs -->
+			<Route path="ssh" {SshShell}/>
 			<Route path="assets" {ExchangeSequence}>
 				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb"/>
 				<Derive/>

@@ -265,8 +265,7 @@ Now the automated part. One `.bsx` file declares the whole system, and the bound
 
 	<StalwartBlock label="mail" hostname="mail.example.com"
 		blob_bucket="mail-blobs" backup_bucket="archive" dns_stage="prod"
-		{VpcRef($net)}
-		ssh_public_keys={["ssh-ed25519 AAAA... deploy"]}/>
+		{VpcRef($net)}/>
 
 	<MailDomainBlock
 		domain="stalwart.example.com"
@@ -303,6 +302,8 @@ Some notes on the declarations that are not obvious from reading them:
 
 **The one static credential in the stack is the SES SMTP key pair**, because the SMTP protocol forces it. Terraform derives it into two SecureString parameters and it belongs to a dedicated IAM user whose only permission is `ses:SendRawEmail`. Everything else, including the instance's access to its own buckets, is an instance profile with IMDSv2 required. That user exists exactly while some domain relays through SES: move the last one off and the next apply removes it, which is the point of the relay being composed rather than assumed.
 
+**Nobody's key is on the box.** It has no EC2 key pair and its sshd reads no `authorized_keys`: it trusts the stack's ssh certificate authority, two ed25519 keys `<EnsureSshAuthority/>` mints into the stack's secret store before the first apply. Every step that reaches the box (provision, the DANE pin, the cold push, `ssh`) generates a key of its own, has the user authority sign it for ten minutes as `ec2-user`, and logs in with that. The box answers with a host key the deploy minted and the host authority signed for its hostname, fetched from the store at first boot, so a connection verifies it with one `@cert-authority` line and nothing is trusted on first use. The host key survives every rebuild, so its fingerprint never changes, and adding or losing a device changes nothing about the box at all: any machine that reads the stack's secrets can deploy, and no other can. The authority is per stack, so a drill or dev stage can never sign its way into production. Rolling it is the one thing that replaces the box, since the box trusts the authority it booted with.
+
 **The ports are 22, 25, 443, 465, 587 and 993, and nothing else.** The management HTTP port is deliberately *not* among them: provisioning reaches it through an SSH tunnel, and the listener that serves it is destroyed at the end of the first provision.
 
 **`dns_stage` is not decoration.** A mail name is not stack-composed: `mail.example.com` is the real name of real mail, so a second stage deploying the same declaration publishes a *second* record at that name and receivers round-robin between your live box and your experiment, taking production mail down without erroring anywhere. `dns_stage` names the one stage that owns the shared names; outside it the blocks emit their infrastructure and touch no record.
@@ -312,26 +313,27 @@ The deploy route is a sequence, and its order is the design:
 ```jsx
 <Route path="deploy" {ExchangeSequence}>
 	<EnsureSecret secret="mail-admin-password"/>
+	<EnsureSshAuthority/>
 	<EnsureDkimKey/>
 	<StalwartSnapshot/>
 	<TofuApply/>
 	<EipReverseDns/>
-	<StalwartProvision ssh_key="~/.ssh/id_ed25519_mail"/>
+	<StalwartProvision/>
 	<MtaStsPublish/>
-	<MailDane ssh_key="~/.ssh/id_ed25519_mail"/>
+	<MailDane/>
 	<TofuApply/>
 	<MailProbe mailbox="probe" sender_domain="news.example.com"/>
 	<ZoneAudit/>
 </Route>
 ```
 
-The bootstrap admin secret is minted before the box starts. `EnsureDkimKey` is create-if-missing for a sharper reason than the password: a rolled key under an already-published selector is a fortnight of unverifiable mail. The key is minted before the apply and the apply publishes its public half, so the selector the world resolves and the key the server signs with are one parameter read twice. Letting the server generate its own key would mean reading it back and publishing in a second apply, with a window in between where mail is signed by a selector nothing answers for. `StalwartSnapshot` then finds the persistent volume by its `Name`, `Project` and `Stage` tags and waits for its snapshot to complete. No volume exists on the first deploy, so that case is an intentional skip; retries within one deploy use its UUID as EC2's idempotency token.
+The bootstrap admin secret is minted before the box starts, and the ssh authority before the apply that renders the box trusting it: its public half is a content variable of the box's user data, so a render refuses until it exists. `EnsureDkimKey` is create-if-missing for a sharper reason than the password: a rolled key under an already-published selector is a fortnight of unverifiable mail. The key is minted before the apply and the apply publishes its public half, so the selector the world resolves and the key the server signs with are one parameter read twice. Letting the server generate its own key would mean reading it back and publishing in a second apply, with a window in between where mail is signed by a selector nothing answers for. `StalwartSnapshot` then finds the persistent volume by its `Name`, `Project` and `Stage` tags and waits for its snapshot to complete. No volume exists on the first deploy, so that case is an intentional skip; retries within one deploy use its UUID as EC2's idempotency token.
 
 The apply starts only after the snapshot completes. Reverse DNS comes after the apply because AWS validates the forward record before publishing the reverse one. Provisioning comes after that, because Stalwart 0.16 keeps listeners, routing, domains and accounts as objects *inside* its data store rather than in any file terraform writes. The MTA-STS policy body is published after the apply that published the record pointing at it. The DANE pin is read off the box after provision and published by a second apply, for the reason section 10 gives. The probe proves a message goes out and a message comes back authenticated. And the audit runs last, because it is the only check that can see what the deploy did *not* do: a record left behind by a block that stopped declaring it.
 
 Two things about running these verbs:
 
-`plan` and `deploy` do not produce the same diff, and reading a plan without knowing that is alarming. `deploy` runs the DKIM step before the apply and `plan` does not, so a plan will show the DKIM record going to `p=` empty. The empty `p=` is worth recognising because it is also a genuine failure mode: `p=` with nothing after it is the wire form of a *revoked* key, and a bare `apply` that reaches past the deploy route will publish exactly that.
+`plan` and `deploy` do not produce the same diff, and reading a plan without knowing that is alarming. `deploy` runs the DKIM step before the apply and `plan` does not, so a plan will show the DKIM record going to `p=` empty. On a stack that has never deployed, `plan` refuses outright, since the box's user data reads the ssh authority's public half and nothing has minted it yet: the first `deploy` does. The empty `p=` is worth recognising because it is also a genuine failure mode: `p=` with nothing after it is the wire form of a *revoked* key, and a bare `apply` that reaches past the deploy route will publish exactly that.
 
 Run `validate`, then `plan`, then the audit, before you deploy anything. `plan` against real providers costs nothing and is the last cheap check before a phase that costs real money and real DNS. Check that the planned DNS records match the specification table exactly and that nothing moves the apex early. Running `audit` before the first deploy is likewise worth it: against a zone of 30 records and a stack declaring 31 it reported clean, which means the allowlist was proven right while it was still free to be wrong.
 
@@ -354,13 +356,12 @@ Two subtleties in writing one. Match DKIM selector names as *patterns*, because 
 
 ## 7. The first deploy, the probe, and the soak
 
-**Hand step.** Mint a dedicated deploy key before the first apply, because EC2 installs a key only at launch and swapping one later replaces the instance:
+There is no deploy key to mint. The first deploy mints the stack's ssh authority (section 6), and from then on a shell on the box is a route rather than a key:
 
 ```sh
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_mail -N '' -C mail-deploy
+beet --entry=infra/mail.bsx --stage=prod ssh
+beet --entry=infra/mail.bsx --stage=prod ssh --command='sudo tail /var/log/stalwart/stalwart.log'
 ```
-
-The public half goes into `<StalwartBlock ssh_public_keys={[..]}>` and the path to the private half into `<StalwartProvision ssh_key=..>`. A dedicated key is the right answer here: reusing one that already authenticates somewhere else means one compromise reaches both. Every device that deploys mints its own and lists its public half, since provision and the cold push reach the box over ssh from wherever the deploy runs; the first is the box's key pair, the rest are added at first boot, and a change to the list replaces the box.
 
 **Hand step, if you did section 5 by hand.** Reconcile what you built by hand with what the stack now declares. SESv2 will not let terraform adopt an existing identity or configuration set silently, so the path is delete-and-let-the-apply-recreate: `aws sesv2 delete-email-identity`, `aws sesv2 delete-configuration-set`, and delete the hand-added zone records over the DNS API. Capture the configuration sets' event destinations first if you want to re-add them, and note that event destinations are create-only from terraform's point of view, so a hand-made one that exists in AWS but not in state fails the apply with `AlreadyExistsException`.
 
@@ -378,7 +379,7 @@ Some failure shapes worth recognising, because each cost us hours:
 
 **The box is silent and provisioning times out.** `systemctl status stalwart` says the unit could not be found, which means cloud-init never got that far. `sudo cloud-init status` and then `/var/log/cloud-init-output.log` is the path. Ours was a tarball download dying mid-transfer on a transient network error. User data runs *once* per instance under `set -e`, so a flaky download is a permanently dead box that answers SSH perfectly: the service just does not exist. Fix it in the block (retry flags on the download) rather than on the box, and redeploy, which replaces the instance and proves the fix on a fresh boot.
 
-**An instance replacement changes the host key**, and a stale `known_hosts` entry makes the next SSH fail with `REMOTE HOST IDENTIFICATION HAS CHANGED`. `ssh-keygen -R <ip>` between replacements.
+**`Host key verification failed` that does not clear.** A fresh box answers on 22 before cloud-init has installed its host certificate, and every step waits that out. One that never clears means the box could not read its host key and certificate from the store: `sudo grep 'ssh parameter' /var/log/cloud-init-output.log` names which, and the usual cause is a runtime boundary that predates the grant, which the deploy gate reports as needing `--elevated`. Until the box serves the certificate nothing can log in, so the fix is the elevated deploy, which replaces the box.
 
 **Deleting a block whose resource is protected leaves a resource nothing can destroy.** Removing an `<RdsPostgresBlock/>` declaration and applying fails with `Cannot delete protected DB Instance`: terraform plans a destroy, but the attribute that forbids it is only settable through the declaration that is no longer there, so there is nothing left to turn it off with. Retiring a protected resource is therefore two applies, in this order: set `deletion_protection=false` (or `data_volume_protected=false`) on the block while it is still declared and apply, *then* delete the block and apply again. Clearing the flag out of band with `aws rds modify-db-instance --no-deletion-protection` gets you unstuck once, but it leaves the live resource disagreeing with the state until the destroy lands, so prefer the two applies when you have the choice. The protection did its job either way; it is meant to cost you a deliberate step.
 
@@ -386,7 +387,7 @@ Some failure shapes worth recognising, because each cost us hours:
 
 **A partial apply is not a rolled-back apply.** One of ours replaced the instance and then errored on a later resource, leaving a rebuilt box with provisioning never run. Mail was down until the re-run, with inbound covered by sender retries. Killing a deploy mid-provision is safe by contrast: the apply has already committed its state and provisioning is idempotent, so the recovery is to fix the cause and run `deploy` again.
 
-**A hung deploy is not necessarily a broken box.** SSH in and run `sudo ss -lntp`. A box listening on every declared port and none of the undeclared ones has recovered, and the problem is in what the deploy is waiting *for*. `systemctl is-active stalwart` and `test -f /etc/stalwart/config.json` are the other two lines worth running.
+**A hung deploy is not necessarily a broken box.** Run `sudo ss -lntp` on it through the `ssh` route. A box listening on every declared port and none of the undeclared ones has recovered, and the problem is in what the deploy is waiting *for*. `systemctl is-active stalwart` and `test -f /etc/stalwart/config.json` are the other two lines worth running.
 
 **ACME fails on a name that has no A record.** A mail *domain* is MX and TXT records with nothing resolving at the name itself, so it must not be a certificate SAN. Let's Encrypt fails that name and the entire order dies with it, including the valid names beside it. The SANs are exactly the names that resolve to the box: `autoconfig.<domain>`, `autodiscover.<domain>`, and the box hostname once. This failure is visible only in the server's own log, not in anything the deploy prints.
 
@@ -615,7 +616,7 @@ The way back from a wrong pin is the way back from everything else here: one dep
 
 The honest summary, because a tutorial that blurs this line strands its reader at the first step with no command.
 
-**Fully declared and applied by beet:** the repo's own AWS account, with its locked Recycle Bin rules, its read role and its state bucket; the network (dual-stack if asked), the persistent SQLite data volume, both buckets, the box and its machine config, the events topic and its publish policy (adopted from a hand-made one with a flag), every SES identity and its DKIM and MAIL FROM records, the configuration sets with their suppression and their event destinations, the reputation alarms, every DNS record the mail domains need, the box's `A`, `AAAA` and DANE pin, the mail server's entire configuration (listeners, routing, domains, accounts, aliases, certificates, the default certificate, key reuse across renewals), reverse DNS, the MTA-STS policy host and body, the delivery probe, the zone audit, the backup timer, the credential export, the restore drill and its snapshot pruning, and the off-account cold copy: its bucket, the scoped token that reaches it, its timer, the encrypted secrets export, the read-back probe and the cold restore.
+**Fully declared and applied by beet:** the repo's own AWS account, with its locked Recycle Bin rules, its read role and its state bucket; the network (dual-stack if asked), the persistent SQLite data volume, both buckets, the box and its machine config, the events topic and its publish policy (adopted from a hand-made one with a flag), every SES identity and its DKIM and MAIL FROM records, the configuration sets with their suppression and their event destinations, the reputation alarms, every DNS record the mail domains need, the box's `A`, `AAAA` and DANE pin, its ssh certificate authority, host key and certificate, and every login a step or an operator makes, the mail server's entire configuration (listeners, routing, domains, accounts, aliases, certificates, the default certificate, key reuse across renewals), reverse DNS, the MTA-STS policy host and body, the delivery probe, the zone audit, the backup timer, the credential export, the restore drill and its snapshot pruning, and the off-account cold copy: its bucket, the scoped token that reaches it, its timer, the encrypted secrets export, the read-back probe and the cold restore.
 
 **Genuinely not automatable, and labelled as such:**
 

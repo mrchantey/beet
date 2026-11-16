@@ -100,10 +100,6 @@ impl MailDane {
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn MailDane(
-	/// The private half of the key pair the box imported, as
-	/// [`StalwartProvision`] takes it.
-	#[field(default = StalwartProvision::SSH_KEY)]
-	ssh_key: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let mail = MailStack::of(&cx.caller).await?;
@@ -115,12 +111,7 @@ pub async fn MailDane(
 		);
 	}
 	let hostname = mail.mail_box.hostname().to_string();
-	let connection = SshConnection {
-		host: mail.public_ip().await?,
-		user: StalwartProvision::SSH_USER.to_string(),
-		port: 22,
-		key_path: StalwartProvision::key_path(&ssh_key)?,
-	};
+	let connection = mail.ssh().await?;
 	connection
 		.wait_for_ready(Duration::from_secs(120), Duration::from_secs(5))
 		.await?;
