@@ -24,7 +24,7 @@ impl Plugin for OoxmlPlugin {
 			.register_type::<Slide>()
 			.register_type::<SlidePicture>()
 			.register_type::<DeckReported>()
-			.install(OoxmlRenderer)
+			.install((OoxmlParser, OoxmlRenderer))
 			.init_schedule(PostParseTree)
 			.add_systems(
 				PostParseTree,

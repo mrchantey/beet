@@ -146,7 +146,7 @@ mod test {
 		if let Some(store) = store {
 			world.entity_mut(root).insert(store);
 		}
-		BsxParser::bsx()
+		BsxParser
 			.parse(ParseContext::new(
 				&mut world.entity_mut(root),
 				&MediaBytes::new_bsx(bsx),
@@ -244,12 +244,11 @@ mod test {
 		let mut world = (AsyncPlugin, CharcellPlugin).into_world();
 		let root = world.spawn(BlobStore::new(FsStore::new(routes))).id();
 		// the diagrams are post-parse passes, which the media parse runs
-		MediaParser::new()
-			.parse(ParseContext::new(
-				&mut world.entity_mut(root),
-				&MediaBytes::new_markdown(&md),
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(root),
+			&MediaBytes::new_markdown(&md),
+		))
+		.unwrap();
 		// the include reads its file off a task
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		let forms = figure_forms(&mut world, root);

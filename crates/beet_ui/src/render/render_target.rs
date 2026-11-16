@@ -282,7 +282,7 @@ mod test {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<div><p>hi</p></div>");
-		BsxParser::html()
+		BsxParser
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		(world, entity)

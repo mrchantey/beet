@@ -18,7 +18,7 @@ fn world() -> World { world_ext::ui_world() }
 fn parse_bsx(world: &mut World, source: &str) -> Entity {
 	let bytes = MediaBytes::new_bsx(source);
 	let mut entity = world.spawn_empty();
-	BsxParser::bsx()
+	BsxParser
 		.parse(ParseContext::new(&mut entity, &bytes))
 		.unwrap();
 	entity.id()
@@ -283,7 +283,7 @@ fn component_field_binds_document() {
 	let bytes = MediaBytes::new_bsx("<Slider value=@doc:level/>");
 	let root = {
 		let mut entity = world.spawn(ChildOf(doc));
-		BsxParser::bsx()
+		BsxParser
 			.parse(ParseContext::new(&mut entity, &bytes))
 			.unwrap();
 		entity.id()
@@ -340,7 +340,7 @@ async fn async_remote_schema_defers_load() {
 	let root = {
 		let world = app.world_mut();
 		let mut entity = world.spawn_empty();
-		BsxParser::bsx()
+		BsxParser
 			.parse(ParseContext::new(&mut entity, &bytes))
 			.unwrap();
 		entity.id()
@@ -389,7 +389,7 @@ async fn remote_template_stub_defers_load() {
 	let root = {
 		let world = app.world_mut();
 		let mut entity = world.spawn_empty();
-		BsxParser::bsx()
+		BsxParser
 			.parse(ParseContext::new(&mut entity, &bytes))
 			.unwrap();
 		entity.id()

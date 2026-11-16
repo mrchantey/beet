@@ -105,7 +105,7 @@ impl StandardSiteDocument {
 		publication: &StandardSitePub,
 		site: AtUri,
 		path: &RelPath,
-		meta: &PageMeta,
+		meta: &DocMeta,
 	) -> Result<Self> {
 		let relative =
 			path.strip_prefix(&publication.path).ok_or_else(|| {
@@ -236,7 +236,7 @@ mod test {
 	fn filled() -> StandardSiteDocument {
 		let page = SyndicationPage {
 			path: RelPath::new("blog/full-stack-bevy"),
-			meta: PageMeta {
+			meta: DocMeta {
 				title: Some("Full Stack Bevy".into()),
 				description: Some("One language across the stack.".into()),
 				created: Date::parse("2025-07-11").ok(),
@@ -298,11 +298,11 @@ mod test {
 	/// is refused rather than published as a guess.
 	#[beet_core::test]
 	fn refuses_an_incomplete_page() {
-		let page = |path: &str, meta: PageMeta| SyndicationPage {
+		let page = |path: &str, meta: DocMeta| SyndicationPage {
 			path: RelPath::new(path),
 			meta,
 		};
-		let dated = PageMeta {
+		let dated = DocMeta {
 			title: Some("Post".into()),
 			created: Date::parse("2025-07-11").ok(),
 			..default()
@@ -318,12 +318,12 @@ mod test {
 			.to_string()
 		};
 		build(page("docs/post", dated.clone())).xpect_contains("not beneath");
-		build(page("blog/post", PageMeta {
+		build(page("blog/post", DocMeta {
 			title: None,
 			..dated.clone()
 		}))
 		.xpect_contains("no title");
-		build(page("blog/post", PageMeta {
+		build(page("blog/post", DocMeta {
 			created: None,
 			..dated
 		}))

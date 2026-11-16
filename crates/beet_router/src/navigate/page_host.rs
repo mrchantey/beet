@@ -192,14 +192,14 @@ pub(crate) async fn build_live_page(
 ///
 /// The remote/HTTP counterpart of [`build_live_page`]: a network fetch yields
 /// bytes that must become a tree, so they parse through the same template
-/// substrate the route build uses (via [`MediaParser`]). The tree is marked for
+/// substrate the route build uses (via [`DocParsers`]). The tree is marked for
 /// cleanup on the next page swap.
 pub(crate) fn parse_page(
 	world: &mut World,
 	bytes: MediaBytes,
 ) -> Result<Entity> {
 	let mut entity = world.spawn_empty();
-	MediaParser::new().parse(ParseContext::new(&mut entity, &bytes))?;
+	DocParsers::parse(ParseContext::new(&mut entity, &bytes))?;
 	let page = entity.id();
 	// the parsed tree is this page's own; clean it up when the page is replaced.
 	world

@@ -14,7 +14,7 @@ use core::any::TypeId;
 ///
 /// The authoring surfaces name the same thing two ways — a BSX page writes
 /// bare-position spreads on its root element
-/// (`<Fragment {PageMeta{title:".."}}>`), markdown writes frontmatter
+/// (`<Fragment {DocMeta{title:".."}}>`), markdown writes frontmatter
 /// (`+++ title = ".." +++`) — and both lower to this. So a document's root
 /// metadata is *whatever components it declares*, never one blessed type:
 /// splitting a metadata component in two, or a site declaring its own, needs no

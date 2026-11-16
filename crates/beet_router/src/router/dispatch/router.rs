@@ -272,8 +272,8 @@ async fn find_route(
 }
 
 /// Whether the matched route is a page this process must not serve: a
-/// [`PageMeta`](beet_ui::prelude::PageMeta) marked
-/// [`Draft`](beet_ui::prelude::PageVisibility::Draft), in a production process.
+/// [`DocMeta`](beet_ui::prelude::DocMeta) marked
+/// [`Draft`](beet_ui::prelude::DocVisibility::Draft), in a production process.
 ///
 /// The dispatch half of the one draft rule
 /// ([`ActionNode::is_public_page`](crate::prelude::ActionNode::is_public_page),
@@ -289,11 +289,11 @@ pub(crate) async fn hides_draft(
 	entity: Entity,
 	is_prod: bool,
 ) -> bool {
-	use beet_ui::prelude::PageMeta;
+	use beet_ui::prelude::DocMeta;
 	is_prod
 		&& world
-			.with_state::<Query<&PageMeta>, _>(move |metas| {
-				metas.get(entity).is_ok_and(PageMeta::is_draft)
+			.with_state::<Query<&DocMeta>, _>(move |metas| {
+				metas.get(entity).is_ok_and(DocMeta::is_draft)
 			})
 			.await
 }
@@ -438,8 +438,8 @@ mod test {
 				),
 				HttpMethod::Get,
 				PageRoute,
-				PageMeta {
-					visibility: PageVisibility::Draft,
+				DocMeta {
+					visibility: DocVisibility::Draft,
 					..default()
 				},
 			)]))

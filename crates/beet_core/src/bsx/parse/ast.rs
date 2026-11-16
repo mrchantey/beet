@@ -235,7 +235,7 @@ pub enum ValueExpr {
 /// `@entity:` is `@comp` retargeted to a named entity: the [`selector`] names a
 /// `bx:ref` entity, or one of the reserved well-known entities `BuildRoot`,
 /// `SnippetRoot`, `PageRoot`, `Router` (see `ReservedRef` in the resolver), eg
-/// `@entity:PageRoot::PageMeta.title`. `@comp:` (no `@entity:`) binds the
+/// `@entity:PageRoot::DocMeta.title`. `@comp:` (no `@entity:`) binds the
 /// current entity.
 ///
 /// [`selector`]: Self::selector

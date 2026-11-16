@@ -32,7 +32,7 @@
 //! `icon` and `coverImage` at 1MB each. A builder clamps nothing: a value over
 //! a limit is a `check` failure on the page that authored it, since silently
 //! truncating a title is worse than refusing to publish it. The tighter rules
-//! a page's metadata keeps are `PageMeta`'s.
+//! a page's metadata keeps are `DocMeta`'s.
 //!
 //! [`Rkeyed`]: beet_core::prelude::Rkeyed
 //! [`Theme`]: beet_ui::prelude::Theme

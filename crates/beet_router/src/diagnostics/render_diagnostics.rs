@@ -498,9 +498,7 @@ mod test {
 			.entity_mut(root)
 			.xtap(|entity| {
 				// the build failure rides `TemplateError`, never a panic/return.
-				MediaParser::new()
-					.parse(ParseContext::new(entity, &bytes))
-					.ok();
+				DocParsers::parse(ParseContext::new(entity, &bytes)).ok();
 			})
 			.flush();
 		let tree = route_tree();

@@ -5,7 +5,7 @@
 //! The block is the markdown surface for a document's root component
 //! declarations exactly as a root spread is the BSX surface, so both resolve
 //! through one reflect path rather than a hand-written key mapping. Its
-//! unsectioned keys declare the document's [`FrontmatterType`], [`PageMeta`]
+//! unsectioned keys declare the document's [`FrontmatterType`], [`DocMeta`]
 //! by default, and each table (`[Section]` in TOML, a key holding a map in
 //! YAML) the component it names.
 //!
@@ -57,7 +57,7 @@ pub struct Frontmatter {
 /// The component a document's unsectioned frontmatter keys declare, resolved by
 /// self-or-ancestor from whichever entity discovered the document.
 ///
-/// Defaults to [`PageMeta`], the general page metadata beet ships. A site
+/// Defaults to [`DocMeta`], the general page metadata beet ships. A site
 /// declaring its own names it on the dir that discovers those documents,
 /// `<RoutesDir src="routes" {FrontmatterType{component:"MyMeta"}}/>`, and a
 /// section names a component explicitly, winning over this default.
@@ -80,7 +80,7 @@ pub struct FrontmatterType {
 impl Default for FrontmatterType {
 	fn default() -> Self {
 		Self {
-			component: type_ext::short_name::<PageMeta>(),
+			component: type_ext::short_name::<DocMeta>(),
 		}
 	}
 }
@@ -530,9 +530,9 @@ mod test {
 			MediaType::Yaml,
 		)
 		.unwrap();
-		let RootDeclarations(declarations) = fm.declarations("PageMeta");
+		let RootDeclarations(declarations) = fm.declarations("DocMeta");
 		declarations.len().xpect_eq(1);
-		declarations[0].name.as_str().xpect_eq("PageMeta");
+		declarations[0].name.as_str().xpect_eq("DocMeta");
 		let NamedFields::Struct(fields) = &declarations[0].fields else {
 			panic!("expected named fields")
 		};
@@ -551,19 +551,19 @@ mod test {
 			("title: Hello\nExtra:\n  note: hi", MediaType::Yaml),
 		] {
 			let fm = Frontmatter::parse(content, media_type).unwrap();
-			fm.declarations("PageMeta")
+			fm.declarations("DocMeta")
 				.0
 				.iter()
 				.map(|named| named.name.to_string())
 				.collect::<Vec<_>>()
-				.xpect_eq(vec!["PageMeta".to_string(), "Extra".to_string()]);
+				.xpect_eq(vec!["DocMeta".to_string(), "Extra".to_string()]);
 			// only the default component's keys reach the reflect surface
 			fm.get_str("title").unwrap().xpect_eq("Hello");
 			fm.get_str("note").is_none().xpect_true();
 		}
 	}
 
-	/// Stands in for a component declared frontmatter beside `PageMeta`.
+	/// Stands in for a component declared frontmatter beside `DocMeta`.
 	#[derive(
 		Debug,
 		Default,
@@ -588,7 +588,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(ParsePlugin).register_type::<Course>();
 		let world = app.world_mut();
-		let meta = PageMeta {
+		let meta = DocMeta {
 			title: Some("Plan: one, two".into()),
 			created: Some(Date::parse("2025-07-09").unwrap()),
 			authors: vec!["Mel Richards".into(), "Packwood, Geoff".into()],
@@ -615,7 +615,7 @@ mod test {
 			),
 		] {
 			let block =
-				Frontmatter::write(world, entity, "PageMeta", &media_type)
+				Frontmatter::write(world, entity, "DocMeta", &media_type)
 					.unwrap()
 					.unwrap();
 			block.clone().xpect_eq(expected);
@@ -623,9 +623,9 @@ mod test {
 			let declarations = Frontmatter::extract(&block)
 				.unwrap()
 				.unwrap()
-				.declarations("PageMeta");
+				.declarations("DocMeta");
 			declarations
-				.get::<PageMeta>(&registry)
+				.get::<DocMeta>(&registry)
 				.unwrap()
 				.xpect_eq(Some(meta.clone()));
 			declarations
@@ -635,11 +635,11 @@ mod test {
 		}
 		// nothing to declare writes no block, and no format but these two is
 		// a block's
-		let bare = world.spawn(PageMeta::default()).id();
-		Frontmatter::write(world, bare, "PageMeta", &MediaType::Toml)
+		let bare = world.spawn(DocMeta::default()).id();
+		Frontmatter::write(world, bare, "DocMeta", &MediaType::Toml)
 			.unwrap()
 			.xpect_none();
-		Frontmatter::write(world, entity, "PageMeta", &MediaType::Json)
+		Frontmatter::write(world, entity, "DocMeta", &MediaType::Json)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("is not a frontmatter format");

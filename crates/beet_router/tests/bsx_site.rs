@@ -66,7 +66,7 @@ async fn site_store() -> BlobStore {
 		// the page root rather than written as frontmatter
 		(
 			"routes/docs/spread.bsx",
-			r#"<Fragment {PageMeta{title: "The Spread", order: 2}}><p>spread body</p></Fragment>"#,
+			r#"<Fragment {DocMeta{title: "The Spread", order: 2}}><p>spread body</p></Fragment>"#,
 		),
 	] {
 		store.insert(&RelPath::from(path), content).await.unwrap();
@@ -326,7 +326,7 @@ async fn page_renders_in_layout() {
 		.xpect_contains("aria-current=\"page\"");
 }
 
-/// A BSX page declares its metadata as an `PageMeta` spread on its root,
+/// A BSX page declares its metadata as an `DocMeta` spread on its root,
 /// which the `<RoutesDir/>` scan reads without building the page (so the nav
 /// labels it) and the render carries onto the page root (so `RouteHead` titles
 /// it) — the same two places markdown frontmatter reaches.
@@ -491,7 +491,7 @@ fn spawn_bsx_under(world: &mut World, parent: Entity, source: &str) -> Entity {
 	use beet_ui::prelude::*;
 	let bytes = MediaBytes::new_bsx(source);
 	let mut entity = world.spawn(ChildOf(parent));
-	BsxParser::bsx()
+	BsxParser
 		.parse(ParseContext::new(&mut entity, &bytes))
 		.unwrap();
 	let container = entity.id();
@@ -507,11 +507,11 @@ fn text_value(world: &World, entity: Entity) -> Value {
 /// `@entity:PageRoot::` resolves to the nearest render-root ancestor, the
 /// in-content replacement for the Rust `RouteHead` meta lookup.
 #[beet_core::test]
-fn render_root_binding_reads_page_meta() {
+fn render_root_binding_reads_doc_meta() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	// the route content entity: its own render root, carrying frontmatter meta
 	let route = world
-		.spawn(PageMeta {
+		.spawn(DocMeta {
 			title: Some("The Title".into()),
 			..default()
 		})
@@ -520,13 +520,13 @@ fn render_root_binding_reads_page_meta() {
 	let span = spawn_bsx_under(
 		&mut world,
 		route,
-		"<span>{@entity:PageRoot::PageMeta.title}</span>",
+		"<span>{@entity:PageRoot::DocMeta.title}</span>",
 	);
 	world.update_local();
 	text_value(&world, span).xpect_eq(Value::Str("The Title".into()));
 
 	// reactive: a meta edit reaches the bound text
-	world.entity_mut(route).get_mut::<PageMeta>().unwrap().title =
+	world.entity_mut(route).get_mut::<DocMeta>().unwrap().title =
 		Some("Renamed".into());
 	world.update_local();
 	text_value(&world, span).xpect_eq(Value::Str("Renamed".into()));

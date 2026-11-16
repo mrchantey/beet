@@ -13,7 +13,7 @@ pub(crate) struct SyndicationPage {
 	pub path: RelPath,
 	/// The page's authored metadata. Defaulted for a page that declared none,
 	/// which is public like any other.
-	pub meta: PageMeta,
+	pub meta: DocMeta,
 }
 
 /// Everything a syndication route serializes from: the pages in its scope, the
@@ -85,7 +85,7 @@ impl SyndicationScope {
 pub(crate) struct SyndicationQuery<'w, 's> {
 	trees: AncestorQuery<'w, 's, &'static RouteTree>,
 	paths: Query<'w, 's, &'static PathPattern>,
-	metas: Query<'w, 's, &'static PageMeta>,
+	metas: Query<'w, 's, &'static DocMeta>,
 	package: Res<'w, PackageConfig>,
 }
 
@@ -121,7 +121,7 @@ impl SyndicationQuery<'_, '_> {
 			.filter_map(|node| {
 				let meta = self.metas.get(node.entity).ok();
 				(node.is_public_page(meta, is_prod)
-					&& meta.is_none_or(PageMeta::is_listed))
+					&& meta.is_none_or(DocMeta::is_listed))
 				.then(|| SyndicationPage {
 					path: node.path.annotated_path(),
 					meta: meta.cloned().unwrap_or_default(),
@@ -164,7 +164,7 @@ pub(crate) mod test_fixtures {
 	/// `page`. The metadata sits on the route, where a scan finds it, and on
 	/// the content each request builds, where a layout reads it, as a
 	/// discovered file's frontmatter does.
-	pub fn page(path: &str, meta: PageMeta) -> impl Bundle {
+	pub fn page(path: &str, meta: DocMeta) -> impl Bundle {
 		(
 			render_action::fixed_func_route(path, {
 				let meta = meta.clone();
@@ -176,8 +176,8 @@ pub(crate) mod test_fixtures {
 	}
 
 	/// A published post's frontmatter.
-	pub fn post(title: &str, created: &str) -> PageMeta {
-		PageMeta {
+	pub fn post(title: &str, created: &str) -> DocMeta {
+		DocMeta {
 			title: Some(title.into()),
 			description: Some(format!("all about {title}")),
 			authors: vec!["Pete Hayman".into()],
@@ -195,11 +195,11 @@ pub(crate) mod test_fixtures {
 	) -> Entity {
 		let root = world
 			.spawn((Router, children![
-				page("", PageMeta {
+				page("", DocMeta {
 					title: Some("Beet".into()),
 					..default()
 				}),
-				page("blog", PageMeta {
+				page("blog", DocMeta {
 					title: Some("Blog".into()),
 					..default()
 				}),
@@ -211,12 +211,12 @@ pub(crate) mod test_fixtures {
 				page("blog/ecs-router", post("ECS Router", "2025-08-09")),
 				page("blog/hidden", {
 					let mut meta = post("Hidden", "2025-08-20");
-					meta.visibility = PageVisibility::Unlisted;
+					meta.visibility = DocVisibility::Unlisted;
 					meta
 				}),
 				page("blog/wip", {
 					let mut meta = post("Work In Progress", "2025-08-25");
-					meta.visibility = PageVisibility::Draft;
+					meta.visibility = DocVisibility::Draft;
 					meta
 				}),
 			]))
@@ -246,7 +246,7 @@ pub(crate) mod test_fixtures {
 			.unwrap();
 		world
 			.spawn((Router, Layout::new("FixtureLayout"), children![
-				page("", PageMeta {
+				page("", DocMeta {
 					title: Some("Beet".into()),
 					..default()
 				}),

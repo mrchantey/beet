@@ -10,5 +10,5 @@ collection is scanned into a route serving a `BlobPage` that reads this file
 from the collection's `BlobStore` and parses it to entities plus frontmatter on
 each request.
 
-- the frontmatter `title`/`order` above drives the route's `PageMeta`
+- the frontmatter `title`/`order` above drives the route's `DocMeta`
 - there is no content codegen: the markdown is parsed per request

@@ -13,7 +13,7 @@ use beet_net::prelude::*;
 /// so one under the router root covers the whole url space and one inside
 /// `<Route path="docs">` indexes only the docs.
 ///
-/// Only [`Public`](beet_ui::prelude::PageVisibility::Public) pages appear:
+/// Only [`Public`](beet_ui::prelude::DocVisibility::Public) pages appear:
 /// unlisted pages are reachable by their link alone, and drafts are absent from
 /// production entirely.
 ///

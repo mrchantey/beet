@@ -2,7 +2,7 @@
 //!
 //! A file is read into one tree whatever its format, so nothing downstream
 //! knows which format it came from. The root carries what the format says
-//! about the whole, the [`PageMeta`] its core properties declare and the
+//! about the whole, the [`DocMeta`] its core properties declare and the
 //! [`OoxmlPackage`] it came in, and each part read is an
 //! [`OoxmlNode::Part`] beneath it, every node of the part an entity carrying
 //! the [`OoxmlNode`] it was read as:
@@ -46,7 +46,7 @@
 //! | Slide deck | each listed slide a `<section>` in presentation order headed `Slide <n>`, its shapes in reading order, each text frame labelled by its kind, its tables, its SmartArt read from its data part, its pictures `<img>`s with their [`SlidePicture`], and its speaker notes an `<aside>`; [`OoxmlPlugin`] appends a triage of the deck in [`PostParseTree`] |
 //! | Workbook | each worksheet a `<table>` captioned with its tab name, every cell a [`SheetCellAddress`] with its [`CellLocked`] and [`CellFormula`], shared strings resolved, a merged range's first cell spanning the rest, and every gap before a row's last cell a projection-only `<td>` |
 //!
-//! [`PageMeta`]: crate::prelude::PageMeta
+//! [`DocMeta`]: crate::prelude::DocMeta
 //! [`PostParseTree`]: crate::prelude::PostParseTree
 //! [`TableCellAddress`]: crate::prelude::TableCellAddress
 //! [`Element`]: beet_core::prelude::Element

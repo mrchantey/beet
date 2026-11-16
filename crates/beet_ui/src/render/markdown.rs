@@ -1211,10 +1211,10 @@ mod test {
 	/// Asked for, a root's metadata leads its render as the frontmatter
 	/// declaring it; unasked, the render is the body alone.
 	#[beet_core::test]
-	fn renders_page_meta_as_frontmatter() {
+	fn renders_doc_meta_as_frontmatter() {
 		let mut world = ParsePlugin.into_world();
 		let entity = world
-			.spawn(PageMeta {
+			.spawn(DocMeta {
 				title: Some("Plan".into()),
 				..default()
 			})
@@ -1277,7 +1277,7 @@ mod test {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
-		BsxParser::html()
+		BsxParser
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		render_with(&mut world, entity, renderer)

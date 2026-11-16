@@ -30,12 +30,18 @@ impl Plugin for ParsePlugin {
 		// adding it to the per-frame main loop (which would repaint the whole world
 		// every tick).
 		app.init_schedule(PostParseTree);
+		// the built-in document formats; OoxmlPlugin adds the office formats
+		app.install(PlainTextParser::default());
+		#[cfg(feature = "bsx")]
+		app.install(BsxParser);
+		#[cfg(feature = "markdown_parser")]
+		app.install(MarkdownParser::new());
 		// the default BSX event vocabulary (the `click` script installer), so
 		// every `bx:click="..."` resolves through the core seam.
 		#[cfg(feature = "bsx")]
 		app.install_type::<crate::prelude::BsxDefaultsPlugin>();
 		// a document's root metadata, which frontmatter declares and writes
-		app.register_type::<PageMeta>()
+		app.register_type::<DocMeta>()
 			.register_type::<FrontmatterType>();
 		// the cell addresses every parsed document's tables carry, numbered
 		// once per document

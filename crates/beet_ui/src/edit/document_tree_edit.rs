@@ -488,17 +488,16 @@ mod test {
 	fn fills_a_markdown_form() {
 		let mut world = ParsePlugin.into_world();
 		let root = world.spawn_empty().id();
-		MediaParser::new()
-			.parse(ParseContext::new(
-				&mut world.entity_mut(root),
-				&MediaBytes::new_markdown(
-					"| Name |  |\n|---|---|\n| Describe it: |  |\n\n\
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(root),
+			&MediaBytes::new_markdown(
+				"| Name |  |\n|---|---|\n| Describe it: |  |\n\n\
 					 - [ ] Surveys\n- [ ] Focus groups\n\n\
 					 (Please delete this sentence once completed)\n\n\
 					 The business is <mark>(Insert name)</mark>.\n",
-				),
-			))
-			.unwrap();
+			),
+		))
+		.unwrap();
 		let cell = |text| CellAddress::parse(text).unwrap();
 		world
 			.with_state::<DocumentTreeEdit, _>(|mut edit| {

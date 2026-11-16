@@ -284,7 +284,7 @@ mod test {
 		app.add_plugins((TemplatePlugin, DocumentPlugin, CharcellPlugin));
 		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_html("<p>a &amp; b</p>");
-		BsxParser::html()
+		BsxParser
 			.parse(ParseContext::new(
 				&mut app.world_mut().entity_mut(entity),
 				&bytes,

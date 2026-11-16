@@ -15,7 +15,7 @@ use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
 /// A page built and held alive: its render middleware run (the layouts), the
-/// `--root` cascade resolved, the route's [`PageMeta`] carried onto the root it
+/// `--root` cascade resolved, the route's [`DocMeta`] carried onto the root it
 /// chose, and the media its request named resolved. Rendered through any
 /// registered target as many times as its holder likes, each render answering
 /// the request it was built for.
@@ -35,7 +35,7 @@ pub struct LivePage {
 	root: Entity,
 	/// The ephemeral entities released with the page.
 	to_despawn: Vec<Entity>,
-	/// The root a copy of the route's [`PageMeta`] was inserted on, taken back
+	/// The root a copy of the route's [`DocMeta`] was inserted on, taken back
 	/// on release.
 	carried_meta: Option<Entity>,
 	/// The entities the media resolve step gave an [`InlineBlob`], taken back
@@ -59,7 +59,7 @@ impl From<Entity> for SurfacePage {
 impl LivePage {
 	/// Prepare a built `page` for rendering: run the render middleware of
 	/// `route` and its ancestors (the layouts), resolve the `--root` cascade
-	/// ([`RenderRoot`]), carry the route's [`PageMeta`] onto the root it chose,
+	/// ([`RenderRoot`]), carry the route's [`DocMeta`] onto the root it chose,
 	/// so a scene response reads the page's metadata where it reads the tree,
 	/// and, when the request names a [`MediaIngestPolicy`], run the media
 	/// resolve step ([`InlineBlob::resolve`]). The live page keeps `parts`,
@@ -113,9 +113,9 @@ impl LivePage {
 				// layout chain, which the resolved root generally is not
 				let content = LayoutContent::terminal(world_mut, rendered)?;
 				let carried_meta = world_mut
-					.get::<PageMeta>(content)
+					.get::<DocMeta>(content)
 					.filter(|_| {
-						!world_mut.entity(resolved).contains::<PageMeta>()
+						!world_mut.entity(resolved).contains::<DocMeta>()
 					})
 					.cloned()
 					.map(|meta| {
@@ -301,7 +301,7 @@ impl LivePage {
 	}
 
 	/// The page's cover image, the [`InlineBlob`] the media resolve step
-	/// fetched onto the render root from `PageMeta::social_image_url`.
+	/// fetched onto the render root from `DocMeta::social_image_url`.
 	pub async fn cover(&self) -> Option<InlineBlob> {
 		let root = self.root;
 		self.world
@@ -373,7 +373,7 @@ impl LivePage {
 				if let Some(entity) = self.carried_meta
 					&& let Ok(mut entity) = world.get_entity_mut(entity)
 				{
-					entity.remove::<PageMeta>();
+					entity.remove::<DocMeta>();
 				}
 				for entity in self.inline_blobs {
 					if let Ok(mut entity) = world.get_entity_mut(entity) {
@@ -559,15 +559,15 @@ mod test {
 	}
 
 	/// A scene response is rooted at the cascade's root, the route's
-	/// `PageMeta` carried onto that root at every rung.
+	/// `DocMeta` carried onto that root at every rung.
 	#[cfg(all(feature = "template_serde", feature = "json"))]
 	#[beet_core::test]
-	async fn scene_root_carries_the_page_meta() {
+	async fn scene_root_carries_the_doc_meta() {
 		let (mut world, router) = site();
 		for root in ROOTS {
 			get(&mut world, router, post_at(root), MediaType::Json)
 				.await
-				.xpect_contains("PageMeta")
+				.xpect_contains("DocMeta")
 				.xpect_contains("Full Stack Bevy");
 		}
 		get(&mut world, router, at(POST, "content"), MediaType::Json)
@@ -576,10 +576,10 @@ mod test {
 			.xpect_contains("\"h1\"");
 	}
 
-	/// The carried `PageMeta` sits on the very root a render starts from,
+	/// The carried `DocMeta` sits on the very root a render starts from,
 	/// whichever rung chose it, and goes when the page is released.
 	#[beet_core::test]
-	async fn carries_the_page_meta_to_each_rung() {
+	async fn carries_the_doc_meta_to_each_rung() {
 		let mut world = syndication_world(None);
 		let meta = post("Rungs", "2025-07-11");
 		let route = |path: &str, body: fn() -> Snippet| {
@@ -617,7 +617,7 @@ mod test {
 										world.get::<Element>(root).map(
 											|element| element.tag().to_string(),
 										),
-										world.get::<PageMeta>(root).cloned(),
+										world.get::<DocMeta>(root).cloned(),
 									)
 								})
 								.await

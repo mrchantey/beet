@@ -7,7 +7,7 @@
 //! `--media-ingest` render param), and only then, so a plain request fetches
 //! nothing. It runs after the layouts and the `--root` cascade, over the
 //! render root's subtree: each image source (an `img`'s `src`) and the page's
-//! cover image (`PageMeta::social_image_url`) resolves against the page's
+//! cover image (`DocMeta::social_image_url`) resolves against the page's
 //! url, is fetched, and lands as an [`InlineBlob`] on the attribute's entity.
 //! The attribute's value stays the link. The policy says which sources are
 //! fetched: every one, the site's own alone, or none, so a target links what
@@ -30,7 +30,7 @@
 //! back every [`InlineBlob`] it inserted, so nothing is persisted and a
 //! request naming a policy resolves, renders and discards.
 //! The cover image's [`InlineBlob`] sits on the render root itself, beside the
-//! `PageMeta` carried there; an attribute's sits on the attribute.
+//! `DocMeta` carried there; an attribute's sits on the attribute.
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
@@ -254,7 +254,7 @@ struct MediaSourceQuery<'w, 's> {
 	elements: Query<'w, 's, &'static Element>,
 	tree: RenderTreeQuery<'w, 's>,
 	attributes: AttributeQuery<'w, 's>,
-	metas: Query<'w, 's, &'static PageMeta>,
+	metas: Query<'w, 's, &'static DocMeta>,
 }
 
 impl MediaSourceQuery<'_, '_> {
@@ -285,7 +285,7 @@ impl MediaSourceQuery<'_, '_> {
 			.metas
 			.get(root)
 			.ok()
-			.and_then(PageMeta::social_image_url)
+			.and_then(DocMeta::social_image_url)
 		{
 			sources.push((root, page_url.join(cover)));
 		}
@@ -535,7 +535,7 @@ mod test {
 		let (mut world, router) = site(
 			|| {
 				(
-					PageMeta {
+					DocMeta {
 						image_url: Some(
 							Url::parse("/media/poster.png").unwrap(),
 						),

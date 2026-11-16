@@ -17,13 +17,13 @@ use beet_ui::prelude::*;
 /// [`RouteSidebar`](crate::prelude::RouteSidebar) for why the handle rather than
 /// a walk) and lists the children of the node the request matched, so an
 /// `index.md` under `blog/` lists the posts beside it. Every field comes from
-/// each page's [`PageMeta`], ie its root declarations: a child declaring none
+/// each page's [`DocMeta`], ie its root declarations: a child declaring none
 /// has nothing to list and is skipped, as is one that is not a [`PageRoute`].
 /// An unlisted page never appears (an index is a listing), and a draft appears
 /// everywhere but production, exactly as static export drops it there.
 ///
 /// Entries are ordered like the nav — frontmatter `order`, which a numbered
-/// filename fills in ([`PageMeta::declare_file_defaults`]), then natural order
+/// filename fills in ([`DocMeta::declare_file_defaults`]), then natural order
 /// by path — and numbered `#1..#N` by their place in that ascending order.
 /// `reverse` flips the *display* only, so a blog reads newest first while post
 /// `#1` stays post `#1`.
@@ -40,12 +40,12 @@ pub fn RouteIndex(
 	reverse: bool,
 	stack: Res<RequestContextStack>,
 	trees: Query<&RouteTree>,
-	metas: Query<&PageMeta>,
+	metas: Query<&DocMeta>,
 ) -> impl Bundle {
 	let cx = stack.current();
 	let is_prod = BootstrapConfig::get().is_prod();
 	let current = RelPath::new(cx.current_path());
-	let mut entries: Vec<(RelPath, PageMeta)> = trees
+	let mut entries: Vec<(RelPath, DocMeta)> = trees
 		.get(cx.router())
 		.ok()
 		.and_then(|tree| tree.find_subtree(&current.segments()))
@@ -64,14 +64,14 @@ pub fn RouteIndex(
 		})
 		.unwrap_or_default();
 	entries.sort_by(|(path_a, meta_a), (path_b, meta_b)| {
-		let order = |meta: &PageMeta| meta.order.unwrap_or(u32::MAX);
+		let order = |meta: &DocMeta| meta.order.unwrap_or(u32::MAX);
 		order(meta_a)
 			.cmp(&order(meta_b))
 			.then_with(|| natural_cmp(path_a.as_str(), path_b.as_str()))
 	});
 	// numbered in ascending order, then flipped for display, so `reverse`
 	// renumbers nothing
-	let mut items: Vec<(usize, RelPath, PageMeta)> = entries
+	let mut items: Vec<(usize, RelPath, DocMeta)> = entries
 		.into_iter()
 		.enumerate()
 		.map(|(idx, (path, meta))| (idx + 1, path, meta))
@@ -117,7 +117,7 @@ pub(crate) fn route_index_rules() -> Vec<Rule> {
 fn index_entry(
 	number: usize,
 	path: &RelPath,
-	meta: &PageMeta,
+	meta: &DocMeta,
 	separator: bool,
 ) -> Snippet {
 	let rule = match separator {
@@ -148,7 +148,7 @@ fn index_entry(
 }
 
 /// The entry's summary, or nothing when the frontmatter has no `description`.
-fn entry_description(meta: &PageMeta) -> Snippet {
+fn entry_description(meta: &DocMeta) -> Snippet {
 	let Some(text) = meta.description.clone() else {
 		return Snippet::from_bundle(());
 	};
@@ -163,7 +163,7 @@ mod test {
 	/// A page route at `path` carrying the frontmatter an index entry reads.
 	/// The rendered body is irrelevant: collection keys off the tree and the
 	/// metadata, so every fixture route shares one.
-	fn post(path: &str, meta: PageMeta) -> impl Bundle {
+	fn post(path: &str, meta: DocMeta) -> impl Bundle {
 		(
 			render_action::fixed_func_route(path, || rsx! { <p>"post"</p> }),
 			PageRoute,
@@ -172,8 +172,8 @@ mod test {
 	}
 
 	/// Frontmatter as a numbered blog post would declare it.
-	fn meta(title: &str, created: &str, order: u32) -> PageMeta {
-		PageMeta {
+	fn meta(title: &str, created: &str, order: u32) -> DocMeta {
+		DocMeta {
 			title: Some(title.into()),
 			description: Some(format!("about {title}")),
 			authors: vec!["Pete Hayman".into()],
@@ -197,7 +197,7 @@ mod test {
 				post("ecs-router", meta("ECS Router", "2025-08-09", 2)),
 				post("declarative-state", {
 					let mut meta = meta("Declarative State", "2025-11-03", 3);
-					meta.visibility = PageVisibility::Draft;
+					meta.visibility = DocVisibility::Draft;
 					meta
 				}),
 			])])
@@ -251,7 +251,7 @@ mod test {
 		for (path, content) in [
 			(
 				"blog/index.bsx",
-				r#"<Fragment {PageMeta{title: "Blog"}}><h1>Blog</h1><RouteIndex reverse="true"/></Fragment>"#,
+				r#"<Fragment {DocMeta{title: "Blog"}}><h1>Blog</h1><RouteIndex reverse="true"/></Fragment>"#,
 			),
 			(
 				"blog/1-full-stack-bevy.md",

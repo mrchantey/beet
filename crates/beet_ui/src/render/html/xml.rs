@@ -189,7 +189,7 @@ mod test {
 	const XML: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<t:root xmlns:t=\"urn:t\" xmlns:u=\"urn:u\" a=\"1 &amp; 2 &lt; 3 &quot;q&quot;\" b=\"x&#xA;y\"><t:p xml:space=\"preserve\">  two  spaces </t:p>\n\t<u:empty/><![CDATA[<raw> & ]]><!-- note --><?pi data?>&lt;tag&gt; &amp; text<Upper Mixed=\"1\"/></t:root>";
 
 	fn parse(xml: &str) -> (World, Entity) {
-		let mut world = World::new();
+		let mut world = ParsePlugin.into_world();
 		let entity = parse_into(&mut world, xml);
 		(world, entity)
 	}
@@ -197,12 +197,11 @@ mod test {
 	/// `xml` parsed into a fresh entity of `world`.
 	fn parse_into(world: &mut World, xml: &str) -> Entity {
 		let entity = world.spawn_empty().id();
-		MediaParser::new()
-			.parse(ParseContext::new(
-				&mut world.entity_mut(entity),
-				&MediaBytes::new_string(MediaType::Xml, xml.into()),
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(entity),
+			&MediaBytes::new_string(MediaType::Xml, xml.into()),
+		))
+		.unwrap();
 		entity
 	}
 

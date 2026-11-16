@@ -76,7 +76,7 @@ ROUTE TREE  (persistent; RouteTree component lives on the root ancestor)
                 │ for pure/func routes,      │
                 │ content is a DETACHED root │
                 ▼                            │
-            content entity  ◄── cx.content() │  (carries PageMeta, etc)
+            content entity  ◄── cx.content() │  (carries DocMeta, etc)
                 ▲     ▲                       
                 │     │                       
    ┌────────────┘     └────────────────┐      
@@ -87,7 +87,7 @@ ROUTE TREE  (persistent; RouteTree component lives on the root ancestor)
    │                                   │
 LAYOUT TREE  (ephemeral, detached, rebuilt per request)
   layout root  [PageRoot = self, LayoutContent ──► content]
-   ├─ head … <title>{ @entity:PageRoot::PageMeta.title }</title>   ◄── RouteHead
+   ├─ head … <title>{ @entity:PageRoot::DocMeta.title }</title>   ◄── RouteHead
    └─ body
        ├─ slot child  [Portal ──► content]    (content spliced in here at render)
        └─ RouteSidebar
@@ -97,7 +97,7 @@ The matched `route` entity is reachable from **no** layout edge (`Portal` and `L
 
 - `route` — the matched route entity, the in-tree anchor.
 - `router` — the entity that owns this request's `RouteTree`; widgets read the tree off it directly (no ancestor walk).
-- `content` — the rendered content entity, off which per-route components (eg `PageMeta`) are queried.
+- `content` — the rendered content entity, off which per-route components (eg `DocMeta`) are queried.
 
 `PageRoot` names the entity the serializer walks (self-referential for a plain route, the layout itself for a wrapped one). `DespawnAfterRender` lists the ephemerals torn down after each render; nothing is cached between requests.
 
@@ -134,11 +134,11 @@ template = "ArticleLayout"
 +++
 ```
 
-The scan reads the ROOT only, resolving each declaration against the type registry with the same coercions a spread gets (`created` becomes a `Date`), and hoists every resolved component onto the route entity. Nothing is built, no hook runs and no child is spawned, which is what lets discovery know a page's title, order and slug before anyone visits it. Unsectioned keys declare the document's `FrontmatterType` (`PageMeta` by default, overridable per dir); a `[Section]` header names its component by short type path.
+The scan reads the ROOT only, resolving each declaration against the type registry with the same coercions a spread gets (`created` becomes a `Date`), and hoists every resolved component onto the route entity. Nothing is built, no hook runs and no child is spawned, which is what lets discovery know a page's title, order and slug before anyone visits it. Unsectioned keys declare the document's `FrontmatterType` (`DocMeta` by default, overridable per dir); a `[Section]` header names its component by short type path.
 
-`PageMeta` is a consumer of that set like any other: the router reads `slug` for the url, `order`/`sidebar_label`/`expanded` for the nav, `visibility` for the nav, static export and dispatch, and `<ArticleHeader/>` renders its `title`/`authors`/`created`/`video_url` as the article chrome.
+`DocMeta` is a consumer of that set like any other: the router reads `slug` for the url, `order`/`sidebar_label`/`expanded` for the nav, `visibility` for the nav, static export and dispatch, and `<ArticleHeader/>` renders its `title`/`authors`/`created`/`video_url` as the article chrome.
 
-`visibility` is the one knob every listing reads: `Public` serves and is listed everywhere, `Unlisted` serves to whoever holds the link and appears in no index, sidebar or `<RouteIndex/>` (and is marked `noindex` for crawlers), and `Draft` never reaches production at all (previewed in the nav everywhere else, `PageMeta::is_browsable`): dropped from a prod static export and answered `404` by a prod dispatch, exactly as an unknown url is.
+`visibility` is the one knob every listing reads: `Public` serves and is listed everywhere, `Unlisted` serves to whoever holds the link and appears in no index, sidebar or `<RouteIndex/>` (and is marked `noindex` for crawlers), and `Draft` never reaches production at all (previewed in the nav everywhere else, `DocMeta::is_browsable`): dropped from a prod static export and answered `404` by a prod dispatch, exactly as an unknown url is.
 
 ## Syndication
 

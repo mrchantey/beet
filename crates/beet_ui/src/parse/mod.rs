@@ -13,7 +13,7 @@ pub use frontmatter::*;
 mod markdown;
 #[cfg(feature = "markdown_parser")]
 pub use markdown::*;
-mod media;
+mod doc_parsers;
 #[cfg(feature = "mermaid")]
 mod mermaid;
 #[cfg(feature = "mermaid")]
@@ -25,7 +25,7 @@ mod span_tracker;
 pub use parse_plugin::*;
 #[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]
 mod syntax_highlighting;
-pub use media::*;
+pub use doc_parsers::*;
 pub use node_parser::*;
 pub use plaintext::*;
 pub use span_tracker::*;

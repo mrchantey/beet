@@ -10,7 +10,7 @@
 //! produces trees identical to what `rsx!` lowers to.
 //!
 //! Author + parse + build live here in `beet_core`; rendering the built tree to
-//! HTML or charcell lives in `beet_ui`, as do the `MediaParser` dispatch, which
+//! HTML or charcell lives in `beet_ui`, as do the `DocParsers` dispatch, which
 //! delegates BSX parsing to [`BsxNode::parse_document`] + [`BsxTemplate`], and
 //! the `RenderTargets` registry.
 //!

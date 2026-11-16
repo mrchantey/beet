@@ -619,12 +619,11 @@ mod test {
 		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_markdown("```rust\nfn main() {}\n```");
 		// highlighting is a post-parse pass, which the media parse runs
-		MediaParser::new()
-			.parse(ParseContext::new(
-				&mut app.world_mut().entity_mut(entity),
-				&bytes,
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut app.world_mut().entity_mut(entity),
+			&bytes,
+		))
+		.unwrap();
 
 		// root -> pre -> code -> spans (no plain text child)
 		let world = app.world_mut();

@@ -27,7 +27,7 @@
 //!
 //! A layout's `<main>` holds more than the route's content: `ArticleLayout`
 //! renders `ArticleHeader` (the `<h1>` title, the byline and the companion
-//! video, all from `PageMeta`) inside it. A `main` render keeps that header,
+//! video, all from `DocMeta`) inside it. A `main` render keeps that header,
 //! which is what a reader asking for the main content generally wants; a
 //! `content` render carries nothing a layout contributed, which is what every
 //! syndication target wants, since the record already carries the title and

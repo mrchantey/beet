@@ -108,7 +108,10 @@ impl Plugin for RouterPlugin {
 					// `ServerPlugin` installs the `HttpServer` backend and registers the
 					// server types.
 					ServerPlugin,
-					// every scene route renders through the render target registry
+					// every document a route serves parses through the parser
+					// registry, and every scene route renders through the render
+					// target registry
+					ParsePlugin,
 					RenderPlugin,
 				)>()
 				// the scene routes' render params and the media a request resolves
@@ -141,8 +144,8 @@ impl Plugin for RouterPlugin {
 				// navigation-failure error page, both rendered through the layout.
 				.install_type::<(RouteList, NotFoundPage, ErrorPage)>()
 				// per-route metadata, bindable via the reserved ref, eg
-				// `@entity:PageRoot::PageMeta.title`
-				.register_type::<PageMeta>()
+				// `@entity:PageRoot::DocMeta.title`
+				.register_type::<DocMeta>()
 				// the component a document's unsectioned frontmatter keys declare,
 				// overridable per dir, eg
 				// `<RoutesDir {FrontmatterType{component:"MyMeta"}}/>`
@@ -162,7 +165,7 @@ impl Plugin for RouterPlugin {
 					// of a hand-maintained list, eg `<RouteIndex reverse="true"/>`
 					RouteIndex,
 					// the article chrome a blog layout places above the post body,
-					// rendered from the page's own `PageMeta`
+					// rendered from the page's own `DocMeta`
 					ArticleHeader,
 					YouTubeEmbed,
 					// the shipped document shell a no-code site wraps its pages in,
@@ -611,16 +614,15 @@ mod test {
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let mut root = world.spawn((store, Router));
-		MediaParser::new()
-			.parse(ParseContext::new(
-				&mut root,
-				&MediaBytes::new_bsx(
-					r#"<Route path="guide" {BlobPage{path:"guide.md"}}/>
+		DocParsers::parse(ParseContext::new(
+			&mut root,
+			&MediaBytes::new_bsx(
+				r#"<Route path="guide" {BlobPage{path:"guide.md"}}/>
 					<DocumentView/>
 					<DocumentCells/>"#,
-				),
-			))
-			.unwrap();
+			),
+		))
+		.unwrap();
 		let root = root.flush();
 		for (path, expected) in [
 			("guide", "# Guide"),

@@ -5,7 +5,7 @@ filenames carry and reversed so the newest reads first. A post's title,
 description, authors and date all come from its own `+++` block, so adding a post
 is adding a file.
 
-The `{PageMeta{..}}` spread is a ROOT DECLARATION, what frontmatter is in a
+The `{DocMeta{..}}` spread is a ROOT DECLARATION, what frontmatter is in a
 markdown page: document metadata as a component, read off this file by the
 `<RoutesDir/>` scan without building it (so the nav knows this page before anyone
 visits it) and hoisted onto the rendered page as well (so the document title
@@ -15,7 +15,7 @@ The heading is hand-authored because this page is undated: `<ArticleHeader/>` in
 the shared `ArticleLayout` gates on `created`, so it renders for every post and
 not for this index.
 -->
-<Fragment {PageMeta{title: "The Full Moon Harvest", sidebar_label: "Blog", order: 1, expanded: true}}>
+<Fragment {DocMeta{title: "The Full Moon Harvest", sidebar_label: "Blog", order: 1, expanded: true}}>
 	<h1>The Full Moon Harvest</h1>
 	<RouteIndex reverse="true"/>
 </Fragment>

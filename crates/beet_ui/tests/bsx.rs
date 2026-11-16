@@ -51,7 +51,7 @@ fn parse_bsx(
 		Some(parent) => world.spawn(ChildOf(parent)),
 		None => world.spawn_empty(),
 	};
-	BsxParser::bsx()
+	BsxParser
 		.parse(ParseContext::new(&mut entity, &bytes))
 		.unwrap();
 	entity.id()
@@ -908,7 +908,7 @@ async fn counter_bsx_repaints_in_live_tui() {
 	app.update();
 	// parse the counter markup as the host's content tree.
 	let bytes = MediaBytes::new_bsx(COUNTER_BSX);
-	BsxParser::bsx()
+	BsxParser
 		.parse(ParseContext::new(
 			&mut app.world_mut().entity_mut(host),
 			&bytes,
@@ -1602,7 +1602,7 @@ fn html_mode_is_plain_html() {
 /// Parse HTML-mode bytes into a container, returning the container entity.
 fn parse_bsx_html(world: &mut World, bytes: &MediaBytes) -> Entity {
 	let mut entity = world.spawn_empty();
-	BsxParser::html()
+	BsxParser
 		.parse(ParseContext::new(&mut entity, bytes))
 		.unwrap();
 	entity.id()

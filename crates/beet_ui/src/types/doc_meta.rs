@@ -1,7 +1,7 @@
-//! Per-page document metadata, declared by markdown frontmatter or a BSX root
-//! spread.
+//! Document metadata, declared by markdown frontmatter, a BSX root spread or
+//! an Office file's core properties.
 //!
-//! [`PageMeta`] is inserted on a document's root entity, hoisted there by
+//! [`DocMeta`] is inserted on a document's root entity, hoisted there by
 //! whichever scan read the document (see
 //! [`RootDeclarations`](beet_core::prelude::RootDeclarations)). Its
 //! `title`/`description` override the
@@ -20,7 +20,7 @@
 //! document head, the feed and a syndicated record with no second pass and no
 //! truncation anywhere.
 //!
-//! - [`description`](PageMeta::description): at most 300 graphemes and 3000
+//! - [`description`](DocMeta::description): at most 300 graphemes and 3000
 //!   bytes. The tightest limit of the set, and it comes from the furthest
 //!   consumer: a post's description becomes the text of the Bluesky post
 //!   announcing it, and `app.bsky.feed.post.text` caps at 300 graphemes and
@@ -28,9 +28,9 @@
 //!   summary and its link card description. Graphemes rather than chars because
 //!   an emoji with a skin-tone modifier is one thing a reader sees and should
 //!   cost one unit of the budget.
-//! - [`title`](PageMeta::title): at most 500 graphemes and 5000 bytes, the
+//! - [`title`](DocMeta::title): at most 500 graphemes and 5000 bytes, the
 //!   `site.standard.document` limit, which nothing downstream undercuts.
-//! - [`tags`](PageMeta::tags): each matching `^[a-z0-9]+(-[a-z0-9]+)*$` and drawn from the
+//! - [`tags`](DocMeta::tags): each matching `^[a-z0-9]+(-[a-z0-9]+)*$` and drawn from the
 //!   vocabulary its site declares. Lowercase kebab because a tag is a url
 //!   segment of its own listing page and a plain string in a syndicated record,
 //!   and a closed vocabulary because an open one drifts into synonyms that
@@ -40,13 +40,13 @@
 use crate::prelude::ReflectFrontmatter;
 use beet_core::prelude::*;
 
-/// General metadata common to blog posts, docs pages, etc.
+/// General document metadata: a blog post's, a docs page's, a Word file's.
 ///
 /// Flat by design: every field is a frontmatter key by the same name, so a
 /// document's authored surface maps onto the component 1:1 through reflection
 /// with no hand-written mapping.
 ///
-/// Two of its fields are *url* metadata rather than page metadata, applied by
+/// Two of its fields are *url* metadata rather than document metadata, applied by
 /// whichever scan discovered the file (see [`apply_slug`](Self::apply_slug) and
 /// [`declare_file_defaults`](Self::declare_file_defaults)): a `slug` renames the
 /// route's last segment, and a numbered filename orders it.
@@ -54,10 +54,10 @@ use beet_core::prelude::*;
 #[reflect(Component, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", reflect(Frontmatter))]
-pub struct PageMeta {
-	/// Page title; overrides the package title in the document `Head`.
+pub struct DocMeta {
+	/// Document title; overrides the package title in the document `Head`.
 	pub title: Option<String>,
-	/// Page description; overrides the package description in the `Head`.
+	/// Document description; overrides the package description in the `Head`.
 	pub description: Option<String>,
 	/// The single url segment this page serves at, replacing the one its
 	/// filename implies, so a file may be numbered for reading order while its
@@ -67,7 +67,7 @@ pub struct PageMeta {
 	/// The day the page was published.
 	///
 	/// Authored as a `YYYY-MM-DD` string in either surface, markdown frontmatter
-	/// (`created = "2026-08-28"`) or a BSX spread (`{PageMeta{created:".."}}`),
+	/// (`created = "2026-08-28"`) or a BSX spread (`{DocMeta{created:".."}}`),
 	/// through [`Date`]'s literal parser, so it sorts and formats as a day
 	/// rather than as text.
 	pub created: Option<Date>,
@@ -96,7 +96,7 @@ pub struct PageMeta {
 	///
 	/// Authored by variant name, ie `visibility = "unlisted"` (the match is
 	/// case-insensitive, so the Rust spelling works too).
-	pub visibility: PageVisibility,
+	pub visibility: DocVisibility,
 	/// The page's thumbnail / social card image.
 	pub image_url: Option<Url>,
 	/// The page's companion video, eg the YouTube watch url a post embeds.
@@ -121,7 +121,7 @@ pub struct PageMeta {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
 #[reflect(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PageVisibility {
+pub enum DocVisibility {
 	/// Fully public: served, exported, and listed everywhere.
 	#[default]
 	Public,
@@ -132,26 +132,24 @@ pub enum PageVisibility {
 	Draft,
 }
 
-impl PageMeta {
+impl DocMeta {
 	/// Whether the page is listed: in a sitemap, a feed, a search index, and to
-	/// a crawler. False for both [`Unlisted`](PageVisibility::Unlisted) and
-	/// [`Draft`](PageVisibility::Draft) pages.
-	pub fn is_listed(&self) -> bool {
-		self.visibility == PageVisibility::Public
-	}
+	/// a crawler. False for both [`Unlisted`](DocVisibility::Unlisted) and
+	/// [`Draft`](DocVisibility::Draft) pages.
+	pub fn is_listed(&self) -> bool { self.visibility == DocVisibility::Public }
 
 	/// Whether the page is unfinished, ie must not reach production.
-	pub fn is_draft(&self) -> bool { self.visibility == PageVisibility::Draft }
+	pub fn is_draft(&self) -> bool { self.visibility == DocVisibility::Draft }
 
 	/// Whether a reader browsing the site finds the page, ie it appears in a
-	/// sidebar or a route index: an [`Unlisted`](PageVisibility::Unlisted) page
-	/// is reachable by its link alone, and a [`Draft`](PageVisibility::Draft)
+	/// sidebar or a route index: an [`Unlisted`](DocVisibility::Unlisted) page
+	/// is reachable by its link alone, and a [`Draft`](DocVisibility::Draft)
 	/// is previewed everywhere but production, matching static export.
 	pub fn is_browsable(&self, is_prod: bool) -> bool {
 		match self.visibility {
-			PageVisibility::Public => true,
-			PageVisibility::Unlisted => false,
-			PageVisibility::Draft => !is_prod,
+			DocVisibility::Public => true,
+			DocVisibility::Unlisted => false,
+			DocVisibility::Draft => !is_prod,
 		}
 	}
 
@@ -278,13 +276,13 @@ mod test {
 
 	/// Resolve a frontmatter block exactly as a scan does: lower it to root
 	/// declarations, then reflect-build this one component out of them.
-	fn parse(content: &str, media_type: MediaType) -> PageMeta {
+	fn parse(content: &str, media_type: MediaType) -> DocMeta {
 		let mut registry = TypeRegistry::default();
-		registry.register::<PageMeta>();
+		registry.register::<DocMeta>();
 		Frontmatter::parse(content, media_type)
 			.unwrap()
-			.declarations(&type_ext::short_name::<PageMeta>())
-			.get::<PageMeta>(&registry)
+			.declarations(&type_ext::short_name::<DocMeta>())
+			.get::<DocMeta>(&registry)
 			.unwrap()
 			.unwrap_or_default()
 	}
@@ -340,7 +338,7 @@ mod test {
 	#[beet_core::test]
 	fn derives_the_social_card_from_a_video() {
 		let card = |video_url: &str| {
-			PageMeta {
+			DocMeta {
 				video_url: Some(video_url.into()),
 				..default()
 			}
@@ -360,7 +358,7 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect_eq(thumbnail);
-		PageMeta::youtube_id(&Url::coerce(
+		DocMeta::youtube_id(&Url::coerce(
 			"https://www.youtube.com/embed/7koepBSRoUI",
 		))
 		.unwrap()
@@ -369,7 +367,7 @@ mod test {
 		// a bare path is no video at all
 		card("/assets/clip.mp4").xpect_none();
 		// an explicit image always wins over the derived one
-		PageMeta {
+		DocMeta {
 			image_url: Some("/assets/card.png".into()),
 			video_url: Some("https://youtu.be/7koepBSRoUI".into()),
 			..default()
@@ -383,13 +381,13 @@ mod test {
 	#[beet_core::test]
 	fn defaults_when_empty() {
 		let meta = parse("", MediaType::Yaml);
-		meta.xpect_eq(PageMeta::default());
+		meta.xpect_eq(DocMeta::default());
 		meta.sidebar_label().is_none().xpect_true();
 	}
 
 	#[beet_core::test]
 	fn apply_slug_renames_last_segment() {
-		let meta = PageMeta {
+		let meta = DocMeta {
 			slug: Some("full-stack-bevy".into()),
 			..default()
 		};
@@ -397,12 +395,12 @@ mod test {
 			.unwrap()
 			.xpect_eq(RelPath::new("blog/full-stack-bevy"));
 		// no slug declared, the filename-derived path stands
-		PageMeta::default()
+		DocMeta::default()
 			.apply_slug(&RelPath::new("blog/post-1"))
 			.unwrap()
 			.xpect_eq(RelPath::new("blog/post-1"));
 		// a nested slug is a loud error, never a silent re-parent
-		PageMeta {
+		DocMeta {
 			slug: Some("blog/nested".into()),
 			..default()
 		}
@@ -415,17 +413,17 @@ mod test {
 	#[beet_core::test]
 	fn file_defaults_order_by_number() {
 		let mut registry = TypeRegistry::default();
-		registry.register::<PageMeta>();
+		registry.register::<DocMeta>();
 		let order = |file: &str, frontmatter: &str| {
 			let mut declarations =
 				Frontmatter::parse(frontmatter, MediaType::Toml)
 					.unwrap()
-					.declarations(&type_ext::short_name::<PageMeta>());
-			PageMeta::declare_file_defaults(
+					.declarations(&type_ext::short_name::<DocMeta>());
+			DocMeta::declare_file_defaults(
 				&mut declarations,
 				&RelPath::new(file),
 			);
-			declarations.get::<PageMeta>(&registry).unwrap()?.order
+			declarations.get::<DocMeta>(&registry).unwrap()?.order
 		};
 		order("blog/10-later.md", "title = \"Later\"")
 			.unwrap()

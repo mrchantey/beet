@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// A file's core properties, `docProps/core.xml`, every one as written: on an
-/// Office file's root beside the [`PageMeta`] it shares the title, the
+/// Office file's root beside the [`DocMeta`] it shares the title, the
 /// author and the days with, and written as its own `[CoreProperties]` table
 /// of that root's frontmatter, an absent property left out.
 #[derive(
@@ -89,10 +89,10 @@ impl CoreProperties {
 		.xok()
 	}
 
-	/// The page metadata these share with [`PageMeta`]: the title, the
+	/// The page metadata these share with [`DocMeta`]: the title, the
 	/// author and the days the file was created and last modified.
-	pub fn page_meta(&self) -> PageMeta {
-		PageMeta {
+	pub fn doc_meta(&self) -> DocMeta {
+		DocMeta {
 			title: self.title.as_ref().map(ToString::to_string),
 			authors: self.creator.iter().cloned().collect(),
 			created: self.created.as_deref().and_then(Self::day),
@@ -101,10 +101,10 @@ impl CoreProperties {
 		}
 	}
 
-	/// The [`page_meta`](Self::page_meta) as the declarations a root scan
+	/// The [`doc_meta`](Self::doc_meta) as the declarations a root scan
 	/// reads, named as `component`.
 	pub fn declarations(&self, component: &str) -> RootDeclarations {
-		let meta = self.page_meta();
+		let meta = self.doc_meta();
 		let text = |text: &str| DataLiteral::Scalar(Value::Str(text.into()));
 		let fields = [
 			meta.title.as_deref().map(|title| ("title", text(title))),

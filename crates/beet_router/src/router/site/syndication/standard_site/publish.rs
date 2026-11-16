@@ -41,7 +41,7 @@ impl StandardSiteDocument {
 		publication: &StandardSitePub,
 		site: AtUri,
 		path: &RelPath,
-		meta: &PageMeta,
+		meta: &DocMeta,
 		live: &LivePage,
 		formats: &StandardSiteContentFormats,
 	) -> Result<Self> {
@@ -109,8 +109,8 @@ mod test {
 	use beet_ui::prelude::*;
 
 	/// The fixture post's frontmatter: a cover image, a title and a date.
-	fn meta() -> PageMeta {
-		PageMeta {
+	fn meta() -> DocMeta {
+		DocMeta {
 			image_url: Some(Url::parse("/media/cover.png").unwrap()),
 			..post("Full Stack Bevy", "2025-07-11")
 		}

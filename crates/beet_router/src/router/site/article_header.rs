@@ -1,12 +1,12 @@
 //! The chrome an article wears above its body, rendered from the page's own
-//! [`PageMeta`] rather than repeated in every post.
+//! [`DocMeta`] rather than repeated in every post.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
 
 /// An article's heading block: its `<h1>`, an `AUTHOR · DATE` byline, and the
-/// video the post companions, all read from the page's [`PageMeta`].
+/// video the post companions, all read from the page's [`DocMeta`].
 ///
 /// Placed in a LAYOUT (`site/templates/ArticleLayout.bsx`) rather than in each
 /// post, so it applies to a whole url subtree and to nothing else, and a post is
@@ -24,7 +24,7 @@ use beet_ui::prelude::*;
 #[template(system)]
 pub fn ArticleHeader(
 	stack: Res<RequestContextStack>,
-	metas: Query<&PageMeta>,
+	metas: Query<&DocMeta>,
 ) -> impl Bundle {
 	let header = metas
 		.get(stack.current().content())
@@ -50,7 +50,7 @@ pub fn ArticleHeader(
 ///
 /// Shared with [`RouteIndex`](crate::prelude::RouteIndex), whose entries wear the
 /// same line, so the two cannot drift apart.
-pub(crate) fn article_byline(meta: &PageMeta) -> Snippet {
+pub(crate) fn article_byline(meta: &DocMeta) -> Snippet {
 	let text = [
 		meta.byline().map(|byline| byline.to_uppercase()),
 		meta.created
@@ -84,7 +84,7 @@ pub fn YouTubeEmbed(
 	#[prop(default)]
 	title: String,
 ) -> impl Bundle {
-	let embed = PageMeta::youtube_id(&url)
+	let embed = DocMeta::youtube_id(&url)
 		.map(|id| format!("https://www.youtube.com/embed/{id}"));
 	let url = url.to_string();
 	rsx! {

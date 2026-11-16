@@ -15,10 +15,10 @@
 //! Values are **site-level** by default, sourced from [`PackageConfig`], with
 //! everything a search result or a link preview shows — the description, the
 //! social card, the canonical url, the `article:*` block — overridden by the
-//! page's own [`PageMeta`] and `url` when the caller supplies them, so a shared
+//! page's own [`DocMeta`] and `url` when the caller supplies them, so a shared
 //! link previews as the PAGE rather than as the site. The per-page `<title>` is
 //! owned by the layout (eg [`RouteHead`](beet_router) binds it to the route's
-//! `PageMeta`), so `omit_title` drops this widget's own `<title>` to keep
+//! `DocMeta`), so `omit_title` drops this widget's own `<title>` to keep
 //! exactly one in the document.
 //!
 //! The brand tint is read off the [`Theme`] resource, the palette the page's
@@ -49,13 +49,13 @@ use beet_core::prelude::*;
 pub fn Head(
 	#[prop] fixed_scale: bool,
 	/// Omit this widget's own `<title>`, so a layout can own a single bound
-	/// `<title>` (eg from the route's `PageMeta`) without a duplicate.
+	/// `<title>` (eg from the route's `DocMeta`) without a duplicate.
 	#[prop]
 	omit_title: bool,
 	/// The page's own metadata, overriding the package defaults in the social
 	/// card. Empty by default, ie a standalone `<Head/>` names the site.
 	#[prop]
-	meta: PageMeta,
+	meta: DocMeta,
 	/// This page's absolute url, the `<link rel="canonical">` and `og:url` a
 	/// crawler resolves every relative reference against. Defaults to the
 	/// [`PackageConfig`] homepage, ie the SITE, which is all a standalone
@@ -105,7 +105,7 @@ pub fn Head(
 	};
 	// an unlisted page serves to whoever holds its link and is advertised
 	// nowhere, which for a crawler means `noindex` (it may still follow links).
-	let noindex = meta.visibility == PageVisibility::Unlisted;
+	let noindex = meta.visibility == DocVisibility::Unlisted;
 	// the same facts again as schema.org structured data, which is what a
 	// search result reads for its byline and date
 	let json_ld = JsonLd {

@@ -78,16 +78,13 @@ impl BlobPage {
 				// The BSX build below re-inserts the same components from the same
 				// root spreads; that duplication is harmless, a binding resolving to
 				// the nearest holder.
-				let declarations = MediaParser::scan_root_declarations(
-					&bytes,
-					&world
-						.with_state::<AncestorQuery<&FrontmatterType>, _>(
-							|types| {
-								types.get(route).cloned().unwrap_or_default()
-							},
-						)
-						.component,
-				)?;
+				let frontmatter_type = world
+					.with_state::<AncestorQuery<&FrontmatterType>, _>(|types| {
+						types.get(route).cloned().unwrap_or_default()
+					})
+					.component;
+				let declarations = DocParsers::of(world)?
+					.declarations(&bytes, &frontmatter_type)?;
 				let content = world.spawn(render_store).id();
 				declarations.insert(&mut world.entity_mut(content))?;
 				// the entity owning this request's route tree, resolved from the
@@ -106,8 +103,10 @@ impl BlobPage {
 					RequestContext::new(parts, content, route, router),
 					|world| -> Result<PageRequest> {
 						let mut entity = world.entity_mut(content);
-						MediaParser::new()
-							.parse(ParseContext::new(&mut entity, &bytes))?;
+						DocParsers::parse(ParseContext::new(
+							&mut entity,
+							&bytes,
+						))?;
 
 						PageRoot::insert(&mut entity, vec![content]);
 						Ok(PageRequest(content))

@@ -121,9 +121,9 @@ fn head_emits_single_og_site_name_from_package_config() {
 /// read: the description, the canonical url and the `article:*` block, each
 /// falling back to the site only where the page declares nothing.
 #[beet_core::test]
-fn head_prefers_page_metadata() {
+fn head_prefers_doc_metadata() {
 	let mut world = layout_world();
-	let meta = PageMeta {
+	let meta = DocMeta {
 		title: Some("ECS Router".into()),
 		description: Some("routing as a tree of entities".into()),
 		created: Date::parse("2025-08-09").ok(),
@@ -206,8 +206,8 @@ fn head_falls_back_to_the_site() {
 #[beet_core::test]
 fn head_marks_unlisted_pages_noindex() {
 	let mut world = layout_world();
-	let meta = PageMeta {
-		visibility: PageVisibility::Unlisted,
+	let meta = DocMeta {
+		visibility: DocVisibility::Unlisted,
 		..default()
 	};
 	let root = world

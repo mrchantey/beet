@@ -504,9 +504,11 @@ pub(crate) mod test {
 		let mut world =
 			(TemplatePlugin, DocumentPlugin, ParsePlugin).into_world();
 		let root = world.spawn_empty().id();
-		MediaParser::new()
-			.parse(ParseContext::new(&mut world.entity_mut(root), &bytes))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(root),
+			&bytes,
+		))
+		.unwrap();
 		(world, root)
 	}
 
@@ -587,7 +589,7 @@ pub(crate) mod test {
 		Frontmatter::extract(&block)
 			.unwrap()
 			.unwrap()
-			.declarations("PageMeta")
+			.declarations("DocMeta")
 			.get::<CoreProperties>(&registry)
 			.unwrap()
 			.unwrap()

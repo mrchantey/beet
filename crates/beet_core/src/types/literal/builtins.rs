@@ -277,7 +277,7 @@ fn add_domain(table: &mut Table) {
 			))
 		})
 		// a day is its `YYYY-MM-DD` string, so a markup
-		// `{PageMeta{created:"2026-08-28"}}` authors a publication date. Any
+		// `{DocMeta{created:"2026-08-28"}}` authors a publication date. Any
 		// other value errors rather than silently landing on the epoch, since
 		// nothing structural builds an opaque date. A `Timestamp` has no entry:
 		// a person writes a day, never an instant.

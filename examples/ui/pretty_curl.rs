@@ -1,9 +1,9 @@
 //! Fetch a URL and render it in the terminal through [`RenderTargets`].
 //!
-//! Combines the HTTP client with [`MediaParser`] and [`RenderTargets`]
+//! Combines the HTTP client with [`DocParsers`] and [`RenderTargets`]
 //! to load remote content into ECS, then render it with the chosen
 //! media type. The `content-type` response header is used to select
-//! the parser automatically via [`MediaParser`].
+//! the parser automatically via [`DocParsers`].
 //!
 //! ```sh
 //! # default: fetch example.com, render as ansi-term
@@ -23,7 +23,12 @@ use beet::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, AsyncPlugin::default(), RenderPlugin))
+		.add_plugins((
+			MinimalPlugins,
+			AsyncPlugin::default(),
+			ParsePlugin,
+			RenderPlugin,
+		))
 		.add_systems(Startup, fetch_and_render)
 		.run();
 }
@@ -62,8 +67,7 @@ fn fetch_and_render(async_commands: AsyncCommands) {
 				let mut entity = world.spawn_empty();
 
 				// 2. Parse the response body into ECS and render it
-				MediaParser::new()
-					.parse(ParseContext::new(&mut entity, &input_bytes))
+				DocParsers::parse(ParseContext::new(&mut entity, &input_bytes))
 					.unwrap();
 
 				// 3. Render as the answer to a request accepting that type

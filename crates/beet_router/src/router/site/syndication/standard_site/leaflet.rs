@@ -78,9 +78,9 @@
 //!
 //! # The companion video
 //!
-//! A post's companion video is its `PageMeta::video_url`, which `ArticleHeader`
+//! A post's companion video is its `DocMeta::video_url`, which `ArticleHeader`
 //! renders and a `--root=content` render therefore leaves out. The target
-//! reads it off the `PageMeta` on the render root, as the cover image reads
+//! reads it off the `DocMeta` on the render root, as the cover image reads
 //! `social_image_url`, and leads the document with it: a `blocks.iframe` of
 //! the video's embed url at 16:9 for a YouTube video, the block Leaflet's own
 //! records carry for one, else a `blocks.website` with the url.
@@ -476,7 +476,7 @@ struct LeafletQuery<'w, 's> {
 	tree: RenderTreeQuery<'w, 's>,
 	attributes: AttributeQuery<'w, 's>,
 	inline_blobs: Query<'w, 's, &'static InlineBlob>,
-	metas: Query<'w, 's, &'static PageMeta>,
+	metas: Query<'w, 's, &'static DocMeta>,
 	package: Option<Res<'w, PackageConfig>>,
 	unregistered: Query<'w, 's, (), With<UnregisteredTag>>,
 	#[cfg(feature = "mermaid")]
@@ -548,7 +548,7 @@ impl LeafletQuery<'_, '_> {
 
 	/// The companion video's block: a YouTube video's embed, else a link card.
 	fn video(url: &Url) -> Result<LeafletBlock> {
-		match PageMeta::youtube_id(url) {
+		match DocMeta::youtube_id(url) {
 			Some(id) => LeafletBlock::Iframe(IframeBlock {
 				url: Uri::parse(&format!(
 					"https://www.youtube.com/embed/{id}"
@@ -1596,7 +1596,7 @@ mod test {
 	#[beet_core::test]
 	fn leads_with_the_companion_video() {
 		render((
-			PageMeta {
+			DocMeta {
 				video_url: Some(Url::parse("https://youtu.be/7koepBSRoUI").unwrap()),
 				..default()
 			},

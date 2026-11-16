@@ -100,12 +100,11 @@ pub(super) mod test {
 		root: Entity,
 		md: &str,
 	) {
-		MediaParser::new()
-			.parse(ParseContext::new(
-				&mut world.entity_mut(root),
-				&MediaBytes::new_markdown(md),
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(root),
+			&MediaBytes::new_markdown(md),
+		))
+		.unwrap();
 	}
 
 	/// The `diagram-render` mode the cascade resolves for `entity`.

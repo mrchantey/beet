@@ -4,7 +4,7 @@
 //! carry the `ooxml` module's `SheetCellAddress` instead, and
 //! [`CellText::listing`] lists both.
 //!
-//! Cells are numbered in one place: [`MediaParser`] leaves [`NumberTables`]
+//! Cells are numbered in one place: [`DocParsers`] leaves [`NumberTables`]
 //! on every root it parses into, and the [`TableNumbering`] step of
 //! [`PostParseTree`] numbers that document's tables once, whatever its
 //! format.

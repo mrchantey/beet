@@ -151,14 +151,11 @@ mod test {
 			))
 			.id();
 		// the media parse runs the post-parse passes, the diagram's among them
-		MediaParser::new()
-			.parse(ParseContext::new(
-				&mut world.entity_mut(column),
-				&MediaBytes::new_markdown(&format!(
-					"```mermaid\n{SOURCE}\n```"
-				)),
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(column),
+			&MediaBytes::new_markdown(&format!("```mermaid\n{SOURCE}\n```")),
+		))
+		.unwrap();
 		let figure = world.entity(column).get::<Children>().unwrap()[0];
 		let children = world.entity(figure).get::<Children>().unwrap().to_vec();
 		let (form, art) = fit(&mut world, figure);

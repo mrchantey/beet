@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 use ooxmlsdk::parts::PartRef;
 
 /// Parses a Word file, a workbook or a slide deck into the one document tree:
-/// the [`PageMeta`] its core properties declare and its [`OoxmlPackage`] on
+/// the [`DocMeta`] its core properties declare and its [`OoxmlPackage`] on
 /// the root, each part it reads an [`OoxmlNode::Part`] beneath, every node of
 /// the part an entity with its [`OoxmlNode`] and, where it means what an HTML
 /// element means, that [`Element`]. See the [`ooxml`](crate::ooxml) module
@@ -15,21 +15,6 @@ use ooxmlsdk::parts::PartRef;
 pub struct OoxmlParser;
 
 impl OoxmlParser {
-	/// The media types this parser reads.
-	pub const SUPPORTED: [MediaType; 3] = OoxmlPackage::MEDIA_TYPES;
-
-	/// The [`PageMeta`] a file's core properties declare, named as
-	/// `component`, for a scan that reads a root without building it.
-	pub fn declarations(
-		bytes: &MediaBytes,
-		component: &str,
-	) -> Result<RootDeclarations> {
-		OoxmlFile::open(bytes)?
-			.core_properties()?
-			.declarations(component)
-			.xok()
-	}
-
 	/// Reads `part` of `package` as an [`OoxmlNode::Part`] child of `root`,
 	/// holding the part's prolog and document element.
 	pub(crate) fn spawn_part(
@@ -51,18 +36,41 @@ impl OoxmlParser {
 	}
 }
 
+impl DocParser for OoxmlParser {
+	fn media_types(&self) -> Vec<MediaType> {
+		OoxmlPackage::MEDIA_TYPES.to_vec()
+	}
+
+	/// The [`DocMeta`] a file's core properties declare, named as
+	/// `frontmatter_type`.
+	fn declarations(
+		&self,
+		bytes: &MediaBytes,
+		frontmatter_type: &str,
+	) -> Result<RootDeclarations> {
+		OoxmlFile::open(bytes)?
+			.core_properties()?
+			.declarations(frontmatter_type)
+			.xok()
+	}
+}
+
+impl Installer for OoxmlParser {
+	fn install(self, app: &mut App) { DocParsers::register_on(app, self); }
+}
+
 impl NodeParser for OoxmlParser {
 	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
-		if !Self::SUPPORTED.contains(cx.bytes.media_type()) {
+		if !OoxmlPackage::MEDIA_TYPES.contains(cx.bytes.media_type()) {
 			return Err(ParseError::UnsupportedType {
 				unsupported: cx.bytes.media_type().clone(),
-				supported: Self::SUPPORTED.to_vec(),
+				supported: OoxmlPackage::MEDIA_TYPES.to_vec(),
 			});
 		}
 		let file = OoxmlFile::open(cx.bytes)?;
 		let root = cx.entity.id();
 		let properties = file.core_properties()?;
-		cx.entity.insert((properties.page_meta(), properties));
+		cx.entity.insert((properties.doc_meta(), properties));
 		cx.entity.world_scope(|world| -> Result {
 			match file.media_type() {
 				MediaType::Docx => WordProjection::build(world, root, &file)?,

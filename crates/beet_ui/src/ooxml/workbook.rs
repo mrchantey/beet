@@ -492,8 +492,10 @@ mod test {
 		let mut world =
 			(TemplatePlugin, DocumentPlugin, ParsePlugin).into_world();
 		let root = world.spawn_empty().id();
-		MediaParser::new()
-			.parse(ParseContext::new(&mut world.entity_mut(root), &bytes))?;
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(root),
+			&bytes,
+		))?;
 		CellText::listing(&mut world, root)
 			.into_iter()
 			.map(|cell| cell.address.to_string())

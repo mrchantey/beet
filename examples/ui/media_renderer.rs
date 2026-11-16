@@ -2,7 +2,7 @@
 //! [`MediaType`]. Use cli args to specify the output
 //!
 //! With the `markdown` feature the markdown is parsed into structured
-//! nodes; without it the [`MediaParser`] falls back to plain text.
+//! nodes; without it [`DocParsers`] falls back to plain text.
 //!
 //! ```sh
 //! # ansi-term (default)
@@ -15,15 +15,13 @@
 use beet::prelude::*;
 
 fn main() {
-	let mut world = RenderPlugin.into_world();
+	let mut world = (ParsePlugin, RenderPlugin).into_world();
 	let mut entity = world.spawn_empty();
 	let md_bytes = MediaBytes::new_markdown(MARKDOWN);
 
 	// 1. Load the markdown into ecs — falls back to plain text without
 	// the `markdown_parser` feature.
-	MediaParser::new()
-		.parse(ParseContext::new(&mut entity, &md_bytes))
-		.unwrap();
+	DocParsers::parse(ParseContext::new(&mut entity, &md_bytes)).unwrap();
 
 	// 2. Get the requested media type
 	let media_type = CliArgs::parse_env()

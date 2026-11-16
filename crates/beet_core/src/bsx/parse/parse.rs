@@ -56,6 +56,19 @@ impl BsxParseConfig {
 			dialect: MarkupDialect::Xml,
 		}
 	}
+	/// The media types a dialect reads, one per dialect.
+	pub const MEDIA_TYPES: [MediaType; 3] =
+		[MediaType::Bsx, MediaType::Html, MediaType::Xml];
+
+	/// The dialect `media_type` is read in, `None` for a non-markup type.
+	pub fn from_media_type(media_type: &MediaType) -> Option<Self> {
+		match media_type {
+			MediaType::Bsx => Some(Self::bsx()),
+			MediaType::Html => Some(Self::html()),
+			MediaType::Xml => Some(Self::xml()),
+			_ => None,
+		}
+	}
 	/// Whether the BSX surface is enabled.
 	pub fn is_bsx(&self) -> bool { self.dialect == MarkupDialect::Bsx }
 	/// Whether markup is read as XML.
