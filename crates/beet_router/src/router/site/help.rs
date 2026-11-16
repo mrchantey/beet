@@ -257,16 +257,21 @@ impl RouteEntry {
 		}
 		// only show input/output for non-trivial, non-exchange, non-scene
 		// routes, an exchange sequence's step outcome an exchange too
-		let input_type = node.meta.input().type_name();
-		let output_type = node.meta.output().type_name();
-		let is_trivial = input_type == "()" && output_type == "()";
+		let is_trivial =
+			node.meta.input_is::<()>() && node.meta.output_is::<()>();
 		let is_exchange = (node.meta.input_is::<Request>()
 			|| node.meta.input_is::<RequestParts>())
 			&& (node.meta.output_is::<Response>()
 				|| node.meta.output_is::<Outcome<Request, Response>>());
 		if !is_trivial && !is_exchange && !node.is_scene() {
-			details.push(("input".into(), input_type.to_string()));
-			details.push(("output".into(), output_type.to_string()));
+			details.push((
+				"input".into(),
+				node.meta.input().type_name().to_string(),
+			));
+			details.push((
+				"output".into(),
+				node.meta.output().type_name().to_string(),
+			));
 		}
 		if node.params.takes_any() {
 			details.push((

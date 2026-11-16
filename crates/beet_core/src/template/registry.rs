@@ -163,7 +163,7 @@ where
 				let template = T::from_reflect(value).ok_or_else(|| {
 					bevyhow!(
 						"failed to build template `{}` from reflected value",
-						core::any::type_name::<T>()
+						TypeName::of::<T>()
 					)
 				})?;
 				template.build_template(cx)

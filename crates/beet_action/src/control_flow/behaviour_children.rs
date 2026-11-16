@@ -141,8 +141,8 @@ impl BehaviourChildren<'_, '_> {
 			bevybail!(
 				"{node} {parent} skipped all {} of its steps, none serve Action<{}, {}>:{}",
 				steps.len(),
-				core::any::type_name::<Input>(),
-				core::any::type_name::<Out>(),
+				TypeName::of::<Input>(),
+				TypeName::of::<Out>(),
 				self.describe(steps.iter().copied())
 			);
 		}
@@ -172,8 +172,8 @@ impl BehaviourChildren<'_, '_> {
 			.ok_or_else(|| {
 				bevyhow!(
 					"no child of {parent} matches Action<{}, {}>:{}",
-					core::any::type_name::<Input>(),
-					core::any::type_name::<Out>(),
+					TypeName::of::<Input>(),
+					TypeName::of::<Out>(),
 					self.describe(steps.iter().copied())
 				)
 			})

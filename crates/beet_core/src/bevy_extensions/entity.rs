@@ -12,7 +12,7 @@ pub impl<'a> EntityRef<'a> {
 	/// Gets a reference to the component of type `T`, or returns an error if it doesn't exist.
 	fn get_or_else<T: Component>(&self) -> Result<&T> {
 		self.get::<T>().ok_or_else(|| {
-			bevyhow!("Component not found: {}", core::any::type_name::<T>())
+			bevyhow!("Component not found: {}", TypeName::of::<T>())
 		})
 	}
 }
@@ -99,7 +99,7 @@ pub impl<'a> EntityWorldMut<'a> {
 	/// Gets a reference to the component of type `T`, or returns an error if it doesn't exist.
 	fn get_or_else<T: Component>(&mut self) -> Result<&T> {
 		self.get::<T>().ok_or_else(|| {
-			bevyhow!("Component not found: {}", core::any::type_name::<T>())
+			bevyhow!("Component not found: {}", TypeName::of::<T>())
 		})
 	}
 	/// Gets a mutable reference to the component of type `T`, or returns an error if it doesn't exist.
@@ -107,7 +107,7 @@ pub impl<'a> EntityWorldMut<'a> {
 		&mut self,
 	) -> Result<Mut<'_, T>> {
 		self.get_mut::<T>().ok_or_else(|| {
-			bevyhow!("Component not found: {}", core::any::type_name::<T>())
+			bevyhow!("Component not found: {}", TypeName::of::<T>())
 		})
 	}
 
@@ -152,7 +152,7 @@ pub impl<'a> EntityWorldMut<'a> {
 	/// Gets a reference to the component of type `T`, or returns an error if it doesn't exist.
 	fn try_get<T: Component>(&self) -> Result<&T> {
 		self.get::<T>().ok_or_else(|| {
-			bevyhow!("Component not found: {}", core::any::type_name::<T>())
+			bevyhow!("Component not found: {}", TypeName::of::<T>())
 		})
 	}
 

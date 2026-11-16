@@ -273,7 +273,7 @@ where
 		let running = entity.take::<Running<T>>().ok_or_else(|| {
 			bevyhow!(
 				"EndRun expected a Running<{}> component",
-				core::any::type_name::<T>()
+				TypeName::of::<T>()
 			)
 		})?;
 		running.end(entity.into_world_mut(), self.0)

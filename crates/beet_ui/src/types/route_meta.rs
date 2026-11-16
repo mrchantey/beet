@@ -154,7 +154,7 @@ impl RouteMeta {
 		else {
 			return;
 		};
-		let name = type_ext::short_name::<Self>();
+		let name = TypeName::of::<Self>().short();
 		if !declarations.0.iter().any(|named| named.name == name) {
 			declarations.0.push(NamedLiteral {
 				name: name.clone(),
@@ -181,7 +181,7 @@ mod test {
 		registry.register::<RouteMeta>();
 		Frontmatter::parse(content, MediaType::Toml)
 			.unwrap()
-			.declarations(&type_ext::short_name::<DocMeta>())
+			.declarations(&TypeName::of::<DocMeta>().short())
 			.get::<RouteMeta>(&registry)
 			.unwrap()
 			.unwrap_or_default()
@@ -240,7 +240,7 @@ mod test {
 			let mut declarations =
 				Frontmatter::parse(frontmatter, MediaType::Toml)
 					.unwrap()
-					.declarations(&type_ext::short_name::<DocMeta>());
+					.declarations(&TypeName::of::<DocMeta>().short());
 			RouteMeta::declare_file_defaults(
 				&mut declarations,
 				&RelPath::new(file),

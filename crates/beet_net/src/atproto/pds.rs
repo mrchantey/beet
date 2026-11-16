@@ -262,7 +262,7 @@ impl RecordEntry {
 			value: self.value.into_serde::<T>().map_err(|err| {
 				bevyhow!(
 					"{uri} does not read as a `{}`: {err}",
-					core::any::type_name::<T>()
+					TypeName::of::<T>()
 				)
 			})?,
 			uri,

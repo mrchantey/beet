@@ -77,8 +77,8 @@ where
 	/// This action's descriptor, the entity's [`ActionMeta`] once inserted.
 	pub fn meta(&self) -> &ActionMeta { &self.meta }
 
-	/// The full type name of the handler, for display and debugging.
-	pub fn handler_meta(&self) -> TypeMeta { *self.meta.handler() }
+	/// The handler's [`TypeMeta`], for identity checks and diagnostics.
+	pub fn handler_meta(&self) -> &TypeMeta { self.meta.handler() }
 
 	/// Guard A: [`ActionMeta`] ownership. Deferred through [`Commands`] so two
 	/// actions inserted in one bundle are checked against each other rather than
@@ -113,7 +113,7 @@ where
 			let existing = entity_ref.get::<ActionMeta>().map(|meta| {
 				let clobbers =
 					!meta.is_unset() && *meta.handler() != *canonical.handler();
-				(clobbers, meta.name(), meta.overloads().clone())
+				(clobbers, meta.name().clone(), meta.overloads().clone())
 			});
 			match existing {
 				Some((true, existing_name, _)) => {
@@ -163,7 +163,7 @@ where
 		let intact = world
 			.entity(cx.entity)
 			.get::<Self>()
-			.is_some_and(|action| action.handler_meta() == TypeMeta::of::<P>());
+			.is_some_and(|action| action.handler_meta().is::<P>());
 		if intact {
 			return;
 		}
@@ -171,10 +171,10 @@ where
 			"{} on {} lost its action slot: a colocated explicit Action<{}, {}> \
 			 replaced the one it requires, so everything depending on it is inert. \
 			 Move the explicit action (or this provider) to its own entity.",
-			core::any::type_name::<P>(),
+			TypeName::of::<P>(),
 			cx.entity,
-			core::any::type_name::<In>(),
-			core::any::type_name::<Out>(),
+			TypeName::of::<In>(),
+			TypeName::of::<Out>(),
 		);
 		world.commands().handle_command_error::<P>(err);
 	}

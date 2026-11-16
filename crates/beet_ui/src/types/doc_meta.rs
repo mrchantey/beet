@@ -156,7 +156,7 @@ mod test {
 		registry.register::<DocMeta>();
 		Frontmatter::parse(content, media_type)
 			.unwrap()
-			.declarations(&type_ext::short_name::<DocMeta>())
+			.declarations(&TypeName::of::<DocMeta>().short())
 			.get::<DocMeta>(&registry)
 			.unwrap()
 			.unwrap_or_default()

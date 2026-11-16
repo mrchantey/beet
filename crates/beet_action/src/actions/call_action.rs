@@ -53,8 +53,8 @@ where
 		}),
 		None => bevybail!(
 			"No Action<{}, {}> on {caller}, which matches {}",
-			core::any::type_name::<Input>(),
-			core::any::type_name::<Out>(),
+			TypeName::of::<Input>(),
+			TypeName::of::<Out>(),
 			match metas.get(caller) {
 				Ok(meta) => meta.signatures(),
 				Err(_) => "no action".into(),

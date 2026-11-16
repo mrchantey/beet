@@ -140,7 +140,7 @@ pub fn exclusive_with<C: Component>(
 			bevybail!(
 				"an app has exactly one `{}`, but entity {other} already carries \
 				 one, so entity {entity} cannot{hint}",
-				type_ext::short_name::<C>()
+				TypeName::of::<C>().short()
 			)
 		});
 	}

@@ -111,16 +111,16 @@ impl ParamsPattern {
 			});
 			return Ok(());
 		};
-		if item.meta.type_path != meta.type_path
+		if item.meta.type_name != meta.type_name
 			|| item.meta.value != meta.value
 		{
 			let first = &item.extractors[0].name;
 			bevybail!(
 				"conflicting declarations of `--{key}`: `{first}` takes {} ({}), `{}` takes {} ({})",
-				item.meta.type_path,
+				item.meta.type_name,
 				item.meta.value,
 				extractor.name,
-				meta.type_path,
+				meta.type_name,
 				meta.value,
 				key = meta.key,
 			);
@@ -310,14 +310,14 @@ pub struct ParamMeta {
 	key: SmolStr,
 	/// The param value arity (flag / single / multiple).
 	value: ParamValue,
-	/// The full path of the Rust type the param parses into, ie
-	/// `alloc::string::String`, with any `Option<..>` wrapper stripped (its
-	/// optionality is conveyed by [`required`](Self::required)). Two
-	/// declarations of one key must agree on it.
-	type_path: SmolStr,
+	/// The Rust type the param parses into, ie `alloc::string::String`, with
+	/// any `Option<..>` wrapper stripped (its optionality is conveyed by
+	/// [`required`](Self::required)). Two declarations of one key must agree
+	/// on it.
+	type_name: TypeName,
 	/// How the param is written, its displayed `kind`: the type's authored
-	/// hint (`a YYYY-MM-DD date`), a unit enum's variants, else the short
-	/// [`type_path`](Self::type_path), ie `String`.
+	/// hint (`a YYYY-MM-DD date`), a unit enum's variants, else the
+	/// [`type_name`](Self::type_name)'s short form, ie `String`.
 	kind: SmolStr,
 	/// Additional details for the param
 	options: ParamOptions,
@@ -344,10 +344,10 @@ impl ParamMeta {
 	/// Creates a new `ParamMeta` with the given name and value arity, deriving a
 	/// representative concrete type for the arity (no reflected field to read).
 	pub fn new(name: impl Into<SmolStr>, value: ParamValue) -> Self {
-		let type_path = value.placeholder_type_path();
+		let type_name = value.placeholder_type_name();
 		Self {
-			kind: type_ext::short_path(type_path),
-			type_path: type_path.into(),
+			kind: type_name.short(),
+			type_name,
 			value,
 			key: name.into(),
 			options: default(),
@@ -395,7 +395,7 @@ impl ParamMeta {
 		let some_inner = info.and_then(reflect_ext::option_some_inner);
 		let leaf_id = some_inner.map_or(field.type_id(), TypeInfo::type_id);
 		let value = ParamValue::of_leaf(leaf_id, some_inner.or(info));
-		let type_path = strip_option(field.type_path());
+		let type_name = TypeName::new(strip_option(field.type_path()));
 
 		Self {
 			key: field.name().to_kebab_case().into(),
@@ -403,8 +403,8 @@ impl ParamMeta {
 			value,
 			kind: authored_kind(leaf_id)
 				.or_else(|| variant_kind(some_inner.or(info)))
-				.unwrap_or_else(|| type_ext::short_path(type_path)),
-			type_path: type_path.into(),
+				.unwrap_or_else(|| type_name.short()),
+			type_name,
 			options: ParamOptions::from_reflect(field),
 		}
 	}
@@ -468,10 +468,9 @@ impl ParamMeta {
 	/// The name of the param
 	pub fn name(&self) -> &str { &self.key }
 
-	/// The full path of the Rust type the param parses into (an `Option<..>`
-	/// wrapper is stripped, its optionality given by
-	/// [`is_required`](Self::is_required)).
-	pub fn type_path(&self) -> &str { &self.type_path }
+	/// The Rust type the param parses into (an `Option<..>` wrapper is
+	/// stripped, its optionality given by [`is_required`](Self::is_required)).
+	pub fn type_name(&self) -> &TypeName { &self.type_name }
 
 	/// How the param is written, its displayed `kind`, ie `String` or
 	/// `a YYYY-MM-DD date`.
@@ -488,11 +487,10 @@ impl ParamMeta {
 		self
 	}
 
-	/// Sets the full path of the type the param parses into, shown as its
-	/// short path.
-	pub fn with_type_path(mut self, type_path: impl Into<SmolStr>) -> Self {
-		self.type_path = type_path.into();
-		self.kind = type_ext::short_path(&self.type_path);
+	/// Sets the type the param parses into, shown as its short name.
+	pub fn with_type_name(mut self, type_name: TypeName) -> Self {
+		self.kind = type_name.short();
+		self.type_name = type_name;
 		self
 	}
 
@@ -563,13 +561,13 @@ impl ParamValue {
 		}
 	}
 
-	/// A representative concrete type path for this arity, used when a
+	/// A representative concrete type for this arity, used when a
 	/// [`ParamMeta`] is built without a reflected field (eg [`ParamMeta::new`]).
-	fn placeholder_type_path(&self) -> &'static str {
+	fn placeholder_type_name(&self) -> TypeName {
 		match self {
-			Self::Flag => "bool",
-			Self::Single => "alloc::string::String",
-			Self::Multiple => "alloc::vec::Vec<alloc::string::String>",
+			Self::Flag => TypeName::of::<bool>(),
+			Self::Single => TypeName::of::<String>(),
+			Self::Multiple => TypeName::of::<Vec<String>>(),
 		}
 	}
 }
@@ -708,12 +706,12 @@ mod test {
 			|name: &str| ParamMeta::from_field(info.field(name).unwrap());
 		// a required `String` shows its concrete type, not the `single` arity
 		let package = by_name("package");
-		package.type_path().xpect_eq("alloc::string::String");
+		package.type_name().xpect_eq(TypeName::of::<String>());
 		package.kind().xpect_eq("String");
 		package.is_required().xpect_true();
 		// an `Option<String>` is not required and its `kind` strips the wrapper
 		let out_dir = by_name("out_dir");
-		out_dir.type_path().xpect_eq("alloc::string::String");
+		out_dir.type_name().xpect_eq(TypeName::of::<String>());
 		out_dir.kind().xpect_eq("String");
 		out_dir.is_required().xpect_false();
 		// a `bool` is a flag whose kind is `bool`
@@ -920,25 +918,34 @@ mod test {
 	/// beside both.
 	#[beet_core::test]
 	fn conflicts_on_type_not_on_sources() {
-		let port = |name: &str, type_path: &str| {
+		let port = |name: &str, type_name: TypeName| {
 			ParamsDeclaration::named(
 				name,
 				[ParamMeta::new("port", ParamValue::Single)
-					.with_type_path(type_path)],
+					.with_type_name(type_name)],
 				false,
 			)
 		};
-		for (left, right) in
-			[("u16", "alloc::string::String"), ("net::Port", "tui::Port")]
-		{
+		mod net {
+			pub struct Port;
+		}
+		mod tui {
+			pub struct Port;
+		}
+		for (left, right) in [
+			(TypeName::of::<u16>(), TypeName::of::<String>()),
+			(TypeName::of::<net::Port>(), TypeName::of::<tui::Port>()),
+		] {
 			pattern(&[port("HttpServer", left), port("Serve", right)])
 				.unwrap_err()
 				.to_string()
 				.xpect_contains("conflicting declarations of `--port`");
 		}
-		let pattern =
-			pattern(&[port("HttpServer", "u16"), port("TuiServer", "u16")])
-				.unwrap();
+		let pattern = pattern(&[
+			port("HttpServer", TypeName::of::<u16>()),
+			port("TuiServer", TypeName::of::<u16>()),
+		])
+		.unwrap();
 		pattern.items().len().xpect_eq(1);
 		pattern.items()[0]
 			.extractors
@@ -962,17 +969,18 @@ mod test {
 
 		ParamMeta::of::<MyParams>().xpect_eq(vec![
 			ParamMeta::new("foo", ParamValue::Single)
-				.with_type_path("u32")
+				.with_type_name(TypeName::of::<u32>())
 				.required(),
 			ParamMeta::new("bar", ParamValue::Single)
-				.with_type_path("alloc::string::String")
+				.with_type_name(TypeName::of::<String>())
 				.with_description("all about 'bar'"),
 			ParamMeta::new("bazz", ParamValue::Multiple)
-				.with_type_path("alloc::vec::Vec<f64>")
+				.with_type_name(TypeName::of::<Vec<f64>>())
 				.with_description("all about 'bazz'")
 				.with_short('b'),
 			// .required(),
-			ParamMeta::new("boo", ParamValue::Flag).with_type_path("bool"),
+			ParamMeta::new("boo", ParamValue::Flag)
+				.with_type_name(TypeName::of::<bool>()),
 		]);
 	}
 

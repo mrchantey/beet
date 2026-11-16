@@ -35,10 +35,10 @@ use beet_net::prelude::Request;
 /// The converge of the deploy credential is the one reader of the token that
 /// does not go through this: it runs as the mint token, which no action
 /// lowers.
-#[derive(Debug, Clone, Copy, Component)]
+#[derive(Debug, Clone, Component)]
 pub struct CloudflareAccess {
-	/// The action's type path, reported as what asked for each group.
-	action: &'static str,
+	/// The action's type, reported as what asked for each group.
+	action: TypeName,
 	/// The groups the action's calls need, from the one vocabulary
 	/// [`TokenPermission`] holds.
 	permissions: &'static [TokenPermission],
@@ -62,7 +62,7 @@ impl CloudflareAccess {
 	/// inside the action's own `#[require]`.
 	pub fn new<T: 'static>(permissions: &'static [TokenPermission]) -> Self {
 		Self {
-			action: core::any::type_name::<T>(),
+			action: TypeName::of::<T>(),
 			permissions,
 			bucket: None,
 		}
@@ -86,9 +86,7 @@ impl CloudflareAccess {
 	}
 
 	/// The action's short name, ie `MtaStsPublish`.
-	pub fn action(&self) -> &'static str {
-		self.action.rsplit("::").next().unwrap_or(self.action)
-	}
+	pub fn action(&self) -> SmolStr { self.action.short() }
 
 	/// The groups the action's calls need.
 	pub fn permissions(&self) -> &'static [TokenPermission] { self.permissions }
@@ -101,7 +99,7 @@ impl CloudflareAccess {
 
 	/// The declaration on `entity`, an error naming the fix when it has none.
 	pub fn of(entity: EntityRef) -> Result<Self> {
-		entity.get::<Self>().copied().ok_or_else(|| {
+		entity.get::<Self>().cloned().ok_or_else(|| {
 			bevyhow!(
 				"entity {} reaches Cloudflare but declares no `CloudflareAccess`: \
 				require one on the action naming the groups its calls need, so \

@@ -6,6 +6,9 @@ mod literal;
 pub use literal::*;
 mod field_path;
 pub use field_path::*;
+/// [`TypeName`], the one way a rust type is named, and [`TypeMeta`].
+mod type_name;
+pub use type_name::*;
 mod on_missing;
 pub use on_missing::*;
 mod write_policy;

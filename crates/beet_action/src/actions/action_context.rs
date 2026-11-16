@@ -28,7 +28,7 @@ impl<In> ActionContext<In> {
 	pub fn missing_component<T>(&self) -> BevyError {
 		bevyhow!(
 			"Component not found: {} on caller {}",
-			core::any::type_name::<T>(),
+			TypeName::of::<T>(),
 			self.id()
 		)
 	}

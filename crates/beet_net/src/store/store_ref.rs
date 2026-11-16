@@ -66,7 +66,7 @@ impl StoreRef {
 				bevybail!(
 					"entity {target} has no `{}`: give the declaration it names a \
 					 store provider component, ie `<FsStore/>`",
-					core::any::type_name::<T>()
+					TypeName::of::<T>()
 				);
 			}
 		}

@@ -300,7 +300,7 @@ pub(super) fn map_field(
 fn entry_label(schema: &MapSchema, key: &str) -> String {
 	match schema {
 		MapSchema::Uniform { .. } => key.to_string(),
-		MapSchema::Keyed => SchemaRegistry::short_name(key).to_string(),
+		MapSchema::Keyed => TypeName::new(key).short().to_string(),
 	}
 }
 

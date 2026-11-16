@@ -81,7 +81,7 @@ impl SchemaRegistry {
 		schema: ValueSchema,
 	) -> &mut Self {
 		let name = name.into();
-		let short = Self::short_name(&name);
+		let short = TypeName::new(name.clone()).short();
 		if short != name {
 			let keys = self.aliases.entry(short.clone()).or_default();
 			if !keys.contains(&name) {
@@ -197,11 +197,6 @@ impl SchemaRegistry {
 			}
 			None => ValueSchema::Any,
 		}
-	}
-
-	/// The trailing `::` segment of `name`, its display and authoring sugar.
-	pub fn short_name(name: &str) -> SmolStr {
-		name.rsplit("::").next().unwrap_or(name).into()
 	}
 
 	/// The sole full key `short` aliases, or `None` when it aliases several.
@@ -383,6 +378,14 @@ mod test {
 		registry.register_type::<Count>();
 		registry.get(Count::type_path()).is_some().xpect_true();
 		registry.get("Count").is_some().xpect_true();
+	}
+
+	/// A generic key aliases as its reflect short path, every segment shortened.
+	#[crate::test]
+	fn a_generic_short_name_shortens_every_segment() {
+		let mut registry = SchemaRegistry::default();
+		registry.insert("a::Wrap<alloc::string::String>", ValueSchema::Any);
+		registry.get("Wrap<String>").is_some().xpect_true();
 	}
 
 	/// Two full keys sharing a short name are a collision: it resolves to

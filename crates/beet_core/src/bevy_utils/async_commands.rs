@@ -1362,10 +1362,7 @@ impl AsyncEntity {
 			if let Some(comp) = entity.get() {
 				func(comp).xok()
 			} else {
-				bevybail!(
-					"Component not found: {}",
-					core::any::type_name::<T>()
-				)
+				bevybail!("Component not found: {}", TypeName::of::<T>())
 			}
 		});
 		async move { fut.await.flatten() }
@@ -1389,10 +1386,7 @@ impl AsyncEntity {
 			if let Some(comp) = entity.get_mut() {
 				func(comp).xok()
 			} else {
-				bevybail!(
-					"Component not found: {}",
-					core::any::type_name::<T>()
-				)
+				bevybail!("Component not found: {}", TypeName::of::<T>())
 			}
 		});
 		async move { fut.await.flatten() }

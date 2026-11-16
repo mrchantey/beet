@@ -423,7 +423,7 @@ impl CloudflareDeployCredential {
 		world
 			.query::<(Entity, &CloudflareAccess)>()
 			.iter(world)
-			.map(|(entity, access)| (entity, *access))
+			.map(|(entity, access)| (entity, access.clone()))
 			.collect()
 	}
 

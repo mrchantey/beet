@@ -159,7 +159,7 @@ impl CloudflareDeployToken {
 		access: &CloudflareAccess,
 		bucket: Option<&str>,
 	) -> Result<Self> {
-		self.add(stack, access.action(), access.permissions(), &[], bucket)?;
+		self.add(stack, &access.action(), access.permissions(), &[], bucket)?;
 		self.xok()
 	}
 

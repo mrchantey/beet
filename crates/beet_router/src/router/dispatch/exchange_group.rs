@@ -68,7 +68,7 @@ impl ExchangeGroup {
 			&mut world.commands(),
 			cx.entity,
 			ParamsDeclaration::named(
-				type_ext::short_name::<Self>(),
+				TypeName::of::<Self>().short(),
 				[meta],
 				false,
 			),

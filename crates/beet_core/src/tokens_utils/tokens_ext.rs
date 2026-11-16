@@ -2,12 +2,11 @@
 
 use crate::prelude::*;
 
-/// Returns the last part of an [`std::any::type_name`] as a [`syn::Path`],
-/// the user is expected to bring the type into scope.
-/// Where the typename is `"std::option::Option<std::vec::Vec<usize>>"`,
-/// the output is `Option<Vec<usize>>`
+/// The [`TypeName::short`] of `T` as a [`syn::Path`], ie `Option<Vec<usize>>`
+/// for `core::option::Option<alloc::vec::Vec<usize>>`; the caller brings the
+/// type into scope.
 pub fn short_type_path<T>() -> syn::Path {
-	let short_name = type_ext::short_name::<T>();
+	let short_name = TypeName::of::<T>().short();
 	syn::parse_str::<syn::Path>(&short_name).expect(&format!(
 		"Failed to parse type name {short_name} into syn::Path"
 	))

@@ -1073,7 +1073,7 @@ fn field_checks(
 				else {
 					return ::core::result::Result::Err(#beet_core::prelude::bevyhow!(
 						"{}: missing required field `{}`",
-						::core::any::type_name::<#struct_ty>(),
+						#beet_core::prelude::TypeName::of::<#struct_ty>(),
 						#lit
 					));
 				};

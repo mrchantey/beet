@@ -104,7 +104,7 @@ impl Layout {
 	/// checks and a rename follows, where a `.bsx` layout has no type to name
 	/// and takes its filename.
 	pub fn of<T: BuildTemplate>() -> Self {
-		Self::new(type_ext::short_name::<T>())
+		Self::new(TypeName::of::<T>().short())
 	}
 
 	/// Wrap descendant routes in the named layout template, ie a `.bsx`

@@ -70,7 +70,7 @@ impl ParamsDeclaration {
 		let takes_any = ParamMeta::walk(T::type_info(), &mut metas).unwrap();
 		Self {
 			reads: ParamsRead::of(T::type_info()),
-			..Self::named(type_ext::short_name::<Extractor>(), metas, takes_any)
+			..Self::named(TypeName::of::<Extractor>().short(), metas, takes_any)
 		}
 	}
 
@@ -119,7 +119,7 @@ impl ParamsDeclaration {
 
 	/// A declaration of nothing, by `Extractor`.
 	pub fn empty<Extractor: ?Sized>() -> Self {
-		Self::named(type_ext::short_name::<Extractor>(), [], false)
+		Self::named(TypeName::of::<Extractor>().short(), [], false)
 	}
 
 	/// Whether this declares no param and does not take any.

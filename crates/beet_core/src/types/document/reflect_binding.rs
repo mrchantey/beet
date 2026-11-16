@@ -71,8 +71,7 @@ impl ReflectFieldRef {
 	///
 	/// The typed counterpart of [`new`](Self::new), and the binding twin of
 	/// `Layout::of::<T>()`: the name comes from
-	/// [`type_ext::short_name`](crate::prelude::type_ext::short_name), which
-	/// shortens generics the way the reflect registry indexes them. Keep
+	/// [`TypeName::short`], which shortens generics the way the reflect registry indexes them. Keep
 	/// [`new`](Self::new) for a name with no type behind it (a `.bsx`-declared
 	/// component, a dynamic selector).
 	///
@@ -85,7 +84,7 @@ impl ReflectFieldRef {
 	) -> Result<Self> {
 		let field = field.into();
 		validate_field_path(T::type_info(), &field)?;
-		Self::new(type_ext::short_name::<T>(), field).xok()
+		Self::new(TypeName::of::<T>().short(), field).xok()
 	}
 
 	/// Retarget the bound component: an entity, or a lazily resolved

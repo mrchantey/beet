@@ -65,8 +65,9 @@ pub trait EmitBlock: Block {
 #[derive(Debug, Clone, Component)]
 #[component(immutable)]
 pub struct ErasedBlock {
-	/// The concrete block's short type name, for diagnostics.
-	pub type_name: SmolStr,
+	/// The concrete block's type, so a second block type on the entity is
+	/// caught even when it shares a short name.
+	pub type_name: TypeName,
 	/// The block's [`label`](Block::label).
 	pub label: SmolStr,
 	/// The block's [`artifact_label`](Block::artifact_label).
@@ -93,17 +94,19 @@ impl ErasedBlock {
 				.get::<ErasedBlock>()
 				.map(|erased| erased.type_name.clone());
 			let block = entity_ref.get_or_else::<T>()?.clone();
+			let type_name = TypeName::of::<T>();
 			if let Some(existing) = existing
-				&& existing != type_ext::short_name::<T>()
+				&& existing != type_name
 			{
 				bevybail!(
 					"an entity holds at most one block, but {entity} already \
-					 declares a {existing}. Remove it before inserting a {}.",
-					type_ext::short_name::<T>()
+					 declares a {}. Remove it before inserting a {}.",
+					existing.short(),
+					type_name.short()
 				);
 			}
 			let erased = Self {
-				type_name: type_ext::short_name::<T>(),
+				type_name,
 				label: block.label().clone(),
 				artifact_label: block.artifact_label().cloned(),
 			};
@@ -189,6 +192,37 @@ mod test {
 		world.spawn((
 			S3BucketBlock::new("app"),
 			DynamoTableBlock::new("analytics"),
+		));
+		world.flush();
+	}
+
+	/// Block identity is the full type path, so two block types sharing a
+	/// short name are still two types, not a refresh.
+	#[beet_core::test]
+	#[should_panic = "holds at most one block"]
+	fn a_second_block_sharing_a_short_name_raises() {
+		macro_rules! label_block {
+			($module:ident) => {
+				mod $module {
+					use super::*;
+					#[derive(Clone, Component)]
+					#[component(
+										immutable,
+										on_insert = ErasedBlock::on_insert::<Self>
+									)]
+					pub struct LabelBlock(pub SmolStr);
+					impl Block for LabelBlock {
+						fn label(&self) -> &SmolStr { &self.0 }
+					}
+				}
+			};
+		}
+		label_block!(left);
+		label_block!(right);
+		let mut world = world();
+		world.spawn((
+			left::LabelBlock("a".into()),
+			right::LabelBlock("b".into()),
 		));
 		world.flush();
 	}

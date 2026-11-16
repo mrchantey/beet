@@ -80,7 +80,7 @@ pub struct FrontmatterType {
 impl Default for FrontmatterType {
 	fn default() -> Self {
 		Self {
-			component: type_ext::short_name::<DocMeta>(),
+			component: TypeName::of::<DocMeta>().short(),
 		}
 	}
 }

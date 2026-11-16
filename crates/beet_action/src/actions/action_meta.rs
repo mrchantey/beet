@@ -82,9 +82,7 @@ impl ActionMeta {
 
 	/// Whether this meta is still waiting for its canonical action, see
 	/// [`unset`](Self::unset).
-	pub(crate) fn is_unset(&self) -> bool {
-		self.handler == TypeMeta::of::<NoAction>()
-	}
+	pub(crate) fn is_unset(&self) -> bool { self.handler.is::<NoAction>() }
 
 	/// Adopt overloads already registered on the meta this one replaces, so
 	/// [`Action`] can refresh the canonical fields (and re-fire `Insert`) without
@@ -117,8 +115,10 @@ impl ActionMeta {
 	/// The single meta-matching predicate: call resolution, sequence child
 	/// validation and the child selector all ask this.
 	pub fn matches<In: 'static, Out: 'static>(&self) -> bool {
-		let pair = (TypeMeta::of::<In>(), TypeMeta::of::<Out>());
-		(self.input, self.output) == pair || self.overloads.contains(&pair)
+		(self.input.is::<In>() && self.output.is::<Out>())
+			|| self
+				.overloads
+				.contains(&(TypeMeta::of::<In>(), TypeMeta::of::<Out>()))
 	}
 
 	/// The canonical signature plus any overloads, for diagnostics.
@@ -130,17 +130,13 @@ impl ActionMeta {
 	}
 
 	/// The full type name of the handler function or type.
-	pub fn name(&self) -> &'static str { self.handler.type_name() }
+	pub fn name(&self) -> &TypeName { self.handler.type_name() }
 
 	/// Returns true if the input type matches `T`.
-	pub fn input_is<T: 'static>(&self) -> bool {
-		self.input.type_id() == core::any::TypeId::of::<T>()
-	}
+	pub fn input_is<T: 'static>(&self) -> bool { self.input.is::<T>() }
 
 	/// Returns true if the output type matches `T`.
-	pub fn output_is<T: 'static>(&self) -> bool {
-		self.output.type_id() == core::any::TypeId::of::<T>()
-	}
+	pub fn output_is<T: 'static>(&self) -> bool { self.output.is::<T>() }
 
 	/// The handler [`TypeInfo`], if reflection data is available.
 	pub fn handler_info(&self) -> Option<&'static TypeInfo> {
@@ -245,49 +241,6 @@ impl ActionTypeInfo {
 				None
 			}
 		}
-	}
-}
-
-/// Lightweight type metadata using [`TypeId`](core::any::TypeId) for
-/// comparison and [`type_name`](core::any::type_name) for display.
-#[derive(Debug, Copy, Clone)]
-pub struct TypeMeta {
-	type_name: &'static str,
-	type_id: core::any::TypeId,
-}
-
-impl TypeMeta {
-	/// Create a [`TypeMeta`] for the given type.
-	pub fn of<T: 'static>() -> Self {
-		Self {
-			type_name: core::any::type_name::<T>(),
-			type_id: core::any::TypeId::of::<T>(),
-		}
-	}
-	pub fn of_val<T: 'static>(_: &T) -> Self { Self::of::<T>() }
-
-	/// The full type name, ie `core::option::Option<i32>`.
-	pub fn type_name(&self) -> &'static str { self.type_name }
-	/// The [`TypeId`](core::any::TypeId) for this type.
-	pub fn type_id(&self) -> core::any::TypeId { self.type_id }
-}
-
-impl core::fmt::Display for TypeMeta {
-	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		write!(f, "{}", self.type_name)
-	}
-}
-
-/// Identity is the [`TypeId`](core::any::TypeId) alone; the name is display data
-/// derived from it.
-impl PartialEq for TypeMeta {
-	fn eq(&self, other: &Self) -> bool { self.type_id == other.type_id }
-}
-impl Eq for TypeMeta {}
-
-impl core::hash::Hash for TypeMeta {
-	fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-		self.type_id.hash(state);
 	}
 }
 

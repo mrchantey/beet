@@ -242,7 +242,7 @@ impl<'a> SceneEntities<'a> {
 						&& *type_path != AttributeOf::type_path()
 				})
 				.map(|type_path| {
-					SchemaRegistry::short_name(type_path).to_string()
+					TypeName::new(type_path.as_str()).short().to_string()
 				})
 				.unwrap_or_default()
 		};

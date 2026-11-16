@@ -397,7 +397,7 @@ pub trait TableStoreRow: TableContent {
 	/// snake case of the short type name, generics dropped, so `TableItem<u32>`
 	/// lives in `table_item`.
 	fn table_name() -> SmolStr {
-		let name = type_ext::short_name::<Self>();
+		let name = TypeName::of::<Self>().short();
 		name.split_once('<')
 			.map_or(name.as_str(), |(base, _generics)| base)
 			.to_snake_case()

@@ -119,8 +119,7 @@ pub impl World {
 		location: &'static Location<'static>,
 	) {
 		self.fallback_error_handler()(err.into(), ErrorContext::Command {
-			name: format!("{}\nat {:?}", core::any::type_name::<F>(), location)
-				.into(),
+			name: format!("{}\nat {:?}", TypeName::of::<F>(), location).into(),
 		});
 	}
 

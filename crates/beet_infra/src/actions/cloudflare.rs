@@ -100,10 +100,7 @@ async fn sibling<T: Component + Clone>(
 					.iter()
 					.find_map(|child| comp_q.get(child).ok().cloned())
 					.ok_or_else(|| {
-						bevyhow!(
-							"no sibling {} found",
-							core::any::type_name::<T>()
-						)
+						bevyhow!("no sibling {} found", TypeName::of::<T>())
 					})
 			},
 		)

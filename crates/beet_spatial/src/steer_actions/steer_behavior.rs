@@ -63,7 +63,7 @@ pub(crate) fn steer_behavior<T: SteerBehavior>(
 		) = agents.get_mut(action).map_err(|_| {
 			bevyhow!(
 				"{} action {action}: its resolved steering agent is missing required steering components (Transform/Velocity/MaxSpeed/Impulse/...)",
-				core::any::type_name::<T>()
+				TypeName::of::<T>()
 			)
 		})?;
 		match steer_target.get_position(&transforms) {
