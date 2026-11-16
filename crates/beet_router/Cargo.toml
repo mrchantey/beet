@@ -121,13 +121,13 @@ scripting = ["beet_action/scripting", "beet_ui?/scripting", "serde", "json"]
 quickjs = ["scripting", "beet_action/quickjs", "beet_ui?/quickjs"]
 # Build-time code generation: route tree, server/client actions, typed links.
 # The collection scan reads a content file's root declarations through the doc
-# parsers (`bsx`, `markdown_parser`), exactly as `RoutesDir` discovery does, so
-# blob routes are emitted with the declarations they hoist.
+# parsers exactly as `RoutesDir` discovery does, so blob routes are emitted
+# with the declarations they hoist: `bsx` reads markup roots and markdown
+# frontmatter alike, no markdown content parser required.
 codegen = [
 	"std",
 	"serde",
 	"bsx",
-	"markdown_parser",
 	"beet_core/tokens",
 	"beet_net/tokens",
 	"dep:syn",

@@ -167,6 +167,27 @@ impl Frontmatter {
 		Self::parse(&body[..end], media_type.clone()).map(Some)
 	}
 
+	/// The components a markdown document's leading block declares, its
+	/// unsectioned keys naming `frontmatter_type`, and none for any other
+	/// media type or a document with no block.
+	///
+	/// A format property rather than a content parser's: every [`DocParser`]
+	/// reading markdown answers [`DocParser::declarations`] through this, so a
+	/// scan reads the same declarations whether or not the markdown content
+	/// parser is built in.
+	pub fn root_declarations(
+		bytes: &MediaBytes,
+		frontmatter_type: &str,
+	) -> Result<RootDeclarations> {
+		if *bytes.media_type() != MediaType::Markdown {
+			return RootDeclarations::default().xok();
+		}
+		Self::extract(core::str::from_utf8(bytes)?)?
+			.map(|frontmatter| frontmatter.declarations(frontmatter_type))
+			.unwrap_or_default()
+			.xok()
+	}
+
 	/// Parse a raw frontmatter block, the text between its fences, through
 	/// serde in `media_type`, refusing a format no block is written in: its
 	/// keys holding a map are sections, the rest unsectioned.

@@ -298,6 +298,38 @@ mod test {
 		first_tag(&mut world, entity).xpect_eq("h1".to_string());
 	}
 
+	/// Frontmatter is a property of the markdown format: with only the plain
+	/// text fallback registered, a scan still reads a page's declarations.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn text_fallback_reads_markdown_frontmatter() {
+		let mut parsers = DocParsers::default();
+		parsers.register(PlainTextParser::default());
+		let declarations = parsers
+			.declarations(
+				&MediaBytes::new_markdown(
+					"+++\ntitle = \"Post\"\n[RouteMeta]\norder = 2\n+++\n\n# Post",
+				),
+				"DocMeta",
+			)
+			.unwrap();
+		declarations
+			.0
+			.iter()
+			.map(|literal| literal.name.as_str())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["DocMeta", "RouteMeta"]);
+		// a plain text document leading with a fence declares nothing
+		parsers
+			.declarations(
+				&MediaBytes::new_text("+++\ntitle = \"x\"\n+++"),
+				"DocMeta",
+			)
+			.unwrap()
+			.is_empty()
+			.xpect_true();
+	}
+
 	/// CSS has no parser of its own but is a text type, so it reads as plain
 	/// text.
 	#[beet_core::test]

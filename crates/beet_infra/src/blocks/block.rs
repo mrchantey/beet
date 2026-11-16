@@ -206,10 +206,7 @@ mod test {
 				mod $module {
 					use super::*;
 					#[derive(Clone, Component)]
-					#[component(
-										immutable,
-										on_insert = ErasedBlock::on_insert::<Self>
-									)]
+					#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>)]
 					pub struct LabelBlock(pub SmolStr);
 					impl Block for LabelBlock {
 						fn label(&self) -> &SmolStr { &self.0 }

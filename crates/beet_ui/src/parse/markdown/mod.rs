@@ -165,10 +165,7 @@ impl DocParser for MarkdownParser {
 		bytes: &MediaBytes,
 		frontmatter_type: &str,
 	) -> Result<RootDeclarations> {
-		Frontmatter::extract(core::str::from_utf8(bytes)?)?
-			.map(|frontmatter| frontmatter.declarations(frontmatter_type))
-			.unwrap_or_default()
-			.xok()
+		Frontmatter::root_declarations(bytes, frontmatter_type)
 	}
 
 	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {

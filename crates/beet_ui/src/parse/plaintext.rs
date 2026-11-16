@@ -12,6 +12,11 @@ use beet_core::prelude::*;
 /// When `plaintext_only` is `true`, only [`MediaType::Text`] is accepted.
 /// When `false` (the default), any media type where [`MediaType::is_text`]
 /// returns `true` is allowed.
+///
+/// As the fallback for a text type with no parser of its own, it still
+/// answers a markdown document's frontmatter declarations
+/// ([`Frontmatter::root_declarations`]), so route discovery reads a page's
+/// metadata without the markdown content parser.
 #[derive(Debug, Default, Clone)]
 pub struct PlainTextParser {
 	/// When `true`, require an explicit [`MediaType::Text`].
@@ -32,6 +37,15 @@ impl PlainTextParser {
 
 impl DocParser for PlainTextParser {
 	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Text] }
+
+	#[cfg(feature = "bsx")]
+	fn declarations(
+		&self,
+		bytes: &MediaBytes,
+		frontmatter_type: &str,
+	) -> Result<RootDeclarations> {
+		Frontmatter::root_declarations(bytes, frontmatter_type)
+	}
 
 	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
 		let media_type = cx.bytes.media_type();
