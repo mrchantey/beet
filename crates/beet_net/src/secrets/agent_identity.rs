@@ -2,6 +2,7 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use std::path::Path;
 use std::path::PathBuf;
 
 /// The global document and the one pair it holds: **this machine's own AWS
@@ -159,6 +160,12 @@ impl AdminSession {
 	/// per-uid path under `/run/user`, which is what the variable would have
 	/// named anyway.
 	pub fn path() -> Result<PathBuf> {
+		Self::dir()?.join("admin-session").xok()
+	}
+
+	/// The private tmpfs directory the session, and the request that buys
+	/// one, are written to: `$XDG_RUNTIME_DIR/beet`.
+	pub fn dir() -> Result<PathBuf> {
 		let dir = match env_ext::var("XDG_RUNTIME_DIR") {
 			Ok(dir) if !dir.is_empty() => PathBuf::from(dir.as_str()),
 			_ => bevybail!(
@@ -168,7 +175,7 @@ impl AdminSession {
 				<command>` instead, which keeps nothing"
 			),
 		};
-		dir.join("beet").join("admin-session").xok()
+		dir.join("beet").xok()
 	}
 
 	/// What is on tmpfs: a live session, one that has lapsed, or nothing.
@@ -177,8 +184,12 @@ impl AdminSession {
 	/// removed either way. "Your session ran out" and "you never had one" have
 	/// the same remedy but very different causes, and a caller that cannot tell
 	/// them apart cannot explain why a command that worked a minute ago stopped.
-	pub fn read() -> Result<SessionState> {
-		let path = Self::path()?;
+	pub fn read() -> Result<SessionState> { Self::read_at(Self::path()?) }
+
+	/// [`read`](Self::read) the session at `path`, the seam a test points at
+	/// a scratch directory: the real one may hold the operator's live grant.
+	fn read_at(path: impl AsRef<Path>) -> Result<SessionState> {
+		let path = path.as_ref();
 		if !fs_ext::exists(&path)? {
 			return SessionState::None.xok();
 		}
@@ -249,8 +260,11 @@ impl AdminSession {
 	/// Write the session to tmpfs through [`fs_ext::write_private`], which
 	/// creates it `0600` in one `open` so there is no moment it is readable by
 	/// anyone else, and creates the parent directory on the way.
-	pub fn write(&self) -> Result {
-		let path = Self::path()?;
+	pub fn write(&self) -> Result { self.write_to(Self::path()?) }
+
+	/// [`write`](Self::write) the session to `path`.
+	fn write_to(&self, path: impl AsRef<Path>) -> Result {
+		let path = path.as_ref();
 		if let Some(parent) = path.parent() {
 			fs_ext::create_dir_private(parent)?;
 		}
@@ -315,25 +329,20 @@ mod test {
 	/// a stale credential left on disk for the next reader to pick up.
 	#[beet_core::test]
 	fn a_session_round_trips_and_lapses() {
-		let path = match AdminSession::path() {
-			Ok(path) => path,
-			// no `XDG_RUNTIME_DIR` on this host, so there is no tmpfs to test
-			Err(_) => return,
-		};
-		let restore = fs_ext::exists(&path).unwrap_or(false);
-		let saved = restore
-			.then(|| fs_ext::read_to_string(&path).ok())
-			.flatten();
+		// a scratch directory, never the real one, which may hold the
+		// operator's live grant
+		let dir = TempDir::new().unwrap();
+		let path = dir.join("beet").join("admin-session");
 		let live = AdminSession {
 			key_id: "ASIAEXAMPLE".into(),
 			secret: "secrethalf".into(),
 			token: "sessiontoken".into(),
 			expires: Timestamp::now().secs() + 600,
 		};
-		live.write().unwrap();
+		live.write_to(&path).unwrap();
 		// owner-only, with no window in which it was not
 		fs_ext::is_private(&path).unwrap().xpect_true();
-		match AdminSession::read().unwrap() {
+		match AdminSession::read_at(&path).unwrap() {
 			SessionState::Live(read) => {
 				read.key_id.as_str().xpect_eq("ASIAEXAMPLE");
 				read.token.as_str().xpect_eq("sessiontoken");
@@ -347,33 +356,30 @@ mod test {
 			expires: Timestamp::now().secs() - 1,
 			..live.clone()
 		}
-		.write()
+		.write_to(&path)
 		.unwrap();
-		matches!(AdminSession::read().unwrap(), SessionState::Expired)
+		matches!(AdminSession::read_at(&path).unwrap(), SessionState::Expired)
 			.xpect_true();
 		fs_ext::exists(&path).unwrap().xpect_false();
 		// and absence is None rather than an error
-		matches!(AdminSession::read().unwrap(), SessionState::None)
+		matches!(AdminSession::read_at(&path).unwrap(), SessionState::None)
 			.xpect_true();
 		// a file claiming more than the role can grant is a moved clock
 		AdminSession {
 			expires: Timestamp::now().secs() + 43200 * 3,
 			..live.clone()
 		}
-		.write()
+		.write_to(&path)
 		.unwrap();
-		AdminSession::read()
+		AdminSession::read_at(&path)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("beyond the role's own ceiling");
 		fs_ext::exists(&path).unwrap().xpect_false();
 		// a truncated file is no session, not a panic
 		fs_ext::write_private(&path, "AWS_ACCESS_KEY_ID=only\n").unwrap();
-		matches!(AdminSession::read().unwrap(), SessionState::None)
+		matches!(AdminSession::read_at(&path).unwrap(), SessionState::None)
 			.xpect_true();
-		if let Some(saved) = saved {
-			fs_ext::write_private(&path, saved).unwrap();
-		}
 	}
 
 	/// The three the sdk needs, token included: a role's credentials without it

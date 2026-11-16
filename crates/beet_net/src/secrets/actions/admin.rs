@@ -2,6 +2,7 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use std::path::Path;
 use std::path::PathBuf;
 
 /// Become an administrator for a session: the one path to tier 0a.
@@ -307,8 +308,13 @@ impl AdminElevate {
 		// the device is named for the user, so its arn is composed the same way
 		let device =
 			format!("arn:aws:iam::{account}:mfa/{}", AgentIdentity::USER);
-		let (request_path, request) =
-			Self::write_request(&role, &device, code, seconds)?;
+		let (request_path, request) = Self::write_request(
+			AdminSession::dir()?,
+			&role,
+			&device,
+			code,
+			seconds,
+		)?;
 		let result = AgentIdentity::aws(agent, [
 			"sts",
 			"assume-role",
@@ -332,8 +338,8 @@ impl AdminElevate {
 		AdminSession::parse(&body, seconds)
 	}
 
-	/// Write the request where the cli can read it: a `0600` file on tmpfs,
-	/// returning the path and the `file://` argument naming it.
+	/// Write the request where the cli can read it: a `0600` file in `dir`,
+	/// tmpfs in use, returning the path and the `file://` argument naming it.
 	///
 	/// **The cli cannot read `--cli-input-json` from a pipe.** `file:///dev/stdin`
 	/// is rejected as `Invalid JSON received` even from a plain shell
@@ -348,15 +354,17 @@ impl AdminElevate {
 	/// where this is readable by its owner alone. `with_secret` governs what
 	/// beet writes down, not what the kernel shows about a child.
 	fn write_request(
+		dir: impl AsRef<Path>,
 		role: &str,
 		device: &str,
 		code: &str,
 		seconds: i64,
 	) -> Result<(PathBuf, String)> {
-		let path = AdminSession::path()?.with_file_name("assume-request.json");
-		if let Some(parent) = path.parent() {
-			fs_ext::create_dir_private(parent)?;
-		}
+		let dir = dir.as_ref();
+		fs_ext::create_dir_private(dir)?;
+		// named for this process, so two `admin` runs never share a request
+		let path =
+			dir.join(format!("assume-request-{}.json", std::process::id()));
 		fs_ext::write_private(
 			&path,
 			Self::assume_request(role, device, code, seconds),
@@ -500,11 +508,10 @@ mod test {
 	/// argument, a file that EXISTS at that path, and owner-only permissions.
 	#[beet_core::test]
 	fn the_request_reaches_the_cli_as_a_private_file() {
-		// no `XDG_RUNTIME_DIR` on this host means no tmpfs to write to
-		if AdminSession::path().is_err() {
-			return;
-		}
+		// a scratch directory, never the real one an `admin` run is using
+		let dir = TempDir::new().unwrap();
 		let (path, arg) = AdminElevate::write_request(
+			&dir,
 			"arn:aws:iam::1234:role/beet-admin",
 			"arn:aws:iam::1234:mfa/beet-agent",
 			"123456",
