@@ -22,8 +22,8 @@ use beet_ui::prelude::*;
 /// An unlisted page never appears (an index is a listing), and a draft appears
 /// everywhere but production, exactly as static export drops it there.
 ///
-/// Entries are ordered like the nav — frontmatter `order`, which a numbered
-/// filename fills in ([`DocMeta::declare_file_defaults`]), then natural order
+/// Entries are ordered like the nav: the [`RouteMeta`] `order`, which a numbered
+/// filename fills in ([`RouteMeta::declare_file_defaults`]), then natural order
 /// by path — and numbered `#1..#N` by their place in that ascending order.
 /// `reverse` flips the *display* only, so a blog reads newest first while post
 /// `#1` stays post `#1`.

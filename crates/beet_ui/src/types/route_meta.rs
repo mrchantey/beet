@@ -130,9 +130,9 @@ impl RouteMeta {
 
 	/// Declare onto `declarations` the defaults a content file's NAME implies: a
 	/// leading `<number>-` on the filename sets [`order`](Self::order), unless the
-	/// document declared one. A document declaring only its [`DocMeta`] gets a
-	/// [`RouteMeta`] declaration to carry it; one declaring nothing at all gets
-	/// no metadata invented for it.
+	/// document's `[RouteMeta]` declares one. The filename is itself a route
+	/// declaration, so a numbered file is ordered whatever else it declares,
+	/// frontmatter or none.
 	///
 	/// A patch of the LITERAL rather than of a built value, so the discovery scan
 	/// and the codegen emit share it: an emitted route carries no filename to
@@ -155,9 +155,7 @@ impl RouteMeta {
 			return;
 		};
 		let name = type_ext::short_name::<Self>();
-		if !declarations.is_empty()
-			&& !declarations.0.iter().any(|named| named.name == name)
-		{
+		if !declarations.0.iter().any(|named| named.name == name) {
 			declarations.0.push(NamedLiteral {
 				name: name.clone(),
 				fields: NamedFields::Unit,
@@ -260,7 +258,7 @@ mod test {
 		order("docs/intro.md", "title = \"Intro\"")
 			.is_none()
 			.xpect_true();
-		// a document declaring nothing gets no metadata invented for it
-		order("blog/10-later.md", "").is_none().xpect_true();
+		// the filename orders a document declaring nothing else
+		order("blog/10-later.md", "").unwrap().xpect_eq(10);
 	}
 }
