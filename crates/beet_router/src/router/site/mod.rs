@@ -23,6 +23,10 @@ mod route_index;
 mod sidebar;
 #[cfg(feature = "std")]
 mod site_layout;
+// `<SocialCards/>`: a link preview drawn for every page, on the icon set's
+// image toolchain
+#[cfg(feature = "std")]
+mod social_cards;
 // the machine-readable faces of a site (`robots.txt`, `sitemap.xml`, `rss.xml`,
 // `search-index.json`): ordinary static routes over the `RouteTree`.
 #[cfg(feature = "std")]
@@ -55,6 +59,8 @@ pub use route_index::*;
 pub use sidebar::*;
 #[cfg(feature = "std")]
 pub use site_layout::*;
+#[cfg(feature = "std")]
+pub use social_cards::*;
 #[cfg(feature = "std")]
 pub use syndication::*;
 #[cfg(all(feature = "bsx", feature = "template_serde"))]

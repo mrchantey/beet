@@ -282,14 +282,17 @@ serde_ipld_dagcbor = { version = "0.6", default-features = false }
 # an image's pixel size read from its header, no decode
 imagesize = { version = "0.15", default-features = false }
 # raster decode, resize and encode: the terminal's `<img>` transmit
-# (`beet_ui/tui`), the cli's qr png (`beet-cli/qrcode`) and the icon set
-# derivation (`beet_router/icon_set`, which adds `ico`). No codec by default,
-# each consumer enables the formats it reads and writes.
+# (`beet_ui/tui`), the cli's qr png (`beet-cli/qrcode`) and the icon set and
+# social card derivations (`beet_router/site_images`, which adds `ico`). No
+# codec by default, each consumer enables the formats it reads and writes.
 image = { version = "0.25", default-features = false }
-# svg rasterisation, the terminal's `<img src=*.svg>` and an svg icon set's
-# sizes. Keep it current: an older resvg pins an older codec line (zune-jpeg,
-# gif, png) and duplicates the one `image` already pulls.
+# svg rasterisation, the terminal's `<img src=*.svg>`, an svg icon set's sizes
+# and a social card. Keep it current: an older resvg pins an older codec line
+# (zune-jpeg, gif, png) and duplicates the one `image` already pulls.
 resvg = { version = "0.48" }
+# glyph advances, for a social card's text wrap: the font reader `resvg`'s own
+# text layout shapes with, so the version follows the one `usvg` pins
+skrifa = { version = "0.44", default-features = false, features = ["std"] }
 ipld-core = { version = "0.4", default-features = false, features = ["serde"] }
 # MD5 for the store mirror's change detection: S3 answers an object's etag as
 # its MD5, so the local side digests the same way and a sync skips what matches.
@@ -425,9 +428,10 @@ dag_cbor = ["serde", "beet_core/dag_cbor", "beet_net?/dag_cbor", "beet_router?/d
 # the rich body a standard site document carries by default. Only a binary
 # that publishes needs it; a served site answers its media type 406.
 leaflet = ["dag_cbor", "json", "beet_router?/leaflet"]
-# Deriving an `<IconSet/>`'s files (`beet_router`), for the binary running
-# `<Derive/>`; a served site links the set without it.
-icon_set = ["json", "beet_router?/icon_set"]
+# Deriving the site's images (`beet_router`), an `<IconSet/>`'s files and a
+# `<SocialCards/>` set, for the binary running `<Derive/>`; a served site links
+# them without it.
+site_images = ["json", "beet_router?/site_images"]
 # offline geoip country lookup for analytics (pulls the pure-rust `maxminddb`
 # reader). Off by default; a deployed site enables it and commits a
 # `country.mmdb` to `assets/databases/` to populate the analytics country field.

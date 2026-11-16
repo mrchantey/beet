@@ -36,8 +36,10 @@ use beet_ui::prelude::*;
 /// this request's own absolute url as the canonical one, and an
 /// [`Unlisted`](RouteVisibility::Unlisted) route's [`RouteMeta`] marks it
 /// `noindex`. The declared [`IconSet`], when the world holds one, is linked
-/// from its declaration: its icons and its web app manifest. Extra tags
-/// (stylesheet, fonts, ...) flow through to the `<head>` via the default slot.
+/// from its declaration: its icons and its web app manifest. The declared
+/// [`SocialCards`], when the world holds them, hand the head this page's card
+/// (else the root route's) as its social image. Extra tags (stylesheet, fonts,
+/// ...) flow through to the `<head>` via the default slot.
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
 /// a BSX layout declares `<RouteHead>...</RouteHead>`. Builds inside a layout
@@ -48,6 +50,7 @@ pub fn RouteHead(
 	metas: Query<&DocMeta>,
 	route_metas: Query<&RouteMeta>,
 	icon_sets: Query<&IconSet>,
+	cards: SocialCardQuery,
 	pkg: Res<PackageConfig>,
 ) -> Result<impl Bundle> {
 	let cx = stack.current();
@@ -72,8 +75,9 @@ pub fn RouteHead(
 			"more than one `IconSet` declared: a site has one set of icons"
 		),
 	};
+	let social_image = cards.card_url(cx.route())?;
 	rsx! {
-		<Head omit_title=true meta=meta url=url noindex=noindex>
+		<Head omit_title=true meta=meta url=url noindex=noindex social_image=social_image>
 			<title>{title}</title>
 			{icons}
 			<Slot/>

@@ -65,7 +65,7 @@ use beet_ui::prelude::*;
 /// the declaration, each file at the url its store path serves at (`/` joined
 /// to the path, as `<AssetsDir src="assets"/>` serves `assets/`).
 ///
-/// Deriving needs the `icon_set` feature; a binary without it, ie a served
+/// Deriving needs the `site_images` feature; a binary without it, ie a served
 /// site, still links the set it declares.
 #[action]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
@@ -92,12 +92,12 @@ pub async fn IconSet(
 		})
 		.await;
 	cfg_if! {
-		if #[cfg(feature = "icon_set")] {
+		if #[cfg(feature = "site_images")] {
 			icon_set.derive(&cx.input, &bytes, &theme, &package).await
 		} else {
 			let _ = (bytes, theme, package);
 			bevybail!(
-				"deriving the icon set from `{}` needs the `icon_set` feature",
+				"deriving the icon set from `{}` needs the `site_images` feature",
 				icon_set.src
 			)
 		}
@@ -202,7 +202,7 @@ impl IconSet {
 	}
 
 	/// The url a file at `path` in the store serves at.
-	fn href(path: &RelPath) -> SmolStr { format!("/{path}").into() }
+	pub(crate) fn href(path: &RelPath) -> SmolStr { format!("/{path}").into() }
 
 	/// The file `name` beside the source.
 	fn path(&self, name: &str) -> RelPath {
@@ -226,7 +226,7 @@ impl IconSet {
 	}
 }
 
-#[cfg(feature = "icon_set")]
+#[cfg(feature = "site_images")]
 impl IconSet {
 	/// The unpadded png sizes, each `icon-<size>.png`.
 	const PNG_SIZES: [u32; 5] = [16, 32, 180, 192, 512];
@@ -320,20 +320,21 @@ impl IconSet {
 	}
 }
 
-/// A decoded icon source, rendered at each size of the set.
-#[cfg(feature = "icon_set")]
-enum IconSource {
+/// A decoded icon source, rendered at each size of the set, and at the size
+/// a social card places the logo.
+#[cfg(feature = "site_images")]
+pub(crate) enum IconSource {
 	/// A raster, resized down.
 	Raster(image::RgbaImage),
 	/// A vector, rasterised at each size.
 	Svg(resvg::usvg::Tree),
 }
 
-#[cfg(feature = "icon_set")]
+#[cfg(feature = "site_images")]
 impl IconSource {
 	/// Decode `bytes` as `icon_set`'s source, refusing a raster too small for
 	/// the set.
-	fn decode(icon_set: &IconSet, bytes: &[u8]) -> Result<Self> {
+	pub(crate) fn decode(icon_set: &IconSet, bytes: &[u8]) -> Result<Self> {
 		if icon_set.is_svg() {
 			let options = resvg::usvg::Options::default();
 			return Self::Svg(resvg::usvg::Tree::from_data(bytes, &options)?)
@@ -359,7 +360,7 @@ impl IconSource {
 
 	/// The source fit centred in a `size` square, transparent around a source
 	/// that is not square.
-	fn render(&self, size: u32) -> Result<image::RgbaImage> {
+	pub(crate) fn render(&self, size: u32) -> Result<image::RgbaImage> {
 		match self {
 			Self::Raster(image) => {
 				let (width, height) = image.dimensions();
@@ -456,14 +457,14 @@ impl IconSource {
 	}
 
 	/// `image` as png.
-	fn encode_png(image: &image::RgbaImage) -> Result<Vec<u8>> {
+	pub(crate) fn encode_png(image: &image::RgbaImage) -> Result<Vec<u8>> {
 		let mut bytes = std::io::Cursor::new(Vec::new());
 		image.write_to(&mut bytes, image::ImageFormat::Png)?;
 		bytes.into_inner().xok()
 	}
 }
 
-#[cfg(all(test, feature = "icon_set"))]
+#[cfg(all(test, feature = "site_images"))]
 mod test {
 	use super::IconSource;
 	use crate::prelude::*;

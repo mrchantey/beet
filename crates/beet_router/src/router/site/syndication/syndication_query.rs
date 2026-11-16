@@ -14,6 +14,8 @@ pub(crate) struct SyndicationPage {
 	/// The page's authored metadata. Defaulted for a page that declared none,
 	/// which is public like any other.
 	pub meta: DocMeta,
+	/// The page's route entity.
+	pub route: Entity,
 }
 
 /// Everything a syndication route serializes from: the pages in its scope, the
@@ -91,6 +93,9 @@ pub(crate) struct SyndicationQuery<'w, 's> {
 }
 
 impl SyndicationQuery<'_, '_> {
+	/// The site identity every url resolves against.
+	pub fn package(&self) -> &PackageConfig { &self.package }
+
 	/// The scope of the syndication route at `route`.
 	///
 	/// # Errors
@@ -99,8 +104,6 @@ impl SyndicationQuery<'_, '_> {
 	///
 	/// [`Router`]: crate::prelude::Router
 	pub fn scope(&self, route: Entity) -> Result<SyndicationScope> {
-		let router = self.trees.get_entity(route)?;
-		let tree = self.trees.get(route)?;
 		// this route's own position minus its filename segment, so a
 		// `<Sitemap/>` serving at `blog/sitemap.xml` covers the `blog` subtree
 		// and one at the root covers the whole url space
@@ -110,12 +113,33 @@ impl SyndicationQuery<'_, '_> {
 			.annotated_path()
 			.parent()
 			.unwrap_or_default();
+		SyndicationScope {
+			pages: self.listed(route, &root)?,
+			root,
+			package: self.package.clone(),
+			router: self.trees.get_entity(route)?,
+		}
+		.xok()
+	}
+
+	/// The listed pages under `root` in the url space `entity` belongs to, in
+	/// route-tree order: every public page, plus the drafts outside
+	/// production, never the unlisted. The one selection every syndication
+	/// face lists, a social card set included.
+	///
+	/// # Errors
+	/// Errors when `entity` is in no [`RouteTree`].
+	pub fn listed(
+		&self,
+		entity: Entity,
+		root: &RelPath,
+	) -> Result<Vec<SyndicationPage>> {
+		let tree = self.trees.get(entity)?;
 		// a draft is invisible in production exactly as it is to dispatch and
 		// to static export; the syndication routes additionally drop the
 		// unlisted, which serve but are advertised nowhere.
 		let is_prod = BootstrapConfig::get().is_prod();
-		let pages = tree
-			.find_subtree(&root.segments())
+		tree.find_subtree(&root.segments())
 			.unwrap_or(tree)
 			.flatten_nodes()
 			.into_iter()
@@ -130,16 +154,11 @@ impl SyndicationQuery<'_, '_> {
 						.get(node.entity)
 						.cloned()
 						.unwrap_or_default(),
+					route: node.entity,
 				})
 			})
-			.collect();
-		SyndicationScope {
-			pages,
-			root,
-			package: self.package.clone(),
-			router,
-		}
-		.xok()
+			.collect::<Vec<_>>()
+			.xok()
 	}
 }
 

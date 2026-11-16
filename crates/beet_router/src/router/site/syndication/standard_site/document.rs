@@ -245,6 +245,7 @@ mod test {
 				labels: vec!["graphic-media".into()],
 				..default()
 			},
+			route: Entity::PLACEHOLDER,
 		};
 		let author = AtprotoAccount::new(
 			"pete.beet.org",
@@ -301,6 +302,7 @@ mod test {
 		let page = |path: &str, meta: DocMeta| SyndicationPage {
 			path: RelPath::new(path),
 			meta,
+			route: Entity::PLACEHOLDER,
 		};
 		let dated = DocMeta {
 			title: Some("Post".into()),

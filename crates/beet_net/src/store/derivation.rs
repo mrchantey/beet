@@ -63,7 +63,10 @@ use beet_core::prelude::*;
 ///
 /// A record source is read from the repo of the `Pds` in the world holding its
 /// did. A record no repo here holds cannot be seen from here and counts as
-/// unchanged, so a derivation reading one declares a `ttl`.
+/// unchanged, so a derivation reading one declares a `ttl`. A url source (a
+/// remote image a card embeds) counts as unchanged the same way, since nothing
+/// local can hash it without fetching it again; one that practically never
+/// changes, like a video's poster frame, needs no `ttl`.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct Derivation {
@@ -476,6 +479,8 @@ impl SourceDigests {
 			ProvenanceSource::Record(strong_ref) => {
 				self.record_unchanged(strong_ref).await?
 			}
+			// see `Derivation`'s docs: a url is never fetched to be checked
+			ProvenanceSource::Url { .. } => true,
 		}
 		.xok()
 	}

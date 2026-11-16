@@ -8,8 +8,9 @@
 //! # Fresh
 //!
 //! Fresh means every source's digest is unchanged and the `ttl` has not expired.
-//! A source is a file by path and cid, or a record by strong ref; the `ttl`
-//! covers only what cannot be seen from here, an upstream nothing local hashes.
+//! A source is a file by path and cid, a record by strong ref, or a url by the
+//! cid of what it answered when fetched; the `ttl` covers only what cannot be
+//! seen from here, an upstream nothing local hashes.
 //! `ensure()` regenerates a stale or missing file and does nothing otherwise, so
 //! running it twice costs one comparison.
 //!
@@ -102,6 +103,15 @@ pub enum ProvenanceSource {
 	},
 	/// A record at the version the derivation read.
 	Record(StrongRef),
+	/// A remote resource as fetched, ie a video's poster frame. Nothing local
+	/// can hash it without fetching it again, so it counts as unchanged like a
+	/// record no repo here holds.
+	Url {
+		/// Where it was fetched from.
+		url: Url,
+		/// The content id of what it answered.
+		cid: Cid,
+	},
 }
 
 impl ProvenanceSource {
@@ -113,10 +123,18 @@ impl ProvenanceSource {
 		}
 	}
 
+	/// The resource at `url` as fetched, its digest the raw cid of `bytes`.
+	pub fn url(url: Url, bytes: &[u8]) -> Self {
+		Self::Url {
+			url,
+			cid: Cid::raw(bytes),
+		}
+	}
+
 	/// The digest this source had when the derivation read it.
 	pub fn cid(&self) -> &Cid {
 		match self {
-			Self::File { cid, .. } => cid,
+			Self::File { cid, .. } | Self::Url { cid, .. } => cid,
 			Self::Record(strong_ref) => &strong_ref.cid,
 		}
 	}
@@ -129,6 +147,7 @@ impl core::fmt::Display for ProvenanceSource {
 			Self::Record(strong_ref) => {
 				write!(f, "record `{}`", strong_ref.uri)
 			}
+			Self::Url { url, .. } => write!(f, "url `{url}`"),
 		}
 	}
 }

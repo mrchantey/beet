@@ -74,7 +74,9 @@ the site, and `<RssFeed/>` the blog's. They are ordinary static routes scoped by
 where they sit, so the first three cover the whole url space while the feed,
 declared inside `<Route path="blog">`, serves at `/blog/rss.xml` and carries the
 posts alone. Being ordinary routes they serve live and static-export as files
-with no special casing.
+with no special casing. `<SocialCards/>` beside them draws a link preview for
+every page the sitemap lists, a derived png per page under `assets/og` that
+each page's head names as its `og:image`.
 
 Layouts nest, so the blog is a subtree with its own chrome: the root
 `<RoutesDir/>` excludes `blog/**` and a second, scoped one under `<Route
@@ -289,6 +291,11 @@ token (plus AWS for the social stack's state bucket).
 			<Sitemap/>
 			<Robots/>
 			<SearchIndex/>
+			<!-- a link preview for every page the sitemap lists, derived into
+			     `site/assets/og` by `<Derive/>` and named by each page's head.
+			     The font is the TTF of the face the site serves as woff2, which
+			     the card renderer cannot read; the logo is the `<IconSet>`'s. -->
+			<SocialCards font="assets/fonts/InterVariable.ttf"/>
 			<RoutesDir src="routes" filter={GlobFilter{exclude:["blog/**"]}}/>
 			<!-- the blog is its own url subtree so it can wear its own chrome: the
 			     posts are discovered here rather than by the root dir (which excludes

@@ -1899,6 +1899,7 @@ dependencies = [
  "resvg",
  "serde",
  "serde_json",
+ "skrifa 0.44.0",
  "syn 2.0.117",
  "thiserror 2.0.21",
  "variadics_please",

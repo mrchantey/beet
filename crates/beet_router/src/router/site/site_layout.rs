@@ -274,6 +274,48 @@ mod test {
 			.xpect_contains("CLIENT_IO_PATH");
 	}
 
+	/// With social cards declared, a listed page previews as its own card and
+	/// an unlisted one as the root route's, each an absolute url filling the
+	/// large summary card.
+	#[beet_core::test]
+	async fn head_previews_the_declared_social_card() {
+		let mut world = syndication_world(Some("https://beet.org"));
+		world
+			.get_resource_or_init::<BsxTemplateRegistry>()
+			.insert_source(
+				"HeadLayout",
+				"<html><RouteHead/><body><Slot/></body></html>",
+			)
+			.unwrap();
+		let root = spawn_syndication_router(&mut world, rsx! {
+			<SocialCards font="fonts/inter.ttf"/>
+		});
+		world.entity_mut(root).insert(Layout::new("HeadLayout"));
+		let mut head = async |path: &str| {
+			world
+				.entity_mut(root)
+				.exchange(Request::get(path))
+				.await
+				.unwrap_str()
+				.await
+		};
+		let card = "https://beet.org/assets/og/blog/ecs-router.png";
+		head("blog/ecs-router")
+			.await
+			.xpect_contains(format!(
+				r#"<meta property="og:image" content="{card}" />"#
+			))
+			.xpect_contains(format!(
+				r#"<meta name="twitter:image" content="{card}" />"#
+			))
+			.xpect_contains(
+				r#"<meta name="twitter:card" content="summary_large_image" />"#,
+			);
+		head("blog/hidden").await.xpect_contains(
+			r#"content="https://beet.org/assets/og/index.png""#,
+		);
+	}
+
 	/// The head links the declared icon set, and no icon without one.
 	#[beet_core::test]
 	fn head_links_the_declared_icon_set() {

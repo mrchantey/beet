@@ -42,9 +42,9 @@ use beet_core::prelude::*;
 /// [`JsonLd`] description of the page. Extra app-specific tags can be added
 /// through the default slot.
 ///
-/// The social card renders only when [`PackageConfig`] or the page names one,
-/// so an app that has no card gets the small summary preview rather than a
-/// broken image, and the theme colour only in a world with a [`Theme`].
+/// The social card renders only when the caller, the page or [`PackageConfig`]
+/// names one, so an app that has no card gets the small summary preview rather
+/// than a broken image, and the theme colour only in a world with a [`Theme`].
 #[template(system)]
 pub fn Head(
 	#[prop] fixed_scale: bool,
@@ -68,6 +68,11 @@ pub fn Head(
 	/// its links).
 	#[prop]
 	noindex: bool,
+	/// The page's social card image, ahead of the page's own
+	/// [`social_image_url`](DocMeta::social_image_url), ie a card generated
+	/// for it.
+	#[prop]
+	social_image: Option<Url>,
 	pkg_config: Res<PackageConfig>,
 	theme: Option<Res<Theme>>,
 ) -> Result<impl Bundle> {
@@ -87,8 +92,8 @@ pub fn Head(
 	let version = pkg_config.version.clone();
 	// the social card is omitted rather than defaulted, since an invented card
 	// url is a broken preview.
-	let social_image = meta
-		.social_image_url()
+	let social_image = social_image
+		.or_else(|| meta.social_image_url())
 		.or_else(|| pkg_config.social_image.clone());
 	let tints = theme.map(|theme| ThemeTints::new(&theme)).transpose()?;
 	// a dated page is an ARTICLE to a crawler and to a link preview, which is
