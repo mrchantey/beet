@@ -67,6 +67,13 @@ use beet_core::prelude::*;
 /// remote image a card embeds) counts as unchanged the same way, since nothing
 /// local can hash it without fetching it again; one that practically never
 /// changes, like a video's poster frame, needs no `ttl`.
+///
+/// What a producer reads off the world rather than from a file (a title a page
+/// declares in code, a theme colour) the declaration computes itself, as
+/// [`values`](Self::values) it keeps current. Each regeneration stamps them
+/// onto its provenance, so the file is stale once the declaration's values
+/// differ from the ones it was computed from, a value added or dropped
+/// included.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct Derivation {
@@ -78,6 +85,9 @@ pub struct Derivation {
 	/// The file sources the declaration itself names, so a file computed from
 	/// another (a declaration edited to a new source) is stale.
 	pub inputs: Vec<RelPath>,
+	/// The values the declaration computes from the world, by name and
+	/// digest, stamped onto each regeneration's [`Provenance`].
+	pub values: Vec<ProvenanceValue>,
 }
 
 impl Derivation {
@@ -87,12 +97,19 @@ impl Derivation {
 			path: path.into(),
 			ttl: None,
 			inputs: Vec::new(),
+			values: Vec::new(),
 		}
 	}
 
 	/// This derivation declaring `input` as a file source it reads.
 	pub fn with_input(mut self, input: impl Into<RelPath>) -> Self {
 		self.inputs.push(input.into());
+		self
+	}
+
+	/// This derivation declaring `value`, computed from the world.
+	pub fn with_value(mut self, value: ProvenanceValue) -> Self {
+		self.values.push(value);
 		self
 	}
 
@@ -211,6 +228,9 @@ impl Derivation {
 		}) {
 			return Freshness::Redeclared(input.clone()).xok();
 		}
+		if let Some(name) = self.first_revalued(&provenance) {
+			return Freshness::Revalued(name).xok();
+		}
 		if let Some(source) = digests.first_changed(&provenance.sources).await?
 		{
 			return Freshness::Changed(source).xok();
@@ -222,8 +242,31 @@ impl Derivation {
 			.xok()
 	}
 
+	/// The name of the first value declared and not computed from, or
+	/// computed from and no longer declared, at the digest each names.
+	fn first_revalued(&self, provenance: &Provenance) -> Option<SmolStr> {
+		let computed = provenance
+			.sources
+			.iter()
+			.filter_map(|source| match source {
+				ProvenanceSource::Value(value) => Some(value),
+				_ => None,
+			})
+			.collect::<Vec<_>>();
+		self.values
+			.iter()
+			.find(|value| !computed.contains(value))
+			.or_else(|| {
+				computed
+					.iter()
+					.find(|value| !self.values.contains(value))
+					.copied()
+			})
+			.map(|value| value.name.clone())
+	}
+
 	/// Run the producing action and write the document it answers, stamped
-	/// with the time and this declaration's ttl, removing every output the
+	/// with the time, this declaration's ttl and its values, removing every output the
 	/// document it replaces listed and this one does not.
 	async fn regenerate(
 		&self,
@@ -262,10 +305,16 @@ impl Derivation {
 				self.path
 			);
 		}
+		let provenance = body.get::<Provenance>()?;
 		body.insert(&Provenance {
 			created: Timestamp::now(),
 			ttl: self.ttl,
-			..body.get::<Provenance>()?
+			sources: provenance
+				.sources
+				.into_iter()
+				.filter(|source| !matches!(source, ProvenanceSource::Value(_)))
+				.chain(self.values.iter().cloned().map(ProvenanceSource::Value))
+				.collect(),
 		})?;
 		let bytes = self
 			.media_type()?
@@ -388,6 +437,9 @@ pub enum Freshness {
 	Changed(ProvenanceSource),
 	/// The declaration names a file source the file was not computed from.
 	Redeclared(RelPath),
+	/// A value the declaration computes differs from the one the file was
+	/// computed from, or only one of them has it.
+	Revalued(SmolStr),
 	/// A file the document lists as written beside it is gone.
 	OutputMissing(RelPath),
 	/// A file the document lists as written beside it was altered.
@@ -411,6 +463,9 @@ impl core::fmt::Display for Freshness {
 			Self::Changed(source) => write!(f, "{source} changed"),
 			Self::Redeclared(path) => {
 				write!(f, "not computed from the declared `{path}`")
+			}
+			Self::Revalued(name) => {
+				write!(f, "value `{name}` changed")
 			}
 			Self::OutputMissing(path) => {
 				write!(f, "output `{path}` is missing")
@@ -481,6 +536,8 @@ impl SourceDigests {
 			}
 			// see `Derivation`'s docs: a url is never fetched to be checked
 			ProvenanceSource::Url { .. } => true,
+			// the declaration compares its values, see `first_revalued`
+			ProvenanceSource::Value(_) => true,
 		}
 		.xok()
 	}
@@ -687,6 +744,37 @@ mod test {
 			.unwrap()
 			.xpect_eq(Freshness::Redeclared(RelPath::new("other.md")));
 		runs.get().xpect_eq(2);
+	}
+
+	/// A declared value is stamped onto the provenance, and regenerates once
+	/// it changes or is dropped.
+	#[beet_core::test]
+	async fn regenerates_a_changed_value() {
+		let declared = |title: &str| {
+			Derivation::new(DERIVED)
+				.with_value(ProvenanceValue::new("title", title.as_bytes()))
+		};
+		let (mut world, entity, store, runs) = setup(declared("first"), "text");
+		ensure(&mut world, entity, &store).await.unwrap();
+		ensure(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_eq(Freshness::Fresh);
+		world.entity_mut(entity).insert(declared("second"));
+		ensure(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_eq(Freshness::Revalued("title".into()));
+		world.entity_mut(entity).insert(Derivation::new(DERIVED));
+		ensure(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_eq(Freshness::Revalued("title".into()));
+		ensure(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_eq(Freshness::Fresh);
+		runs.get().xpect_eq(3);
 	}
 
 	#[beet_core::test]

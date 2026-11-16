@@ -46,18 +46,16 @@
 //! The provenance names the font, the logo, each page's source file and each
 //! embedded image, a file by its digest and a remote one by the digest of what
 //! it answered ([`ProvenanceSource::Url`], counted unchanged since nothing
-//! local can hash it without fetching it again). Editing one post's
-//! frontmatter regenerates the set; a page added is a source the declaration
-//! names that the document was not computed from, and a page removed is a
-//! source gone, so both regenerate too, and the removed page's card is pruned
-//! as a superseded output. One document rather than one per page: a
-//! regeneration redraws every card, which costs little at a site's size.
-//!
-//! A page declared in code rather than discovered from a file has no source
-//! to track, so editing it regenerates nothing until something else does.
-//! The `Theme` and the `PackageConfig` are read but not tracked, as with the
-//! icon set: a rebrand regenerates with `rm assets/og/social-cards.json`
-//! before `assets`.
+//! local can hash it without fetching it again). Beside the files, the
+//! declaration computes a value per card from what the card draws off the
+//! world (the page's title, description and media url) and one for the frame
+//! (the site title, description, homepage and `Theme`), so a page declared in
+//! code or a rebrand regenerates the set like an edited file
+//! ([`ProvenanceValue`]). A page added is a value the document was not
+//! computed from and a page removed one it no longer declares, so both
+//! regenerate too, and the removed page's card is pruned as a superseded
+//! output. One document rather than one per page: a regeneration redraws
+//! every card, which costs little at a site's size.
 //!
 //! # The head
 //!
@@ -70,7 +68,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-#[cfg(feature = "site_images")]
 use beet_ui::prelude::*;
 
 /// `<SocialCards font="assets/fonts/InterVariable.ttf"/>`: the module docs'
@@ -124,8 +121,8 @@ impl SocialCards {
 	pub fn new(font: impl Into<RelPath>) -> Self { Self { font: font.into() } }
 
 	/// The [`Derivation`] this set declares, its document in `assets/og`
-	/// naming the font; the logo and the pages join it as the world names
-	/// them ([`refresh_inputs`](Self::refresh_inputs)).
+	/// naming the font; the logo, the pages and the values join it as the
+	/// world names them ([`refresh_inputs`](Self::refresh_inputs)).
 	pub fn derivation(&self) -> Derivation {
 		Derivation::new(RelPath::new(Self::DIR).join(Self::DOCUMENT))
 			.with_input(self.font.clone())
@@ -163,10 +160,10 @@ impl SocialCards {
 	}
 
 	/// Name every source each declared set reads as its [`Derivation`]'s
-	/// inputs (the font, the logo, each listed page's source file), so a page
-	/// added since the set was derived is a source the document was not
-	/// computed from. A set whose router has no tree yet keeps the font alone
-	/// until one lands.
+	/// inputs (the font, the logo, each listed page's source file) and every
+	/// card's drawn text as its values, so a page added, edited in code or
+	/// rebranded since the set was derived is stale. A set whose router has
+	/// no tree yet keeps the font and the frame alone until one lands.
 	fn refresh_inputs(world: &mut World) -> Result {
 		let derivations =
 			world
@@ -180,6 +177,10 @@ impl SocialCards {
 										cards.derivation(),
 										Derivation::with_input,
 									);
+								let derivation = query
+									.values(entity)
+									.into_iter()
+									.fold(derivation, Derivation::with_value);
 								(entity, derivation)
 							})
 							.collect::<Vec<_>>()
@@ -195,17 +196,21 @@ impl SocialCards {
 }
 
 impl TypeInstaller for SocialCards {
-	/// Registers the declaration and refreshes each set's inputs whenever a
-	/// route tree, the logo or a set itself lands.
+	/// Registers the declaration and refreshes each set's inputs whenever
+	/// something a card draws lands: a route tree, a page's metadata, the
+	/// logo, the theme or the package.
 	fn install(app: &mut App) {
 		app.register_type::<Self>()
 			.add_observer(queue_refresh::<RouteTree>)
-			.add_observer(queue_refresh::<IconSet>);
+			.add_observer(queue_refresh::<PageMeta>)
+			.add_observer(queue_refresh::<IconSet>)
+			.add_observer(queue_refresh::<Theme>)
+			.add_observer(queue_refresh::<PackageConfig>);
 	}
 }
 
-/// Observer queueing [`SocialCards::refresh_inputs`] once `T` lands, so the
-/// refresh reads the world whole.
+/// Observer queueing [`SocialCards::refresh_inputs`] once `T` lands, a
+/// resource included, so the refresh reads the world whole.
 fn queue_refresh<T: Component>(_ev: On<Insert<T>>, mut commands: Commands) {
 	commands.queue(SocialCards::refresh_inputs);
 }
@@ -245,10 +250,11 @@ impl SocialCardQuery<'_, '_> {
 }
 
 /// What a [`SocialCards`] set reads off the world: its pages, each with the
-/// file it was discovered from, and the logo.
+/// file it was discovered from, the logo and the theme.
 #[derive(SystemParam)]
 struct SocialCardsQuery<'w, 's> {
 	syndication: SyndicationQuery<'w, 's>,
+	theme: Option<Res<'w, Theme>>,
 	blobs: Query<'w, 's, &'static Blob>,
 	stores: AncestorQuery<'w, 's, &'static BlobStore>,
 	icon_sets: Query<'w, 's, &'static IconSet>,
@@ -282,6 +288,50 @@ impl SocialCardsQuery<'_, '_> {
 			.flatten()
 			.filter_map(|(_, source)| source);
 		logo.into_iter().chain(sources).collect()
+	}
+
+	/// The values the set at `cards` draws off the world, as far as it can
+	/// name them now: the frame, then each card's text and media url, named
+	/// by the card's path. A value is the drawn fields joined, so it changes
+	/// exactly when the drawing could.
+	fn values(&self, cards: Entity) -> Vec<ProvenanceValue> {
+		let package = self.syndication.package();
+		let homepage = package.homepage.as_ref().map(Url::to_string);
+		let theme =
+			format!("{:?}", self.theme.as_deref().cloned().unwrap_or_default());
+		let frame = Self::value("frame", [
+			Some(package.title.as_str()),
+			Some(package.description.as_str()),
+			homepage.as_deref(),
+			Some(theme.as_str()),
+		]);
+		let pages = self.pages(cards).into_iter().flatten().map(|(page, _)| {
+			let card = SocialCards::card(&page.path);
+			// a poster url is only ever a video's, so the url implies the badge
+			let media = page.meta.social_image_url().map(|url| url.to_string());
+			Self::value(card.as_str(), [
+				page.meta.title.as_deref(),
+				page.meta.description.as_deref(),
+				media.as_deref(),
+			])
+		});
+		core::iter::once(frame).chain(pages).collect()
+	}
+
+	/// The value `name` over `fields`, each delimited so no two sets of
+	/// fields join alike.
+	fn value<'a>(
+		name: &str,
+		fields: impl IntoIterator<Item = Option<&'a str>>,
+	) -> ProvenanceValue {
+		let bytes = fields
+			.into_iter()
+			.map(|field| match field {
+				Some(field) => format!("+{}:{field}", field.len()),
+				None => "-".to_string(),
+			})
+			.collect::<String>();
+		ProvenanceValue::new(name, bytes.as_bytes())
 	}
 
 	/// The world's one [`IconSet`], the logo every card wears.
@@ -1167,12 +1217,49 @@ mod test {
 		ensure(&mut world, cards, &store)
 			.await
 			.to_string()
-			.xpect_eq("file `routes/blog/post.md` changed");
+			.xpect_eq("value `assets/og/blog/post.png` changed");
 		(store
 			.get(&RelPath::new("assets/og/blog/post.png"))
 			.await
 			.unwrap() != before)
 			.xpect_true();
+	}
+
+	/// A page declared in code has no file to track, so its drawn text is a
+	/// value, as is the frame a rebrand redraws.
+	#[beet_core::test]
+	async fn regenerates_a_page_declared_in_code() {
+		let (mut world, cards, store) = setup(&two_pages()).await;
+		let router = world.entity(cards).get::<ChildOf>().unwrap().parent();
+		let about = |title: &str| PageMeta {
+			title: Some(title.into()),
+			..default()
+		};
+		let page = world
+			.spawn((ChildOf(router), page("about", about("About"))))
+			.id();
+		settle(&mut world).await;
+		ensure(&mut world, cards, &store).await;
+		outputs(&store)
+			.await
+			.contains(&"assets/og/about.png".to_string())
+			.xpect_true();
+		ensure(&mut world, cards, &store)
+			.await
+			.xpect_eq(Freshness::Fresh);
+		world.entity_mut(page).insert(about("About Beet"));
+		settle(&mut world).await;
+		ensure(&mut world, cards, &store)
+			.await
+			.xpect_eq(Freshness::Revalued("assets/og/about.png".into()));
+		world.insert_resource(Theme {
+			color: Color::srgb(0.5, 0.2, 0.8),
+			..default()
+		});
+		settle(&mut world).await;
+		ensure(&mut world, cards, &store)
+			.await
+			.xpect_eq(Freshness::Revalued("frame".into()));
 	}
 
 	/// A page added since the set was derived is a source the document was

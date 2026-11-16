@@ -1,16 +1,24 @@
 //! Run libtest with pretty filenames for unit tests.
 //!
 //! Only available on the nightly `custom_test_frameworks` path, since it
-//! depends on `test::test_main_static`.
+//! depends on libtest's unstable `test::test_main`.
 
 use crate::prelude::*;
 use crate::testing::utils::*;
 
-/// Run libtest with pretty filenames for unit tests.
+/// Run libtest with pretty filenames for unit tests, exiting with libtest's
+/// failure code when a test fails.
 pub fn test_runner(tests: &[&test::TestDescAndFn]) {
 	let tests = apply_filenames(tests);
 	let borrowed = tests.iter().collect::<Vec<_>>();
-	test::test_main_static(&borrowed);
+	let args = env_ext::args()
+		.into_iter()
+		.map(|arg| arg.to_string())
+		.collect::<Vec<_>>();
+	// renamed tests are no longer sorted, so the unsorted entry point
+	if test::test_main(&args, &borrowed) != std::process::ExitCode::SUCCESS {
+		std::process::exit(101);
+	}
 }
 
 fn clone_static(test: &test::TestDescAndFn) -> test::TestDescAndFn {

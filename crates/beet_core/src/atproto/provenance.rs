@@ -8,9 +8,10 @@
 //! # Fresh
 //!
 //! Fresh means every source's digest is unchanged and the `ttl` has not expired.
-//! A source is a file by path and cid, a record by strong ref, or a url by the
-//! cid of what it answered when fetched; the `ttl` covers only what cannot be
-//! seen from here, an upstream nothing local hashes.
+//! A source is a file by path and cid, a record by strong ref, a url by the
+//! cid of what it answered when fetched, or a value the declaration computes
+//! (a title a page declares in code) by name and cid; the `ttl` covers only
+//! what cannot be seen from here, an upstream nothing local hashes.
 //! `ensure()` regenerates a stale or missing file and does nothing otherwise, so
 //! running it twice costs one comparison.
 //!
@@ -112,6 +113,10 @@ pub enum ProvenanceSource {
 		/// The content id of what it answered.
 		cid: Cid,
 	},
+	/// A value the declaration computes rather than a file it names, ie the
+	/// title of a page declared in code, which only the declaring world can
+	/// read again.
+	Value(ProvenanceValue),
 }
 
 impl ProvenanceSource {
@@ -136,6 +141,29 @@ impl ProvenanceSource {
 		match self {
 			Self::File { cid, .. } | Self::Url { cid, .. } => cid,
 			Self::Record(strong_ref) => &strong_ref.cid,
+			Self::Value(value) => &value.cid,
+		}
+	}
+}
+
+/// A named value a derivation's declaration computes, and its digest: see
+/// [`ProvenanceSource::Value`].
+#[derive(Debug, Clone, PartialEq, Eq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
+pub struct ProvenanceValue {
+	/// What the value is, unique within its declaration, ie a route path.
+	pub name: SmolStr,
+	/// The content id of the value's bytes.
+	pub cid: Cid,
+}
+
+impl ProvenanceValue {
+	/// The value `name`, its digest the raw cid of `bytes`.
+	pub fn new(name: impl Into<SmolStr>, bytes: &[u8]) -> Self {
+		Self {
+			name: name.into(),
+			cid: Cid::raw(bytes),
 		}
 	}
 }
@@ -148,6 +176,7 @@ impl core::fmt::Display for ProvenanceSource {
 				write!(f, "record `{}`", strong_ref.uri)
 			}
 			Self::Url { url, .. } => write!(f, "url `{url}`"),
+			Self::Value(value) => write!(f, "value `{}`", value.name),
 		}
 	}
 }
