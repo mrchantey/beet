@@ -1,7 +1,7 @@
 //! The render root: the entity a render walks, and the response a built page
 //! answers a request with.
 //!
-//! [`PageRoot`] names the entity the [`NodeRenderer`] walks, and a scene
+//! [`PageRoot`] names the entity the [`DocRenderer`] walks, and a scene
 //! route's [`PageRequest`] answers through [`LivePage::respond`], which
 //! prepares, renders and releases it.
 
@@ -12,7 +12,7 @@ use beet_net::prelude::*;
 /// On the rendered content entity: its [`PageRoot`] handle (often itself).
 ///
 /// The source side of the one-to-one [`PageRoot`] relationship, the entity
-/// whose tree the [`NodeRenderer`] walks, and the boundary at which in-tree
+/// whose tree the [`DocRenderer`] walks, and the boundary at which in-tree
 /// traversal stops (see [`RouteQuery`]). A fixed or per-request route is
 /// self-referential, the content being its own handle, hence
 /// `allow_self_referential`. An ephemeral coordinator route instead points a
@@ -25,7 +25,7 @@ pub struct PageRootOf(pub Entity);
 /// The handle of a render tree: names the content entity to walk and serialize.
 ///
 /// The target side of the one-to-one relationship. [`PageRoot::rendered`] is
-/// the content entity (the [`PageRootOf`] holder) the [`NodeRenderer`] walks;
+/// the content entity (the [`PageRootOf`] holder) the [`DocRenderer`] walks;
 /// it equals the handle itself for self-referential roots. The ephemeral
 /// entities to clean up after render live separately on [`DespawnAfterRender`],
 /// since cleanup is *not* derived from tree membership: a shared fragment
@@ -33,7 +33,7 @@ pub struct PageRootOf(pub Entity);
 #[derive(Component)]
 #[relationship_target(relationship = PageRootOf)]
 pub struct PageRoot {
-	/// The content entity whose tree the [`NodeRenderer`] walks (the one-to-one
+	/// The content entity whose tree the [`DocRenderer`] walks (the one-to-one
 	/// source), equal to the handle for self-referential roots.
 	#[relationship]
 	rendered: Entity,
@@ -45,7 +45,7 @@ pub struct PageRoot {
 pub struct DespawnAfterRender(pub Vec<Entity>);
 
 impl PageRoot {
-	/// The entity whose tree the [`NodeRenderer`] walks.
+	/// The entity whose tree the [`DocRenderer`] walks.
 	pub fn rendered(&self) -> Entity { self.rendered }
 
 	/// Marks `entity` as a self-referential render root, recording the
@@ -65,7 +65,7 @@ impl PageRoot {
 	///
 	/// The path for ephemeral coordinator routes, where a persistent handle (in
 	/// the route tree) renders per-request content spawned elsewhere. The
-	/// [`NodeRenderer`] walks `rendered`, not `handle`. For the common
+	/// [`DocRenderer`] walks `rendered`, not `handle`. For the common
 	/// self-referential case see [`PageRoot::insert`].
 	pub fn insert_rendered(
 		world: &mut World,

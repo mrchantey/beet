@@ -1,5 +1,7 @@
 +++
 title = "beet_async"
+
+[RouteMeta]
 visibility = "unlisted"
 +++
 

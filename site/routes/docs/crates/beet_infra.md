@@ -1,5 +1,7 @@
 +++
 title = "beet_infra"
+
+[RouteMeta]
 visibility = "unlisted"
 +++
 

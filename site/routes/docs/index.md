@@ -1,5 +1,7 @@
 +++
 title = "Docs"
+
+[RouteMeta]
 order = 0
 expanded = true
 visibility = "unlisted"

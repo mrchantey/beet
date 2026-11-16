@@ -40,7 +40,7 @@ impl HtmlParseConfigExt for HtmlParseConfig {
 	}
 }
 
-/// A configurable markdown parser that implements [`NodeParser`].
+/// A configurable markdown parser that implements [`DocParser`].
 ///
 /// Parses markdown into a tree of ECS entities via an [`HtmlNode`]
 /// representation and the markdown-owned diff engine. Embedded markup is parsed
@@ -157,7 +157,20 @@ impl MarkdownParser {
 	}
 }
 
-impl NodeParser for MarkdownParser {
+impl DocParser for MarkdownParser {
+	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Markdown] }
+
+	fn declarations(
+		&self,
+		bytes: &MediaBytes,
+		frontmatter_type: &str,
+	) -> Result<RootDeclarations> {
+		Frontmatter::extract(core::str::from_utf8(bytes)?)?
+			.map(|frontmatter| frontmatter.declarations(frontmatter_type))
+			.unwrap_or_default()
+			.xok()
+	}
+
 	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
 		let media_type = cx.bytes.media_type();
 		if *media_type != MediaType::Markdown {
@@ -174,6 +187,11 @@ impl NodeParser for MarkdownParser {
 			})?
 			.xok()
 	}
+}
+
+#[cfg(feature = "markdown_parser")]
+impl Installer for MarkdownParser {
+	fn install(self, app: &mut App) { DocParsers::register_on(app, self); }
 }
 
 #[cfg(test)]

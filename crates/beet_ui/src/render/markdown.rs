@@ -1039,7 +1039,9 @@ impl NodeVisitor for MarkdownRenderer {
 	}
 }
 
-impl NodeRenderer for MarkdownRenderer {
+impl DocRenderer for MarkdownRenderer {
+	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Markdown] }
+
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
@@ -1073,6 +1075,10 @@ impl NodeRenderer for MarkdownRenderer {
 		)
 		.xok()
 	}
+}
+
+impl Installer for MarkdownRenderer {
+	fn install(self, app: &mut App) { DocRenderers::register_on(app, self); }
 }
 
 #[cfg(test)]

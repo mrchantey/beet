@@ -91,26 +91,26 @@ impl ActionNode {
 	/// The ONE visibility predicate a static export, a sitemap, a feed and a
 	/// search index share, so a site can never export a page it does not list
 	/// or list one it does not export.
-	/// [`Unlisted`](beet_ui::prelude::DocVisibility::Unlisted) pages pass
+	/// [`Unlisted`](beet_ui::prelude::RouteVisibility::Unlisted) pages pass
 	/// here — they serve and export like any other — and each syndication route
-	/// drops them itself with [`DocMeta::is_listed`].
+	/// drops them itself with [`RouteMeta::is_listed`].
 	///
 	/// [`PageRoute`]: crate::prelude::PageRoute
 	// Takes the metadata rather than reading it, so the same predicate serves a
 	// `&World` caller (static export) and a `Query` one (the syndication
-	// routes). std-only: `DocMeta` is a beet_ui type, and a no_std router has
+	// routes). std-only: `RouteMeta` is a beet_ui type, and a no_std router has
 	// no scene pipeline to render a page with.
 	#[cfg(feature = "std")]
 	pub fn is_public_page(
 		&self,
-		meta: Option<&beet_ui::prelude::DocMeta>,
+		meta: Option<&beet_ui::prelude::RouteMeta>,
 		is_prod: bool,
 	) -> bool {
-		use beet_ui::prelude::DocMeta;
+		use beet_ui::prelude::RouteMeta;
 		self.is_page_route
 			&& self.path.is_static()
 			&& !self.method.is_some_and(|method| method != HttpMethod::Get)
-			&& !(is_prod && meta.is_some_and(DocMeta::is_draft))
+			&& !(is_prod && meta.is_some_and(RouteMeta::is_draft))
 	}
 
 	/// Merge the dynamic path segments matched by this node's [`PathPattern`]

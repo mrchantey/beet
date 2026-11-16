@@ -1,11 +1,13 @@
 +++
 title = "ECS Router"
-slug = "ecs-router"
 description = "An ECS-native router unifies server actions, client island scenes, and static file serving under one paradigm."
 tags = ["release-notes", "ecs", "web"]
 created = "2025-08-09"
 authors = ["Pete Hayman"]
 video_url = "https://youtu.be/YKiHKQJmEoU"
+
+[RouteMeta]
+slug = "ecs-router"
 +++
 
 The stack bevyfication continues this harvest, with ecs proving to be the anything paradigm!

@@ -2,8 +2,8 @@
 use beet_core::prelude::*;
 
 /// The `content` formats a publication may name, each by its NSID and mapped
-/// to the media type of the render target that answers it, so a declaration
-/// says exactly which object lands in each record and a name with no target
+/// to the media type of the doc renderer that writes it, so a declaration
+/// says exactly which object lands in each record and a name with no renderer
 /// fails listing the registered ones.
 ///
 /// Initialized empty by `RouterPlugin`, each format registered by the

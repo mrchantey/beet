@@ -1,11 +1,13 @@
 +++
 title = "Full Stack Bevy"
-slug = "full-stack-bevy"
 description = "Bevy ECS as the foundation for a full-stack metaframework with file based routes, markdown, rusty MDX, SSR, CSR, SSG, client islands, server actions, template scoped styles and live reload."
 tags = ["release-notes", "bevy", "web", "ecs"]
 created = "2025-07-11"
 authors = ["Pete Hayman"]
 video_url = "https://youtu.be/7koepBSRoUI"
+
+[RouteMeta]
+slug = "full-stack-bevy"
 +++
 
 I'm very excited for the `0.0.6-rc.3` of beet, now available.

@@ -244,7 +244,7 @@ impl LivePage {
 	///
 	/// This is the http page handler, so a request with no `Accept` or a
 	/// wildcard (`*/*`) renders the web document, the registry's
-	/// [`DEFAULT`](RenderTargets::DEFAULT). Negotiating before the build means
+	/// [`DEFAULT`](DocRenderers::DEFAULT). Negotiating before the build means
 	/// a type nothing renders builds nothing and answers `406 Not Acceptable`.
 	pub async fn respond(
 		page: Entity,
@@ -256,10 +256,10 @@ impl LivePage {
 			.world()
 			.with(move |world: &mut World| -> Result<MediaType> {
 				world
-					.get_resource::<RenderTargets>()
+					.get_resource::<DocRenderers>()
 					.ok_or_else(|| {
 						bevyhow!(
-							"no `RenderTargets` in this world: add the `RenderPlugin`"
+							"no `DocRenderers` in this world: add the `RenderPlugin`"
 						)
 					})?
 					.negotiate(&request)
@@ -318,7 +318,7 @@ impl LivePage {
 		let request = self.request.clone().with_accept(media_type.clone());
 		self.world
 			.with(move |world: &mut World| {
-				RenderTargets::render(world, root, &request)
+				DocRenderers::render(world, root, &request)
 			})
 			.await?
 			.xok()
@@ -832,7 +832,12 @@ mod test {
 	async fn renders_a_downstream_target() {
 		#[derive(Clone)]
 		struct Shout;
-		impl NodeRenderer for Shout {
+		impl DocRenderer for Shout {
+			fn media_types(&self) -> Vec<MediaType> {
+				vec![MediaType::other("text/vnd.shout")]
+			}
+
+
 			fn render(
 				&mut self,
 				cx: &mut RenderContext,
@@ -850,18 +855,13 @@ mod test {
 				.xok()
 			}
 		}
-		impl RenderTarget for Shout {
-			fn media_types(&self) -> Vec<MediaType> {
-				vec![MediaType::other("text/vnd.shout")]
-			}
-		}
 		impl Installer for Shout {
 			fn install(self, app: &mut App) {
-				RenderTargets::register_on(app, self);
+				DocRenderers::register_on(app, self);
 			}
 		}
 		let (mut world, router) = site();
-		world.resource_mut::<RenderTargets>().register(Shout);
+		world.resource_mut::<DocRenderers>().register(Shout);
 		get(
 			&mut world,
 			router,

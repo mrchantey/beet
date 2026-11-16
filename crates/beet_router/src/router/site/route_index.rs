@@ -40,12 +40,12 @@ pub fn RouteIndex(
 	reverse: bool,
 	stack: Res<RequestContextStack>,
 	trees: Query<&RouteTree>,
-	metas: Query<&DocMeta>,
+	metas: Query<(&DocMeta, Option<&RouteMeta>)>,
 ) -> impl Bundle {
 	let cx = stack.current();
 	let is_prod = BootstrapConfig::get().is_prod();
 	let current = RelPath::new(cx.current_path());
-	let mut entries: Vec<(RelPath, DocMeta)> = trees
+	let mut entries: Vec<(RelPath, DocMeta, Option<u32>)> = trees
 		.get(cx.router())
 		.ok()
 		.and_then(|tree| tree.find_subtree(&current.segments()))
@@ -56,17 +56,24 @@ pub fn RouteIndex(
 				.filter_map(|child| Some((child, child.node()?)))
 				.filter(|(_, node)| node.is_page_route)
 				.filter_map(|(child, node)| {
-					let meta = metas.get(node.entity).ok()?;
-					meta.is_browsable(is_prod)
-						.then(|| (child.path.annotated_path(), meta.clone()))
+					let (meta, route) = metas.get(node.entity).ok()?;
+					route.is_none_or(|route| route.is_browsable(is_prod)).then(
+						|| {
+							(
+								child.path.annotated_path(),
+								meta.clone(),
+								route.and_then(|route| route.order),
+							)
+						},
+					)
 				})
 				.collect()
 		})
 		.unwrap_or_default();
-	entries.sort_by(|(path_a, meta_a), (path_b, meta_b)| {
-		let order = |meta: &DocMeta| meta.order.unwrap_or(u32::MAX);
-		order(meta_a)
-			.cmp(&order(meta_b))
+	entries.sort_by(|(path_a, _, order_a), (path_b, _, order_b)| {
+		let order = |order: &Option<u32>| order.unwrap_or(u32::MAX);
+		order(order_a)
+			.cmp(&order(order_b))
 			.then_with(|| natural_cmp(path_a.as_str(), path_b.as_str()))
 	});
 	// numbered in ascending order, then flipped for display, so `reverse`
@@ -74,7 +81,7 @@ pub fn RouteIndex(
 	let mut items: Vec<(usize, RelPath, DocMeta)> = entries
 		.into_iter()
 		.enumerate()
-		.map(|(idx, (path, meta))| (idx + 1, path, meta))
+		.map(|(idx, (path, meta, _))| (idx + 1, path, meta))
 		.collect();
 	if reverse {
 		items.reverse();
@@ -163,7 +170,7 @@ mod test {
 	/// A page route at `path` carrying the frontmatter an index entry reads.
 	/// The rendered body is irrelevant: collection keys off the tree and the
 	/// metadata, so every fixture route shares one.
-	fn post(path: &str, meta: DocMeta) -> impl Bundle {
+	fn post(path: &str, meta: (DocMeta, RouteMeta)) -> impl Bundle {
 		(
 			render_action::fixed_func_route(path, || rsx! { <p>"post"</p> }),
 			PageRoute,
@@ -172,15 +179,20 @@ mod test {
 	}
 
 	/// Frontmatter as a numbered blog post would declare it.
-	fn meta(title: &str, created: &str, order: u32) -> DocMeta {
-		DocMeta {
-			title: Some(title.into()),
-			description: Some(format!("about {title}")),
-			authors: vec!["Pete Hayman".into()],
-			created: Date::parse(created).ok(),
-			order: Some(order),
-			..default()
-		}
+	fn meta(title: &str, created: &str, order: u32) -> (DocMeta, RouteMeta) {
+		(
+			DocMeta {
+				title: Some(title.into()),
+				description: Some(format!("about {title}")),
+				authors: vec!["Pete Hayman".into()],
+				created: Date::parse(created).ok(),
+				..default()
+			},
+			RouteMeta {
+				order: Some(order),
+				..default()
+			},
+		)
 	}
 
 	/// A router world holding a `blog` index and three posts beside it, with the
@@ -197,7 +209,7 @@ mod test {
 				post("ecs-router", meta("ECS Router", "2025-08-09", 2)),
 				post("declarative-state", {
 					let mut meta = meta("Declarative State", "2025-11-03", 3);
-					meta.visibility = DocVisibility::Draft;
+					meta.1.visibility = RouteVisibility::Draft;
 					meta
 				}),
 			])])
@@ -255,11 +267,11 @@ mod test {
 			),
 			(
 				"blog/1-full-stack-bevy.md",
-				"+++\ntitle = \"Full Stack Bevy\"\nslug = \"full-stack-bevy\"\ndescription = \"the first one\"\ncreated = \"2025-07-11\"\nauthors = [\"Pete Hayman\"]\n+++\n\n# One",
+				"+++\ntitle = \"Full Stack Bevy\"\ndescription = \"the first one\"\ncreated = \"2025-07-11\"\nauthors = [\"Pete Hayman\"]\n\n[RouteMeta]\nslug = \"full-stack-bevy\"\n+++\n\n# One",
 			),
 			(
 				"blog/2-ecs-router.md",
-				"+++\ntitle = \"ECS Router\"\nslug = \"ecs-router\"\ndescription = \"the second one\"\ncreated = \"2025-08-09\"\nauthors = [\"Pete Hayman\"]\n+++\n\n# Two",
+				"+++\ntitle = \"ECS Router\"\ndescription = \"the second one\"\ncreated = \"2025-08-09\"\nauthors = [\"Pete Hayman\"]\n\n[RouteMeta]\nslug = \"ecs-router\"\n+++\n\n# Two",
 			),
 		] {
 			store.insert(&RelPath::from(path), content).await.unwrap();

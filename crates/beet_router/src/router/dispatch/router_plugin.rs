@@ -367,7 +367,7 @@ impl Plugin for RouterPlugin {
 			// opts in with that on-switch.
 			app.register_type::<AnalyticsMiddleware>();
 			// the standard.site `content` formats, each registered by the
-			// render target answering it
+			// doc renderer writing it
 			#[cfg(feature = "dag_cbor")]
 			app.init_resource::<StandardSiteContentFormats>();
 			#[cfg(feature = "leaflet")]

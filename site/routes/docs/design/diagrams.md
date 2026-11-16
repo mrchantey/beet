@@ -1,5 +1,7 @@
 +++
 title = "Diagrams"
+
+[RouteMeta]
 visibility = "unlisted"
 +++
 

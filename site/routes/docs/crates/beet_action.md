@@ -1,5 +1,7 @@
 +++
 title = "beet_action"
+
+[RouteMeta]
 visibility = "unlisted"
 +++
 

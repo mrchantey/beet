@@ -40,9 +40,11 @@ impl Plugin for ParsePlugin {
 		// every `bx:click="..."` resolves through the core seam.
 		#[cfg(feature = "bsx")]
 		app.install_type::<crate::prelude::BsxDefaultsPlugin>();
-		// a document's root metadata, which frontmatter declares and writes
-		app.register_type::<DocMeta>()
-			.register_type::<FrontmatterType>();
+		// a document's root metadata and its route's, which frontmatter
+		// declares and writes
+		app.register_type::<DocMeta>().register_type::<RouteMeta>();
+		#[cfg(feature = "bsx")]
+		app.register_type::<FrontmatterType>();
 		// the cell addresses every parsed document's tables carry, numbered
 		// once per document
 		app.register_type::<TableCellAddress>()

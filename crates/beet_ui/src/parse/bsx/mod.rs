@@ -1,4 +1,4 @@
-//! The `beet_ui` BSX front-end: a thin [`NodeParser`] that delegates parsing to
+//! The `beet_ui` BSX front-end: a thin [`DocParser`] that delegates parsing to
 //! the core BSX parser ([`beet_core::bsx`]).
 //!
 //! The grammar, the value model, the `bx:` directives, the event seam, and the
@@ -17,7 +17,7 @@ mod event_script;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A [`NodeParser`] for the BSX, HTML and XML media types, delegating to the
+/// A [`DocParser`] for the BSX, HTML and XML media types, delegating to the
 /// core parser in the dialect the media type names
 /// ([`BsxParseConfig::from_media_type`]).
 ///
@@ -53,7 +53,23 @@ impl BsxParser {
 	}
 }
 
-impl NodeParser for BsxParser {
+impl DocParser for BsxParser {
+	fn media_types(&self) -> Vec<MediaType> {
+		BsxParseConfig::MEDIA_TYPES.to_vec()
+	}
+
+	fn declarations(
+		&self,
+		bytes: &MediaBytes,
+		_frontmatter_type: &str,
+	) -> Result<RootDeclarations> {
+		let config = BsxParseConfig::from_media_type(bytes.media_type())
+			.unwrap_or_default();
+		BsxNode::parse_document(core::str::from_utf8(bytes)?, &config)?
+			.xmap(|nodes| RootDeclarations::from_bsx(&nodes))
+			.xok()
+	}
+
 	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
 		let media_type = cx.bytes.media_type();
 		let config =
@@ -67,4 +83,9 @@ impl NodeParser for BsxParser {
 		Self::parse_into(&config, cx.entity, text)?;
 		Ok(())
 	}
+}
+
+#[cfg(feature = "bsx")]
+impl Installer for BsxParser {
+	fn install(self, app: &mut App) { DocParsers::register_on(app, self); }
 }

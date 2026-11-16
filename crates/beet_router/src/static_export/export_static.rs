@@ -69,7 +69,7 @@ impl StaticExport {
 		}
 		let entity = world.entity(node.entity);
 		if node.is_page_route
-			&& !node.is_public_page(entity.get::<DocMeta>(), is_prod)
+			&& !node.is_public_page(entity.get::<RouteMeta>(), is_prod)
 		{
 			return false;
 		}
@@ -385,7 +385,7 @@ mod test {
 	}
 
 	/// A `published` page plus a `secret` one eagerly marked
-	/// `DocMeta { visibility: Draft }` (the codegen `BlobPage` shape).
+	/// `RouteMeta { visibility: Draft }` (the codegen `BlobPage` shape).
 	fn spawn_draft_router(world: &mut World) -> Entity {
 		world
 			.spawn((Router::with_defaults(), children![
@@ -404,8 +404,8 @@ mod test {
 					),
 					HttpMethod::Get,
 					PageRoute,
-					DocMeta {
-						visibility: DocVisibility::Draft,
+					RouteMeta {
+						visibility: RouteVisibility::Draft,
 						..default()
 					},
 				),
@@ -442,7 +442,7 @@ mod test {
 		fs_ext::write(root.join("published.md"), "# Published").unwrap();
 		fs_ext::write(
 			root.join("secret.md"),
-			"+++\nvisibility = \"draft\"\n+++\n\n# Secret",
+			"+++\n[RouteMeta]\nvisibility = \"draft\"\n+++\n\n# Secret",
 		)
 		.unwrap();
 		root

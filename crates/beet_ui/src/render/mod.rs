@@ -1,28 +1,32 @@
-//! Rendering an entity tree to bytes: one walk, many formats.
+//! Rendering an entity tree to a document: one walk, many formats.
 //!
-//! A [`NodeRenderer`] walks the tree rooted at an entity (through
+//! A [`DocRenderer`] walks the tree rooted at an entity (through
 //! [`NodeWalker`], which reads it through [`RenderTreeQuery`], so every
-//! [`Portal`] renders the tree it transcludes in place) and writes one format. Each format is a [`RenderTarget`], and every target a world renders
-//! to lives in one registry, [`RenderTargets`], the one path every render takes.
+//! [`Portal`] renders the tree it transcludes in place) and writes it as a
+//! document of one format, even plain text being a document of a single text
+//! node. Every renderer a world renders to lives in one registry,
+//! [`DocRenderers`], the one path every render takes. A live surface, the DOM
+//! or a charcell buffer, is painted rather than rendered to a document, and
+//! is no doc renderer.
 //!
 //! Every render answers a request: an http request, a cli command, a
 //! syndication route's in-process `Request::get`, a publish step, a test's
-//! [`RequestParts::default()`]. [`RenderTargets::render`] negotiates the format
-//! from its `Accept` ([`RenderTargets::negotiate`]), the default media type
+//! [`RequestParts::default()`]. [`DocRenderers::render`] negotiates the format
+//! from its `Accept` ([`DocRenderers::negotiate`]), the default media type
 //! answering an absent header or a wildcard and any unregistered text type
-//! falling back to plain text, and the target reads the same request off its
+//! falling back to plain text, and the renderer reads the same request off its
 //! [`RenderContext`]. A caller wanting a particular format renders a request
 //! accepting it, so a direct render can never drift from what a client asking
 //! for the same type receives.
 //!
-//! [`RenderPlugin`] registers the built-in targets: [`HtmlRenderer`],
+//! [`RenderPlugin`] registers the built-in renderers: [`HtmlRenderer`],
 //! [`XmlRenderer`], [`MarkdownRenderer`], [`PlainTextRenderer`], and with
 //! their features [`AnsiTermRenderer`] (`style`) and the serialized scene of
 //! [`TemplateRenderer`] (`template_serde`, json and postcard).
 //!
-//! # Registering a target
+//! # Registering a renderer
 //!
-//! A downstream crate registers its own target through the same call the
+//! A downstream crate registers its own renderer through the same call the
 //! built-ins use, from its plugin:
 //!
 //! ```
@@ -32,7 +36,11 @@
 //! #[derive(Clone)]
 //! struct Shout;
 //!
-//! impl NodeRenderer for Shout {
+//! impl DocRenderer for Shout {
+//! 	fn media_types(&self) -> Vec<MediaType> {
+//! 		vec![MediaType::other("text/vnd.shout")]
+//! 	}
+//!
 //! 	fn render(
 //! 		&mut self,
 //! 		cx: &mut RenderContext,
@@ -47,14 +55,8 @@
 //! 	}
 //! }
 //!
-//! impl RenderTarget for Shout {
-//! 	fn media_types(&self) -> Vec<MediaType> {
-//! 		vec![MediaType::other("text/vnd.shout")]
-//! 	}
-//! }
-//!
 //! impl Installer for Shout {
-//! 	fn install(self, app: &mut App) { RenderTargets::register_on(app, self); }
+//! 	fn install(self, app: &mut App) { DocRenderers::register_on(app, self); }
 //! }
 //!
 //! let mut app = App::new();
@@ -63,14 +65,14 @@
 //! let page = world.spawn(rsx! { <p>"hello"</p> }).id();
 //! let request = RequestParts::default()
 //! 	.with_accept(MediaType::other("text/vnd.shout"));
-//! RenderTargets::render(world, page, &request)
+//! DocRenderers::render(world, page, &request)
 //! 	.unwrap()
 //! 	.to_string()
 //! 	.xpect_eq("HELLO\n");
 //! ```
 //!
 //! The registered instance is cloned for every render, so its configuration
-//! is fixed at registration. A target registered later answers its media
+//! is fixed at registration. A renderer registered later answers its media
 //! types ahead of an earlier one, which is how a built-in is replaced.
 //!
 //! [`Portal`]: crate::prelude::Portal
@@ -80,12 +82,12 @@
 mod charcell;
 #[cfg(feature = "style")]
 pub use charcell::*;
-// the html-rendering target and its utilities; the shared
-// `node_walker`/`node_renderer` substrate
+// the html renderer and its utilities; the shared
+// `node_walker`/`render_context` substrate
 // (also used by markdown/ansi/charcell) stays here in `render/`.
 mod html;
 pub use html::*;
-// the DOM render target: the browser's document as a sink over the same walk,
+// the DOM surface: the browser's document as a sink over the same walk,
 // painted once and patched each frame; there is nothing to paint into
 // anywhere else, so it is target-gated rather than featured.
 #[cfg(target_arch = "wasm32")]
@@ -96,12 +98,12 @@ pub use dom::*;
 // back by the browser world once it has adopted it.
 mod pre_boot;
 pub use pre_boot::*;
-mod render_target;
-pub use render_target::*;
+mod doc_renderers;
+pub use doc_renderers::*;
 mod plaintext;
 pub use plaintext::*;
-mod node_renderer;
-pub use node_renderer::*;
+mod render_context;
+pub use render_context::*;
 mod node_walker;
 pub use node_walker::*;
 mod text_render_state;

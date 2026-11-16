@@ -33,7 +33,9 @@ use beet_ui::prelude::*;
 /// per route and stays live. The route's whole [`DocMeta`] is handed to the base
 /// [`Head`] so its social card previews this page, falling back to
 /// [`PackageConfig`](beet_core::prelude::PackageConfig) per field, along with
-/// this request's own absolute url as the canonical one. Extra tags
+/// this request's own absolute url as the canonical one, and an
+/// [`Unlisted`](RouteVisibility::Unlisted) route's [`RouteMeta`] marks it
+/// `noindex`. Extra tags
 /// (stylesheet, favicon, ...) flow through to the `<head>` via the default slot.
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
@@ -43,6 +45,7 @@ use beet_ui::prelude::*;
 pub fn RouteHead(
 	stack: Res<RequestContextStack>,
 	metas: Query<&DocMeta>,
+	route_metas: Query<&RouteMeta>,
 	pkg: Res<PackageConfig>,
 ) -> Result<impl Bundle> {
 	let cx = stack.current();
@@ -57,8 +60,11 @@ pub fn RouteHead(
 	// serve a relative `<loc>` at all, a head has plenty to say without an
 	// origin, so an unset `homepage` simply omits the tag.
 	let url = pkg.absolute_url(&cx.current_path()).ok();
+	let noindex = route_metas
+		.get(cx.route())
+		.is_ok_and(|route| route.visibility == RouteVisibility::Unlisted);
 	rsx! {
-		<Head omit_title=true meta=meta url=url>
+		<Head omit_title=true meta=meta url=url noindex=noindex>
 			<title>{title}</title>
 			<Slot/>
 		</Head>
@@ -122,7 +128,7 @@ pub fn RouteSidebar(
 	exclude: Vec<String>,
 	stack: Res<RequestContextStack>,
 	trees: Query<&RouteTree>,
-	metas: Query<&DocMeta>,
+	metas: Query<(Option<&DocMeta>, &RouteMeta)>,
 ) -> impl Bundle {
 	let cx = stack.current();
 	let is_prod = BootstrapConfig::get().is_prod();
@@ -136,10 +142,10 @@ pub fn RouteSidebar(
 			}
 			// each route's metadata drives its label/order/expansion/visibility
 			for node in tree.flatten_nodes() {
-				if let Ok(meta) = metas.get(node.entity) {
+				if let Ok((meta, route)) = metas.get(node.entity) {
 					state = state.with_info(
 						node.path.annotated_path(),
-						SidebarInfo::of_page(meta, is_prod),
+						SidebarInfo::of_page(route, meta, is_prod),
 					);
 				}
 			}
@@ -170,20 +176,20 @@ pub struct SidebarInfo {
 }
 
 impl SidebarInfo {
-	/// The nav slice of a page's metadata in a process of the given stage: the
-	/// label resolved through [`DocMeta::sidebar_label`], so an unlabelled
-	/// page falls back to its title, and hidden unless
-	/// [`DocMeta::is_browsable`].
-	///
-	/// Lives here rather than on [`DocMeta`] because the nav is a router
-	/// concern: the page merely declares label, order, expansion and
-	/// visibility.
-	pub fn of_page(meta: &DocMeta, is_prod: bool) -> Self {
+	/// The nav slice of a page's route metadata in a process of the given
+	/// stage: the label resolved through [`RouteMeta::sidebar_label`], so an
+	/// unlabelled page falls back to its document's title, and hidden unless
+	/// [`RouteMeta::is_browsable`].
+	pub fn of_page(
+		route: &RouteMeta,
+		doc: Option<&DocMeta>,
+		is_prod: bool,
+	) -> Self {
 		Self {
-			label: meta.sidebar_label().map(String::from),
-			order: meta.order,
-			expanded: meta.expanded,
-			hidden: !meta.is_browsable(is_prod),
+			label: route.sidebar_label(doc).map(String::from),
+			order: route.order,
+			expanded: route.expanded,
+			hidden: !route.is_browsable(is_prod),
 		}
 	}
 }
@@ -598,7 +604,7 @@ mod test {
 			])
 			.flush();
 		let tree = tree_of(&mut world, root);
-		let page = |visibility| DocMeta {
+		let page = |visibility| RouteMeta {
 			visibility,
 			..default()
 		};
@@ -606,11 +612,15 @@ mod test {
 		let nodes = SidebarState::new("about")
 			.with_info(
 				"about",
-				SidebarInfo::of_page(&page(DocVisibility::Unlisted), false),
+				SidebarInfo::of_page(
+					&page(RouteVisibility::Unlisted),
+					None,
+					false,
+				),
 			)
 			.with_info(
 				"docs",
-				SidebarInfo::of_page(&page(DocVisibility::Draft), true),
+				SidebarInfo::of_page(&page(RouteVisibility::Draft), None, true),
 			)
 			.collect(&tree);
 		nodes

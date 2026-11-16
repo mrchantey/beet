@@ -1,5 +1,7 @@
 +++
 title = "beet_router"
+
+[RouteMeta]
 visibility = "unlisted"
 +++
 

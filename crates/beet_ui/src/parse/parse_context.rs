@@ -1,19 +1,7 @@
 use beet_core::prelude::*;
 use thiserror::Error;
 
-/// Parses bytes into an entity's components.
-///
-/// Implementors provide [`NodeParser::parse`] which operates synchronously
-/// on a `&mut EntityWorldMut`, keeping all ECS mutations in one place.
-pub trait NodeParser {
-	/// Parse the bytes in `cx` and apply the result to `cx.entity`.
-	///
-	/// Implementations should check `cx.bytes.media_type()` and return
-	/// [`ParseError::UnsupportedType`] if the type is not handled.
-	fn parse(&mut self, cx: ParseContext<'_, '_>) -> Result<(), ParseError>;
-}
-
-/// Context passed to [`NodeParser::parse`].
+/// Context passed to [`DocParser::parse`].
 ///
 /// Two lifetimes: `'w` for the world borrow inside [`EntityWorldMut`],
 /// and `'a` for all other borrows (entity ref, bytes) which must live

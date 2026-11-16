@@ -1,5 +1,7 @@
 +++
 title = "Scripts"
+
+[RouteMeta]
 order = 2
 visibility = "unlisted"
 +++

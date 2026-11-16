@@ -1,11 +1,13 @@
 +++
 title = "Folk Technology"
-slug = "folk-technology"
 description = "Drawing parallels between malleable software and the open participitary culture of folk festivals."
 tags = ["malleable-software", "talks"]
 created = "2025-12-04"
 authors = ["Pete Hayman"]
 video_url = "https://youtu.be/NFjdN8KGkg8"
+
+[RouteMeta]
+slug = "folk-technology"
 +++
 
 Last week I was lucky enough to attend the first DevOps Days in my hometown of Wollongong, Australia. DevOps Days has a very cool format, employing tools like five-minute Ignite Talks and group discussions called Open Spaces to ensure all voices have an opportunity to be heard. It is designed to foster a marketplace of ideas and the experience reminded me of my love for folk festivals. The same principles of abundance that bring these events to life can and should shape how we design software.

@@ -240,7 +240,7 @@ impl Navigator {
 	/// ## Errors
 	/// - No [`Navigator`] found on entity
 	/// - Network request failed
-	/// - No [`RenderTargets`] found
+	/// - No [`DocRenderers`] found
 	pub async fn navigate_to(
 		entity: AsyncEntity,
 		url: impl Into<Url>,

@@ -1,11 +1,13 @@
 +++
 title = "Multi-Interface Applications"
-slug = "multi-interface-applications"
 description = "Putting the agency back in user agents by bringing back content negotiation, with a single beet application serving HTML, Markdown, ANSI, and raw scenes all at the same route."
 tags = ["web", "terminal", "architecture"]
 created = "2026-03-06"
 authors = ["Pete Hayman"]
 video_url = "https://youtu.be/MIlRSPAZ1Fo"
+
+[RouteMeta]
+slug = "multi-interface-applications"
 +++
 
 Last month I [began exploring](/blog/its-all-been-done-before) an agnostic `Request/Response` pattern so I could use the same router library for both a cli and a server.

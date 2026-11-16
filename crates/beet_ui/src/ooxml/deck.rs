@@ -838,7 +838,7 @@ mod test {
 			)
 			.xpect_contains("| 1 | slide1.xml | 11 | 0 | 0% | 1 |  | picture |");
 		// a deck is read, never written
-		RenderTargets::render(
+		DocRenderers::render(
 			&mut world,
 			root,
 			&RequestParts::default().with_accept(MediaType::Pptx),

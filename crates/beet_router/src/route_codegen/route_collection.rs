@@ -116,7 +116,7 @@ impl RouteCollection {
 		// declarations (a `slug` renaming the emitted route) registers here; the
 		// rest resolve against the app registry when the emitted route spawns.
 		let mut registry = TypeRegistry::default();
-		registry.register::<DocMeta>();
+		registry.register::<RouteMeta>();
 		let frontmatter_type = FrontmatterType::default();
 
 		let mut files = Vec::new();
@@ -164,14 +164,14 @@ impl RouteCollection {
 								.unwrap_or_default()
 						}
 					};
-					DocMeta::declare_file_defaults(
+					RouteMeta::declare_file_defaults(
 						&mut declarations,
 						&store_path,
 					);
 					// the frontmatter has the last word on the url, exactly as it
 					// does in `RoutesDir` discovery
 					let route_path =
-						match declarations.get::<DocMeta>(&registry)? {
+						match declarations.get::<RouteMeta>(&registry)? {
 							Some(meta) => meta.apply_slug(&route_path)?,
 							None => route_path,
 						};

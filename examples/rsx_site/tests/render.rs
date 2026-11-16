@@ -15,7 +15,7 @@ fn site_world() -> World {
 	core::mem::take(app.world_mut())
 }
 
-/// A `GET {path}` request negotiating HTML (the web render target).
+/// A `GET {path}` request negotiating HTML (the web doc renderer).
 fn html_get(path: &str) -> Request {
 	Request::get(path).with_header::<header::Accept>(vec![MediaType::Html])
 }

@@ -1,11 +1,13 @@
 +++
 title = "Bevy's Five and Beet's Alive!"
-slug = "bevys-five-and-beets-alive"
 description = "ECS requires a fundamental shift in how we build apps, and it takes practice to learn the Way."
 tags = ["architecture", "ecs", "bevy"]
 created = "2025-09-06"
 authors = ["Pete Hayman"]
 video_url = "https://youtu.be/J0zxMdsAk_I"
+
+[RouteMeta]
+slug = "bevys-five-and-beets-alive"
 +++
 
 It's been a very good year, but for this reflection I'd like to share my journey of seemingly relentless deviations from The Way of the ECS.

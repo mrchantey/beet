@@ -5,7 +5,7 @@
 //! The format is a small block model, a subset of html. A beet post is a
 //! markdown document whose parsed article is a superset of it, so the conversion
 //! is lossy by design and the canonical page stays the full post. This is a
-//! render target like html and charcell, and the only piece of another project's
+//! doc renderer like html and markdown, and the only piece of another project's
 //! lexicon beet learns.
 //!
 //! # The shape
@@ -409,7 +409,7 @@ pub enum LeafletFacetFeature {
 	Strikethrough,
 }
 
-/// The Leaflet render target: a page's tree as [`LeafletContent`], answering
+/// The Leaflet doc renderer: a page's tree as [`LeafletContent`], answering
 /// [`MEDIA_TYPE`](Self::MEDIA_TYPE) and embedding images, so the media
 /// resolve step fetches an `img`'s bytes before it renders.
 ///
@@ -430,7 +430,9 @@ impl LeafletRenderer {
 	pub fn media_type() -> MediaType { MediaType::other(Self::MEDIA_TYPE) }
 }
 
-impl NodeRenderer for LeafletRenderer {
+impl DocRenderer for LeafletRenderer {
+	fn media_types(&self) -> Vec<MediaType> { vec![Self::media_type()] }
+
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
@@ -453,10 +455,6 @@ impl NodeRenderer for LeafletRenderer {
 	}
 }
 
-impl RenderTarget for LeafletRenderer {
-	fn media_types(&self) -> Vec<MediaType> { vec![Self::media_type()] }
-}
-
 /// Registers the target and `pub.leaflet.content`, the standard site content
 /// format it answers.
 impl Installer for LeafletRenderer {
@@ -464,7 +462,7 @@ impl Installer for LeafletRenderer {
 		app.world_mut()
 			.get_resource_or_init::<StandardSiteContentFormats>()
 			.register(LeafletContent::NSID, Self::media_type());
-		RenderTargets::register_on(app, self);
+		DocRenderers::register_on(app, self);
 	}
 }
 
@@ -1301,7 +1299,7 @@ mod test {
 			..default()
 		});
 		world
-			.resource_mut::<RenderTargets>()
+			.resource_mut::<DocRenderers>()
 			.register(LeafletRenderer);
 		world
 	}
@@ -1315,7 +1313,7 @@ mod test {
 		world: &mut World,
 		root: Entity,
 	) -> Result<MediaBytes, RenderError> {
-		RenderTargets::render(
+		DocRenderers::render(
 			world,
 			root,
 			&RequestParts::get("/blog/post")

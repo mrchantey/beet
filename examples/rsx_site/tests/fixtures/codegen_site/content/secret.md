@@ -1,5 +1,7 @@
 +++
 title = "Secret"
+
+[RouteMeta]
 visibility = "draft"
 +++
 

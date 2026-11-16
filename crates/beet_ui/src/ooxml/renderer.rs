@@ -25,17 +25,15 @@ type Ns = OoxmlNamespace;
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct OoxmlRenderer;
 
-impl RenderTarget for OoxmlRenderer {
+impl Installer for OoxmlRenderer {
+	fn install(self, app: &mut App) { DocRenderers::register_on(app, self); }
+}
+
+impl DocRenderer for OoxmlRenderer {
 	fn media_types(&self) -> Vec<MediaType> {
 		vec![MediaType::Docx, MediaType::Xlsx]
 	}
-}
 
-impl Installer for OoxmlRenderer {
-	fn install(self, app: &mut App) { RenderTargets::register_on(app, self); }
-}
-
-impl NodeRenderer for OoxmlRenderer {
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
@@ -820,7 +818,7 @@ mod test {
 		root: Entity,
 		media_type: MediaType,
 	) -> MediaBytes {
-		RenderTargets::render(
+		DocRenderers::render(
 			world,
 			root,
 			&RequestParts::default().with_accept(media_type),

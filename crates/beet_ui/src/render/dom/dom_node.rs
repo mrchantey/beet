@@ -13,7 +13,7 @@ use wasm_bindgen::JsValue;
 /// Three shapes, one per kind of entity in the walk: a node of the entity's
 /// own (an element, a text node, a comment), the element an attribute entity
 /// sets its attribute on, and a document element an entity binds in place
-/// rather than creates (the render target a page's `<body>` stands in for).
+/// rather than creates (the surface a page's `<body>` stands in for).
 /// The shape decides what a despawn takes with it: its node, its attribute,
 /// or nothing.
 ///

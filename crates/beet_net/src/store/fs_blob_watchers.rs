@@ -51,7 +51,7 @@ impl WatchDir {
 // (the `notify`/`FsWatcher` backend). Native-only: deno directory watching is
 // unimplemented, so a wasm `FsStore` serves reads through `fs_ext` with no live
 // reload; the `WatchDir` component above is inert there (and on a `std`-but-no-`fs`
-// render target).
+// build target).
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub use native::*;
 

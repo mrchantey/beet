@@ -1,11 +1,13 @@
 +++
 title = "Declarative State"
-slug = "declarative-state"
 description = "Exploring a declarative, local-first htmx-like state bindings with Automerge as an alternative to client islands."
 tags = ["web", "local-first", "architecture"]
 created = "2025-11-05"
 authors = ["Pete Hayman"]
 video_url = "https://youtu.be/BhLvfvw1rgw"
+
+[RouteMeta]
+slug = "declarative-state"
 +++
 
 Writing a metaframework can be surprisingly straightforward: Start with an unmet need, and copy-pasta the best modern patterns and principles that align with this need. So far the web layer of beet has been entirely based on Astro which is taking the web dev world by storm with a single principle:

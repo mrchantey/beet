@@ -201,17 +201,12 @@ fn head_falls_back_to_the_site() {
 		.xpect_contains("datePublished");
 }
 
-/// An unlisted page serves to whoever holds its link and is advertised nowhere,
-/// so the head asks crawlers not to index it.
+/// A `noindex` head asks crawlers not to index the page.
 #[beet_core::test]
-fn head_marks_unlisted_pages_noindex() {
+fn head_marks_noindex() {
 	let mut world = layout_world();
-	let meta = DocMeta {
-		visibility: DocVisibility::Unlisted,
-		..default()
-	};
 	let root = world
-		.spawn_template(rsx! { <Head meta=meta/> })
+		.spawn_template(rsx! { <Head noindex=true/> })
 		.unwrap()
 		.id();
 	render_html(&mut world, root)

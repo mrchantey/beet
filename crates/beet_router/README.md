@@ -101,7 +101,7 @@ The matched `route` entity is reachable from **no** layout edge (`Portal` and `L
 
 `PageRoot` names the entity the serializer walks (self-referential for a plain route, the layout itself for a wrapped one). `DespawnAfterRender` lists the ephemerals torn down after each render; nothing is cached between requests.
 
-`LivePage::prepare` runs the layouts, resolves the `--root` render param (`main` or `content`, one cascade documented on `RenderRoot`, absent for the whole page) and, when the request names a `--media-ingest` policy, the media resolve step, into a `LivePage` a caller renders through any registered target (`beet_ui`'s `RenderTargets`). A request is `LivePage::respond`, one render whose media type `Accept` negotiates, so a direct caller in `LivePage::scoped` naming the same type gets exactly the body a client does, and both release the page whatever the outcome.
+`LivePage::prepare` runs the layouts, resolves the `--root` render param (`main` or `content`, one cascade documented on `RenderRoot`, absent for the whole page) and, when the request names a `--media-ingest` policy, the media resolve step, into a `LivePage` a caller renders through any registered target (`beet_ui`'s `DocRenderers`). A request is `LivePage::respond`, one render whose media type `Accept` negotiates, so a direct caller in `LivePage::scoped` naming the same type gets exactly the body a client does, and both release the page whatever the outcome.
 
 ### Layouts
 
@@ -127,8 +127,11 @@ A document's metadata is **whatever components it declares at its root**. A mark
 ```md
 +++
 title = "Full Stack Bevy"
-slug = "full-stack-bevy"
 created = "2025-07-11"
+
+[RouteMeta]
+slug = "full-stack-bevy"
+
 [Layout]
 template = "ArticleLayout"
 +++
@@ -136,9 +139,9 @@ template = "ArticleLayout"
 
 The scan reads the ROOT only, resolving each declaration against the type registry with the same coercions a spread gets (`created` becomes a `Date`), and hoists every resolved component onto the route entity. Nothing is built, no hook runs and no child is spawned, which is what lets discovery know a page's title, order and slug before anyone visits it. Unsectioned keys declare the document's `FrontmatterType` (`DocMeta` by default, overridable per dir); a `[Section]` header names its component by short type path.
 
-`DocMeta` is a consumer of that set like any other: the router reads `slug` for the url, `order`/`sidebar_label`/`expanded` for the nav, `visibility` for the nav, static export and dispatch, and `<ArticleHeader/>` renders its `title`/`authors`/`created`/`video_url` as the article chrome.
+`DocMeta` and `RouteMeta` are consumers of that set like any other. `DocMeta` is the document's own: `<ArticleHeader/>` renders its `title`/`authors`/`created`/`video_url` as the article chrome. `RouteMeta` is the route's: the router reads `slug` for the url, `order`/`sidebar_label`/`expanded` for the nav, and `visibility` for the nav, static export and dispatch.
 
-`visibility` is the one knob every listing reads: `Public` serves and is listed everywhere, `Unlisted` serves to whoever holds the link and appears in no index, sidebar or `<RouteIndex/>` (and is marked `noindex` for crawlers), and `Draft` never reaches production at all (previewed in the nav everywhere else, `DocMeta::is_browsable`): dropped from a prod static export and answered `404` by a prod dispatch, exactly as an unknown url is.
+`visibility` is the one knob every listing reads: `Public` serves and is listed everywhere, `Unlisted` serves to whoever holds the link and appears in no index, sidebar or `<RouteIndex/>` (and is marked `noindex` for crawlers), and `Draft` never reaches production at all (previewed in the nav everywhere else, `RouteMeta::is_browsable`): dropped from a prod static export and answered `404` by a prod dispatch, exactly as an unknown url is.
 
 ## Syndication
 

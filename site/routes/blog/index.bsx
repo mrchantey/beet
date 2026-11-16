@@ -15,7 +15,7 @@ The heading is hand-authored because this page is undated: `<ArticleHeader/>` in
 the shared `ArticleLayout` gates on `created`, so it renders for every post and
 not for this index.
 -->
-<Fragment {DocMeta{title: "The Full Moon Harvest", sidebar_label: "Blog", order: 1, expanded: true}}>
+<Fragment {DocMeta{title: "The Full Moon Harvest"}} {RouteMeta{sidebar_label: "Blog", order: 1, expanded: true}}>
 	<h1>The Full Moon Harvest</h1>
 	<RouteIndex reverse="true"/>
 </Fragment>

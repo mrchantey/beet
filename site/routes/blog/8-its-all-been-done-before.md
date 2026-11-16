@@ -1,11 +1,13 @@
 +++
 title = "It's All Been Done Before"
-slug = "its-all-been-done-before"
 description = "Looking for the similarites between the old and new leads to clean abstractions like a transport-agnostic router."
 tags = ["architecture", "ecs"]
 created = "2026-02-01"
 authors = ["Pete Hayman"]
 video_url = "https://youtu.be/8nokKDoz2_4"
+
+[RouteMeta]
+slug = "its-all-been-done-before"
 +++
 
 My one-year-old has started getting new ideas, wanting to try something he hasn't done before like open a screw-top lid. Naturally things usually dont go as planned the first time which can be frustrating. In these times I find myself reminding him to take it easy by quoting one of my faviorite songs as a ten-year-old.

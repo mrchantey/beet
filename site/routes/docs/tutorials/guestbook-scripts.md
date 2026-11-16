@@ -1,5 +1,7 @@
 +++
 title = "Teach it new words"
+
+[RouteMeta]
 visibility = "unlisted"
 +++
 

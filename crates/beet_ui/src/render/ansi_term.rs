@@ -80,7 +80,9 @@ impl AnsiTermRenderer {
 	}
 }
 
-impl NodeRenderer for AnsiTermRenderer {
+impl DocRenderer for AnsiTermRenderer {
+	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::AnsiTerm] }
+
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
@@ -89,6 +91,11 @@ impl NodeRenderer for AnsiTermRenderer {
 		let output = self.render_to_string(cx.entity, cx.world)?;
 		MediaBytes::new_string(MediaType::AnsiTerm, output).xok()
 	}
+}
+
+#[cfg(feature = "style")]
+impl Installer for AnsiTermRenderer {
+	fn install(self, app: &mut App) { DocRenderers::register_on(app, self); }
 }
 
 #[cfg(test)]

@@ -373,7 +373,9 @@ impl NodeVisitor for HtmlRenderer {
 	}
 }
 
-impl NodeRenderer for HtmlRenderer {
+impl DocRenderer for HtmlRenderer {
+	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Html] }
+
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
@@ -391,6 +393,10 @@ impl NodeRenderer for HtmlRenderer {
 		)
 		.xok()
 	}
+}
+
+impl Installer for HtmlRenderer {
+	fn install(self, app: &mut App) { DocRenderers::register_on(app, self); }
 }
 
 #[cfg(test)]

@@ -1,5 +1,7 @@
 +++
 title = "A guestbook from a scene"
+
+[RouteMeta]
 visibility = "unlisted"
 +++
 

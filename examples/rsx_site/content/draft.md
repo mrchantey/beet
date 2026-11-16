@@ -1,5 +1,7 @@
 +++
 title = "Draft"
+
+[RouteMeta]
 visibility = "draft"
 +++
 

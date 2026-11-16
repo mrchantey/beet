@@ -6,7 +6,7 @@
 //! root.
 //!
 //! The boundary is the *rendered content* entity — the one tagged
-//! [`PageRootOf`] and walked by the `NodeRenderer` — not the [`PageRoot`]
+//! [`PageRootOf`] and walked by the `DocRenderer` — not the [`PageRoot`]
 //! handle that names it. The two coincide for self-referential roots, but an
 //! ephemeral coordinator route points its handle at separate content, and only
 //! the content lives in the traversed tree.

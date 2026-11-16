@@ -62,6 +62,12 @@ pub fn Head(
 	/// `<Head/>` outside a route can honestly claim.
 	#[prop]
 	url: Option<Url>,
+	/// Mark the page `noindex` for crawlers, ie an
+	/// [`Unlisted`](RouteVisibility::Unlisted) route, which serves to whoever
+	/// holds its link and is advertised nowhere (a crawler may still follow
+	/// its links).
+	#[prop]
+	noindex: bool,
 	pkg_config: Res<PackageConfig>,
 	theme: Option<Res<Theme>>,
 ) -> Result<impl Bundle> {
@@ -103,9 +109,6 @@ pub fn Head(
 		true => "article",
 		false => "website",
 	};
-	// an unlisted page serves to whoever holds its link and is advertised
-	// nowhere, which for a crawler means `noindex` (it may still follow links).
-	let noindex = meta.visibility == DocVisibility::Unlisted;
 	// the same facts again as schema.org structured data, which is what a
 	// search result reads for its byline and date
 	let json_ld = JsonLd {

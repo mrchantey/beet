@@ -1,10 +1,12 @@
 +++
 title = "Standardizing Standard Site Content"
-slug = "standardizing-standard-site-content"
 description = "Standard Site unifies discovery but content is fractured, lets explore some options."
 tags = ["standard-site", "malleable-software", "atproto"]
 created = "2026-10-21"
 authors = ["Pete Hayman"]
+
+[RouteMeta]
+slug = "standardizing-standard-site-content"
 +++
 
 The unification of longform posts under [Standard Site](https://standard.site) is a fantastic example of the Atmosphere working as intended both culturally and technically, but it has also surfaced where we still have more work to do in primitives for the Atmospheric application layer.

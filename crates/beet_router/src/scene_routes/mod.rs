@@ -6,7 +6,7 @@
 //! root of a tree (an rsx/markdown/parsed document, a behavior tree, …)
 //! carrying a [`PageRoot`]. [`LivePage::prepare`] runs its render middleware
 //! (the layouts) and resolves the `--root` cascade ([`RenderRoot`]) into a
-//! [`LivePage`], which renders through the `RenderTargets` registry as the
+//! [`LivePage`], which renders through the `DocRenderers` registry as the
 //! request's `Accept` negotiates (HTML, markdown, charcell, …) or as a caller
 //! names, and is then released, its [`DespawnAfterRender`] entities despawned.
 //!

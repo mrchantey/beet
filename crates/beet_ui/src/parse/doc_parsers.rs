@@ -1,6 +1,6 @@
 //! The registry of document formats a world reads: each [`DocParser`] names the
 //! media types it parses and installs itself into [`DocParsers`], the one path
-//! every parse takes, the parsing counterpart of [`RenderTargets`].
+//! every parse takes, the parsing counterpart of [`DocRenderers`].
 //!
 //! [`ParsePlugin`] installs the built-in parsers: plain text, and with their
 //! features BSX, HTML and XML (`bsx`), markdown (`markdown_parser`) and the
@@ -10,18 +10,21 @@ use crate::prelude::*;
 use alloc::sync::Arc;
 use beet_core::prelude::*;
 
-/// A document format a world reads: a [`NodeParser`] that names the media
-/// types it parses, registered in [`DocParsers`] by installing it,
+/// Parses a document into a tree: reads `cx.bytes`, one of the media types it
+/// names, into `cx.entity` synchronously, keeping every ECS mutation in one
+/// place. Registered in [`DocParsers`] by installing it,
 /// `app.install(MarkdownParser::new())`. Its [`Installer`] impl, a supertrait
 /// so no parser skips it, forwards to [`DocParsers::register_on`].
 ///
 /// The registry clones the registered instance for every parse, so its
 /// configuration is set once at registration.
-pub trait DocParser:
-	'static + Send + Sync + Clone + NodeParser + Installer
-{
+pub trait DocParser: 'static + Send + Sync + Clone + Installer {
 	/// The media types this parser reads, preferred first.
 	fn media_types(&self) -> Vec<MediaType>;
+
+	/// Parse the bytes in `cx` into `cx.entity`, returning
+	/// [`ParseError::UnsupportedType`] for a media type it does not read.
+	fn parse(&mut self, cx: ParseContext<'_, '_>) -> Result<(), ParseError>;
 
 	/// The components `bytes` declares at its document root, ie markdown's
 	/// frontmatter or markup's root spreads, its unsectioned keys naming
@@ -192,7 +195,7 @@ impl<T: DocParser> ErasedDocParser for T {
 	fn media_types(&self) -> Vec<MediaType> { DocParser::media_types(self) }
 
 	fn parse(&self, cx: ParseContext) -> Result<(), ParseError> {
-		NodeParser::parse(&mut self.clone(), cx)
+		DocParser::parse(&mut self.clone(), cx)
 	}
 
 	#[cfg(feature = "bsx")]
@@ -205,58 +208,10 @@ impl<T: DocParser> ErasedDocParser for T {
 	}
 }
 
-impl DocParser for PlainTextParser {
-	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Text] }
-}
 
-impl Installer for PlainTextParser {
-	fn install(self, app: &mut App) { DocParsers::register_on(app, self); }
-}
 
-#[cfg(feature = "bsx")]
-impl DocParser for BsxParser {
-	fn media_types(&self) -> Vec<MediaType> {
-		BsxParseConfig::MEDIA_TYPES.to_vec()
-	}
 
-	fn declarations(
-		&self,
-		bytes: &MediaBytes,
-		_frontmatter_type: &str,
-	) -> Result<RootDeclarations> {
-		let config = BsxParseConfig::from_media_type(bytes.media_type())
-			.unwrap_or_default();
-		BsxNode::parse_document(core::str::from_utf8(bytes)?, &config)?
-			.xmap(|nodes| RootDeclarations::from_bsx(&nodes))
-			.xok()
-	}
-}
 
-#[cfg(feature = "bsx")]
-impl Installer for BsxParser {
-	fn install(self, app: &mut App) { DocParsers::register_on(app, self); }
-}
-
-#[cfg(feature = "markdown_parser")]
-impl DocParser for MarkdownParser {
-	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Markdown] }
-
-	fn declarations(
-		&self,
-		bytes: &MediaBytes,
-		frontmatter_type: &str,
-	) -> Result<RootDeclarations> {
-		Frontmatter::extract(core::str::from_utf8(bytes)?)?
-			.map(|frontmatter| frontmatter.declarations(frontmatter_type))
-			.unwrap_or_default()
-			.xok()
-	}
-}
-
-#[cfg(feature = "markdown_parser")]
-impl Installer for MarkdownParser {
-	fn install(self, app: &mut App) { DocParsers::register_on(app, self); }
-}
 
 #[cfg(test)]
 mod test {

@@ -1,5 +1,7 @@
 +++
 title = "beet_ui"
+
+[RouteMeta]
 visibility = "unlisted"
 +++
 

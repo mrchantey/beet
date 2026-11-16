@@ -1,6 +1,6 @@
-//! Fetch a URL and render it in the terminal through [`RenderTargets`].
+//! Fetch a URL and render it in the terminal through [`DocRenderers`].
 //!
-//! Combines the HTTP client with [`DocParsers`] and [`RenderTargets`]
+//! Combines the HTTP client with [`DocParsers`] and [`DocRenderers`]
 //! to load remote content into ECS, then render it with the chosen
 //! media type. The `content-type` response header is used to select
 //! the parser automatically via [`DocParsers`].
@@ -72,7 +72,7 @@ fn fetch_and_render(async_commands: AsyncCommands) {
 
 				// 3. Render as the answer to a request accepting that type
 				let entity = entity.id();
-				let output = RenderTargets::render(
+				let output = DocRenderers::render(
 					world,
 					entity,
 					&RequestParts::default().with_accept(output_type),

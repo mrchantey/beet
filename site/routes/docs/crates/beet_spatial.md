@@ -1,5 +1,7 @@
 +++
 title = "beet_spatial"
+
+[RouteMeta]
 visibility = "unlisted"
 +++
 

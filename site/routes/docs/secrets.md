@@ -1,6 +1,8 @@
 +++
 title = "Secrets"
 description = "From nothing to a checked secrets document: one age identity per person, a sealed document beside your entry, and the verbs that keep it honest."
+
+[RouteMeta]
 visibility = "unlisted"
 +++
 

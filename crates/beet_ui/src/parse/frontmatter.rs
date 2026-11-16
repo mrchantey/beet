@@ -592,7 +592,6 @@ mod test {
 			title: Some("Plan: one, two".into()),
 			created: Some(Date::parse("2025-07-09").unwrap()),
 			authors: vec!["Mel Richards".into(), "Packwood, Geoff".into()],
-			order: Some(2),
 			..default()
 		};
 		let course = Course {
@@ -604,13 +603,13 @@ mod test {
 			(
 				MediaType::Toml,
 				"+++\ntitle = \"Plan: one, two\"\ncreated = \"2025-07-09\"\n\
-				 authors = [\"Mel Richards\", \"Packwood, Geoff\"]\norder = 2\n\n\
+				 authors = [\"Mel Richards\", \"Packwood, Geoff\"]\n\n\
 				 [Course]\nunit = \"BSBOPS404\"\n+++\n",
 			),
 			(
 				MediaType::Yaml,
 				"---\ntitle: \"Plan: one, two\"\ncreated: 2025-07-09\n\
-				 authors: [Mel Richards, \"Packwood, Geoff\"]\norder: 2\n\
+				 authors: [Mel Richards, \"Packwood, Geoff\"]\n\
 				 Course:\n  unit: BSBOPS404\n---\n",
 			),
 		] {

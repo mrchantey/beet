@@ -1,4 +1,4 @@
-//! [`RenderTargets`] selects the render target for a request accepting a
+//! [`DocRenderers`] selects the doc renderer for a request accepting a
 //! [`MediaType`]. Use cli args to specify the output
 //!
 //! With the `markdown` feature the markdown is parsed into structured
@@ -32,7 +32,7 @@ fn main() {
 
 	// 3. Render as the answer to a request accepting that media type
 	let entity = entity.id();
-	let output = RenderTargets::render(
+	let output = DocRenderers::render(
 		&mut world,
 		entity,
 		&RequestParts::default().with_accept(media_type),

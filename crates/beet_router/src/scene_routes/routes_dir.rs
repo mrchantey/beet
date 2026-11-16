@@ -13,8 +13,8 @@
 //! spread) are read at scan time and hoisted onto the route entity, so navigation
 //! (eg [`RouteSidebar`](crate::prelude::RouteSidebar)) knows every page's
 //! title/order without visiting it. The scan knows no metadata type: it hoists
-//! whatever components a document declares, and [`DocMeta`] is one consumer of
-//! that set like any other. Discovery is store-backed, so it reads identically
+//! whatever components a document declares, and [`DocMeta`] and [`RouteMeta`]
+//! are consumers of that set like any other. Discovery is store-backed, so it reads identically
 //! from the local filesystem in dev and from S3 in a deployed task.
 //!
 //! The routes stay true to their files through change detection: each route's
@@ -253,20 +253,20 @@ impl RoutesDir {
 	}
 
 	/// A discovered file's declarations with the filename defaults applied
-	/// ([`DocMeta::declare_file_defaults`]), and the url it serves at once its
+	/// ([`RouteMeta::declare_file_defaults`]), and the url it serves at once its
 	/// `slug` has had its say.
 	///
 	/// Resolved here rather than in the scan because reflect-building the
 	/// declarations needs the world's type registry, and the router reads
-	/// [`DocMeta`] out of them first because a `slug` has the last word on the
+	/// [`RouteMeta`] out of them first because a `slug` has the last word on the
 	/// url, before the route entity it would live on exists.
 	fn resolve_spec(
 		world: &World,
 		spec: RouteSpec,
 	) -> Result<(RootDeclarations, RelPath)> {
 		let mut declarations = spec.declarations?;
-		DocMeta::declare_file_defaults(&mut declarations, &spec.store_path);
-		let meta = declarations.get::<DocMeta>(
+		RouteMeta::declare_file_defaults(&mut declarations, &spec.store_path);
+		let meta = declarations.get::<RouteMeta>(
 			&world
 				.get_resource::<AppTypeRegistry>()
 				.ok_or_else(|| {
@@ -437,7 +437,7 @@ impl RoutesDir {
 	/// A pure function of the filename, shared with the codegen collection scan
 	/// so a route path never depends on which scan found the file. The
 	/// frontmatter `slug` override is applied on top by the caller, which holds
-	/// the resolved [`DocMeta`] (see [`DocMeta::apply_slug`]).
+	/// the resolved [`RouteMeta`] (see [`RouteMeta::apply_slug`]).
 	pub(crate) fn route_path_of(rel: &RelPath) -> RelPath {
 		let mut segments = rel.segments();
 		if let (Some(stem), Some(last)) = (rel.file_stem(), segments.last_mut())
@@ -461,7 +461,7 @@ impl RoutesDir {
 	/// serve at `/journal` while every sibling post stayed under `/blog`.
 	fn route_path_for(
 		store_path: &RelPath,
-		meta: Option<&DocMeta>,
+		meta: Option<&RouteMeta>,
 	) -> Result<RelPath> {
 		let route_path = Self::route_path_of(store_path);
 		let Some(meta) = meta.filter(|meta| meta.slug.is_some()) else {
@@ -622,7 +622,7 @@ mod test {
 		let mut world = reactive_world();
 		let (inner, handle) = reactive_fixture(&[(
 			"post.md",
-			"+++\nslug = \"first\"\n+++\n\n# Post",
+			"+++\n[RouteMeta]\nslug = \"first\"\n+++\n\n# Post",
 		)])
 		.await;
 		let root = spawn_routes(
@@ -640,7 +640,7 @@ mod test {
 		handle
 			.insert(
 				&RelPath::from("post.md"),
-				"+++\nslug = \"second\"\n+++\n\n# Post",
+				"+++\n[RouteMeta]\nslug = \"second\"\n+++\n\n# Post",
 			)
 			.await
 			.unwrap();
@@ -881,7 +881,7 @@ mod test {
 			&mut world,
 			memory_fixture(&[(
 				"blog/1-full-stack-bevy.md",
-				"+++\nslug = \"full-stack-bevy\"\n+++\n\n# Post",
+				"+++\n[RouteMeta]\nslug = \"full-stack-bevy\"\n+++\n\n# Post",
 			)])
 			.await,
 			(Router, children![RoutesDir::default()]),
@@ -893,7 +893,7 @@ mod test {
 		let node = tree.find(&["blog", "full-stack-bevy"]).unwrap();
 		world
 			.entity(node.entity)
-			.get::<DocMeta>()
+			.get::<RouteMeta>()
 			.unwrap()
 			.order
 			.unwrap()
@@ -905,7 +905,7 @@ mod test {
 	/// renaming the directory out from under its siblings.
 	#[beet_core::test]
 	fn route_path_for_applies_slug() {
-		let slugged = DocMeta {
+		let slugged = RouteMeta {
 			slug: Some("full-stack-bevy".into()),
 			..default()
 		};
@@ -971,7 +971,7 @@ mod test {
 			&mut world,
 			memory_fixture(&[(
 				"blog/index.bsx",
-				r#"<Fragment {DocMeta{title: "The Full Moon Harvest", created: "2025-09-06", sidebar_label: "Blog", order: 1}}><h1>Blog</h1></Fragment>"#,
+				r#"<Fragment {DocMeta{title: "The Full Moon Harvest", created: "2025-09-06"}} {RouteMeta{sidebar_label: "Blog", order: 1}}><h1>Blog</h1></Fragment>"#,
 			)])
 			.await,
 			(Router, children![RoutesDir::default()]),
@@ -985,8 +985,9 @@ mod test {
 			.as_deref()
 			.unwrap()
 			.xpect_eq("The Full Moon Harvest");
-		meta.sidebar_label.as_deref().unwrap().xpect_eq("Blog");
-		meta.order.unwrap().xpect_eq(1);
+		let route = world.entity(node.entity).get::<RouteMeta>().unwrap();
+		route.sidebar_label.as_deref().unwrap().xpect_eq("Blog");
+		route.order.unwrap().xpect_eq(1);
 		// the date string coerces to the day it names
 		meta.created
 			.unwrap()
@@ -1098,8 +1099,11 @@ mod test {
 		let root = spawn_routes(
 			&mut world,
 			memory_fixture(&[
-				("good.md", "+++\norder = 1\n+++\n\n# Good"),
-				("bad_meta.md", "+++\norder = \"not-a-number\"\n+++\n\n# Bad"),
+				("good.md", "+++\n[RouteMeta]\norder = 1\n+++\n\n# Good"),
+				(
+					"bad_meta.md",
+					"+++\n[RouteMeta]\norder = \"not-a-number\"\n+++\n\n# Bad",
+				),
 				("bad_markup.bsx", "<main {Unterminated"),
 			])
 			.await,
@@ -1122,7 +1126,7 @@ mod test {
 			&mut world,
 			memory_fixture(&[(
 				"docs/intro.md",
-				"+++\ntitle = \"Getting Started\"\norder = 2\n+++\n\n# Intro",
+				"+++\ntitle = \"Getting Started\"\n\n[RouteMeta]\norder = 2\n+++\n\n# Intro",
 			)])
 			.await,
 			(Router::with_defaults(), children![RoutesDir::default()]),
@@ -1133,6 +1137,12 @@ mod test {
 		let node = tree.find(&["docs", "intro"]).unwrap().clone();
 		let meta = world.entity(node.entity).get::<DocMeta>().unwrap();
 		meta.title.as_deref().unwrap().xpect_eq("Getting Started");
-		meta.order.unwrap().xpect_eq(2);
+		world
+			.entity(node.entity)
+			.get::<RouteMeta>()
+			.unwrap()
+			.order
+			.unwrap()
+			.xpect_eq(2);
 	}
 }

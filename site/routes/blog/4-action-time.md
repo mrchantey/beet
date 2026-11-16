@@ -1,11 +1,13 @@
 +++
 title = "Action Time!"
-slug = "action-time"
 description = "Rewriting beet_flow on the Bevy 0.17 event triggers and other additions: cross platform websockets, Webdriver BiDi, analytics, PDF printing and the first moves toward bsn."
 tags = ["release-notes", "behavior-trees"]
 created = "2025-10-07"
 authors = ["Pete Hayman"]
 video_url = "https://youtu.be/yI9tuBsrW1M"
+
+[RouteMeta]
+slug = "action-time"
 +++
 
 This one's a bit of a groundwork harvest, I have some exciting ideas for where to take beet next but to do it properly we need a firm base to launch from.

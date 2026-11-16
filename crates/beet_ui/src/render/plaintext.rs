@@ -100,7 +100,9 @@ impl NodeVisitor for PlainTextRenderer {
 	}
 }
 
-impl NodeRenderer for PlainTextRenderer {
+impl DocRenderer for PlainTextRenderer {
+	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Text] }
+
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
@@ -124,6 +126,10 @@ impl NodeRenderer for PlainTextRenderer {
 		)
 		.xok()
 	}
+}
+
+impl Installer for PlainTextRenderer {
+	fn install(self, app: &mut App) { DocRenderers::register_on(app, self); }
 }
 
 #[cfg(test)]

@@ -18,7 +18,7 @@ mod doc_parsers;
 mod mermaid;
 #[cfg(feature = "mermaid")]
 pub use mermaid::*;
-mod node_parser;
+mod parse_context;
 mod parse_plugin;
 mod plaintext;
 mod span_tracker;
@@ -26,7 +26,7 @@ pub use parse_plugin::*;
 #[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]
 mod syntax_highlighting;
 pub use doc_parsers::*;
-pub use node_parser::*;
+pub use parse_context::*;
 pub use plaintext::*;
 pub use span_tracker::*;
 #[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]

@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A [`NodeRenderer`] that serializes the entity subtree via [`TemplateSaver`].
+/// A [`DocRenderer`] that serializes the entity subtree via [`TemplateSaver`].
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct TemplateRenderer {}
 
@@ -35,7 +35,9 @@ impl TemplateRenderer {
 	}
 }
 
-impl NodeRenderer for TemplateRenderer {
+impl DocRenderer for TemplateRenderer {
+	fn media_types(&self) -> Vec<MediaType> { Self::available() }
+
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
@@ -46,6 +48,11 @@ impl NodeRenderer for TemplateRenderer {
 			.save(cx.world, media_type)?
 			.xok()
 	}
+}
+
+#[cfg(feature = "template_serde")]
+impl Installer for TemplateRenderer {
+	fn install(self, app: &mut App) { DocRenderers::register_on(app, self); }
 }
 
 #[cfg(test)]

@@ -4,19 +4,7 @@ use beet_net::prelude::*;
 use bevy::ecs::system::SystemState;
 use thiserror::Error;
 
-/// Renders an entity tree into serialized [`MediaBytes`].
-///
-/// Implementors walk the entity tree rooted at `cx.entity` using
-/// `cx.walk()` and produce the serialized bytes for their media type.
-pub trait NodeRenderer {
-	/// Render the entity tree described by `cx`.
-	fn render(
-		&mut self,
-		cx: &mut RenderContext,
-	) -> Result<MediaBytes, RenderError>;
-}
-
-/// Context passed to [`NodeRenderer::render`]: the tree to render and the
+/// Context passed to [`DocRenderer::render`]: the tree to render and the
 /// request the render answers.
 ///
 /// Every render answers a request, a test's being
@@ -28,7 +16,7 @@ pub struct RenderContext<'a> {
 	pub entity: Entity,
 	/// The request this render answers.
 	pub request: &'a RequestParts,
-	/// The media type a [`RenderTargets`] negotiation chose, which the
+	/// The media type a [`DocRenderers`] negotiation chose, which the
 	/// request's `Accept` need not name literally (a wildcard's default, the
 	/// plain text fallback).
 	negotiated: Option<MediaType>,
@@ -63,7 +51,7 @@ impl<'a> RenderContext<'a> {
 	}
 
 	/// The media types this render may answer, highest priority first: the
-	/// negotiated one when a [`RenderTargets`] render chose it, else the
+	/// negotiated one when a [`DocRenderers`] render chose it, else the
 	/// request's `Accept`. Empty accepts anything.
 	pub fn accepts(&self) -> Vec<MediaType> {
 		match &self.negotiated {
@@ -103,7 +91,7 @@ impl<'a> RenderContext<'a> {
 	}
 }
 
-/// Error returned by [`NodeRenderer::render`].
+/// Error returned by [`DocRenderer::render`].
 #[derive(Debug, Error)]
 pub enum RenderError {
 	/// The renderer does not support any of the requested media type.

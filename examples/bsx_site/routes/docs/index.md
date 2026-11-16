@@ -1,5 +1,7 @@
 +++
 title = "Docs"
+
+[RouteMeta]
 expanded = true
 +++
 

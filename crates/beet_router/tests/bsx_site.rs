@@ -60,13 +60,13 @@ async fn site_store() -> BlobStore {
 		("assets/style.css", "body { color: red; }"),
 		(
 			"routes/docs/intro.md",
-			"+++\ntitle = \"The Intro\"\norder = 1\n+++\n\n# Intro\n\nintro body",
+			"+++\ntitle = \"The Intro\"\n\n[RouteMeta]\norder = 1\n+++\n\n# Intro\n\nintro body",
 		),
 		// the BSX surface of the same metadata: the component itself, spread on
 		// the page root rather than written as frontmatter
 		(
 			"routes/docs/spread.bsx",
-			r#"<Fragment {DocMeta{title: "The Spread", order: 2}}><p>spread body</p></Fragment>"#,
+			r#"<Fragment {DocMeta{title: "The Spread"}} {RouteMeta{order: 2}}><p>spread body</p></Fragment>"#,
 		),
 	] {
 		store.insert(&RelPath::from(path), content).await.unwrap();
@@ -326,7 +326,7 @@ async fn page_renders_in_layout() {
 		.xpect_contains("aria-current=\"page\"");
 }
 
-/// A BSX page declares its metadata as an `DocMeta` spread on its root,
+/// A BSX page declares its metadata as `DocMeta` and `RouteMeta` spreads on its root,
 /// which the `<RoutesDir/>` scan reads without building the page (so the nav
 /// labels it) and the render carries onto the page root (so `RouteHead` titles
 /// it) — the same two places markdown frontmatter reaches.

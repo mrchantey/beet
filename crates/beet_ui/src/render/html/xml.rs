@@ -9,7 +9,9 @@ use beet_core::prelude::*;
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct XmlRenderer;
 
-impl NodeRenderer for XmlRenderer {
+impl DocRenderer for XmlRenderer {
+	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Xml] }
+
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
@@ -21,6 +23,10 @@ impl NodeRenderer for XmlRenderer {
 			.with_state::<XmlWriter, _>(|writer| writer.write(entity));
 		MediaBytes::new_string(MediaType::Xml, text).xok()
 	}
+}
+
+impl Installer for XmlRenderer {
+	fn install(self, app: &mut App) { DocRenderers::register_on(app, self); }
 }
 
 /// Writes a tree as XML: an element from its [`Element`] and [`Attribute`]s,

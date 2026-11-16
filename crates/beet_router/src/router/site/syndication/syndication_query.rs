@@ -86,6 +86,7 @@ pub(crate) struct SyndicationQuery<'w, 's> {
 	trees: AncestorQuery<'w, 's, &'static RouteTree>,
 	paths: Query<'w, 's, &'static PathPattern>,
 	metas: Query<'w, 's, &'static DocMeta>,
+	route_metas: Query<'w, 's, &'static RouteMeta>,
 	package: Res<'w, PackageConfig>,
 }
 
@@ -119,12 +120,16 @@ impl SyndicationQuery<'_, '_> {
 			.flatten_nodes()
 			.into_iter()
 			.filter_map(|node| {
-				let meta = self.metas.get(node.entity).ok();
-				(node.is_public_page(meta, is_prod)
-					&& meta.is_none_or(DocMeta::is_listed))
+				let route_meta = self.route_metas.get(node.entity).ok();
+				(node.is_public_page(route_meta, is_prod)
+					&& route_meta.is_none_or(RouteMeta::is_listed))
 				.then(|| SyndicationPage {
 					path: node.path.annotated_path(),
-					meta: meta.cloned().unwrap_or_default(),
+					meta: self
+						.metas
+						.get(node.entity)
+						.cloned()
+						.unwrap_or_default(),
 				})
 			})
 			.collect();
@@ -160,11 +165,14 @@ pub(crate) mod test_fixtures {
 		world
 	}
 
-	/// A page route at `path` carrying `meta`, its body the one paragraph
-	/// `page`. The metadata sits on the route, where a scan finds it, and on
-	/// the content each request builds, where a layout reads it, as a
-	/// discovered file's frontmatter does.
-	pub fn page(path: &str, meta: DocMeta) -> impl Bundle {
+	/// A page route at `path` carrying `meta`, ie a [`DocMeta`] and maybe a
+	/// [`RouteMeta`], its body the one paragraph `page`. The metadata sits on
+	/// the route, where a scan finds it, and on the content each request
+	/// builds, where a layout reads it, as a discovered file's frontmatter does.
+	pub fn page(
+		path: &str,
+		meta: impl 'static + Send + Sync + Clone + Bundle,
+	) -> impl Bundle {
 		(
 			render_action::fixed_func_route(path, {
 				let meta = meta.clone();
@@ -209,16 +217,20 @@ pub(crate) mod test_fixtures {
 					meta
 				}),
 				page("blog/ecs-router", post("ECS Router", "2025-08-09")),
-				page("blog/hidden", {
-					let mut meta = post("Hidden", "2025-08-20");
-					meta.visibility = DocVisibility::Unlisted;
-					meta
-				}),
-				page("blog/wip", {
-					let mut meta = post("Work In Progress", "2025-08-25");
-					meta.visibility = DocVisibility::Draft;
-					meta
-				}),
+				page(
+					"blog/hidden",
+					(post("Hidden", "2025-08-20"), RouteMeta {
+						visibility: RouteVisibility::Unlisted,
+						..default()
+					},)
+				),
+				page(
+					"blog/wip",
+					(post("Work In Progress", "2025-08-25"), RouteMeta {
+						visibility: RouteVisibility::Draft,
+						..default()
+					},)
+				),
 			]))
 			.flush();
 		world

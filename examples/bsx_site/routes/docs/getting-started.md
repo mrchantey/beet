@@ -1,5 +1,7 @@
 +++
 title = "Getting Started"
+
+[RouteMeta]
 order = 0
 +++
 

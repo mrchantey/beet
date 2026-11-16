@@ -1,11 +1,13 @@
 +++
 title = "Malleable Application Framework"
-slug = "malleable-application-framework"
 description = "Completing the great ECS-ification of the beet repo and rebranding as a Malleable Application Framework."
 tags = ["release-notes", "architecture", "ecs", "malleable-software"]
 created = "2026-01-04"
 authors = ["Pete Hayman"]
 video_url = "https://youtu.be/ycOUd6f0XRw"
+
+[RouteMeta]
+slug = "malleable-application-framework"
 +++
 
 This post and [pr #75](https://github.com/mrchantey/beet/pull/75) marks the completion of the great ECS-ification. The test runner was the final crate built in the hap-hazard 'c++ style oop' and now that it has been converted the beet repo is entirely ECS.

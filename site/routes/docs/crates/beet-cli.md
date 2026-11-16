@@ -1,5 +1,7 @@
 +++
 title = "beet-cli"
+
+[RouteMeta]
 visibility = "unlisted"
 +++
 

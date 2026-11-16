@@ -1,5 +1,7 @@
 +++
 title = "Plugins"
+
+[RouteMeta]
 order = 3
 visibility = "unlisted"
 +++

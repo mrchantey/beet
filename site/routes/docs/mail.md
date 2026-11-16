@@ -1,6 +1,8 @@
 +++
 title = "Self-hosted mail"
 description = "A runbook for standing up a self-hosted mail server on real cloud infrastructure."
+
+[RouteMeta]
 visibility = "unlisted"
 +++
 

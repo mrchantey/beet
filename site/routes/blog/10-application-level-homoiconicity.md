@@ -1,11 +1,13 @@
 +++
 title = "Application Level Homoiconicity"
-slug = "application-level-homoiconicity"
 description = "Malleable software bends but doesn't break. Encoding behavior as data is a natural fit for sync engines and provides a fine-grained boundary for developers to safely expose parts of the application."
 tags = ["ecs", "behavior-trees", "malleable-software"]
 created = "2026-04-06"
 authors = ["Pete Hayman"]
 video_url = "https://youtu.be/D-d_mJ9N5mA"
+
+[RouteMeta]
+slug = "application-level-homoiconicity"
 +++
 
 As much as I'd like to be I'm not a lisp guy, when somebody tells me `(+ 1 2)` is so cool because its all just data, I believe them and can admire the symmetry but have not yet built up an intuition for why thats useful.

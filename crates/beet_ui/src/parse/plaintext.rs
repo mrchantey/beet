@@ -30,7 +30,9 @@ impl PlainTextParser {
 	}
 }
 
-impl NodeParser for PlainTextParser {
+impl DocParser for PlainTextParser {
+	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Text] }
+
 	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
 		let media_type = cx.bytes.media_type();
 		let accepted = if self.plaintext_only {
@@ -82,4 +84,8 @@ impl NodeParser for PlainTextParser {
 
 		Ok(())
 	}
+}
+
+impl Installer for PlainTextParser {
+	fn install(self, app: &mut App) { DocParsers::register_on(app, self); }
 }

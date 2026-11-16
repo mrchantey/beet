@@ -36,6 +36,10 @@ impl OoxmlParser {
 	}
 }
 
+impl Installer for OoxmlParser {
+	fn install(self, app: &mut App) { DocParsers::register_on(app, self); }
+}
+
 impl DocParser for OoxmlParser {
 	fn media_types(&self) -> Vec<MediaType> {
 		OoxmlPackage::MEDIA_TYPES.to_vec()
@@ -53,13 +57,7 @@ impl DocParser for OoxmlParser {
 			.declarations(frontmatter_type)
 			.xok()
 	}
-}
 
-impl Installer for OoxmlParser {
-	fn install(self, app: &mut App) { DocParsers::register_on(app, self); }
-}
-
-impl NodeParser for OoxmlParser {
 	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
 		if !OoxmlPackage::MEDIA_TYPES.contains(cx.bytes.media_type()) {
 			return Err(ParseError::UnsupportedType {

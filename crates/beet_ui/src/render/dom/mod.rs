@@ -1,4 +1,4 @@
-//! The DOM render target: the browser's document as a third sink over the
+//! The DOM surface: the browser's document as a third sink over the
 //! same [`NodeWalker`] the string and charcell sinks read, driven by the same
 //! world.
 //!

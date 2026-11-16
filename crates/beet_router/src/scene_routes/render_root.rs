@@ -241,7 +241,7 @@ mod test {
 		let router = world
 			.spawn((Router::with_defaults(), children![page(
 				"post",
-				default()
+				DocMeta::default()
 			)]))
 			.flush();
 		world
