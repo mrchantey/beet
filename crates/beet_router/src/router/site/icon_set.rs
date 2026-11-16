@@ -1,6 +1,6 @@
 //! One source image, every size a browser or a PWA asks for, derived.
 //!
-//! `<IconSet src="assets/branding/logo.png"/>` at an entry's top level is the
+//! `<IconSet src="assets/logo/logo.png"/>` at an entry's top level is the
 //! whole declaration. Each output is a derived file whose provenance is the
 //! source image's digest and nothing else, so a changed source regenerates the
 //! set and an unchanged one costs one hash.
@@ -54,7 +54,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// `<IconSet src="assets/branding/logo.png"/>`: the module docs' set, derived
+/// `<IconSet src="assets/logo/logo.png"/>`: the module docs' set, derived
 /// from the one source image and written beside it, in the store this entity
 /// resolves by ancestry.
 ///
@@ -312,7 +312,7 @@ impl IconSet {
 			"description": package.description,
 			"start_url": "/",
 			"display": "standalone",
-			"theme_color": tints.light,
+			"theme_color": tints.light.as_str(),
 			"background_color": background,
 			"icons": icons,
 		}))?

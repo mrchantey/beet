@@ -281,11 +281,11 @@ mod test {
 			.xnot()
 			.xpect_contains("rel=\"icon\"");
 		let mut world = layout_world(request("", MediaType::Html));
-		world.spawn(IconSet::new("assets/branding/logo.png"));
+		world.spawn(IconSet::new("assets/logo/logo.png"));
 		render_world(&mut world)
-			.xpect_contains("href=\"/assets/branding/favicon.ico\"")
-			.xpect_contains("href=\"/assets/branding/icon-180.png\"")
-			.xpect_contains("href=\"/assets/branding/site.webmanifest\"");
+			.xpect_contains("href=\"/assets/logo/favicon.ico\"")
+			.xpect_contains("href=\"/assets/logo/icon-180.png\"")
+			.xpect_contains("href=\"/assets/logo/site.webmanifest\"");
 	}
 
 	/// The shell links nothing of its own: a site's `nav` content lands in the

@@ -247,10 +247,10 @@ token (plus AWS for the social stack's state bucket).
 		repository="https://github.com/mrchantey/beet"
 		social_image="https://beet.org/assets/branding/social-card.png"/>
 	<!-- the site's icons, every size a browser or a PWA asks for derived from
-	     the one source image and written beside it in `site/assets/branding`
+	     the one source image and written beside it in `site/assets/logo`
 	     by `<Derive/>`; `<Head>` links them from this declaration, and
 	     `beet check` fails a set that is missing or incomplete -->
-	<IconSet src="assets/branding/logo.png"/>
+	<IconSet src="assets/logo/logo.png"/>
 	<!-- the tag vocabulary every page's metadata draws from, each tag earning
 	     its place by sitting on two or more posts; `beet check` fails a page
 	     carrying any other, or breaking a limit `DocMetaRules` carries -->
@@ -475,6 +475,15 @@ token (plus AWS for the social stack's state bucket).
 				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb"/>
 				<Derive/>
 				<DirSync bucket="assets" local_dir="site/assets"/>
+			</Route>
+			<!-- `push` made a mirror: what `site/assets` no longer holds is
+			     pruned from the bucket, for a rename or a removal. Guarded
+			     against an unhydrated dir, and object versioning keeps every
+			     pruned object recoverable; run `pull` first. -->
+			<Route path="mirror" {ExchangeSequence}>
+				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb"/>
+				<Derive/>
+				<DirSync bucket="assets" local_dir="site/assets" {SyncS3Bucket{delete:true}}/>
 			</Route>
 			<Route path="pull" {ExchangeSequence}>
 				<DirSync bucket="assets" local_dir="site/assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>

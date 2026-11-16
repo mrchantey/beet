@@ -117,7 +117,8 @@ beet-roll-state *args:
 beet-shared *args:
   cargo run -p beet-cli --features infra,extra -- shared {{ args }}
 # The SITE assets bucket (`beet-site--shared--assets`), the source of record for
-# ./site/assets: `just site-shared plan|apply|pull|push|..`.
+# ./site/assets: `just site-shared plan|apply|pull|push|mirror|..` (`mirror` is a
+# push that also prunes what `site/assets` no longer holds).
 site-shared *args:
   cargo run -p beet-cli --features infra,extra -- --entry=site shared {{ args }}
 # The atproto handles under beet.org (the site entry's `social` stack):

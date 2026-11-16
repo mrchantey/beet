@@ -107,17 +107,22 @@ impl Theme {
 pub struct ThemeTints {
 	/// The light scheme's primary tone, the brand's key colour itself where the
 	/// key sits at the palette's tone 40, as a brand colour usually does.
-	pub light: String,
+	pub light: SmolStr,
 	/// The dark scheme's primary container, the deep brand tone a dark page
 	/// wears without a bright bar above it, where its primary is a pastel.
-	pub dark: String,
+	pub dark: SmolStr,
 }
 
 impl ThemeTints {
 	/// The tints `theme` resolves to.
 	pub fn new(theme: &Theme) -> Result<Self> {
-		let hex = |scheme: ColorScheme, role: Token| -> Result<String> {
-			theme.resolve(scheme, role)?.to_srgba().to_hex().xok()
+		let hex = |scheme: ColorScheme, role: Token| -> Result<SmolStr> {
+			theme
+				.resolve(scheme, role)?
+				.to_srgba()
+				.to_hex()
+				.xmap(SmolStr::from)
+				.xok()
 		};
 		Self {
 			light: hex(ColorScheme::Light, colors::Primary.into())?,
