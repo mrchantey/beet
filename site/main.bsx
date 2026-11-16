@@ -244,8 +244,7 @@ token (plus AWS for the social stack's state bucket).
 		description="An Atmospheric OS for homegrown tech"
 		version="0.0.9-dev.16"
 		homepage="https://beet.org"
-		repository="https://github.com/mrchantey/beet"
-		social_image="https://beet.org/assets/branding/social-card.png"/>
+		repository="https://github.com/mrchantey/beet"/>
 	<!-- the site's icons, every size a browser or a PWA asks for derived from
 	     the one source image and written beside it in `site/assets/logo`
 	     by `<Derive/>`; `<Head>` links them from this declaration, and
