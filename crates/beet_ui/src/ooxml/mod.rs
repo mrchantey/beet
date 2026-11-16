@@ -22,7 +22,7 @@
 //!   [`OoxmlNode::Text`] rather than a [`Value`].
 //! - **What HTML cannot say is components on the same entities**: what a
 //!   query wants, a paragraph's [`ParagraphStyle`], a [`ListLevel`], a run's
-//!   whole [`RunLook`], a cell's [`TableCellAddress`] or [`SheetCellAddress`].
+//!   whole [`RunLook`], a workbook cell's [`CellAddress`] and [`CellFormula`].
 //! - **An entity with no [`OoxmlNode`] is projection only**, ie a list's
 //!   `<ul>` or the `<strong>` inside a highlighted bold run. The writer
 //!   passes through it, writing its children in place.
@@ -44,11 +44,12 @@
 //! |---|---|
 //! | Word | its headers, main document, footers and notes, the main document's tables numbered as a fill addresses them and captioned `t<n>` |
 //! | Slide deck | each listed slide a `<section>` in presentation order headed `Slide <n>`, its shapes in reading order, each text frame labelled by its kind, its tables, its SmartArt read from its data part, its pictures `<img>`s with their [`SlidePicture`], and its speaker notes an `<aside>`; [`OoxmlPlugin`] appends a triage of the deck in [`PostParseTree`] |
-//! | Workbook | each worksheet a `<table>` captioned with its tab name, every cell a [`SheetCellAddress`] with its [`CellFormula`], a cell locked on a protected sheet `contenteditable="false"`, shared strings resolved, a merged range's first cell spanning the rest, and every gap before a row's last cell a projection-only `<td>` |
+//! | Workbook | each worksheet a `<table>` captioned with its tab name, every cell a [`CellAddress`] by tab name, `Sheet!A1`, with its [`CellFormula`], a cell locked on a protected sheet `contenteditable="false"`, shared strings resolved, a merged range's first cell spanning the rest, which take no address, and every other gap before a row's last cell a projection-only `<td>` |
 //!
 //! [`DocMeta`]: crate::prelude::DocMeta
 //! [`PostParseTree`]: crate::prelude::PostParseTree
-//! [`TableCellAddress`]: crate::prelude::TableCellAddress
+//! [`CellAddress`]: crate::prelude::CellAddress
+//! [`CellFormula`]: crate::prelude::CellFormula
 //! [`Element`]: beet_core::prelude::Element
 //! [`Value`]: beet_core::prelude::Value
 mod core_properties;
@@ -61,7 +62,6 @@ mod ooxml_query;
 mod package;
 mod parser;
 mod renderer;
-mod sheet_cell;
 mod word;
 mod workbook;
 mod writer;
@@ -74,5 +74,4 @@ pub use ooxml_plugin::*;
 pub use package::*;
 pub use parser::*;
 pub use renderer::*;
-pub use sheet_cell::*;
 pub use word::*;

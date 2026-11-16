@@ -1,23 +1,24 @@
-//! The cells of a document's tables, addressed: every cell of every table as
-//! a [`TableCellAddress`], so an edit or a cells listing names a cell the same
-//! way in a markdown table, an HTML page and a Word form. A workbook's cells
-//! carry the `ooxml` module's `SheetCellAddress` instead, and
-//! [`CellText::listing`] lists both.
+//! The cells of a document's tables, addressed: every cell of every table a
+//! [`CellAddress`], so an edit or a cells listing names a cell the same way
+//! in a markdown table, an HTML page, a Word form and a workbook.
 //!
-//! Cells are numbered in one place: [`DocParsers`] leaves [`NumberTables`]
-//! on every root it parses into, and the [`TableNumbering`] step of
-//! [`PostParseTree`] numbers that document's tables once, whatever its
-//! format.
+//! A format that names its grids supplies the addresses itself, ie a
+//! workbook's `Budget!D3`; every other table is numbered in one place:
+//! [`DocParsers`] leaves [`NumberTables`] on every root it parses into, and
+//! the [`TableNumbering`] step of [`PostParseTree`] numbers that document's
+//! unaddressed tables once, `t3r2c1`, whatever its format. Either way a
+//! column is the visual column HTML's table model places a cell in, so a
+//! spanning cell answers for every slot it covers through [`Cells`].
 use crate::prelude::*;
 use beet_core::prelude::*;
 use core::num::NonZeroU32;
 
 /// On a parsed document's root until [`PostParseTree`] numbers its tables:
-/// every table outside a `header`, `footer` or `aside`, in document order,
-/// which is Word's main-part rule, each of its cells given a
-/// [`TableCellAddress`]. A workbook's sheets are tables already addressed by
-/// sheet, and are left alone. The numbering removes it, so a document numbers
-/// its tables once and an edit adding a table renumbers nothing.
+/// every table outside a `header`, `footer` or `aside` none of whose cells
+/// carries a [`CellAddress`], in document order, which is Word's main-part
+/// rule, each of its cells given one. A table arriving addressed, ie a
+/// workbook's sheet, is left alone. The numbering removes it, so a document
+/// numbers its tables once and an edit adding a table renumbers nothing.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Component)]
 pub struct NumberTables {
 	/// Whether each numbered table is captioned with its number, ie `t3`: a
@@ -33,106 +34,39 @@ pub struct NumberTables {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct TableNumbering;
 
-impl NumberTables {
-	/// Numbers the tables of every root carrying [`NumberTables`], captioning
-	/// them where it asks, and removes it.
-	pub(crate) fn apply_all(world: &mut World) {
-		let roots = world
-			.query::<(Entity, &NumberTables)>()
-			.iter(world)
-			.map(|(entity, number)| (entity, *number))
-			.collect::<Vec<_>>();
-		for (root, number) in roots {
-			let numbered = world
-				.with_state::<TableCells, _>(|cells| cells.numbering(root));
-			for (entity, address) in &numbered.cells {
-				world.entity_mut(*entity).insert(*address);
-			}
-			if number.caption {
-				for (table, address) in numbered.tables {
-					let caption = world
-						.spawn((Element::new("caption"), children![
-							Value::Str(format!("t{address}").into())
-						]))
-						.id();
-					world.entity_mut(table).insert_child(0, caption);
-				}
-			}
-			world.entity_mut(root).remove::<NumberTables>();
-		}
-	}
-}
-
-/// What [`TableCells::numbering`] found under one root.
-struct Numbering {
-	/// Each numbered table with its number, in document order.
-	tables: Vec<(Entity, NonZeroU32)>,
-	/// Each unaddressed cell with its address.
-	cells: Vec<(Entity, TableCellAddress)>,
-}
-
-/// A table cell, `t<table>r<row>c<cell>`, each counted from 1: tables in
-/// document order as they open, nested ones included, rows as the rows of
-/// their table and cells as the cells of their row. `t3r2c1` is the first
-/// cell of the second row of the third table. A document's parser numbers
-/// its cells once, so an edit adding a table renumbers nothing.
-#[derive(
-	Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
-)]
+/// A table cell: its grid, its visual column and its row, each counted from
+/// 1. Spelled `t<table>r<row>c<column>` for a numbered table, ie `t3r2c1`,
+/// and `<sheet>!<A1>` for a named one, ie `Budget!D3`. The column is the one
+/// HTML's table model places the cell in, never its place among the cells
+/// present: a cell spanning two columns before it moves it right by two, and
+/// a `rowspan` from a row above moves it past the slot it holds.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-pub struct TableCellAddress {
-	/// The table, from 1.
-	pub table: NonZeroU32,
-	/// The row within it, from 1.
+pub struct CellAddress {
+	/// The table: its number in the document, or a sheet's tab name.
+	pub grid: CellGrid,
+	/// The visual column, from 1.
+	pub column: NonZeroU32,
+	/// The row, from 1.
 	pub row: NonZeroU32,
-	/// The cell within the row, from 1.
-	pub cell: NonZeroU32,
 }
 
-impl TableCellAddress {
-	/// Parses `t<n>r<n>c<n>`, every number from 1.
-	pub fn parse(text: &str) -> Result<Self> {
-		Self::try_parse(text).ok_or_else(|| {
-			bevyhow!("`{text}` is not a table cell, expected `t<n>r<n>c<n>`")
-		})
-	}
-
-	fn try_parse(text: &str) -> Option<Self> {
-		let rest = text.strip_prefix('t')?;
-		let (table, rest) = rest.split_once('r')?;
-		let (row, cell) = rest.split_once('c')?;
-		Self {
-			table: Self::parse_count(table)?,
-			row: Self::parse_count(row)?,
-			cell: Self::parse_count(cell)?,
-		}
-		.xsome()
-	}
-
-	/// A count from 1 in plain digits, no leading zero.
-	pub(crate) fn parse_count(text: &str) -> Option<NonZeroU32> {
-		(!text.starts_with('0')
-			&& text.chars().all(|char| char.is_ascii_digit()))
-		.then(|| text.parse().ok())
-		.flatten()
-		.and_then(NonZeroU32::new)
-	}
-
-	/// The count of the item at `index` from 0, ie a table's place among the
-	/// tables before it.
-	pub(crate) fn count(index: usize) -> NonZeroU32 {
-		NonZeroU32::MIN.saturating_add(index as u32)
-	}
+/// The table a [`CellAddress`] is in.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
+pub enum CellGrid {
+	/// A table by its number in the document, as [`NumberTables`] counts
+	/// them, a captioned Word or HTML table included.
+	Ordinal(NonZeroU32),
+	/// A grid a format names itself, ie a workbook's sheet by its tab name.
+	Named(SmolStr),
 }
 
-impl core::fmt::Display for TableCellAddress {
-	fn fmt(
-		&self,
-		formatter: &mut core::fmt::Formatter<'_>,
-	) -> core::fmt::Result {
-		write!(formatter, "t{}r{}c{}", self.table, self.row, self.cell)
-	}
-}
+/// The formula a cell computes, as a spreadsheet writes it, without its `=`:
+/// its shown text is the value last computed. An edit replaces it as typing
+/// into the cell would, with a value, or with another formula led by `=`.
+#[derive(Debug, Clone, PartialEq, Eq, Deref, Reflect, Component)]
+#[reflect(Component)]
+pub struct CellFormula(pub SmolStr);
 
 /// One addressed cell as a cells listing prints it: its address and the
 /// text a reader reads in it.
@@ -144,6 +78,166 @@ pub struct CellText {
 	/// The cell's paragraphs, trimmed, the empty dropped and the rest joined
 	/// by ` / `; a formula as `=` and its expression.
 	pub text: SmolStr,
+}
+
+/// The addressed cells of a document, the one way any table's cells are
+/// found, read and locked.
+#[derive(SystemParam)]
+pub struct Cells<'w, 's> {
+	addresses: Query<'w, 's, &'static CellAddress>,
+	formulas: Query<'w, 's, &'static CellFormula>,
+	elements: Query<'w, 's, &'static Element>,
+	views: ElementQuery<'w, 's>,
+	children: Query<'w, 's, &'static Children>,
+	parents: Query<'w, 's, &'static ChildOf>,
+	text: ReaderText<'w, 's>,
+}
+
+impl NumberTables {
+	/// Numbers the tables of every root carrying [`NumberTables`], captioning
+	/// them where it asks, and removes it.
+	pub(crate) fn apply_all(world: &mut World) {
+		let roots = world
+			.query::<(Entity, &NumberTables)>()
+			.iter(world)
+			.map(|(entity, number)| (entity, *number))
+			.collect::<Vec<_>>();
+		for (root, number) in roots {
+			let numbered =
+				world.with_state::<Cells, _>(|cells| cells.numbering(root));
+			for (entity, address) in numbered.cells {
+				world.entity_mut(entity).insert(address);
+			}
+			if number.caption {
+				for (table, number) in numbered.tables {
+					let caption = world
+						.spawn((Element::new("caption"), children![
+							Value::Str(format!("t{number}").into())
+						]))
+						.id();
+					world.entity_mut(table).insert_child(0, caption);
+				}
+			}
+			world.entity_mut(root).remove::<NumberTables>();
+		}
+	}
+}
+
+/// What [`Cells::numbering`] found under one root.
+struct Numbering {
+	/// Each numbered table with its number, in document order.
+	tables: Vec<(Entity, NonZeroU32)>,
+	/// Each cell of a numbered table with its address.
+	cells: Vec<(Entity, CellAddress)>,
+}
+
+impl CellAddress {
+	/// Parses either spelling: `t<n>r<n>c<n>`, every number from 1, or
+	/// `<sheet>!<A1>`, a quoted sheet name, `'Start Here'!D3`, losing its
+	/// quotes.
+	pub fn parse(text: &str) -> Result<Self> {
+		Self::parse_ordinal(text)
+			.or_else(|| Self::parse_named(text))
+			.ok_or_else(|| {
+				bevyhow!(
+					"`{text}` is not a cell, expected `t<n>r<n>c<n>` or `<sheet>!<A1>`"
+				)
+			})
+	}
+
+	fn parse_ordinal(text: &str) -> Option<Self> {
+		let rest = text.strip_prefix('t')?;
+		let (table, rest) = rest.split_once('r')?;
+		let (row, column) = rest.split_once('c')?;
+		Self {
+			grid: CellGrid::Ordinal(Self::parse_count(table)?),
+			column: Self::parse_count(column)?,
+			row: Self::parse_count(row)?,
+		}
+		.xsome()
+	}
+
+	fn parse_named(text: &str) -> Option<Self> {
+		let (sheet, cell) = text.rsplit_once('!')?;
+		let sheet = sheet
+			.strip_prefix('\'')
+			.and_then(|sheet| sheet.strip_suffix('\''))
+			.unwrap_or(sheet);
+		let (column, row) = Self::parse_a1(cell)?;
+		(!sheet.is_empty()).then(|| Self {
+			grid: CellGrid::Named(sheet.into()),
+			column,
+			row,
+		})
+	}
+
+	/// The cell's `A1` reference, ie `D3`.
+	pub fn a1(&self) -> String {
+		format!("{}{}", Self::column_letters(self.column), self.row)
+	}
+
+	/// The letters naming column `column`, `1` being `A` and `27` `AA`.
+	pub fn column_letters(column: NonZeroU32) -> String {
+		let mut letters = Vec::new();
+		let mut rest = column.get();
+		while rest > 0 {
+			letters.push(b'A' + ((rest - 1) % 26) as u8);
+			rest = (rest - 1) / 26;
+		}
+		letters.reverse();
+		String::from_utf8(letters).unwrap_or_default()
+	}
+
+	/// The column and row of an `A1` reference, one to three uppercase
+	/// letters then a row with no leading zero.
+	pub fn parse_a1(a1: &str) -> Option<(NonZeroU32, NonZeroU32)> {
+		let letters = a1
+			.chars()
+			.take_while(|char| char.is_ascii_uppercase())
+			.count();
+		let (column, row) = a1.split_at(letters);
+		if column.is_empty() || column.len() > 3 {
+			return None;
+		}
+		let column = column
+			.bytes()
+			.fold(0, |acc, byte| acc * 26 + (byte - b'A' + 1) as u32)
+			.xmap(NonZeroU32::new)?;
+		Some((column, Self::parse_count(row)?))
+	}
+
+	/// A count from 1 in plain digits, no leading zero.
+	fn parse_count(text: &str) -> Option<NonZeroU32> {
+		(!text.starts_with('0')
+			&& text.chars().all(|char| char.is_ascii_digit()))
+		.then(|| text.parse().ok())
+		.flatten()
+		.and_then(NonZeroU32::new)
+	}
+
+	/// The count of the item at `index` from 0, ie a table's place among the
+	/// tables before it.
+	fn count(index: usize) -> NonZeroU32 {
+		NonZeroU32::MIN.saturating_add(index as u32)
+	}
+}
+
+/// `t3r2c1` for an [`Ordinal`](CellGrid::Ordinal) grid, `Budget!D3` for a
+/// [`Named`](CellGrid::Named) one.
+impl core::fmt::Display for CellAddress {
+	fn fmt(
+		&self,
+		formatter: &mut core::fmt::Formatter<'_>,
+	) -> core::fmt::Result {
+		match &self.grid {
+			CellGrid::Ordinal(table) => {
+				write!(formatter, "t{table}r{}c{}", self.row, self.column)
+			}
+			CellGrid::Named(sheet) => {
+				write!(formatter, "{sheet}!{}", self.a1())
+			}
+		}
+	}
 }
 
 /// The listing's row, `| address | text |`, an empty cell `(empty)` and a
@@ -162,20 +256,10 @@ impl core::fmt::Display for CellText {
 }
 
 impl CellText {
-	/// Every addressed cell under `root` a person may type into, the map an
-	/// edit addresses a document by: its table cells in document order, then
-	/// a workbook's.
+	/// Every addressed cell under `root` a person may type into, in document
+	/// order: the map an edit addresses a document by.
 	pub fn listing(world: &mut World, root: Entity) -> Vec<CellText> {
-		let cells =
-			world.with_state::<TableCells, _>(|cells| cells.listing(root));
-		#[cfg(feature = "ooxml")]
-		let cells = cells
-			.into_iter()
-			.chain(
-				world.with_state::<SheetCells, _>(|cells| cells.listing(root)),
-			)
-			.collect();
-		cells
+		world.with_state::<Cells, _>(|cells| cells.listing(root))
 	}
 
 	/// The cells as a table headed `Cell` and `Text`, an empty cell's text
@@ -215,51 +299,40 @@ impl CellText {
 	}
 }
 
-/// The addressed table cells of a document, and the text a reader reads in
-/// each.
-#[derive(SystemParam)]
-pub struct TableCells<'w, 's> {
-	tables: Query<'w, 's, &'static TableCellAddress>,
-	elements: Query<'w, 's, &'static Element>,
-	views: ElementQuery<'w, 's>,
-	children: Query<'w, 's, &'static Children>,
-	parents: Query<'w, 's, &'static ChildOf>,
-	text: ReaderText<'w, 's>,
-	/// The cells a workbook addresses by sheet, whose tables are no tables
-	/// to number.
-	#[cfg(feature = "ooxml")]
-	sheet_cells: Query<'w, 's, (), With<SheetCellAddress>>,
-}
-
-impl TableCells<'_, '_> {
-	/// Every table cell under `root` in document order, with its address.
-	pub fn table_cells(&self, root: Entity) -> Vec<(TableCellAddress, Entity)> {
+impl Cells<'_, '_> {
+	/// Every addressed cell under `root` in document order, with its address.
+	pub fn cells(&self, root: Entity) -> Vec<(CellAddress, Entity)> {
 		self.children
 			.iter_descendants_depth_first(root)
 			.filter_map(|entity| {
-				self.tables
+				self.addresses
 					.get(entity)
 					.ok()
-					.map(|address| (*address, entity))
+					.map(|address| (address.clone(), entity))
 			})
 			.collect()
 	}
 
-	/// The table cell at `address` under `root`.
-	pub fn table_cell(
-		&self,
-		root: Entity,
-		address: TableCellAddress,
-	) -> Option<Entity> {
-		self.children
-			.iter_descendants_depth_first(root)
-			.find(|entity| self.tables.get(*entity) == Ok(&address))
+	/// The cell at `address` under `root`: the cell carrying it, else the
+	/// cell whose `colspan` and `rowspan` cover that slot, so naming any slot
+	/// of a merged cell answers the merged cell.
+	pub fn cell(&self, root: Entity, address: &CellAddress) -> Option<Entity> {
+		let cells = self.cells(root);
+		cells
+			.iter()
+			.find(|(found, _)| found == address)
+			.or_else(|| {
+				cells
+					.iter()
+					.find(|(found, cell)| self.covers(found, *cell, address))
+			})
+			.map(|(_, cell)| *cell)
 	}
 
-	/// The listing of every table cell under `root` a person may type
+	/// The listing of every addressed cell under `root` a person may type
 	/// into, in document order.
 	pub fn listing(&self, root: Entity) -> Vec<CellText> {
-		self.table_cells(root)
+		self.cells(root)
 			.into_iter()
 			.filter(|(_, cell)| !self.is_locked(*cell))
 			.map(|(address, cell)| CellText {
@@ -267,6 +340,29 @@ impl TableCells<'_, '_> {
 				text: self.cell_text(cell).into(),
 			})
 			.collect()
+	}
+
+	/// What a reader reads in `cell`: a formula as `=` and its expression,
+	/// else its blocks' text, each trimmed, the empty dropped and the rest
+	/// joined by ` / `, and its own text when it holds no block.
+	pub fn cell_text(&self, cell: Entity) -> String {
+		if let Ok(formula) = self.formulas.get(cell) {
+			return format!("={}", formula.0);
+		}
+		let blocks = self.text.blocks(cell);
+		let texts = match blocks.is_empty() {
+			true => vec![self.text.own_text(cell)],
+			false => blocks
+				.into_iter()
+				.map(|block| self.text.text(block))
+				.collect(),
+		};
+		texts
+			.iter()
+			.map(|text| text.split_whitespace().collect::<Vec<_>>().join(" "))
+			.filter(|text| !text.is_empty())
+			.collect::<Vec<_>>()
+			.join(" / ")
 	}
 
 	/// Whether a person may not type into `cell`: the first of it and its
@@ -285,30 +381,35 @@ impl TableCells<'_, '_> {
 			.is_some_and(|editable| !editable)
 	}
 
-	/// What a reader reads in `cell`: its blocks' text, each trimmed, the
-	/// empty dropped and the rest joined by ` / `, and its own text when it
-	/// holds no block.
-	pub fn cell_text(&self, cell: Entity) -> String {
-		let blocks = self.text.blocks(cell);
-		let texts = match blocks.is_empty() {
-			true => vec![self.text.own_text(cell)],
-			false => blocks
-				.into_iter()
-				.map(|block| self.text.text(block))
-				.collect(),
+	/// Whether `cell`, at `found`, spans the slot `address` names.
+	fn covers(
+		&self,
+		found: &CellAddress,
+		cell: Entity,
+		address: &CellAddress,
+	) -> bool {
+		let (columns, rows) = self.span(cell);
+		let within = |start: NonZeroU32, span: u32, at: NonZeroU32| {
+			(start.get()..start.get().saturating_add(span)).contains(&at.get())
 		};
-		texts
-			.iter()
-			.map(|text| text.split_whitespace().collect::<Vec<_>>().join(" "))
-			.filter(|text| !text.is_empty())
-			.collect::<Vec<_>>()
-			.join(" / ")
+		found.grid == address.grid
+			&& within(found.column, columns, address.column)
+			&& within(found.row, rows, address.row)
 	}
 
-	/// The number of every table under `root` outside a `header`, `footer`
-	/// or `aside`, in document order as the tables open, a sheet aside, and
-	/// the address of every cell not yet addressed: rows and cells as their
-	/// table's and row's own, a nested table's left to it.
+	/// The columns and rows `cell` spans, as its `colspan` and `rowspan` say.
+	fn span(&self, cell: Entity) -> (u32, u32) {
+		self.views
+			.get(cell)
+			.map(|view| (view.colspan(), view.rowspan()))
+			.unwrap_or((1, 1))
+	}
+
+	/// The number of every unaddressed table under `root` outside a
+	/// `header`, `footer` or `aside`, in document order as the tables open,
+	/// and the address of each of its cells: rows as their table's own,
+	/// columns as HTML's table model places each cell, a nested table's left
+	/// to it.
 	fn numbering(&self, root: Entity) -> Numbering {
 		let mut tables = Vec::new();
 		self.tables_under(root, &mut tables);
@@ -317,55 +418,63 @@ impl TableCells<'_, '_> {
 			cells: Vec::new(),
 		};
 		for (index, table) in tables.into_iter().enumerate() {
-			let number = TableCellAddress::count(index);
+			let number = CellAddress::count(index);
 			numbering.tables.push((table, number));
-			for (row_index, row) in
-				self.within(table, &["tr"]).into_iter().enumerate()
-			{
-				for (cell_index, cell) in
-					self.within(row, &["td", "th"]).into_iter().enumerate()
-				{
-					if self.tables.contains(cell) {
-						continue;
+			let rows = self.within(table, &["tr"]);
+			// the slots a `rowspan` from a row above still holds, by row
+			let mut held = HashSet::<(usize, u32)>::default();
+			for (row_index, row) in rows.iter().enumerate() {
+				let mut column = 1;
+				for cell in self.within(*row, &["td", "th"]) {
+					while held.contains(&(row_index, column)) {
+						column += 1;
 					}
-					numbering.cells.push((cell, TableCellAddress {
-						table: number,
-						row: TableCellAddress::count(row_index),
-						cell: TableCellAddress::count(cell_index),
+					let (columns, spanned) = self.span(cell);
+					// a span past the table's last row holds nothing
+					let below = (spanned as usize)
+						.min(rows.len() - row_index)
+						.saturating_sub(1);
+					for row_offset in 1..=below {
+						for offset in 0..columns {
+							held.insert((
+								row_index + row_offset,
+								column + offset,
+							));
+						}
+					}
+					numbering.cells.push((cell, CellAddress {
+						grid: CellGrid::Ordinal(number),
+						column: NonZeroU32::MIN.saturating_add(column - 1),
+						row: CellAddress::count(row_index),
 					}));
+					column += columns;
 				}
 			}
 		}
 		numbering
 	}
 
-	/// Every table under `parent` in document order, each before the tables
-	/// nested in it, none under a `header`, `footer` or `aside`, and no
-	/// workbook sheet.
+	/// Every unaddressed table under `parent` in document order, each before
+	/// the tables nested in it, none under a `header`, `footer` or `aside`.
 	fn tables_under(&self, parent: Entity, out: &mut Vec<Entity>) {
 		for child in self.children.get(parent).into_iter().flatten() {
 			match self.tag(*child) {
 				Some("header" | "footer" | "aside") => continue,
-				Some("table") if !self.is_sheet(*child) => out.push(*child),
+				Some("table") if !self.is_addressed(*child) => out.push(*child),
 				_ => {}
 			}
 			self.tables_under(*child, out);
 		}
 	}
 
-	/// Whether `table` is a workbook's sheet, its cells addressed by sheet.
-	fn is_sheet(&self, table: Entity) -> bool {
-		#[cfg(feature = "ooxml")]
-		return self.within(table, &["tr"]).into_iter().any(|row| {
+	/// Whether any cell of `table`, a nested table's aside, carries a
+	/// [`CellAddress`], ie the format addressed it.
+	fn is_addressed(&self, table: Entity) -> bool {
+		self.within(table, &["tr"]).into_iter().any(|row| {
 			self.within(row, &["td", "th"])
 				.into_iter()
-				.any(|cell| self.sheet_cells.contains(cell))
-		});
-		#[cfg(not(feature = "ooxml"))]
-		{
-			let _ = table;
-			false
-		}
+				.any(|cell| self.addresses.contains(cell))
+		})
 	}
 
 	/// The elements tagged `tags` under `parent`, in order, through every
@@ -392,14 +501,62 @@ impl TableCells<'_, '_> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use core::num::NonZeroU32;
+
+	/// The addresses a listing of `scene`'s numbered tables prints, with
+	/// each cell's text.
+	fn listing(scene: impl Bundle) -> Vec<String> {
+		let mut world = ParsePlugin.into_world();
+		let root = world.spawn((NumberTables::default(), scene)).id();
+		world.run_schedule(PostParseTree);
+		world.entity(root).contains::<NumberTables>().xpect_false();
+		CellText::listing(&mut world, root)
+			.iter()
+			.map(ToString::to_string)
+			.collect()
+	}
 
 	#[beet_core::test]
-	fn parses_table_cells() {
-		let cell = TableCellAddress::parse("t3r2c1").unwrap();
-		(cell.table.get(), cell.row.get(), cell.cell.get()).xpect_eq((3, 2, 1));
+	fn parses_both_spellings() {
+		let cell = CellAddress::parse("t3r2c1").unwrap();
+		cell.grid
+			.clone()
+			.xpect_eq(CellGrid::Ordinal(NonZeroU32::new(3).unwrap()));
+		(cell.row.get(), cell.column.get()).xpect_eq((2, 1));
 		cell.to_string().xpect_eq("t3r2c1");
-		for bad in ["t0r1c1", "t1r1", "t01r1c1", "x1r1c1"] {
-			TableCellAddress::parse(bad).xpect_err();
+		let cell = CellAddress::parse("Start Here!D3").unwrap();
+		cell.grid
+			.clone()
+			.xpect_eq(CellGrid::Named("Start Here".into()));
+		(cell.column.get(), cell.row.get()).xpect_eq((4, 3));
+		cell.to_string().xpect_eq("Start Here!D3");
+		CellAddress::parse("'Table 1'!AA10")
+			.unwrap()
+			.to_string()
+			.xpect_eq("Table 1!AA10");
+		// a sheet may be named like a table cell
+		CellAddress::parse("t1r1c1!A1")
+			.unwrap()
+			.grid
+			.xpect_eq(CellGrid::Named("t1r1c1".into()));
+		CellAddress::column_letters(NonZeroU32::new(28).unwrap())
+			.xpect_eq("AB");
+		for bad in [
+			"t0r1c1",
+			"t1r1",
+			"t01r1c1",
+			"x1r1c1",
+			"Sheet!3",
+			"!A1",
+			"Sheet!A01",
+			"A1",
+			"Sheet!a1",
+			"Sheet!ABCD1",
+		] {
+			CellAddress::parse(bad)
+				.unwrap_err()
+				.to_string()
+				.xpect_contains("expected `t<n>r<n>c<n>` or `<sheet>!<A1>`");
 		}
 	}
 
@@ -408,34 +565,82 @@ mod test {
 	/// cell reads as its paragraphs joined.
 	#[beet_core::test]
 	fn numbers_and_reads_cells() {
+		listing(rsx! {
+			<div>
+				<header><table><tr><td>"page"</td></tr></table></header>
+				<table><tbody><tr>
+					<td><p>"Name"</p><p>" "</p><p>"Here"</p></td>
+					<td>
+						<table><tr><td>"inner"</td></tr></table>
+					</td>
+				</tr></tbody></table>
+				<aside><table><tr><td>"note"</td></tr></table></aside>
+				<table><tr><th>"a | b"</th><td/></tr></table>
+			</div>
+		})
+		.xpect_eq(vec![
+			"| t1r1c1 | Name / Here |".to_string(),
+			"| t1r1c2 | (empty) |".into(),
+			"| t2r1c1 | inner |".into(),
+			"| t3r1c1 | a \\| b |".into(),
+			"| t3r1c2 | (empty) |".into(),
+		]);
+	}
+
+	/// A column is the visual column a cell sits in: a `colspan` moves the
+	/// cells after it, and naming any slot it covers answers the spanning
+	/// cell.
+	#[beet_core::test]
+	fn numbers_visual_columns() {
 		let mut world = ParsePlugin.into_world();
 		let root = world
 			.spawn((NumberTables::default(), rsx! {
-				<div>
-					<header><table><tr><td>"page"</td></tr></table></header>
-					<table><tbody><tr>
-						<td><p>"Name"</p><p>" "</p><p>"Here"</p></td>
-						<td>
-							<table><tr><td>"inner"</td></tr></table>
-						</td>
-					</tr></tbody></table>
-					<aside><table><tr><td>"note"</td></tr></table></aside>
-					<table><tr><th>"a | b"</th><td/></tr></table>
-				</div>
+				<div><table>
+					<tr><td colspan="2">"Name"</td><td>"Acme"</td></tr>
+					<tr><td>"a"</td><td>"b"</td><td>"c"</td></tr>
+				</table></div>
 			}))
 			.id();
 		world.run_schedule(PostParseTree);
-		world.entity(root).contains::<NumberTables>().xpect_false();
 		CellText::listing(&mut world, root)
 			.iter()
 			.map(ToString::to_string)
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![
-				"| t1r1c1 | Name / Here |".to_string(),
-				"| t1r1c2 | (empty) |".into(),
-				"| t2r1c1 | inner |".into(),
-				"| t3r1c1 | a \\| b |".into(),
-				"| t3r1c2 | (empty) |".into(),
+				"| t1r1c1 | Name |".to_string(),
+				"| t1r1c3 | Acme |".into(),
+				"| t1r2c1 | a |".into(),
+				"| t1r2c2 | b |".into(),
+				"| t1r2c3 | c |".into(),
 			]);
+		world
+			.with_state::<Cells, _>(|cells| {
+				let cell = cells
+					.cell(root, &CellAddress::parse("t1r1c2").unwrap())
+					.unwrap();
+				cells.cell_text(cell)
+			})
+			.xpect_eq("Name");
+	}
+
+	/// A `rowspan` holds its column in the rows below, shifting their cells
+	/// past it, and an absent, zero or unparseable span is 1.
+	#[beet_core::test]
+	fn rowspans_shift_the_rows_below() {
+		listing(rsx! {
+			<div><table>
+				<tr><td rowspan="2">"tall"</td><td colspan="0">"b"</td><td colspan="x">"c"</td></tr>
+				<tr><td>"d"</td><td>"e"</td></tr>
+				<tr><td>"f"</td></tr>
+			</table></div>
+		})
+		.xpect_eq(vec![
+			"| t1r1c1 | tall |".to_string(),
+			"| t1r1c2 | b |".into(),
+			"| t1r1c3 | c |".into(),
+			"| t1r2c2 | d |".into(),
+			"| t1r2c3 | e |".into(),
+			"| t1r3c1 | f |".into(),
+		]);
 	}
 }

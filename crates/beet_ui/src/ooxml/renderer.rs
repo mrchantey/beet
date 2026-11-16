@@ -1,4 +1,5 @@
 use super::ooxml_query::*;
+use super::workbook::SheetCellStyle;
 use super::writer::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -561,10 +562,7 @@ impl WorkbookWriter {
 	) -> Result<bool> {
 		let cells = world.with_state::<(
 			Query<&Children>,
-			Query<
-				(&SheetCellAddress, Option<&SheetCellStyle>),
-				Without<CoveredBy>,
-			>,
+			Query<(&CellAddress, Option<&SheetCellStyle>)>,
 			Query<&OoxmlNode>,
 			Query<(), With<Value>>,
 		), _>(|(children, cells, nodes, values)| {
@@ -597,8 +595,7 @@ impl WorkbookWriter {
 			if !changed {
 				continue;
 			}
-			if world.with_state::<TableCells, _>(|cells| cells.is_locked(cell))
-			{
+			if world.with_state::<Cells, _>(|cells| cells.is_locked(cell)) {
 				bevybail!(
 					"{address} is locked; only an unlocked cell takes a value"
 				);
@@ -620,7 +617,7 @@ impl WorkbookWriter {
 	fn write(
 		world: &mut World,
 		cell: Entity,
-		address: &SheetCellAddress,
+		address: &CellAddress,
 		style: Option<u32>,
 		value: &str,
 	) {
@@ -1014,8 +1011,6 @@ mod test {
 				"Start Here!B3".into(),
 				"Start Here!C3".into(),
 				"Start Here!D3".into(),
-				"Start Here!E3".into(),
-				"Start Here!F3".into(),
 				"Start Here!G3".into(),
 				"Start Here!H3".into(),
 				"Start Here!A4".into(),
@@ -1071,8 +1066,6 @@ mod test {
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![
 				"| Start Here!D3 | Enter it here |".to_string(),
-				"| Start Here!E3 | Enter it here |".into(),
-				"| Start Here!F3 | Enter it here |".into(),
 				"| Start Here!G3 | (empty) |".into(),
 				"| Start Here!D4 | =1+1 |".into(),
 			]);
@@ -1085,11 +1078,11 @@ mod test {
 				)
 			})
 		};
-		// a covered cell writes its range's first
+		// a merged range lists once, and any slot it covers writes its first
 		let written = set(&mut world, "Start Here!E3", "Acme Stalls").unwrap();
 		world
 			.entity(written)
-			.get::<SheetCellAddress>()
+			.get::<CellAddress>()
 			.unwrap()
 			.to_string()
 			.xpect_eq("Start Here!D3");
@@ -1124,8 +1117,6 @@ mod test {
 		let (mut world, root) = parse(&bytes);
 		cells(&mut world, root).xpect_eq(vec![
 			"Acme Stalls".to_string(),
-			"Acme Stalls".into(),
-			"Acme Stalls".into(),
 			"120.5".into(),
 			"=G3*2".into(),
 		]);

@@ -3,59 +3,20 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A cell an edit addresses: a table cell, or with the `ooxml` feature a
-/// workbook cell.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CellAddress {
-	/// A table cell, `t<table>r<row>c<cell>`.
-	Table(TableCellAddress),
-	/// A workbook cell, `<sheet>!<A1>`.
-	#[cfg(feature = "ooxml")]
-	Sheet(SheetCellAddress),
-}
-
-impl CellAddress {
-	/// Parses either form, a table cell or a workbook cell.
-	pub fn parse(text: &str) -> Result<Self> {
-		if let Ok(address) = TableCellAddress::parse(text) {
-			return Self::Table(address).xok();
-		}
-		#[cfg(feature = "ooxml")]
-		if let Ok(address) = SheetCellAddress::parse(text) {
-			return Self::Sheet(address).xok();
-		}
-		bevybail!(
-			"`{text}` is not a cell, expected `t<n>r<n>c<n>` or `<sheet>!<A1>`"
-		)
-	}
-}
-
-impl core::fmt::Display for CellAddress {
-	fn fmt(
-		&self,
-		formatter: &mut core::fmt::Formatter<'_>,
-	) -> core::fmt::Result {
-		match self {
-			Self::Table(address) => address.fmt(formatter),
-			#[cfg(feature = "ooxml")]
-			Self::Sheet(address) => address.fmt(formatter),
-		}
-	}
-}
-
 /// Edits that may span several nodes of a document's tree: a cell's
 /// paragraphs, a phrase split across runs, a box found by the label beside
 /// it. A form control's own [`Value`] is the form widgets' to edit; these are
 /// for filling a document as a person fills a form, the same edits over a
-/// markdown table, an HTML page or a Word file.
+/// markdown table, an HTML page, a Word file or a workbook.
 ///
 /// Each method is one edit: it plans from what it reads and queues what it
 /// writes, so a caller runs each in its own `world.with_state` and the next
 /// sees its result, ie
 /// `world.with_state::<DocumentTreeEdit, _>(|mut edit| edit.check_labeled_boxes(root, "Surveys"))`.
-/// A cell is addressed by its [`CellAddress`], a checkbox by the label in its
-/// paragraph, a paragraph by a text it carries; matching reads a no-break
-/// space as a space, since a form's placeholders carry them.
+/// A cell is addressed by its [`CellAddress`], any slot of a merged cell
+/// naming it, a checkbox by the label in its paragraph, a paragraph by a text
+/// it carries; matching reads a no-break space as a space, since a form's
+/// placeholders carry them.
 #[derive(SystemParam)]
 pub struct DocumentTreeEdit<'w, 's> {
 	commands: Commands<'w, 's>,
@@ -70,9 +31,7 @@ pub struct DocumentTreeEdit<'w, 's> {
 		),
 	>,
 	parents: Query<'w, 's, &'static ChildOf>,
-	table_cells: TableCells<'w, 's>,
-	#[cfg(feature = "ooxml")]
-	sheet_cells: SheetCells<'w, 's>,
+	cells: Cells<'w, 's>,
 }
 
 impl DocumentTreeEdit<'_, '_> {
@@ -260,17 +219,14 @@ impl DocumentTreeEdit<'_, '_> {
 		replaced.xok()
 	}
 
-	/// The cell at `address` under `root`, refused when absent or locked.
+	/// The cell at `address` under `root`, a merged cell answering for every
+	/// slot it spans, refused when absent or locked.
 	fn cell(&self, root: Entity, address: &CellAddress) -> Result<Entity> {
-		let cell = match address {
-			CellAddress::Table(table) => {
-				self.table_cells.table_cell(root, *table)
-			}
-			#[cfg(feature = "ooxml")]
-			CellAddress::Sheet(sheet) => self.sheet_cells.sheet_cell(root, sheet),
-		}
-		.ok_or_else(|| bevyhow!("the document has no cell {address}"))?;
-		if self.table_cells.is_locked(cell) {
+		let cell = self
+			.cells
+			.cell(root, address)
+			.ok_or_else(|| bevyhow!("the document has no cell {address}"))?;
+		if self.cells.is_locked(cell) {
 			bevybail!(
 				"{address} is locked; only an unlocked cell takes a value"
 			);

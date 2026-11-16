@@ -774,11 +774,7 @@ impl NodeVisitor for MarkdownRenderer {
 				}
 			}
 			"th" | "td" => {
-				let span = view
-					.attribute_string("colspan")
-					.parse::<usize>()
-					.unwrap_or(1)
-					.max(1);
+				let span = view.colspan() as usize;
 				let start = self.state.buffer.len();
 				if let Some(table) = self.tables.last_mut() {
 					table.cell = Some((start, span));

@@ -44,8 +44,10 @@ impl Plugin for ParsePlugin {
 		#[cfg(feature = "bsx")]
 		app.register_type::<FrontmatterType>();
 		// the cell addresses every parsed document's tables carry, numbered
-		// once per document
-		app.register_type::<TableCellAddress>()
+		// once per document unless the format supplies them, and a cell's
+		// formula
+		app.register_type::<CellAddress>()
+			.register_type::<CellFormula>()
 			.add_systems(PostParseTree, number_tables.in_set(TableNumbering));
 		#[cfg(feature = "ooxml")]
 		app.install_type::<crate::prelude::OoxmlPlugin>();

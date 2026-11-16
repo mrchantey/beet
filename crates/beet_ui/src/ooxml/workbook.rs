@@ -15,6 +15,13 @@ pub(crate) struct WorkbookProjection {
 	strings: Vec<String>,
 }
 
+/// The cell format a gap's cell is written with when an edit sets a value
+/// there: its row's when the row carries one, else its column's. A cell the
+/// sheet already holds names its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deref, Reflect, Component)]
+#[reflect(Component)]
+pub(crate) struct SheetCellStyle(pub u32);
+
 /// One sheet as the projection reads it.
 #[derive(Default)]
 struct SheetRead {
@@ -48,6 +55,27 @@ struct CellRead {
 	column: NonZeroU32,
 	style: u32,
 	formula: Option<SmolStr>,
+}
+
+impl SheetRead {
+	/// The columns and rows of the merged range whose first cell is at
+	/// `(column, row)`.
+	fn span(&self, column: u32, row: u32) -> Option<(u32, u32)> {
+		self.merges
+			.iter()
+			.find(|(first, _)| *first == (column, row))
+			.map(|(first, last)| (last.0 - first.0 + 1, last.1 - first.1 + 1))
+	}
+
+	/// Whether a merged range covers `(column, row)` other than as its first
+	/// cell.
+	fn is_covered(&self, column: u32, row: u32) -> bool {
+		self.merges.iter().any(|(first, last)| {
+			(column, row) != *first
+				&& (first.0..=last.0).contains(&column)
+				&& (first.1..=last.1).contains(&row)
+		})
+	}
 }
 
 impl WorkbookProjection {
@@ -159,8 +187,9 @@ impl WorkbookProjection {
 
 	/// Projects one sheet: its data a `<table>` captioned with its tab name,
 	/// its rows `<tr>`s, its cells `<td>`s with their addresses and formulas,
-	/// a locked cell `contenteditable="false"`, a merged range's first cell spanning the rest, and every
-	/// gap before a row's last cell filled by a projection-only `<td>`.
+	/// a locked cell `contenteditable="false"`, a merged range's first cell
+	/// spanning the rest, which take no address and no `<td>`, and every
+	/// other gap before a row's last cell filled by a projection-only `<td>`.
 	fn project(
 		&self,
 		world: &mut World,
@@ -191,21 +220,6 @@ impl WorkbookProjection {
 			)]))
 			.id();
 		world.entity_mut(data).insert_child(0, caption);
-		// each merged cell's range's first, and each first's span
-		let mut masters = HashMap::<(u32, u32), (u32, u32)>::default();
-		let mut spans = HashMap::<(u32, u32), (u32, u32)>::default();
-		for (first, last) in &sheet.merges {
-			spans.insert(*first, (last.0 - first.0 + 1, last.1 - first.1 + 1));
-			for row in first.1..=last.1 {
-				for column in first.0..=last.0 {
-					if (column, row) != *first {
-						masters.insert((column, row), *first);
-					}
-				}
-			}
-		}
-		let mut cells = HashMap::<(u32, u32), Entity>::default();
-		let mut covered = Vec::<(Entity, (u32, u32))>::new();
 		for row in &sheet.rows {
 			Tagged::new("tr").insert(world, row.entity);
 			let present = row
@@ -221,7 +235,11 @@ impl WorkbookProjection {
 				.unwrap_or(0);
 			for offset in 0..last {
 				let column = NonZeroU32::MIN.saturating_add(offset);
-				let key = (column.get(), row.index.get());
+				// a covered cell is no cell: its range's first answers for
+				// it through its spans, its source kept for the writer
+				if sheet.is_covered(column.get(), row.index.get()) {
+					continue;
+				}
 				let (entity, style) = match present.get(&column) {
 					Some(cell) => {
 						if let Some(formula) = &cell.formula {
@@ -241,22 +259,19 @@ impl WorkbookProjection {
 						(gap, style)
 					}
 				};
-				world.entity_mut(entity).insert(SheetCellAddress {
-					sheet: name.clone(),
+				world.entity_mut(entity).insert(CellAddress {
+					grid: CellGrid::Named(name.clone()),
 					column,
 					row: row.index,
 				});
-				cells.insert(key, entity);
-				if let Some(master) = masters.get(&key) {
-					covered.push((entity, *master));
-					continue;
-				}
 				let mut cell = Tagged::new("td");
-				if let Some((columns, rows)) = spans.get(&key) {
-					if *columns > 1 {
+				if let Some((columns, rows)) =
+					sheet.span(column.get(), row.index.get())
+				{
+					if columns > 1 {
 						cell = cell.with("colspan", columns.to_string());
 					}
-					if *rows > 1 {
+					if rows > 1 {
 						cell = cell.with("rowspan", rows.to_string());
 					}
 				}
@@ -264,12 +279,6 @@ impl WorkbookProjection {
 					cell = cell.with("contenteditable", "false");
 				}
 				cell.insert(world, entity);
-			}
-		}
-		// a covered cell shows its range's first, and has no `<td>` of its own
-		for (entity, master) in covered {
-			if let Some(master) = cells.get(&master) {
-				world.entity_mut(entity).insert(CoveredBy(*master));
 			}
 		}
 		Ok(())
@@ -339,7 +348,7 @@ impl WorkbookProjection {
 				.and_then(|value| value.parse::<u32>().ok())
 		};
 		let a1 = |address: &str| {
-			SheetCellAddress::parse_a1(address).ok_or_else(|| {
+			CellAddress::parse_a1(address).ok_or_else(|| {
 				bevyhow!(
 					"sheet `{name}`: `{address}` is not a cell address, whose \
 					column and row count from 1"
@@ -395,7 +404,12 @@ impl WorkbookProjection {
 						a1(corner)
 							.map(|(column, row)| (column.get(), row.get()))
 					};
-					sheet.merges.push((corner(first)?, corner(last)?));
+					let (first, last) = (corner(first)?, corner(last)?);
+					// a range written last corner first is the same range
+					sheet.merges.push((
+						(first.0.min(last.0), first.1.min(last.1)),
+						(first.0.max(last.0), first.1.max(last.1)),
+					));
 				}
 				"row" => {
 					let custom = matches!(
@@ -474,6 +488,25 @@ impl WorkbookProjection {
 				_ => {}
 			}
 		}
+		// a covered cell shows nothing, its range's first answering for it
+		let covered = sheet
+			.rows
+			.iter()
+			.flat_map(|row| {
+				row.cells
+					.iter()
+					.filter(|cell| {
+						sheet.is_covered(cell.column.get(), row.index.get())
+					})
+					.map(|cell| cell.entity)
+			})
+			.collect::<Vec<_>>();
+		for cell in covered {
+			sheet
+				.shown
+				.retain(|(value, _)| tree.parent(*value) != Some(cell));
+			sheet.hidden.extend(Self::texts(tree, cell));
+		}
 		sheet.xok()
 	}
 
@@ -491,12 +524,13 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// The address of every cell a workbook holding `sheet_data` lists, or
-	/// the refusal of its read: an unprotected sheet, every cell listed.
-	fn addresses(sheet_data: &str) -> Result<Vec<String>> {
+	/// The cells a workbook of one unprotected sheet, `Sheet`, lists, every
+	/// cell listed, or the refusal of its read: the sheet holding
+	/// `sheet_data` followed by `after`, ie its merged ranges.
+	fn listing(sheet_data: &str, after: &str) -> Result<Vec<CellText>> {
 		let bytes = OoxmlFile::workbook("<xf/>", &[(
 			"Sheet",
-			&format!("<sheetData>{sheet_data}</sheetData>"),
+			&format!("<sheetData>{sheet_data}</sheetData>{after}"),
 		)])?;
 		let mut world =
 			(TemplatePlugin, DocumentPlugin, ParsePlugin).into_world();
@@ -505,11 +539,38 @@ mod test {
 			&mut world.entity_mut(root),
 			&bytes,
 		))?;
-		CellText::listing(&mut world, root)
+		CellText::listing(&mut world, root).xok()
+	}
+
+	/// The address of every cell [`listing`] lists for `sheet_data`.
+	fn addresses(sheet_data: &str) -> Result<Vec<String>> {
+		listing(sheet_data, "")?
 			.into_iter()
 			.map(|cell| cell.address.to_string())
 			.collect::<Vec<_>>()
 			.xok()
+	}
+
+	/// A merged range is one cell at its first, spanning the rest: a covered
+	/// cell takes no address and shows nothing it holds, a gap it covers is
+	/// no cell, and a range written last corner first is the same range.
+	#[beet_core::test]
+	fn merged_ranges_are_one_cell() {
+		listing(
+			"<row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is><t>first</t></is></c>\
+			 <c r=\"B1\" t=\"inlineStr\"><is><t>stale</t></is></c><c r=\"C1\"/></row>\
+			 <row r=\"2\"><c r=\"C2\"><v>7</v></c></row>",
+			"<mergeCells count=\"1\"><mergeCell ref=\"B2:A1\"/></mergeCells>",
+		)
+		.unwrap()
+		.iter()
+		.map(ToString::to_string)
+		.collect::<Vec<_>>()
+		.xpect_eq(vec![
+			"| Sheet!A1 | first |".to_string(),
+			"| Sheet!C1 | (empty) |".into(),
+			"| Sheet!C2 | 7 |".into(),
+		]);
 	}
 
 	/// A row or cell written without its number follows the one before, and

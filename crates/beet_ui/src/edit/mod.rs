@@ -3,11 +3,10 @@
 //!
 //! [`DocumentTreeEdit`] holds the edits that may span several nodes, each a
 //! method answering what it touched, so the same edits fill a markdown form,
-//! an HTML page or a Word file. A cell is addressed by its
-//! [`TableCellAddress`], or a workbook's by its `SheetCellAddress` with the
-//! `ooxml` feature, a checkbox by the label in its paragraph, a paragraph by
-//! a text it carries; matching reads a no-break space as a space, since a
-//! form's placeholders carry them.
+//! an HTML page, a Word file or a workbook. A cell is addressed by its
+//! [`CellAddress`], `t1r2c3` or `Sheet!A1`, a checkbox by the label in its
+//! paragraph, a paragraph by a text it carries; matching reads a no-break
+//! space as a space, since a form's placeholders carry them.
 //!
 //! | Method | Does |
 //! |---|---|

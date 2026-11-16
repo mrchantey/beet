@@ -99,6 +99,25 @@ impl<'a> ElementView<'a> {
 		}
 	}
 
+	/// The columns a table cell spans, as its `colspan` says: 1 when absent,
+	/// zero or unparseable, and at most 1000, as HTML's table model reads it.
+	pub fn colspan(&self) -> u32 { self.span("colspan", 1000) }
+
+	/// The rows a table cell spans, as its `rowspan` says: 1 when absent,
+	/// zero or unparseable, and at most 65534, as HTML's table model reads
+	/// it.
+	pub fn rowspan(&self) -> u32 { self.span("rowspan", 65534) }
+
+	fn span(&self, key: &str, most: u32) -> u32 {
+		self.attribute_string(key)
+			.trim()
+			.parse::<u32>()
+			.ok()
+			.filter(|span| *span > 0)
+			.unwrap_or(1)
+			.min(most)
+	}
+
 	/// Look up the first attribute matching `key` and return its value.
 	pub fn attribute<'b>(&'b self, key: &str) -> Option<&'b AttributeView<'a>> {
 		self.attributes
