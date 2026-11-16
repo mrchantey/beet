@@ -256,7 +256,7 @@ impl ScheduledJobBlock {
 						"Action": "lambda:InvokeFunction",
 						"Resource": function_arn
 					}))
-					.render()
+					.render()?
 					.into(),
 				..default()
 			},

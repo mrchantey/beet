@@ -787,7 +787,7 @@ impl StalwartBlock {
 			AwsIamRolePolicyDetails {
 				name: Some(policy_ident.primary_identifier().clone()),
 				role: role.field_ref("name").into(),
-				policy: self.runtime_policy(stack, access)?.render().into(),
+				policy: self.runtime_policy(stack, access)?.render()?.into(),
 				..default()
 			},
 		);
@@ -797,6 +797,10 @@ impl StalwartBlock {
 			AwsIamInstanceProfileDetails {
 				name: Some(profile_ident.primary_identifier().clone()),
 				role: Some(role.field_ref("name").into()),
+				// the instance boots through this profile and reads its host
+				// key at once, so a policy that fails to land must fail the
+				// apply before a replacement box exists, not after
+				depends_on: Some(vec![policy.address().into()]),
 				..default()
 			},
 		);
@@ -835,9 +839,9 @@ impl StalwartBlock {
 					self.admin_secret_name(stack)
 				)
 			}))
-			// the host key and certificate its sshd serves, read at first boot
+			// the host key and certificate its sshd serves, read at first
+			// boot, with the decryption every read here needs
 			.read_secrets(stack, &self.ssh_host().host_secrets())
-			.decrypt_secure_strings()
 			.write_action("s3:AbortMultipartUpload")
 			.lower(access)?
 			.statement(json!({
@@ -2594,6 +2598,12 @@ mod tests {
 					)
 				)
 			));
+		// the box boots reading those at once, so its profile waits on the
+		// policy: a policy refused at the apply leaves the running box alone
+		resource(&config, "aws_iam_instance_profile")["depends_on"][0]
+			.as_str()
+			.unwrap()
+			.xpect_starts_with("aws_iam_role_policy.");
 	}
 
 	/// Every statement of the box's runtime policy.

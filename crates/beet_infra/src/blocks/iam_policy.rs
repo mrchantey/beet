@@ -323,10 +323,27 @@ impl IamPolicy {
 	/// rather than an empty one.
 	pub fn is_empty(&self) -> bool { self.statements.is_empty() }
 
-	/// The policy document.
-	pub fn render(&self) -> String {
+	/// The policy document, refusing a `Sid` stated twice: AWS rejects the
+	/// whole document for one (`MalformedPolicyDocument`), and only at the
+	/// apply, after everything not depending on the policy has changed.
+	pub fn render(&self) -> Result<String> {
+		let mut seen = HashSet::<&str>::default();
+		for sid in self
+			.statements
+			.iter()
+			.filter_map(|statement| statement["Sid"].as_str())
+		{
+			if !seen.insert(sid) {
+				bevybail!(
+					"the {} policy states `{sid}` twice, which AWS rejects \
+					as a malformed document",
+					self.compute
+				);
+			}
+		}
 		json!({ "Version": "2012-10-17", "Statement": self.statements })
 			.to_string()
+			.xok()
 	}
 
 	/// The dynamodb actions a read-only table grant lowers to.
@@ -395,7 +412,8 @@ mod tests {
 			)]))
 			.unwrap()
 			.statement(json!({ "Sid": "OwnThing" }))
-			.render();
+			.render()
+			.unwrap();
 		serde_json::from_str::<Value>(&policy).unwrap()["Statement"]
 			.as_array()
 			.unwrap()
@@ -422,6 +440,23 @@ mod tests {
 			.xpect_true();
 	}
 
+	/// A `Sid` stated twice refuses at render rather than at the apply,
+	/// where AWS rejects it only after the rest of the stack has changed.
+	#[beet_core::test]
+	fn refuses_a_sid_stated_twice() {
+		let stack = Stack::new("beetmash")
+			.with_stage("prod")
+			.resolve(&PackageConfig::default())
+			.with_aws_region("us-west-2");
+		IamPolicy::new("us-west-2", "test compute")
+			.read_secrets(&stack, &[SecretRef::new("one")])
+			.decrypt_secure_strings()
+			.render()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("states `SsmSecureStringDecrypt` twice");
+	}
+
 	/// A `Sid` must be unique within an identity policy, so every grant of one
 	/// permission collapses into ONE statement. Rendering a statement per table
 	/// produced two `DeclaredTables` and AWS rejected the whole document
@@ -445,7 +480,8 @@ mod tests {
 				AccessGrant::read_write(S3BucketBlock::ACCESS_KIND, "ops"),
 			]))
 			.unwrap()
-			.render();
+			.render()
+			.unwrap();
 		let statements =
 			serde_json::from_str::<Value>(&policy).unwrap()["Statement"]
 				.as_array()

@@ -471,6 +471,12 @@ impl Project {
 		tofu::remove(&self.dir(), &self.required_vars()?, resource).await
 	}
 
+	/// Mark a resource for replacement by the next apply.
+	pub async fn taint(&self, resource: &str) -> Result<String> {
+		self.init().await?;
+		tofu::taint(&self.dir(), &self.required_vars()?, resource).await
+	}
+
 	/// Run `tofu destroy`, and nothing else.
 	///
 	/// What the old `destroy` swept afterwards, the state object, the native S3

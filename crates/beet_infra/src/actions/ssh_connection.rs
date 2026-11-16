@@ -3,7 +3,6 @@
 //! a mail server ([`StalwartProvision`]), and the same connection serves an
 //! operator's session on a box that is misbehaving.
 use crate::prelude::*;
-use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use ssh_key::PrivateKey;
@@ -38,7 +37,7 @@ pub async fn SshShell(
 	#[param]
 	command: Option<String>,
 	cx: ActionContext<Request>,
-) -> Result<Outcome<Request, Response>> {
+) -> Result<Response> {
 	let backend = terra::Project::resolve_backend(&cx.caller).await?;
 	let (project, store, host) = cx
 		.caller
@@ -57,7 +56,7 @@ pub async fn SshShell(
 		.session(command.as_deref())
 		.await?;
 	match status.success() {
-		true => Pass(cx.input).xok(),
+		true => Response::ok().xok(),
 		false => bevybail!("the ssh session on {name} ended with {status}"),
 	}
 }

@@ -74,6 +74,7 @@ pub fn DeployRoutes(
 		Show,
 		List,
 		Forget,
+		Taint,
 		RollState,
 		Rollback,
 		Rollforward
@@ -224,6 +225,32 @@ pub async fn Forget(
 	report.xok()
 }
 
+/// Mark resources for replacement by the next deploy (`tofu taint`): the
+/// way to rebuild a resource whose declaration has not changed, ie a box
+/// whose first boot failed, so its `user_data` runs again. Writes the state
+/// alone; the next deploy's gate plans the replacement and its apply makes
+/// it, once.
+#[action(route = "taint")]
+#[derive(Component)]
+pub async fn Taint(
+	/// The state addresses to replace, comma separated, spelled as `list`
+	/// prints them.
+	#[param]
+	resources: String,
+	cx: ActionContext<Request>,
+) -> Result<String> {
+	let resources = str_ext::csv(&resources).collect::<Vec<_>>();
+	if resources.is_empty() {
+		bevybail!("`taint` names no resource: pass `--resources=<address>,..`");
+	}
+	let project = terra::Project::resolve(&cx.caller).await?;
+	let mut report = String::new();
+	for resource in resources {
+		report.push_str(&project.taint(resource).await?);
+	}
+	report.xok()
+}
+
 /// Re-encrypt the stack's state under its current passphrase, see
 /// [`terra::Project::roll_state`]: the stack half of rolling
 /// `TF_STATE_PASSPHRASE`, run once per stack after the document holds the
@@ -322,6 +349,7 @@ mod tests {
 		tree.find(&["show"]).xpect_some();
 		tree.find(&["list"]).xpect_some();
 		tree.find(&["forget"]).xpect_some();
+		tree.find(&["taint"]).xpect_some();
 		tree.find(&["roll-state"]).xpect_some();
 		// artifact routes
 		tree.find(&["rollback"]).xpect_some();

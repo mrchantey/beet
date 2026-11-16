@@ -557,6 +557,7 @@ impl FargateBlock {
 		);
 		let policy =
 			IamPolicy::new(region.clone(), "fargate task").lower(access)?;
+		let document = policy.render()?;
 		let policy_ident =
 			stack.resource_ident(self.build_label("task-policy"));
 		let task_policy = (!policy.is_empty()).then(|| {
@@ -565,7 +566,7 @@ impl FargateBlock {
 				AwsIamRolePolicyDetails {
 					name: Some(policy_ident.primary_identifier().clone()),
 					role: task_role.field_ref("name").into(),
-					policy: policy.render().into(),
+					policy: document.into(),
 					..default()
 				},
 			)

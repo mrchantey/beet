@@ -256,6 +256,7 @@ impl LambdaBlock {
 		// grants the function nothing, and no policy resource is emitted at all.
 		let policy =
 			IamPolicy::new(region.clone(), "lambda function").lower(access)?;
+		let document = policy.render()?;
 		let policy_ident =
 			stack.resource_ident(self.build_label("runtime_policy"));
 		let runtime_policy = (!policy.is_empty()).then(|| {
@@ -264,7 +265,7 @@ impl LambdaBlock {
 				AwsIamRolePolicyDetails {
 					name: Some(policy_ident.primary_identifier().clone()),
 					role: lambda_role.field_ref("name").into(),
-					policy: policy.render().into(),
+					policy: document.into(),
 					..default()
 				},
 			)

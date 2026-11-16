@@ -401,6 +401,23 @@ pub async fn remove(
 	.await
 }
 
+/// Mark a resource for replacement by the next apply (`tofu taint`), a
+/// state write and nothing else: the resource itself is untouched until then.
+pub async fn taint(
+	dir: &AbsPath,
+	vars: &[TofuVar],
+	resource: &str,
+) -> Result<String> {
+	with_vars(
+		tofu_process()
+			.with_cwd(dir.clone())
+			.with_args(["taint", resource]),
+		vars,
+	)
+	.run_async_stdout()
+	.await
+}
+
 /// Destroy infrastructure. `vars` carries anything required to read/write
 /// state, eg a [`StateEncryption`] passphrase.
 pub async fn destroy(dir: &AbsPath, vars: &[TofuVar]) -> Result<String> {

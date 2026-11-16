@@ -849,7 +849,14 @@ mod test {
 			.query::<&EnsureSshAuthority>()
 			.single(&world)
 			.xpect_ok();
-		world.query::<&SshShell>().single(&world).xpect_ok();
+		// a verb, so it answers a request where a route mounts it
+		world
+			.query_filtered::<(), (
+				With<SshShell>,
+				With<beet_action::prelude::Action<Request, Response>>,
+			)>()
+			.single(&world)
+			.xpect_ok();
 		world
 			.query::<&MailProbe>()
 			.single(&world)

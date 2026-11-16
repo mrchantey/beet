@@ -301,7 +301,6 @@ impl LightsailBlock {
 			}))
 			.read_secrets(stack, secrets)
 			.render()
-			.xok()
 	}
 
 	/// The port the application server listens on: the block's explicit
