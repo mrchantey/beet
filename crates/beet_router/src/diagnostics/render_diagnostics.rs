@@ -51,6 +51,9 @@ pub enum DiagnosticKind {
 	/// A derived file the document declares whose sources changed or whose ttl
 	/// ran out: it still serves, but no longer says what its sources do.
 	StaleDerivedFile,
+	/// A content file a [`RoutesDir`] discovered but could not serve, ie its
+	/// frontmatter names a field its component lacks.
+	FailedRoute,
 }
 
 /// Configures the [`DiagnosticSeverity`] of each check `beet check` runs,
@@ -63,7 +66,8 @@ pub enum DiagnosticKind {
 /// a [`Warn`](DiagnosticSeverity::Warn) (a one-off marker class with no rule is sometimes
 /// intentional; classes carry no rule-existence guarantee even in Rust). A
 /// missing derived file is an error, since the site serves without it, and a
-/// stale one a warning, since it still serves.
+/// stale one a warning, since it still serves. A discovered file that could not
+/// be served is an error, since the site serves without it too.
 #[derive(Debug, Clone, Resource, Reflect)]
 #[reflect(Resource, Default)]
 pub struct RenderDiagnostics {
@@ -77,6 +81,8 @@ pub struct RenderDiagnostics {
 	pub missing_derived_file: DiagnosticSeverity,
 	/// A declared derived file that is stale. Default [`Warn`](DiagnosticSeverity::Warn).
 	pub stale_derived_file: DiagnosticSeverity,
+	/// A discovered file that could not be served. Default [`Error`](DiagnosticSeverity::Error).
+	pub failed_route: DiagnosticSeverity,
 }
 
 impl Default for RenderDiagnostics {
@@ -87,6 +93,7 @@ impl Default for RenderDiagnostics {
 			unknown_class: DiagnosticSeverity::Warn,
 			missing_derived_file: DiagnosticSeverity::Error,
 			stale_derived_file: DiagnosticSeverity::Warn,
+			failed_route: DiagnosticSeverity::Error,
 		}
 	}
 }
@@ -100,6 +107,7 @@ impl RenderDiagnostics {
 			DiagnosticKind::UnknownClass => self.unknown_class,
 			DiagnosticKind::MissingDerivedFile => self.missing_derived_file,
 			DiagnosticKind::StaleDerivedFile => self.stale_derived_file,
+			DiagnosticKind::FailedRoute => self.failed_route,
 		}
 	}
 }

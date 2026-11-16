@@ -183,7 +183,7 @@ impl RoutesDir {
 							// every valid route still spawns, so one bad slug does
 							// not take the site down with it; the failures are
 							// reported together once the guard has resolved.
-							let mut failures = Vec::new();
+							let mut failed = FailedRoutes::default();
 							let mut spawned = Vec::new();
 							for spec in specs {
 								let path = spec.store_path.clone();
@@ -191,11 +191,14 @@ impl RoutesDir {
 									world, entity, spec,
 								) {
 									Ok(route) => spawned.push(route),
-									Err(err) => failures
-										.push(format!("`{path}`: {err}")),
+									Err(err) => failed.set(path, err),
 								}
 							}
 							Self::swap_routes(world, entity, &spawned);
+							// recorded for `beet check`, which reports each as an
+							// error rather than only the broken links it leaves
+							let failures = failed.lines();
+							world.entity_mut(entity).insert(failed);
 							world.flush();
 							// routes are spawned: resolve, draining the root's set so
 							// the deferred `Ready` fires.
@@ -317,7 +320,9 @@ impl RoutesDir {
 			route
 				.world()
 				.with(move |world| -> Result {
+					let path = spec.store_path.clone();
 					let outcome = Self::apply_refresh(world, entity, spec);
+					FailedRoutes::record(world, entity, path, &outcome);
 					world.flush();
 					guard.resolve(world);
 					outcome
@@ -425,7 +430,7 @@ impl RoutesDir {
 	}
 
 	/// Whether `path`'s extension marks it as a servable content file.
-	fn is_content(path: &RelPath) -> bool {
+	pub(crate) fn is_content(path: &RelPath) -> bool {
 		path.extension()
 			.is_some_and(|ext| CONTENT_EXTENSIONS.contains(&ext))
 	}
@@ -488,6 +493,63 @@ impl RoutesDir {
 		frontmatter_type: &str,
 	) -> Result<RootDeclarations> {
 		parsers.declarations(&store.get_media(path).await?, frontmatter_type)
+	}
+}
+
+/// The discovered files a [`RoutesDir`] could not serve, on the dir: each
+/// store path and why, ie a frontmatter key its component lacks.
+///
+/// Replaced by every scan and kept current by each file's refresh, so
+/// [`CheckReport`] reports a file that failed as an error of its own rather
+/// than only through the broken links its missing route leaves.
+#[derive(Debug, Default, Clone, Component)]
+pub struct FailedRoutes(Vec<(RelPath, String)>);
+
+impl FailedRoutes {
+	/// Each failed file and why, in scan order.
+	pub fn iter(&self) -> impl Iterator<Item = (&RelPath, &str)> {
+		self.0.iter().map(|(path, reason)| (path, reason.as_str()))
+	}
+
+	/// Record `path` as failed for `err`, replacing an earlier failure.
+	fn set(&mut self, path: RelPath, err: impl core::fmt::Display) {
+		self.clear(&path);
+		self.0.push((path, err.to_string()));
+	}
+
+	fn clear(&mut self, path: &RelPath) {
+		self.0.retain(|(failed, _)| failed != path);
+	}
+
+	/// One `` `path`: reason `` line per failure, for the console report.
+	fn lines(&self) -> Vec<String> {
+		self.iter()
+			.map(|(path, reason)| format!("`{path}`: {reason}"))
+			.collect()
+	}
+
+	/// Record a refresh's `outcome` for `path` on the dir owning `route`, a
+	/// route with no dir (a codegen blob route) recording nothing.
+	fn record(
+		world: &mut World,
+		route: Entity,
+		path: RelPath,
+		outcome: &Result,
+	) {
+		let Some(dir) = world
+			.get::<ChildOf>(route)
+			.map(ChildOf::parent)
+			.filter(|dir| world.entity(*dir).contains::<RoutesDir>())
+		else {
+			return;
+		};
+		let mut dir = world.entity_mut(dir);
+		let mut failed = dir.take::<FailedRoutes>().unwrap_or_default();
+		match outcome {
+			Ok(()) => failed.clear(&path),
+			Err(err) => failed.set(path, err),
+		}
+		dir.insert(failed);
 	}
 }
 
@@ -1115,6 +1177,31 @@ mod test {
 		tree.find(&["good"]).is_some().xpect_true();
 		tree.find(&["bad_meta"]).is_none().xpect_true();
 		tree.find(&["bad_markup"]).is_none().xpect_true();
+		// the dir records both, and `beet check` reports each as an error of
+		// its own rather than only through links to the missing pages
+		let dir = world.entity(root).get::<Children>().unwrap()[0];
+		world
+			.entity(dir)
+			.get::<FailedRoutes>()
+			.unwrap()
+			.iter()
+			.map(|(path, _)| path.to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["bad_markup.bsx".to_string(), "bad_meta.md".into()]);
+		world
+			.run_async_then(async move |world| {
+				CheckReport::check_routes(&world, root).await
+			})
+			.await
+			.unwrap()
+			.diagnostics
+			.iter()
+			.filter(|diagnostic| {
+				diagnostic.kind == DiagnosticKind::FailedRoute
+					&& diagnostic.is_error()
+			})
+			.count()
+			.xpect_eq(2);
 	}
 
 	/// Frontmatter is scanned from file content through the store, so it is store

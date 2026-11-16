@@ -31,11 +31,9 @@ impl Plugin for ParsePlugin {
 		// every tick).
 		app.init_schedule(PostParseTree);
 		// the built-in document formats; OoxmlPlugin adds the office formats
-		app.install(PlainTextParser::default());
-		#[cfg(feature = "bsx")]
-		app.install(BsxParser);
-		#[cfg(feature = "markdown_parser")]
-		app.install(MarkdownParser::new());
+		app.world_mut()
+			.get_resource_or_init::<DocParsers>()
+			.register_builtins();
 		// the default BSX event vocabulary (the `click` script installer), so
 		// every `bx:click="..."` resolves through the core seam.
 		#[cfg(feature = "bsx")]

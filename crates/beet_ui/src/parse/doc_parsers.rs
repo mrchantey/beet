@@ -75,6 +75,18 @@ impl DocParsers {
 			.register(parser);
 	}
 
+	/// Register the built-in parsers: plain text, and with their features
+	/// BSX, HTML and XML (`bsx`) and markdown (`markdown_parser`), as
+	/// [`ParsePlugin`] does, for a caller with no app, ie a codegen scan.
+	pub fn register_builtins(&mut self) -> &mut Self {
+		self.register(PlainTextParser::default());
+		#[cfg(feature = "bsx")]
+		self.register(BsxParser);
+		#[cfg(feature = "markdown_parser")]
+		self.register(MarkdownParser::new());
+		self
+	}
+
 	/// Every media type a registered parser reads, in registration order.
 	pub fn available(&self) -> Vec<MediaType> {
 		let mut available = Vec::new();

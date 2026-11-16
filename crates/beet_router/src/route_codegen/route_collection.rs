@@ -112,9 +112,12 @@ impl RouteCollection {
 		let store = self.store();
 		let mut paths = store.list().await?;
 		paths.sort();
-		// codegen has no world, so the one type it reads out of a document's
-		// declarations (a `slug` renaming the emitted route) registers here; the
-		// rest resolve against the app registry when the emitted route spawns.
+		// codegen has no world, so the parsers its declaration scan reads
+		// through and the one type it reads out of those declarations (a `slug`
+		// renaming the emitted route) are built here; the rest resolve against
+		// the app registry when the emitted route spawns.
+		let mut parsers = DocParsers::default();
+		parsers.register_builtins();
 		let mut registry = TypeRegistry::default();
 		registry.register::<RouteMeta>();
 		let frontmatter_type = FrontmatterType::default();
@@ -146,24 +149,14 @@ impl RouteCollection {
 						},
 					});
 				}
-				"md" | "mdx" | "markdown" | "html" => {
+				_ if RoutesDir::is_content(&store_path) => {
 					// a content file's root declarations are read at scan time so
 					// the emitted route hoists them eagerly (sidebar labels,
-					// drafts), exactly as `RoutesDir` discovery does
-					let mut declarations = match ext {
-						"html" => RootDeclarations::default(),
-						_ => {
-							let bytes = store.get(&store_path).await?;
-							let src = String::from_utf8(bytes.to_vec())?;
-							Frontmatter::extract(&src)?
-								.map(|frontmatter| {
-									frontmatter.declarations(
-										&frontmatter_type.component,
-									)
-								})
-								.unwrap_or_default()
-						}
-					};
+					// drafts), through the same parsers `RoutesDir` discovery reads
+					let mut declarations = parsers.declarations(
+						&store.get_media(&store_path).await?,
+						&frontmatter_type.component,
+					)?;
 					RouteMeta::declare_file_defaults(
 						&mut declarations,
 						&store_path,

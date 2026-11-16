@@ -132,8 +132,9 @@ impl CheckReport {
 		routes: Option<HashSet<Entity>>,
 	) -> Result<CheckReport> {
 		// the static GET routes worth checking, plus the route tree + config snapshot
-		// every per-route scan validates against, and the document's own inert tags.
-		let (route_entities, route_tree, config, unregistered) = world
+		// every per-route scan validates against, the document's own inert tags
+		// and the discovered files that failed to become routes.
+		let (route_entities, route_tree, config, unserved) = world
 			.with(move |world: &mut World| -> Result<_> {
 				let route_tree = RouteTree::of(world, root)?.clone();
 				let config = world
@@ -151,13 +152,14 @@ impl CheckReport {
 					})
 					.map(|node| (node.entity, node.path.annotated_path()))
 					.collect::<Vec<_>>();
-				let unregistered = unregistered_tags(world, root, &config);
-				Ok((route_entities, Arc::new(route_tree), config, unregistered))
+				let mut unserved = unregistered_tags(world, root, &config);
+				unserved.extend(failed_routes(world, root, &config));
+				Ok((route_entities, Arc::new(route_tree), config, unserved))
 			})
 			.await?;
 
 		let mut report = CheckReport::default();
-		report.diagnostics.extend(unregistered);
+		report.diagnostics.extend(unserved);
 		for (entity, path) in route_entities {
 			let diagnostics = check_route(
 				world,
@@ -205,6 +207,37 @@ fn unregistered_tags(
 				.iter_descendants_inclusive(root)
 				.filter_map(|entity| tags.get(entity).ok())
 				.map(|tag| Diagnostic::unregistered_tag(tag, severity))
+				.collect()
+		},
+	)
+}
+
+/// Every file a [`RoutesDir`] in `root`'s subtree failed to serve
+/// ([`FailedRoutes`]), as a [`FailedRoute`](DiagnosticKind::FailedRoute)
+/// diagnostic: the page is simply absent, so without this it surfaces only as
+/// the broken links pointing at it.
+fn failed_routes(
+	world: &mut World,
+	root: Entity,
+	config: &RenderDiagnostics,
+) -> Vec<Diagnostic> {
+	let severity = config.severity(DiagnosticKind::FailedRoute);
+	if severity == DiagnosticSeverity::Off {
+		return Vec::new();
+	}
+	world.with_state::<(Query<&FailedRoutes>, Query<&Children>), _>(
+		|(failed, children)| {
+			children
+				.iter_descendants_inclusive(root)
+				.filter_map(|entity| failed.get(entity).ok())
+				.flat_map(|failed| failed.iter())
+				.map(|(path, reason)| {
+					Diagnostic::new(
+						DiagnosticKind::FailedRoute,
+						severity,
+						format!("`{path}` could not be served: {reason}"),
+					)
+				})
 				.collect()
 		},
 	)
