@@ -108,7 +108,6 @@ mod secret_record;
 mod secret_ref;
 mod secret_roll;
 mod secret_store;
-#[cfg(feature = "vault")]
 mod secrets;
 #[cfg(feature = "vault")]
 mod secrets_document;
@@ -122,7 +121,6 @@ pub use secret_record::*;
 pub use secret_ref::*;
 pub use secret_roll::*;
 pub use secret_store::*;
-#[cfg(feature = "vault")]
 pub use secrets::*;
 #[cfg(feature = "vault")]
 pub use secrets_document::*;

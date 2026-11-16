@@ -19,7 +19,7 @@ pub struct DocumentSecrets {
 impl Default for DocumentSecrets {
 	fn default() -> Self {
 		Self {
-			path: RelPath::new(SecretsDocument::DEFAULT_PATH),
+			path: RelPath::new(Secrets::DEFAULT_PATH),
 		}
 	}
 }

@@ -78,64 +78,64 @@ beet *args:
 # still loads whole, with the deploy tags inert and `all` excluded, naming the
 # features it needs.
 beet-deploy *args:
-  cargo run -p beet-cli --features infra,extra,atproto -- --entry=site all/deploy {{ args }}
+  cargo run -p beet-cli --features infra,extra,atproto -- --entry=site all/deploy "$@"
 # The site entry's STAGE stack alone, the Lightsail box and its stores:
 # `just site-stage deploy|plan|destroy|.. [--stage=prod]`, for targeted work.
 site-stage *args:
-  cargo run -p beet-cli --features infra,extra -- --entry=site site {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site site "$@"
 # Re-publish the site to S3 without a redeploy (site assets: `site-shared push`).
 beet-sync *args:
-  cargo run -p beet-cli --features infra,extra -- --entry=site site/sync {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site site/sync "$@"
 # A shell on the deployed box's management sshd, or one command with
 # `--command=..`, logged in through the stack's ssh authority.
 beet-ssh *args:
-  cargo run -p beet-cli --features infra,extra -- --entry=site site/ssh {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site site/ssh "$@"
 # Tail the deployed instance's logs.
 beet-watch *args:
-  cargo run -p beet-cli --features infra,extra -- --entry=site site/watch {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site site/watch "$@"
 # Refresh the files site/assets borrows from the workspace tree (the geoip
 # database, the robot faces), and regenerate any of the site's derived files
 # that is stale or missing. Every publish does the same into its assembled copy.
 beet-assets *args:
-  cargo run -p beet-cli --features infra,extra -- --entry=site site/assets {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site site/assets "$@"
 # Tear the deployed stage stack down (pass --stage=prod for the prod stack).
 # Stage only: the `shared` stage (the assets bucket) has its own verbs under
 # `site-shared`, and the package deploy lists no `destroy`.
 beet-destroy *args:
-  cargo run -p beet-cli --features infra,extra -- --entry=site site/destroy --force {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site site/destroy --force "$@"
 # Resolve the stage stack's deploy config without touching cloud (safe
 # pre-apply check).
 beet-validate *args:
-  cargo run -p beet-cli --features infra,extra -- --entry=site site/validate {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site site/validate "$@"
 # Show the stage stack's tofu plan without applying (eyeball before deploy).
 beet-plan *args:
-  cargo run -p beet-cli --features infra,extra -- --entry=site site/plan {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site site/plan "$@"
 # Re-encrypt the stage stack's state under the current `TF_STATE_PASSPHRASE`
 # (the record's roll note has the surrounding steps); the shared and social
 # stacks take the same verb as args: `just site-shared roll-state`.
 beet-roll-state *args:
-  cargo run -p beet-cli --features infra,extra -- --entry=site site/roll-state {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site site/roll-state "$@"
 # The WORKSPACE assets bucket (`beet--shared--assets`), the source of record for
 # ./assets: `just beet-shared plan|apply|pull|push|..`. Rooted at the workspace
 # entry, since these assets belong to the repo rather than to the website.
 beet-shared *args:
-  cargo run -p beet-cli --features infra,extra -- shared {{ args }}
+  cargo run -p beet-cli --features infra,extra -- shared "$@"
 # The SITE assets bucket (`beet-site--shared--assets`), the source of record for
 # ./site/assets: `just site-shared plan|apply|pull|push|mirror|..` (`mirror` is a
 # push that also prunes what `site/assets` no longer holds).
 site-shared *args:
-  cargo run -p beet-cli --features infra,extra -- --entry=site shared {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site shared "$@"
 # The atproto handles under beet.org (the site entry's `social` stack):
 # `just site-social plan|deploy|probe|destroy --stage=prod`. Prod only: the
 # block's `dns_stage` publishes nothing from any other stage. `atproto` with
 # `infra` links the block.
 site-social *args:
-  cargo run -p beet-cli --features infra,extra,atproto -- --entry=site social {{ args }}
+  cargo run -p beet-cli --features infra,extra,atproto -- --entry=site social "$@"
 # Diff the beet.org zone against every stack the site entry declares, reporting
 # the strays; `--fix` deletes them. Built with `atproto` so the handle records
 # are declarations rather than strays.
 site-audit *args:
-  cargo run -p beet-cli --features infra,extra,atproto -- --entry=site audit {{ args }}
+  cargo run -p beet-cli --features infra,extra,atproto -- --entry=site audit "$@"
 # There is no mint recipe: the deploy credentials (`<AwsDeployCredential/>`,
 # `<CloudflareDeployCredential/>`) are kept in line with the declarations by an
 # elevated deploy. Any deploy recipe above takes `--elevated`, which asks for the

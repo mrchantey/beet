@@ -2,7 +2,9 @@
 //! file.
 
 use crate::prelude::*;
+#[cfg(feature = "vault")]
 use std::path::Path;
+#[cfg(feature = "vault")]
 use std::path::PathBuf;
 
 /// A secrets document an entry declares, `<Secrets path="secrets.toml"/>`:
@@ -48,7 +50,7 @@ impl Default for Secrets {
 	fn default() -> Self {
 		Self {
 			label: Self::DEFAULT_LABEL.into(),
-			path: SmolPath::new(SecretsDocument::DEFAULT_PATH),
+			path: SmolPath::new(Self::DEFAULT_PATH),
 		}
 	}
 }
@@ -56,8 +58,8 @@ impl Default for Secrets {
 impl Secrets {
 	/// The label an undeclared or lone document answers to.
 	pub const DEFAULT_LABEL: &'static str = "secrets";
-	/// The formats a conventional document may be written in, by extension.
-	const EXTENSIONS: &'static [&'static str] = &["toml", "json", "ron"];
+	/// The file a document lives in by convention, beside an entry.
+	pub const DEFAULT_PATH: &'static str = "secrets.toml";
 
 	/// The document at `path`, labelled by default.
 	pub fn new(path: impl AsRef<str>) -> Self {
@@ -72,6 +74,13 @@ impl Secrets {
 		self.label = label.into();
 		self
 	}
+}
+
+/// The document itself, only in a build that can open one.
+#[cfg(feature = "vault")]
+impl Secrets {
+	/// The formats a conventional document may be written in, by extension.
+	const EXTENSIONS: &'static [&'static str] = &["toml", "json", "ron"];
 
 	/// The document's format, from its path.
 	pub fn media_type(&self) -> Result<MediaType> {
@@ -168,6 +177,7 @@ impl Secrets {
 }
 
 /// Group names for a message, `none` when empty.
+#[cfg(feature = "vault")]
 fn list(names: &[SmolStr]) -> String {
 	match names.is_empty() {
 		true => "none".to_string(),
@@ -175,7 +185,7 @@ fn list(names: &[SmolStr]) -> String {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "vault"))]
 mod test {
 	use crate::prelude::*;
 

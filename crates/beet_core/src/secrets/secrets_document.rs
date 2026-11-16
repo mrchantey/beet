@@ -137,8 +137,6 @@ impl Default for SecretsDocument {
 }
 
 impl SecretsDocument {
-	/// The file a document lives in by convention, beside an entry.
-	pub const DEFAULT_PATH: &'static str = "secrets.toml";
 	/// The conventional file's stem, so the test runner finds
 	/// `secrets.<format>` from any crate's directory.
 	pub const FILE_STEM: &'static str = "secrets";
@@ -173,7 +171,7 @@ impl SecretsDocument {
 			_ => bevybail!(
 				"`{path}` is not a secrets document: its extension names the \
 				format, `toml`, `json` or `ron`, ie `{}`",
-				Self::DEFAULT_PATH
+				Secrets::DEFAULT_PATH
 			),
 		}
 	}

@@ -1334,9 +1334,11 @@ impl LightsailBlock {
 			key_pair_name: Some(keypair.field_ref("name").into()),
 			user_data: Some(user_data),
 			// the group and the secrets outlive the box on teardown, and
-			// exist before it boots, see above
+			// exist before it boots, see above; so does the policy granting
+			// its host key, so a refused policy fails the apply before a
+			// replacement box exists
 			depends_on: Some(
-				[log_group.address()]
+				[log_group.address(), policy.address()]
 					.into_iter()
 					.chain(
 						secrets
@@ -1774,6 +1776,11 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_eq(&format!("aws_cloudwatch_log_group.{logs_label}"));
+		config["resource"]["aws_lightsail_instance"][&instance_label]
+			["depends_on"][1]
+			.as_str()
+			.unwrap()
+			.xpect_starts_with("aws_iam_user_policy.");
 	}
 
 	/// The stack's log group owns retention; the box's CloudWatch agent only
