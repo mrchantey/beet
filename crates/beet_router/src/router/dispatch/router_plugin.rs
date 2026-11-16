@@ -157,6 +157,8 @@ impl Plugin for RouterPlugin {
 				// (`<RoutesDir/>`, a `Layout` spread) and the by-name
 				// route-aware head/sidebar widgets.
 				.register_type::<Layout>()
+				// the declared icon set `RouteHead` links, deriving its own files
+				.register_type::<IconSet>()
 				.install(ColorSchemeParams::declare_on::<Layout>())
 				.install_type::<(
 					RouteHead,

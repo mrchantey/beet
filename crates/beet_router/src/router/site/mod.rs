@@ -12,6 +12,9 @@ mod app_shell;
 mod article_header;
 #[cfg(feature = "std")]
 mod help;
+// `<IconSet/>`: the icons a browser and a PWA ask for, derived from one image
+#[cfg(feature = "std")]
+mod icon_set;
 #[cfg(feature = "std")]
 mod layout;
 #[cfg(feature = "std")]
@@ -42,6 +45,8 @@ pub use app_shell::*;
 pub use article_header::*;
 #[cfg(feature = "std")]
 pub use help::*;
+#[cfg(feature = "std")]
+pub use icon_set::*;
 #[cfg(feature = "std")]
 pub use layout::*;
 #[cfg(feature = "std")]

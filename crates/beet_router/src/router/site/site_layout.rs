@@ -36,9 +36,9 @@ use beet_ui::prelude::Reset;
 ///
 /// Slots, each defaulting to the standard chrome:
 /// - `head`: EXTRA head content appended to the always-emitted chrome inside
-///   [`RouteHead`] (eg a page-view beacon, or the site's icon links: the
-///   layout links no icon of its own, since it cannot know the site has one),
-///   so a site adds to the head without losing the chrome.
+///   [`RouteHead`] (eg a page-view beacon or a font), so a site adds to the
+///   head without losing the chrome. The site's icons are not slot content:
+///   [`RouteHead`] links the [`IconSet`] the entry declares.
 /// - `header`: defaults to the library [`Header`] with a [`MenuButton`], the
 ///   `nav` slot's links, then a [`RepositoryLink`] when the package names a
 ///   repository. The shell links nothing of its own, since it cannot know the
@@ -272,6 +272,20 @@ mod test {
 		render(request("", MediaType::Html))
 			.xnot()
 			.xpect_contains("CLIENT_IO_PATH");
+	}
+
+	/// The head links the declared icon set, and no icon without one.
+	#[beet_core::test]
+	fn head_links_the_declared_icon_set() {
+		render(request("", MediaType::Html))
+			.xnot()
+			.xpect_contains("rel=\"icon\"");
+		let mut world = layout_world(request("", MediaType::Html));
+		world.spawn(IconSet::new("assets/branding/logo.png"));
+		render_world(&mut world)
+			.xpect_contains("href=\"/assets/branding/favicon.ico\"")
+			.xpect_contains("href=\"/assets/branding/icon-180.png\"")
+			.xpect_contains("href=\"/assets/branding/site.webmanifest\"");
 	}
 
 	/// The shell links nothing of its own: a site's `nav` content lands in the

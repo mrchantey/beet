@@ -50,6 +50,13 @@ use beet_core::prelude::*;
 /// # Ok(()) }
 /// ```
 ///
+/// A producer whose answer is binary (an image, an archive) writes those files
+/// beside its document through [`DerivationOutputs::write`] and answers the
+/// listing in the body. The document is then the set's manifest: a listed file
+/// deleted or altered is stale like a changed source, and a file an earlier
+/// generation listed but this one does not is removed, so a renamed output
+/// leaves no orphan behind.
+///
 /// A derivation is declared by whatever owns its file, beside that file's
 /// producing action, and ensured by a step gathering every one a document
 /// declares, so nothing regenerates until something asks.
@@ -65,6 +72,9 @@ pub struct Derivation {
 	/// How long a regeneration holds for an input nothing local can hash,
 	/// stamped onto the [`Provenance`] it writes.
 	pub ttl: Option<Duration>,
+	/// The file sources the declaration itself names, so a file computed from
+	/// another (a declaration edited to a new source) is stale.
+	pub inputs: Vec<RelPath>,
 }
 
 impl Derivation {
@@ -73,7 +83,14 @@ impl Derivation {
 		Self {
 			path: path.into(),
 			ttl: None,
+			inputs: Vec::new(),
 		}
+	}
+
+	/// This derivation declaring `input` as a file source it reads.
+	pub fn with_input(mut self, input: impl Into<RelPath>) -> Self {
+		self.inputs.push(input.into());
+		self
 	}
 
 	/// This derivation expiring `ttl` after each regeneration.
@@ -172,26 +189,39 @@ impl Derivation {
 		}
 		let bytes = store.get(&self.path).await?;
 		// a file that is no derived document is regenerated, never trusted
-		let provenance = match self
+		let (provenance, outputs) = match self
 			.media_type()?
 			.deserialize::<EntityBody>(&bytes)
-			.and_then(|body| body.get::<Provenance>())
-		{
-			Ok(provenance) => provenance,
+			.and_then(|body| {
+				(body.get::<Provenance>()?, DerivationOutputs::of(&body)?).xok()
+			}) {
+			Ok(read) => read,
 			Err(error) => return Freshness::Invalid(error.to_string()).xok(),
 		};
 		if provenance.expired(Timestamp::now()) {
 			return Freshness::Expired.xok();
 		}
-		match digests.first_changed(&provenance.sources).await? {
-			Some(source) => Freshness::Changed(source),
-			None => Freshness::Fresh,
+		if let Some(input) = self.inputs.iter().find(|input| {
+			!provenance.sources.iter().any(|source| {
+				matches!(source, ProvenanceSource::File { path, .. } if path == *input)
+			})
+		}) {
+			return Freshness::Redeclared(input.clone()).xok();
 		}
-		.xok()
+		if let Some(source) = digests.first_changed(&provenance.sources).await?
+		{
+			return Freshness::Changed(source).xok();
+		}
+		outputs
+			.first_stale(store)
+			.await?
+			.unwrap_or(Freshness::Fresh)
+			.xok()
 	}
 
 	/// Run the producing action and write the document it answers, stamped
-	/// with the time and this declaration's ttl.
+	/// with the time and this declaration's ttl, removing every output the
+	/// document it replaces listed and this one does not.
 	async fn regenerate(
 		&self,
 		entity: AsyncEntity,
@@ -211,6 +241,15 @@ impl Derivation {
 				entity.id()
 			);
 		}
+		// a previous document that no longer reads lists nothing to remove
+		let superseded = self
+			.read(store)
+			.await
+			.ok()
+			.flatten()
+			.map(|body| DerivationOutputs::of(&body))
+			.transpose()?
+			.unwrap_or_default();
 		let mut body =
 			entity.call::<BlobStore, EntityBody>(store.clone()).await?;
 		if !body.contains::<Provenance>() {
@@ -228,7 +267,106 @@ impl Derivation {
 		let bytes = self
 			.media_type()?
 			.serialize_with_options(&body, SerializeOptions { pretty: true })?;
-		store.insert(&self.path, bytes).await
+		store.insert(&self.path, bytes).await?;
+		let outputs = DerivationOutputs::of(&body)?;
+		for output in superseded
+			.0
+			.iter()
+			.filter(|old| outputs.get(&old.path).is_none())
+		{
+			if store.exists(&output.path).await? {
+				store.remove(&output.path).await?;
+			}
+		}
+		Ok(())
+	}
+}
+
+/// The files a derived document's producer wrote beside it, each with the cid
+/// it was written with, carried in the document so a deleted or altered one
+/// counts as stale.
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
+/// # async fn run() -> Result {
+/// let store = BlobStore::temp();
+/// let mut outputs = DerivationOutputs::default();
+/// outputs.write(&store, "icons/icon-16.png", vec![0u8; 4]).await?;
+/// let body = EntityBody::default().with(&outputs)?;
+/// # let _ = body;
+/// # Ok(()) }
+/// ```
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, Reflect, Serialize, Deserialize,
+)]
+#[reflect(Default, Serialize, Deserialize)]
+pub struct DerivationOutputs(pub Vec<DerivationOutput>);
+
+/// One file a producer wrote beside its derived document.
+#[derive(Debug, Clone, PartialEq, Eq, Reflect, Serialize, Deserialize)]
+#[reflect(Serialize, Deserialize)]
+pub struct DerivationOutput {
+	/// The file's path in the store its document is in.
+	pub path: RelPath,
+	/// Its content id as written.
+	pub cid: Cid,
+}
+
+impl DerivationOutputs {
+	/// The outputs `body` lists, none when it lists none.
+	pub fn of(body: &EntityBody) -> Result<Self> {
+		match body.contains::<Self>() {
+			true => body.get::<Self>(),
+			false => Self::default().xok(),
+		}
+	}
+
+	/// Write `bytes` at `path` in `store` and list it.
+	pub async fn write(
+		&mut self,
+		store: &BlobStore,
+		path: impl Into<RelPath>,
+		bytes: impl Into<Vec<u8>>,
+	) -> Result {
+		let path = path.into();
+		let bytes = bytes.into();
+		let cid = Cid::raw(&bytes);
+		store.insert(&path, bytes).await?;
+		self.0.retain(|output| output.path != path);
+		self.0.push(DerivationOutput { path, cid });
+		Ok(())
+	}
+
+	/// The listed output at `path`.
+	pub fn get(&self, path: &RelPath) -> Option<&DerivationOutput> {
+		self.0.iter().find(|output| &output.path == path)
+	}
+
+	/// The first listed output that is missing from `store` or no longer has
+	/// the cid it was written with, all read at once.
+	async fn first_stale(
+		&self,
+		store: &BlobStore,
+	) -> Result<Option<Freshness>> {
+		let found = async_ext::try_join_all_bounded(
+			BlobStore::GET_ALL_CONCURRENCY,
+			self.0
+				.iter()
+				.map(async |output| -> Result<Option<Freshness>> {
+					if !store.exists(&output.path).await? {
+						return Some(Freshness::OutputMissing(
+							output.path.clone(),
+						))
+						.xok();
+					}
+					(Cid::raw(&store.get(&output.path).await?) != output.cid)
+						.then(|| Freshness::OutputChanged(output.path.clone()))
+						.xok()
+				}),
+		)
+		.await?;
+		found.into_iter().flatten().next().xok()
 	}
 }
 
@@ -245,6 +383,12 @@ pub enum Freshness {
 	Expired,
 	/// A source's digest changed, or the source is gone.
 	Changed(ProvenanceSource),
+	/// The declaration names a file source the file was not computed from.
+	Redeclared(RelPath),
+	/// A file the document lists as written beside it is gone.
+	OutputMissing(RelPath),
+	/// A file the document lists as written beside it was altered.
+	OutputChanged(RelPath),
 }
 
 impl Freshness {
@@ -262,6 +406,15 @@ impl core::fmt::Display for Freshness {
 			}
 			Self::Expired => write!(f, "past its ttl"),
 			Self::Changed(source) => write!(f, "{source} changed"),
+			Self::Redeclared(path) => {
+				write!(f, "not computed from the declared `{path}`")
+			}
+			Self::OutputMissing(path) => {
+				write!(f, "output `{path}` is missing")
+			}
+			Self::OutputChanged(path) => {
+				write!(f, "output `{path}` was altered")
+			}
 		}
 	}
 }
@@ -515,6 +668,22 @@ mod test {
 		runs.get().xpect_eq(3);
 	}
 
+	/// A declaration edited to name another source regenerates.
+	#[beet_core::test]
+	async fn regenerates_a_redeclared_input() {
+		let (mut world, entity, store, runs) =
+			setup(Derivation::new(DERIVED), "first");
+		ensure(&mut world, entity, &store).await.unwrap();
+		world
+			.entity_mut(entity)
+			.insert(Derivation::new(DERIVED).with_input("other.md"));
+		ensure(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_eq(Freshness::Redeclared(RelPath::new("other.md")));
+		runs.get().xpect_eq(2);
+	}
+
 	#[beet_core::test]
 	async fn needs_a_producer_answering_provenance() {
 		let mut world = AsyncPlugin.into_world();
@@ -538,6 +707,85 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("answered no `Provenance`");
+	}
+
+	/// A derivation whose producer writes `<source text>.bin` beside its
+	/// document, so a changed source renames the output.
+	fn with_outputs() -> (World, Entity, BlobStore) {
+		let mut world = AsyncPlugin.into_world();
+		let store = BlobStore::temp();
+		let entity = world
+			.spawn((
+				Derivation::new(DERIVED),
+				Action::<BlobStore, EntityBody>::new_async(
+					async |cx: ActionContext<BlobStore>| {
+						let bytes = cx.input.get(&RelPath::new(SOURCE)).await?;
+						let mut outputs = DerivationOutputs::default();
+						outputs
+							.write(
+								&cx.input,
+								format!("{}.bin", str::from_utf8(&bytes)?),
+								bytes.to_vec(),
+							)
+							.await?;
+						EntityBody::default()
+							.with(&Provenance::new([ProvenanceSource::file(
+								SOURCE, &bytes,
+							)]))?
+							.with(&outputs)
+					},
+				),
+			))
+			.id();
+		(world, entity, store)
+	}
+
+	#[beet_core::test]
+	async fn restores_its_outputs() {
+		let (mut world, entity, store) = with_outputs();
+		store.insert(&RelPath::new(SOURCE), "first").await.unwrap();
+		ensure(&mut world, entity, &store).await.unwrap();
+		let output = RelPath::new("first.bin");
+		store.remove(&output).await.unwrap();
+		ensure(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_eq(Freshness::OutputMissing(output.clone()));
+		store.insert(&output, "tampered").await.unwrap();
+		ensure(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_eq(Freshness::OutputChanged(output.clone()));
+		store
+			.get(&output)
+			.await
+			.unwrap()
+			.to_vec()
+			.xpect_eq(b"first".to_vec());
+		ensure(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_eq(Freshness::Fresh);
+	}
+
+	/// An output the new generation no longer lists is removed.
+	#[beet_core::test]
+	async fn removes_superseded_outputs() {
+		let (mut world, entity, store) = with_outputs();
+		store.insert(&RelPath::new(SOURCE), "first").await.unwrap();
+		ensure(&mut world, entity, &store).await.unwrap();
+		store.insert(&RelPath::new(SOURCE), "second").await.unwrap();
+		ensure(&mut world, entity, &store).await.unwrap();
+		store
+			.exists(&RelPath::new("first.bin"))
+			.await
+			.unwrap()
+			.xpect_false();
+		store
+			.exists(&RelPath::new("second.bin"))
+			.await
+			.unwrap()
+			.xpect_true();
 	}
 
 	/// A record source is checked against the repo holding its did, and one

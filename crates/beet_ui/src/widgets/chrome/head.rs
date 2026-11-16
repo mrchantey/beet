@@ -186,33 +186,6 @@ pub fn Head(
 	.xok()
 }
 
-/// The colours a browser tints its own chrome with, ie the mobile address bar,
-/// one per scheme, as hex.
-struct ThemeTints {
-	/// The light scheme's primary tone, the brand's key colour itself where the
-	/// key sits at the palette's tone 40, as a brand colour usually does.
-	light: String,
-	/// The dark scheme's primary container, the deep brand tone a dark page
-	/// wears without a bright bar above it, where its primary is a pastel.
-	dark: String,
-}
-
-impl ThemeTints {
-	fn new(theme: &Theme) -> Result<Self> {
-		let hex = |scheme: ColorScheme, role: Token| -> Result<String> {
-			theme.resolve(scheme, role)?.to_srgba().to_hex().xok()
-		};
-		Self {
-			light: hex(ColorScheme::Light, material::colors::Primary.into())?,
-			dark: hex(
-				ColorScheme::Dark,
-				material::colors::PrimaryContainer.into(),
-			)?,
-		}
-		.xok()
-	}
-}
-
 /// The `content` block attribute for the `og:site_name` meta: a [`Value`] seeded
 /// with [`PackageConfig::title`] plus, under `json`, a [`ResourceFieldRef`]
 /// binding it to that field so the rendered site name tracks the live resource.

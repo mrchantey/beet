@@ -50,7 +50,8 @@ pub enum DiagnosticKind {
 	BrokenHref,
 	/// A `class`/[`Classes`] token with no matching selector in the [`RuleSet`].
 	UnknownClass,
-	/// A derived file the document declares, absent from its store.
+	/// A derived file the document declares, or an output it lists, absent
+	/// from its store.
 	MissingDerivedFile,
 	/// A derived file the document declares whose sources changed or whose ttl
 	/// ran out: it still serves, but no longer says what its sources do.

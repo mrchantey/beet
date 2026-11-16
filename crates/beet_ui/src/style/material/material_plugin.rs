@@ -98,6 +98,35 @@ impl Theme {
 	}
 }
 
+/// The colours a browser tints its own chrome with, ie the mobile address bar,
+/// one per scheme, as hex.
+///
+/// Read by everything naming the brand to a browser rather than to the page's
+/// own css: `<Head>`'s `theme-color` metas and the icon set's web app
+/// manifest, so the two cannot disagree.
+pub struct ThemeTints {
+	/// The light scheme's primary tone, the brand's key colour itself where the
+	/// key sits at the palette's tone 40, as a brand colour usually does.
+	pub light: String,
+	/// The dark scheme's primary container, the deep brand tone a dark page
+	/// wears without a bright bar above it, where its primary is a pastel.
+	pub dark: String,
+}
+
+impl ThemeTints {
+	/// The tints `theme` resolves to.
+	pub fn new(theme: &Theme) -> Result<Self> {
+		let hex = |scheme: ColorScheme, role: Token| -> Result<String> {
+			theme.resolve(scheme, role)?.to_srgba().to_hex().xok()
+		};
+		Self {
+			light: hex(ColorScheme::Light, colors::Primary.into())?,
+			dark: hex(ColorScheme::Dark, colors::PrimaryContainer.into())?,
+		}
+		.xok()
+	}
+}
+
 /// Installs the Material rule set. The palette keys and scheme are owned by the
 /// [`Theme`] resource (insert it before adding this plugin to override the
 /// default), the only way to configure them.

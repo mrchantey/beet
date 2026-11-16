@@ -75,6 +75,11 @@ dag_cbor = ["serde", "beet_core/dag_cbor", "beet_net/dag_cbor"]
 # header (`imagesize`). Only a binary that publishes needs it; without it a
 # request for the Leaflet media type answers 406.
 leaflet = ["dag_cbor", "json", "dep:imagesize"]
+# Deriving an `<IconSet/>`'s files from its source image: decode, resize and
+# encode (`image`, `ico` for the multi-size favicon) and svg rasterisation
+# (`resvg`). Only the binary that runs `<Derive/>` needs it; the served site
+# reads the declaration for its head links without it.
+icon_set = ["std", "json", "dep:image", "dep:resvg"]
 postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
 serde = ["dep:serde", "beet_core/serde", "beet_action/serde", "beet_net/serde", "beet_ui?/serde"]
 markdown_parser = ["std", "beet_ui/markdown_parser"]
@@ -158,6 +163,10 @@ serde = {workspace = true, optional=true}
 serde_json = {workspace = true, optional=true}
 # the raster formats the web serves, for a Leaflet image block's aspect ratio
 imagesize = { workspace = true, optional = true, features = ["png", "jpeg", "gif", "webp", "heif", "bmp", "tiff", "ico"] }
+# an icon set's source decoded, each size resized and encoded
+image = { workspace = true, optional = true, features = ["png", "jpeg", "webp", "ico"] }
+# an svg icon source rasterised at each size rather than traced
+resvg = { workspace = true, optional = true }
 
 #💡 codegen
 syn = { workspace = true, optional = true }

@@ -35,8 +35,9 @@ use beet_ui::prelude::*;
 /// [`PackageConfig`](beet_core::prelude::PackageConfig) per field, along with
 /// this request's own absolute url as the canonical one, and an
 /// [`Unlisted`](RouteVisibility::Unlisted) route's [`RouteMeta`] marks it
-/// `noindex`. Extra tags
-/// (stylesheet, favicon, ...) flow through to the `<head>` via the default slot.
+/// `noindex`. The declared [`IconSet`], when the world holds one, is linked
+/// from its declaration: its icons and its web app manifest. Extra tags
+/// (stylesheet, fonts, ...) flow through to the `<head>` via the default slot.
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
 /// a BSX layout declares `<RouteHead>...</RouteHead>`. Builds inside a layout
@@ -46,6 +47,7 @@ pub fn RouteHead(
 	stack: Res<RequestContextStack>,
 	metas: Query<&DocMeta>,
 	route_metas: Query<&RouteMeta>,
+	icon_sets: Query<&IconSet>,
 	pkg: Res<PackageConfig>,
 ) -> Result<impl Bundle> {
 	let cx = stack.current();
@@ -63,13 +65,39 @@ pub fn RouteHead(
 	let noindex = route_metas
 		.get(cx.route())
 		.is_ok_and(|route| route.visibility == RouteVisibility::Unlisted);
+	let icons = match icon_sets.iter().collect::<Vec<_>>().as_slice() {
+		[] => None,
+		[icon_set] => Some(icon_links(icon_set)),
+		_ => bevybail!(
+			"more than one `IconSet` declared: a site has one set of icons"
+		),
+	};
 	rsx! {
 		<Head omit_title=true meta=meta url=url noindex=noindex>
 			<title>{title}</title>
+			{icons}
 			<Slot/>
 		</Head>
 	}
 	.xok()
+}
+
+/// The `<link>`s naming `icon_set`'s icons and its web app manifest.
+fn icon_links(icon_set: &IconSet) -> impl Bundle {
+	let icons = icon_set
+		.links()
+		.into_iter()
+		.map(|link| {
+			rsx! {
+				<link rel={link.rel} type={link.mime} sizes={link.sizes.to_string()} href={link.href.to_string()}/>
+			}
+		})
+		.collect::<Vec<_>>();
+	let manifest = icon_set.manifest_href().to_string();
+	rsx! {
+		{icons}
+		<link rel="manifest" href=manifest/>
+	}
 }
 
 /// The bound text child of the route `<title>`: a [`Value`] seeded with the

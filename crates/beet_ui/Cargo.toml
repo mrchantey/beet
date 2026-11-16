@@ -144,15 +144,13 @@ vte = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
 # terminal raster decoding: a non-PNG `<img>` (eg a `.jpg`) is decoded and
 # re-encoded to PNG for the kitty `f=100` transmit. PNG + common web formats only.
-image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+image = { workspace = true, optional = true, features = ["png", "jpeg", "gif", "webp"] }
 # terminal SVG rasterisation: an `<img src=*.svg>` is rendered to an RGBA pixmap
 # (resvg bundles usvg + tiny-skia) and PNG-encoded for the kitty `f=100`
 # transmit, so a vector figure draws in the terminal like any other raster. The
 # default features include text layout + system fonts, which the deck's labelled
-# diagrams need. It is the only consumer of the tiny-skia/ttf-parser stack, so
-# keep it current: an older resvg pins an older codec line (zune-jpeg, gif, png)
-# and duplicates the one `image` already pulls.
-resvg = { version = "0.48", optional = true }
+# diagrams need.
+resvg = { workspace = true, optional = true }
 # decode/rasterise off the world thread: beet runs bevy single-threaded, so an
 # inline `image::load_from_memory` + `resvg::render` freezes every connection
 blocking = { workspace = true, optional = true }

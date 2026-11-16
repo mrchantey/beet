@@ -246,6 +246,11 @@ token (plus AWS for the social stack's state bucket).
 		homepage="https://beet.org"
 		repository="https://github.com/mrchantey/beet"
 		social_image="https://beet.org/assets/branding/social-card.png"/>
+	<!-- the site's icons, every size a browser or a PWA asks for derived from
+	     the one source image and written beside it in `site/assets/branding`
+	     by `<Derive/>`; `<Head>` links them from this declaration, and
+	     `beet check` fails a set that is missing or incomplete -->
+	<IconSet src="assets/branding/logo.png"/>
 	<!-- the tag vocabulary every page's metadata draws from, each tag earning
 	     its place by sitting on two or more posts; `beet check` fails a page
 	     carrying any other, or breaking a limit `DocMetaRules` carries -->

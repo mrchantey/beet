@@ -290,6 +290,14 @@ async fn derived_file_diagnostics(
 						"derived file `{path}` is missing: the site serves without it"
 					),
 				),
+				// an incomplete set serves broken links, so it fails as missing
+				Freshness::OutputMissing(output) => (
+					DiagnosticKind::MissingDerivedFile,
+					format!(
+						"derived file `{path}` is incomplete, output `{output}` \
+						 is missing: the site serves without it"
+					),
+				),
 				stale => (
 					DiagnosticKind::StaleDerivedFile,
 					format!("derived file `{path}` is stale: {stale}"),

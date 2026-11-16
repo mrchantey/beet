@@ -54,7 +54,9 @@ thread = ["beet/thread", "beet/ui"]
 # `beet/mail` carries the network and mail stack with it, so a deploy entry
 # declaring `<VpcBlock/>`/`<StalwartBlock/>`/`<MailDomainBlock/>` resolves those
 # tags from the same build rather than needing a feature of its own.
-infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/scheduled_job_block", "beet/lightsail_block", "beet/fargate_block", "beet/aws_sdk", "beet/mail"]
+# `beet/icon_set` derives an `<IconSet/>`'s files, which the deploy's and the
+# `assets` verb's `<Derive/>` regenerate.
+infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/scheduled_job_block", "beet/lightsail_block", "beet/fargate_block", "beet/aws_sdk", "beet/mail", "beet/icon_set"]
 # The atproto network half: an `<AtprotoAccount/>` lands its repo, reads and
 # writes reach a real PDS, handles resolve. Lean, so a serving binary can link
 # it without the deploy machinery; with `infra` too it brings the handle block
@@ -265,7 +267,7 @@ beet = { workspace = true, features = [
 # date/rayon surface (whose `time` path does not compile against current `time`).
 lopdf = { version = "0.44", optional = true, default-features = false }
 qrcode = { workspace = true, optional = true, features = ["image"] }
-image = { version = "0.25", optional = true }
+image = { workspace = true, optional = true, features = ["png"] }
 
 # the wasm target's extra deps. The portable render router rides every wasm build
 # (both the standalone `beet` binary and the Cloudflare Worker): `beet/router` is
