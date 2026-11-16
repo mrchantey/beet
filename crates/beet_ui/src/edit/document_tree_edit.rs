@@ -262,25 +262,20 @@ impl DocumentTreeEdit<'_, '_> {
 
 	/// The cell at `address` under `root`, refused when absent or locked.
 	fn cell(&self, root: Entity, address: &CellAddress) -> Result<Entity> {
-		let absent = || bevyhow!("the document has no cell {address}");
-		match address {
+		let cell = match address {
 			CellAddress::Table(table) => {
-				self.table_cells.table_cell(root, *table).ok_or_else(absent)
+				self.table_cells.table_cell(root, *table)
 			}
 			#[cfg(feature = "ooxml")]
-			CellAddress::Sheet(sheet) => {
-				let cell = self
-					.sheet_cells
-					.sheet_cell(root, sheet)
-					.ok_or_else(absent)?;
-				if self.sheet_cells.is_locked(cell) {
-					bevybail!(
-						"{address} is locked; only an unlocked cell takes a value"
-					);
-				}
-				cell.xok()
-			}
+			CellAddress::Sheet(sheet) => self.sheet_cells.sheet_cell(root, sheet),
 		}
+		.ok_or_else(|| bevyhow!("the document has no cell {address}"))?;
+		if self.table_cells.is_locked(cell) {
+			bevybail!(
+				"{address} is locked; only an unlocked cell takes a value"
+			);
+		}
+		cell.xok()
 	}
 
 	/// Text as matching reads it, a no-break space as a space.
@@ -481,6 +476,46 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+
+	/// A `contenteditable="false"` locks a cell of any table, refused by an
+	/// edit and left out of the listing, and a cell inherits it from its row
+	/// unless it says otherwise.
+	#[beet_core::test]
+	fn refuses_locked_cells() {
+		let mut world = ParsePlugin.into_world();
+		let root = world.spawn_empty().id();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(root),
+			&MediaBytes::new_html(
+				"<table>\
+				 <tr><td contenteditable=\"false\">Label</td><td>Field</td></tr>\
+				 <tr contenteditable=\"false\"><td>Row</td><td contenteditable=\"true\">Open</td></tr>\
+				 </table>",
+			),
+		))
+		.unwrap();
+		let mut set = |cell: &str| {
+			world.with_state::<DocumentTreeEdit, _>(|mut edit| {
+				edit.set_cell_text(
+					root,
+					&CellAddress::parse(cell).unwrap(),
+					"x",
+				)
+			})
+		};
+		set("t1r1c1")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("t1r1c1 is locked");
+		set("t1r2c1").xpect_err();
+		set("t1r1c2").unwrap();
+		set("t1r2c2").unwrap();
+		CellText::listing(&mut world, root)
+			.into_iter()
+			.map(|cell| cell.address.to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["t1r1c2".to_string(), "t1r2c2".into()]);
+	}
 
 	/// The edits a Word form takes, applied to a markdown one: its table's
 	/// cells, its task list's box, its instruction and its placeholder.

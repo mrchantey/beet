@@ -16,7 +16,6 @@ impl Plugin for OoxmlPlugin {
 			.register_type::<RunLook>()
 			.register_type::<OoxmlNode>()
 			.register_type::<SheetCellAddress>()
-			.register_type::<CellLocked>()
 			.register_type::<CellFormula>()
 			.register_type::<CoveredBy>()
 			.register_type::<SheetCellStyle>()

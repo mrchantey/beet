@@ -100,12 +100,6 @@ impl core::fmt::Display for SheetCellAddress {
 	}
 }
 
-/// A cell a person may not type into, ie a protected workbook's label: an
-/// edit setting its text is refused.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect, Component)]
-#[reflect(Component, Default)]
-pub struct CellLocked;
-
 /// The formula a workbook cell computes, as written without its `=`: its
 /// shown text is the value last computed. An edit replaces it as typing into
 /// the cell would, with a value, or with another formula led by `=`.
@@ -135,7 +129,6 @@ pub struct SheetCells<'w, 's> {
 		's,
 		(
 			&'static SheetCellAddress,
-			Has<CellLocked>,
 			Option<&'static CellFormula>,
 			Option<&'static CoveredBy>,
 		),
@@ -176,17 +169,12 @@ impl SheetCells<'_, '_> {
 			.map(|entity| self.shown(entity))
 	}
 
-	/// Whether the workbook cell `cell` is locked.
-	pub fn is_locked(&self, cell: Entity) -> bool {
-		self.sheets.get(cell).is_ok_and(|(_, locked, ..)| locked)
-	}
-
 	/// The listing of every unlocked workbook cell under `root`, a covered
-	/// cell showing its range's first.
+	/// cell showing, and locked as, its range's first.
 	pub fn listing(&self, root: Entity) -> Vec<CellText> {
 		self.sheet_cells(root)
 			.into_iter()
-			.filter(|(_, cell)| !self.is_locked(*cell))
+			.filter(|(_, cell)| !self.tables.is_locked(self.shown(*cell)))
 			.map(|(address, cell)| CellText {
 				address: address.to_string().into(),
 				text: self.cell_text(self.shown(cell)).into(),
@@ -197,7 +185,7 @@ impl SheetCells<'_, '_> {
 	/// What a reader reads in `cell`, a formula as `=` and its expression.
 	pub fn cell_text(&self, cell: Entity) -> String {
 		match self.sheets.get(cell) {
-			Ok((_, _, Some(formula), _)) => format!("={}", formula.0),
+			Ok((_, Some(formula), _)) => format!("={}", formula.0),
 			_ => self.tables.cell_text(cell),
 		}
 	}
@@ -205,7 +193,7 @@ impl SheetCells<'_, '_> {
 	/// The cell `cell` shows: its range's first when it is covered.
 	fn shown(&self, cell: Entity) -> Entity {
 		match self.sheets.get(cell) {
-			Ok((_, _, _, Some(covered))) => covered.0,
+			Ok((_, _, Some(covered))) => covered.0,
 			_ => cell,
 		}
 	}

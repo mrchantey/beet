@@ -20,6 +20,8 @@ pub(crate) struct WorkbookProjection {
 struct SheetRead {
 	/// The `sheetData` element, the sheet's table.
 	data: Option<Entity>,
+	/// Whether the sheet is protected, without which no cell is locked.
+	protected: bool,
 	/// Each column range's style, `(min, max, style)`.
 	columns: Vec<(u32, u32, u32)>,
 	rows: Vec<RowRead>,
@@ -114,8 +116,8 @@ impl WorkbookProjection {
 		Ok(())
 	}
 
-	/// Whether each cell format of `cellXfs` unlocks its cells: a cell is
-	/// locked unless its format says otherwise.
+	/// Whether each cell format of `cellXfs` unlocks its cells: on a
+	/// protected sheet a cell is locked unless its format says otherwise.
 	fn unlocked_styles(styles: &[BsxNode]) -> Vec<bool> {
 		BsxNode::document_element(styles)
 			.and_then(|root| root.child("cellXfs"))
@@ -156,8 +158,8 @@ impl WorkbookProjection {
 	}
 
 	/// Projects one sheet: its data a `<table>` captioned with its tab name,
-	/// its rows `<tr>`s, its cells `<td>`s with their addresses, locks and
-	/// formulas, a merged range's first cell spanning the rest, and every
+	/// its rows `<tr>`s, its cells `<td>`s with their addresses and formulas,
+	/// a locked cell `contenteditable="false"`, a merged range's first cell spanning the rest, and every
 	/// gap before a row's last cell filled by a projection-only `<td>`.
 	fn project(
 		&self,
@@ -220,15 +222,14 @@ impl WorkbookProjection {
 			for offset in 0..last {
 				let column = NonZeroU32::MIN.saturating_add(offset);
 				let key = (column.get(), row.index.get());
-				let entity = match present.get(&column) {
+				let (entity, style) = match present.get(&column) {
 					Some(cell) => {
 						if let Some(formula) = &cell.formula {
 							world
 								.entity_mut(cell.entity)
 								.insert(CellFormula(formula.clone()));
 						}
-						self.lock(world, cell.entity, cell.style);
-						cell.entity
+						(cell.entity, cell.style)
 					}
 					None => {
 						let style =
@@ -237,8 +238,7 @@ impl WorkbookProjection {
 						let index =
 							Self::position(world, row.entity, &present, column);
 						world.entity_mut(row.entity).insert_child(index, gap);
-						self.lock(world, gap, style);
-						gap
+						(gap, style)
 					}
 				};
 				world.entity_mut(entity).insert(SheetCellAddress {
@@ -247,20 +247,23 @@ impl WorkbookProjection {
 					row: row.index,
 				});
 				cells.insert(key, entity);
-				match (masters.get(&key), spans.get(&key)) {
-					(Some(master), _) => covered.push((entity, *master)),
-					(None, Some((columns, rows))) => {
-						let mut cell = Tagged::new("td");
-						if *columns > 1 {
-							cell = cell.with("colspan", columns.to_string());
-						}
-						if *rows > 1 {
-							cell = cell.with("rowspan", rows.to_string());
-						}
-						cell.insert(world, entity);
-					}
-					(None, None) => Tagged::new("td").insert(world, entity),
+				if let Some(master) = masters.get(&key) {
+					covered.push((entity, *master));
+					continue;
 				}
+				let mut cell = Tagged::new("td");
+				if let Some((columns, rows)) = spans.get(&key) {
+					if *columns > 1 {
+						cell = cell.with("colspan", columns.to_string());
+					}
+					if *rows > 1 {
+						cell = cell.with("rowspan", rows.to_string());
+					}
+				}
+				if self.is_locked(&sheet, style) {
+					cell = cell.with("contenteditable", "false");
+				}
+				cell.insert(world, entity);
 			}
 		}
 		// a covered cell shows its range's first, and has no `<td>` of its own
@@ -295,11 +298,11 @@ impl WorkbookProjection {
 			.unwrap_or(children.len())
 	}
 
-	/// Locks `cell` unless its format unlocks it.
-	fn lock(&self, world: &mut World, cell: Entity, style: u32) {
-		if !self.unlocked.get(style as usize).copied().unwrap_or(false) {
-			world.entity_mut(cell).insert(CellLocked);
-		}
+	/// Whether a cell drawn with `style` is locked: only on a protected
+	/// sheet, and only when its format does not unlock it.
+	fn is_locked(&self, sheet: &SheetRead, style: u32) -> bool {
+		sheet.protected
+			&& !self.unlocked.get(style as usize).copied().unwrap_or(false)
 	}
 
 	/// The style a cell absent from the sheet is drawn with: its row's when
@@ -363,6 +366,12 @@ impl WorkbookProjection {
 			}
 			match element.local_name() {
 				"sheetData" => sheet.data = Some(entity),
+				"sheetProtection" => {
+					sheet.protected = matches!(
+						tree.attribute(entity, None, "sheet"),
+						Some("1" | "true")
+					);
+				}
 				"col" => {
 					if let (Some(min), Some(max)) =
 						(number(entity, "min"), number(entity, "max"))
@@ -482,13 +491,13 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// The address of every cell a workbook holding `sheet_data` lists, every
-	/// cell unlocked, or the refusal of its read.
+	/// The address of every cell a workbook holding `sheet_data` lists, or
+	/// the refusal of its read: an unprotected sheet, every cell listed.
 	fn addresses(sheet_data: &str) -> Result<Vec<String>> {
-		let bytes = OoxmlFile::workbook(
-			"<xf><protection locked=\"0\"/></xf>",
-			&[("Sheet", &format!("<sheetData>{sheet_data}</sheetData>"))],
-		)?;
+		let bytes = OoxmlFile::workbook("<xf/>", &[(
+			"Sheet",
+			&format!("<sheetData>{sheet_data}</sheetData>"),
+		)])?;
 		let mut world =
 			(TemplatePlugin, DocumentPlugin, ParsePlugin).into_world();
 		let root = world.spawn_empty().id();

@@ -82,6 +82,23 @@ impl<'a> ElementView<'a> {
 		}
 	}
 
+	/// Whether a person may type here, as its `contenteditable` says:
+	/// `Some(false)` for `false`, `Some(true)` for an empty value, `true` or
+	/// `plaintext-only`, and `None` when absent or unrecognised, which
+	/// inherits its parent's.
+	pub fn content_editable(&self) -> Option<bool> {
+		match self.attribute("contenteditable")?.value {
+			Value::Null => Some(true),
+			Value::Bool(editable) => Some(*editable),
+			Value::Str(value) => match value.as_str() {
+				"" | "true" | "plaintext-only" => Some(true),
+				"false" => Some(false),
+				_ => None,
+			},
+			_ => None,
+		}
+	}
+
 	/// Look up the first attribute matching `key` and return its value.
 	pub fn attribute<'b>(&'b self, key: &str) -> Option<&'b AttributeView<'a>> {
 		self.attributes

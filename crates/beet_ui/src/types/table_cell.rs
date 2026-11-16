@@ -162,9 +162,9 @@ impl core::fmt::Display for CellText {
 }
 
 impl CellText {
-	/// Every addressed cell under `root`, the map an edit addresses a
-	/// document by: its table cells in document order, then a workbook's
-	/// unlocked cells.
+	/// Every addressed cell under `root` a person may type into, the map an
+	/// edit addresses a document by: its table cells in document order, then
+	/// a workbook's.
 	pub fn listing(world: &mut World, root: Entity) -> Vec<CellText> {
 		let cells =
 			world.with_state::<TableCells, _>(|cells| cells.listing(root));
@@ -221,7 +221,9 @@ impl CellText {
 pub struct TableCells<'w, 's> {
 	tables: Query<'w, 's, &'static TableCellAddress>,
 	elements: Query<'w, 's, &'static Element>,
+	views: ElementQuery<'w, 's>,
 	children: Query<'w, 's, &'static Children>,
+	parents: Query<'w, 's, &'static ChildOf>,
 	text: ReaderText<'w, 's>,
 	/// The cells a workbook addresses by sheet, whose tables are no tables
 	/// to number.
@@ -254,15 +256,33 @@ impl TableCells<'_, '_> {
 			.find(|entity| self.tables.get(*entity) == Ok(&address))
 	}
 
-	/// The listing of every table cell under `root`, in document order.
+	/// The listing of every table cell under `root` a person may type
+	/// into, in document order.
 	pub fn listing(&self, root: Entity) -> Vec<CellText> {
 		self.table_cells(root)
 			.into_iter()
+			.filter(|(_, cell)| !self.is_locked(*cell))
 			.map(|(address, cell)| CellText {
 				address: address.to_string().into(),
 				text: self.cell_text(cell).into(),
 			})
 			.collect()
+	}
+
+	/// Whether a person may not type into `cell`: the first of it and its
+	/// ancestors whose `contenteditable` says either decides, locked when it
+	/// says `false`, so a `<tr contenteditable="false">` locks its cells and
+	/// a `<td contenteditable="true">` inside it unlocks itself.
+	pub fn is_locked(&self, cell: Entity) -> bool {
+		core::iter::once(cell)
+			.chain(self.parents.iter_ancestors(cell))
+			.find_map(|entity| {
+				self.views
+					.get(entity)
+					.ok()
+					.and_then(|view| view.content_editable())
+			})
+			.is_some_and(|editable| !editable)
 	}
 
 	/// What a reader reads in `cell`: its blocks' text, each trimmed, the

@@ -597,7 +597,8 @@ impl WorkbookWriter {
 			if !changed {
 				continue;
 			}
-			if world.entity(cell).contains::<CellLocked>() {
+			if world.with_state::<TableCells, _>(|cells| cells.is_locked(cell))
+			{
 				bevybail!(
 					"{address} is locked; only an unlocked cell takes a value"
 				);
@@ -979,20 +980,86 @@ mod test {
 	/// A protected sheet: `A1` a locked label, `D3:F3` an unlocked merged
 	/// field holding a prompt, `D4` an unlocked formula, and column `G`
 	/// unlocked by its column style where no cell is written.
-	fn workbook() -> MediaBytes {
+	fn workbook() -> MediaBytes { sheet("<sheetProtection sheet=\"1\"/>") }
+
+	/// [`workbook`]'s sheet with `protection` after its data, its cells
+	/// locked only when that protects it.
+	fn sheet(protection: &str) -> MediaBytes {
 		OoxmlFile::workbook(
 			"<xf/><xf><protection locked=\"0\"/></xf>",
 			&[(
 				"Start Here",
-				"<cols><col min=\"7\" max=\"7\" style=\"1\"/></cols><sheetData>\
+				&format!("<cols><col min=\"7\" max=\"7\" style=\"1\"/></cols><sheetData>\
 				 <row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is><t>Business name</t></is></c></row>\
 				 <row r=\"3\"><c r=\"D3\" s=\"1\" t=\"inlineStr\"><is><t>Enter it here</t></is></c>\
 				 <c r=\"E3\" s=\"1\"/><c r=\"F3\" s=\"1\"/><c r=\"H3\"/></row>\
 				 <row r=\"4\"><c r=\"D4\" s=\"1\"><f>1+1</f><v>2</v></c></row>\
-				 </sheetData><sheetProtection sheet=\"1\"/><mergeCells count=\"1\"><mergeCell ref=\"D3:F3\"/></mergeCells>",
+				 </sheetData>{protection}<mergeCells count=\"1\"><mergeCell ref=\"D3:F3\"/></mergeCells>"),
 			)],
 		)
 		.unwrap()
+	}
+
+	/// An unprotected sheet locks nothing, whatever its formats say.
+	#[beet_core::test]
+	fn unprotected_sheets_lock_nothing() {
+		let (mut world, root) = parse(&sheet(""));
+		CellText::listing(&mut world, root)
+			.into_iter()
+			.map(|cell| cell.address.to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![
+				"Start Here!A1".to_string(),
+				"Start Here!A3".into(),
+				"Start Here!B3".into(),
+				"Start Here!C3".into(),
+				"Start Here!D3".into(),
+				"Start Here!E3".into(),
+				"Start Here!F3".into(),
+				"Start Here!G3".into(),
+				"Start Here!H3".into(),
+				"Start Here!A4".into(),
+				"Start Here!B4".into(),
+				"Start Here!C4".into(),
+				"Start Here!D4".into(),
+			]);
+		for cell in ["Start Here!A1", "Start Here!H3"] {
+			edit(&mut world, |edit| {
+				edit.set_cell_text(
+					root,
+					&CellAddress::parse(cell).unwrap(),
+					"x",
+				)
+			})
+			.unwrap();
+		}
+	}
+
+	/// A protected sheet's locked cells say so in HTML, and its markdown,
+	/// which has no say over editing, reads as an unprotected one's.
+	#[beet_core::test]
+	fn renders_locked_cells() {
+		fn render(
+			bytes: &MediaBytes,
+			mut renderer: impl DocRenderer,
+		) -> String {
+			let (mut world, root) = parse(bytes);
+			renderer
+				.render(&mut RenderContext::new(
+					&mut world,
+					root,
+					&RequestParts::default(),
+				))
+				.unwrap()
+				.to_string()
+		}
+		render(&workbook(), HtmlRenderer::new())
+			.xpect_starts_with("<table><caption>Start Here</caption>")
+			.xpect_contains("<td contenteditable=\"false\">Business name</td>")
+			.xpect_contains("<td colspan=\"3\">Enter it here</td><td></td><td contenteditable=\"false\"></td>")
+			.xpect_contains("<td>2</td>");
+		render(&workbook(), MarkdownRenderer::new())
+			.xpect_eq(render(&sheet(""), MarkdownRenderer::new()));
 	}
 
 	#[beet_core::test]

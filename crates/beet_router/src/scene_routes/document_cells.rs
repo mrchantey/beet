@@ -7,8 +7,8 @@ use beet_ui::prelude::*;
 /// `cells <path>`: the addressed cells of any document in the nearest
 /// ancestor [`BlobStore`], parsed through the one parse [`DocumentView`]
 /// renders, root declarations and all: every table cell, `t1r2c3`, in
-/// document order, and every unlocked workbook cell, `Sheet!A1`, each with
-/// what a reader reads in it. The map an edit addresses a form by, answered
+/// document order, then every workbook cell, `Sheet!A1`, a locked cell
+/// (`contenteditable="false"`) omitted, each with what a reader reads in it. The map an edit addresses a form by, answered
 /// as a table for a markup `Accept` and as its rows for a serde one.
 ///
 /// ```bsx
