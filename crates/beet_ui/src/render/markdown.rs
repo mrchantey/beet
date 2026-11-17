@@ -259,6 +259,36 @@ enum InlineWrapper {
 	Transparent,
 }
 
+impl InlineWrapper {
+	/// The wrapper an inline formatting element opens, `None` for any other
+	/// tag. A `<span>` opens [`Self::Html`], or [`Self::Transparent`] when
+	/// [`MarkdownRenderer::open_html`] finds it unstyled.
+	fn of(tag: &str) -> Option<Self> {
+		match tag {
+			tag if TextLook::is_italic(tag) => Some(Self::Em),
+			tag if TextLook::is_bold(tag) => Some(Self::Strong),
+			"del" | "s" => Some(Self::Del),
+			"sup" => Some(Self::Sup),
+			"sub" => Some(Self::Sub),
+			"mark" | "span" => Some(Self::Html),
+			_ => None,
+		}
+	}
+
+	/// The markdown delimiter written either side of its words, `None` for
+	/// a wrapper written another way.
+	fn delimiter(self) -> Option<&'static str> {
+		match self {
+			Self::Em => Some("*"),
+			Self::Strong => Some("**"),
+			Self::Del => Some("~~"),
+			Self::Sup => Some("^"),
+			Self::Sub => Some("~"),
+			_ => None,
+		}
+	}
+}
+
 impl Default for MarkdownRenderer {
 	fn default() -> Self { Self::new() }
 }
@@ -443,8 +473,9 @@ impl MarkdownRenderer {
 	/// other only when styled, since an unstyled `span` signals nothing. Only
 	/// the tags are HTML: CommonMark reads the words between them as markdown,
 	/// so they are written as any other words are.
-	fn open_html(&mut self, view: &ElementView, close: &'static str) {
+	fn open_html(&mut self, view: &ElementView) {
 		let style = view.attribute_string("style");
+		let close = format!("</{}>", view.tag());
 		let open = match (view.tag(), style.is_empty()) {
 			("mark", true) => "<mark>".to_string(),
 			(tag, false) => {
@@ -562,14 +593,7 @@ impl NodeVisitor for MarkdownRenderer {
 		}
 		let name = view.tag();
 		let value = view.value;
-		let inline = matches!(
-			name,
-			"em" | "i"
-				| "strong" | "b"
-				| "del" | "s"
-				| "sup" | "sub"
-				| "mark" | "span"
-		);
+		let inline = InlineWrapper::of(name);
 		// whether the block around has written nothing yet
 		let block_start = self.at_block_start;
 		let spaced = self.after_element.take().is_some_and(|after_item| {
@@ -578,7 +602,7 @@ impl NodeVisitor for MarkdownRenderer {
 		});
 		// a line break before a block's first words writes nothing, so the
 		// wrappers around it stay unwritten, ie a bold page break
-		if !inline && !(name == "br" && block_start) {
+		if inline.is_none() && !(name == "br" && block_start) {
 			self.flush_inline();
 		}
 		// an item and an element beside it with nothing between them never
@@ -586,7 +610,7 @@ impl NodeVisitor for MarkdownRenderer {
 		// formatting runs still join, a word split across them by a richer
 		// format. An inline wrapper's marker is deferred, so its space waits
 		// for its words
-		match (spaced, inline) {
+		match (spaced, inline.is_some()) {
 			(true, true) => self.after_box = true,
 			(true, false)
 				if !self.state.buffer.ends_with(char::is_whitespace) =>
@@ -606,9 +630,8 @@ impl NodeVisitor for MarkdownRenderer {
 
 		match name {
 			// ── Headings ──
-			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
+			name if let Some(level) = ReaderText::heading_level(name) => {
 				self.state.ensure_block_separator();
-				let level = name.as_bytes()[1] - b'0';
 				let prefix = "#".repeat(level as usize);
 				self.push_str(&format!("{prefix} "));
 			}
@@ -683,30 +706,13 @@ impl NodeVisitor for MarkdownRenderer {
 					.push(InlineMark::eager(InlineWrapper::InlineCode));
 			}
 
-			// ── Inline formatting ──
-			"em" | "i" => {
-				self.open_inline(InlineMark::new(InlineWrapper::Em, "*", "*"));
-			}
-			"strong" | "b" => {
-				self.open_inline(InlineMark::new(
-					InlineWrapper::Strong,
-					"**",
-					"**",
-				));
-			}
-			"del" | "s" => {
-				self.open_inline(InlineMark::new(
-					InlineWrapper::Del,
-					"~~",
-					"~~",
-				));
-			}
-			"sup" => {
-				self.open_inline(InlineMark::new(InlineWrapper::Sup, "^", "^"));
-			}
-			"sub" => {
-				self.open_inline(InlineMark::new(InlineWrapper::Sub, "~", "~"));
-			}
+			// ── Inline formatting, and inline HTML ──
+			_ if let Some(wrapper) = inline => match wrapper.delimiter() {
+				Some(delimiter) => self.open_inline(InlineMark::new(
+					wrapper, delimiter, delimiter,
+				)),
+				None => self.open_html(&view),
+			},
 
 			// ── Links ──
 			"a" => {
@@ -744,10 +750,6 @@ impl NodeVisitor for MarkdownRenderer {
 			}
 			"br" => {}
 
-			// ── Inline HTML ──
-			"mark" => self.open_html(&view, "</mark>"),
-			"span" => self.open_html(&view, "</span>"),
-
 			// ── Tables, collected and written on leave ──
 			"table" => {
 				// a table in a cell is GFM's to hold nowhere, so it follows
@@ -773,7 +775,7 @@ impl NodeVisitor for MarkdownRenderer {
 					table.rows.push(Vec::new());
 				}
 			}
-			"th" | "td" => {
+			name if Cells::is_cell_tag(name) => {
 				let span = view.colspan() as usize;
 				let start = self.state.buffer.len();
 				if let Some(table) = self.tables.last_mut() {
@@ -823,30 +825,16 @@ impl NodeVisitor for MarkdownRenderer {
 		if passthrough_closed {
 			return;
 		}
-		let inline = matches!(
-			name,
-			"em" | "i"
-				| "strong" | "b"
-				| "del" | "s"
-				| "sup" | "sub"
-				| "mark" | "span"
-		);
-		if inline {
-			let wrapper = match name {
-				"em" | "i" => InlineWrapper::Em,
-				"strong" | "b" => InlineWrapper::Strong,
-				"del" | "s" => InlineWrapper::Del,
-				"sup" => InlineWrapper::Sup,
-				"sub" => InlineWrapper::Sub,
-				"mark" => InlineWrapper::Html,
-				_ => match self.inline_stack.last() {
-					Some(mark)
-						if mark.wrapper == InlineWrapper::Transparent =>
-					{
-						InlineWrapper::Transparent
-					}
-					_ => InlineWrapper::Html,
-				},
+		if let Some(wrapper) = InlineWrapper::of(name) {
+			// an unstyled span closes the transparent mark it opened
+			let wrapper = match self.inline_stack.last() {
+				Some(mark)
+					if name == "span"
+						&& mark.wrapper == InlineWrapper::Transparent =>
+				{
+					InlineWrapper::Transparent
+				}
+				_ => wrapper,
 			};
 			self.close_inline(wrapper);
 			return;
@@ -863,7 +851,7 @@ impl NodeVisitor for MarkdownRenderer {
 
 		match name {
 			// ── Headings ──
-			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" if kept => {
+			name if kept && ReaderText::heading_level(name).is_some() => {
 				self.state.ensure_newline();
 				self.state.needs_block_separator = true;
 			}
@@ -938,7 +926,7 @@ impl NodeVisitor for MarkdownRenderer {
 					table.caption = caption;
 				}
 			}
-			"th" | "td" => {
+			name if Cells::is_cell_tag(name) => {
 				let Some((start, span)) =
 					self.tables.last_mut().and_then(|table| table.cell.take())
 				else {

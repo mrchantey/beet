@@ -18,28 +18,28 @@ pub struct ParagraphStyle(pub SmolStr);
 #[reflect(Component)]
 pub struct ListLevel(pub u8);
 
-/// A Word run's whole look, its `w:rPr` as a reader sees it: what a form
-/// signals by look, ie a highlighted placeholder or a red instruction.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect, Component)]
-#[reflect(Component, Default)]
-pub struct RunLook {
+/// A Word run's look, its `w:rPr` as a reader sees it, the projection's
+/// working value: the tree holds it as the elements
+/// [`RunLook::elements`] makes, which [`ReaderText::look`] reads back.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct RunLook {
 	/// `w:b`.
-	pub bold: bool,
+	bold: bool,
 	/// `w:i`.
-	pub italic: bool,
+	italic: bool,
 	/// The highlight colour by name, ie `yellow`, `w:highlight`.
-	pub highlight: Option<SmolStr>,
+	highlight: Option<SmolStr>,
 	/// The shading fill, `RRGGBB`, `w:shd`.
-	pub shading: Option<SmolStr>,
+	shading: Option<SmolStr>,
 	/// The text colour, `RRGGBB`, absent for automatic or black, `w:color`.
-	pub colour: Option<SmolStr>,
+	colour: Option<SmolStr>,
 }
 
 impl RunLook {
 	/// The elements the look projects to, outermost first: its highlight,
 	/// else its shading, as a `<mark>`, else its colour as a styled
 	/// `<span>`, then `<strong>`, then `<em>`.
-	pub(crate) fn elements(&self) -> Vec<Tagged> {
+	fn elements(&self) -> Vec<Tagged> {
 		let wrap = match (&self.highlight, &self.shading, &self.colour) {
 			(Some(highlight), ..) if highlight == "yellow" => {
 				Some(Tagged::new("mark"))
@@ -280,9 +280,6 @@ impl WordProjection {
 						.collect(),
 				});
 			}
-		}
-		if look != RunLook::default() {
-			changes.push(Projected::insert(entity, look));
 		}
 	}
 
@@ -549,11 +546,26 @@ pub(crate) mod test {
 			.xpect_contains("**Date** due\n")
 			.xnot()
 			.xpect_contains("PAGE");
-		world
-			.query::<&RunLook>()
-			.iter(&world)
-			.any(|look| look.colour.as_deref() == Some("FF0000"))
-			.xpect_true();
+		// the run's look reads back off the tree
+		let text = |world: &mut World, words: &str| {
+			world
+				.query::<(Entity, &Value)>()
+				.iter(world)
+				.find(|(_, value)| value.as_str().ok() == Some(words))
+				.map(|(entity, _)| entity)
+				.unwrap()
+		};
+		let delete = text(&mut world, "(Please delete");
+		let name = text(&mut world, "Name");
+		let placeholder = text(&mut world, "a < b");
+		world.with_state::<ReaderText, _>(|reader| {
+			reader.look(delete).colour.xpect_eq(Some("#FF0000".into()));
+			reader.look(name).bold.xpect_true();
+			reader
+				.look(placeholder)
+				.highlight
+				.xpect_eq(Some("yellow".into()));
+		});
 	}
 
 	/// A Word file's core properties lead its markdown as frontmatter, when

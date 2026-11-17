@@ -202,8 +202,7 @@ impl WordWriter {
 				.iter_descendants_depth_first(root)
 				.filter_map(|entity| {
 					let (_, element) = elements.get(entity).ok()?;
-					let is_paragraph = ReaderText::BLOCKS
-						.contains(&element.tag())
+					let is_paragraph = ReaderText::is_block(element.tag())
 						&& element.tag() != "pre";
 					let parent = tree.parent(entity)?;
 					// a new paragraph sits among the file's nodes

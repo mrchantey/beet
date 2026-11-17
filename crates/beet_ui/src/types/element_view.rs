@@ -82,6 +82,27 @@ impl<'a> ElementView<'a> {
 		}
 	}
 
+	/// Whether this is a checkbox ([`Self::is_checkbox`]), and if so whether
+	/// it is [`checked`](Self::checked).
+	pub fn checkbox(&self) -> Option<bool> {
+		self.is_checkbox().then(|| self.checked())
+	}
+
+	/// The value its inline `style` declares for the CSS `property`, ie
+	/// `#FF0000` for `color` in `style="color: #FF0000"`, the last
+	/// declaration winning as in CSS.
+	pub fn style_property(&self, property: &str) -> Option<SmolStr> {
+		let style = self.attribute_string("style");
+		style
+			.split(';')
+			.filter_map(|declaration| declaration.split_once(':'))
+			.filter(|(name, _)| name.trim().eq_ignore_ascii_case(property))
+			.map(|(_, value)| value.trim())
+			.filter(|value| !value.is_empty())
+			.last()
+			.map(SmolStr::new)
+	}
+
 	/// Whether a person may type here, as its `contenteditable` says:
 	/// `Some(false)` for `false`, `Some(true)` for an empty value, `true` or
 	/// `plaintext-only`, and `None` when absent or unrecognised, which

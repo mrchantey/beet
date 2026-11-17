@@ -143,7 +143,7 @@ fn collect_cell_rows(
 	let is_cell = |entity: Entity| {
 		elements
 			.get(entity)
-			.is_ok_and(|view| matches!(view.tag(), "td" | "th"))
+			.is_ok_and(|view| Cells::is_cell_tag(view.tag()))
 	};
 	let cells: Vec<Entity> = kids.iter().filter(|&kid| is_cell(kid)).collect();
 	if cells.is_empty() {
@@ -442,7 +442,7 @@ fn select_marker(
 /// the state *is* the text. `None` for every other input type, which paints
 /// its value as an editable textbox instead.
 fn checkbox_marker(view: &ElementView) -> Option<SmolStr> {
-	view.is_checkbox().then(|| match view.checked() {
+	view.checkbox().map(|checked| match checked {
 		true => "[x]".into(),
 		false => "[ ]".into(),
 	})

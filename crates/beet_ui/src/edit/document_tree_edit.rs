@@ -293,16 +293,15 @@ impl DocumentTreeEdit<'_, '_> {
 	/// ancestor.
 	fn paragraph(&self, entity: Entity) -> Option<Entity> {
 		self.parents.iter_ancestors(entity).find(|ancestor| {
-			self.tag(*ancestor)
-				.is_some_and(|tag| ReaderText::BLOCKS.contains(&tag))
+			self.tag(*ancestor).is_some_and(ReaderText::is_block)
 		})
 	}
 
 	/// The table cell around `entity`.
 	fn cell_of(&self, entity: Entity) -> Option<Entity> {
-		self.parents
-			.iter_ancestors(entity)
-			.find(|ancestor| matches!(self.tag(*ancestor), Some("td" | "th")))
+		self.parents.iter_ancestors(entity).find(|ancestor| {
+			self.tag(*ancestor).is_some_and(Cells::is_cell_tag)
+		})
 	}
 
 	/// Every paragraph under `root` at any depth, tables included, a
@@ -316,9 +315,7 @@ impl DocumentTreeEdit<'_, '_> {
 	fn push_paragraphs(&self, entity: Entity, out: &mut Vec<Entity>) {
 		for child in self.children(entity) {
 			match self.tag(child) {
-				Some(tag) if ReaderText::BLOCKS.contains(&tag) => {
-					out.push(child)
-				}
+				Some(tag) if ReaderText::is_block(tag) => out.push(child),
 				Some(tag) if RenderTreeQuery::is_textless(tag) => {}
 				_ => self.push_paragraphs(child, out),
 			}

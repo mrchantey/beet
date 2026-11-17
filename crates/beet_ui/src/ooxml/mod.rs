@@ -21,8 +21,9 @@
 //!   renderer. Text no reader sees, ie a field's instruction, is an
 //!   [`OoxmlNode::Text`] rather than a [`Value`].
 //! - **What HTML cannot say is components on the same entities**: what a
-//!   query wants, a paragraph's [`ParagraphStyle`], a [`ListLevel`], a run's
-//!   whole [`RunLook`], a workbook cell's [`CellAddress`] and [`CellFormula`].
+//!   query wants, a paragraph's [`ParagraphStyle`], a [`ListLevel`], a
+//!   workbook cell's [`CellAddress`] and [`CellFormula`]. A run's look is
+//!   its elements alone, read back by [`ReaderText::look`].
 //! - **An entity with no [`OoxmlNode`] is projection only**, ie a list's
 //!   `<ul>` or the `<strong>` inside a highlighted bold run. The writer
 //!   passes through it, writing its children in place.

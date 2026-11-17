@@ -300,6 +300,14 @@ impl CellText {
 }
 
 impl Cells<'_, '_> {
+	/// Whether `tag` is a table cell's, `td` or `th`.
+	pub fn is_cell_tag(tag: &str) -> bool { matches!(tag, "td" | "th") }
+
+	/// Whether `tag` is a table's own structure: the table, a row or a cell.
+	pub fn is_table_tag(tag: &str) -> bool {
+		matches!(tag, "table" | "tr") || Self::is_cell_tag(tag)
+	}
+
 	/// Every addressed cell under `root` in document order, with its address.
 	pub fn cells(&self, root: Entity) -> Vec<(CellAddress, Entity)> {
 		self.children
@@ -420,12 +428,12 @@ impl Cells<'_, '_> {
 		for (index, table) in tables.into_iter().enumerate() {
 			let number = CellAddress::count(index);
 			numbering.tables.push((table, number));
-			let rows = self.within(table, &["tr"]);
+			let rows = self.within(table, Self::is_row_tag);
 			// the slots a `rowspan` from a row above still holds, by row
 			let mut held = HashSet::<(usize, u32)>::default();
 			for (row_index, row) in rows.iter().enumerate() {
 				let mut column = 1;
-				for cell in self.within(*row, &["td", "th"]) {
+				for cell in self.within(*row, Self::is_cell_tag) {
 					while held.contains(&(row_index, column)) {
 						column += 1;
 					}
@@ -470,23 +478,25 @@ impl Cells<'_, '_> {
 	/// Whether any cell of `table`, a nested table's aside, carries a
 	/// [`CellAddress`], ie the format addressed it.
 	fn is_addressed(&self, table: Entity) -> bool {
-		self.within(table, &["tr"]).into_iter().any(|row| {
-			self.within(row, &["td", "th"])
+		self.within(table, Self::is_row_tag).into_iter().any(|row| {
+			self.within(row, Self::is_cell_tag)
 				.into_iter()
 				.any(|cell| self.addresses.contains(cell))
 		})
 	}
 
-	/// The elements tagged `tags` under `parent`, in order, through every
+	fn is_row_tag(tag: &str) -> bool { tag == "tr" }
+
+	/// The elements whose tag `is` under `parent`, in order, through every
 	/// entity between that is no table, row or cell, ie a `<tbody>` or a
 	/// node a reader never sees.
-	fn within(&self, parent: Entity, tags: &[&str]) -> Vec<Entity> {
+	fn within(&self, parent: Entity, is: fn(&str) -> bool) -> Vec<Entity> {
 		let mut out = Vec::new();
 		for child in self.children.get(parent).into_iter().flatten() {
 			match self.tag(*child) {
-				Some(tag) if tags.contains(&tag) => out.push(*child),
-				Some("table" | "tr" | "td" | "th") => {}
-				_ => out.extend(self.within(*child, tags)),
+				Some(tag) if is(tag) => out.push(*child),
+				Some(tag) if Self::is_table_tag(tag) => {}
+				_ => out.extend(self.within(*child, is)),
 			}
 		}
 		out

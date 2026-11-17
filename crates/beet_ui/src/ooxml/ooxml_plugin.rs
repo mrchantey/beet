@@ -14,7 +14,6 @@ impl Plugin for OoxmlPlugin {
 		app.register_type::<CoreProperties>()
 			.register_type::<ParagraphStyle>()
 			.register_type::<ListLevel>()
-			.register_type::<RunLook>()
 			.register_type::<OoxmlNode>()
 			.register_type::<SheetCellStyle>()
 			.register_type::<Deck>()

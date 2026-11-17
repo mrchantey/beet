@@ -234,8 +234,8 @@ pub(crate) enum Projected {
 		wrappers: Vec<Tagged>,
 		content: Vec<Entity>,
 	},
-	/// A component the projection reads the node into, ie its
-	/// [`RunLook`](crate::prelude::RunLook).
+	/// A component the projection reads the node into, ie a paragraph's
+	/// [`ParagraphStyle`](crate::prelude::ParagraphStyle).
 	Insert(Entity, Box<dyn FnOnce(&mut EntityWorldMut)>),
 }
 
