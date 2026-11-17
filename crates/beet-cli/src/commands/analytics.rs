@@ -1,4 +1,3 @@
-use beet::net::prelude::Table;
 use beet::prelude::*;
 
 /// Summarize collected analytics: what kinds of clients connected, the pages they
@@ -50,31 +49,26 @@ pub async fn AnalyticsReport(
 	// the deploy provisions holds them both. `--rollup` names a store keeping
 	// the aggregates apart.
 	let store = match &store {
-		Some(uri) => BlobStore::from_uri(uri)?,
+		Some(uri) => AnalyticsStore::new(BlobStore::from_uri(uri)?),
 		None => {
 			let config = one_config(&world).await?;
-			StoreRef::resolve::<AnalyticsStore>(&world, config)
-				.await?
-				.store
+			StoreRef::resolve::<AnalyticsStore>(&world, config).await?
 		}
 	};
 	let rollups = match &rollup {
 		Some(uri) => BlobStore::from_uri(uri)?,
-		None => store.clone(),
+		None => store.store.clone(),
 	};
-	let store = AnalyticsStore::new(store);
-	let rollups = AnalyticsRollup::table(rollups);
-
-	// a store that was never written to (no analytics collected yet) reads as
+	// a store never written to (no analytics collected yet) summarizes as
 	// empty rather than an error, so the command works on a fresh site. The
-	// lossy read skips (and warns on) legacy-schema or corrupt rows rather than
+	// lossy reads skip (and warn on) legacy-schema or corrupt rows rather than
 	// failing the whole summary.
-	let events = store.read_all_lossy().await?;
-	let rollups = match raw_only {
-		true => Vec::new(),
-		false => read_table(&rollups).await?,
-	};
-	Response::ok_text(AnalyticsSummary::compose(&rollups, &events).to_string())
+	let rollups = AnalyticsRollup::table(rollups);
+	store
+		.summary((!raw_only).then_some(&rollups))
+		.await?
+		.to_string()
+		.xmap(Response::ok_text)
 		.xok()
 }
 
@@ -112,20 +106,6 @@ async fn one_config(world: &AsyncWorld) -> Result<Entity> {
 				.join(", ")
 		),
 	}
-}
-
-/// Reads every valid row from a table whose blob store may not exist yet.
-async fn read_table<T: TableStoreRow>(table: &Table<T>) -> Result<Vec<T>> {
-	match table.store_exists().await? {
-		true => table
-			.get_all_lossy()
-			.await?
-			.into_iter()
-			.map(|(_, row)| row)
-			.collect(),
-		false => Vec::new(),
-	}
-	.xok()
 }
 
 #[cfg(test)]

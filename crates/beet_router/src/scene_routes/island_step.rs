@@ -11,7 +11,10 @@
 //! An island's content builds inside its page's [`RequestContext`], so a
 //! widget in it reads the page off [`RequestContextStack`] as a layout widget
 //! does, and content that parks a [`TemplatePending`] dependency (a store
-//! read, a network fetch) is awaited before the root resolves. Everything the
+//! read, a network fetch) is awaited before the root resolves. The island
+//! route refuses content any part of which failed to build (its
+//! [`TemplateError`]), so the placeholder keeps its fallback rather than
+//! swapping in an empty island. Everything the
 //! step spawns sits under its island marked [`IslandResolution`]: the next
 //! resolution of the same island replaces it, and the page's release takes it
 //! back, so a persistent tree keeps nothing between requests.
@@ -149,6 +152,9 @@ impl IslandScope {
 	) -> Result {
 		for (island, content) in built {
 			Self::assert_content(world, *island, *content)?;
+			if let Self::Only(_) = self {
+				Self::assert_built(world, *island, *content)?;
+			}
 		}
 		if let (Self::Only(_), Some(island)) = (self, resolved.root)
 			&& let Some(style) = Self::spawn_fragment_style(world, island)?
@@ -311,6 +317,41 @@ impl IslandScope {
 					.map(|island| island.name.clone())
 					.unwrap_or_default();
 				bevybail!("server island `{name}` contains {found}")
+			}
+		}
+	}
+
+	/// Refuse island content any part of which failed to build, its
+	/// [`TemplateError`] (a failed read in async content included). Only the
+	/// island route asks: an error keeps the placeholder's fallback where an
+	/// empty island would replace it, while a live surface renders its islands
+	/// with the tolerance of the rest of its page.
+	fn assert_built(
+		world: &mut World,
+		island: Entity,
+		content: Entity,
+	) -> Result {
+		let failed = world
+			.with_state::<(RenderTreeQuery, Query<&TemplateError>), _>(
+				|(tree, errors)| {
+					tree.iter_descendants_inclusive(content).find_map(
+						|entity| {
+							errors
+								.get(entity)
+								.ok()
+								.map(|error| error.error.to_string())
+						},
+					)
+				},
+			);
+		match failed {
+			None => Ok(()),
+			Some(failed) => {
+				let name = world
+					.get::<ServerIsland>(island)
+					.map(|island| island.name.clone())
+					.unwrap_or_default();
+				bevybail!("server island `{name}` failed to build: {failed}")
 			}
 		}
 	}

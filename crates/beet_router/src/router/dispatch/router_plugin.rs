@@ -389,6 +389,12 @@ impl Plugin for RouterPlugin {
 			app.install(LeafletRenderer);
 			#[cfg(feature = "json")]
 			app.add_plugins(analytics_plugin);
+			// the visit count a server island reads back from the analytics
+			// store; a build without the store surface loads it inert
+			#[cfg(feature = "json")]
+			app.install_type::<VisitCount>();
+			#[cfg(not(feature = "json"))]
+			app.install(UnregisteredTag::allow("VisitCount"));
 		}
 	}
 }

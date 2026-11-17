@@ -161,10 +161,12 @@ It is never a route of its own. Its address is its page's path under a reserved 
 One declaration, three renders, chosen by the caller of `LivePage::prepare` and never by a param:
 
 - **Placeholder.** The http page handler's html: a `<beet-island name="<name>">` custom element around the fallback (so it sits inside a paragraph as well as a block), then a fixed inline script that fetches the island with `Accept: text/html` and swaps it in only when the response's `beet-island` header names it. The content never builds, so nothing live is cached with the page. A page carrying an island under a router with no `<ServerIslands/>` fails here.
-- **Island.** The island route's answer: the island built inside its page's request context, so a widget in it reads the page as a layout widget does, its async content awaited, led by a `<style>` of the rules its own subtree selects so a swap is styled on a process that never built it.
+- **Island.** The island route's answer: the island built inside its page's request context, so a widget in it reads the page as a layout widget does, its async content awaited, led by a `<style>` of the rules its own subtree selects so a swap is styled on a process that never built it. Content any part of which failed to build (a `TemplateError`, a failed read included) answers an error, so the placeholder keeps its fallback rather than swapping in an empty island.
 - **Inline.** Every other render, a live surface, a scoped render or any non-html response, builds every island in place like any other content.
 
 The island route's response carries the island's own `CacheHeaders`, `no-store` when it has none, never the page's or the router's. Island content carrying a `<script>`, which a swap leaves inert, two islands sharing a name on one page, and an island nested in another are errors.
+
+Async island content parks on its build root with `TemplatePending::register_fetch`, never `Loading`, and its failure rides `TemplateError`: `<VisitCount/>` (the analytics store's visits, read as `beet analytics` reads them) is the worked example.
 
 ## Syndication
 

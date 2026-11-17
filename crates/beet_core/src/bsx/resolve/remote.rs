@@ -47,9 +47,9 @@ impl TemplatePending {
 	///
 	/// The task ends with the entity, and a guard dropped by a cancelled or dead
 	/// task resolves through the sweep, so the fetch can never hang the load.
-	/// Public so a higher layer can build its own store-backed front-end on the
-	/// same wiring (eg `beet_router`'s `<Template src>` include reads the bytes
-	/// through a `BlobStore` it alone can reference).
+	/// Public so a higher layer can build its own async content on the same
+	/// wiring, ie `beet_router`'s `<Template src>` include and its
+	/// `<VisitCount/>`, each reading through a store it alone can reference.
 	pub fn register_fetch<Func, Fut>(
 		entity: &mut EntityWorldMut,
 		kind: PendingKind,
@@ -66,7 +66,8 @@ impl TemplatePending {
 				|| !world.contains_resource::<AsyncSpawner>()
 			{
 				bevybail!(
-					"a remote schema/template needs the async runtime (add `AsyncPlugin`)"
+					"async template content (a remote schema or template, a store \
+					 read) needs the async runtime: add `AsyncPlugin`"
 				);
 			}
 			TemplatePending::park(world, id, kind, label).xok()

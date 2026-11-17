@@ -291,6 +291,9 @@ token (plus AWS for the social stack's state bucket).
 			<Sitemap/>
 			<Robots/>
 			<SearchIndex/>
+			<!-- the address every page's server islands are fetched from,
+			     `/_server-islands/<page>/<name>`, listed by none of the above -->
+			<ServerIslands/>
 			<!-- a link preview for every page the sitemap lists, derived into
 			     `site/assets/og` by `<Derive/>` and named by each page's head.
 			     The font is the TTF of the face the site serves as woff2, which

@@ -7,6 +7,9 @@ title = "Beet"
 	<p class="text-title-large">
 		<b>An Atmospheric OS for homegrown tech</b>
 	</p>
+	<ServerIsland name="visits" {CacheHeaders{edge_max_age: "60s"}}>
+		<p class="text-label-medium"><VisitCount/> and counting</p>
+	</ServerIsland>
 	<div bx:style="max-width=Rem(34.0)">
 		<div class="card-filled">
 			<h3>🚧 Mind your step! 🚧</h3>

@@ -59,11 +59,40 @@ impl AnalyticsStore {
 		}
 	}
 
-	/// Read every raw segment, deduplicating repeated event ids to their newest
-	/// timestamp and skipping unreadable segment objects with a warning.
+	/// Read every raw event this writer can see: each segment in the store and
+	/// its own buffer not yet flushed, deduplicating repeated event ids to their
+	/// newest timestamp and skipping unreadable segment objects with a warning.
 	pub async fn read_all_lossy(&self) -> Result<Vec<AnalyticsEvent>> {
 		let segments = AnalyticsSegment::read_all_lossy(&self.store).await?;
-		Self::dedupe(segments.into_iter().flat_map(|(_, events)| events)).xok()
+		let buffered = self.buffer.lock().unwrap().events.clone();
+		segments
+			.into_iter()
+			.flat_map(|(_, events)| events)
+			.chain(buffered)
+			.xmap(Self::dedupe)
+			.xok()
+	}
+
+	/// Compose the [`AnalyticsSummary`] of everything recorded: the daily
+	/// aggregates in `rollups` for the days they cover, and the raw events
+	/// (this writer's buffer included) for the rest. `None` reads the raw
+	/// events alone, and a rollup store never written to reads as empty, so a
+	/// fresh site summarizes rather than failing.
+	pub async fn summary(
+		&self,
+		rollups: Option<&Table<AnalyticsRollup>>,
+	) -> Result<AnalyticsSummary> {
+		let events = self.read_all_lossy().await?;
+		let rollups = match rollups {
+			Some(table) if table.store_exists().await? => table
+				.get_all_lossy()
+				.await?
+				.into_iter()
+				.map(|(_, row)| row)
+				.collect(),
+			_ => Vec::new(),
+		};
+		AnalyticsSummary::compose(&rollups, &events).xok()
 	}
 
 	/// Take the buffer only when its oldest event reached the age limit.
@@ -350,6 +379,30 @@ mod test {
 		loaded.len().xpect_eq(1);
 		loaded[0].id.xpect_eq(id);
 		loaded[0].path.as_str().xpect_eq("/about");
+	}
+
+	/// A summary reads the writer's unflushed buffer beside its segments and
+	/// the aggregates, so a count is current to the last event recorded.
+	#[beet_core::test]
+	async fn summary_reads_the_buffer() {
+		let store = BlobStore::temp();
+		let analytics = AnalyticsStore::new(store.clone());
+		analytics.record(request("/flushed")).await.unwrap();
+		analytics.flush().await.unwrap();
+		analytics.record(request("/buffered")).await.unwrap();
+		let mut old = request("/old");
+		old.timestamp -= 2 * 86_400_000;
+		let rollups = AnalyticsRollup::table(store);
+		for row in AnalyticsRollup::from_events(&[old]) {
+			rollups.push(row).await.unwrap();
+		}
+		analytics.summary(None).await.unwrap().requests.xpect_eq(2);
+		analytics
+			.summary(Some(&rollups))
+			.await
+			.unwrap()
+			.requests
+			.xpect_eq(3);
 	}
 
 	#[cfg(not(target_arch = "wasm32"))]
