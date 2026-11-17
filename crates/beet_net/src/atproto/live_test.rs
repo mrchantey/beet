@@ -10,36 +10,6 @@ use beet_core::prelude::*;
 /// beet.org's did, whose profile carries a blob.
 const BEET_ORG: &str = "did:plc:vgxy56shhs3t3b2mu2avizjf";
 
-/// The throwaway account's repo, or `None` after a note naming what is
-/// missing.
-fn throwaway() -> Option<(SmolStr, Pds)> {
-	const VARS: [&str; 3] = [
-		"BEET_TEST_ATPROTO_HANDLE",
-		"BEET_TEST_ATPROTO_DID",
-		"BEET_TEST_ATPROTO_APP_PASSWORD",
-	];
-	let missing = VARS
-		.iter()
-		.filter(|var| env_ext::var(var).is_err())
-		.copied()
-		.collect::<Vec<_>>();
-	if !missing.is_empty() {
-		warn!(
-			"skipping a live atproto write: {} not set, see the `atproto` \
-			 module docs for the throwaway account",
-			missing.join(", ")
-		);
-		return None;
-	}
-	let handle = env_ext::var(VARS[0]).ok()?;
-	let did = Did::parse(&env_ext::var(VARS[1]).ok()?).unwrap();
-	let auth = AppPassword::new(did.clone(), VARS[2]);
-	Some((
-		handle.into(),
-		Pds::new(XrpcPds::new(did).with_auth(Some(auth))),
-	))
-}
-
 /// A record read from a real PDS answers the cid the emulator computes for
 /// its body, which is what keeps a repo in a bucket and one on the network
 /// interchangeable.
@@ -100,7 +70,7 @@ async fn a_read_only_repo_refuses_writes() {
 #[ignore = "live: talks to the public network"]
 #[beet_core::test(timeout_ms = 120_000)]
 async fn converges_a_live_repo() {
-	let Some((handle, pds)) = throwaway() else {
+	let Some((handle, pds)) = XrpcPds::throwaway() else {
 		return;
 	};
 	HandleResolver::default()

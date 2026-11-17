@@ -87,41 +87,16 @@ impl StandardSiteIndex {
 	/// Errors when the repo holds no publication at `url`, or a record of
 	/// either collection does not read as its lexicon.
 	pub async fn from_repo(pds: &Pds, url: &Uri) -> Result<Self> {
-		let publication = pds
-			.list::<StandardSitePublication>()
+		StandardSiteRecords::read(pds, url)
 			.await?
-			.into_iter()
-			.find(|entry| &entry.value.url == url)
+			.index()
 			.ok_or_else(|| {
 				bevyhow!(
 					"{} holds no publication at `{url}`: `{}` writes it",
 					pds.describe(),
 					StandardSitePub::WRITTEN_BY
 				)
-			})?;
-		let mut documents = pds
-			.list::<StandardSiteDocument>()
-			.await?
-			.into_iter()
-			.filter(|entry| {
-				entry.value.site.at_uri().as_ref() == Some(&publication.uri)
 			})
-			.filter_map(|entry| {
-				StandardSiteIndexDocument {
-					path: entry.value.path?,
-					uri: entry.uri,
-					cid: entry.cid,
-					bsky_post: entry.value.bsky_post_ref,
-				}
-				.xmap(Some)
-			})
-			.collect::<Vec<_>>();
-		documents.sort_by(|left, right| left.path.cmp(&right.path));
-		Self {
-			publication: publication.strong_ref(),
-			documents,
-		}
-		.xok()
 	}
 
 	/// The document at `path`, the document's own `path`, ie
@@ -225,6 +200,88 @@ impl StandardSiteIndex {
 		));
 		world.flush();
 		Ok(())
+	}
+}
+
+/// A publication's records as its repo holds them, read by listing both
+/// collections: the memory the publish steps converge against and the index
+/// is rebuilt from. Every record carries its natural key, so the listing finds
+/// a record whatever an index lost, a run interrupted before the index was
+/// written included.
+#[derive(Debug, Default, Clone)]
+pub struct StandardSiteRecords {
+	/// The publication, found by its natural key, its `url`; `None` before
+	/// the first publish.
+	pub publication: Option<RecordEntry<StandardSitePublication>>,
+	/// Every document naming the publication, in rkey order.
+	pub documents: Vec<RecordEntry<StandardSiteDocument>>,
+}
+
+impl StandardSiteRecords {
+	/// The records of the publication at `url` in `pds`. Where several
+	/// publications share the url the earliest wins, and the converge reports
+	/// the rest as orphans.
+	///
+	/// # Errors
+	/// Errors when a record of either collection does not read as its
+	/// lexicon.
+	pub async fn read(pds: &Pds, url: &Uri) -> Result<Self> {
+		let Some(publication) = pds
+			.list::<StandardSitePublication>()
+			.await?
+			.into_iter()
+			.find(|entry| &entry.value.url == url)
+		else {
+			return Self::default().xok();
+		};
+		let documents = pds
+			.list::<StandardSiteDocument>()
+			.await?
+			.into_iter()
+			.filter(|entry| {
+				entry.value.site.at_uri().as_ref() == Some(&publication.uri)
+			})
+			.collect();
+		Self {
+			publication: Some(publication),
+			documents,
+		}
+		.xok()
+	}
+
+	/// The document whose `path` is `path`, ie `/full-stack-bevy`.
+	pub fn document(
+		&self,
+		path: &str,
+	) -> Option<&RecordEntry<StandardSiteDocument>> {
+		self.documents
+			.iter()
+			.find(|entry| entry.value.path.as_deref() == Some(path))
+	}
+
+	/// The index of these records, `None` without a publication: every
+	/// document with a `path`, ordered by it.
+	pub fn index(&self) -> Option<StandardSiteIndex> {
+		let publication = self.publication.as_ref()?;
+		let mut documents = self
+			.documents
+			.iter()
+			.filter_map(|entry| {
+				StandardSiteIndexDocument {
+					path: entry.value.path.clone()?,
+					uri: entry.uri.clone(),
+					cid: entry.cid.clone(),
+					bsky_post: entry.value.bsky_post_ref.clone(),
+				}
+				.xmap(Some)
+			})
+			.collect::<Vec<_>>();
+		documents.sort_by(|left, right| left.path.cmp(&right.path));
+		StandardSiteIndex {
+			publication: publication.strong_ref(),
+			documents,
+		}
+		.xmap(Some)
 	}
 }
 

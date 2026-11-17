@@ -81,6 +81,12 @@ impl FeedPost {
 		segments
 	}
 
+	/// The link card the post embeds, `None` for a post embedding anything
+	/// else or nothing.
+	pub fn external(&self) -> Option<EmbedExternal> {
+		self.embed.as_ref().and_then(EmbedExternal::from_union)
+	}
+
 	/// A post of `rich` text, written at `created_at`.
 	pub fn new(rich: RichText, created_at: Timestamp) -> Self {
 		Self {

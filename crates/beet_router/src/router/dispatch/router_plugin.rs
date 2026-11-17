@@ -400,6 +400,14 @@ impl Plugin for RouterPlugin {
 				UnregisteredTag::allow("StandardSiteComments"),
 				UnregisteredTag::allow("StandardSiteReplyLink"),
 			));
+			// the publish sequence's steps, which write to a repo and fetch
+			// the live site; the route declaring them is gated on the same
+			// feature, so no build loads them inert
+			#[cfg(feature = "atproto")]
+			app.register_type::<StandardSitePublish>()
+				.register_type::<StandardSiteAnnounce>()
+				.register_type::<StandardSiteIndexWrite>()
+				.register_type::<StandardSiteProbe>();
 			#[cfg(feature = "leaflet")]
 			app.install(LeafletRenderer);
 			#[cfg(feature = "json")]

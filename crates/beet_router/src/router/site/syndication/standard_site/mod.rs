@@ -26,6 +26,13 @@
 //! - [`StandardSiteComments`], an article's comments, the replies to its
 //!   announcement read live from the AppView with the `atproto` feature, and
 //!   [`StandardSiteReplyLink`], the link to reply
+//! - with the `atproto` feature, the publish sequence, each step reaching its
+//!   declaration through a [`PublicationRef`]: `StandardSitePublish` (the
+//!   publication and the documents a run names), `StandardSiteAnnounce` (the
+//!   announcements and the reposts), `StandardSiteIndexWrite` (the index,
+//!   rewritten from the repo), and `StandardSiteProbe`, the live site checked
+//!   against the repo. The repo is their memory, [`StandardSiteRecords`] read
+//!   by listing, so a run interrupted anywhere resumes
 //! - the [`StandardSiteContentFormats`] registry a publication's `content`
 //!   NSID resolves through, and with the `leaflet` feature `LeafletContent`,
 //!   `pub.leaflet.content`, the rich `content` format, rendered by the
@@ -51,8 +58,18 @@ mod leaflet;
 mod publication;
 #[cfg(feature = "json")]
 mod publish;
+#[cfg(feature = "atproto")]
+mod publishing;
+#[cfg(feature = "atproto")]
+mod standard_site_announce;
 mod standard_site_index;
+#[cfg(feature = "atproto")]
+mod standard_site_index_write;
+#[cfg(feature = "atproto")]
+mod standard_site_probe;
 mod standard_site_pub;
+#[cfg(feature = "atproto")]
+mod standard_site_publish;
 mod theme;
 pub use comments::*;
 pub use content_format::*;
@@ -60,8 +77,16 @@ pub use document::*;
 #[cfg(feature = "leaflet")]
 pub use leaflet::*;
 pub use publication::*;
+#[cfg(feature = "atproto")]
+pub use standard_site_announce::*;
 pub use standard_site_index::*;
+#[cfg(feature = "atproto")]
+pub use standard_site_index_write::*;
+#[cfg(feature = "atproto")]
+pub use standard_site_probe::*;
 pub use standard_site_pub::*;
+#[cfg(feature = "atproto")]
+pub use standard_site_publish::*;
 pub use theme::*;
 
 /// What every standard site test serializes against: the fixture

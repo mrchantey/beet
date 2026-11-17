@@ -65,6 +65,41 @@ impl XrpcPds {
 		self
 	}
 
+	/// The env vars naming the throwaway account a live write test writes
+	/// to, its handle, did and app password, the runbook in the `atproto`
+	/// module docs.
+	pub const THROWAWAY_VARS: [&'static str; 3] = [
+		"BEET_TEST_ATPROTO_HANDLE",
+		"BEET_TEST_ATPROTO_DID",
+		"BEET_TEST_ATPROTO_APP_PASSWORD",
+	];
+
+	/// The throwaway account's handle and writable repo, or `None` after a
+	/// warning naming what is missing, so a live write test skips on a
+	/// checkout without the account. Never an account anything publishes
+	/// from.
+	pub fn throwaway() -> Option<(SmolStr, Pds)> {
+		let [handle, did, password] = Self::THROWAWAY_VARS;
+		let missing = Self::THROWAWAY_VARS
+			.into_iter()
+			.filter(|var| env_ext::var(var).is_err())
+			.collect::<Vec<_>>();
+		if !missing.is_empty() {
+			warn!(
+				"skipping a live atproto write: {} not set, see the `atproto` \
+				 module docs for the throwaway account",
+				missing.join(", ")
+			);
+			return None;
+		}
+		let did = Did::parse(&env_ext::var(did).ok()?).ok()?;
+		let auth = AppPassword::new(did.clone(), password);
+		Some((
+			env_ext::var(handle).ok()?.into(),
+			Pds::new(Self::new(did).with_auth(Some(auth))),
+		))
+	}
+
 	/// Write with `auth`; `None` keeps the repo read only.
 	pub fn with_auth(mut self, auth: Option<impl AtprotoAuth>) -> Self {
 		self.auth = auth.map(|auth| Arc::new(auth) as Arc<dyn AtprotoAuth>);

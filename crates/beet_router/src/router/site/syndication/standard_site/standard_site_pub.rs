@@ -158,12 +158,24 @@ impl StandardSitePub {
 }
 
 impl TypeInstaller for StandardSitePub {
-	/// Registers the declaration and the observer declaring and loading each
-	/// one's index.
+	/// Registers the declaration, the reference naming it, and the observer
+	/// declaring and loading each one's index.
 	fn install(app: &mut App) {
-		app.register_type::<Self>().add_observer(declare_index);
+		app.register_type::<Self>()
+			.register_type::<PublicationRef>()
+			.add_observer(declare_index);
 	}
 }
+
+/// Names a [`StandardSitePub`] declared elsewhere in the document, so a
+/// publish step outside the served router reaches it:
+/// `{PublicationRef($harvest)}` beside a
+/// `<StandardSitePub bx:ref="harvest" ../>`, on the step or an ancestor.
+#[derive(
+	Debug, Clone, Copy, PartialEq, Eq, Component, Reflect, MapEntities,
+)]
+#[reflect(Component, MapEntities)]
+pub struct PublicationRef(#[entities] pub Entity);
 
 /// Observer: land the [`Derivation`] a [`StandardSitePub`] declares, then load
 /// its index from the store it resolves by ancestry, the build's [`Ready`]

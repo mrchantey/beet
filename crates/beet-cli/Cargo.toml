@@ -64,6 +64,11 @@ infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/scheduled_job_block
 # entry's `social` stack resolves its tags. Run with:
 # `cargo run -p beet-cli --features infra,extra,atproto -- --entry=site social deploy --stage=prod`.
 atproto = ["beet/atproto"]
+# The Leaflet render target, a standard site document's rich body. Only the
+# binary running the site entry's `social/publish` verb links it (the
+# `site-social` recipe); a served site answers its media type 406, so it never
+# joins a deployed binary's features.
+leaflet = ["beet/leaflet"]
 # The windowed render stack, so one `beet` binary runs a wgpu scene `.bsx` (which
 # spawns its own `Window`) and a headless server `.bsx` from the same build. Pulls
 # `beet/examples` (winit + bevy_default + spatial + `extra`), so `BeetPlugins` adds

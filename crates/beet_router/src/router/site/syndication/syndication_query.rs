@@ -123,9 +123,9 @@ impl SyndicationQuery<'_, '_> {
 	}
 
 	/// The listed pages under `root` in the url space `entity` belongs to, in
-	/// route-tree order: every public page, plus the drafts outside
-	/// production, never the unlisted. The one selection every syndication
-	/// face lists, a social card set included.
+	/// route-tree order: every public page, never a draft or an unlisted one,
+	/// in any build. The one selection every syndication face lists, a social
+	/// card set and a standard.site publication included.
 	///
 	/// # Errors
 	/// Errors when `entity` is in no [`RouteTree`].
@@ -136,8 +136,9 @@ impl SyndicationQuery<'_, '_> {
 	) -> Result<Vec<SyndicationPage>> {
 		let tree = self.trees.get(entity)?;
 		// a draft is invisible in production exactly as it is to dispatch and
-		// to static export; the syndication routes additionally drop the
-		// unlisted, which serve but are advertised nowhere.
+		// to static export; the syndication routes additionally drop every
+		// page that is not public, the unlisted (which serve but are
+		// advertised nowhere) and a draft in every build.
 		let is_prod = BootstrapConfig::get().is_prod();
 		tree.find_subtree(&root.segments())
 			.unwrap_or(tree)

@@ -57,10 +57,11 @@
 //! beet secrets/set BEET_TEST_ATPROTO_APP_PASSWORD --group=agents --role=env_var --note="app password for that account" --roll="manual:https://bsky.app/settings/app-passwords"
 //! ```
 //!
-//! A live write test reads the three and skips with a note naming them when
-//! any is absent, so a fresh checkout passes without the account. The did is
-//! stored rather than resolved because a handle can be renamed and a test
-//! should not depend on a lookup to decide whether to run.
+//! A live write test reads the three through `XrpcPds::throwaway`, which
+//! answers `None` with a note naming them when any is absent, so a fresh
+//! checkout passes without the account. The did is stored rather than
+//! resolved because a handle can be renamed and a test should not depend on
+//! a lookup to decide whether to run.
 mod atproto_account;
 mod atproto_plugin;
 mod bsky;

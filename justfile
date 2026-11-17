@@ -125,12 +125,14 @@ beet-shared *args:
 # push that also prunes what `site/assets` no longer holds).
 site-shared *args:
   cargo run -p beet-cli --features infra,extra -- --entry=site shared "$@"
-# The atproto handles under beet.org (the site entry's `social` stack):
-# `just site-social plan|deploy|probe|destroy --stage=prod`. Prod only: the
-# block's `dns_stage` publishes nothing from any other stage. `atproto` with
-# `infra` links the block.
+# The atproto handles under beet.org and the blog's standard.site records (the
+# site entry's `social` stack): `just site-social plan|deploy|probe|destroy
+# --stage=prod`, and `just site-social publish --only=<slug>`. Prod only for
+# the handles: the block's `dns_stage` publishes nothing from any other stage.
+# `atproto` with `infra` links the block; `leaflet` renders each post's rich
+# body, which only the publishing binary needs.
 site-social *args:
-  cargo run -p beet-cli --features infra,extra,atproto -- --entry=site social "$@"
+  cargo run -p beet-cli --features infra,extra,atproto,leaflet -- --entry=site social "$@"
 # Diff the beet.org zone against every stack the site entry declares, reporting
 # the strays; `--fix` deletes them. Built with `atproto` so the handle records
 # are declarations rather than strays.
@@ -366,9 +368,11 @@ _test-pkgs-wasm pkgs *args: _cli
 # folds back into the one above on its next release.
 # The atproto suites that talk to the network: unauthenticated reads of real
 # accounts, and writes to the throwaway account `beet_net`'s `atproto` module
-# docs set up, skipped with a note naming its secrets when they are absent.
+# docs set up, skipped with a note naming its secrets when they are absent:
+# the converge, then the whole standard.site publish sequence.
 test-atproto-live *args:
 	cargo test -p beet_net --lib --features atproto,ureq,rustls-tls {{ args }} -- --include-ignored --include '*live_test*'
+	cargo test -p beet_router --lib --features atproto,leaflet,vault,beet_net/rustls-tls {{ args }} -- --include-ignored --include '*publishes_to_a_live_repo*'
 
 test-wasm-sqlite *args: _cli
 	cargo test -p beet_net --lib --target wasm32-unknown-unknown \

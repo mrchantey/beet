@@ -78,7 +78,8 @@ use beet_core::prelude::*;
 /// A file whose producer reads what a deploy must never depend on (a listing
 /// of a remote repo, say) names the verb that alone writes it
 /// ([`written_by`](Self::written_by)): an ensure step leaves it as committed,
-/// and `beet check` names the verb for a missing or stale one.
+/// `beet check` names the verb for a missing or stale one, and the verb writes
+/// it with [`Derivation::rewrite`], whatever its freshness.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct Derivation {
@@ -184,13 +185,34 @@ impl Derivation {
 		if freshness.is_fresh() {
 			debug!("derived file `{}` is fresh", derivation.path);
 		} else {
-			derivation.regenerate(world.entity(entity), store).await?;
+			derivation
+				.regenerate(world.entity(entity), store, false)
+				.await?;
 			info!(
 				"derived file `{}` regenerated: {freshness}",
 				derivation.path
 			);
 		}
 		freshness.xok()
+	}
+
+	/// Regenerate the derived file `entity` declares in `store` whatever its
+	/// freshness, which is how the verb a file is
+	/// [`written_by`](Self::written_by) writes it, since such a file's
+	/// provenance may name nothing that could go stale. A document matching
+	/// the one in place but for its creation time leaves the file untouched,
+	/// so running the verb twice changes nothing. Answers whether it wrote.
+	pub async fn rewrite(
+		world: &AsyncWorld,
+		entity: Entity,
+		store: &BlobStore,
+	) -> Result<bool> {
+		world
+			.entity(entity)
+			.get_cloned::<Self>()
+			.await?
+			.regenerate(world.entity(entity), store, true)
+			.await
 	}
 
 	/// The derivation `entity` declares, and its freshness in `store`.
@@ -283,13 +305,16 @@ impl Derivation {
 	}
 
 	/// Run the producing action and write the document it answers, stamped
-	/// with the time, this declaration's ttl and its values, removing every output the
-	/// document it replaces listed and this one does not.
+	/// with the time, this declaration's ttl and its values, removing every
+	/// output the document it replaces listed and this one does not. With
+	/// `keep_unchanged`, a document equal to the one in place but for its
+	/// creation time is not written. Answers whether it wrote.
 	async fn regenerate(
 		&self,
 		entity: AsyncEntity,
 		store: &BlobStore,
-	) -> Result {
+		keep_unchanged: bool,
+	) -> Result<bool> {
 		let produces = entity
 			.get::<ActionMeta, _>(|meta| {
 				meta.matches::<BlobStore, EntityBody>()
@@ -305,12 +330,10 @@ impl Derivation {
 			);
 		}
 		// a previous document that no longer reads lists nothing to remove
-		let superseded = self
-			.read(store)
-			.await
-			.ok()
-			.flatten()
-			.map(|body| DerivationOutputs::of(&body))
+		let previous = self.read(store).await.ok().flatten();
+		let superseded = previous
+			.as_ref()
+			.map(DerivationOutputs::of)
 			.transpose()?
 			.unwrap_or_default();
 		let mut body =
@@ -322,21 +345,31 @@ impl Derivation {
 				self.path
 			);
 		}
-		let provenance = body.get::<Provenance>()?;
-		body.insert(&Provenance {
+		let produced = body.get::<Provenance>()?;
+		let mut provenance = Provenance {
 			created: Timestamp::now(),
 			ttl: self.ttl,
-			sources: provenance
+			sources: produced
 				.sources
 				.into_iter()
 				.filter(|source| !matches!(source, ProvenanceSource::Value(_)))
 				.chain(self.values.iter().cloned().map(ProvenanceSource::Value))
 				.collect(),
-		})?;
-		let bytes = self
-			.media_type()?
-			.serialize_with_options(&body, SerializeOptions { pretty: true })?;
-		store.insert(&self.path, bytes).await?;
+		};
+		// unchanged but for when it was made: keep the file in place
+		if keep_unchanged
+			&& let Some(previous) = &previous
+			&& let Ok(previous_provenance) = previous.get::<Provenance>()
+		{
+			provenance.created = previous_provenance.created;
+			body.insert(&provenance)?;
+			if self.encode(&body)? == self.encode(previous)? {
+				return Ok(false);
+			}
+			provenance.created = Timestamp::now();
+		}
+		body.insert(&provenance)?;
+		store.insert(&self.path, self.encode(&body)?).await?;
 		let outputs = DerivationOutputs::of(&body)?;
 		for output in superseded
 			.0
@@ -347,7 +380,14 @@ impl Derivation {
 				store.remove(&output.path).await?;
 			}
 		}
-		Ok(())
+		Ok(true)
+	}
+
+	/// `body` in the format the path's extension names, pretty where the
+	/// format has one.
+	fn encode(&self, body: &EntityBody) -> Result<Vec<u8>> {
+		self.media_type()?
+			.serialize_with_options(body, SerializeOptions { pretty: true })
 	}
 }
 
@@ -655,6 +695,49 @@ mod test {
 			.get::<Echo>()
 			.unwrap()
 			.0
+	}
+
+	/// [`Derivation::rewrite`] in `world`'s async context.
+	async fn rewrite(
+		world: &mut World,
+		entity: Entity,
+		store: &BlobStore,
+	) -> Result<bool> {
+		let store = store.clone();
+		world
+			.run_async_then(async move |world| {
+				Derivation::rewrite(&world, entity, &store).await
+			})
+			.await
+	}
+
+	/// A rewrite runs the producer whatever the freshness, and leaves a file
+	/// it would only restamp byte for byte as it was.
+	#[beet_core::test]
+	async fn rewrites_only_a_changed_document() {
+		let (mut world, entity, store, runs) =
+			setup(Derivation::new(DERIVED), "first");
+		rewrite(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_true();
+		let written = store.get(&RelPath::new(DERIVED)).await.unwrap();
+		rewrite(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_false();
+		runs.get().xpect_eq(2);
+		store
+			.get(&RelPath::new(DERIVED))
+			.await
+			.unwrap()
+			.xpect_eq(written);
+		store.insert(&RelPath::new(SOURCE), "second").await.unwrap();
+		rewrite(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_true();
+		echo(&store).await.xpect_eq("second");
 	}
 
 	#[beet_core::test]

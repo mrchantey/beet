@@ -9,14 +9,18 @@
 mod actor_defs;
 #[cfg(feature = "atproto")]
 mod app_view;
+mod embed_external;
 mod feed_defs;
 mod feed_post;
+mod feed_repost;
 mod rich_text;
 mod richtext_facet;
 pub use actor_defs::*;
 #[cfg(feature = "atproto")]
 pub use app_view::*;
+pub use embed_external::*;
 pub use feed_defs::*;
 pub use feed_post::*;
+pub use feed_repost::*;
 pub use rich_text::*;
 pub use richtext_facet::*;

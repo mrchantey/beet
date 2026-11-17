@@ -228,6 +228,29 @@ The provider addresses (the region, the Cloudflare account and zone) are
 identifiers, not secrets, declared as spreads on the root `<Router>` below and
 resolved by ancestry. The social stack and the audit need only the Cloudflare
 token (plus AWS for the social stack's state bucket).
+
+## The publication
+
+The blog is a standard.site publication on `beet.org`'s repo, one document per
+dated post, each crediting its author and, once announced, pointing at the
+Bluesky post whose replies are its comments. `<StandardSitePub bx:ref="harvest">`
+in the served router declares it; `social/publish` converges the repo to it and
+rewrites the committed index the served site reads
+(`site/derived/standard-site.json`), so the index lands with the next deploy or
+`just beet-sync`. A post publishes only when named, so the back catalogue drips
+out rather than landing at once, and every step takes `--dry-run`:
+
+    just site-social publish --only=<slug> --dry-run          # read every line first
+    just site-social publish --only=<slug>                    # the publication and that post
+    just site-social publish --announce=<slug>                # its announcement, and the reposts
+    just site-social publish                                  # update what is published, create nothing
+    just site-social probe --stage=prod                       # the handles, then the live site against the repo
+
+The verb writes with the accounts' app passwords (`BEET_ORG_APP_PASSWORD`,
+`PETE_BEET_ORG_APP_PASSWORD`, `env_var` records in `secrets.toml`), and renders
+each post's Leaflet body, which only the `site-social` recipe's `leaflet`
+feature links: the deployed binary serves the records and the comments
+(`atproto`) and never renders Leaflet.
 -->
 <CliServer always=true {CallOnReady}>
 <!-- the provider addresses every stack below deploys into, resolved by
@@ -260,13 +283,18 @@ token (plus AWS for the social stack's state bucket).
 	<DocMetaRules tags={["malleable-software", "ecs", "bevy", "web", "terminal", "architecture", "release-notes", "atproto", "local-first", "behavior-trees", "talks"]}/>
 	<!-- the atproto accounts this entry reads and writes, each declared once
 	     and named by `bx:ref` wherever a declaration needs one (the handle
-	     block below). Plain data, outside every `bx:cfg`: the served site and
-	     the deploy verbs both read them, and a build without `atproto` keeps
-	     them as inert declarations. -->
+	     block, the publication). Plain data, outside every `bx:cfg`: the
+	     served site and the deploy verbs both read them, and a build without
+	     `atproto` keeps them as inert declarations. `secret` names the
+	     `secrets.toml` record holding each app password, read only by the
+	     `social/publish` verb; `pete.beet.org` reposts every announcement it
+	     authored. -->
 	<AtprotoAccount bx:ref="beet_org" handle="beet.org"
-		did="did:plc:vgxy56shhs3t3b2mu2avizjf" display_name="Beet"/>
+		did="did:plc:vgxy56shhs3t3b2mu2avizjf" display_name="Beet"
+		secret="BEET_ORG_APP_PASSWORD"/>
 	<AtprotoAccount bx:ref="pete" handle="pete.beet.org"
-		did="did:plc:hnv7bd4gtxrf7iigjo22qukp" display_name="Pete Hayman"/>
+		did="did:plc:hnv7bd4gtxrf7iigjo22qukp" display_name="Pete Hayman"
+		secret="PETE_BEET_ORG_APP_PASSWORD" auto_repost=true/>
 	<!-- the ssh terminal presents the host key `$ssh_host_key` declares: the
 	     launch's `secrets.toml` record locally, the stack's secret store on
 	     the box, failing the serve rather than presenting a stranger's key -->
@@ -296,6 +324,15 @@ token (plus AWS for the social stack's state bucket).
 			<!-- the address every page's server islands are fetched from,
 			     `/_server-islands/<page>/<name>`, listed by none of the above -->
 			<ServerIslands/>
+			<!-- the blog as a standard.site publication on `beet.org`'s repo,
+			     one document per dated post. The served half reads the index
+			     `social/publish` commits at `derived/standard-site.json`: the
+			     well-known file and each page's `<link>`s, and each article's
+			     comments island reading the replies to its announcement. At
+			     the router root, since its well-known route roots where it
+			     sits. -->
+			<StandardSitePub bx:ref="harvest" {AccountRef($beet_org)} path="blog"
+				name="The Full Moon Harvest"/>
 			<!-- a link preview for every page the sitemap lists, derived into
 			     `site/assets/og` by `<Derive/>` and named by each page's head.
 			     The font is the TTF of the face the site serves as woff2, which
@@ -405,11 +442,11 @@ token (plus AWS for the social stack's state bucket).
 			<Fragment bx:cfg="feature:infra && feature:extra">
 			<!-- the block + its build artifact share one entity (the deploy pairs them);
 			     the box alone is granted read on the host key -->
-			<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip" {ReadsSecrets([$ssh_host_key])}/>
+			<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip,atproto" {ReadsSecrets([$ssh_host_key])}/>
 			<!-- the box is replaceable, so it owns no durable timer: the rollup runs
 			     as an invoke-only lambda the schedule calls at 03:00 UTC, booting the
 			     `jobs` verb of this same document. -->
-			<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda"/>
+			<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda,atproto"/>
 			<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 			<!-- 💡 what a deploy DOES, as an ordered group rather than a route: the
 			     `deploy` verb `<DeployRoutes/>` spawns runs this list forward. -->
@@ -533,11 +570,21 @@ token (plus AWS for the social stack's state bucket).
 			     `CloudflareZone` declared on the root. -->
 			<AtprotoHandleBlock domain="beet.org" dns_stage="prod"
 				accounts={[$beet_org, $pete]}/>
+			<!-- the blog's records on `beet.org`'s repo, published on purpose
+			     and one post at a time, see "The publication" above -->
+			<Route path="publish" {(ExchangeSequence, PublicationRef($harvest))}>
+				<StandardSitePublish/>
+				<StandardSiteAnnounce/>
+				<StandardSiteIndexWrite/>
+			</Route>
 			<!-- the post-claim check: cheap, read-only, and the honest answer
 			     to "does the handle work", which nothing about a converged
-			     record can tell you. -->
+			     record can tell you. Then the same question of the
+			     publication: does the live site claim every record the repo
+			     holds, run once a deploy serves the index `publish` wrote. -->
 			<Route path="probe" {ExchangeSequence}>
 				<AtprotoHandleProbe/>
+				<StandardSiteProbe {PublicationRef($harvest)}/>
 			</Route>
 		</Stack>
 	</Route>
