@@ -17,9 +17,9 @@
 //! One declaration renders three ways, the caller's choice
 //! (the island step's module docs):
 //!
-//! - The http page handler's html leaves each island a placeholder: a wrapper
-//!   carrying `data-beet-island="<name>"` around the fallback, then a fixed
-//!   inline script that fetches the island's html and swaps it in. The content
+//! - The http page handler's html leaves each island a placeholder:
+//!   `<beet-island name="<name>">` around the fallback, a custom element so it
+//!   sits in a paragraph as well as a block, then a fixed inline script that fetches the island's html and swaps it in. The content
 //!   never builds, so a page the edge holds for a week holds nothing live.
 //! - The island route builds the one island inline and answers it alone, led
 //!   by a `<style>` of the rules its own subtree selects, with a `beet-island`
@@ -101,7 +101,7 @@ impl ServerIsland {
 	pub(crate) const SWAP_SCRIPT: &str = concat!(
 		"(()=>{",
 		"const wrapper=document.currentScript.previousElementSibling;",
-		"const name=wrapper.dataset.beetIsland;",
+		"const name=wrapper.getAttribute(\"name\");",
 		"const page=location.pathname.replace(/\\/$/,\"\");",
 		"fetch(\"/_server-islands\"+page+\"/\"+name,{headers:{accept:\"text/html\"}})",
 		".then(res=>res.ok&&res.headers.get(\"beet-island\")===name?res.text():null)",
@@ -384,7 +384,7 @@ mod test {
 		html(&mut world, router, "/blog/post")
 			.await
 			.xpect_contains(
-				"<div data-beet-island=\"visits\"><em>counting</em></div><script>",
+				"<beet-island name=\"visits\"><em>counting</em></beet-island><script>",
 			)
 			.xpect_contains("document.currentScript.previousElementSibling")
 			.xnot()
@@ -452,7 +452,7 @@ mod test {
 			.xpect_contains("island on /docs/intro");
 		html(&mut world, router, "/docs/intro")
 			.await
-			.xpect_contains("<div data-beet-island=\"where\"></div>")
+			.xpect_contains("<beet-island name=\"where\"></beet-island>")
 			.xnot()
 			.xpect_contains("island on");
 	}
@@ -629,7 +629,7 @@ mod test {
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
-			.xpect_contains("data-beet-island=\"visits\"")
+			.xpect_contains("<beet-island name=\"visits\">")
 			.xnot()
 			.xpect_contains("post visits");
 	}
@@ -661,7 +661,7 @@ mod test {
 		html(&mut world, router, "/")
 			.await
 			.xpect_contains(
-				"<div data-beet-island=\"visits\"><em>later</em></div>",
+				"<beet-island name=\"visits\"><em>later</em></beet-island>",
 			)
 			.xnot()
 			.xpect_contains("live");

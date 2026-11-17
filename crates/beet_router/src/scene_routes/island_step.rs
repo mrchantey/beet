@@ -246,8 +246,10 @@ impl IslandScope {
 		content.xok()
 	}
 
-	/// Spawn under `entity` the placeholder: a wrapper naming the island with
-	/// the fallback inside it, then the script that swaps the island in.
+	/// Spawn under `entity` the placeholder: a `<beet-island>` naming the
+	/// island with the fallback inside it, then the script that swaps the
+	/// island in. A custom element rather than a `<div>`, which the html
+	/// parser would end a surrounding `<p>` at.
 	fn spawn_placeholder(
 		world: &mut World,
 		entity: Entity,
@@ -258,7 +260,7 @@ impl IslandScope {
 		let name = island.name.to_string();
 		let wrapper = world
 			.spawn((IslandResolution, ChildOf(entity), rsx! {
-				<div data-beet-island=name/>
+				<beet-island name=name/>
 			}))
 			.id();
 		resolved.spawned.push(wrapper);
