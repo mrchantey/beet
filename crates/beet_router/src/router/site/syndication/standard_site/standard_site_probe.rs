@@ -34,10 +34,11 @@ pub async fn StandardSiteProbe(
 
 impl StandardSiteProbe {
 	/// Check `publishing`'s records against the site `fetch` answers for an
-	/// absolute url.
-	async fn audit(
+	/// absolute url. A plain [`Fn`] rather than an [`AsyncFn`], whose
+	/// borrowing call future rustc cannot prove `Send` inside an action.
+	async fn audit<Fut: Future<Output = Result<Response>>>(
 		publishing: &Publishing,
-		fetch: impl AsyncFn(Url) -> Result<Response>,
+		fetch: impl Fn(Url) -> Fut,
 	) -> Result {
 		let Some(index) = publishing.records().await?.index() else {
 			bevybail!(
@@ -127,8 +128,8 @@ impl StandardSiteProbe {
 	}
 
 	/// The body `fetch` answers for `url`, an error naming it unless 200.
-	async fn get(
-		fetch: &impl AsyncFn(Url) -> Result<Response>,
+	async fn get<Fut: Future<Output = Result<Response>>>(
+		fetch: &impl Fn(Url) -> Fut,
 		url: Url,
 	) -> Result<String> {
 		let response = fetch(url.clone()).await?;
@@ -156,12 +157,14 @@ mod test {
 			.run_async_then(async move |world| {
 				let publishing =
 					Publishing::resolve(&world.entity(step)).await?;
-				StandardSiteProbe::audit(&publishing, async |url: Url| {
-					world
-						.entity(root)
-						.exchange(Request::get(url.path_string()))
-						.await
-						.xok()
+				StandardSiteProbe::audit(&publishing, |url: Url| {
+					let entity = world.entity(root);
+					async move {
+						entity
+							.exchange(Request::get(url.path_string()))
+							.await
+							.xok()
+					}
 				})
 				.await
 			})

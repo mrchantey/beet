@@ -203,7 +203,7 @@ impl ThreadRoute {
 	fn last_agent_text(world: &World, thread: Entity) -> Option<String> {
 		let window = world.get::<ThreadWindow>(thread)?;
 		window
-			.post_views()
+			.authored_posts()
 			.filter(|view| {
 				view.actor.kind() == ActorKind::Agent
 					&& !view.post.in_progress()

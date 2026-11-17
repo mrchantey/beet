@@ -42,10 +42,12 @@ impl RichText {
 	pub const MAX_TAG_CHARS: usize = 64;
 
 	/// `text` with its facets, each mentioned handle resolved through
-	/// `resolve`.
-	pub async fn new(
+	/// `resolve`. A plain [`Fn`] returning one future type rather than an
+	/// [`AsyncFn`], whose borrowing call future rustc cannot prove `Send`
+	/// inside a caller's `Send` future.
+	pub async fn new<Fut: Future<Output = Result<Did>>>(
 		text: impl Into<String>,
-		resolve: impl AsyncFn(&str) -> Result<Did>,
+		resolve: impl Fn(SmolStr) -> Fut,
 	) -> Result<Self> {
 		let text = text.into();
 		let mut facets = Vec::new();
@@ -53,7 +55,7 @@ impl RichText {
 			let feature = match candidate {
 				Candidate::Link(uri) => FacetFeature::Link { uri },
 				Candidate::Tag(tag) => FacetFeature::Tag { tag },
-				Candidate::Mention(handle) => match resolve(&handle).await {
+				Candidate::Mention(handle) => match resolve(handle.clone()).await {
 					Ok(did) => FacetFeature::Mention { did },
 					Err(err) => {
 						warn!("@{handle} stays plain text: {err}");
@@ -75,7 +77,10 @@ impl RichText {
 		text: impl Into<String>,
 		resolver: &HandleResolver,
 	) -> Result<Self> {
-		Self::new(text, async |handle| resolver.resolve(handle).await).await
+		Self::new(text, move |handle| async move {
+			resolver.resolve(&handle).await
+		})
+		.await
 	}
 
 	/// Every live range of `text`, ordered by start.
@@ -172,7 +177,7 @@ mod test {
 	/// `text`'s facets, every mention resolving to the test did except
 	/// `@missing.example`.
 	async fn facets(text: &str) -> Vec<(usize, usize, FacetFeature)> {
-		RichText::new(text, async |handle| match handle {
+		RichText::new(text, async |handle| match handle.as_str() {
 			"missing.example" => bevybail!("no such handle"),
 			_ => Did::parse(EmulatorPds::TEST_DID),
 		})
