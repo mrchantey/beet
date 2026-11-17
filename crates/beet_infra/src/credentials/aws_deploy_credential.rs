@@ -72,8 +72,7 @@ use serde_json::Value;
 /// ## What converges
 ///
 /// - the user, `<repo>-deploy` ([`DeployCredential::name`]), created when
-///   absent, or renamed in place from the `<repo>-deployer` it was once called
-///   (its keys, policies and attachments go with it). Named for the
+///   absent. Named for the
 ///   CREDENTIAL DOCUMENT rather than for an app, since a document holds one
 ///   `AWS_ACCESS_KEY_ID` however many apps a repo deploys.
 /// - one managed policy per app, attached to the user, rewritten only when its
@@ -190,8 +189,8 @@ impl AwsDeployCredential {
 	/// ..and that account's name in the Organization, absent for the
 	/// management account itself.
 	const ACCOUNT_NAME: &'static str = "account_name";
-	/// Stands in for a member account's id in a dry run, which the move
-	/// learns, as [`AwsAccount`]'s own description writes it.
+	/// Stands in for a member account's id in a dry run, which only the
+	/// elevated deploy learns, as [`AwsAccount`]'s own description writes it.
 	const UNKNOWN_ACCOUNT: &'static str = "<id>";
 
 	/// The grant line naming a service-linked role the account must hold, ie
@@ -403,8 +402,8 @@ impl AwsDeployCredential {
 		};
 		let account = admin.account_id().await?;
 		// lowered against the launch's state bucket, which is another
-		// account's while the credential moves: inside a member it is granted
-		// that account's own, as the plain deploys after the move resolve it
+		// account's until the credential lives in the member: inside one it is
+		// granted that account's own, as the plain deploys after resolve it
 		let apps = match home {
 			Some(_) => {
 				Self::apps(caller, Some(&account)).await?.unwrap_or(apps)
@@ -412,11 +411,7 @@ impl AwsDeployCredential {
 			None => apps,
 		};
 		let user = DeployCredential::name()?;
-		report.push(
-			admin
-				.ensure_user(&user, &Self::retired_user_name()?)
-				.await?,
-		);
+		report.push(admin.ensure_user(&user).await?);
 		// what the account must hold that the key may never create
 		for service in Self::service_linked_roles(&apps) {
 			report.push(admin.ensure_service_linked_role(service).await?);
@@ -533,12 +528,6 @@ impl AwsDeployCredential {
 		.xok()
 	}
 
-	/// What the user was called before it shared the Cloudflare token's name,
-	/// which a converge finding no [`DeployCredential::name`] renames in place.
-	fn retired_user_name() -> Result<String> {
-		format!("{}-deployer", DeployCredential::repo_name()?).xok()
-	}
-
 	/// The dry run's answer, needing no credential: the user and every policy
 	/// document, pretty printed so it reads and pipes. The boundary conditions
 	/// are absent, since whether they apply is an account read a dry run does
@@ -546,7 +535,8 @@ impl AwsDeployCredential {
 	async fn describe_of(caller: &AsyncEntity) -> Result<String> {
 		let declared = AwsAccount::declared(caller).await?;
 		// a key not yet in the declared account is described as it will be
-		// there, granted that account's state bucket, whose id the move learns
+		// there, granted that account's state bucket, whose id the elevated
+		// deploy learns
 		let moving = match &declared {
 			Some((account, _)) => {
 				let name = account.resolved_name()?;
@@ -908,36 +898,14 @@ impl AwsAdmin {
 		}
 	}
 
-	/// The user, renamed in place from `retired` when only that exists, else
-	/// created when absent. A rename keeps the user's id, so its keys,
-	/// policies and attachments go with it and the sealed pair still answers.
-	async fn ensure_user(&self, user: &str, retired: &str) -> Result<String> {
-		let exists = async |name: &str| {
-			self.iam_json(["get-user", "--user-name", name])
-				.await
-				.map(|found| found.is_some())
-		};
-		if exists(user).await? {
+	/// The user, created when absent.
+	async fn ensure_user(&self, user: &str) -> Result<String> {
+		if self
+			.iam_json(["get-user", "--user-name", user])
+			.await?
+			.is_some()
+		{
 			return format!("user {user} exists").xok();
-		}
-		if exists(retired).await? {
-			self.iam([
-				"update-user",
-				"--user-name",
-				retired,
-				"--new-user-name",
-				user,
-			])
-			.await?;
-			self.iam([
-				"tag-user",
-				"--user-name",
-				user,
-				"--tags",
-				Self::USER_TAG,
-			])
-			.await?;
-			return format!("user {retired} renamed to {user}").xok();
 		}
 		self.iam([
 			"create-user",
