@@ -20,7 +20,8 @@ pub struct ListLevel(pub u8);
 
 /// A Word run's look, its `w:rPr` as a reader sees it, the projection's
 /// working value: the tree holds it as the elements
-/// [`RunLook::elements`] makes, which [`ReaderText::look`] reads back.
+/// [`RunLook::elements`] makes, which [`DocumentText::formatting`] reads
+/// back.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct RunLook {
 	/// `w:b`.
@@ -546,8 +547,8 @@ pub(crate) mod test {
 			.xpect_contains("**Date** due\n")
 			.xnot()
 			.xpect_contains("PAGE");
-		// the run's look reads back off the tree
-		let text = |world: &mut World, words: &str| {
+		// each run's formatting reads back off the tree
+		let text_node = |world: &mut World, words: &str| {
 			world
 				.query::<(Entity, &Value)>()
 				.iter(world)
@@ -555,14 +556,15 @@ pub(crate) mod test {
 				.map(|(entity, _)| entity)
 				.unwrap()
 		};
-		let delete = text(&mut world, "(Please delete");
-		let name = text(&mut world, "Name");
-		let placeholder = text(&mut world, "a < b");
-		world.with_state::<ReaderText, _>(|reader| {
-			reader.look(delete).colour.xpect_eq(Some("#FF0000".into()));
-			reader.look(name).bold.xpect_true();
-			reader
-				.look(placeholder)
+		let delete = text_node(&mut world, "(Please delete");
+		let name = text_node(&mut world, "Name");
+		let placeholder = text_node(&mut world, "a < b");
+		world.with_state::<DocumentText, _>(|text| {
+			text.formatting(delete)
+				.colour
+				.xpect_eq(Some("#FF0000".into()));
+			text.formatting(name).bold.xpect_true();
+			text.formatting(placeholder)
 				.highlight
 				.xpect_eq(Some("yellow".into()));
 		});

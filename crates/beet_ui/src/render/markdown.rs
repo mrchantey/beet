@@ -265,8 +265,8 @@ impl InlineWrapper {
 	/// [`MarkdownRenderer::open_html`] finds it unstyled.
 	fn of(tag: &str) -> Option<Self> {
 		match tag {
-			tag if TextLook::is_italic(tag) => Some(Self::Em),
-			tag if TextLook::is_bold(tag) => Some(Self::Strong),
+			tag if TextFormatting::is_italic(tag) => Some(Self::Em),
+			tag if TextFormatting::is_bold(tag) => Some(Self::Strong),
 			"del" | "s" => Some(Self::Del),
 			"sup" => Some(Self::Sup),
 			"sub" => Some(Self::Sub),
@@ -630,7 +630,7 @@ impl NodeVisitor for MarkdownRenderer {
 
 		match name {
 			// ── Headings ──
-			name if let Some(level) = ReaderText::heading_level(name) => {
+			name if let Some(level) = DocumentText::heading_level(name) => {
 				self.state.ensure_block_separator();
 				let prefix = "#".repeat(level as usize);
 				self.push_str(&format!("{prefix} "));
@@ -851,7 +851,7 @@ impl NodeVisitor for MarkdownRenderer {
 
 		match name {
 			// ── Headings ──
-			name if kept && ReaderText::heading_level(name).is_some() => {
+			name if kept && DocumentText::heading_level(name).is_some() => {
 				self.state.ensure_newline();
 				self.state.needs_block_separator = true;
 			}

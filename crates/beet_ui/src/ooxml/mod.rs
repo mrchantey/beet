@@ -22,8 +22,9 @@
 //!   [`OoxmlNode::Text`] rather than a [`Value`].
 //! - **What HTML cannot say is components on the same entities**: what a
 //!   query wants, a paragraph's [`ParagraphStyle`], a [`ListLevel`], a
-//!   workbook cell's [`CellAddress`] and [`CellFormula`]. A run's look is
-//!   its elements alone, read back by [`ReaderText::look`].
+//!   workbook cell's [`CellAddress`] and [`CellFormula`]. A run's
+//!   formatting is its elements alone, read back by
+//!   [`DocumentText::formatting`].
 //! - **An entity with no [`OoxmlNode`] is projection only**, ie a list's
 //!   `<ul>` or the `<strong>` inside a highlighted bold run. The writer
 //!   passes through it, writing its children in place.

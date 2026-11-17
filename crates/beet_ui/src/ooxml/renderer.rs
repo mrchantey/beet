@@ -202,7 +202,7 @@ impl WordWriter {
 				.iter_descendants_depth_first(root)
 				.filter_map(|entity| {
 					let (_, element) = elements.get(entity).ok()?;
-					let is_paragraph = ReaderText::is_block(element.tag())
+					let is_paragraph = DocumentText::is_block(element.tag())
 						&& element.tag() != "pre";
 					let parent = tree.parent(entity)?;
 					// a new paragraph sits among the file's nodes
@@ -335,7 +335,7 @@ impl WordWriter {
 	/// and highlighted.
 	fn checkboxes(world: &mut World, root: Entity) {
 		let boxes = world
-			.with_state::<(OoxmlQuery, ReaderText, Query<&Children>), _>(
+			.with_state::<(OoxmlQuery, DocumentText, Query<&Children>), _>(
 				|(tree, text, children)| {
 					children
 						.iter_descendants_depth_first(root)
@@ -600,7 +600,7 @@ impl WorkbookWriter {
 				);
 			}
 			let value = world
-				.with_state::<ReaderText, _>(|text| text.own_text(cell))
+				.with_state::<DocumentText, _>(|text| text.own_text(cell))
 				.trim()
 				.to_string();
 			Self::write(world, cell, &address, style, &value);

@@ -90,7 +90,7 @@ pub struct Cells<'w, 's> {
 	views: ElementQuery<'w, 's>,
 	children: Query<'w, 's, &'static Children>,
 	parents: Query<'w, 's, &'static ChildOf>,
-	text: ReaderText<'w, 's>,
+	text: DocumentText<'w, 's>,
 }
 
 impl NumberTables {

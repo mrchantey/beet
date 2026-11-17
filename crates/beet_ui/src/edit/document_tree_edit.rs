@@ -20,7 +20,7 @@ use beet_core::prelude::*;
 #[derive(SystemParam)]
 pub struct DocumentTreeEdit<'w, 's> {
 	commands: Commands<'w, 's>,
-	text: ReaderText<'w, 's>,
+	text: DocumentText<'w, 's>,
 	nodes: Query<
 		'w,
 		's,
@@ -289,11 +289,11 @@ impl DocumentTreeEdit<'_, '_> {
 				.any(|child| self.is_content(child))
 	}
 
-	/// The paragraph around `entity`, the nearest [`ReaderText::BLOCKS`]
+	/// The paragraph around `entity`, the nearest [`DocumentText::BLOCKS`]
 	/// ancestor.
 	fn paragraph(&self, entity: Entity) -> Option<Entity> {
 		self.parents.iter_ancestors(entity).find(|ancestor| {
-			self.tag(*ancestor).is_some_and(ReaderText::is_block)
+			self.tag(*ancestor).is_some_and(DocumentText::is_block)
 		})
 	}
 
@@ -315,7 +315,7 @@ impl DocumentTreeEdit<'_, '_> {
 	fn push_paragraphs(&self, entity: Entity, out: &mut Vec<Entity>) {
 		for child in self.children(entity) {
 			match self.tag(child) {
-				Some(tag) if ReaderText::is_block(tag) => out.push(child),
+				Some(tag) if DocumentText::is_block(tag) => out.push(child),
 				Some(tag) if RenderTreeQuery::is_textless(tag) => {}
 				_ => self.push_paragraphs(child, out),
 			}

@@ -1,14 +1,18 @@
-//! The words a reader reads, read straight off a tree.
+//! [`DocumentText`], a document's words, paragraphs, checkboxes and
+//! formatting, read off its tree the same way whichever format it came from.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// The text a reader reads under an entity, the words every renderer shows:
-/// text values and a node's own text, never a textless element's content
-/// ([`RenderTreeQuery::is_textless`]), with a checkbox as `[x] ` or `[ ] `,
-/// and a line break, a paragraph's end and a cell's as a newline. Also the
-/// look of its words, [`ReaderText::look`].
+/// A document's content read off its tree, the same way for every format
+/// (markdown, HTML, Word, a workbook): its words as plain text
+/// ([`text`](Self::text)), its paragraphs ([`blocks`](Self::blocks)), its
+/// checkboxes ([`checkbox`](Self::checkbox)) and the formatting of its
+/// words ([`formatting`](Self::formatting)).
+///
+/// Edits and cell listings read a document through this; it is not a
+/// renderer, which writes the tree out in a format of its own.
 #[derive(SystemParam)]
-pub struct ReaderText<'w, 's> {
+pub struct DocumentText<'w, 's> {
 	nodes: Query<
 		'w,
 		's,
@@ -23,8 +27,8 @@ pub struct ReaderText<'w, 's> {
 	parents: Query<'w, 's, &'static ChildOf>,
 }
 
-impl ReaderText<'_, '_> {
-	/// The block elements a reader reads as paragraphs.
+impl DocumentText<'_, '_> {
+	/// The elements that are paragraphs.
 	pub const BLOCKS: &[&str] =
 		&["p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "pre"];
 
@@ -38,15 +42,18 @@ impl ReaderText<'_, '_> {
 			.filter(|level| (1..=6).contains(level))
 	}
 
-	/// Everything a reader reads under `entity`, itself included.
+	/// The plain text under `entity`, itself included: every text node,
+	/// nothing inside a textless element
+	/// ([`RenderTreeQuery::is_textless`]), a checkbox as `[x] ` or `[ ] `, and
+	/// a line break and the end of a paragraph, row or cell as a newline.
 	pub fn text(&self, entity: Entity) -> String {
 		let mut out = String::new();
 		self.push_text(entity, false, true, &mut out);
 		out
 	}
 
-	/// What a reader reads under `entity` outside any table nested in it, ie
-	/// a table cell's own words.
+	/// The [`text`](Self::text) under `entity` outside any table nested in
+	/// it, ie a table cell's own words.
 	pub fn own_text(&self, entity: Entity) -> String {
 		let mut out = String::new();
 		self.push_text(entity, true, true, &mut out);
@@ -69,21 +76,21 @@ impl ReaderText<'_, '_> {
 		self.elements.get(entity).ok()?.checkbox()
 	}
 
-	/// The look of the words at `entity`, read from it and its ancestors up
-	/// to the paragraph around it, the nearest [`BLOCKS`](Self::BLOCKS)
-	/// element: the same facts whichever format the tree was read from.
-	pub fn look(&self, entity: Entity) -> TextLook {
-		let mut look = TextLook::default();
+	/// The formatting of the text at `entity`, read from it and the elements
+	/// around it up to its paragraph, the nearest [`BLOCKS`](Self::BLOCKS)
+	/// element.
+	pub fn formatting(&self, entity: Entity) -> TextFormatting {
+		let mut formatting = TextFormatting::default();
 		for view in core::iter::once(entity)
 			.chain(self.parents.iter_ancestors(entity))
 			.filter_map(|entity| self.elements.get(entity).ok())
 		{
-			look.apply(&view);
+			formatting.apply(&view);
 			if Self::is_block(view.tag()) {
 				break;
 			}
 		}
-		look
+		formatting
 	}
 
 	fn children(&self, entity: Entity) -> Vec<Entity> {
@@ -161,10 +168,10 @@ impl ReaderText<'_, '_> {
 	}
 }
 
-/// The look of some words, as [`ReaderText::look`] reads it from the
-/// elements around them.
+/// Whether some text is bold, italic, highlighted or coloured, as
+/// [`DocumentText::formatting`] reads it from the elements around it.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct TextLook {
+pub struct TextFormatting {
 	/// Inside a `<strong>` or `<b>`.
 	pub bold: bool,
 	/// Inside an `<em>` or `<i>`.
@@ -176,7 +183,7 @@ pub struct TextLook {
 	pub colour: Option<SmolStr>,
 }
 
-impl TextLook {
+impl TextFormatting {
 	/// Whether `tag` sets its words bold, `strong` or `b`.
 	pub fn is_bold(tag: &str) -> bool { matches!(tag, "strong" | "b") }
 
@@ -222,7 +229,7 @@ mod test {
 				</p>
 			})
 			.id();
-		world.with_state::<(ReaderText, Query<&Children>), _>(
+		world.with_state::<(DocumentText, Query<&Children>), _>(
 			|(text, children)| {
 				children
 					.iter_descendants(root)
@@ -233,9 +240,9 @@ mod test {
 		);
 	}
 
-	/// The look of each text under a parsed document, by its words.
+	/// The formatting of each text under a parsed document, by its words.
 	#[cfg(feature = "markdown_parser")]
-	fn looks(bytes: MediaBytes) -> Vec<(String, TextLook)> {
+	fn formatting_by_words(bytes: MediaBytes) -> Vec<(String, TextFormatting)> {
 		let mut world = ParsePlugin.into_world();
 		let root = world.spawn_empty().id();
 		DocParsers::parse(ParseContext::new(
@@ -243,55 +250,59 @@ mod test {
 			&bytes,
 		))
 		.unwrap();
-		world.with_state::<(ReaderText, Query<&Children>, Query<&Value>), _>(
+		world.with_state::<(DocumentText, Query<&Children>, Query<&Value>), _>(
 			|(text, children, values)| {
 				children
 					.iter_descendants(root)
 					.filter_map(|entity| {
 						let words = values.get(entity).ok()?.as_str().ok()?;
-						(words.to_string(), text.look(entity)).xsome()
+						(words.to_string(), text.formatting(entity)).xsome()
 					})
 					.collect()
 			},
 		)
 	}
 
-	/// The look of `words` in `looks`.
+	/// The formatting of `words` in `found`.
 	#[cfg(feature = "markdown_parser")]
-	fn look_of(looks: &[(String, TextLook)], words: &str) -> TextLook {
-		looks
+	fn formatting_of(
+		found: &[(String, TextFormatting)],
+		words: &str,
+	) -> TextFormatting {
+		found
 			.iter()
 			.find(|(text, _)| text == words)
 			.map(|(_, look)| look.clone())
 			.unwrap()
 	}
 
-	/// A look is the same fact whichever format said it: markdown's
+	/// Formatting is the same fact whichever format said it: markdown's
 	/// emphasis, an HTML `<mark>` and a styled colour, the innermost
 	/// winning and nothing read from beyond the paragraph.
 	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
-	fn reads_a_look_from_any_format() {
-		let markdown = looks(MediaBytes::new_markdown("**bold** and *it*"));
-		look_of(&markdown, "bold").xpect_eq(TextLook {
+	fn reads_formatting_from_any_format() {
+		let markdown =
+			formatting_by_words(MediaBytes::new_markdown("**bold** and *it*"));
+		formatting_of(&markdown, "bold").xpect_eq(TextFormatting {
 			bold: true,
 			..default()
 		});
-		look_of(&markdown, "it").xpect_eq(TextLook {
+		formatting_of(&markdown, "it").xpect_eq(TextFormatting {
 			italic: true,
 			..default()
 		});
-		look_of(&markdown, " and ").xpect_eq(TextLook::default());
+		formatting_of(&markdown, " and ").xpect_eq(TextFormatting::default());
 
-		let html = looks(MediaBytes::new_html(
+		let html = formatting_by_words(MediaBytes::new_html(
 			"<div style=\"color: red\"><p><mark>hi</mark>\
 			 <span style=\"color: #00F\"><mark style=\"background: green\"><b>there</b></mark></span></p></div>",
 		));
-		look_of(&html, "hi").xpect_eq(TextLook {
+		formatting_of(&html, "hi").xpect_eq(TextFormatting {
 			highlight: Some("yellow".into()),
 			..default()
 		});
-		look_of(&html, "there").xpect_eq(TextLook {
+		formatting_of(&html, "there").xpect_eq(TextFormatting {
 			bold: true,
 			highlight: Some("green".into()),
 			colour: Some("#00F".into()),
