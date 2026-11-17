@@ -18,11 +18,11 @@ use crate::o11s::streaming::ResponseQueuedEvent;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Maps a [`PostView`] into an OpenResponses [`InputItem`] for request building.
+/// Maps an [`AuthoredPost`] into an OpenResponses [`InputItem`] for request building.
 /// Classification is performed via [`AgentPost`] for clean dispatch.
 pub fn post_to_o11s_input(
 	agent_id: ActorId,
-	post: PostView,
+	post: AuthoredPost,
 ) -> Result<o11s::request::InputItem> {
 	let role = match post.actor.kind() {
 		ActorKind::System => MessageRole::System,

@@ -33,15 +33,15 @@ use async_openai::types::chat::ToolChoiceOptions;
 use beet_core::prelude::*;
 
 // ═══════════════════════════════════════════════════════════════════════
-// Request Mapping: PostView -> ChatCompletionRequestMessage
+// Request Mapping: AuthoredPost -> ChatCompletionRequestMessage
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Maps a [`PostView`] into a [`ChatCompletionRequestMessage`].
+/// Maps an [`AuthoredPost`] into a [`ChatCompletionRequestMessage`].
 /// The `agent_id` determines which agent posts become `Assistant`
 /// messages vs `User` messages.
 pub fn post_to_completions_message(
 	agent_id: ActorId,
-	post: PostView,
+	post: AuthoredPost,
 ) -> Result<ChatCompletionRequestMessage> {
 	let is_self = post.actor_id() == agent_id;
 	let kind = post.actor.kind();
@@ -131,7 +131,7 @@ pub fn post_to_completions_message(
 
 /// Builds a text message, dispatching on role.
 fn build_text_message(
-	post: &PostView,
+	post: &AuthoredPost,
 	text: &str,
 	kind: ActorKind,
 	is_self: bool,
@@ -188,7 +188,7 @@ fn build_text_message(
 
 /// Builds a user message containing an image content part.
 fn build_image_user_message(
-	post: &PostView,
+	post: &AuthoredPost,
 	image_url: String,
 	_kind: ActorKind,
 ) -> ChatCompletionRequestMessage {

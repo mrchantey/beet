@@ -119,7 +119,7 @@ impl CompletionsStreamer {
 
 					// Convert window posts to completions messages
 					let post_messages =
-						window.post_views().xtry_map(|post| {
+						window.authored_posts().xtry_map(|post| {
 							completions_mapper::post_to_completions_message(
 								agent_id, post,
 							)

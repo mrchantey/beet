@@ -156,7 +156,7 @@ impl StandardSiteComments {
 	/// deleted.
 	fn render(
 		announcement: &StrongRef,
-		thread: &ThreadView,
+		thread: &PostThread,
 	) -> Result<Snippet> {
 		let Some(root) = thread.post() else {
 			bevybail!(

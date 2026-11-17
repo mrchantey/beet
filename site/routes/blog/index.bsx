@@ -17,5 +17,6 @@ not for this index.
 -->
 <Fragment {DocMeta{title: "The Full Moon Harvest"}} {RouteMeta{sidebar_label: "Blog", order: 1, expanded: true}}>
 	<h1>The Full Moon Harvest</h1>
+	<p>A monthly blog with beet updates and first-principles thoughts about tech.</p>
 	<RouteIndex reverse="true"/>
 </Fragment>

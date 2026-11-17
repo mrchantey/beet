@@ -332,7 +332,7 @@ feature links: the deployed binary serves the records and the comments
 			     the router root, since its well-known route roots where it
 			     sits. -->
 			<StandardSitePub bx:ref="harvest" {AccountRef($beet_org)} path="blog"
-				name="The Full Moon Harvest"/>
+				name="The Full Moon Harvest" description="A monthly blog with beet updates and first-principles thoughts about tech."/>
 			<!-- a link preview for every page the sitemap lists, derived into
 			     `site/assets/og` by `<Derive/>` and named by each page's head.
 			     The font is the TTF of the face the site serves as woff2, which

@@ -45,7 +45,7 @@ fn assert_and_exit(
 ) -> Result<Outcome> {
 	query
 		.window(input.id())?
-		.post_views()
+		.authored_posts()
 		.find(|view| {
 			view.intent().is_display() && view.actor.kind() == ActorKind::Agent
 		})

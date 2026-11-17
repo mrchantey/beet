@@ -395,7 +395,7 @@ const FOLLOW_FRAMES: u8 = 4;
 /// Build the document value for a window: a `posts` list of `{ id, author, text }`.
 fn project_window(window: &ThreadWindow) -> Value {
 	let posts = window
-		.post_views()
+		.authored_posts()
 		.map(|view| {
 			Value::Map(
 				[
@@ -414,7 +414,7 @@ fn project_window(window: &ThreadWindow) -> Value {
 
 /// The display role of a post, used by [`post_row`] for styling: a 5xx error post
 /// renders as `error`, otherwise it follows the authoring actor's kind.
-fn post_kind(view: &PostView) -> &'static str {
+fn post_kind(view: &AuthoredPost) -> &'static str {
 	if view.post.intent().is_server_error() {
 		return "error";
 	}

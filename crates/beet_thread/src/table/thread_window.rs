@@ -64,18 +64,18 @@ impl ThreadWindow {
 	}
 
 	/// Join each post with its authoring [`Actor`] from the window.
-	pub fn post_views(&self) -> impl Iterator<Item = PostView<'_>> {
+	pub fn authored_posts(&self) -> impl Iterator<Item = AuthoredPost<'_>> {
 		self.posts.iter().filter_map(|post| {
 			self.actors
 				.get(&post.author())
-				.map(|actor| PostView { post, actor })
+				.map(|actor| AuthoredPost { post, actor })
 		})
 	}
 
-	/// Post views after an exclusive cursor. A missing or unknown cursor
-	/// returns every view (the caller has seen none of these posts).
-	pub fn posts_after(&self, after: Option<PostId>) -> Vec<PostView<'_>> {
-		let views = self.post_views().collect::<Vec<_>>();
+	/// The authored posts after an exclusive cursor. A missing or unknown cursor
+	/// returns them all (the caller has seen none of these posts).
+	pub fn posts_after(&self, after: Option<PostId>) -> Vec<AuthoredPost<'_>> {
+		let views = self.authored_posts().collect::<Vec<_>>();
 		let Some(after) = after else { return views };
 		match views.iter().position(|view| view.post.id() == after) {
 			Some(i) => views[i + 1..].to_vec(),
@@ -164,22 +164,22 @@ impl ThreadWindow {
 const STUBBED_IMAGE: &str = "[earlier image, no longer shown]";
 
 // ═══════════════════════════════════════════════════════════════════════
-// PostView
+// AuthoredPost
 // ═══════════════════════════════════════════════════════════════════════
 
 /// A post joined with its authoring [`Actor`], sourced from a [`ThreadWindow`].
 #[derive(Debug, Clone, Copy)]
-pub struct PostView<'a> {
+pub struct AuthoredPost<'a> {
 	pub post: &'a Post,
 	pub actor: &'a Actor,
 }
 
-impl std::ops::Deref for PostView<'_> {
+impl std::ops::Deref for AuthoredPost<'_> {
 	type Target = Post;
 	fn deref(&self) -> &Self::Target { self.post }
 }
 
-impl PostView<'_> {
+impl AuthoredPost<'_> {
 	pub fn actor_id(&self) -> ActorId { self.actor.id() }
 
 	/// Wraps text in XML metadata tags so models can distinguish speakers.

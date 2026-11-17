@@ -44,7 +44,7 @@ pub struct FeedViewPost {
 /// `app.bsky.feed.defs#threadViewPost`, `#notFoundPost` or `#blockedPost`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "$type")]
-pub enum ThreadView {
+pub enum PostThread {
 	/// A post, with what it replies to and its replies.
 	#[serde(rename = "app.bsky.feed.defs#threadViewPost")]
 	Post(Box<ThreadViewPost>),
@@ -65,7 +65,7 @@ pub enum ThreadView {
 	Other,
 }
 
-impl ThreadView {
+impl PostThread {
 	/// The post this view shows, `None` for a missing, blocked or unknown one.
 	pub fn post(&self) -> Option<&ThreadViewPost> {
 		match self {
@@ -84,10 +84,10 @@ pub struct ThreadViewPost {
 	pub post: PostView,
 	/// The post this one replies to.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub parent: Option<ThreadView>,
+	pub parent: Option<PostThread>,
 	/// The replies to this post, in the AppView's order.
 	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub replies: Vec<ThreadView>,
+	pub replies: Vec<PostThread>,
 }
 
 impl ThreadViewPost {
@@ -97,7 +97,7 @@ impl ThreadViewPost {
 		let mut replies = self
 			.replies
 			.iter()
-			.filter_map(ThreadView::post)
+			.filter_map(PostThread::post)
 			.collect::<Vec<_>>();
 		replies.sort_by_key(|reply| {
 			Timestamp::parse_rfc3339(&reply.post.record.created_at)

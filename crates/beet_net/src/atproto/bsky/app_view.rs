@@ -100,7 +100,7 @@ impl AppView {
 		uri: &AtUri,
 		depth: u16,
 		parent_height: u16,
-	) -> Result<ThreadView> {
+	) -> Result<PostThread> {
 		self.xrpc("app.bsky.feed.getPostThread")
 			.with_param("uri", &uri.to_string())
 			.with_param("depth", &depth.to_string())
@@ -164,7 +164,7 @@ struct GetPostsResponse {
 /// The `app.bsky.feed.getPostThread` output, the parts read.
 #[derive(Debug, Deserialize)]
 struct GetPostThreadResponse {
-	thread: ThreadView,
+	thread: PostThread,
 }
 
 #[cfg(test)]
@@ -221,7 +221,7 @@ mod test {
 	/// post, and only the post is a reply shown.
 	#[beet_core::test]
 	fn reads_a_thread() {
-		let thread = serde_json::from_str::<ThreadView>(&format!(
+		let thread = serde_json::from_str::<PostThread>(&format!(
 			r#"{{
 				"$type": "app.bsky.feed.defs#threadViewPost",
 				"post": {POST_VIEW},
