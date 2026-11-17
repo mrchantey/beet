@@ -1,6 +1,7 @@
 //! A page built and held alive between its build and its renders.
 //!
 //! [`LivePage::prepare`] runs a built page's render middleware (the layouts),
+//! the island step (each [`ServerIsland`] a placeholder, inline or the root),
 //! resolves the `--root` cascade ([`RenderRoot`]) and, when the request names
 //! a [`MediaIngestPolicy`], the media resolve step ([`InlineBlob`]). The live
 //! page keeps the request it was built for, the [`RequestParts`] every render
@@ -58,17 +59,29 @@ impl From<Entity> for SurfacePage {
 
 impl LivePage {
 	/// Prepare a built `page` for rendering: run the render middleware of
-	/// `route` and its ancestors (the layouts), resolve the `--root` cascade
-	/// ([`RenderRoot`]), carry the route's [`DocMeta`] onto the root it chose,
-	/// so a scene response reads the page's metadata where it reads the tree,
-	/// and, when the request names a [`MediaIngestPolicy`], run the media
-	/// resolve step ([`InlineBlob::resolve`]). The live page keeps `parts`,
-	/// the request every render of it answers. A failure releases what was
-	/// built.
+	/// `route` and its ancestors (the layouts), resolve every
+	/// [`ServerIsland`] inline, resolve the `--root` cascade ([`RenderRoot`]),
+	/// carry the route's [`DocMeta`] onto the root it chose, so a scene
+	/// response reads the page's metadata where it reads the tree, and, when
+	/// the request names a [`MediaIngestPolicy`], run the media resolve step
+	/// ([`InlineBlob::resolve`]). The live page keeps `parts`, the request
+	/// every render of it answers. A failure releases what was built.
 	pub async fn prepare(
 		page: Entity,
 		route: &AsyncEntity,
 		parts: RequestParts,
+	) -> Result<Self> {
+		Self::prepare_with(page, route, parts, IslandScope::Inline).await
+	}
+
+	/// [`prepare`](Self::prepare), resolving the page's islands as `islands`
+	/// asks: the island step runs after the layouts and before the cascade, an
+	/// island it makes the root winning over `--root`.
+	pub(crate) async fn prepare_with(
+		page: Entity,
+		route: &AsyncEntity,
+		parts: RequestParts,
+		islands: IslandScope,
 	) -> Result<Self> {
 		let params = match RenderParams::of(&parts) {
 			Ok(params) => params,
@@ -80,7 +93,7 @@ impl LivePage {
 		let request = parts.clone();
 		// apply ancestor render middleware (layout wrapping, etc.)
 		let wrapped = match route
-			.call_with_middleware(Action::new_fixed(page), parts)
+			.call_with_middleware(Action::new_fixed(page), parts.clone())
 			.await
 		{
 			Ok(wrapped) => wrapped,
@@ -91,62 +104,83 @@ impl LivePage {
 		};
 		let world = route.world().clone();
 		let route_id = route.id();
-		let prepared = route
-			.world()
-			.with(move |world_mut: &mut World| -> Result<(Self, Entity)> {
-				let entity = world_mut.entity(wrapped);
-				let rendered = entity
-					.get::<PageRoot>()
-					.ok_or_else(|| {
-						bevyhow!("entity {wrapped} is not a render root")
-					})?
-					.rendered();
-				let to_despawn = entity
-					.get::<DespawnAfterRender>()
-					.map(|despawn| despawn.0.clone())
-					.unwrap_or_default();
-				let resolved =
-					world_mut.with_state::<RenderRootQuery, _>(|query| {
-						query.resolve(rendered, params.root)
-					});
-				// the route's metadata lives on its content, the end of any
-				// layout chain, which the resolved root generally is not
-				let content = LayoutContent::terminal(world_mut, rendered)?;
-				let carried_meta = world_mut
-					.get::<DocMeta>(content)
-					.filter(|_| {
-						!world_mut.entity(resolved).contains::<DocMeta>()
-					})
-					.cloned()
-					.map(|meta| {
-						world_mut.entity_mut(resolved).insert(meta);
-						resolved
-					});
-				// the router a source fetch re-enters
-				let router = world_mut
-					.with_state::<AncestorQuery<&RouteTree>, _>(|trees| {
-						trees.get_entity(route_id)
-					})
-					.unwrap_or(route_id);
-				let live = Self {
-					world,
-					request,
-					page: wrapped,
-					root: resolved,
-					to_despawn,
-					carried_meta,
-					inline_blobs: Vec::new(),
-				};
-				(live, router).xok()
-			})
+		// the whole tree, its ephemerals and the request context it renders in
+		let found = world
+			.with(
+				move |world_mut: &mut World| -> Result<(Entity, Vec<Entity>, RequestContext)> {
+					let entity = world_mut.entity(wrapped);
+					let rendered = entity
+						.get::<PageRoot>()
+						.ok_or_else(|| {
+							bevyhow!("entity {wrapped} is not a render root")
+						})?
+						.rendered();
+					let to_despawn = entity
+						.get::<DespawnAfterRender>()
+						.map(|despawn| despawn.0.clone())
+						.unwrap_or_default();
+					// the route's metadata lives on its content, the end of any
+					// layout chain, which the resolved root generally is not
+					let content = LayoutContent::terminal(world_mut, rendered)?;
+					// the router a source fetch re-enters
+					let router = world_mut
+						.with_state::<AncestorQuery<&RouteTree>, _>(|trees| {
+							trees.get_entity(route_id)
+						})
+						.unwrap_or(route_id);
+					let cx = RequestContext::new(parts, content, route_id, router);
+					(rendered, to_despawn, cx).xok()
+				},
+			)
 			.await;
-		let (mut live, router) = match prepared {
-			Ok(prepared) => prepared,
+		let (rendered, mut to_despawn, cx) = match found {
+			Ok(found) => found,
 			Err(err) => {
-				Self::discard(route.world(), wrapped).await;
+				Self::discard(&world, wrapped).await;
 				return Err(err);
 			}
 		};
+		let (content, router) = (cx.content(), cx.router());
+		let islands = match islands.resolve(&world, rendered, cx).await {
+			Ok(islands) => islands,
+			Err(err) => {
+				Self::discard(&world, wrapped).await;
+				return Err(err);
+			}
+		};
+		to_despawn.extend(islands.spawned);
+		let island_root = islands.root;
+		let live_world = world.clone();
+		let mut live = world
+			.with(move |world_mut: &mut World| {
+				let root = island_root.unwrap_or_else(|| {
+					world_mut.with_state::<RenderRootQuery, _>(|query| {
+						query.resolve(rendered, params.root)
+					})
+				});
+				// an island answers its own region, never the page's metadata
+				let carried_meta = world_mut
+					.get::<DocMeta>(content)
+					.filter(|_| {
+						island_root.is_none()
+							&& !world_mut.entity(root).contains::<DocMeta>()
+					})
+					.cloned()
+					.map(|meta| {
+						world_mut.entity_mut(root).insert(meta);
+						root
+					});
+				Self {
+					world: live_world,
+					request,
+					page: wrapped,
+					root,
+					to_despawn,
+					carried_meta,
+					inline_blobs: Vec::new(),
+				}
+			})
+			.await;
 		// a request naming no policy fetches nothing
 		let Some(policy) = params.media_ingest else {
 			return live.xok();
@@ -194,8 +228,20 @@ impl LivePage {
 		node: ActionNode,
 		request: Request,
 	) -> Result<Self> {
+		Self::prepare_route_with(router, node, request, IslandScope::Inline)
+			.await
+	}
+
+	/// [`prepare_route`](Self::prepare_route), resolving the page's islands
+	/// as `islands` asks.
+	pub(crate) async fn prepare_route_with(
+		router: &AsyncEntity,
+		node: ActionNode,
+		request: Request,
+		islands: IslandScope,
+	) -> Result<Self> {
 		let (route, page, parts) = Self::build(router, node, request).await?;
-		Self::prepare(page, &route, parts).await
+		Self::prepare_with(page, &route, parts, islands).await
 	}
 
 	/// The route `path` matches in the route tree `router` sits in, `None`
@@ -246,14 +292,39 @@ impl LivePage {
 	/// wildcard (`*/*`) renders the web document, the registry's
 	/// [`DEFAULT`](DocRenderers::DEFAULT). Negotiating before the build means
 	/// a type nothing renders builds nothing and answers `406 Not Acceptable`.
+	/// Html leaves each [`ServerIsland`] a placeholder, since the edge may
+	/// hold it; any other type resolves them inline.
 	pub async fn respond(
 		page: Entity,
 		route: &AsyncEntity,
 		parts: RequestParts,
 	) -> Result<Response> {
-		let request = parts.clone();
-		let negotiated = route
-			.world()
+		let media_type = match Self::negotiate(route.world(), &parts).await {
+			Ok(media_type) => media_type,
+			Err(err) => {
+				Self::discard(route.world(), page).await;
+				return Err(err);
+			}
+		};
+		let islands = match media_type == MediaType::Html {
+			true => IslandScope::Placeholders,
+			false => IslandScope::Inline,
+		};
+		let bytes = Self::prepare_with(page, route, parts, islands)
+			.await?
+			.release_after(async |live| live.render(&media_type).await)
+			.await?;
+		Response::ok().with_media(bytes).xok()
+	}
+
+	/// The media type `parts` negotiates from the registered render targets,
+	/// a type nothing renders answering `406 Not Acceptable`.
+	pub(crate) async fn negotiate(
+		world: &AsyncWorld,
+		parts: &RequestParts,
+	) -> Result<MediaType> {
+		let parts = parts.clone();
+		world
 			.with(move |world: &mut World| -> Result<MediaType> {
 				world
 					.get_resource::<DocRenderers>()
@@ -262,23 +333,11 @@ impl LivePage {
 							"no `DocRenderers` in this world: add the `RenderPlugin`"
 						)
 					})?
-					.negotiate(&request)
+					.negotiate(&parts)
 					.map_err(HttpError::from)?
 					.xok()
 			})
-			.await;
-		let media_type = match negotiated {
-			Ok(media_type) => media_type,
-			Err(err) => {
-				Self::discard(route.world(), page).await;
-				return Err(err);
-			}
-		};
-		let bytes = Self::prepare(page, route, parts)
-			.await?
-			.release_after(async |live| live.render(&media_type).await)
-			.await?;
-		Response::ok().with_media(bytes).xok()
+			.await
 	}
 
 	/// The entity a render starts from, the cascade's answer to `--root`.
@@ -303,11 +362,16 @@ impl LivePage {
 	/// The page's cover image, the [`InlineBlob`] the media resolve step
 	/// fetched onto the render root from `DocMeta::social_image_url`.
 	pub async fn cover(&self) -> Option<InlineBlob> {
+		self.root_component::<InlineBlob>().await
+	}
+
+	/// A copy of the render root's `C`, ie an island's [`CacheHeaders`].
+	pub(crate) async fn root_component<C: Clone + Component>(
+		&self,
+	) -> Option<C> {
 		let root = self.root;
 		self.world
-			.with(move |world: &mut World| {
-				world.get::<InlineBlob>(root).cloned()
-			})
+			.with(move |world: &mut World| world.get::<C>(root).cloned())
 			.await
 	}
 
@@ -353,7 +417,7 @@ impl LivePage {
 	}
 
 	/// Run `func` over this page, then release it whatever `func` answered.
-	async fn release_after<T, Fut>(
+	pub(crate) async fn release_after<T, Fut>(
 		self,
 		func: impl FnOnce(LivePage) -> Fut,
 	) -> Result<T>

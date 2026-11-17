@@ -12,9 +12,21 @@ pub struct StyleQuery<'w, 's> {
 
 impl StyleQuery<'_, '_> {
 	/// Builds a CSS string from the global [`RuleSet`] resource.
-	///
-	/// The `_entity` parameter is retained for API compatibility.
 	pub fn build_css(&self, builder: &CssBuilder) -> Result<String> {
 		builder.build(&self.css_map, &self.rule_set)
+	}
+
+	/// The CSS of only the rules selecting one of `classes`: the sheet a
+	/// fragment rendered apart from its page carries, the page's own sheet
+	/// holding the `:root` variables and every other rule. Variable names
+	/// format as the whole sheet's do ([`CssBuilder::build_where`]).
+	pub fn build_css_selecting(
+		&self,
+		builder: &CssBuilder,
+		classes: &HashSet<SmolStr>,
+	) -> Result<String> {
+		builder.build_where(&self.css_map, &self.rule_set, |rule| {
+			rule.selector().any_class(|class| classes.contains(class))
+		})
 	}
 }

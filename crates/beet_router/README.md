@@ -101,7 +101,7 @@ The matched `route` entity is reachable from **no** layout edge (`Portal` and `L
 
 `PageRoot` names the entity the serializer walks (self-referential for a plain route, the layout itself for a wrapped one). `DespawnAfterRender` lists the ephemerals torn down after each render; nothing is cached between requests.
 
-`LivePage::prepare` runs the layouts, resolves the `--root` render param (`main` or `content`, one cascade documented on `RenderRoot`, absent for the whole page) and, when the request names a `--media-ingest` policy, the media resolve step, into a `LivePage` a caller renders through any registered target (`beet_ui`'s `DocRenderers`). A request is `LivePage::respond`, one render whose media type `Accept` negotiates, so a direct caller in `LivePage::scoped` naming the same type gets exactly the body a client does, and both release the page whatever the outcome.
+`LivePage::prepare` runs the layouts, resolves each server island (below), resolves the `--root` render param (`main` or `content`, one cascade documented on `RenderRoot`, absent for the whole page) and, when the request names a `--media-ingest` policy, the media resolve step, into a `LivePage` a caller renders through any registered target (`beet_ui`'s `DocRenderers`). A request is `LivePage::respond`, one render whose media type `Accept` negotiates, so a direct caller in `LivePage::scoped` naming the same type gets exactly the body a client does, and both release the page whatever the outcome.
 
 ### Layouts
 
@@ -142,6 +142,29 @@ The scan reads the ROOT only, resolving each declaration against the type regist
 `DocMeta` and `RouteMeta` are consumers of that set like any other. `DocMeta` is the document's own: `<ArticleHeader/>` renders its `title`/`authors`/`created`/`video_url` as the article chrome. `RouteMeta` is the route's: the router reads `slug` for the url, `order`/`sidebar_label`/`expanded` for the nav, and `visibility` for the nav, static export and dispatch.
 
 `visibility` is the one knob every listing reads: `Public` serves and is listed everywhere, `Unlisted` serves to whoever holds the link and appears in no index, sidebar or `<RouteIndex/>` (and is marked `noindex` for crawlers), and `Draft` never reaches production at all (previewed in the nav everywhere else, `RouteMeta::is_browsable`): dropped from a prod static export and answered `404` by a prod dispatch, exactly as an unknown url is.
+
+### Server islands
+
+A server island is a named region of a page whose content renders live, so a page the edge holds for a week still shows a count or a thread from the last minute. The island contains its content, held unbuilt, and a `slot="fallback"` child shown until it arrives:
+
+```bsx
+<ServerIsland name="visits" {CacheHeaders{edge_max_age: "60s"}}>
+	<VisitCount/>
+	<span slot="fallback">counting visits</span>
+</ServerIsland>
+```
+
+From rust both are closures, `<ServerIsland name="visits" content={|| rsx!{ <VisitCount/> }}/>`.
+
+It is never a route of its own. Its address is its page's path under a reserved prefix, then its name: `/_server-islands/blog/ecs-router/comments`, the home page's `/_server-islands/visits`. One `<ServerIslands/>` at the router root, beside `<Sitemap/>`, answers every island: it builds the addressed page as its own route does and renders the island alone. A glob with no `PageRoute`, so no listing and no static export ever walks it.
+
+One declaration, three renders, chosen by the caller of `LivePage::prepare` and never by a param:
+
+- **Placeholder.** The http page handler's html: a `<div data-beet-island="<name>">` around the fallback, then a fixed inline script that fetches the island with `Accept: text/html` and swaps it in only when the response's `beet-island` header names it. The content never builds, so nothing live is cached with the page. A page carrying an island under a router with no `<ServerIslands/>` fails here.
+- **Island.** The island route's answer: the island built inside its page's request context, so a widget in it reads the page as a layout widget does, its async content awaited, led by a `<style>` of the rules its own subtree selects so a swap is styled on a process that never built it.
+- **Inline.** Every other render, a live surface, a scoped render or any non-html response, builds every island in place like any other content.
+
+The island route's response carries the island's own `CacheHeaders`, `no-store` when it has none, never the page's or the router's. Island content carrying a `<script>`, which a swap leaves inert, two islands sharing a name on one page, and an island nested in another are errors.
 
 ## Syndication
 

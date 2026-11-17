@@ -15,12 +15,15 @@
 //! This is the no_std core; async helpers sit behind the `bevy_async` feature,
 //! never on the core path.
 
+// templates held unbuilt, built on demand by their holder
+mod held;
 mod lifecycle;
 mod registry;
 mod slot;
 mod spawn_template;
 mod template_plugin;
 
+pub use held::*;
 pub use lifecycle::*;
 pub use registry::*;
 pub use slot::*;

@@ -490,6 +490,31 @@ impl Selector {
 		}
 	}
 
+	/// Whether any [`Class`](Self::Class) this selector names, at any depth,
+	/// satisfies `func`.
+	pub fn any_class(&self, func: impl Copy + Fn(&str) -> bool) -> bool {
+		match self {
+			Selector::Class(class) => func(class),
+			Selector::Root
+			| Selector::Entity(_)
+			| Selector::Any
+			| Selector::Tag(_)
+			| Selector::State(_)
+			| Selector::Attribute { .. } => false,
+			Selector::Not(inner) => inner.any_class(func),
+			Selector::AnyOf(parts) | Selector::AllOf(parts) => {
+				parts.iter().any(|part| part.any_class(func))
+			}
+			Selector::Descendant {
+				ancestor,
+				descendant,
+			} => ancestor.any_class(func) || descendant.any_class(func),
+			Selector::Child { parent, child } => {
+				parent.any_class(func) || child.any_class(func)
+			}
+		}
+	}
+
 	/// Whether `el` matches this selector. `ancestors` is `el`'s ancestor
 	/// element views, nearest-first (`ancestors[0]` is the immediate parent),
 	/// used to evaluate the [`Child`](Self::Child)/[`Descendant`](Self::Descendant)

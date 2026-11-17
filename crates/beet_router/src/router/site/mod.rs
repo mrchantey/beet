@@ -21,6 +21,10 @@ mod layout;
 mod route_index;
 #[cfg(feature = "std")]
 mod sidebar;
+// `<ServerIsland>`: a region of a page rendered live, and `<ServerIslands/>`,
+// the route answering each one
+#[cfg(feature = "std")]
+mod server_island;
 #[cfg(feature = "std")]
 mod site_layout;
 // `<SocialCards/>`: a link preview drawn for every page, on the icon set's
@@ -55,6 +59,8 @@ pub use icon_set::*;
 pub use layout::*;
 #[cfg(feature = "std")]
 pub use route_index::*;
+#[cfg(feature = "std")]
+pub use server_island::*;
 #[cfg(feature = "std")]
 pub use sidebar::*;
 #[cfg(feature = "std")]

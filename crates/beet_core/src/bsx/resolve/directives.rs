@@ -6,7 +6,7 @@ use crate::prelude::*;
 /// The [`SlotChild`] routing marker for an element's `slot`/`bx:slot`, if any.
 pub(super) fn slot_routing(el: &BsxElement) -> Option<SlotChild> {
 	el.attributes.iter().find_map(|attr| {
-		if attr.key != "slot" && attr.key != "bx:slot" {
+		if !is_slot_directive(&attr.key) {
 			return None;
 		}
 		match &attr.value {
@@ -14,6 +14,11 @@ pub(super) fn slot_routing(el: &BsxElement) -> Option<SlotChild> {
 			_ => Some(SlotChild::new()),
 		}
 	})
+}
+
+/// Whether a key is the `slot`/`bx:slot` routing directive.
+pub(super) fn is_slot_directive(key: &str) -> bool {
+	key == "slot" || key == "bx:slot"
 }
 
 /// Whether a key is a `bx:`/slot directive rather than an HTML attribute.

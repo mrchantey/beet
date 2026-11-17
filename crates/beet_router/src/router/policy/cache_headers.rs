@@ -85,7 +85,7 @@ impl CacheHeaders {
 
 	/// The `Cache-Control` value for a response of `media_type` under this
 	/// policy.
-	fn value(&self, media_type: Option<MediaType>) -> String {
+	pub(crate) fn value(&self, media_type: Option<MediaType>) -> String {
 		if self.no_store {
 			return "no-cache, no-store, must-revalidate".to_string();
 		}

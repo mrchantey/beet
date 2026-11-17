@@ -23,6 +23,9 @@ pub use page_root::*;
 // a built page held alive between its build and its renders
 mod live_page;
 pub use live_page::*;
+// each server island on a page resolved as its preparation's caller asks
+mod island_step;
+pub(crate) use island_step::*;
 // a store file served as a page, parsed per request
 mod blob_page;
 pub use blob_page::*;

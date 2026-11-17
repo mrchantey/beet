@@ -111,14 +111,23 @@ pub(super) fn build_uppercase(
 				} else {
 					UppercaseKind::Component
 				};
-				(kind, registration.type_info())
+				(
+					kind,
+					registration.type_info(),
+					registration.data::<ReflectHoldChildren>().cloned(),
+				)
 			})
-			.map(|(kind, info)| {
-				(kind, info, build_patch(el, info, &registry, &entity_refs))
+			.map(|(kind, info, hold)| {
+				(
+					kind,
+					info,
+					hold,
+					build_patch(el, info, &registry, &entity_refs),
+				)
 			})
 	};
 
-	let Some((kind, type_info, patch)) = registration_kind else {
+	let Some((kind, type_info, hold, patch)) = registration_kind else {
 		// a known featured-out tag (eg `<LiveReloadScript/>` with `client_io`
 		// compiled out) resolves to nothing at all, children included.
 		if AllowedUnregistered::allows(cx, &el.tag) {
@@ -177,10 +186,67 @@ pub(super) fn build_uppercase(
 			apply_component_field_bindings(el, cx.entity)?;
 			apply_common_directives(el, refs, cx)?;
 			apply_spreads(el, cx.entity, &entity_refs)?;
-			build_children(el, registry, refs, cx)?;
+			// a component holding its children takes them unbuilt
+			match hold {
+				Some(hold) => {
+					hold.hold(cx.entity, held_children(el, registry))?
+				}
+				None => build_children(el, registry, refs, cx)?,
+			}
 		}
 	}
 	Ok(())
+}
+
+/// `el`'s children unbuilt for a [`HoldChildren`] component, grouped by the
+/// slot each routes to (the `slot` directive stripped, its group naming it),
+/// each group a [`BsxTemplate::container`] over the `registry` this build
+/// resolves against. A group of nothing but whitespace prose holds nothing.
+fn held_children(
+	el: &BsxElement,
+	registry: &BsxTemplateRegistry,
+) -> HeldChildren {
+	let mut default = Vec::new();
+	let mut named = HashMap::<SmolStr, Vec<BsxNode>>::default();
+	for child in &el.children {
+		match child {
+			BsxNode::Element(child_el) => {
+				match slot_routing(child_el).and_then(|slot| slot.name) {
+					Some(name) => {
+						let mut child_el = child_el.clone();
+						child_el
+							.attributes
+							.retain(|attr| !is_slot_directive(&attr.key));
+						named
+							.entry(name)
+							.or_default()
+							.push(BsxNode::Element(child_el));
+					}
+					None => default.push(child.clone()),
+				}
+			}
+			_ => default.push(child.clone()),
+		}
+	}
+	let held = |nodes: Vec<BsxNode>| {
+		let blank = nodes.iter().all(
+			|node| matches!(node, BsxNode::Text(text) if text.trim().is_empty()),
+		);
+		match blank {
+			true => HeldTemplate::default(),
+			false => HeldTemplate::from_template(BsxTemplate::container(
+				nodes,
+				registry.clone(),
+			)),
+		}
+	};
+	HeldChildren::new(
+		held(default),
+		named
+			.into_iter()
+			.map(|(name, nodes)| (name, held(nodes)))
+			.collect(),
+	)
 }
 
 /// Build a tag nothing is registered under: warn, record the name in an

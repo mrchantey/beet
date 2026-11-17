@@ -46,12 +46,28 @@ impl Default for CssBuilder {
 }
 
 impl CssBuilder {
+	/// The stylesheet of every rule in `rule_set`, its `:root` default first.
 	pub fn build(
 		&self,
 		css_map: &CssTokenMap,
 		rule_set: &RuleSet,
 	) -> Result<String> {
-		let css_rules = rule_set
+		self.build_where(css_map, rule_set, |_| true)
+	}
+
+	/// [`build`](Self::build) emitting only the rules `keep` admits. Every rule
+	/// is still formatted, so variable names resolve exactly as the whole set's
+	/// do and a fragment's sheet names the variables its page's sheet declares.
+	/// A rule `keep` refuses that has no CSS form is skipped rather than failing
+	/// the build: the whole sheet would have failed on it, so there is no page
+	/// naming to match.
+	pub fn build_where(
+		&self,
+		css_map: &CssTokenMap,
+		rule_set: &RuleSet,
+		keep: impl Fn(&Rule) -> bool,
+	) -> Result<String> {
+		let (kept, css_rules): (Vec<bool>, Vec<CssRule>) = rule_set
 			.iter()
 			// rules gated on a query with no CSS condition (`Terminal`) never reach
 			// the serialized stylesheet (the charcell cascade applies them instead),
@@ -61,7 +77,17 @@ impl CssBuilder {
 				rule.media().is_none_or(|media| media.as_css().is_some())
 					&& !rule.selector().has_entity()
 			})
-			.xtry_map(|rule| CssRule::from_rule(css_map, rule))?;
+			.filter_map(|rule| {
+				let kept = keep(rule);
+				match CssRule::from_rule(css_map, rule) {
+					Ok(css) => Some(Ok((kept, css))),
+					Err(err) if kept => Some(Err(err)),
+					Err(_) => None,
+				}
+			})
+			.collect::<Result<Vec<_>>>()?
+			.into_iter()
+			.unzip();
 
 		// iteration variables
 		let mut declared = HashMap::default();
@@ -72,6 +98,11 @@ impl CssBuilder {
 				self.format_rule(format_variables, &mut declared, rule)
 			}) {
 				Ok(formatted) => {
+					let formatted = formatted
+						.into_iter()
+						.zip(&kept)
+						.filter_map(|(rule, kept)| kept.then_some(rule))
+						.collect::<Vec<_>>();
 					return if self.minify {
 						formatted.join("")
 					} else {
@@ -403,5 +434,65 @@ mod tests {
 			})
 			.xunwrap()
 			.xpect_snapshot();
+	}
+
+	/// A fragment's sheet carries only the rules selecting its classes, each
+	/// formatted exactly as the whole sheet formats it, and skips a rule
+	/// outside it with no CSS form, which fails the whole sheet.
+	#[beet_core::test]
+	fn selecting_matches_the_whole_sheet() {
+		let mut world = World::new();
+		world.insert_resource(
+			CssTokenMap::default()
+				.insert(colors::OnPrimary)
+				.insert(tones::Primary20)
+				.insert(common_props::ForegroundColor),
+		);
+		let rule = |class: &str| {
+			Rule::new()
+				.with_selector(Selector::class(class))
+				.with_token(common_props::ForegroundColor, colors::OnPrimary)
+				.unwrap()
+		};
+		world.insert_resource(
+			RuleSet::default()
+				.with_token(colors::OnPrimary, tones::Primary20)
+				.unwrap()
+				.with_value(tones::Primary20, Color::srgb(0., 1., 0.))
+				.unwrap()
+				.with_rule(rule("kept"))
+				.with_rule(rule("other")),
+		);
+		let whole = |world: &mut World| {
+			world.with_state::<StyleQuery, _>(|query| {
+				query.build_css(&test_builder())
+			})
+		};
+		let fragment = |world: &mut World| {
+			world
+				.with_state::<StyleQuery, _>(|query| {
+					query.build_css_selecting(
+						&test_builder(),
+						&HashSet::from_iter([SmolStr::new("kept")]),
+					)
+				})
+				.unwrap()
+		};
+		let kept = fragment(&mut world);
+		kept.xref()
+			.xpect_contains(".kept")
+			.xnot()
+			.xpect_contains(".other")
+			.xnot()
+			.xpect_contains(":root");
+		whole(&mut world).unwrap().xpect_contains(kept.trim());
+		world.resource_mut::<RuleSet>().insert_rule(
+			Rule::new()
+				.with_selector(Selector::class("broken"))
+				.with_token(ColorRoleProps, colors::PrimaryRole)
+				.unwrap(),
+		);
+		whole(&mut world).is_err().xpect_true();
+		fragment(&mut world).xpect_eq(kept);
 	}
 }

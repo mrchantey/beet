@@ -157,6 +157,8 @@ impl Plugin for RouterPlugin {
 				// (`<RoutesDir/>`, a `Layout` spread) and the by-name
 				// route-aware head/sidebar widgets.
 				.register_type::<Layout>()
+				.register_type::<ServerIsland>()
+				.register_type::<ServerIslandsRoute>()
 				// the declared icon set `RouteHead` links, deriving its own files,
 				// and the social cards it points each page's preview at
 				.register_type::<IconSet>()
@@ -184,6 +186,9 @@ impl Plugin for RouterPlugin {
 					Sitemap,
 					RssFeed,
 					SearchIndex,
+					// the island route, declared once at a router's root, and the
+					// live region of a page it answers
+					ServerIslands,
 					// the default app routes as a markup template, so a no-code BSX
 					// site requests them with `<DefaultAppRoutes/>`.
 					DefaultAppRoutes,

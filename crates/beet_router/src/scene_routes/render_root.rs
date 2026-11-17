@@ -23,6 +23,14 @@
 //! earliest, wins. The walk follows a [`Portal`] into the tree it transcludes,
 //! exactly as a render does.
 //!
+//! # The island rung
+//!
+//! Above both sits a rung no request names: the island route
+//! ([`ServerIslands`]) roots its render at the one [`ServerIsland`] it
+//! answers, winning over any `--root`. It is set by the caller of the page's
+//! preparation, never a param, so [`RenderRoot`] keeps its two values and an
+//! island is reached only through its own address.
+//!
 //! # Main and content
 //!
 //! A layout's `<main>` holds more than the route's content: `ArticleLayout`
