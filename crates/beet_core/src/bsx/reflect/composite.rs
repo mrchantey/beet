@@ -221,9 +221,16 @@ pub(super) fn enum_to_reflect(
 	let variant_name = named.name.rsplit("::").next().unwrap_or(&named.name);
 	let variant = enum_info.and_then(|info| info.variant(variant_name));
 
-	let dynamic_variant = match (&named.fields, variant) {
-		(NamedFields::Unit, _) => DynamicVariant::Unit,
-		(NamedFields::Tuple(items), variant) => {
+	let dynamic_variant = match (&named.fields, enum_info) {
+		// a bare name spells a variant exactly as a string does: a unit one, a
+		// tuple one carrying only `()` (`Fail` for `Outcome::Fail(())`), and an
+		// error for a name the enum lacks, which a unit `DynamicEnum` would have
+		// let `from_reflect` miss and leave the field's DEFAULT in place
+		(NamedFields::Unit, Some(enum_info)) => {
+			return reflect_ext::unit_variant_value(enum_info, variant_name);
+		}
+		(NamedFields::Unit, None) => DynamicVariant::Unit,
+		(NamedFields::Tuple(items), _) => {
 			let mut tuple = DynamicTuple::default();
 			for (index, item) in items.iter().enumerate() {
 				let nested = match variant {
@@ -238,7 +245,7 @@ pub(super) fn enum_to_reflect(
 			}
 			DynamicVariant::Tuple(tuple)
 		}
-		(NamedFields::Struct(struct_fields), variant) => {
+		(NamedFields::Struct(struct_fields), _) => {
 			assert_variant_complete(variant_name, variant, struct_fields)?;
 			let mut dynamic = DynamicStruct::default();
 			for (name, literal) in struct_fields {

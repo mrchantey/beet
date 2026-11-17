@@ -165,10 +165,18 @@ fn agent_count(app: &mut App) -> usize {
 	agents.iter(app.world()).count()
 }
 
-/// Count of tool definitions equipped on the reduced tree.
+/// Count of tools the reduced agents hold, each agent's the routes of the
+/// `<Router>` beneath it.
 fn tool_count(app: &mut App) -> usize {
-	let mut tools = app.world_mut().query::<&ToolDefinition>();
-	tools.iter(app.world()).count()
+	app.world_mut()
+		.with_state::<(Query<Entity, With<ActorRef>>, ThreadQuery), _>(
+			|(agents, query)| {
+				agents
+					.iter()
+					.map(|agent| query.tools(agent).unwrap().len())
+					.sum()
+			},
+		)
 }
 
 #[beet::test]

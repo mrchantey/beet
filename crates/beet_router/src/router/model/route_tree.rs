@@ -116,23 +116,14 @@ impl RouteTree {
 				});
 
 				if is_last {
-					if node.route.is_some() {
-						bevybail!(
-							"Duplicate route: multiple routes defined for path '{}'",
-							path.annotated_path()
-						);
-					}
+					Self::assert_unique(node.route.as_ref(), action_node)?;
 					node.route = Some(action_node.clone());
 				}
 			}
 
 			// handle root path (empty segments)
 			if segments.is_empty() {
-				if node.route.is_some() {
-					bevybail!(
-						"Duplicate route: multiple routes defined for path '/'"
-					);
-				}
+				Self::assert_unique(node.route.as_ref(), action_node)?;
 				node.route = Some(action_node.clone());
 			}
 		}
@@ -163,6 +154,23 @@ impl RouteTree {
 		}
 
 		build_tree(PathPattern::from_segments(vec![]).unwrap(), &root).xok()
+	}
+
+	/// Refuse a second route at a path one url space already answers, naming
+	/// both entities, ie two `<StoreToolset/>`s under one agent's router.
+	fn assert_unique(
+		existing: Option<&ActionNode>,
+		node: &ActionNode,
+	) -> Result {
+		match existing {
+			Some(existing) => bevybail!(
+				"Duplicate route: {} and {} both answer `/{}` in one url space",
+				existing.entity,
+				node.entity,
+				node.path.annotated_path()
+			),
+			None => Ok(()),
+		}
 	}
 
 	/// System wrapper around

@@ -602,6 +602,36 @@ impl TemplatePending {
 		}
 	}
 
+	/// Awaits the [`TemplatePending`] set of the one build `root` alone, the
+	/// settle a caller building per request uses (a route building a thread),
+	/// so it never waits on another build's dependency. Returns once the set
+	/// drains or the root is gone, sweeping dropped guards each pass as
+	/// [`Self::settle`] does.
+	pub async fn settle_root(root: &AsyncEntity) {
+		let entity = root.id();
+		loop {
+			let pending = root
+				.world()
+				.with(move |world| {
+					world.flush();
+					Self::sweep_dropped(world);
+					world
+						.get_entity(entity)
+						.ok()
+						.and_then(|root| root.get::<TemplatePending>())
+						.is_some_and(|pending| !pending.is_empty())
+				})
+				.await;
+			if !pending {
+				return;
+			}
+			// same two-step yield as `settle`: a single yield can lap the
+			// dependency tasks' bridge polls, see its comment.
+			async_ext::yield_now().await;
+			root.world().with(|_| ()).await;
+		}
+	}
+
 	/// [`Self::settle`] with a ceiling: fails once `deadline` elapses with a
 	/// dependency still outstanding.
 	///

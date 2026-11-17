@@ -18,9 +18,10 @@ impl SyncedPosts {
 /// The window is the single in-memory truth the scene streams into; this is the
 /// one channel that persists it. Only completed (`!in_progress`) posts not yet
 /// in [`SyncedPosts`] are committed, with their authoring actors and any
-/// response metadata; the thread record is idempotent (keyed by id). In-progress
-/// (streaming) posts stay window-local until completion. Threads without a
-/// [`ThreadStore`] are ignored.
+/// response metadata ([`ThreadFlush`]); the thread record is idempotent (keyed
+/// by id). Each flush is a task counted on its store, which
+/// [`ThreadStore::flush`] awaits. Threads without a [`ThreadStore`] are
+/// ignored.
 pub(crate) fn sync_window_to_store(
 	async_commands: AsyncCommands,
 	mut changed: Query<
@@ -29,47 +30,10 @@ pub(crate) fn sync_window_to_store(
 	>,
 ) -> Result {
 	for (thread, window, store, mut synced) in changed.iter_mut() {
-		// completed posts not yet flushed
-		let new_posts = window
-			.posts()
-			.iter()
-			.filter(|post| !post.in_progress() && !synced.contains(post.id()))
-			.cloned()
-			.collect::<Vec<_>>();
-		if new_posts.is_empty() {
-			continue;
+		if let Some(flush) = ThreadFlush::take(thread, window, &mut synced) {
+			store.spawn_flush(&async_commands, flush);
 		}
-
-		// dedup the authors and collect metadata for the new posts
-		let mut actors: Vec<Actor> = Vec::new();
-		let mut metas: Vec<ResponseMeta> = Vec::new();
-		for post in &new_posts {
-			if let Ok(actor) = window.actor(post.author())
-				&& !actors.iter().any(|existing| existing.id() == actor.id())
-			{
-				actors.push(actor.clone());
-			}
-			if let Some(meta) = window.meta(post.id()) {
-				metas.push(meta.clone());
-			}
-		}
-		new_posts.iter().for_each(|post| synced.insert(post.id()));
-
-		let store = store.inner();
-		let thread = thread.clone();
-		async_commands.run(async move |_: AsyncWorld| -> Result {
-			store.insert_thread(thread).await?;
-			for actor in actors {
-				store.insert_actor(actor).await?;
-			}
-			store.insert_posts(new_posts).await?;
-			if !metas.is_empty() {
-				store.insert_response_metas(metas).await?;
-			}
-			Ok(())
-		});
 	}
-
 	Ok(())
 }
 

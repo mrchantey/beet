@@ -10,6 +10,7 @@ use bevy_reflect::enums::DynamicEnum;
 use bevy_reflect::enums::DynamicVariant;
 use bevy_reflect::enums::EnumInfo;
 use bevy_reflect::enums::VariantInfo;
+use bevy_reflect::tuple::DynamicTuple;
 
 /// Clones a [`PartialReflect`] value, trying [`PartialReflect::reflect_clone`],
 /// then [`ReflectFromReflect::from_reflect`], then [`PartialReflect::to_dynamic`].
@@ -59,7 +60,9 @@ pub fn option_some_inner(info: &TypeInfo) -> Option<&'static TypeInfo> {
 }
 
 /// The unit variant of `enum_info` that `name` spells, as the value to write
-/// into the field.
+/// into the field. A tuple variant whose every field is `()` reads as unit
+/// too, so `Fail` spells beet_action's `Outcome::Fail(())`, which carries
+/// nothing to write.
 ///
 /// The one place a human's word becomes a variant, shared by markup (a
 /// `kind="user"` attribute) and the cli (a `--format=jsonl` flag), so the two
@@ -82,12 +85,27 @@ pub fn unit_variant_value(
 	enum_info: &EnumInfo,
 	name: &str,
 ) -> Result<Box<dyn PartialReflect>> {
-	let is_unit =
-		|variant: &&VariantInfo| matches!(variant, VariantInfo::Unit(_));
+	let is_unit = |variant: &&VariantInfo| match variant {
+		VariantInfo::Unit(_) => true,
+		VariantInfo::Tuple(tuple) => tuple
+			.iter()
+			.all(|field| field.type_id() == core::any::TypeId::of::<()>()),
+		VariantInfo::Struct(_) => false,
+	};
 	let unit_variants =
 		|| enum_info.iter().filter(is_unit).map(VariantInfo::name);
-	let unit = |variant: &str| -> Box<dyn PartialReflect> {
-		Box::new(DynamicEnum::new(variant, DynamicVariant::Unit))
+	let unit = |name: &str| -> Box<dyn PartialReflect> {
+		let variant = match enum_info.variant(name) {
+			Some(VariantInfo::Tuple(tuple)) => {
+				let mut fields = DynamicTuple::default();
+				for _ in 0..tuple.field_len() {
+					fields.insert(());
+				}
+				DynamicVariant::Tuple(fields)
+			}
+			_ => DynamicVariant::Unit,
+		};
+		Box::new(DynamicEnum::new(name, variant))
 	};
 	if let Some(variant) = enum_info.variant(name)
 		&& is_unit(&variant)

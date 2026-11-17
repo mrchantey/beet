@@ -4,7 +4,8 @@ Tool calling, the whole program in one scene. Run it through the one binary:
     beet --entry=examples/thread/tool_call.bsx
 
 A finite dungeon turn whose agent is equipped with the inline `<AgentChoiceAction/>`
-tool (registered by the binary), looped twice by `{RepeatTimes}` and run by
+tool (registered by the binary), a route of the url space its own `<Router>`
+roots, looped twice by `{RepeatTimes}` and run by
 `{RunThread}`. The run is finite, so the transcript settles once the two turns
 complete and the terminal holds it until Ctrl+C.
 -->
@@ -35,7 +36,7 @@ You enter the cave, and from the ceiling drops a glowing red beet..
 '/>
 				</CreateActor>
 				<CreateActor name="Fearless Warrior" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-					<AgentChoiceAction/>
+					<Router><AgentChoiceAction/></Router>
 				</CreateActor>
 			</Thread>
 		</RepeatTimes>

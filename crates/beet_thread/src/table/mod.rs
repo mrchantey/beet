@@ -6,10 +6,14 @@ mod document;
 mod load_thread;
 pub use create_post::*;
 pub use load_thread::*;
+#[cfg(feature = "action")]
+mod seed_source;
 mod thread;
 mod thread_query;
 pub mod thread_store;
 mod thread_window;
+#[cfg(feature = "action")]
+pub use seed_source::*;
 pub use thread_store::SyncedPosts;
 mod blob_thread_store;
 mod thread_store_provider;

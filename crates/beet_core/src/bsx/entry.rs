@@ -92,6 +92,53 @@ impl BsxTemplate {
 		})
 	}
 
+	/// The template `name` names, as a [`container`](Self::container) for the
+	/// single-element document `<Name/>`, so the name resolves exactly as it
+	/// would in tag position: a `.bsx` document in the
+	/// [`BsxTemplateRegistry`] first, else a rust `#[template]` registered by
+	/// short type path. One resolution for every declaration naming a
+	/// template, ie a layout or a route building a thread per request.
+	///
+	/// ## Errors
+	///
+	/// Errors when `name` is neither, naming both registries: in tag position
+	/// an unknown name builds as an inert unregistered tag, which a caller
+	/// naming a template would otherwise take for an empty one.
+	pub fn named(world: &World, name: &str) -> Result<Self> {
+		let registry = world
+			.get_resource::<BsxTemplateRegistry>()
+			.cloned()
+			.unwrap_or_default();
+		let registered_type = registry.get(name).is_some()
+			|| world
+				.get_resource::<AppTypeRegistry>()
+				.map(|types| types.read())
+				.and_then(|types| {
+					ReflectTemplate::registration_named(&types, name).map(
+						|registration| {
+							registration.data::<ReflectTemplate>().is_some()
+						},
+					)
+				})
+				.unwrap_or_default();
+		if !registered_type {
+			bevybail!(
+				"no template named `{name}`: it is neither a `.bsx` document in \
+				 the `BsxTemplateRegistry` (eg `{name}.bsx` under a \
+				 `<TemplateDir/>`) nor a rust template registered by short type \
+				 path (`app.install_type::<{name}>()`)"
+			);
+		}
+		let nodes = vec![BsxNode::Element(BsxElement {
+			tag: name.to_string(),
+			tag_literal: None,
+			attributes: default(),
+			children: default(),
+			self_closing: true,
+		})];
+		Self::container(nodes, registry).xok()
+	}
+
 	/// Build this template into a fresh root entity and flush, returning the root.
 	///
 	/// The flush materializes observer-driven structure (eg routes spawned off a

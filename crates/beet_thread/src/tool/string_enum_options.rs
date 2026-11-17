@@ -89,7 +89,8 @@ mod test {
 					"show",
 					"show an image",
 					JsonSchema::from_value(image_object_schema()),
-				),
+				)
+				.unwrap(),
 				StringEnumOptions::new("image", ["happy", "sad"]),
 			))
 			.id();

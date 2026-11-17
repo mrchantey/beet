@@ -4,7 +4,7 @@
 use crate::prelude::*;
 
 /// Lower a literal in text/attribute position to a concrete [`Value`].
-pub(super) fn literal_to_value(literal: &DataLiteral) -> Result<Value> {
+pub(in crate::bsx) fn literal_to_value(literal: &DataLiteral) -> Result<Value> {
 	match literal {
 		DataLiteral::Scalar(value) => Ok(value.clone()),
 		DataLiteral::List(items) => items

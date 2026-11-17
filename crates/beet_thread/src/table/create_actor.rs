@@ -8,9 +8,11 @@ use beet_core::prelude::*;
 /// identity (required for persisted threads, where the seed hash and `ActorRef`
 /// bindings depend on it); omit it for an ephemeral, freshly-minted id.
 ///
-/// Spread behavior and nest seeds/tools as children, ie
+/// Spread behavior and nest seeds as children, and an agent's tools as the
+/// routes of the one `<Router>` beneath it, its own url space, ie
 /// `<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}>
 ///   <CreatePost text="hello"/>
+///   <Router><StoreToolset/></Router>
 /// </CreateActor>`.
 #[template]
 pub fn CreateActor(
@@ -83,7 +85,7 @@ mod test {
 	<CreateActor name="System" kind="System"><CreatePost text="x"/></CreateActor>
 	<CreateActor name="Camera" kind="User" {TickStep}/>
 	<CreateActor name="Bot" kind="Agent" {ModelStreamer{provider:Ollama}}>
-		<ProbeTool/>
+		<Router><ProbeTool/></Router>
 	</CreateActor>
 </div>
 "#;
@@ -159,7 +161,7 @@ mod test {
 		let source = r#"
 <Thread>
 	<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama}}>
-		<ProbeTool/>
+		<Router><ProbeTool/></Router>
 	</CreateActor>
 </div>
 "#;

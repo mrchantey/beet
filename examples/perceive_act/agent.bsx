@@ -17,8 +17,8 @@ turn, so the robot carries its memory across incarnations.
 One model call per cycle: the `Camera` actor (`{PostPhoto}`) captures via `take-photo`
 and posts the photo straight into the thread, then the `Robot` agent answers with a
 single forced `respond-multi-modal` tool call ({ToolChoice::RequiredAny},
-`<RespondMultiModal/>` its only tool), which fans out to
-`show-image`/`speak-text`/`drive` and awaits them all (by default speaking before it
+`<RespondMultiModal/>` its only tool, the one route of its own `<Router>`), which
+fans out to the host's `show-image`/`speak-text`/`drive` and awaits them all (by default speaking before it
 drives), so the next photo waits for the body to stop moving. The window is append-only;
 `{PostPhoto}` stubs older photos to text to keep the request small while the prompt cache holds.
 
@@ -57,7 +57,7 @@ esp body) are unaffected, and managed deployments (lambda/Fargate) serve plainte
 			<CreateActor name="Camera" kind="User" {PostPhoto}/>
 			<CreateActor name="Robot" kind="Agent"
 				{(RobotStreamer{effort:ReasoningEffort::None}, ToolChoice::RequiredAny)}>
-				<RespondMultiModal max_drive_duration="4s" {StringEnumOptions{field:"image"}}/>
+				<Router><RespondMultiModal max_drive_duration="4s" {StringEnumOptions{field:"image"}}/></Router>
 			</CreateActor>
 		</Thread>
 	</Repeat>

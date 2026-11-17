@@ -37,10 +37,11 @@ use beet_net::prelude::*;
 /// Calling the **thread**, never an "agent", is the whole point: the `Sequence`
 /// is the behavior and runs its actors in order.
 ///
-/// When the thread carries a [`ThreadStore`] (eg via `{MountThreadStore{path:..}}`)
-/// the stored conversation is adopted by seed hash before the first turn, so a
-/// reload resumes instead of re-replying; `--new` (carried on the start request)
-/// discards it and starts fresh.
+/// When the thread declares a [`MountThreadStore`] the stored conversation is
+/// adopted by seed hash before the first turn, so a reload resumes instead of
+/// re-replying; `--new` (carried on the start request) discards it and starts
+/// fresh. A thread built per request rather than per entry is a
+/// [`ThreadRoute`].
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(CallOnStart)]
@@ -48,9 +49,9 @@ use beet_net::prelude::*;
 pub struct RunThread;
 
 impl RunThread {
-	/// The thread's entry point: adopt its persistent store (honoring `--new` on
-	/// the request), reduce the authored scene, then run the behavior to
-	/// completion.
+	/// The thread's entry point: enter every thread at or under the entity
+	/// ([`Thread::enter`], honoring `--new` on the request), then run the
+	/// behavior to completion.
 	///
 	/// An [`ActionOverload`] rather than a free function, so the entity's
 	/// [`ActionMeta`] advertises the whole thread as `Request -> Outcome` and no
@@ -61,23 +62,8 @@ impl RunThread {
 		ActionOverload::new(Action::new_async(
 			async |cx: ActionContext<Request>| -> Result<Outcome> {
 				let entity = cx.caller.clone();
-				let world = entity.world().clone();
 				// `--new` rides the start request, never a global env read mid-load.
-				Self::adopt_store(
-					world.clone(),
-					entity.id(),
-					cx.input.has_param("new"),
-				)
-				.await?;
-				// Reduce the authored scene into its `ThreadWindow` + behavior scene
-				// before running it. The entry drives the behavior directly, ahead of
-				// the scheduled `First` reduce, so without this the `Sequence` would
-				// receive raw, action-less `<CreateActor>` spans and fail. Idempotent
-				// (`Without<ThreadWindow>`), so the store path (already reduced in
-				// `Thread::adopt`) is unaffected.
-				world
-					.with(|world: &mut World| ThreadWindow::reduce_now(world))
-					.await;
+				Self::enter_all(&entity, cx.input.has_param("new")).await?;
 				// the canonical action, resolved by its own signature: an endless
 				// `Repeat` never returns, a finite loop completes while the servers
 				// stay parked.
@@ -86,53 +72,26 @@ impl RunThread {
 		))
 	}
 
-	/// Adopt the persistent store of the thread (at or under `root`) declaring a
-	/// [`MountThreadStore`], by seed hash, then mount it. The store is mounted
-	/// *after* adoption so the persistence sync never flushes a fresh, un-adopted
-	/// thread (which would fork a duplicate on every reload). `new` discards the
-	/// stored conversation first. Ephemeral threads declare no store and skip this.
-	async fn adopt_store(world: AsyncWorld, root: Entity, new: bool) -> Result {
-		let Some((thread, mount)) = world
-			.with(move |world: &mut World| Self::pending_store(world, root))
-			.await
-		else {
-			return Ok(());
-		};
-		let store = mount.build();
-		// `--new` discards the stored conversation and starts fresh
-		if new {
-			store.store_remove().await.ok();
+	/// Enter every [`Thread`] at or under `root`, in tree order
+	/// ([`Thread::enter`]). Each entry reduces its thread first, ahead of the
+	/// scheduled `First` reduce, so the behavior never receives raw,
+	/// action-less `<CreateActor>` spans.
+	pub(crate) async fn enter_all(root: &AsyncEntity, new: bool) -> Result {
+		let world = root.world().clone();
+		let threads = root
+			.with_state::<(Query<&Children>, Query<(), With<Thread>>), _>(
+				|root, (children, threads)| {
+					children
+						.iter_descendants_inclusive(root)
+						.filter(|entity| threads.contains(*entity))
+						.collect::<Vec<_>>()
+				},
+			)
+			.await?;
+		for thread in threads {
+			Thread::enter(world.clone(), thread, new).await?;
 		}
-		Thread::adopt(world.clone(), store.clone(), thread).await?;
-		world
-			.with(move |world: &mut World| {
-				if let Ok(mut thread) = world.get_entity_mut(thread) {
-					thread.insert(store).remove::<MountThreadStore>();
-				}
-			})
-			.await;
 		Ok(())
-	}
-
-	/// The thread (at or under `root`) declaring a [`MountThreadStore`], with that
-	/// declaration, if any: the persistence seam [`RunThread::adopt_store`] builds
-	/// and adopts before mounting the store and running the behavior.
-	fn pending_store(
-		world: &mut World,
-		root: Entity,
-	) -> Option<(Entity, MountThreadStore)> {
-		world.with_state::<(Query<&Children>, Query<&MountThreadStore>), _>(
-			|(children, mounts)| {
-				children
-					.iter_descendants_inclusive(root)
-					.find_map(|entity| {
-						mounts
-							.get(entity)
-							.ok()
-							.map(|mount| (entity, mount.clone()))
-					})
-			},
-		)
 	}
 }
 
@@ -143,16 +102,19 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
+	/// The directory every scene keeps its thread records under.
+	const RECORDS: &str = "threads";
+
 	/// A persistent thread scene: pinned actor ids so the seed hash is stable
 	/// across runs, one system seed and one mock agent. One agent turn, no loop,
 	/// so the run finishes.
-	fn scene(path: &str, system: ActorId, agent: ActorId) -> impl Bundle {
+	fn scene(system: ActorId, agent: ActorId) -> impl Bundle {
 		(
 			Thread::default(),
 			Sequence::new(),
 			RunThread,
 			MountThreadStore {
-				path: path.to_string(),
+				path: RelPath::new(RECORDS),
 			},
 			children![
 				(
@@ -186,51 +148,58 @@ mod test {
 	fn sweep() -> SweepDescendants<StartRunning<Request>> { default() }
 
 	/// Run a persistent thread to completion through the start notification: a
-	/// root whose child is the thread, declaring the sweep as a real entry root
-	/// does.
-	fn run_once(path: &str, system: ActorId, agent: ActorId) {
+	/// root holding the store, whose child is the thread, declaring the sweep as
+	/// a real entry root does.
+	fn run_once(store: &BlobStore, system: ActorId, agent: ActorId) {
 		let mut app = app();
 		app.world_mut()
-			.spawn((sweep(), children![scene(path, system, agent)]))
+			.spawn((sweep(), store.clone(), children![scene(system, agent)]))
 			.trigger(|entity| StartRunning::new(entity, Request::default()));
 		pump(&mut app, 120);
 	}
 
-	/// The stored thread count, read through a fresh store so the on-disk file is
-	/// re-read rather than served from an in-memory snapshot.
-	async fn stored_threads(path: &str) -> usize {
-		BlobThreadStore::new(BlobStore::new(FsStore::new(WsPath::new(path))))
+	/// Call `entity` as `In -> Outcome` and pump the app until it settles.
+	fn call<In: 'static + Send + Sync + Default>(
+		app: &mut App,
+		entity: Entity,
+	) {
+		app.world_mut().entity_mut(entity).run_async_local(
+			|entity| async move {
+				entity.call::<In, Outcome>(In::default()).await.map(|_| ())
+			},
+		);
+		pump(app, 120);
+	}
+
+	/// The stored thread count, read through a fresh thread store so the
+	/// records are re-read rather than served from an in-memory snapshot.
+	async fn stored_threads(store: &BlobStore) -> usize {
+		BlobThreadStore::new(store.with_subdir(RelPath::new(RECORDS)))
 			.threads()
 			.await
 			.unwrap()
 			.len()
 	}
 
-	/// The workspace-relative path [`MountThreadStore`] declares for `dir`.
-	fn ws_rel(dir: &TempDir) -> String {
-		dir.into_ws_path().unwrap().to_string()
-	}
-
 	/// A `{MountThreadStore}` thread, run twice against the same store, adopts the
 	/// stored thread on reload rather than forking a duplicate. Regression for the
 	/// deferred mount: the sync used to flush the fresh, un-adopted thread before
 	/// adoption ran, growing the store to two threads on the second run.
-	// runs a full app twice against real disk; the async fs flushes can exceed
-	// the 5s default under parallel test load.
+	// runs a full app twice; the async flushes can exceed the 5s default under
+	// parallel test load.
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn reload_adopts_without_duplicating() {
-		let dir = TempDir::new_ws().unwrap();
-		let path = &ws_rel(&dir);
+		let store = BlobStore::temp();
 		// stable ids so the seed hash matches across runs
 		let system = ActorId::from_u128(1);
 		let agent = ActorId::from_u128(2);
 
-		run_once(path, system, agent);
-		stored_threads(path).await.xpect_eq(1);
+		run_once(&store, system, agent);
+		stored_threads(&store).await.xpect_eq(1);
 
 		// reload: the same seed hash adopts the stored thread, no duplicate
-		run_once(path, system, agent);
-		stored_threads(path).await.xpect_eq(1);
+		run_once(&store, system, agent);
+		stored_threads(&store).await.xpect_eq(1);
 	}
 
 	/// Calling a mounted thread directly is the whole thread, not half of it: the
@@ -238,36 +207,31 @@ mod test {
 	/// with no start notification still adopts before running.
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn a_direct_call_adopts_before_running() {
-		let dir = TempDir::new_ws().unwrap();
-		let path = &ws_rel(&dir);
+		let store = BlobStore::temp();
 		let system = ActorId::from_u128(3);
 		let agent = ActorId::from_u128(4);
 
 		// seed the store through a normal start: the system seed plus one reply
-		run_once(path, system, agent);
-		stored_threads(path).await.xpect_eq(1);
+		run_once(&store, system, agent);
+		stored_threads(&store).await.xpect_eq(1);
 
 		// .. then re-run it by calling the entity itself. An un-adopted thread
 		// would run its seed alone, ending on two posts rather than continuing the
 		// stored conversation.
 		let mut app = app();
-		let thread = app.world_mut().spawn(scene(path, system, agent)).id();
-		app.world_mut().entity_mut(thread).run_async_local(
-			|thread| async move {
-				thread
-					.call::<Request, Outcome>(Request::default())
-					.await
-					.map(|_| ())
-			},
-		);
-		pump(&mut app, 120);
+		let root = app.world_mut().spawn(store.clone()).id();
+		let thread = app
+			.world_mut()
+			.spawn((ChildOf(root), scene(system, agent)))
+			.id();
+		call::<Request>(&mut app, thread);
 		app.world()
 			.get::<ThreadWindow>(thread)
 			.unwrap()
 			.posts()
 			.len()
 			.xpect_eq(3);
-		stored_threads(path).await.xpect_eq(1);
+		stored_threads(&store).await.xpect_eq(1);
 	}
 
 	/// The start sweep never leaves its root's subtree: starting one entry runs

@@ -438,7 +438,7 @@ pub fn tool_to_completions_tool(tool: &ToolDefinition) -> ChatCompletionTools {
 				params.into_inner().into_json();
 			ChatCompletionTools::Function(ChatCompletionTool {
 				function: FunctionObject {
-					name: func.path().to_string(),
+					name: FunctionToolDefinition::encode_name(func.path()),
 					description: Some(func.description().to_string()),
 					parameters: Some(json_params),
 					strict: Some(true),
@@ -477,13 +477,15 @@ pub fn tool_choice_to_completions(
 		ToolChoice::RequiredAny => {
 			ChatCompletionToolChoiceOption::Mode(ToolChoiceOptions::Required)
 		}
-		ToolChoice::RequiredList(names) => {
+		ToolChoice::RequiredList(paths) => {
 			// The completions API can only force a single named function;
 			// pick the first and rely on the caller to be specific.
-			if let Some(name) = names.first() {
+			if let Some(path) = paths.first() {
 				ChatCompletionToolChoiceOption::Function(
 					ChatCompletionNamedToolChoice {
-						function: FunctionName { name: name.clone() },
+						function: FunctionName {
+							name: FunctionToolDefinition::encode_name(path),
+						},
 					},
 				)
 			} else {
@@ -492,11 +494,13 @@ pub fn tool_choice_to_completions(
 				)
 			}
 		}
-		ToolChoice::AutoList(names) => {
-			if let Some(name) = names.first() {
+		ToolChoice::AutoList(paths) => {
+			if let Some(path) = paths.first() {
 				ChatCompletionToolChoiceOption::Function(
 					ChatCompletionNamedToolChoice {
-						function: FunctionName { name: name.clone() },
+						function: FunctionName {
+							name: FunctionToolDefinition::encode_name(path),
+						},
 					},
 				)
 			} else {

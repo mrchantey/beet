@@ -6,5 +6,9 @@ pub use repeat_while_function_call_output::*;
 mod run_thread;
 #[cfg(feature = "action")]
 pub use run_thread::*;
+#[cfg(feature = "action")]
+mod thread_route;
+#[cfg(feature = "action")]
+pub use thread_route::*;
 mod thread_plugin;
 pub use thread_plugin::*;

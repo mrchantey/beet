@@ -466,7 +466,7 @@ pub fn tool_to_function_param(tool: &ToolDefinition) -> FunctionToolParam {
 				params.into_inner().into_json();
 			FunctionToolParam {
 				tool_type: "function".to_string(),
-				name: func.path().to_string(),
+				name: FunctionToolDefinition::encode_name(func.path()),
 				description: func.description().to_string().xsome(),
 				parameters: json_params.xsome(),
 				strict: Some(true),
@@ -497,8 +497,8 @@ pub fn tool_choice(tool: &ToolChoice) -> o11s::ToolChoice {
 				mode: ToolChoiceValue::Auto,
 				tools: items
 					.into_iter()
-					.map(|name| SpecificFunctionChoice {
-						name: name.to_string(),
+					.map(|path| SpecificFunctionChoice {
+						name: FunctionToolDefinition::encode_name(&path),
 						choice_type: "function".into(),
 					})
 					.collect::<Vec<_>>(),
@@ -513,8 +513,8 @@ pub fn tool_choice(tool: &ToolChoice) -> o11s::ToolChoice {
 				mode: ToolChoiceValue::Auto,
 				tools: items
 					.into_iter()
-					.map(|name| SpecificFunctionChoice {
-						name: name.to_string(),
+					.map(|path| SpecificFunctionChoice {
+						name: FunctionToolDefinition::encode_name(&path),
 						choice_type: "function".into(),
 					})
 					.collect::<Vec<_>>(),

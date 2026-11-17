@@ -487,11 +487,40 @@ fn queue_route_tree_rebuild_on_insert<T: Component>(
 /// runs later) would still see `T` present; the wake is deferred for the same
 /// reason as the insert half, and the reconciler itself works out what
 /// changed via [`RemovedComponents`].
+///
+/// What it does record is the url space the entity sits in while its
+/// ancestry is still whole, for a despawn, after which nothing can find it:
+/// see [`RebuildWake::namespace`].
 fn queue_route_tree_rebuild_on_remove<T: Component>(
 	ev: On<Remove<T>>,
+	parents: Query<&ChildOf>,
+	partials: Query<&PathPartial>,
+	alive: Query<Entity>,
 	mut commands: Commands,
 ) {
-	queue_route_tree_rebuild(&mut commands, ev.entity);
+	let whole = parents
+		.iter_ancestors(ev.entity)
+		.all(|ancestor| alive.contains(ancestor));
+	let namespace = whole
+		.then(|| PathPattern::namespace_root(ev.entity, &parents, &partials));
+	queue_route_tree_wake(&mut commands, RebuildWake {
+		entity: ev.entity,
+		namespace,
+	});
+}
+
+/// What woke a [`rebuild_dirty_route_trees`]: the entity whose route state
+/// changed and, for a removal, the url space it sat in.
+#[derive(Debug, Clone, Copy)]
+struct RebuildWake {
+	/// The entity whose [`PathPattern`], [`RouteHidden`], [`RouteParams`] or
+	/// [`SubtreeParams`] changed.
+	entity: Entity,
+	/// The namespace root the entity sat in when its removal was observed,
+	/// read while its ancestry was whole. `None` for an insert, and for a
+	/// removal whose parent was already gone (a top-down despawn reaching a
+	/// child after its parent), which leaves the namespace unknown.
+	namespace: Option<Entity>,
 }
 
 /// Queue one run of [`rebuild_dirty_route_trees`] for `entity`, deferred past
@@ -504,9 +533,17 @@ fn queue_route_tree_rebuild_on_remove<T: Component>(
 /// route — in particular the last one added — would then be dropped from the
 /// tree with nothing left to wake it again.
 fn queue_route_tree_rebuild(commands: &mut Commands, entity: Entity) {
+	queue_route_tree_wake(commands, RebuildWake {
+		entity,
+		namespace: None,
+	});
+}
+
+/// Queue one run of [`rebuild_dirty_route_trees`] for `wake`.
+fn queue_route_tree_wake(commands: &mut Commands, wake: RebuildWake) {
 	commands.queue(move |world: &mut World| {
 		if let Ok(Err(err)) =
-			world.run_system_cached_with(rebuild_dirty_route_trees, entity)
+			world.run_system_cached_with(rebuild_dirty_route_trees, wake)
 		{
 			world.handle_command_error::<RouteTree>(err);
 		}
@@ -518,37 +555,49 @@ fn queue_route_tree_rebuild(commands: &mut Commands, entity: Entity) {
 /// funnels into, run once per dirty namespace root rather than once per
 /// changed entity.
 ///
-/// `trigger` is the entity whose [`PathPattern`], [`RouteHidden`],
+/// `trigger` names the entity whose [`PathPattern`], [`RouteHidden`],
 /// [`RouteParams`] or [`SubtreeParams`] just changed, handed over by the
 /// waking observer.
 /// An insert or a live removal leaves the entity and its ancestry intact, so
 /// [`PathPattern::namespace_root`] answers
 /// and only that namespace is dirty. A despawn does not: by the time this runs
-/// the entity is gone, which namespace lost the route can no longer be found,
-/// and every existing namespace is rebuilt this pass instead.
+/// the entity is gone, so the namespace its removal recorded is dirty, and
+/// none at all once that namespace went with it, its tree gone too. A
+/// removal that recorded none, its parent already gone when it was observed,
+/// rebuilds every existing namespace this pass instead. So a subtree torn
+/// down leaves first, ie a thread a route built for one request, rebuilds
+/// only the url spaces that survive it.
 ///
 /// The [`Changed`] query is the *mutation* half — a path edited in place fires
 /// no insert observer — and is a superset filter only, never the sole source
 /// of dirt: several wakes in one flush share one change tick, so every run
 /// after the first sees it empty.
 fn rebuild_dirty_route_trees(
-	trigger: In<Entity>,
+	trigger: In<RebuildWake>,
 	changed: Query<Entity, Or<(Changed<PathPattern>, Changed<RouteHidden>)>>,
 	all_entities: Query<Entity>,
 	mut builder: RouteTreeBuilder,
 ) -> Result {
 	let mut dirty: HashSet<Entity> = HashSet::new();
 
-	for entity in changed.iter().chain(core::iter::once(*trigger)) {
-		// `all_entities` (an unfiltered `Query<Entity>`) is the only reliable
-		// liveness check, since ancestry-based lookups fail alike for "gone" and
-		// for "alive but parentless"/"alive but no `PathPartial`".
-		if all_entities.contains(entity) {
-			dirty.insert(builder.namespace_of(entity));
-		} else {
-			// a despawn took the route with it, so sweep every namespace
-			dirty.extend(builder.existing_roots());
+	for entity in changed.iter() {
+		dirty.insert(builder.namespace_of(entity));
+	}
+	// `all_entities` (an unfiltered `Query<Entity>`) is the only reliable
+	// liveness check, since ancestry-based lookups fail alike for "gone" and
+	// for "alive but parentless"/"alive but no `PathPartial`".
+	match (all_entities.contains(trigger.entity), trigger.namespace) {
+		(true, _) => {
+			dirty.insert(builder.namespace_of(trigger.entity));
 		}
+		// a despawn took the route with it, out of the url space it recorded
+		(false, Some(namespace)) => {
+			if all_entities.contains(namespace) {
+				dirty.insert(namespace);
+			}
+		}
+		// a despawn whose url space is unknown, so sweep every namespace
+		(false, None) => dirty.extend(builder.existing_roots()),
 	}
 
 	for root in dirty {

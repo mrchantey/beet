@@ -128,7 +128,7 @@ impl CompletionsStreamer {
 
 					// Collect tools
 					let tools = query
-						.tools(actor_entity)
+						.tools(actor_entity)?
 						.into_iter()
 						.map(|(_entity, tool_def)| {
 							completions_mapper::tool_to_completions_tool(

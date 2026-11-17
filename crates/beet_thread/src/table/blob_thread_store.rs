@@ -221,6 +221,23 @@ impl ThreadStoreProvider for BlobThreadStore {
 		})
 	}
 
+	fn remove_thread(&self, thread_id: ThreadId) -> BoxedFuture<'_, Result> {
+		Box::pin(async move {
+			self.write(move |data| {
+				data.threads.retain(|thread| thread.id() != thread_id);
+				let removed = data
+					.posts
+					.iter()
+					.filter(|post| post.thread() == thread_id)
+					.map(Post::id)
+					.collect::<HashSet<_>>();
+				data.posts.retain(|post| post.thread() != thread_id);
+				data.metas.retain(|meta| !removed.contains(&meta.post_id));
+			})
+			.await
+		})
+	}
+
 	fn insert_posts(&self, posts: Vec<Post>) -> BoxedFuture<'_, Result<()>> {
 		Box::pin(async move {
 			self.write(move |data| {

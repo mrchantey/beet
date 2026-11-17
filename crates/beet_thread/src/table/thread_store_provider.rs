@@ -1,19 +1,170 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 /// The durable, syncable log of a thread's records: [`Thread`], [`Actor`],
 /// [`Post`] and [`ResponseMeta`]. Parallels [`BlobStore`] as the source of
 /// truth the ephemeral scene is a view onto.
+///
+/// The window flushes into it as it changes, each flush a task of its own;
+/// [`ThreadStore::flush`] awaits every one, so a thread is torn down only once
+/// its records are written.
 #[derive(Clone, Deref, Component)]
 #[require(SyncedPosts)]
-pub struct ThreadStore(Arc<dyn ThreadStoreProvider>);
+pub struct ThreadStore {
+	#[deref]
+	provider: Arc<dyn ThreadStoreProvider>,
+	/// The flushes spawned and not yet written.
+	in_flight: Arc<AtomicUsize>,
+}
 
 impl ThreadStore {
 	pub fn new(provider: impl ThreadStoreProvider) -> Self {
-		Self(Arc::new(provider))
+		Self {
+			provider: Arc::new(provider),
+			in_flight: default(),
+		}
 	}
-	pub fn inner(&self) -> Arc<dyn ThreadStoreProvider> { self.0.clone() }
+	pub fn inner(&self) -> Arc<dyn ThreadStoreProvider> {
+		self.provider.clone()
+	}
+
+	/// Write the thread `entity`'s completed posts not yet flushed, then wait
+	/// out every flush already in flight, so once this returns the store holds
+	/// every completed post of the window. A thread with no store has nothing
+	/// to flush.
+	pub async fn flush(entity: &AsyncEntity) -> Result {
+		let id = entity.id();
+		let Some((store, flush)) = entity
+			.world()
+			.with(move |world: &mut World| {
+				let store = world.get::<ThreadStore>(id)?.clone();
+				let flush =
+					world
+						.with_state::<Query<(&Thread, &ThreadWindow, &mut SyncedPosts)>, _>(
+							|mut query| {
+								query.get_mut(id).ok().and_then(
+									|(thread, window, mut synced)| {
+										ThreadFlush::take(
+											thread,
+											window,
+											&mut synced,
+										)
+									},
+								)
+							},
+						);
+				(store, flush).xsome()
+			})
+			.await
+		else {
+			return Ok(());
+		};
+		if let Some(flush) = flush {
+			flush.write(store.inner()).await?;
+		}
+		while store.in_flight.load(Ordering::SeqCst) > 0 {
+			async_ext::yield_now().await;
+			entity.world().with(|_| ()).await;
+		}
+		Ok(())
+	}
+
+	/// Spawn `flush` as a task of its own, counted until it is written.
+	pub(crate) fn spawn_flush(
+		&self,
+		commands: &AsyncCommands,
+		flush: ThreadFlush,
+	) {
+		let provider = self.inner();
+		let in_flight = InFlight::new(self.in_flight.clone());
+		commands.run(async move |_: AsyncWorld| -> Result {
+			let _in_flight = in_flight;
+			flush.write(provider).await
+		});
+	}
+}
+
+/// One counted in-flight flush, released however its task ends.
+struct InFlight(Arc<AtomicUsize>);
+
+impl InFlight {
+	fn new(count: Arc<AtomicUsize>) -> Self {
+		count.fetch_add(1, Ordering::SeqCst);
+		Self(count)
+	}
+}
+
+impl Drop for InFlight {
+	fn drop(&mut self) { self.0.fetch_sub(1, Ordering::SeqCst); }
+}
+
+/// The records a window holds that its store does not yet: completed posts
+/// not in [`SyncedPosts`], their authors and response metadata.
+pub(crate) struct ThreadFlush {
+	thread: Thread,
+	actors: Vec<Actor>,
+	posts: Vec<Post>,
+	metas: Vec<ResponseMeta>,
+}
+
+impl ThreadFlush {
+	/// The window's unflushed completed posts, marking them synced, or `None`
+	/// when every completed post is already flushed. In-progress (streaming)
+	/// posts stay window-local until completion.
+	pub(crate) fn take(
+		thread: &Thread,
+		window: &ThreadWindow,
+		synced: &mut SyncedPosts,
+	) -> Option<Self> {
+		let posts = window
+			.posts()
+			.iter()
+			.filter(|post| !post.in_progress() && !synced.contains(post.id()))
+			.cloned()
+			.collect::<Vec<_>>();
+		if posts.is_empty() {
+			return None;
+		}
+		// dedup the authors and collect metadata for the new posts
+		let mut actors: Vec<Actor> = Vec::new();
+		let mut metas: Vec<ResponseMeta> = Vec::new();
+		for post in &posts {
+			if let Ok(actor) = window.actor(post.author())
+				&& !actors.iter().any(|existing| existing.id() == actor.id())
+			{
+				actors.push(actor.clone());
+			}
+			if let Some(meta) = window.meta(post.id()) {
+				metas.push(meta.clone());
+			}
+		}
+		for post in &posts {
+			synced.insert(post.id());
+		}
+		Self {
+			thread: thread.clone(),
+			actors,
+			posts,
+			metas,
+		}
+		.xsome()
+	}
+
+	/// Write the records, the thread record first: idempotent, keyed by id.
+	async fn write(self, store: Arc<dyn ThreadStoreProvider>) -> Result {
+		store.insert_thread(self.thread).await?;
+		for actor in self.actors {
+			store.insert_actor(actor).await?;
+		}
+		store.insert_posts(self.posts).await?;
+		if !self.metas.is_empty() {
+			store.insert_response_metas(self.metas).await?;
+		}
+		Ok(())
+	}
 }
 
 impl Default for ThreadStore {
@@ -88,6 +239,11 @@ pub trait ThreadStoreProvider: 'static + Send + Sync {
 		})
 	}
 
+	/// Remove one thread: its record, its posts and their response metadata,
+	/// leaving every other thread and the actors as they are. What `--new`
+	/// discards when one store keeps many threads.
+	fn remove_thread(&self, thread_id: ThreadId) -> BoxedFuture<'_, Result>;
+
 	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<ActorId>>;
 	fn insert_thread(
 		&self,
@@ -135,6 +291,9 @@ impl ThreadStoreProvider for Arc<dyn ThreadStoreProvider> {
 		after_post: Option<PostId>,
 	) -> BoxedFuture<'_, Result<Vec<(Post, Actor)>>> {
 		self.as_ref().full_thread_posts(thread_id, after_post)
+	}
+	fn remove_thread(&self, thread_id: ThreadId) -> BoxedFuture<'_, Result> {
+		self.as_ref().remove_thread(thread_id)
 	}
 	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<ActorId>> {
 		self.as_ref().insert_actor(actor)
@@ -258,6 +417,47 @@ pub mod thread_store_test {
 			.await
 			.unwrap()
 			.xpect_none();
+
+		// removing one thread leaves the others and the actors
+		let other = Thread::new("Other Thread");
+		let other_id = other.id();
+		provider.insert_thread(other).await.unwrap();
+		provider
+			.insert_posts(vec![AgentPost::new_text(
+				actor_id,
+				other_id,
+				"other",
+				PostStatus::Completed,
+			)])
+			.await
+			.unwrap();
+		provider.remove_thread(thread_id).await.unwrap();
+		provider
+			.threads()
+			.await
+			.unwrap()
+			.iter()
+			.map(|thread| thread.id())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![other_id]);
+		provider
+			.thread_posts(thread_id, None)
+			.await
+			.unwrap()
+			.len()
+			.xpect_eq(0);
+		provider
+			.stored_response_meta("openai", "gpt-5-mini", thread_id)
+			.await
+			.unwrap()
+			.xpect_none();
+		provider
+			.thread_posts(other_id, None)
+			.await
+			.unwrap()
+			.len()
+			.xpect_eq(1);
+		provider.actors().await.unwrap().len().xpect_eq(1);
 
 		provider.store_remove().await.unwrap();
 	}

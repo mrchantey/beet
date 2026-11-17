@@ -19,12 +19,14 @@ impl Plugin for ThreadPlugin {
 		#[cfg(feature = "action")]
 		app.install_type::<ActionPlugin>()
 			// agent-loop control flow, as markup. `StoreToolset` is registered
-			// upstream by `RouterPlugin` (init above); the store is a plain `FsStore`.
+			// upstream by `RouterPlugin` (init above).
 			.register_type::<RepeatWhileFunctionCallOutput>()
 			// markup verb: the thread's `Request -> Outcome` entry point, plus the
 			// `CallOnStart` that calls it on the entry's start sweep. Owns no
 			// action slot.
 			.register_type::<RunThread>()
+			// a route building a thread per request
+			.register_type::<ThreadRoute>()
 			// markup persistence: declare a thread-record store from `.bsx`
 			.register_type::<MountThreadStore>()
 			// markup window bounding: stub older images so an endless loop's
@@ -41,6 +43,9 @@ impl Plugin for ThreadPlugin {
 			.register_type::<Provider>()
 			.register_type::<ModelApi>()
 			.register_type::<ModelSize>()
+			// the scripted mock, so a scene runs its agents with no network
+			.register_type::<MockPostStreamer>()
+			.register_type::<MockTurn>()
 			.install_type::<ModelStreamer>();
 
 		app

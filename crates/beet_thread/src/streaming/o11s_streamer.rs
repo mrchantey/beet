@@ -128,7 +128,7 @@ impl O11sStreamer {
 					trace!("openresponses items: \n{items:#?}");
 
 					let tools = query
-						.tools(actor_entity)
+						.tools(actor_entity)?
 						.into_iter()
 						.map(|(_entity, tool_def)| {
 							o11s_mapper::tool_to_function_param(tool_def)

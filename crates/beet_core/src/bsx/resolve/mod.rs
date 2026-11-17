@@ -20,6 +20,7 @@ mod xml;
 pub use build_cfg::*;
 pub(in crate::bsx) use directives::*;
 pub use events::*;
+pub(in crate::bsx) use literal::literal_to_value;
 pub use resolve::*;
 pub(in crate::bsx) use spread::*;
 pub use style_resolver::*;

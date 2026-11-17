@@ -2,6 +2,7 @@
 // `Post::run_oneshot` helper: a thread is authored as an author scene of actors with
 // seed posts, the agent runs, and its reply is collected.
 use beet_core::prelude::*;
+use beet_router::prelude::Router;
 use beet_thread::prelude::*;
 
 /// Send a simple prompt and verify we get a non-empty display post back.
@@ -78,13 +79,16 @@ pub async fn tool_calling(streamer: impl Component + PostStreamer + Clone) {
 			"required": ["location"]
 		}),
 	)
+	.unwrap()
 	.into();
 
 	let (name, args) = Post::run_oneshot(children![
 		(Actor::user(), children![Post::spawn(
 			"What's the weather like in San Francisco?"
 		)]),
-		(Actor::agent(), streamer, children![tool]),
+		(Actor::agent(), streamer, children![(Router, children![
+			tool
+		])]),
 	])
 	.await
 	.unwrap()

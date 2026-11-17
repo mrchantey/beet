@@ -259,6 +259,9 @@ impl ThreadWindow {
 	/// `window.posts`, then rewrite the actor entity. An actor that carries behavior
 	/// (an [`Action`]) becomes an [`ActorRef`] keeping its behavior and tools; a
 	/// seed-only actor (eg the system prompt) is despawned, leaving no turn behind.
+	/// A thread still holding a [`SeedSource`] waits: its seed is read while
+	/// the thread builds, and the window reduces once every seed is a
+	/// [`SeedPost`], so the seed hash always covers the resolved text.
 	///
 	/// Idempotent: gated on `Without<ThreadWindow>`, so it runs once per thread.
 	pub fn reduce(
@@ -267,9 +270,18 @@ impl ThreadWindow {
 		children: Query<&Children>,
 		actors: Query<&Actor>,
 		seeds: Query<&SeedPost>,
+		#[cfg(feature = "action")] pending: Query<(), With<SeedSource>>,
 		#[cfg(feature = "action")] behaviors: Query<(), With<ActionMeta>>,
 	) -> Result {
 		for (thread_entity, thread) in threads.iter() {
+			// a seed still being read: reduce once it lands
+			#[cfg(feature = "action")]
+			if children
+				.iter_descendants(thread_entity)
+				.any(|entity| pending.contains(entity))
+			{
+				continue;
+			}
 			let thread_id = thread.id();
 			let mut window = ThreadWindow::new();
 
@@ -287,17 +299,14 @@ impl ThreadWindow {
 				// descendants (not just direct children) so seeds authored through a
 				// markup `<Slot/>` are still found; actors never nest, so every
 				// `SeedPost` under an actor entity is unambiguously its own.
-				children
-					.iter_descendants(actor_entity)
-					.filter_map(|child| {
-						seeds.get(child).ok().map(|seed| (child, seed))
-					})
-					.for_each(|(child, seed)| {
+				for child in children.iter_descendants(actor_entity) {
+					if let Ok(seed) = seeds.get(child) {
 						window.upsert_post(
 							seed.clone().into_post(actor_id, thread_id),
 						);
 						commands.entity(child).despawn();
-					});
+					}
+				}
 
 				// rewrite the actor: behavior -> ActorRef, seed-only -> despawn
 				#[cfg(feature = "action")]
@@ -353,7 +362,7 @@ impl ThreadWindow {
 	pub fn seed_hash(&self) -> u64 {
 		use std::hash::Hash;
 		use std::hash::Hasher;
-		let mut hasher = std::collections::hash_map::DefaultHasher::new();
+		let mut hasher = FixedHasher.build_hasher();
 
 		let mut actors = self.actors().values().collect::<Vec<_>>();
 		actors.sort_by_key(|actor| actor.id());

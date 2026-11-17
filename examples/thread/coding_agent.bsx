@@ -5,9 +5,10 @@ binary:
     beet --entry=examples/thread/coding_agent.bsx
 
 `{FsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
-resolves), the agent exercises the five blob tools, and
-`{RepeatWhileFunctionCallOutput}` loops while it keeps calling tools. The run is
-finite, so the transcript settles and the terminal holds it until Ctrl+C.
+resolves), the agent exercises the five blob tools, the routes of the url space
+its own `<Router>` roots, and `{RepeatWhileFunctionCallOutput}` loops while it
+keeps calling tools. The run is finite, so the transcript settles and the
+terminal holds it until Ctrl+C.
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
 	<RequireCfg cfg="feature:thread && feature:tui && feature:ssh"/>
@@ -26,8 +27,7 @@ We are testing that your tool calls work correctly.
 Please perform the following steps in order:
 
 1. Use list-blobs (path: "") to see what is in the store
-2. Use write-blob to create a file called "hello.txt" with the content "Hello, Beet!"
-   (pass the text as UTF-8 bytes)
+2. Use write-text to create a file called "hello.txt" with the text "Hello, Beet!"
 3. Use read-blob to verify the file was written correctly
 4. Use edit-text to change "Hello, Beet!" to "Hello, World!"
 5. Use read-blob again to confirm the edit
@@ -37,7 +37,7 @@ Please perform the following steps in order:
 '/>
 				</CreateActor>
 				<CreateActor name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-					<StoreToolset/>
+					<Router><StoreToolset/></Router>
 				</CreateActor>
 			</Thread>
 		</RepeatWhileFunctionCallOutput>

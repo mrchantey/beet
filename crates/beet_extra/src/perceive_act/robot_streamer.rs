@@ -3,7 +3,7 @@
 //! [`RobotStreamer`] replaces the inline `<ModelStreamer provider="OpenAi"/>` on the
 //! `Robot` actor so the one shared `agent.bsx` runs either the real model or a mock with
 //! no scene fork. With the [`MOCK_MODEL_ENV`] env var set, the model is stubbed with a
-//! canned loop of [`RespondMultiModalInput`] calls ([`robot_mock_payloads`]) instead of
+//! canned loop of `respond-multi-modal` calls ([`robot_mock_payloads`]) instead of
 //! calling OpenAI, so the socket plumbing (browser head + device body) can be hardened
 //! without paying to interpret an image every cycle. The mock still drives the full
 //! `set-emotion`/`speak-text`/`drive` fan-out over the sockets, just with hardcoded
@@ -33,9 +33,7 @@ pub fn RobotStreamer(
 	OnSpawn::new(move |entity: &mut EntityWorldMut| -> Result {
 		if env_ext::var(MOCK_MODEL_ENV).is_ok() {
 			info!("perceive-act: mocking the model ({MOCK_MODEL_ENV} set)");
-			entity.insert(MockPostStreamer::with_tool_arguments(
-				robot_mock_payloads()?,
-			));
+			entity.insert(MockPostStreamer::cycling(robot_mock_payloads()?));
 		} else {
 			entity.insert_template(ModelStreamer {
 				provider: Provider::OpenAi,
@@ -52,7 +50,7 @@ pub fn RobotStreamer(
 /// exercises the face, speech and drive fan-out and looks alive. Velocities are gentle
 /// and steps sub-2s (the agent also clamps to `max_drive_duration`), so the body stays
 /// tame.
-fn robot_mock_payloads() -> Result<Vec<String>> {
+fn robot_mock_payloads() -> Result<Vec<MockTurn>> {
 	// (image title, line, linear mm/s, angular deg/s (+left), seconds); unknown
 	// titles fall back to the scene's fallback image.
 	[
@@ -65,7 +63,7 @@ fn robot_mock_payloads() -> Result<Vec<String>> {
 	]
 	.into_iter()
 	.map(|(image, say, linear, angular, secs)| {
-		serde_json::to_string(&RespondMultiModalInput {
+		MockTurn::call("respond-multi-modal", RespondMultiModalInput {
 			image: image.into(),
 			say: say.into(),
 			drive: DriveForDuration {
@@ -74,7 +72,6 @@ fn robot_mock_payloads() -> Result<Vec<String>> {
 			},
 			parallel: false,
 		})
-		.map_err(Into::into)
 	})
 	.collect()
 }

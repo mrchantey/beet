@@ -312,6 +312,42 @@ mod test {
 		}
 	}
 
+	/// A verdict whose failing variant carries `()`, the shape of
+	/// beet_action's `Outcome`.
+	#[derive(Reflect, Clone, Debug, Default, PartialEq)]
+	enum Verdict {
+		#[default]
+		Pass,
+		Fail(()),
+	}
+
+	/// A leaf holding a verdict, the shape of `EndWith<Outcome>`.
+	#[derive(Component, Reflect, Clone, Debug, Default, PartialEq)]
+	#[reflect(Component, Default)]
+	struct Leaf {
+		value: Verdict,
+	}
+
+	/// A bare variant name builds a tuple variant carrying `()`: `value=Fail`,
+	/// a unit enum literal, once missed the variant in `from_reflect` and kept
+	/// the leaf's default, a pass.
+	#[crate::test]
+	fn an_attribute_spells_a_unit_carrying_variant() {
+		let (mut world, _) = build("<Leaf value=Fail/>");
+		world
+			.query::<&Leaf>()
+			.single(&world)
+			.unwrap()
+			.value
+			.clone()
+			.xpect_eq(Verdict::Fail(()));
+		// a name the enum lacks is refused rather than defaulted
+		try_build("<Leaf value=Fial/>")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`Fial` names no unit variant");
+	}
+
 	/// Build `markup` into a world registering `PackageConfig` and [`Bound`],
 	/// returning the world and the built root.
 	fn build(markup: &str) -> (World, Entity) { try_build(markup).unwrap() }
@@ -327,6 +363,7 @@ mod test {
 			registry.register::<Bound>();
 			registry.register::<BoundPair>();
 			registry.register::<RequireCfg>();
+			registry.register::<Leaf>();
 		}
 		let nodes = BsxNode::parse_document(markup, &BsxParseConfig::bsx())?;
 		let root = world

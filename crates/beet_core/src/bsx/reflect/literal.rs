@@ -56,6 +56,16 @@ impl DataLiteral {
 			option.set_represented_type(field_info);
 			return Ok(Box::new(option));
 		}
+		// a `Value` target takes the literal as data whatever its shape, so a
+		// field holding arbitrary JSON (a tool call's arguments) is authored as
+		// `{path:"a.txt", bytes:[104]}` rather than as an escaped string
+		if let Some(info) = field_info
+			&& info.type_id() == core::any::TypeId::of::<Value>()
+		{
+			return Ok(Box::new(crate::bsx::resolve::literal_to_value(
+				literal,
+			)?));
+		}
 		// a named tuple literal wrapping ONE scalar (`<Name("x")/>`, `{Name("x")}`)
 		// reduces to that scalar for a target whose type carries its own authored
 		// spelling, so the parser sees the string the markup writes: a `Name`'s
@@ -163,6 +173,62 @@ mod test {
 			)]),
 		}))
 		.xpect_eq(Exposure { read: expected });
+	}
+
+	/// A bare variant name spells a tuple variant carrying only `()`, as an
+	/// `Outcome::Fail(())` does: `value=Fail` once built a passing leaf, the
+	/// name missing every unit variant and the field keeping its default.
+	#[crate::test]
+	fn spells_a_unit_carrying_tuple_variant_by_name() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		enum Verdict {
+			#[default]
+			Pass,
+			Fail(()),
+		}
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Leaf {
+			value: Verdict,
+		}
+		resolve::<Leaf>(DataLiteral::Enum(NamedLiteral {
+			name: "Leaf".into(),
+			fields: NamedFields::Struct(vec![(
+				"value".into(),
+				DataLiteral::Scalar(Value::Str("Fail".into())),
+			)]),
+		}))
+		.xpect_eq(Leaf {
+			value: Verdict::Fail(()),
+		});
+	}
+
+	/// A `Value` field takes any literal as data: a struct literal is a map,
+	/// a list a list, so arbitrary JSON authors as markup.
+	#[crate::test]
+	fn lowers_any_literal_into_a_value_field() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Call {
+			arguments: Value,
+		}
+		resolve::<Call>(DataLiteral::Enum(NamedLiteral {
+			name: "Call".into(),
+			fields: NamedFields::Struct(vec![(
+				"arguments".into(),
+				DataLiteral::Struct(vec![(
+					"bytes".into(),
+					DataLiteral::List(vec![DataLiteral::Scalar(Value::Int(
+						104,
+					))]),
+				)]),
+			)]),
+		}))
+		.xpect_eq(Call {
+			arguments: Value::Map(
+				[("bytes".into(), Value::List(vec![Value::Int(104)]))]
+					.into_iter()
+					.collect(),
+			),
+		});
 	}
 
 	/// The two-list form: a `GlobFilter` struct literal names either list, each

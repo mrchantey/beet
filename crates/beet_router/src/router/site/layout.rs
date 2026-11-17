@@ -249,73 +249,28 @@ fn wrap_content(
 /// the same entity, whose slot-resolution pass routes the content into the
 /// template's default `<Slot/>`.
 ///
-/// The template is built as the single-element document `<Name/>`, so name
-/// resolution is the ordinary BSX tag resolution (`.bsx` registry, then the
-/// type registry) rather than a second, narrower lookup. An unresolvable name
-/// would build as an [`UnregisteredTag`] and quietly serve the page with no
-/// chrome at all, so it is rejected here instead.
+/// The name resolves as the same name in tag position does
+/// ([`BsxTemplate::named`]), and an unresolvable one is rejected there rather
+/// than quietly serving the page with no chrome at all.
 fn build_layout(
 	world: &mut World,
 	template: &str,
 	rendered: Entity,
 ) -> Result<Entity> {
-	let registry = world
-		.get_resource::<BsxTemplateRegistry>()
-		.cloned()
-		.unwrap_or_default();
-	assert_registered(world, &registry, template)?;
-	let nodes = vec![BsxNode::Element(BsxElement {
-		tag: template.to_string(),
-		tag_literal: None,
-		attributes: default(),
-		children: default(),
-		self_closing: true,
-	})];
+	let template = BsxTemplate::named(world, template)?;
 	let layout = world
 		.spawn(children![(
 			beet_ui::prelude::Portal::new(rendered),
 			SlotChild::new()
 		)])
 		.id();
-	// `container` (not `new`): a layout is a DOCUMENT, so its body hangs below the
-	// layout entity rather than building onto it. A passthrough layout whose whole
-	// body is `<Slot/>` would otherwise land its `SlotTarget` on the very entity
-	// holding the transcluded content, where slot resolution cannot see it.
-	world
-		.entity_mut(layout)
-		.insert_template(BsxTemplate::container(nodes, registry))?;
+	// a container, since a layout is a DOCUMENT: its body hangs below the
+	// layout entity rather than building onto it. A passthrough layout whose
+	// whole body is `<Slot/>` would otherwise land its `SlotTarget` on the very
+	// entity holding the transcluded content, where slot resolution cannot see
+	// it.
+	world.entity_mut(layout).insert_template(template)?;
 	layout.xok()
-}
-
-/// Verify `template` names something buildable, naming both registries when it
-/// does not: the one error a layout typo can produce, since the tag resolution
-/// it feeds treats an unknown name as ordinary markup.
-fn assert_registered(
-	world: &World,
-	registry: &BsxTemplateRegistry,
-	template: &str,
-) -> Result {
-	if registry.get(template).is_some() {
-		return Ok(());
-	}
-	let registered_type = world
-		.get_resource::<AppTypeRegistry>()
-		.map(|types| types.read())
-		.and_then(|types| {
-			ReflectTemplate::registration_named(&types, template).map(
-				|registration| registration.data::<ReflectTemplate>().is_some(),
-			)
-		})
-		.unwrap_or_default();
-	match registered_type {
-		true => Ok(()),
-		false => bevybail!(
-			"no layout template named `{template}`: it is neither a `.bsx` \
-			 document in the `BsxTemplateRegistry` (eg `{template}.bsx` under a \
-			 `<TemplateDir/>`) nor a rust template registered by short type path \
-			 (`app.install_type::<{template}>()`)"
-		),
-	}
 }
 
 #[cfg(test)]

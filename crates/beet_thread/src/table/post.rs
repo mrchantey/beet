@@ -191,7 +191,7 @@ impl Post {
 	pub fn hash_self(&self) -> u64 {
 		use std::hash::Hash;
 		use std::hash::Hasher;
-		let mut hasher = std::collections::hash_map::DefaultHasher::new();
+		let mut hasher = FixedHasher.build_hasher();
 		self.hash(&mut hasher);
 		hasher.finish()
 	}

@@ -5,7 +5,8 @@ across turns. Run it through the one binary:
     beet --entry=examples/thread/self_evolving.bsx
 
 `{FsStore}` mounts the store on the thread (an ancestor the `<StoreToolset/>`
-resolves) and the agent evolves `notes.md` over ten turns (`{RepeatTimes}`). The
+resolves) and the agent evolves `notes.md` over ten turns (`{RepeatTimes}`)
+through its tools, the routes of the url space its own `<Router>` roots. The
 run is finite, so the transcript settles and the terminal holds it until Ctrl+C.
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
@@ -32,7 +33,7 @@ state in one sentence what you changed.
 "/>
 				</CreateActor>
 				<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}>
-					<StoreToolset/>
+					<Router><StoreToolset/></Router>
 				</CreateActor>
 			</Thread>
 		</RepeatTimes>

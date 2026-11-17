@@ -141,7 +141,9 @@ pub async fn RespondMultiModal(
 /// stall the robot's life.
 const CAPABILITY_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Call a capability route on the agent's router with a JSON body.
+/// Call a capability route with a JSON body, in the url space hosting the
+/// agent ([`ThreadQuery::agent_host`]): the capabilities are routes beside the
+/// agent, never its own tools.
 ///
 /// A body that cannot block on its own effect (the esp robot: no async-timer
 /// waker in its handler task) replies with a [`SettleTime`] instead, and the
@@ -151,9 +153,12 @@ async fn call_capability(
 	path: &str,
 	body: String,
 ) -> Result {
+	let host = caller
+		.with_state::<ThreadQuery, _>(|entity, query| query.agent_host(entity))
+		.await??;
 	let response = async_ext::timeout(
 		CAPABILITY_TIMEOUT,
-		caller.call_detached(
+		caller.world().entity(host).call_detached(
 			Router::action(),
 			Request::get(path)
 				.with_body(body)
@@ -199,30 +204,33 @@ pub struct RespondMultiModalInput {
 mod test {
 	use super::*;
 
-	/// Build an agent serving `show-image` + `drive` (but deliberately no `speak-text`,
-	/// so a failed capability is exercised as tolerated), spawn the `RespondMultiModal`
-	/// tool as `config`, run one `input` through it, and return the app plus the image
-	/// and drive route entities so callers can assert what each recorded.
+	/// Build a host serving `show-image` + `drive` (but deliberately no `speak-text`,
+	/// so a failed capability is exercised as tolerated) beside an agent whose own
+	/// router holds the `RespondMultiModal` tool as `config`, run one `input`
+	/// through it, and return the app plus the image and drive route entities so
+	/// callers can assert what each recorded.
 	async fn run_response(
 		config: RespondMultiModal,
 		input: RespondMultiModalInput,
 	) -> (App, Entity, Entity) {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ThreadPlugin::default()));
-		let agent = app.world_mut().spawn(Router).id();
+		let host = app.world_mut().spawn(Router).id();
 		let image_entity =
-			app.world_mut().spawn((ShowImage, ChildOf(agent))).id();
+			app.world_mut().spawn((ShowImage, ChildOf(host))).id();
 		let drive_entity = app
 			.world_mut()
-			.spawn((LogDriveForDuration, ChildOf(agent)))
+			.spawn((LogDriveForDuration, ChildOf(host)))
 			.id();
-		app.world_mut().spawn((config, ChildOf(agent)));
+		let agent = app.world_mut().spawn((Actor::agent(), ChildOf(host))).id();
+		let tools = app.world_mut().spawn((Router, ChildOf(agent))).id();
+		app.world_mut().spawn((config, ChildOf(tools)));
 		app.world_mut().flush();
 
 		let body = serde_json::to_string(&input).unwrap();
-		app.world_mut().entity_mut(agent).run_async_local(
-			move |agent| async move {
-				agent
+		app.world_mut().entity_mut(tools).run_async_local(
+			move |tools| async move {
+				tools
 					.call_detached(
 						Router::action(),
 						Request::get("respond-multi-modal")
