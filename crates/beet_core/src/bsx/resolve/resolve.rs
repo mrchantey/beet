@@ -139,14 +139,20 @@ impl Template for BsxTemplate {
 	fn clone_template(&self) -> Self { self.clone() }
 }
 
-/// Build the root nodes into the context entity. The first node builds into the
-/// root; the rest spawn as children, matching the `rsx!` fragment lowering.
+/// Build the root nodes into the context entity. A single root builds into
+/// the entity; several spawn as its children, matching the `rsx!` fragment
+/// lowering. Comments and blank text beside a single root element document
+/// the file and build nothing, as they do beside an entry's root, so a
+/// commented template's root is still the tag's own entity.
 fn build_root_nodes(
 	nodes: &[BsxNode],
 	registry: &BsxTemplateRegistry,
 	refs: &RefBindings,
 	cx: &mut TemplateContext,
 ) -> Result<()> {
+	if let Some(root) = BsxNode::single_root(nodes) {
+		return build_node_into(root, registry, refs, cx);
+	}
 	match nodes {
 		[] => Ok(()),
 		[single] => build_node_into(single, registry, refs, cx),

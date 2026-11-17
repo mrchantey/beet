@@ -68,10 +68,12 @@ impl RequestContextStack {
 	/// never is: the content build and the layout middleware each push a context
 	/// around their build (see [`scoped`](Self::scoped)).
 	pub fn current(&self) -> &RequestContext {
-		self.0
-			.last()
+		self.try_current()
 			.expect("no active RequestContext: read outside a layout render")
 	}
+
+	/// The active (top) context, if a request is being built for.
+	pub fn try_current(&self) -> Option<&RequestContext> { self.0.last() }
 }
 
 /// Request-scoped facts available to layout scene systems during a render. Held

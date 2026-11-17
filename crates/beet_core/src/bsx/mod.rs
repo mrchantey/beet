@@ -147,8 +147,9 @@
 //! assert_eq!(world.entity(title).get::<Value>().unwrap(), &Value::Str("Intro".into()));
 //! ```
 //!
-//! A template's root element is the tag's own entity, so an attribute beyond
-//! its declared props (a Rust template's fields, a `.bsx` template's
+//! A template's root element is the tag's own entity (comments beside it
+//! document the file and build nothing, as beside an entry's root), so an
+//! attribute beyond its declared props (a Rust template's fields, a `.bsx` template's
 //! `bx:schema`) falls through to that element: `<Link href="/docs" hidden>`
 //! renders `<a href="/docs" hidden class="btn ..">`. A `class` joins the
 //! element's own, any other key replaces its value, and a template with no

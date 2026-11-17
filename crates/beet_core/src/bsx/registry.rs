@@ -284,4 +284,36 @@ mod test {
 			SmolStr::from("widgets::Swatch"),
 		]);
 	}
+
+	/// A comment beside a template's single root element documents the file:
+	/// the root is still the tag's own entity, as an entry's root is beside
+	/// its comments, rather than one of two children.
+	#[crate::test]
+	fn a_commented_template_keeps_its_root() {
+		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
+		let mut registry = BsxTemplateRegistry::default();
+		registry
+			.insert_source("Card", "<!-- a card -->\n<section><p/></section>\n")
+			.unwrap();
+		let nodes =
+			BsxNode::parse_document("<Card/>", &BsxParseConfig::bsx()).unwrap();
+		let root = world
+			.spawn_template(BsxTemplate::container(nodes, registry))
+			.unwrap()
+			.id();
+		world.flush();
+		let card = world.entity(root).get::<Children>().unwrap()[0];
+		world
+			.entity(card)
+			.get::<Element>()
+			.unwrap()
+			.tag()
+			.xpect_eq("section");
+		world
+			.entity(card)
+			.get::<Children>()
+			.unwrap()
+			.len()
+			.xpect_eq(1);
+	}
 }

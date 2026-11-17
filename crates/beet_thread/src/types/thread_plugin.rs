@@ -80,6 +80,7 @@ impl Plugin for ThreadPlugin {
 			.install_type::<(
 				CreatePost,
 				CreateActor,
+				RequestPost,
 			)>()
 			.add_observer(reapply_string_enum_options)
 			// _

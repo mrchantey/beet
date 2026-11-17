@@ -16,9 +16,8 @@ use beet_router::prelude::*;
 ///
 /// 1. builds a fresh thread from `template`, a name resolved as a [`Layout`]
 ///    resolves its own ([`BsxTemplate::named`]), with the request on the
-///    [`RequestContextStack`] for the build, so a seed reads a path param
-///    (`review {document}`) from a `#[template(system)]` taking
-///    `Res<RequestContextStack>`;
+///    [`RequestContextStack`] for the build, so a seed reads a path param,
+///    ie `<RequestPost text="review {document}"/>`;
 /// 2. settles the build, every [`SeedSource`] read, and attaches the thread
 ///    beneath the route, where it resolves the ancestor [`BlobStore`] and the
 ///    host url space as if authored there. It is built detached first, so the
@@ -224,26 +223,13 @@ mod test {
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
 
-	/// The seed of a review thread, read off the request's
-	/// `document` path param while the thread builds.
-	#[template(system)]
-	fn ReviewSeed(stack: Res<RequestContextStack>) -> impl Bundle {
-		let document = stack
-			.current()
-			.parts()
-			.get_param("document")
-			.unwrap_or_default()
-			.to_string();
-		Post::spawn(format!("review {document}"))
-	}
-
 	/// The thread a review builds per request: pinned actors, the reviewed
 	/// document in its seed, a reading agent with tools of its own that reads once then
 	/// answers, its records kept under `threads`.
 	const REVIEW_THREAD: &str = r#"
 <RepeatWhileFunctionCallOutput>
 	<Thread {(Sequence, MountThreadStore{path:"threads"})}>
-		<CreateActor name="User" kind="User" id=1><ReviewSeed/></CreateActor>
+		<CreateActor name="User" kind="User" id=1><RequestPost text="review {document}"/></CreateActor>
 		<CreateActor name="Agent" kind="Agent" id=2 {MockPostStreamer{script:[Call{tool:"read-blob", arguments:{path:"notes.md"}}]}}>
 			<Router><StoreToolset read_only=true/></Router>
 		</CreateActor>
@@ -255,7 +241,7 @@ mod test {
 	fn host() -> (App, Entity, BlobStore) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<(ThreadPlugin, ReviewSeed)>();
+			.install_type::<ThreadPlugin>();
 		app.world_mut()
 			.get_resource_or_init::<BsxTemplateRegistry>()
 			.insert_source("ReviewThread", REVIEW_THREAD)

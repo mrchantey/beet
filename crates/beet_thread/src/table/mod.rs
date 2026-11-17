@@ -4,8 +4,10 @@ pub use create_actor::*;
 mod create_post;
 mod document;
 mod load_thread;
+mod request_post;
 pub use create_post::*;
 pub use load_thread::*;
+pub use request_post::*;
 #[cfg(feature = "action")]
 mod seed_source;
 mod thread;

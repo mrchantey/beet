@@ -44,11 +44,7 @@ impl BsxTemplate {
 	) -> Result<Self> {
 		let roots = nodes
 			.into_iter()
-			.filter(|node| match node {
-				BsxNode::Comment(_) => false,
-				BsxNode::Text(text) => !text.trim().is_empty(),
-				_ => true,
-			})
+			.filter(BsxNode::is_significant)
 			.collect::<Vec<_>>();
 		let root = match <[BsxNode; 1]>::try_from(roots) {
 			Ok([root @ BsxNode::Element(_)]) => root,

@@ -168,6 +168,26 @@ impl BsxNode {
 			_ => None,
 		})
 	}
+
+	/// Whether the node builds anything at a document's root: a comment or
+	/// blank text beside the root element documents the file.
+	pub fn is_significant(&self) -> bool {
+		match self {
+			BsxNode::Comment(_) => false,
+			BsxNode::Text(text) => !text.trim().is_empty(),
+			_ => true,
+		}
+	}
+
+	/// The single root element among `nodes`, its comments and blank text
+	/// aside, or none when there are several or the one is not an element.
+	pub fn single_root(nodes: &[BsxNode]) -> Option<&BsxNode> {
+		let mut roots = nodes.iter().filter(|node| node.is_significant());
+		match (roots.next(), roots.next()) {
+			(Some(root @ BsxNode::Element(_)), None) => Some(root),
+			_ => None,
+		}
+	}
 }
 
 /// One attribute on an element.
