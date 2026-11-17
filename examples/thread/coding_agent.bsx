@@ -21,7 +21,7 @@ terminal holds it until Ctrl+C.
 				<CreateActor name="System" kind="System">
 					<CreatePost text='
 You are a coding agent with access to a file store.
-Your available tools are: list-blobs, read-blob, write-blob, edit-text, remove-blob.
+Your available tools are: list-blobs, read-blob, write-text, edit-text, remove-blob.
 
 We are testing that your tool calls work correctly.
 Please perform the following steps in order:

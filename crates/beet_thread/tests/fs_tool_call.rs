@@ -9,11 +9,11 @@ use beet_thread::prelude::*;
 const PROMPT: &str = r#"
 You are a testing agent. Perform these steps in order using the provided tools:
 
-1. Use write-blob to create "test.txt" with content "hello beet"
+1. Use write-text to create "test.txt" with content "hello beet"
 2. Use read-blob to verify it contains "hello beet"
 3. Use edit-text to change "hello beet" to "hello world"
 4. Use read-blob to confirm the edit worked
-5. Use write-blob to create "result.txt" with the content of what you read in step 4
+5. Use write-text to create "result.txt" with the content of what you read in step 4
 
 After completing all steps, call execution-outcome with passed=true.
 If any step fails, call execution-outcome with passed=false and describe in reason.
@@ -47,7 +47,7 @@ fn main() {
 							children![(Router, children![
 								route::exchange("list-blobs", ListBlobs),
 								route::exchange("read-blob", ReadBlob),
-								route::exchange("write-blob", WriteBlob),
+								route::exchange("write-text", WriteText),
 								route::exchange("edit-text", EditText),
 								route::exchange("remove-blob", RemoveBlob),
 								route::exchange(

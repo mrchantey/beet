@@ -11,23 +11,83 @@ use beet_net::prelude::*;
 /// Equip an agent with the standard blob-store toolset: list, read, write,
 /// edit, and remove against the nearest ancestor [`BlobStore`]. Each entry is a
 /// routed [`route::exchange`], so the agent both sees the tool's schema and can
-/// dispatch the call.
+/// dispatch the call. It writes through [`WriteText`] rather than
+/// [`WriteBlob`], whose byte array a model spells badly.
 ///
-/// A `#[template]`, so it nests under an agent in markup, ie
-/// `<CreateActor name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}><StoreToolset/></CreateActor>`,
+/// A `#[template]`, so it nests under an agent's [`Router`] in markup, the url
+/// space its tools are the routes of, ie
+/// `<CreateActor name="Coder" kind="Agent" {ModelStreamer{provider:OpenAi}}><Router><StoreToolset/></Router></CreateActor>`,
 /// with a [`BlobStore`] mounted on an ancestor (eg the thread's behavior root).
+/// `<StoreToolset read_only=true/>` mounts the two reading tools alone, for an
+/// agent that may look at a store but never change it: a call of any other
+/// is its router's not-found.
 #[template]
-pub fn StoreToolset() -> impl Bundle {
-	children![
-		route::exchange("list-blobs", ListBlobs),
-		route::exchange("read-blob", ReadBlob),
-		route::exchange("write-blob", WriteBlob),
-		route::exchange("edit-text", EditText),
-		route::exchange("remove-blob", RemoveBlob),
-	]
+pub fn StoreToolset(
+	/// Mount only `list-blobs` and `read-blob`.
+	read_only: bool,
+) -> impl Bundle {
+	OnSpawn::new(move |entity| {
+		entity.with_children(|parent| {
+			parent.spawn(route::exchange("list-blobs", ListBlobs));
+			parent.spawn(route::exchange("read-blob", ReadBlob));
+			if !read_only {
+				parent.spawn(route::exchange("write-text", WriteText));
+				parent.spawn(route::exchange("edit-text", EditText));
+				parent.spawn(route::exchange("remove-blob", RemoveBlob));
+			}
+		});
+	})
 }
 
-// `<StoreToolset/>` equipping the five routed blob tools (and the `ToolDefinition`
+// `<StoreToolset/>` equipping the routed blob tools (and the `ToolDefinition`
 // an agent derives from each) is covered downstream where the tool-definition
 // observer lives: `tests/thread_scenes.rs` (`coding_agent`/`self_evolving` reduce
-// to a `tool_count` of 5).
+// to a `tool_count` of 5) and beet_thread's `read_only_toolset_cannot_write`.
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_action::prelude::*;
+	use beet_core::prelude::*;
+	use beet_net::prelude::*;
+
+	/// Two toolsets under one router are two routes on each path of one url
+	/// space, which the tree build refuses, naming both entities.
+	#[beet_core::test]
+	fn two_toolsets_in_one_url_space_conflict() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		// the observer-driven rebuild raises too, so log rather than panic
+		world.insert_resource(bevy::ecs::error::FallbackErrorHandler(
+			bevy::ecs::error::warn,
+		));
+		let router = BsxTemplate::parse_entry(
+			&world,
+			"<Router><StoreToolset/><StoreToolset/></Router>",
+		)
+		.unwrap()
+		.spawn(&mut world)
+		.unwrap();
+		world.flush();
+		let err = world
+			.run_system_cached_with::<_, Result, _, _>(
+				RouteTree::rebuild,
+				router,
+			)
+			.unwrap()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("Duplicate route");
+		// the build refuses the first duplicate it meets, so find its pair by path
+		let routes = world
+			.query_filtered::<(Entity, &PathPattern), With<ActionMeta>>()
+			.iter(&world)
+			.filter(|(_, path)| {
+				err.contains(&format!("`/{}`", path.annotated_path()))
+			})
+			.map(|(entity, _)| entity)
+			.collect::<Vec<_>>();
+		routes.len().xpect_eq(2);
+		err.xpect_contains(&routes[0].to_string())
+			.xpect_contains(&routes[1].to_string());
+	}
+}
