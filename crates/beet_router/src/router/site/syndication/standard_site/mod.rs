@@ -12,8 +12,12 @@
 //! serialized with the lexicon's exact wire names: the rkey a record lives at
 //! travels beside it in an [`Rkeyed`], never in the body.
 //!
+//! - [`StandardSitePub`], `<StandardSitePub/>`, the declaration: the
+//!   publication's data, its account, and the derived [`StandardSiteIndex`]
+//!   remembering where each record went, whose module docs say what the
+//!   served site makes of it (the well-known route, the head's `<link>`s)
 //! - [`StandardSitePublication`], `site.standard.publication`, built from the
-//!   [`StandardSitePub`] declaration by
+//!   declaration by
 //!   [`from_declaration`](StandardSitePublication::from_declaration), with its
 //!   [`ThemeBasic`] resolved from the site's [`Theme`]
 //! - [`StandardSiteDocument`], `site.standard.document`, built from a listed
@@ -43,6 +47,7 @@ mod leaflet;
 mod publication;
 #[cfg(feature = "json")]
 mod publish;
+mod standard_site_index;
 mod standard_site_pub;
 mod theme;
 pub use content_format::*;
@@ -50,6 +55,7 @@ pub use document::*;
 #[cfg(feature = "leaflet")]
 pub use leaflet::*;
 pub use publication::*;
+pub use standard_site_index::*;
 pub use standard_site_pub::*;
 pub use theme::*;
 
@@ -78,6 +84,43 @@ pub(crate) mod test_fixtures {
 			"at://did:plc:vgxy56shhs3t3b2mu2avizjf/site.standard.publication/3mw72aaeuj22n",
 		)
 		.unwrap()
+	}
+
+	/// The fixture publication's index: the publication, and the one post
+	/// published, `blog/full-stack-bevy`.
+	pub fn harvest_index() -> StandardSiteIndex {
+		let cid = || {
+			Cid::parse(
+				"bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza",
+			)
+			.unwrap()
+		};
+		StandardSiteIndex {
+			publication: StrongRef::new(harvest_uri(), cid()),
+			documents: vec![StandardSiteIndexDocument {
+				path: "/full-stack-bevy".into(),
+				uri: AtUri::parse(
+					"at://did:plc:vgxy56shhs3t3b2mu2avizjf/site.standard.document/3mw72aaeuj22o",
+				)
+				.unwrap(),
+				cid: cid(),
+				bsky_post: None,
+			}],
+		}
+	}
+
+	/// Write `index` to `store` at the fixture publication's index path, as
+	/// `publish` writes it.
+	pub async fn write_index(store: &BlobStore, index: &StandardSiteIndex) {
+		let body = EntityBody::default()
+			.with(index)
+			.unwrap()
+			.with(&Provenance::new([]))
+			.unwrap();
+		store
+			.insert(&harvest().index, MediaType::Json.serialize(&body).unwrap())
+			.await
+			.unwrap();
 	}
 
 	/// Upload `blobs`, then write `record` twice through the converge: one

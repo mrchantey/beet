@@ -74,6 +74,11 @@ use beet_core::prelude::*;
 /// onto its provenance, so the file is stale once the declaration's values
 /// differ from the ones it was computed from, a value added or dropped
 /// included.
+///
+/// A file whose producer reads what a deploy must never depend on (a listing
+/// of a remote repo, say) names the verb that alone writes it
+/// ([`written_by`](Self::written_by)): an ensure step leaves it as committed,
+/// and `beet check` names the verb for a missing or stale one.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct Derivation {
@@ -88,6 +93,10 @@ pub struct Derivation {
 	/// The values the declaration computes from the world, by name and
 	/// digest, stamped onto each regeneration's [`Provenance`].
 	pub values: Vec<ProvenanceValue>,
+	/// The verb that alone writes this file, ie `publish`, or `None` when any
+	/// ensure step may: `<Derive/>` skips a file one names, so a deploy
+	/// publishes it exactly as committed.
+	pub written_by: Option<SmolStr>,
 }
 
 impl Derivation {
@@ -98,6 +107,7 @@ impl Derivation {
 			ttl: None,
 			inputs: Vec::new(),
 			values: Vec::new(),
+			written_by: None,
 		}
 	}
 
@@ -110,6 +120,13 @@ impl Derivation {
 	/// This derivation declaring `value`, computed from the world.
 	pub fn with_value(mut self, value: ProvenanceValue) -> Self {
 		self.values.push(value);
+		self
+	}
+
+	/// This derivation written by `verb` alone, see
+	/// [`written_by`](Self::written_by).
+	pub fn with_written_by(mut self, verb: impl Into<SmolStr>) -> Self {
+		self.written_by = Some(verb.into());
 		self
 	}
 

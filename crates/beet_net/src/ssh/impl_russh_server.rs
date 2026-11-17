@@ -772,11 +772,15 @@ mod tests {
 			.xpect_contains("fixed")
 			.xpect_contains("no secret at fixed#ssh-host-key")
 			.xpect_contains("deploy the stack");
-		// the debug build's default, as `host_key(None)` answers
-		declared_fingerprint(None, false)
-			.await
-			.unwrap()
-			.xpect_eq(expected.clone());
+		// the process default, as `host_key(None)` answers: the debug key,
+		// or `BEET_SSH_HOST_KEY` where the environment sets one
+		declared_fingerprint(None, false).await.unwrap().xpect_eq(
+			host_key(None)
+				.unwrap()
+				.public_key()
+				.fingerprint(Default::default())
+				.to_string(),
+		);
 		declared_fingerprint(Some("not a key".into()), true)
 			.await
 			.unwrap_err()

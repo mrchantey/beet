@@ -23,6 +23,7 @@ mod sitemap;
 // `Pds` family in `beet_net`, which rides `dag_cbor` too.
 #[cfg(feature = "dag_cbor")]
 mod standard_site;
+mod standard_site_links;
 mod syndication_query;
 mod xml;
 
@@ -32,6 +33,7 @@ pub use search_index::*;
 pub use sitemap::*;
 #[cfg(feature = "dag_cbor")]
 pub use standard_site::*;
+pub(crate) use standard_site_links::*;
 #[cfg(test)]
 pub(crate) use syndication_query::test_fixtures::*;
 #[allow(unused_imports)]

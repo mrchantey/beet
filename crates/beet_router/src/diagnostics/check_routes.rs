@@ -246,10 +246,11 @@ fn failed_routes(
 	)
 }
 
-/// A [`MissingDerivedFile`](DiagnosticKind::MissingDerivedFile) or
+/// A [`MissingDerivedFile`](DiagnosticKind::MissingDerivedFile),
+/// [`UnwrittenDerivedFile`](DiagnosticKind::UnwrittenDerivedFile) or
 /// [`StaleDerivedFile`](DiagnosticKind::StaleDerivedFile) diagnostic for each
 /// derived file declared under `root` that is not fresh in the store it
-/// resolves by ancestry.
+/// resolves by ancestry, naming the verb that writes one when it declares it.
 async fn derived_file_diagnostics(
 	world: &AsyncWorld,
 	root: Entity,
@@ -268,7 +269,7 @@ async fn derived_file_diagnostics(
 							|(derivations, stores)| {
 								(
 									entity,
-									derivations.get(entity)?.path.clone(),
+									derivations.get(entity)?.clone(),
 									stores.get(entity)?.clone(),
 								)
 									.xok()
@@ -280,29 +281,43 @@ async fn derived_file_diagnostics(
 		})
 		.await?;
 	let mut diagnostics = Vec::new();
-	for (entity, path, store) in derivations {
-		let (kind, message) =
-			match Derivation::fresh(world, entity, &store).await? {
-				Freshness::Fresh => continue,
-				Freshness::Missing => (
-					DiagnosticKind::MissingDerivedFile,
-					format!(
-						"derived file `{path}` is missing: the site serves without it"
-					),
+	for (entity, derivation, store) in derivations {
+		let path = &derivation.path;
+		let freshness = Derivation::fresh(world, entity, &store).await?;
+		let (kind, message) = match (freshness, &derivation.written_by) {
+			(Freshness::Fresh, _) => continue,
+			(Freshness::Missing, Some(verb)) => (
+				DiagnosticKind::UnwrittenDerivedFile,
+				format!(
+					"derived file `{path}` is not written yet: `{verb}` writes \
+					 it, and the site serves without it until then"
 				),
-				// an incomplete set serves broken links, so it fails as missing
-				Freshness::OutputMissing(output) => (
-					DiagnosticKind::MissingDerivedFile,
-					format!(
-						"derived file `{path}` is incomplete, output `{output}` \
-						 is missing: the site serves without it"
-					),
+			),
+			(Freshness::Missing, None) => (
+				DiagnosticKind::MissingDerivedFile,
+				format!(
+					"derived file `{path}` is missing: the site serves without it"
 				),
-				stale => (
-					DiagnosticKind::StaleDerivedFile,
-					format!("derived file `{path}` is stale: {stale}"),
+			),
+			// an incomplete set serves broken links, so it fails as missing
+			(Freshness::OutputMissing(output), _) => (
+				DiagnosticKind::MissingDerivedFile,
+				format!(
+					"derived file `{path}` is incomplete, output `{output}` \
+					 is missing: the site serves without it"
 				),
-			};
+			),
+			(stale, Some(verb)) => (
+				DiagnosticKind::StaleDerivedFile,
+				format!(
+					"derived file `{path}` is stale: {stale}, `{verb}` refreshes it"
+				),
+			),
+			(stale, None) => (
+				DiagnosticKind::StaleDerivedFile,
+				format!("derived file `{path}` is stale: {stale}"),
+			),
+		};
 		match config.severity(kind) {
 			DiagnosticSeverity::Off => {}
 			severity => {
@@ -748,18 +763,18 @@ mod test {
 			]);
 	}
 
-	/// A declared derived file is an error while missing, silent once fresh,
-	/// and a warning once a source changes, since a stale one still serves.
-	#[beet_core::test]
-	async fn reports_missing_and_stale_derived_files() {
-		let store = BlobStore::temp();
-		store.insert(&"notes.md".into(), "first").await.unwrap();
-		let mut world = check_world();
-		let router = world
+	/// A router over `store` declaring `derivation` of `derived/notes.json`
+	/// from `notes.md`.
+	fn derived_notes(
+		world: &mut World,
+		store: &BlobStore,
+		derivation: Derivation,
+	) -> Entity {
+		world
 			.spawn((store.clone(), Router, children![
 				render_action::fixed_func_route("", || rsx! { <p>"home"</p> }),
 				(
-					Derivation::new("derived/notes.json"),
+					derivation,
 					Action::<BlobStore, EntityBody>::new_async(
 						async |cx: ActionContext<BlobStore>| {
 							let bytes =
@@ -771,21 +786,40 @@ mod test {
 					)
 				)
 			]))
-			.flush();
-		let derived = |report: CheckReport| {
-			report
-				.diagnostics
-				.into_iter()
-				.filter(|diagnostic| {
-					matches!(
-						diagnostic.kind,
-						DiagnosticKind::MissingDerivedFile
-							| DiagnosticKind::StaleDerivedFile
-					)
-				})
-				.map(|diagnostic| (diagnostic.kind, diagnostic.severity))
-				.collect::<Vec<_>>()
-		};
+			.flush()
+	}
+
+	/// The derived file diagnostics `report` carries, by kind and severity.
+	fn derived(
+		report: CheckReport,
+	) -> Vec<(DiagnosticKind, DiagnosticSeverity)> {
+		report
+			.diagnostics
+			.into_iter()
+			.filter(|diagnostic| {
+				matches!(
+					diagnostic.kind,
+					DiagnosticKind::MissingDerivedFile
+						| DiagnosticKind::StaleDerivedFile
+						| DiagnosticKind::UnwrittenDerivedFile
+				)
+			})
+			.map(|diagnostic| (diagnostic.kind, diagnostic.severity))
+			.collect()
+	}
+
+	/// A declared derived file is an error while missing, silent once fresh,
+	/// and a warning once a source changes, since a stale one still serves.
+	#[beet_core::test]
+	async fn reports_missing_and_stale_derived_files() {
+		let store = BlobStore::temp();
+		store.insert(&"notes.md".into(), "first").await.unwrap();
+		let mut world = check_world();
+		let router = derived_notes(
+			&mut world,
+			&store,
+			Derivation::new("derived/notes.json"),
+		);
 		check(&mut world, router)
 			.await
 			.xmap(derived)
@@ -814,5 +848,33 @@ mod test {
 				DiagnosticKind::StaleDerivedFile,
 				DiagnosticSeverity::Warn,
 			)]);
+	}
+
+	/// A derived file only its verb writes is a warning while missing, naming
+	/// the verb, since the verb not having run yet is no fault.
+	#[beet_core::test]
+	async fn names_the_verb_of_an_unwritten_derived_file() {
+		let store = BlobStore::temp();
+		let mut world = check_world();
+		let router = derived_notes(
+			&mut world,
+			&store,
+			Derivation::new("derived/notes.json").with_written_by("publish"),
+		);
+		let report = check(&mut world, router).await;
+		report
+			.diagnostics
+			.iter()
+			.find(|diagnostic| {
+				diagnostic.kind == DiagnosticKind::UnwrittenDerivedFile
+			})
+			.unwrap()
+			.message
+			.as_str()
+			.xpect_contains("`publish` writes it");
+		report.xmap(derived).xpect_eq(vec![(
+			DiagnosticKind::UnwrittenDerivedFile,
+			DiagnosticSeverity::Warn,
+		)]);
 	}
 }

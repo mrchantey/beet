@@ -107,8 +107,8 @@ impl StandardSiteDocument {
 		path: &RelPath,
 		meta: &DocMeta,
 	) -> Result<Self> {
-		let relative =
-			path.strip_prefix(&publication.path).ok_or_else(|| {
+		let document_path =
+			publication.document_path(path).ok_or_else(|| {
 				bevyhow!(
 					"page '{path}' is not beneath the publication at '{}'",
 					publication.path
@@ -116,7 +116,7 @@ impl StandardSiteDocument {
 			})?;
 		Self {
 			site: site.into(),
-			path: Some(format!("/{relative}").into()),
+			path: Some(document_path),
 			title: meta.title.clone().ok_or_else(|| {
 				bevyhow!(
 					"page '{path}' has no title, which a standard site \

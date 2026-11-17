@@ -153,9 +153,18 @@ mod test {
 		router: Entity,
 		pds: Option<Pds>,
 	) -> Result<(StandardSiteDocument, Vec<BlobRef>)> {
+		publish_as(world, router, harvest(), pds).await
+	}
+
+	/// [`publish`] as `publication`.
+	async fn publish_as(
+		world: &mut World,
+		router: Entity,
+		publication: StandardSitePub,
+		pds: Option<Pds>,
+	) -> Result<(StandardSiteDocument, Vec<BlobRef>)> {
 		world
 			.run_async_then(async move |world| {
-				let publication = harvest();
 				let formats = world
 					.with(|world: &mut World| {
 						world.resource::<StandardSiteContentFormats>().clone()
@@ -237,6 +246,51 @@ mod test {
 				panic!("expected a paragraph and an image, found {other:?}")
 			}
 		}
+	}
+
+	/// A `content` format with no target fails the publish step naming the
+	/// registered ones, while the declaration naming it builds, as it must in
+	/// a served binary, which registers no Leaflet target.
+	#[beet_core::test]
+	async fn resolves_the_content_format_when_publishing() {
+		let (mut world, router) = site().await;
+		let unknown = Nsid::new_static("com.example.unknown");
+		world
+			.spawn(ChildOf(router))
+			.insert_template(
+				BsxTemplate::parse_document(
+					r#"<StandardSitePub path="blog" name="Harvest" content="com.example.unknown"/>"#,
+				)
+				.unwrap(),
+			)
+			.unwrap();
+		world.flush();
+		world
+			.query::<&StandardSitePub>()
+			.single(&world)
+			.unwrap()
+			.content
+			.clone()
+			.xpect_eq(Some(unknown.clone()));
+		let error = publish_as(
+			&mut world,
+			router,
+			StandardSitePub {
+				content: Some(unknown),
+				..harvest()
+			},
+			None,
+		)
+		.await
+		.unwrap_err()
+		.to_string()
+		.xpect_contains(
+			"no standard site content format `com.example.unknown`",
+		);
+		#[cfg(feature = "leaflet")]
+		error.xpect_contains("pub.leaflet.content");
+		#[cfg(not(feature = "leaflet"))]
+		let _ = error;
 	}
 
 	/// Every blob the record references uploads off the tree before the

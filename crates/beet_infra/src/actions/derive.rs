@@ -18,6 +18,10 @@ use beet_net::prelude::*;
 /// publish) each is ensured in the store it resolves by ancestry. The
 /// placement rule is [`DirCopy`]'s, so the one tag serves all three.
 ///
+/// A derivation naming the verb that alone writes it
+/// ([`Derivation::written_by`], ie the standard site index `publish` writes)
+/// is skipped: a deploy publishes it exactly as committed, missing included.
+///
 /// ```bsx
 /// <RepoAssemble src="site">
 ///     <DirCopy src="assets" dest="assets" paths="databases/country.mmdb"/>
@@ -60,7 +64,16 @@ impl Derive {
 				},
 			)?;
 		let repo = RepoStore::get(world).ok();
-		Derivation::declared(world, root)
+		// a derivation its own verb alone writes ships as committed
+		let ensured = Derivation::declared(world, root)
+			.into_iter()
+			.filter(|entity| {
+				world
+					.get::<Derivation>(*entity)
+					.is_some_and(|derivation| derivation.written_by.is_none())
+			})
+			.collect::<Vec<_>>();
+		ensured
 			.into_iter()
 			.map(|entity| {
 				let store = world.with_state::<AncestorQuery<&BlobStore>, _>(
@@ -161,6 +174,23 @@ mod test {
 			.await
 			.unwrap();
 		exists(&dir.path().join("site"), DERIVED).xpect_true();
+	}
+
+	/// A derivation its verb alone writes is left as it is, here missing.
+	#[beet_core::test]
+	async fn skips_a_derivation_its_verb_writes() {
+		let (dir, mut world, root) = site(Deployment::default_local().0);
+		world
+			.spawn((ChildOf(root), derivation()))
+			.insert(Derivation::new(DERIVED).with_written_by("publish"));
+		world
+			.spawn((ChildOf(root), ExchangeSequence, children![Derive]))
+			.exchange(Request::get(""))
+			.await
+			.into_result()
+			.await
+			.unwrap();
+		exists(&dir.path().join("site"), DERIVED).xpect_false();
 	}
 
 	/// Under an assemble a derivation in the repo store, or scoped out of it,

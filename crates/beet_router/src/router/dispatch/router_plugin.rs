@@ -374,6 +374,12 @@ impl Plugin for RouterPlugin {
 			// doc renderer writing it
 			#[cfg(feature = "dag_cbor")]
 			app.init_resource::<StandardSiteContentFormats>();
+			// the publication declaration, its index and the well-known route
+			// it serves; a build without the data model loads it inert
+			#[cfg(feature = "dag_cbor")]
+			app.install_type::<StandardSitePub>();
+			#[cfg(not(feature = "dag_cbor"))]
+			app.install(UnregisteredTag::allow("StandardSitePub"));
 			#[cfg(feature = "leaflet")]
 			app.install(LeafletRenderer);
 			#[cfg(feature = "json")]

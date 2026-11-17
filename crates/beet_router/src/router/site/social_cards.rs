@@ -202,7 +202,7 @@ impl TypeInstaller for SocialCards {
 	fn install(app: &mut App) {
 		app.register_type::<Self>()
 			.add_observer(queue_refresh::<RouteTree>)
-			.add_observer(queue_refresh::<PageMeta>)
+			.add_observer(queue_refresh::<DocMeta>)
 			.add_observer(queue_refresh::<IconSet>)
 			.add_observer(queue_refresh::<Theme>)
 			.add_observer(queue_refresh::<PackageConfig>);
@@ -1231,7 +1231,7 @@ mod test {
 	async fn regenerates_a_page_declared_in_code() {
 		let (mut world, cards, store) = setup(&two_pages()).await;
 		let router = world.entity(cards).get::<ChildOf>().unwrap().parent();
-		let about = |title: &str| PageMeta {
+		let about = |title: &str| DocMeta {
 			title: Some(title.into()),
 			..default()
 		};

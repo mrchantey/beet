@@ -47,8 +47,7 @@ impl StandardSitePublication {
 	/// The publication `declaration` describes on the site `package` names,
 	/// in the colours of `theme`, identified by `icon` once it is uploaded.
 	///
-	/// The url is [`PackageConfig::homepage`] joined with the declaration's
-	/// path, its trailing slash trimmed as the lexicon asks.
+	/// The url is the declaration's [`url`](StandardSitePub::url).
 	///
 	/// # Errors
 	/// Errors when the homepage is unset or names no origin (see
@@ -60,11 +59,7 @@ impl StandardSitePublication {
 		icon: Option<BlobRef>,
 	) -> Result<Self> {
 		Self {
-			url: package
-				.absolute_url(declaration.path.as_str())?
-				.to_string()
-				.trim_end_matches('/')
-				.xmap(Uri::parse)?,
+			url: declaration.url(package)?,
 			name: declaration.name.clone(),
 			description: declaration.description.clone(),
 			icon,

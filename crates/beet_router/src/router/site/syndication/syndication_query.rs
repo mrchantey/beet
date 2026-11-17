@@ -220,8 +220,18 @@ pub(crate) mod test_fixtures {
 		world: &mut World,
 		markup: Snippet,
 	) -> Entity {
+		spawn_syndication_router_with(world, (), markup)
+	}
+
+	/// [`spawn_syndication_router`] with `router` on the router entity, ie the
+	/// store its declarations read or the layout its pages wear.
+	pub fn spawn_syndication_router_with(
+		world: &mut World,
+		router: impl Bundle,
+		markup: Snippet,
+	) -> Entity {
 		let root = world
-			.spawn((Router, children![
+			.spawn((Router, router, children![
 				page("", DocMeta {
 					title: Some("Beet".into()),
 					..default()

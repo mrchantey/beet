@@ -3,7 +3,8 @@
 //! Walks the router's route tree for every static-path scene route or route
 //! marked [`ExportStrategy::Static`], renders each through the same dispatch path
 //! a live request would take, and writes the resulting HTML to an output
-//! [`BlobStore`] as `<path>/index.html`.
+//! [`BlobStore`] as `<path>/index.html`, and anything else as the file at its
+//! path.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -18,7 +19,7 @@ impl StaticExport {
 	/// Collects the static-route paths a no-code site ships, in route-tree order.
 	///
 	/// See [`exports`](Self::exports) for which routes qualify. Shared by
-	/// [`collect_static_html`] and the `export-pdf` command, so both ship exactly
+	/// [`collect_static_files`] and the `export-pdf` command, so both ship exactly
 	/// the same page set.
 	pub async fn collect_paths(
 		world: &AsyncWorld,
@@ -78,9 +79,10 @@ impl StaticExport {
 				== ExportStrategy::Static
 	}
 }
-/// Renders every static route in the router to HTML, in route-tree order. See
+/// Renders every static route in the router, in route-tree order, each with the
+/// path it is written to ([`StaticExport::out_path`]). See
 /// [`StaticExport::exports`] for which routes qualify.
-async fn collect_static_html(
+async fn collect_static_files(
 	world: &AsyncWorld,
 	router: Entity,
 ) -> Result<Vec<(RelPath, String)>> {
@@ -97,46 +99,61 @@ async fn collect_static_html(
 		let request = Request::get(path.with_leading_slash())
 			.with_accept(MediaType::Html);
 		let response = entity.exchange(request).await;
-		let html = response
+		// a route answering no html, ie a well-known file, is the file itself
+		let is_html = response
+			.parts
+			.headers
+			.get::<header::ContentType>()
+			.and_then(|media_type| media_type.ok())
+			.is_none_or(|media_type| media_type == MediaType::Html);
+		let body = response
 			.into_result()
 			.await
 			.map_err(|err| bevyhow!("failed to render '{path}': {err}"))?
 			.text()
 			.await?;
-		pages.push((path, html));
+		pages.push((StaticExport::out_path(path, is_html), body));
 	}
 	Ok(pages)
 }
 
 impl StaticExport {
 	/// Renders every static route and writes it to the output store, returning the
-	/// written paths. A page writes to `<path>/index.html` (clean URLs); an asset
-	/// route with a file extension (eg `sitemap.xml`) writes its raw file, so a
-	/// page referencing it resolves and the export is self-contained.
+	/// written paths, see [`out_path`](Self::out_path).
 	pub async fn export(
 		world: &AsyncWorld,
 		router: Entity,
 		out: &BlobStore,
 	) -> Result<Vec<RelPath>> {
-		let mut pages = collect_static_html(world, router).await?;
-		pages.extend(
+		let mut files = collect_static_files(world, router).await?;
+		files.extend(
 			world
 				.with(move |world: &mut World| Self::redirects(world, router))
-				.await?,
+				.await?
+				.into_iter()
+				.map(|(path, html)| (Self::out_path(path, true), html)),
 		);
 		let mut written = Vec::new();
-		for (path, html) in pages {
-			let out_path = if path.segments().is_empty() {
-				RelPath::new("index.html")
-			} else if path.extension().is_some() {
-				path
-			} else {
-				path.join("index.html")
-			};
-			out.insert(&out_path, html).await?;
+		for (out_path, body) in files {
+			out.insert(&out_path, body).await?;
 			written.push(out_path);
 		}
 		Ok(written)
+	}
+
+	/// Where the route at `path` is written: a page to `<path>/index.html`
+	/// (clean URLs), while a route with a file extension (eg `sitemap.xml`) or
+	/// answering anything but html (a well-known file) writes its raw file at
+	/// its path, so a page referencing it resolves and the export is
+	/// self-contained.
+	fn out_path(path: RelPath, is_html: bool) -> RelPath {
+		if path.segments().is_empty() {
+			RelPath::new("index.html")
+		} else if path.extension().is_some() || !is_html {
+			path
+		} else {
+			path.join("index.html")
+		}
 	}
 
 	/// The meta-refresh stub each [`Redirect`] route in the tree exports as,
@@ -204,6 +221,7 @@ fn redirect_stub(target: &Url, canonical: Option<&Url>) -> String {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_ui::prelude::*;
@@ -313,6 +331,42 @@ mod test {
 		read("robots.txt")
 			.await
 			.xpect_contains("Sitemap: https://beet.org/sitemap.xml");
+	}
+
+	/// A route answering no html writes the file at its path even without an
+	/// extension, as a well-known file must serve.
+	#[beet_core::test]
+	async fn exports_a_non_html_route_raw() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let root = world
+			.spawn((Router, children![(
+				route::exchange(
+					".well-known/example",
+					Action::<Request, Response>::new_async(
+						async |_: ActionContext<Request>| -> Result<Response> {
+							Response::ok_body("at://example", MediaType::Text)
+								.xok()
+						},
+					),
+				),
+				HttpMethod::Get,
+				ExportStrategy::Static,
+			)]))
+			.flush();
+		let out = BlobStore::temp();
+		let out2 = out.clone();
+		world
+			.run_async_then(async move |world| {
+				StaticExport::export(&world, root, &out2).await
+			})
+			.await
+			.unwrap()
+			.xpect_eq(vec![RelPath::new(".well-known/example")]);
+		out.get(&RelPath::new(".well-known/example"))
+			.await
+			.unwrap()
+			.to_vec()
+			.xpect_eq(b"at://example".to_vec());
 	}
 
 	/// A renamed page's old url exports as a meta-refresh stub, so a static host

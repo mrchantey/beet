@@ -59,6 +59,11 @@ pub enum DiagnosticKind {
 	/// A content file a [`RoutesDir`] discovered but could not serve, ie its
 	/// frontmatter names a field its component lacks.
 	FailedRoute,
+	/// A derived file only its verb writes
+	/// ([`Derivation::written_by`](beet_net::prelude::Derivation::written_by))
+	/// absent from its store: the verb has not run yet, and the site serves
+	/// without it.
+	UnwrittenDerivedFile,
 	/// A page's [`DocMeta`] breaking the [`DocMetaRules`].
 	DocMeta,
 }
@@ -72,10 +77,12 @@ pub enum DiagnosticKind {
 /// internal href are hard [`Error`](DiagnosticSeverity::Error)s, while an unknown class is
 /// a [`Warn`](DiagnosticSeverity::Warn) (a one-off marker class with no rule is sometimes
 /// intentional; classes carry no rule-existence guarantee even in Rust). A
-/// missing derived file is an error, since the site serves without it, and a
-/// stale one a warning, since it still serves. A discovered file that could not
-/// be served is an error, since the site serves without it too, and metadata
-/// breaking the [`DocMetaRules`] is an error, since it would fail to syndicate.
+/// missing derived file is an error, since the site serves without it, a
+/// stale one a warning, since it still serves, and one only its verb writes a
+/// warning when missing, since the verb not having run yet is no fault. A
+/// discovered file that could not be served is an error, since the site serves
+/// without it too, and metadata breaking the [`DocMetaRules`] is an error,
+/// since it would fail to syndicate.
 #[derive(Debug, Clone, Resource, Reflect)]
 #[reflect(Resource, Default)]
 pub struct RenderDiagnostics {
@@ -91,6 +98,8 @@ pub struct RenderDiagnostics {
 	pub stale_derived_file: DiagnosticSeverity,
 	/// A discovered file that could not be served. Default [`Error`](DiagnosticSeverity::Error).
 	pub failed_route: DiagnosticSeverity,
+	/// A derived file only its verb writes that is absent. Default [`Warn`](DiagnosticSeverity::Warn).
+	pub unwritten_derived_file: DiagnosticSeverity,
 	/// A page's metadata breaking the rules. Default [`Error`](DiagnosticSeverity::Error).
 	pub doc_meta: DiagnosticSeverity,
 }
@@ -104,6 +113,7 @@ impl Default for RenderDiagnostics {
 			missing_derived_file: DiagnosticSeverity::Error,
 			stale_derived_file: DiagnosticSeverity::Warn,
 			failed_route: DiagnosticSeverity::Error,
+			unwritten_derived_file: DiagnosticSeverity::Warn,
 			doc_meta: DiagnosticSeverity::Error,
 		}
 	}
@@ -119,6 +129,7 @@ impl RenderDiagnostics {
 			DiagnosticKind::MissingDerivedFile => self.missing_derived_file,
 			DiagnosticKind::StaleDerivedFile => self.stale_derived_file,
 			DiagnosticKind::FailedRoute => self.failed_route,
+			DiagnosticKind::UnwrittenDerivedFile => self.unwritten_derived_file,
 			DiagnosticKind::DocMeta => self.doc_meta,
 		}
 	}
