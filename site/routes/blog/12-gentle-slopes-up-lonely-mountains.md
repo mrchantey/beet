@@ -1,6 +1,6 @@
 +++
 title = "Gentle Slopes up Lonely Mountains"
-description = "Gentle slopes are usually domains specific, meaning climbing up a mountain peak of specialization only to climb all the way back down again when we want to visit another domain. Game engines are more like escarpments leading to broad plateaus and remaining within reach at all skill levels."
+description = "Gentle slopes are usually domain specific, meaning climbing up a mountain peak of specialization only to climb all the way back down again when we want to visit another domain. Game engines are more like escarpments leading to broad plateaus and remaining within reach at all skill levels."
 tags = ["bevy", "malleable-software", "terminal"]
 created = "2026-06-02"
 authors = ["Pete Hayman"]

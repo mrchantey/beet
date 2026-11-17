@@ -532,7 +532,7 @@ impl<'a, 'de> DeserializeSeed<'de> for TypedValueDeserializer<'a> {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(feature = "ron", feature = "postcard")))]
 mod test {
 	use super::DynamicTemplateDeserializer;
 	use super::DynamicTemplateSerializer;
