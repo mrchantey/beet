@@ -166,7 +166,7 @@ One declaration, three renders, chosen by the caller of `LivePage::prepare` and 
 
 The island route's response carries the island's own `CacheHeaders`, `no-store` when it has none, never the page's or the router's. Island content carrying a `<script>`, which a swap leaves inert, two islands sharing a name on one page, and an island nested in another are errors.
 
-Async island content parks on its build root with `TemplatePending::register_fetch`, never `Loading`, and its failure rides `TemplateError`: `<VisitCount/>` (the analytics store's visits, read as `beet analytics` reads them) is the worked example.
+Async island content parks on its build root with `TemplatePending::register_fetch`, never `Loading`, and its failure rides `TemplateError`: `<VisitCount/>` (the analytics store's visits, read as `beet analytics` reads them) is the worked example, `<StandardSiteComments/>` (an article's comments, the replies to its announcement read from the Bluesky AppView with the `atproto` feature) the second, its fallback the `<StandardSiteReplyLink/>` reading the same index synchronously.
 
 ## Syndication
 

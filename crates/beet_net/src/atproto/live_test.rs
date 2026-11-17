@@ -64,7 +64,7 @@ async fn resolves_live_handles() {
 		.await
 		.unwrap()
 		.xpect_eq(did.clone());
-	HandleResolver::service(HandleResolver::PUBLIC_APPVIEW)
+	HandleResolver::service(AppView::PUBLIC)
 		.resolve("@beet.org")
 		.await
 		.unwrap()
@@ -109,4 +109,41 @@ async fn converges_a_live_repo() {
 		.unwrap()
 		.xpect_eq(pds.did().clone());
 	super::converge::test::converge_suite(&pds).await;
+}
+
+/// The AppView's hydration paths: a published feed page, the same posts
+/// fetched again by uri, and the thread of the first.
+#[ignore = "live: talks to the public network"]
+#[beet_core::test(timeout_ms = 60_000)]
+async fn reads_the_live_appview() {
+	let appview = AppView::default();
+	let page = appview
+		.get_feed(AppView::DISCOVER_FEED, 3, None)
+		.await
+		.unwrap()
+		.feed;
+	// the AppView omits entries it will not serve (deleted, moderated), so a
+	// page is at most the limit asked for
+	page.len().xpect_greater_than(0).xpect_less_or_equal_to(3);
+	let uris = page
+		.iter()
+		.map(|item| item.post.uri.clone())
+		.collect::<Vec<_>>();
+	appview
+		.get_posts(&uris)
+		.await
+		.unwrap()
+		.into_iter()
+		.map(|post| post.uri)
+		.collect::<Vec<_>>()
+		.xpect_eq(uris.clone());
+	appview
+		.get_post_thread(&uris[0], 1, 0)
+		.await
+		.unwrap()
+		.post()
+		.unwrap()
+		.post
+		.uri
+		.xpect_eq(uris[0].clone());
 }

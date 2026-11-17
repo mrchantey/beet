@@ -23,7 +23,7 @@ use beet_net::prelude::*;
 pub async fn AtprotoHandleProbe(
 	/// The AppView the handles are resolved through, ie a self-hosted instance.
 	/// Defaults to the public one, which is the resolver the app itself uses.
-	#[field(default = SmolStr::new_static(HandleResolver::PUBLIC_APPVIEW))]
+	#[field(default = SmolStr::new_static(AppView::PUBLIC))]
 	appview: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {

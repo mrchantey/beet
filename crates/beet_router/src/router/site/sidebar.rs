@@ -40,7 +40,7 @@ use beet_ui::prelude::*;
 /// from its declaration: its icons and its web app manifest. The declared
 /// [`SocialCards`], when the world holds them, hand the head this page's card
 /// (else the root route's) as its social image. A page of a published
-/// standard.site publication links its records ([`StandardSiteLinkQuery`]).
+/// standard.site publication links its records ([`StandardSiteQuery`]).
 /// Extra tags (stylesheet, fonts, ...) flow through to the `<head>` via the
 /// default slot.
 ///
@@ -55,7 +55,7 @@ pub fn RouteHead(
 	statuses: Query<&PageStatus>,
 	icon_sets: Query<&IconSet>,
 	cards: SocialCardQuery,
-	standard_site: StandardSiteLinkQuery,
+	standard_site: StandardSiteQuery,
 	pkg: Res<PackageConfig>,
 ) -> Result<impl Bundle> {
 	let cx = stack.current();

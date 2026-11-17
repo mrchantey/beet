@@ -70,6 +70,7 @@ impl RichText {
 	}
 
 	/// `text` with its facets, mentions resolved through `resolver`.
+	#[cfg(feature = "atproto")]
 	pub async fn resolve(
 		text: impl Into<String>,
 		resolver: &HandleResolver,
@@ -230,6 +231,7 @@ mod test {
 	}
 
 	/// A facet serializes as the lexicon writes it.
+	#[cfg(feature = "json")]
 	#[beet_core::test]
 	async fn serializes_as_the_lexicon() {
 		let rich =

@@ -390,6 +390,16 @@ impl Plugin for RouterPlugin {
 			app.install_type::<StandardSitePub>();
 			#[cfg(not(feature = "dag_cbor"))]
 			app.install(UnregisteredTag::allow("StandardSitePub"));
+			// an article's comments and the link to reply, registered with
+			// the records so a build without `atproto` fails the comments
+			// island over to its fallback rather than swapping in nothing
+			#[cfg(feature = "dag_cbor")]
+			app.install_type::<(StandardSiteComments, StandardSiteReplyLink)>();
+			#[cfg(not(feature = "dag_cbor"))]
+			app.install((
+				UnregisteredTag::allow("StandardSiteComments"),
+				UnregisteredTag::allow("StandardSiteReplyLink"),
+			));
 			#[cfg(feature = "leaflet")]
 			app.install(LeafletRenderer);
 			#[cfg(feature = "json")]

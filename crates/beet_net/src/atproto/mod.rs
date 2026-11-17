@@ -19,7 +19,9 @@
 //! and the `Rkeyed` a write takes. Every encoding goes through
 //! `MediaType::serialize`, so `MediaType::DagCbor` writes exactly the block a
 //! PDS stores and `AtprotoValue::cid` hashes. The `app.bsky.*` lexicons beet
-//! writes (`FeedPost`, `RichText`) are the `bsky` module's, behind `atproto`.
+//! reads and writes (`FeedPost`, `RichText`, the AppView's views) are the
+//! `bsky` module's, plain data like the rest; reading them from a Bluesky
+//! AppView (`AppView`) is behind `atproto`.
 //!
 //! The protocol's primitives (`Did`, `Rkey`, `Tid`, `Cid`, `StrongRef`,
 //! `BlobRef`) and their words are `beet_core::atproto`'s.
@@ -61,20 +63,20 @@
 //! should not depend on a lookup to decide whether to run.
 mod atproto_account;
 mod atproto_plugin;
+mod bsky;
 mod converge;
 mod emulator_pds;
 mod pds;
 mod pds_query;
 pub use atproto_account::*;
 pub use atproto_plugin::*;
+pub use bsky::*;
 pub use converge::*;
 pub use emulator_pds::*;
 pub use pds::*;
 pub use pds_query::*;
 #[cfg(feature = "atproto")]
 mod atproto_auth;
-#[cfg(feature = "atproto")]
-mod bsky;
 #[cfg(feature = "atproto")]
 mod identity;
 #[cfg(all(
@@ -88,8 +90,6 @@ mod live_test;
 mod xrpc_pds;
 #[cfg(feature = "atproto")]
 pub use atproto_auth::*;
-#[cfg(feature = "atproto")]
-pub use bsky::*;
 #[cfg(feature = "atproto")]
 pub use identity::*;
 #[cfg(feature = "atproto")]

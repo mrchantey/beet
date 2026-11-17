@@ -462,11 +462,12 @@ serde_plain = ["serde", "beet_core/serde_plain"]
 vault = ["beet_core/vault", "beet_net?/vault", "beet_router?/vault", "beet_infra?/vault"]
 # The AT Protocol's network half (`beet_net/atproto`): a real PDS over xrpc
 # through the credential seam, did and handle resolution, an
-# `<AtprotoAccount/>` landing its repo, and the Bluesky record shapes beet
-# writes; with `infra` also the handle block and its probe
-# (`beet_infra/atproto`). The data model and the `Pds` family need none of it:
-# they ride `dag_cbor`.
-atproto = ["net", "json", "dag_cbor", "beet_net?/atproto", "beet_infra?/atproto"]
+# `<AtprotoAccount/>` landing its repo, the Bluesky record shapes beet
+# writes and the AppView it reads them back through; with `router` an
+# article's comments (`beet_router/atproto`); with `infra` the handle block
+# and its probe (`beet_infra/atproto`). The data model and the `Pds` family
+# need none of it: they ride `dag_cbor`.
+atproto = ["net", "json", "dag_cbor", "beet_net?/atproto", "beet_router?/atproto", "beet_infra?/atproto"]
 # QR rendering in the terminal, so `vault backup --qr` prints an identity's
 # backup for paper (`beet_net/qrcode`); the cli's png command adds `image`.
 qrcode = ["beet_net?/qrcode"]

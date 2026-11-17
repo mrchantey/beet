@@ -75,6 +75,11 @@ dag_cbor = ["serde", "beet_core/dag_cbor", "beet_net/dag_cbor"]
 # header (`imagesize`). Only a binary that publishes needs it; without it a
 # request for the Leaflet media type answers 406.
 leaflet = ["dag_cbor", "json", "dep:imagesize"]
+# The network half of the standard.site records: an article's comments, the
+# replies to its announcement read live from the Bluesky AppView
+# (`<StandardSiteComments/>`). Without it the comments island fails over to
+# its fallback, the link to reply on Bluesky.
+atproto = ["dag_cbor", "json", "beet_net/atproto"]
 # Deriving the site's images: an `<IconSet/>`'s files from its source image
 # (decode, resize and encode through `image`, `ico` for the multi-size favicon,
 # svg rasterisation through `resvg`) and a `<SocialCards/>` set (an svg per

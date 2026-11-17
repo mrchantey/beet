@@ -123,7 +123,7 @@ pub enum HandleResolver {
 	/// `com.atproto.identity.resolveHandle` on an xrpc service, an AppView or
 	/// a PDS: the answer that service's clients see, cache included.
 	Service {
-		/// The service host, ie [`HandleResolver::PUBLIC_APPVIEW`].
+		/// The service host, ie [`AppView::PUBLIC`].
 		host: SmolStr,
 	},
 }
@@ -140,9 +140,6 @@ impl HandleResolver {
 	/// Cloudflare's DNS-over-HTTPS json endpoint.
 	pub const CLOUDFLARE_DOH: &'static str =
 		"https://cloudflare-dns.com/dns-query";
-	/// The public unauthenticated Bluesky AppView, the resolver the app itself
-	/// asks.
-	pub const PUBLIC_APPVIEW: &'static str = "https://public.api.bsky.app";
 	/// The DNS record type of a TXT record.
 	const TXT: u16 = 16;
 

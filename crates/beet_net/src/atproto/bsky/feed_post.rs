@@ -33,6 +33,54 @@ impl AtprotoRecord for FeedPost {
 }
 
 impl FeedPost {
+	/// The Bluesky web app, where a post's page lives.
+	pub const WEB_APP: &'static str = "https://bsky.app";
+
+	/// The page of the post at `uri` in the Bluesky web app, addressed by did
+	/// so a handle change never breaks it, ie
+	/// `https://bsky.app/profile/did:plc:../post/3mw72aaeuj22n`.
+	pub fn web_url(uri: &AtUri) -> String {
+		format!(
+			"{}/profile/{}/post/{}",
+			Self::WEB_APP,
+			uri.did(),
+			uri.rkey()
+		)
+	}
+
+	/// The text cut at its facets, in order: each run with the feature it is,
+	/// `None` for plain text. A facet out of bounds, off a char boundary,
+	/// overlapping an earlier one or naming no feature stays plain text.
+	pub fn segments(&self) -> Vec<(&str, Option<&FacetFeature>)> {
+		let mut facets = self.facets.iter().collect::<Vec<_>>();
+		facets.sort_by_key(|facet| facet.index.byte_start);
+		let mut segments = Vec::new();
+		let mut cursor = 0;
+		for facet in facets {
+			let ByteSlice {
+				byte_start,
+				byte_end,
+			} = facet.index;
+			let (Some(feature), Some(live)) =
+				(facet.features.first(), self.text.get(byte_start..byte_end))
+			else {
+				continue;
+			};
+			if byte_start < cursor || live.is_empty() {
+				continue;
+			}
+			if byte_start > cursor {
+				segments.push((&self.text[cursor..byte_start], None));
+			}
+			segments.push((live, Some(feature)));
+			cursor = byte_end;
+		}
+		if cursor < self.text.len() {
+			segments.push((&self.text[cursor..], None));
+		}
+		segments
+	}
+
 	/// A post of `rich` text, written at `created_at`.
 	pub fn new(rich: RichText, created_at: Timestamp) -> Self {
 		Self {
@@ -61,6 +109,7 @@ mod test {
 
 	/// The live reply post the record cid fixture is, reading back to the
 	/// same body.
+	#[cfg(feature = "json")]
 	#[beet_core::test]
 	fn round_trips_a_pds_post() {
 		let json = r#"{"$type":"app.bsky.feed.post","createdAt":"2026-09-23T15:22:16.682Z","langs":["en"],"reply":{"parent":{"cid":"bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza","uri":"at://did:plc:y2aci3l7tvrs3vuoz6tou2eb/app.bsky.feed.post/3mw5t5lac4k2y"},"root":{"cid":"bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza","uri":"at://did:plc:y2aci3l7tvrs3vuoz6tou2eb/app.bsky.feed.post/3mw5t5lac4k2y"}},"text":"hi"}"#;
@@ -82,6 +131,37 @@ mod test {
 			.unwrap()
 			.cid()
 			.xpect_eq(value.cid());
+	}
+
+	/// The text cuts at each facet, a malformed facet staying plain.
+	#[beet_core::test]
+	async fn cuts_segments() {
+		let rich =
+			RichText::new("🤘 #bevy at https://beet.org !", async |_| {
+				bevybail!("no mentions")
+			})
+			.await
+			.unwrap();
+		let mut post = FeedPost::new(rich, Timestamp::from_millis(1));
+		// mid-codepoint, so never live
+		post.facets.push(Facet {
+			index: ByteSlice {
+				byte_start: 1,
+				byte_end: 3,
+			},
+			features: vec![FacetFeature::Tag { tag: "bad".into() }],
+		});
+		post.segments()
+			.into_iter()
+			.map(|(text, feature)| (text, feature.is_some()))
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![
+				("🤘 ", false),
+				("#bevy", true),
+				(" at ", false),
+				("https://beet.org", true),
+				(" !", false),
+			]);
 	}
 
 	/// A post with facets and a reply survives the repo's data model, so

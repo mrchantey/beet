@@ -23,6 +23,9 @@
 //! - [`StandardSiteDocument`], `site.standard.document`, built from a listed
 //!   page's metadata and rendered off its live page (the `publish` module:
 //!   the body forms, the cover, the blob upload)
+//! - [`StandardSiteComments`], an article's comments, the replies to its
+//!   announcement read live from the AppView with the `atproto` feature, and
+//!   [`StandardSiteReplyLink`], the link to reply
 //! - the [`StandardSiteContentFormats`] registry a publication's `content`
 //!   NSID resolves through, and with the `leaflet` feature `LeafletContent`,
 //!   `pub.leaflet.content`, the rich `content` format, rendered by the
@@ -40,6 +43,7 @@
 //!
 //! [`Rkeyed`]: beet_core::prelude::Rkeyed
 //! [`Theme`]: beet_ui::prelude::Theme
+mod comments;
 mod content_format;
 mod document;
 #[cfg(feature = "leaflet")]
@@ -50,6 +54,7 @@ mod publish;
 mod standard_site_index;
 mod standard_site_pub;
 mod theme;
+pub use comments::*;
 pub use content_format::*;
 pub use document::*;
 #[cfg(feature = "leaflet")]

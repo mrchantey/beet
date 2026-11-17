@@ -1,0 +1,157 @@
+{
+	"thread": {
+		"post": {
+			"uri": "at://did:plc:vgxy56shhs3t3b2mu2avizjf/app.bsky.feed.post/3mw72aaeuj22p",
+			"cid": "bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza",
+			"author": {
+				"did": "did:plc:vgxy56shhs3t3b2mu2avizjf",
+				"handle": "beet.org",
+				"displayName": "Beet",
+				"avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:vgxy56shhs3t3b2mu2avizjf/beet@jpeg",
+				"associated": { "chat": { "allowIncoming": "none" } },
+				"labels": [],
+				"createdAt": "2025-06-01T00:00:00.000Z"
+			},
+			"record": {
+				"$type": "app.bsky.feed.post",
+				"createdAt": "2025-07-11T02:00:00.000Z",
+				"langs": ["en"],
+				"text": "Full Stack Bevy"
+			},
+			"bookmarkCount": 0,
+			"replyCount": 3,
+			"repostCount": 1,
+			"likeCount": 9,
+			"quoteCount": 0,
+			"indexedAt": "2025-07-11T02:00:01.000Z",
+			"labels": []
+		},
+		"replies": [
+			{
+				"post": {
+					"uri": "at://did:plc:2wco2e2ybeg2lwpfx3kqjsuv/app.bsky.feed.post/3mw72aaeuj23b",
+					"cid": "bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza",
+					"author": {
+						"did": "did:plc:2wco2e2ybeg2lwpfx3kqjsuv",
+						"handle": "alice.example.com",
+						"displayName": "Alice",
+						"avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:2wco2e2ybeg2lwpfx3kqjsuv/alice@jpeg",
+						"labels": [],
+						"createdAt": "2024-02-07T11:49:54.859Z"
+					},
+					"record": {
+						"$type": "app.bsky.feed.post",
+						"createdAt": "2025-07-12T09:30:00.000Z",
+						"facets": [
+							{
+								"$type": "app.bsky.richtext.facet",
+								"features": [
+									{
+										"$type": "app.bsky.richtext.facet#mention",
+										"did": "did:plc:vgxy56shhs3t3b2mu2avizjf"
+									}
+								],
+								"index": { "byteEnd": 9, "byteStart": 0 }
+							},
+							{
+								"$type": "app.bsky.richtext.facet",
+								"features": [
+									{
+										"$type": "app.bsky.richtext.facet#link",
+										"uri": "https://bevy.org"
+									}
+								],
+								"index": { "byteEnd": 50, "byteStart": 34 }
+							}
+						],
+						"langs": ["en"],
+						"reply": {
+							"parent": {
+								"cid": "bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza",
+								"uri": "at://did:plc:vgxy56shhs3t3b2mu2avizjf/app.bsky.feed.post/3mw72aaeuj22p"
+							},
+							"root": {
+								"cid": "bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza",
+								"uri": "at://did:plc:vgxy56shhs3t3b2mu2avizjf/app.bsky.feed.post/3mw72aaeuj22p"
+							}
+						},
+						"text": "@beet.org the second reply, about https://bevy.org\nand a second line"
+					},
+					"bookmarkCount": 0,
+					"replyCount": 1,
+					"repostCount": 0,
+					"likeCount": 2,
+					"quoteCount": 0,
+					"indexedAt": "2025-07-12T09:30:01.000Z",
+					"labels": []
+				},
+				"replies": [
+					{
+						"post": {
+							"uri": "at://did:plc:vgxy56shhs3t3b2mu2avizjf/app.bsky.feed.post/3mw72aaeuj23c",
+							"cid": "bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza",
+							"author": {
+								"did": "did:plc:vgxy56shhs3t3b2mu2avizjf",
+								"handle": "beet.org",
+								"displayName": "Beet",
+								"labels": []
+							},
+							"record": {
+								"$type": "app.bsky.feed.post",
+								"createdAt": "2025-07-13T10:00:00.000Z",
+								"langs": ["en"],
+								"text": "a nested answer"
+							},
+							"bookmarkCount": 0,
+							"replyCount": 0,
+							"repostCount": 0,
+							"likeCount": 0,
+							"quoteCount": 0,
+							"indexedAt": "2025-07-13T10:00:01.000Z",
+							"labels": []
+						},
+						"replies": [],
+						"$type": "app.bsky.feed.defs#threadViewPost"
+					}
+				],
+				"threadContext": {},
+				"$type": "app.bsky.feed.defs#threadViewPost"
+			},
+			{
+				"post": {
+					"uri": "at://did:plc:wlf3bzjhcsnwlbgkzxhafm42/app.bsky.feed.post/3mw72aaeuj23a",
+					"cid": "bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza",
+					"author": {
+						"did": "did:plc:wlf3bzjhcsnwlbgkzxhafm42",
+						"handle": "bob.example.com",
+						"labels": []
+					},
+					"record": {
+						"$type": "app.bsky.feed.post",
+						"createdAt": "2025-07-11T18:00:00.000Z",
+						"langs": ["en"],
+						"text": "the first reply"
+					},
+					"bookmarkCount": 0,
+					"replyCount": 0,
+					"repostCount": 0,
+					"likeCount": 1,
+					"quoteCount": 0,
+					"indexedAt": "2025-07-11T18:00:01.000Z",
+					"labels": []
+				},
+				"replies": [],
+				"threadContext": {},
+				"$type": "app.bsky.feed.defs#threadViewPost"
+			},
+			{
+				"uri": "at://did:plc:wlf3bzjhcsnwlbgkzxhafm42/app.bsky.feed.post/3mw72aaeuj23d",
+				"notFound": true,
+				"$type": "app.bsky.feed.defs#notFoundPost"
+			}
+		],
+		"threadContext": {},
+		"$type": "app.bsky.feed.defs#threadViewPost"
+	},
+	"threadgate": null
+}

@@ -1,4 +1,5 @@
 //! `app.bsky.richtext.facet`, the live ranges of a post's text.
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// `app.bsky.richtext.facet`: one live range of a post's text.
@@ -48,4 +49,21 @@ pub enum FacetFeature {
 	/// A feature this build does not know, kept so a foreign post still reads.
 	#[serde(other)]
 	Other,
+}
+
+impl FacetFeature {
+	/// Where the range links to: a link's own uri, a mention's profile and a
+	/// hashtag's search in the Bluesky web app, `None` for an unknown feature.
+	pub fn href(&self) -> Option<String> {
+		match self {
+			Self::Link { uri } => Some(uri.to_string()),
+			Self::Mention { did } => {
+				Some(format!("{}/profile/{did}", FeedPost::WEB_APP))
+			}
+			Self::Tag { tag } => {
+				Some(format!("{}/hashtag/{tag}", FeedPost::WEB_APP))
+			}
+			Self::Other => None,
+		}
+	}
 }

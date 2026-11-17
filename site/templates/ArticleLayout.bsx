@@ -12,6 +12,16 @@ and nothing else.
 frontmatter, so a post is its prose and nothing else. It renders nothing for a
 page with no `created` date, which is what lets the undated blog index share
 this layout and keep its own heading.
+
+The comments are the replies to the post's announcement on Bluesky, read live
+from the AppView, so they sit in a server island behind a minute's edge cache:
+the page itself stays cached for the week. Its fallback, shown until the island
+swaps in and for good with scripts off, is the link to reply on Bluesky. A post
+with no announcement renders neither.
 -->
 <ArticleHeader/>
 <Slot/>
+<ServerIsland name="comments" {CacheHeaders{edge_max_age: "60s"}}>
+	<StandardSiteComments/>
+	<StandardSiteReplyLink slot="fallback"/>
+</ServerIsland>

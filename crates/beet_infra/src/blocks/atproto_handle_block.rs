@@ -526,6 +526,6 @@ mod test {
 			.unwrap()
 			.appview
 			.as_str()
-			.xpect_eq(HandleResolver::PUBLIC_APPVIEW);
+			.xpect_eq(AppView::PUBLIC);
 	}
 }
