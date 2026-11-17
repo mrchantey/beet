@@ -1,25 +1,22 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::ecs::change_detection::Tick;
 use ooxmlsdk::parts::PartRef;
+use ooxmlsdk::parts::header_part::HeaderPart;
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 use ooxmlsdk::parts::slide_part::SlidePart;
 use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::wordprocessing_document::WordprocessingDocument;
 use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
 use ooxmlsdk::parts::worksheet_part::WorksheetPart;
+use ooxmlsdk::schemas::opc_relationships::TargetMode;
 use ooxmlsdk::sdk::SdkPackage;
 
 /// The Office file a document tree was read from, on the tree's root: the
-/// file as read, so every part the tree does not hold writes back as it was,
-/// and the change tick the read ended on, so a writer tells an edit from the
-/// read.
+/// file as read, so every part the tree does not hold writes back as it was.
 #[derive(Debug, Clone, Component)]
 pub struct OoxmlPackage {
 	/// The file as read.
 	bytes: MediaBytes,
-	/// The tick the read ended on: a value changed after it is an edit.
-	parsed: Tick,
 }
 
 impl OoxmlPackage {
@@ -27,16 +24,11 @@ impl OoxmlPackage {
 	pub const MEDIA_TYPES: [MediaType; 3] =
 		[MediaType::Docx, MediaType::Xlsx, MediaType::Pptx];
 
-	/// The file `bytes` holds, as read at `parsed`.
-	pub(crate) fn new(bytes: MediaBytes, parsed: Tick) -> Self {
-		Self { bytes, parsed }
-	}
+	/// The file `bytes` holds.
+	pub(crate) fn new(bytes: MediaBytes) -> Self { Self { bytes } }
 
 	/// The kind of file, as its media type.
 	pub fn media_type(&self) -> &MediaType { self.bytes.media_type() }
-
-	/// The tick the read ended on: a value changed after it is an edit.
-	pub fn parsed(&self) -> Tick { self.parsed }
 
 	/// The file opened, to read or write its parts.
 	pub fn open(&self) -> Result<OoxmlFile> { OoxmlFile::open(&self.bytes) }
@@ -102,18 +94,13 @@ impl OoxmlFile {
 	/// A new Word file whose body is `body`, WordprocessingML with the `w:`,
 	/// `w14:` and `r:` prefixes bound, ie for a test fixture.
 	pub fn word(body: &str) -> Result<MediaBytes> {
-		Self::word_with_properties(body, None)
+		Self::word_with(body, WordParts::default())
 	}
 
-	/// [`word`](Self::word) with core properties, the inner elements of
-	/// `docProps/core.xml` with the `cp:`, `dc:` and `dcterms:` prefixes
-	/// bound, ie `<dc:creator>Ada</dc:creator>`.
-	pub fn word_with_properties(
-		body: &str,
-		properties: Option<&str>,
-	) -> Result<MediaBytes> {
+	/// [`word`](Self::word) with the parts `parts` adds beside its body.
+	pub fn word_with(body: &str, parts: WordParts) -> Result<MediaBytes> {
 		let mut file = WordprocessingDocument::create(Default::default());
-		if let Some(properties) = properties {
+		if let Some(properties) = parts.properties {
 			let part = file.add_core_file_properties_part()?;
 			part.set_data(
 				&mut file,
@@ -127,8 +114,8 @@ impl OoxmlFile {
 				),
 			)?;
 		}
-		let part = file.add_main_document_part()?;
-		part.set_data(
+		let main = file.add_main_document_part()?;
+		main.set_data(
 			&mut file,
 			format!(
 				"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n\
@@ -139,6 +126,26 @@ impl OoxmlFile {
 				OoxmlNamespace::RELATIONSHIPS,
 			),
 		)?;
+		for (id, target) in parts.links {
+			main.add_hyperlink_relationship_with_mode(
+				&mut file,
+				*id,
+				*target,
+				TargetMode::External,
+			)?;
+		}
+		if let Some(header) = parts.header {
+			let part: HeaderPart =
+				main.add_new_part(&mut file, "rIdHeader1")?;
+			part.set_data(
+				&mut file,
+				format!(
+					"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n\
+					 <w:hdr xmlns:w=\"{}\">{header}</w:hdr>",
+					OoxmlNamespace::WORD,
+				),
+			)?;
+		}
 		MediaBytes::new(MediaType::Docx, file.to_package_bytes()?).xok()
 	}
 
@@ -366,6 +373,41 @@ impl OoxmlFile {
 		}
 	}
 
+	/// The id of an external hyperlink relationship from the part at `path`
+	/// to `target`: one the part already holds, else a new one whose id no
+	/// other relationship of the part has.
+	pub fn hyperlink_to(
+		&mut self,
+		path: &str,
+		target: &str,
+	) -> Result<SmolStr> {
+		let part = self
+			.part_at(path)
+			.ok_or_else(|| bevyhow!("the package has no part `{path}`"))?;
+		if let Some(id) = self
+			.hyperlinks(&part)
+			.into_iter()
+			.find(|(_, existing)| existing == target)
+			.map(|(id, _)| id)
+		{
+			return Ok(id);
+		}
+		macro_rules! add {
+			($file:expr) => {
+				part_handle!(&part, handle => SmolStr::new(handle
+					.add_hyperlink_relationship_auto_id($file, target, TargetMode::External)?
+					.id()),
+					_ => bevybail!("the part `{path}` holds no hyperlinks"))
+			};
+		}
+		match self {
+			Self::Word(file) => add!(file),
+			Self::Workbook(file) => add!(file),
+			Self::Deck(file) => add!(file),
+		}
+		.xok()
+	}
+
 	/// The image paths `part` relates, by relationship id.
 	pub fn images(&self, part: &PartRef) -> HashMap<SmolStr, SmolStr> {
 		self.related(part)
@@ -403,6 +445,22 @@ impl OoxmlFile {
 		}?
 		.xok()
 	}
+}
+
+/// What a fixture Word file holds beside its body, for
+/// [`OoxmlFile::word_with`].
+#[derive(Debug, Default, Clone)]
+pub struct WordParts<'a> {
+	/// The core properties, the inner elements of `docProps/core.xml` with
+	/// the `cp:`, `dc:` and `dcterms:` prefixes bound, ie
+	/// `<dc:creator>Ada</dc:creator>`.
+	pub properties: Option<&'a str>,
+	/// A header's inner WordprocessingML, its root binding only the `w:`
+	/// prefix.
+	pub header: Option<&'a str>,
+	/// The main document's hyperlink relationships, each an id and its
+	/// external target.
+	pub links: &'a [(&'a str, &'a str)],
 }
 
 /// Every part of `file`, from its own relationships down.

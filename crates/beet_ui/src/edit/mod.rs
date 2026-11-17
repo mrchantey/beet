@@ -17,7 +17,7 @@
 //! | [`replace_text`](DocumentTreeEdit::replace_text) | replaces a text inside the words that carry it, each piece keeping its look |
 //!
 //! An edit leaves what it wrote meaning only what HTML says, so a format's
-//! renderer writes it by the reverse of its mapping, new content in its
-//! neighbour's style, as `OoxmlRenderer` writes an Office file.
+//! renderer writes it by the reverse of its mapping, as `OoxmlRenderer`
+//! writes an Office file.
 mod document_tree_edit;
 pub use document_tree_edit::*;

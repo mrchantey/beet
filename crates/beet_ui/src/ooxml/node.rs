@@ -107,6 +107,42 @@ impl OoxmlNode {
 	}
 }
 
+/// The [`Value`] an entity held when its file was read, so a writer tells an
+/// edit from the read by comparison: a value differing from its read, or
+/// with none since an edit made it, is edited. Unlike a change tick it
+/// survives the tree being saved, loaded or cloned.
+#[derive(Debug, Clone, PartialEq, Eq, Deref, Reflect, Component)]
+#[reflect(Component)]
+pub(super) struct OoxmlRead(pub Value);
+
+impl OoxmlRead {
+	/// Records the read of every [`Value`] under `root`.
+	pub fn record(world: &mut World, root: Entity) {
+		let read = world.with_state::<(Query<&Children>, Query<&Value>), _>(
+			|(children, values)| {
+				children
+					.iter_descendants(root)
+					.filter_map(|entity| {
+						Some((entity, Self(values.get(entity).ok()?.clone())))
+					})
+					.collect::<Vec<_>>()
+			},
+		);
+		world.insert_batch(read);
+	}
+
+	/// Whether `entity`'s [`Value`] differs from its read, or it has a value
+	/// and no read.
+	pub fn edited(world: &World, entity: Entity) -> bool {
+		let entity = world.entity(entity);
+		match (entity.get::<Value>(), entity.get::<Self>()) {
+			(Some(value), Some(read)) => *value != read.0,
+			(Some(_), None) => true,
+			(None, _) => false,
+		}
+	}
+}
+
 /// An element as an Office part writes it: its qualified name, the namespace
 /// its prefix resolved to, and its attributes in written order.
 #[derive(Debug, Clone, PartialEq, Eq, Reflect)]
@@ -166,6 +202,24 @@ impl OoxmlElement {
 		}) {
 			Some(existing) => existing.value = attribute.value,
 			None => self.attributes.push(attribute),
+		}
+	}
+
+	/// An attribute named `local` in this element's own namespace, written
+	/// with its prefix, ie `w:val` for a `w:highlight`; unprefixed, and so in
+	/// no namespace, when the element is.
+	pub fn own_attribute(
+		&self,
+		local: &str,
+		value: impl Into<SmolStr>,
+	) -> OoxmlAttribute {
+		match self.prefix() {
+			"" => OoxmlAttribute::new(local, None, value),
+			prefix => OoxmlAttribute::new(
+				format!("{prefix}:{local}"),
+				self.namespace.clone(),
+				value,
+			),
 		}
 	}
 

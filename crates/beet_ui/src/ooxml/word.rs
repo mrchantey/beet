@@ -12,6 +12,23 @@ type Ns = OoxmlNamespace;
 #[reflect(Component)]
 pub struct ParagraphStyle(pub SmolStr);
 
+impl ParagraphStyle {
+	/// The style a heading of `level` is written with, `Heading<level>`.
+	pub fn heading(level: u8) -> Self { Self(format!("Heading{level}").into()) }
+
+	/// The heading level the style reads as: `Title` and `Heading1` as 1,
+	/// `Heading<n>` as n up to 6, any other style none.
+	pub fn heading_level(&self) -> Option<u8> {
+		match self.0.as_str() {
+			"Title" => Some(1),
+			style => style
+				.strip_prefix("Heading")
+				.and_then(|level| level.parse::<u8>().ok())
+				.filter(|level| (1..=6).contains(level)),
+		}
+	}
+}
+
 /// A numbered paragraph's list level from 0, its `w:numPr/w:ilvl`: the
 /// paragraph is an `<li>` in a projection-only `<ul>` per level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deref, Reflect, Component)]
@@ -209,7 +226,7 @@ impl WordProjection {
 	) {
 		let style = tree
 			.property(entity, "pPr", Ns::WORD, "pStyle", "val")
-			.map(SmolStr::new);
+			.map(|style| ParagraphStyle(style.into()));
 		let level = tree
 			.child(entity, Ns::WORD, "pPr")
 			.and_then(|properties| tree.child(properties, Ns::WORD, "numPr"))
@@ -221,14 +238,7 @@ impl WordProjection {
 					.and_then(|level| level.parse::<u8>().ok())
 					.unwrap_or(0)
 			});
-		let heading = match style.as_deref() {
-			Some("Title") => Some(1),
-			Some(style) => style
-				.strip_prefix("Heading")
-				.and_then(|level| level.parse::<u8>().ok())
-				.filter(|level| (1..=6).contains(level)),
-			None => None,
-		};
+		let heading = style.as_ref().and_then(ParagraphStyle::heading_level);
 		let tag = match (heading, level) {
 			(Some(heading), _) => format!("h{heading}"),
 			(None, Some(level)) => {
@@ -239,7 +249,7 @@ impl WordProjection {
 		};
 		changes.push(Projected::Tag(entity, Tagged::new(tag)));
 		if let Some(style) = style {
-			changes.push(Projected::insert(entity, ParagraphStyle(style)));
+			changes.push(Projected::insert(entity, style));
 		}
 	}
 
@@ -576,13 +586,16 @@ pub(crate) mod test {
 	#[beet_core::test]
 	fn writes_its_core_properties_as_frontmatter() {
 		let (mut world, root) = parse(
-			OoxmlFile::word_with_properties(
+			OoxmlFile::word_with(
 				"<w:p><w:r><w:t>Body</w:t></w:r></w:p>",
-				Some(
-					"<dc:title>Plan</dc:title><dc:creator>Ada</dc:creator>\
+				WordParts {
+					properties: Some(
+						"<dc:title>Plan</dc:title><dc:creator>Ada</dc:creator>\
 					 <cp:lastModifiedBy>Grace</cp:lastModifiedBy><cp:revision>3</cp:revision>\
 					 <dcterms:created>2024-03-01T09:30:00Z</dcterms:created>",
-				),
+					),
+					..default()
+				},
 			)
 			.unwrap(),
 		);

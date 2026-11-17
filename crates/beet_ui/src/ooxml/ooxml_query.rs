@@ -120,6 +120,45 @@ impl OoxmlQuery<'_, '_> {
 			.find(|ancestor| self.is(*ancestor, namespace, local))
 	}
 
+	/// The part holding `entity`, the nearest [`OoxmlNode::Part`] above it.
+	pub fn part_of(&self, entity: Entity) -> Option<Entity> {
+		self.parents
+			.iter_ancestors(entity)
+			.find(|ancestor| self.is_part(*ancestor))
+	}
+
+	/// The path of `part`, when it is one.
+	pub fn path(&self, part: Entity) -> Option<&SmolStr> {
+		match self.nodes.get(part) {
+			Ok(OoxmlNode::Part { path }) => Some(path),
+			_ => None,
+		}
+	}
+
+	/// Whether an element of the file holds `entity`, ie a node an edit
+	/// added among the file's rather than beside them.
+	pub fn within_source(&self, entity: Entity) -> bool {
+		self.parents
+			.iter_ancestors(entity)
+			.any(|ancestor| self.element(ancestor).is_some())
+	}
+
+	/// The prefix bound to `namespace` where `entity` sits, by the nearest
+	/// declaration at or above it.
+	pub fn prefix_for(&self, entity: Entity, namespace: &str) -> Option<&str> {
+		core::iter::once(entity)
+			.chain(self.parents.iter_ancestors(entity))
+			.filter_map(|ancestor| self.element(ancestor))
+			.find_map(|element| {
+				element.attributes.iter().find_map(|attribute| {
+					attribute
+						.name
+						.strip_prefix("xmlns:")
+						.filter(|_| attribute.value == namespace)
+				})
+			})
+	}
+
 	/// The value of `entity`'s attribute `local` in `namespace`, or
 	/// unprefixed when `None`.
 	pub fn attribute(

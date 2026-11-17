@@ -1,4 +1,5 @@
 use super::deck_report::*;
+use super::node::OoxmlRead;
 use super::workbook::SheetCellStyle;
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -15,6 +16,7 @@ impl Plugin for OoxmlPlugin {
 			.register_type::<ParagraphStyle>()
 			.register_type::<ListLevel>()
 			.register_type::<OoxmlNode>()
+			.register_type::<OoxmlRead>()
 			.register_type::<SheetCellStyle>()
 			.register_type::<Deck>()
 			.register_type::<Slide>()

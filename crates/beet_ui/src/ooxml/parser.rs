@@ -1,4 +1,5 @@
 use super::deck::*;
+use super::node::OoxmlRead;
 use super::word::*;
 use super::workbook::*;
 use crate::prelude::*;
@@ -77,12 +78,11 @@ impl DocParser for OoxmlParser {
 				}
 				_ => SlideProjection::build(world, root, &file)?,
 			}
-			// the read ends here: a value changed after this tick is an edit
-			let parsed = world.change_tick();
-			world.increment_change_tick();
+			// the read ends here: a value differing from it is an edit
+			OoxmlRead::record(world, root);
 			world
 				.entity_mut(root)
-				.insert(OoxmlPackage::new(cx.bytes.clone(), parsed));
+				.insert(OoxmlPackage::new(cx.bytes.clone()));
 			Ok(())
 		})?;
 		Ok(())

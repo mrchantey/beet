@@ -32,13 +32,16 @@
 //! # Editing and writing
 //!
 //! An edit is an ECS edit in HTML terms: a [`Value`] changed, `checked` set,
-//! a node removed, a projection-only node added. Writing back is
-//! re-projection: [`OoxmlRenderer`] answers a Word file's or a workbook's
-//! own media type by writing every [`OoxmlNode`] as it says, and anything an
-//! edit made with none by the reverse of the mapping, new content in its
-//! neighbour's style. A deck is read, never written. An untouched file writes back render
-//! identical, every part, relationship and attribute kept and only lexical
-//! form free, and an edited one differs only where it was edited.
+//! a node removed, a projection-only node added. The read keeps beside each
+//! [`Value`] the one the file held, so a writer finds an edit by comparison,
+//! never by change ticks, and a tree saved, loaded or cloned still knows what
+//! was edited. Writing back is re-projection: [`OoxmlRenderer`] answers a
+//! Word file's or a workbook's own media type by writing every
+//! [`OoxmlNode`] as it says, and anything an edit made with none by the
+//! reverse of the mapping, which its docs list element by element. A deck is
+//! read, never written. An untouched file writes back render identical,
+//! every part, relationship and attribute kept and only lexical form free,
+//! and an edited one differs only where it was edited.
 //!
 //! # Formats
 //!
