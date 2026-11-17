@@ -117,22 +117,19 @@ impl CloudflareAccess {
 	/// action makes.
 	pub fn token(&self) -> Result<SmolStr> { cloudflare_api_ext::token() }
 
-	/// The zone id `caller` resolves by ancestry
+	/// The zone `caller` resolves by ancestry
 	/// ([`ResolvedStack::cloudflare_zone`]) and the token beside it, the auth
 	/// every zone-level call needs.
 	pub async fn zone_auth(
 		&self,
 		caller: &AsyncEntity,
-	) -> Result<(SmolStr, SmolStr)> {
-		let zone_id = caller
+	) -> Result<(CloudflareZone, SmolStr)> {
+		let zone = caller
 			.with_state::<StackQuery, _>(|entity, stacks| {
-				stacks
-					.resolve(entity)
-					.cloudflare_zone()
-					.map(|zone| zone.id.clone())
+				stacks.resolve(entity).cloudflare_zone().cloned()
 			})
 			.await??;
-		Ok((zone_id, self.token()?))
+		Ok((zone, self.token()?))
 	}
 
 	/// A `wrangler` child carrying the deploy token, redacted from its output.

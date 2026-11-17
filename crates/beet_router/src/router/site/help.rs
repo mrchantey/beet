@@ -111,9 +111,7 @@ pub(crate) async fn ContextualNotFound(
 ) -> Result<Response> {
 	let parts = cx.input.parts().clone();
 	let root = NotFoundNotice::spawn_page(&cx.caller, &parts).await?;
-	let mut response = LivePage::respond(root, &cx.caller, parts).await?;
-	response.parts.status = StatusCode::NOT_FOUND;
-	Ok(response)
+	LivePage::respond(root, &cx.caller, parts).await
 }
 
 /// What [`NotFoundPage`] says: the path that missed, and the nearest ancestor
@@ -616,7 +614,8 @@ async fn spawn_route_list(
 }
 
 /// Spawn the [`NotFoundPage`] the same way, so the small view wears the same
-/// chrome as the listing it links to.
+/// chrome as the listing it links to, marked with the [`PageStatus`] it
+/// answers with.
 async fn spawn_not_found(
 	caller: &AsyncEntity,
 	parts: &RequestParts,
@@ -626,7 +625,15 @@ async fn spawn_not_found(
 	caller
 		.world()
 		.with(move |world: &mut World| {
-			spawn_page(world, &parts, rsx! { <NotFoundPage notice=notice/> })
+			let page = spawn_page(
+				world,
+				&parts,
+				rsx! { <NotFoundPage notice=notice/> },
+			)?;
+			world
+				.entity_mut(page)
+				.insert(PageStatus(StatusCode::NOT_FOUND));
+			page.xok()
 		})
 		.await
 }

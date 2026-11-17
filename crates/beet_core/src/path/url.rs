@@ -64,6 +64,9 @@ pub struct Url {
 	root: bool,
 	/// ie `path/to/page`
 	path: Vec<SmolStr>,
+	/// Whether a non-empty path ends in `/`, ie `/blog/`. See
+	/// [`has_trailing_slash`](Self::has_trailing_slash).
+	trailing_slash: bool,
 	/// ie `?foo=bar&bazz`
 	params: MultiMap<SmolStr, SmolStr>,
 	/// ie `#some-heading`
@@ -83,6 +86,7 @@ impl Url {
 		authority: None,
 		root: true,
 		path: Vec::new(),
+		trailing_slash: false,
 		params: MultiMap::new(),
 		fragment: None,
 	};
@@ -107,6 +111,7 @@ impl Url {
 					true => Vec::new(),
 					false => vec![payload.into()],
 				},
+				trailing_slash: false,
 				params: default(),
 				fragment: None,
 			};
@@ -145,16 +150,18 @@ impl Url {
 			},
 		};
 
+		let hierarchical = scheme.is_hierarchical() || scheme == Scheme::None;
 		Self {
 			// an authority is always followed by a rooted path, and a
 			// non-hierarchical payload is neither rooted nor relative
 			root: authority.is_some() || path.starts_with('/'),
-			path: match scheme.is_hierarchical() || scheme == Scheme::None {
+			path: match hierarchical {
 				true => Self::split_path(path),
 				// opaque payload: one segment, verbatim
 				false if path.is_empty() => Vec::new(),
 				false => vec![path.into()],
 			},
+			trailing_slash: hierarchical && Self::ends_in_slash(path),
 			scheme,
 			authority,
 			params,
@@ -217,6 +224,7 @@ impl Url {
 			authority,
 			root: true,
 			path,
+			trailing_slash: false,
 			params,
 			fragment,
 		}
@@ -333,16 +341,41 @@ impl Url {
 	/// A mutable reference to the path segments.
 	pub fn path_mut(&mut self) -> &mut Vec<SmolStr> { &mut self.path }
 
-	/// Set the path segments.
+	/// Set the path segments, dropping any trailing slash.
 	pub fn with_path(mut self, path: Vec<SmolStr>) -> Self {
-		self.path = path;
+		self.set_path(path);
 		self
 	}
 
-	/// Set the path segments.
+	/// Set the path segments, dropping any trailing slash.
 	pub fn set_path(&mut self, path: Vec<SmolStr>) -> &mut Self {
 		self.path = path;
+		self.trailing_slash = false;
 		self
+	}
+
+	/// Whether the path names a directory, ie `/blog/` rather than `/blog`.
+	///
+	/// Never for an empty path: the root `/` is a rooted empty path, not a
+	/// slash after nothing. The two addresses are distinct urls, so a server
+	/// answering one can redirect the other to it, and a relative reference
+	/// resolves inside a slashed path rather than beside its last segment
+	/// ([`join`](Self::join)).
+	pub fn has_trailing_slash(&self) -> bool {
+		self.trailing_slash && !self.path.is_empty()
+	}
+
+	/// Set whether the path ends in `/`, ignored while the path is empty.
+	pub fn with_trailing_slash(mut self, trailing_slash: bool) -> Self {
+		self.trailing_slash = trailing_slash;
+		self
+	}
+
+	/// Whether an encoded path string ends in a `/` after at least one
+	/// segment, ie `/blog/` but not `/` or `//`.
+	pub fn ends_in_slash(path: &str) -> bool {
+		path.ends_with('/')
+			&& path.split('/').any(|segment| !segment.is_empty())
 	}
 
 	/// All query parameters, decoded.
@@ -403,9 +436,13 @@ impl Url {
 				.collect::<Vec<_>>()
 				.join("/"),
 		};
+		let slash = match self.has_trailing_slash() {
+			true => "/",
+			false => "",
+		};
 		match self.root {
-			true => format!("/{encoded}"),
-			false => encoded,
+			true => format!("/{encoded}{slash}"),
+			false => format!("{encoded}{slash}"),
 		}
 	}
 
@@ -439,7 +476,9 @@ impl Url {
 	/// `other` wins outright when it names another scheme or another host, and
 	/// a rooted `other` replaces the path. A RELATIVE `other` merges: it is
 	/// appended beside this url's last segment, so `next` from `/docs/intro`
-	/// resolves to `/docs/next`, and `.`/`..` segments collapse.
+	/// resolves to `/docs/next`, or inside a [slashed](Self::has_trailing_slash)
+	/// one, so `next` from `/docs/` resolves to `/docs/next`, and `.`/`..`
+	/// segments collapse.
 	pub fn join(&self, other: Url) -> Url {
 		if other.scheme != Scheme::None && other.scheme != self.scheme {
 			return other;
@@ -448,14 +487,26 @@ impl Url {
 			return other;
 		}
 		let mut resolved = self.clone();
-		resolved.params = other.params;
 		resolved.fragment = other.fragment;
+		// an empty relative reference (`?q`, `#top`) keeps the base path whole,
+		// and its query too unless it names one
+		if !other.root && other.path.is_empty() {
+			if !other.params.is_empty() {
+				resolved.params = other.params;
+			}
+			return resolved;
+		}
+		resolved.params = other.params;
+		resolved.trailing_slash = other.trailing_slash;
 		resolved.path = match other.root {
 			true => other.path,
 			false => {
-				// merge beside the base's last segment, as a relative `href` does
+				// merge beside the base's last segment, as a relative `href`
+				// does, or inside it when the base names a directory
 				let mut merged = self.path.clone();
-				merged.pop();
+				if !self.has_trailing_slash() {
+					merged.pop();
+				}
 				merged.extend(other.path);
 				normalize_segments(merged)
 			}
@@ -463,9 +514,11 @@ impl Url {
 		resolved
 	}
 
-	/// Push a path segment to the end of the path.
+	/// Push a path segment to the end of the path, which then ends in that
+	/// segment rather than any trailing slash.
 	pub fn push(mut self, segment: impl Into<SmolStr>) -> Self {
 		self.path.push(segment.into());
+		self.trailing_slash = false;
 		self
 	}
 
@@ -482,6 +535,7 @@ impl Url {
 			authority: other.authority.clone(),
 			root: other.root,
 			path: other.path.clone(),
+			trailing_slash: other.trailing_slash,
 			params: self.params.clone(),
 			fragment: self.fragment.clone(),
 		}
@@ -1161,6 +1215,43 @@ mod test {
 		join("https://other.example/x").xpect_eq("https://other.example/x");
 		// the base's query does not leak onto the resolved reference
 		join("next?fresh=1").xpect_eq("https://beet.org/docs/next?fresh=1");
+		// an empty path keeps the base path, and its query unless replaced
+		join("#top").xpect_eq("https://beet.org/docs/intro?stale=1#top");
+		join("?fresh=1").xpect_eq("https://beet.org/docs/intro?fresh=1");
+		// a slashed base is a directory, so a reference resolves inside it
+		Url::coerce("/docs/")
+			.join(Url::coerce("next/"))
+			.to_string()
+			.xpect_eq("/docs/next/");
+	}
+
+	/// A trailing slash survives the round trip, distinguishing `/blog/` from
+	/// `/blog`, while the root and an empty path never carry one.
+	#[crate::test]
+	fn keeps_trailing_slash() {
+		let slashed = Url::coerce("https://beet.org/blog/foo/?q=1");
+		slashed.has_trailing_slash().xpect_true();
+		slashed.path().xpect_eq(["blog", "foo"]);
+		slashed
+			.to_string()
+			.xpect_eq("https://beet.org/blog/foo/?q=1");
+		(slashed == Url::coerce("https://beet.org/blog/foo?q=1")).xpect_false();
+		slashed
+			.clone()
+			.with_trailing_slash(false)
+			.to_string()
+			.xpect_eq("https://beet.org/blog/foo?q=1");
+		slashed
+			.push("bar")
+			.to_string()
+			.xpect_eq("https://beet.org/blog/foo/bar?q=1");
+		for unslashed in ["/", "//", "https://beet.org/", "/blog"] {
+			Url::coerce(unslashed).has_trailing_slash().xpect_false();
+		}
+		Url::default()
+			.with_trailing_slash(true)
+			.to_string()
+			.xpect_eq("/");
 	}
 
 	#[crate::test]

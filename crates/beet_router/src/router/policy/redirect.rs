@@ -118,10 +118,9 @@ impl RedirectTo {
 		RelPath::from_segments(&segments)
 			.xmap(Url::from)
 			.with_rooted(true)
-			// the scope is a directory, so the reference resolves beside a
-			// trailing segment that is not there: push an empty one for `join`
-			// to drop, exactly as a browser resolves `href` against `/blog/`
-			.push("")
+			// the scope is a directory, so the reference resolves inside it,
+			// exactly as a browser resolves `href` against `/blog/`
+			.with_trailing_slash(true)
 			.join(self.target.clone())
 	}
 }

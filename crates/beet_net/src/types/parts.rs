@@ -423,7 +423,8 @@ impl From<http::request::Parts> for RequestParts {
 			SmolStr::new_static(http_ext::version_str(http_parts.version));
 		let method = HttpMethod::from(http_parts.method);
 
-		let url = Url::new(scheme, authority, path, params, None);
+		let url = Url::new(scheme, authority, path, params, None)
+			.with_trailing_slash(Url::ends_in_slash(uri.path()));
 
 		RequestParts {
 			method,
@@ -450,7 +451,8 @@ impl From<&http::request::Parts> for RequestParts {
 			SmolStr::new_static(http_ext::version_str(http_parts.version));
 		let method = HttpMethod::from(&http_parts.method);
 
-		let url = Url::new(scheme, authority, path, params, None);
+		let url = Url::new(scheme, authority, path, params, None)
+			.with_trailing_slash(Url::ends_in_slash(uri.path()));
 
 		RequestParts {
 			method,

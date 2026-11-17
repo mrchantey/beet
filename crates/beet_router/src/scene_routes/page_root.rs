@@ -44,6 +44,20 @@ pub struct PageRoot {
 #[derive(Default, Component)]
 pub struct DespawnAfterRender(pub Vec<Entity>);
 
+/// On a render root that answers with a status other than `200`, ie the
+/// not-found page's `404`: the one fact [`LivePage::respond`] answers with and
+/// the layout reads, so an error page claims no canonical url ([`RouteHead`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Component)]
+pub struct PageStatus(pub StatusCode);
+
+impl PageStatus {
+	/// Whether the page reports a failure, ie a `4xx` or `5xx`, and so is no
+	/// address worth indexing.
+	pub fn is_error(&self) -> bool {
+		self.0.is_client_error() || self.0.is_server_error()
+	}
+}
+
 impl PageRoot {
 	/// The entity whose tree the [`DocRenderer`] walks.
 	pub fn rendered(&self) -> Entity { self.rendered }

@@ -180,7 +180,8 @@ pub async fn ZoneAudit(
 	// the zone they target, so the id is an input to the render, not just to the
 	// listing that follows it.
 	let access = CloudflareAccess::resolve(&cx.caller).await?;
-	let (zone_id, token) = access.zone_auth(&cx.caller).await?;
+	let (zone, token) = access.zone_auth(&cx.caller).await?;
+	let zone_id = zone.id;
 	let audited = zone_id.clone();
 	let (declared, allowed) = cx
 		.caller

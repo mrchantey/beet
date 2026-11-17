@@ -286,7 +286,8 @@ impl LivePage {
 	}
 
 	/// The response a request makes of a built `page`: negotiate the media
-	/// type from `Accept`, prepare the page, render it and release it.
+	/// type from `Accept`, prepare the page, render it and release it,
+	/// answering with the page's [`PageStatus`], else `200`.
 	///
 	/// This is the http page handler, so a request with no `Accept` or a
 	/// wildcard (`*/*`) renders the web document, the registry's
@@ -310,11 +311,20 @@ impl LivePage {
 			true => IslandScope::Placeholders,
 			false => IslandScope::Inline,
 		};
+		// read before the render releases the page
+		let status = route
+			.world()
+			.with(move |world: &mut World| {
+				world
+					.get::<PageStatus>(page)
+					.map_or(StatusCode::OK, |status| status.0)
+			})
+			.await;
 		let bytes = Self::prepare_with(page, route, parts, islands)
 			.await?
 			.release_after(async |live| live.render(&media_type).await)
 			.await?;
-		Response::ok().with_media(bytes).xok()
+		Response::ok().with_media(bytes).with_status(status).xok()
 	}
 
 	/// The media type `parts` negotiates from the registered render targets,

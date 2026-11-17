@@ -834,6 +834,55 @@ mod test {
 			.xpect_eq("SiteName");
 	}
 
+	/// A page names its own url as canonical, while the not-found page, whose
+	/// [`PageStatus`] is a `404`, claims no url at all rather than its own.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn error_page_claims_no_canonical() {
+		let mut world = router_world();
+		world.insert_resource(PackageConfig {
+			homepage: Some("https://example.test".into()),
+			..default()
+		});
+		let root = world
+			.spawn((Router, Layout::of::<MetaLayout>(), children![meta_route(
+				"alpha", "Alpha"
+			),]))
+			.flush();
+
+		get(&mut world, root, "alpha")
+			.await
+			.as_str()
+			.xpect_contains(
+				r#"rel="canonical" href="https://example.test/alpha""#,
+			)
+			.xpect_contains(
+				r#"property="og:url" content="https://example.test/alpha""#,
+			)
+			.xpect_contains(r#""url":"https://example.test/alpha""#);
+
+		let response = world
+			.entity_mut(root)
+			.exchange(
+				Request::get("missing")
+					.with_header::<header::Accept>(vec![MediaType::Html]),
+			)
+			.await;
+		response.status().xpect_eq(StatusCode::NOT_FOUND);
+		response
+			.text()
+			.await
+			.unwrap()
+			.as_str()
+			.xpect_contains("Not found")
+			.xnot()
+			.xpect_contains(r#"rel="canonical""#)
+			.xnot()
+			.xpect_contains("og:url")
+			.xnot()
+			.xpect_contains(r#""url":"#);
+	}
+
 	/// The SSR seed of the `<title>` (what `RouteHead` renders before any document
 	/// sync, and all a static export ever gets) reads the route's meta through a
 	/// nested layout, not the intervening layout root.

@@ -201,6 +201,28 @@ fn head_falls_back_to_the_site() {
 		.xpect_contains("datePublished");
 }
 
+/// A page with no address of its own, ie a `404`, claims no url: no canonical,
+/// no `og:url` and no JSON-LD `url`, rather than falling back to the site's.
+#[beet_core::test]
+fn head_omits_canonical() {
+	let mut world = layout_world();
+	let root = world
+		.spawn_template(rsx! {
+			<Head url="https://example.test/missing" omit_canonical=true/>
+		})
+		.unwrap()
+		.id();
+	render_html(&mut world, root)
+		.as_str()
+		.xpect_contains(r#"<script type="application/ld+json">"#)
+		.xnot()
+		.xpect_contains(r#"rel="canonical""#)
+		.xnot()
+		.xpect_contains("og:url")
+		.xnot()
+		.xpect_contains(r#""url":"#);
+}
+
 /// A `noindex` head asks crawlers not to index the page.
 #[beet_core::test]
 fn head_marks_noindex() {

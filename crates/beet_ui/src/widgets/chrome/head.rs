@@ -16,7 +16,8 @@
 //! everything a search result or a link preview shows — the description, the
 //! social card, the canonical url, the `article:*` block — overridden by the
 //! page's own [`DocMeta`] and `url` when the caller supplies them, so a shared
-//! link previews as the PAGE rather than as the site. The per-page `<title>` is
+//! link previews as the PAGE rather than as the site. An error page passes
+//! `omit_canonical`, claiming no url at all. The per-page `<title>` is
 //! owned by the layout (eg [`RouteHead`](beet_router) binds it to the route's
 //! `DocMeta`), so `omit_title` drops this widget's own `<title>` to keep
 //! exactly one in the document.
@@ -62,6 +63,10 @@ pub fn Head(
 	/// `<Head/>` outside a route can honestly claim.
 	#[prop]
 	url: Option<Url>,
+	/// The page has no address of its own, ie a `404`: omit the canonical,
+	/// `og:url` and the JSON-LD `url` rather than falling back to the site.
+	#[prop]
+	omit_canonical: bool,
 	/// Mark the page `noindex` for crawlers, ie an
 	/// [`Unlisted`](RouteVisibility::Unlisted) route, which serves to whoever
 	/// holds its link and is advertised nowhere (a crawler may still follow
@@ -87,8 +92,12 @@ pub fn Head(
 		.clone()
 		.unwrap_or_else(|| description.to_string());
 	// the page's own url, else the site's; both optional, so an unset origin
-	// omits the tags entirely rather than rendering empty attributes.
-	let canonical = url.or_else(|| pkg_config.homepage.clone());
+	// omits the tags entirely rather than rendering empty attributes. A page
+	// with no address of its own claims neither.
+	let canonical = match omit_canonical {
+		true => None,
+		false => url.or_else(|| pkg_config.homepage.clone()),
+	};
 	let version = pkg_config.version.clone();
 	// the social card is omitted rather than defaulted, since an invented card
 	// url is a broken preview.

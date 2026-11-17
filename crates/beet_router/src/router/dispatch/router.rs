@@ -141,6 +141,12 @@ impl Router {
 							}
 							_ => {}
 						}
+						// one address per page: a slashed path answers a 301 to
+						// the slashless one it matched
+						if let Some(location) = slashless_location(&request) {
+							return Response::permanent_redirect(location)
+								.xok();
+						}
 						// refuse a param the route cannot take before it runs,
 						// a strict url space an undeclared one too, before the
 						// path's own segments join the params
@@ -205,6 +211,30 @@ impl Router {
 			},
 		)
 	}
+}
+
+/// The `Location` a matched `GET`/`HEAD` with a trailing slash redirects to,
+/// ie `/blog/foo/?q=1` to `/blog/foo?q=1`: rooted and server-relative like a
+/// [`Redirect`]'s, so it holds on every host. `None` for any other request,
+/// which keeps its usual handling.
+///
+/// A static export never reaches it, since it requests the slashless path of
+/// every route and writes `foo/index.html`, which a static host serves at both
+/// addresses.
+fn slashless_location(request: &Request) -> Option<String> {
+	let url = request.url();
+	(url.has_trailing_slash()
+		&& matches!(request.method(), HttpMethod::Get | HttpMethod::Head))
+	.then(|| {
+		Url::new(
+			Scheme::None,
+			None,
+			url.path().clone(),
+			url.params().clone(),
+			None,
+		)
+		.to_string()
+	})
 }
 
 /// A [`ParamError`] the matched route raised, as the `400` naming the param
@@ -418,6 +448,54 @@ mod test {
 		// a HEAD is a GET with the body dropped, so a Get route serves it
 		status(HttpMethod::Head, HttpMethod::Get)
 			.await
+			.xpect_eq(StatusCode::OK);
+	}
+
+	/// A slashed path answers a 301 to the slashless one, query kept, so a page
+	/// has one address; the root never redirects, a slashed path matching no
+	/// route still 404s, and a method other than `GET`/`HEAD` is dispatched as
+	/// before.
+	#[beet_core::test]
+	async fn redirects_trailing_slash() {
+		let mut world = router_world();
+		let router = world
+			.spawn((Router::with_defaults(), children![
+				route::exchange("", EchoParams),
+				route::exchange("blog/foo", EchoParams),
+			]))
+			.flush();
+		let mut exchange = async |request: Request| {
+			world.entity_mut(router).exchange(request).await
+		};
+		let response = exchange(Request::get("/blog/foo/?page=2")).await;
+		response.status().xpect_eq(StatusCode::MOVED_PERMANENTLY);
+		response
+			.parts
+			.headers
+			.get::<header::Location>()
+			.unwrap()
+			.unwrap()
+			.to_string()
+			.xpect_eq("/blog/foo?page=2");
+		exchange(Request::new(HttpMethod::Head, "/blog/foo/"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::MOVED_PERMANENTLY);
+		exchange(Request::get("/blog/foo?page=2"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+		exchange(Request::get("/"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+		exchange(Request::get("/blog/missing/"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::NOT_FOUND);
+		exchange(Request::post("/blog/foo/"))
+			.await
+			.status()
 			.xpect_eq(StatusCode::OK);
 	}
 

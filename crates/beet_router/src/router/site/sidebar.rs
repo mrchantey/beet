@@ -33,7 +33,8 @@ use beet_ui::prelude::*;
 /// per route and stays live. The route's whole [`DocMeta`] is handed to the base
 /// [`Head`] so its social card previews this page, falling back to
 /// [`PackageConfig`](beet_core::prelude::PackageConfig) per field, along with
-/// this request's own absolute url as the canonical one, and an
+/// this request's own absolute url as the canonical one (none for a page
+/// whose [`PageStatus`] is an error), and an
 /// [`Unlisted`](RouteVisibility::Unlisted) route's [`RouteMeta`] marks it
 /// `noindex`. The declared [`IconSet`], when the world holds one, is linked
 /// from its declaration: its icons and its web app manifest. The declared
@@ -51,6 +52,7 @@ pub fn RouteHead(
 	stack: Res<RequestContextStack>,
 	metas: Query<&DocMeta>,
 	route_metas: Query<&RouteMeta>,
+	statuses: Query<&PageStatus>,
 	icon_sets: Query<&IconSet>,
 	cards: SocialCardQuery,
 	standard_site: StandardSiteLinkQuery,
@@ -66,7 +68,10 @@ pub fn RouteHead(
 	let title = route_title(&seed)?;
 	// this page's canonical url. Unlike the syndication routes, which cannot
 	// serve a relative `<loc>` at all, a head has plenty to say without an
-	// origin, so an unset `homepage` simply omits the tag.
+	// origin, so an unset `homepage` simply omits the tag. An error page has
+	// no address of its own, so it claims none.
+	let omit_canonical =
+		statuses.get(cx.content()).is_ok_and(PageStatus::is_error);
 	let url = pkg.absolute_url(&cx.current_path()).ok();
 	let noindex = route_metas
 		.get(cx.route())
@@ -85,7 +90,7 @@ pub fn RouteHead(
 		.map(|(rel, href)| rsx! { <link rel={rel} href={href}/> })
 		.collect::<Vec<_>>();
 	rsx! {
-		<Head omit_title=true meta=meta url=url noindex=noindex social_image=social_image>
+		<Head omit_title=true meta=meta url=url omit_canonical=omit_canonical noindex=noindex social_image=social_image>
 			<title>{title}</title>
 			{icons}
 			{records}
