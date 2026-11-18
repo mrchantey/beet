@@ -248,9 +248,9 @@ out rather than landing at once, and every step takes `--dry-run`:
 
 The verb writes with the accounts' app passwords (`BEET_ORG_APP_PASSWORD`,
 `PETE_BEET_ORG_APP_PASSWORD`, `env_var` records in `secrets.toml`), and renders
-each post's Leaflet body, which only the `site-social` recipe's `leaflet`
-feature links: the deployed binary serves the records and the comments
-(`atproto`) and never renders Leaflet.
+each document off its post's page with the features every binary carrying
+`atproto` has, so the `site-social` recipe needs no extra one; the deployed
+binary serves the records and the comments (`atproto`).
 -->
 <CliServer always=true {CallOnReady}>
 <!-- the provider addresses every stack below deploys into, resolved by

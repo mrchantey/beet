@@ -293,8 +293,8 @@ impl MediaSourceQuery<'_, '_> {
 	}
 
 	/// Whether `attribute` on a `tag` element names an image the step
-	/// fetches. Images alone, since the one target embedding media (Leaflet)
-	/// has no video or audio block.
+	/// fetches. Images alone, since the one renderer embedding media
+	/// (Leaflet's) has no video or audio block.
 	fn is_image_source(tag: &str, attribute: &str) -> bool {
 		tag.eq_ignore_ascii_case("img") && attribute == "src"
 	}
@@ -491,9 +491,8 @@ mod test {
 			.xpect_eq(vec!["/media/photo.png".to_string()]);
 	}
 
-	/// A request naming no policy fetches nothing, a request for Leaflet, which
-	/// embeds images, included; one naming a policy fetches through the same
-	/// route.
+	/// A request naming no policy fetches nothing; one naming a policy
+	/// fetches through the same route.
 	#[beet_core::test]
 	async fn a_plain_request_fetches_nothing() {
 		let fetches = Arc::new(AtomicUsize::new(0));
@@ -502,19 +501,13 @@ mod test {
 			counted(&fetches),
 		)
 		.await;
-		for accept in [
-			MediaType::Html,
-			#[cfg(feature = "leaflet")]
-			LeafletRenderer::media_type(),
-		] {
-			world
-				.entity_mut(router)
-				.exchange(Request::get("/blog/post").with_accept(accept))
-				.await
-				.into_result()
-				.await
-				.unwrap();
-		}
+		world
+			.entity_mut(router)
+			.exchange(Request::get("/blog/post"))
+			.await
+			.into_result()
+			.await
+			.unwrap();
 		prepared(&mut world, router, Request::get("/blog/post"))
 			.await
 			.unwrap()

@@ -129,10 +129,9 @@ site-shared *args:
 # site entry's `social` stack): `just site-social plan|deploy|probe|destroy
 # --stage=prod`, and `just site-social publish --only=<slug>`. Prod only for
 # the handles: the block's `dns_stage` publishes nothing from any other stage.
-# `atproto` with `infra` links the block; `leaflet` renders each post's rich
-# body, which only the publishing binary needs.
+# `atproto` with `infra` links the block and the publish sequence.
 site-social *args:
-  cargo run -p beet-cli --features infra,extra,atproto,leaflet -- --entry=site social "$@"
+  cargo run -p beet-cli --features infra,extra,atproto -- --entry=site social "$@"
 # Diff the beet.org zone against every stack the site entry declares, reporting
 # the strays; `--fix` deletes them. Built with `atproto` so the handle records
 # are declarations rather than strays.
@@ -372,7 +371,7 @@ _test-pkgs-wasm pkgs *args: _cli
 # the converge, then the whole standard.site publish sequence.
 test-atproto-live *args:
 	cargo test -p beet_net --lib --features atproto,ureq,rustls-tls {{ args }} -- --include-ignored --include '*live_test*'
-	cargo test -p beet_router --lib --features atproto,leaflet,vault,beet_net/rustls-tls {{ args }} -- --include-ignored --include '*publishes_to_a_live_repo*'
+	cargo test -p beet_router --lib --features atproto,vault,beet_net/rustls-tls {{ args }} -- --include-ignored --include '*publishes_to_a_live_repo*'
 
 test-wasm-sqlite *args: _cli
 	cargo test -p beet_net --lib --target wasm32-unknown-unknown \

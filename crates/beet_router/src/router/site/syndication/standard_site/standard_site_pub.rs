@@ -27,9 +27,9 @@ use beet_net::prelude::*;
 /// what it serves.
 ///
 /// Registered in every build that carries the data model, so a declaration
-/// naming a `content` format this build has no target for (`leaflet` is off
-/// in a served binary) still builds, the format resolving where the publish
-/// step reads it.
+/// naming a `content` def this build has no renderer for (the
+/// `standard_site_extra` feature's Leaflet is off in a served binary) still
+/// builds, the def resolving where the publish step renders it.
 ///
 /// [`Router`]: crate::prelude::Router
 #[action]
@@ -57,14 +57,15 @@ pub async fn StandardSitePub(
 	/// `textContent`.
 	#[field(no_clone, default = true)]
 	text_content: bool,
-	/// The rich format each document's `content` carries, by NSID, ie
-	/// `pub.leaflet.content`, the default with the `leaflet` feature; none for
-	/// no rich body, the default without it. Resolved through the
-	/// [`StandardSiteContentFormats`] where the publish step renders, never at
-	/// build.
+	/// The lexicon def each document's `content` carries the post as, ie
+	/// `pub.leaflet.content` with the `standard_site_extra` feature; none, the
+	/// default, for no `content`. Rendered through the [`LexiconRenderers`]
+	/// where the publish step renders, never resolved at build.
+	///
+	/// [`LexiconRenderers`]: beet_ui::prelude::LexiconRenderers
 	#[field(no_clone, default = StandardSitePub::default_content())]
 	content: Option<Nsid>,
-	/// The standard site media ingest policy the `content` format's embedded
+	/// The standard site media ingest policy the `content` def's embedded
 	/// media is resolved under.
 	#[field(no_clone)]
 	media_ingest: MediaIngestPolicy,
@@ -109,16 +110,9 @@ impl StandardSitePub {
 	/// uri from, a publication at a path appending it.
 	const WELL_KNOWN: &str = ".well-known/site.standard.publication";
 
-	/// The `content` format a declaration names unless it says otherwise.
-	fn default_content() -> Option<Nsid> {
-		cfg_if! {
-			if #[cfg(feature = "leaflet")] {
-				Some(LeafletContent::NSID)
-			} else {
-				None
-			}
-		}
-	}
+	/// The `content` def a declaration names unless it says otherwise: none,
+	/// so a document carries its post as `textContent` alone.
+	fn default_content() -> Option<Nsid> { None }
 
 	/// The publication's url: [`PackageConfig::homepage`] joined with the
 	/// declaration's path, its trailing slash trimmed as the lexicon asks.

@@ -34,16 +34,17 @@ impl StandardSiteDocument {
 	/// off `live`, the page prepared with the publication's
 	/// [`request`](StandardSitePub::request): what
 	/// [`from_page`](Self::from_page) fills from `meta`, the plain text render
-	/// as `textContent`, the `content` format's render wrapped under its NSID,
-	/// and the cover image the media resolve step fetched as `coverImage`.
-	/// The contributors and the announcement are the publish step's.
+	/// as `textContent`, the page rendered as a member of the publication's
+	/// `content` def ([`LivePage::render_lexicon`], an unregistered def
+	/// failing with the registered ones), and the cover image the media
+	/// resolve step fetched as `coverImage`. The contributors and the
+	/// announcement are the publish step's.
 	pub async fn render(
 		publication: &StandardSitePub,
 		site: AtUri,
 		path: &RelPath,
 		meta: &DocMeta,
 		live: &LivePage,
-		formats: &StandardSiteContentFormats,
 	) -> Result<Self> {
 		let mut document = Self::from_page(publication, site, path, meta)?;
 		if publication.text_content {
@@ -56,8 +57,7 @@ impl StandardSiteDocument {
 				.xmap(Some);
 		}
 		if let Some(nsid) = &publication.content {
-			let bytes = live.render(formats.media_type(nsid)?).await?;
-			document.content = Some(formats.member(nsid, &bytes)?);
+			document.content = Some(live.render_lexicon(nsid).await?);
 		}
 		document.cover_image = live.cover().await.map(|cover| cover.blob_ref());
 		document.xok()
@@ -165,11 +165,6 @@ mod test {
 	) -> Result<(StandardSiteDocument, Vec<BlobRef>)> {
 		world
 			.run_async_then(async move |world| {
-				let formats = world
-					.with(|world: &mut World| {
-						world.resource::<StandardSiteContentFormats>().clone()
-					})
-					.await;
 				let path = RelPath::new("blog/full-stack-bevy");
 				LivePage::scoped(
 					&world.entity(router),
@@ -181,7 +176,6 @@ mod test {
 							&path,
 							&meta(),
 							&live,
-							&formats,
 						)
 						.await?;
 						let Some(pds) = pds else {
@@ -205,7 +199,8 @@ mod test {
 	}
 
 	/// The document carries the post as plain text and its cover a blob,
-	/// rendered off one tree, and no rich body in a build with no format.
+	/// rendered off one tree, and no `content` when its publication names no
+	/// def.
 	#[beet_core::test]
 	async fn renders_the_body_forms() {
 		let (mut world, router) = site().await;
@@ -214,17 +209,29 @@ mod test {
 		document
 			.cover_image
 			.xpect_eq(Some(BlobRef::of(&png(2, 1), MediaType::Png)));
-		#[cfg(not(feature = "leaflet"))]
 		document.content.xpect_none();
 	}
 
-	/// With the `leaflet` feature the document carries the post as Leaflet
-	/// blocks, the image a blob.
-	#[cfg(feature = "leaflet")]
+	/// The fixture publication, its `content` Leaflet's.
+	#[cfg(feature = "standard_site_extra")]
+	fn leaflet_harvest() -> StandardSitePub {
+		StandardSitePub {
+			content: Some(LeafletContent::NSID),
+			..harvest()
+		}
+	}
+
+	/// With the `standard_site_extra` feature a publication naming
+	/// `pub.leaflet.content` carries the post as Leaflet blocks, the image a
+	/// blob.
+	#[cfg(feature = "standard_site_extra")]
 	#[beet_core::test]
 	async fn renders_the_leaflet_body() {
 		let (mut world, router) = site().await;
-		let (document, _) = publish(&mut world, router, None).await.unwrap();
+		let (document, _) =
+			publish_as(&mut world, router, leaflet_harvest(), None)
+				.await
+				.unwrap();
 		let content = document.content.unwrap();
 		content.r#type().xpect_eq(LeafletContent::NSID);
 		let content = content.into_serde::<LeafletContent>().unwrap();
@@ -248,9 +255,9 @@ mod test {
 		}
 	}
 
-	/// A `content` format with no target fails the publish step naming the
+	/// A `content` def with no renderer fails the publish step naming the
 	/// registered ones, while the declaration naming it builds, as it must in
-	/// a served binary, which registers no Leaflet target.
+	/// a served binary, which registers no Leaflet renderer.
 	#[beet_core::test]
 	async fn resolves_the_content_format_when_publishing() {
 		let (mut world, router) = site().await;
@@ -284,36 +291,50 @@ mod test {
 		.await
 		.unwrap_err()
 		.to_string()
-		.xpect_contains(
-			"no standard site content format `com.example.unknown`",
-		);
-		#[cfg(feature = "leaflet")]
+		.xpect_contains("no lexicon renderer for `com.example.unknown`");
+		#[cfg(feature = "standard_site_extra")]
 		error.xpect_contains("pub.leaflet.content");
-		#[cfg(not(feature = "leaflet"))]
+		#[cfg(not(feature = "standard_site_extra"))]
 		let _ = error;
 	}
 
-	/// Every blob the record references uploads off the tree before the
+	/// Publish the fixture post as `publication` twice, checking it uploads
+	/// the `referenced` blobs its record references off the tree before the
 	/// record is written, and a second run uploads nothing new.
-	#[beet_core::test]
-	async fn uploads_the_referenced_blobs() {
+	async fn uploads(publication: StandardSitePub, referenced: usize) {
 		let (mut world, router) = site().await;
 		let emulator = EmulatorPds::temp();
 		let pds = Pds::new(emulator.clone());
-		let (_, uploaded) = publish(&mut world, router, Some(pds.clone()))
-			.await
-			.unwrap();
-		// the cover, and the image a Leaflet body references
-		let referenced = if cfg!(feature = "leaflet") { 2 } else { 1 };
+		let (_, uploaded) = publish_as(
+			&mut world,
+			router,
+			publication.clone(),
+			Some(pds.clone()),
+		)
+		.await
+		.unwrap();
 		uploaded.len().xpect_eq(referenced);
 		let mut stored = emulator.store().list().await.unwrap();
 		stored.sort();
 		// the blobs and the record
 		stored.len().xpect_eq(referenced + 1);
-		publish(&mut world, router, Some(pds)).await.unwrap();
+		publish_as(&mut world, router, publication, Some(pds))
+			.await
+			.unwrap();
 		let mut again = emulator.store().list().await.unwrap();
 		again.sort();
 		again.xpect_eq(stored);
+	}
+
+	/// The cover uploads, the one blob a record with no `content` references.
+	#[beet_core::test]
+	async fn uploads_the_referenced_blobs() { uploads(harvest(), 1).await; }
+
+	/// The cover and the image a Leaflet body references upload.
+	#[cfg(feature = "standard_site_extra")]
+	#[beet_core::test]
+	async fn uploads_the_leaflet_blobs() {
+		uploads(leaflet_harvest(), 2).await;
 	}
 
 	/// A record referencing a blob no source on its page holds is refused

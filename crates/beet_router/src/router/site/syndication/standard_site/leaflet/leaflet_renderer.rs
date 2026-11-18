@@ -1,417 +1,13 @@
-//! `pub.leaflet.content`, the one rich `content` format the atmosphere reads
-//! today: Leaflet's own reader, and the third party standard.site readers built
-//! against it.
-//!
-//! The format is a small block model, a subset of html. A beet post is a
-//! markdown document whose parsed article is a superset of it, so the conversion
-//! is lossy by design and the canonical page stays the full post. This is a
-//! doc renderer like html and markdown, and the only piece of another project's
-//! lexicon beet learns.
-//!
-//! # The shape
-//!
-//! One `pages` entry per document, a `pub.leaflet.pages.linearDocument` holding
-//! an array of `{block: <union member>}`. No canvas page: a post is linear.
-//!
-//! # What maps
-//!
-//! | parsed article node | block |
-//! | --- | --- |
-//! | `h1`..`h6` | `blocks.header`, `level` from the tag |
-//! | `p` | `blocks.text` |
-//! | `blockquote` | `blocks.blockquote`, its paragraphs joined by a blank line |
-//! | `pre > code` | `blocks.code`, `language` from the code's class (`rust`, or `language-rust`) |
-//! | `hr` | `blocks.horizontalRule` |
-//! | `ul`, `ol` | `blocks.unorderedList`, `blocks.orderedList`; each item's `content` is a `blocks.text`, and a nested list rides `children` |
-//! | `img` | `blocks.image`: the `BlobRef` of the `InlineBlob` the media resolve step left on its `src` attribute, and the `aspectRatio` the lexicon requires read from the bytes' header; an image not fetched (a `link` policy, or a request naming none) is a `blocks.website` with its url |
-//! | `a`, `strong`/`b`, `em`/`i`, `code` (inline), `mark`, `u`, `s`, `del` | not blocks: facets over the enclosing block's `plaintext` |
-//!
-//! # Facets
-//!
-//! A facet is a byte range over the block's `plaintext` plus a list of features,
-//! so inline markup is a side table rather than a tree. Byte offsets into the
-//! UTF-8 encoding, not chars and not graphemes. Features used: `#link`, `#bold`,
-//! `#italic`, `#code`, `#highlight`, `#underline`, `#strikethrough`. Nesting is
-//! expressed as two facets over overlapping ranges, which is the only way the
-//! model can say it. Unused: `#didMention`, `#atMention`, `#id`, `#footnote`.
-//!
-//! # Links
-//!
-//! A record is read far from the site, so every link is absolute: a relative
-//! `href` or `src` resolves against the page's url, the site's homepage
-//! ([`PackageConfig::absolute_url`]) over the path of the request the render
-//! answers. A relative link with no homepage declared is an error naming
-//! `PackageConfig.homepage`, as the sitemap and the feeds refuse one.
-//!
-//! # What degrades, and to what
-//!
-//! Every row here is a deliberate choice of the most legible lossy form, never a
-//! silent drop:
-//!
-//! | node | degrade |
-//! | --- | --- |
-//! | `table` | a `blocks.code` with no language, holding the pipe table. Monospace keeps the columns aligned and a reader can see it is a table, where prose cannot say it at all |
-//! | a mermaid fence | a `blocks.code` with `language: "mermaid"`, which is what the source said |
-//! | `iframe` (the YouTube embed every video post carries) | a `blocks.website` with the watch url, ie a link card every reader can render, rather than `blocks.iframe`, which only Leaflet's own reader honours. The canonical page keeps the real embed |
-//! | a client island or any other unregistered element | dropped, with its text content emitted as a `blocks.text` when it has any |
-//!
-//! Nothing beet authors maps to `blocks.math`, `blocks.poll`, `blocks.button`,
-//! `blocks.drawing`, `blocks.embeddedCanvas`, `blocks.signup`,
-//! `blocks.postsList`, `blocks.recommendedPubs`, `blocks.postHeader` or
-//! `blocks.membersOnlyDelimiter`, so none is implemented.
-//!
-//! # The size ceiling
-//!
-//! A repo block is capped at a megabyte and a reader fetches a record whole, so
-//! the content has a budget. The lexicon's escape hatch is `blobPages`, an
-//! `application/json` blob holding the page array, and when it is set every blob
-//! referenced inside it MUST be mirrored in the record's top level `blobs`
-//! array, because a PDS scans only the top level of a current record when
-//! deciding what to garbage collect.
-//!
-//! Beet does not write `blobPages`. The longest post in the corpus is about a
-//! thousand words, which is single digit kilobytes of blocks, and images are
-//! blobs rather than inline bytes. So the renderer asserts the serialised record
-//! stays under the budget and fails loudly naming `blobPages` as the fix. An
-//! unused code path that only a future post would exercise is a path nothing
-//! tests.
-//!
-//! # The companion video
-//!
-//! A post's companion video is its `DocMeta::video_url`, which `ArticleHeader`
-//! renders and a `--root=content` render therefore leaves out. The target
-//! reads it off the `DocMeta` on the render root, as the cover image reads
-//! `social_image_url`, and leads the document with it: a `blocks.iframe` of
-//! the video's embed url at 16:9 for a YouTube video, the block Leaflet's own
-//! records carry for one, else a `blocks.website` with the url.
+//! The Leaflet renderer: a page's tree as `pub.leaflet.content`.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// `pub.leaflet.content`: a post as Leaflet's block model, the object a
-/// standard site document's `content` union carries.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.content")]
-pub struct LeafletContent {
-	/// The document's pages, one linear page for a post.
-	pub pages: Vec<LeafletPage>,
-}
-
-impl LeafletContent {
-	/// The def a document's `content` names this format by.
-	pub const NSID: Nsid = Nsid::new_static("pub.leaflet.content");
-	/// The most a record's content may weigh: a repo block is capped at a
-	/// megabyte.
-	pub const BUDGET: usize = 1_000_000;
-}
-
-/// `pub.leaflet.pages.linearDocument`: one page, its blocks top to bottom.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.pages.linearDocument")]
-pub struct LeafletPage {
-	/// The page's id within its document.
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub id: Option<String>,
-	/// The blocks, each in its slot.
-	pub blocks: Vec<BlockSlot>,
-}
-
-/// `pub.leaflet.pages.linearDocument#block`: one block in a page.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.pages.linearDocument#block")]
-pub struct BlockSlot {
-	/// The block itself.
-	pub block: LeafletBlock,
-}
-
-/// A member of the block union, each naming its own def in `$type`.
-///
-/// Read by that `$type`, since a struct's own serde tag is written but never
-/// checked on read; a block this build does not know is refused naming it.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(untagged)]
-pub enum LeafletBlock {
-	/// `pub.leaflet.blocks.text`
-	Text(TextBlock),
-	/// `pub.leaflet.blocks.header`
-	Header(HeaderBlock),
-	/// `pub.leaflet.blocks.blockquote`
-	Blockquote(BlockquoteBlock),
-	/// `pub.leaflet.blocks.code`
-	Code(CodeBlock),
-	/// `pub.leaflet.blocks.horizontalRule`
-	HorizontalRule(HorizontalRuleBlock),
-	/// `pub.leaflet.blocks.unorderedList`
-	UnorderedList(UnorderedListBlock),
-	/// `pub.leaflet.blocks.orderedList`
-	OrderedList(OrderedListBlock),
-	/// `pub.leaflet.blocks.image`
-	Image(ImageBlock),
-	/// `pub.leaflet.blocks.website`
-	Website(WebsiteBlock),
-	/// `pub.leaflet.blocks.iframe`
-	Iframe(IframeBlock),
-}
-
-impl<'de> Deserialize<'de> for LeafletBlock {
-	fn deserialize<D: serde::Deserializer<'de>>(
-		deserializer: D,
-	) -> Result<Self, D::Error> {
-		use serde::de::Error;
-		let value = Value::deserialize(deserializer)?;
-		let r#type = value
-			.as_map()
-			.ok()
-			.and_then(|map| map.get("$type").ok())
-			.and_then(|r#type| r#type.as_str().ok())
-			.map(SmolStr::new)
-			.unwrap_or_default();
-		match r#type.as_str() {
-			"pub.leaflet.blocks.text" => value.into_serde().map(Self::Text),
-			"pub.leaflet.blocks.header" => value.into_serde().map(Self::Header),
-			"pub.leaflet.blocks.blockquote" => {
-				value.into_serde().map(Self::Blockquote)
-			}
-			"pub.leaflet.blocks.code" => value.into_serde().map(Self::Code),
-			"pub.leaflet.blocks.horizontalRule" => {
-				value.into_serde().map(Self::HorizontalRule)
-			}
-			"pub.leaflet.blocks.unorderedList" => {
-				value.into_serde().map(Self::UnorderedList)
-			}
-			"pub.leaflet.blocks.orderedList" => {
-				value.into_serde().map(Self::OrderedList)
-			}
-			"pub.leaflet.blocks.image" => value.into_serde().map(Self::Image),
-			"pub.leaflet.blocks.website" => {
-				value.into_serde().map(Self::Website)
-			}
-			"pub.leaflet.blocks.iframe" => value.into_serde().map(Self::Iframe),
-			other => Err(bevyhow!(
-				"a Leaflet block this build does not write: `{other}`"
-			)),
-		}
-		.map_err(D::Error::custom)
-	}
-}
-
-/// `pub.leaflet.blocks.text`: a paragraph.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.blocks.text")]
-pub struct TextBlock {
-	/// The paragraph's text, no markup.
-	pub plaintext: String,
-	/// The inline markup over [`plaintext`](Self::plaintext).
-	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub facets: Vec<LeafletFacet>,
-}
-
-/// `pub.leaflet.blocks.header`: a heading.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.blocks.header")]
-pub struct HeaderBlock {
-	/// The heading level, 1 to 6.
-	pub level: u8,
-	/// The heading's text.
-	pub plaintext: String,
-	/// The inline markup over [`plaintext`](Self::plaintext).
-	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub facets: Vec<LeafletFacet>,
-}
-
-/// `pub.leaflet.blocks.blockquote`: a quotation.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.blocks.blockquote")]
-pub struct BlockquoteBlock {
-	/// The quotation's text, its paragraphs joined by a blank line.
-	pub plaintext: String,
-	/// The inline markup over [`plaintext`](Self::plaintext).
-	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub facets: Vec<LeafletFacet>,
-}
-
-/// `pub.leaflet.blocks.code`: a code block, verbatim.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.blocks.code")]
-pub struct CodeBlock {
-	/// The code.
-	pub plaintext: String,
-	/// The language it is written in, ie `rust`.
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub language: Option<String>,
-}
-
-/// `pub.leaflet.blocks.horizontalRule`: a thematic break.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.blocks.horizontalRule")]
-pub struct HorizontalRuleBlock {}
-
-/// `pub.leaflet.blocks.unorderedList`: a bulleted list.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.blocks.unorderedList")]
-pub struct UnorderedListBlock {
-	/// The list's items.
-	pub children: Vec<UnorderedListItem>,
-}
-
-/// `pub.leaflet.blocks.unorderedList#listItem`
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.blocks.unorderedList#listItem")]
-pub struct UnorderedListItem {
-	/// The item's own text.
-	pub content: TextBlock,
-	/// A nested bulleted list.
-	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub children: Vec<UnorderedListItem>,
-	/// A nested numbered list.
-	#[serde(
-		default,
-		rename = "orderedListChildren",
-		skip_serializing_if = "Option::is_none"
-	)]
-	pub ordered_list_children: Option<OrderedListBlock>,
-}
-
-/// `pub.leaflet.blocks.orderedList`: a numbered list.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.blocks.orderedList")]
-pub struct OrderedListBlock {
-	/// The number the list starts at, 1 when absent.
-	#[serde(
-		default,
-		rename = "startIndex",
-		skip_serializing_if = "Option::is_none"
-	)]
-	pub start_index: Option<u32>,
-	/// The list's items.
-	pub children: Vec<OrderedListItem>,
-}
-
-/// `pub.leaflet.blocks.orderedList#listItem`
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.blocks.orderedList#listItem")]
-pub struct OrderedListItem {
-	/// The item's own text.
-	pub content: TextBlock,
-	/// A nested numbered list.
-	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub children: Vec<OrderedListItem>,
-	/// A nested bulleted list.
-	#[serde(
-		default,
-		rename = "unorderedListChildren",
-		skip_serializing_if = "Option::is_none"
-	)]
-	pub unordered_list_children: Option<UnorderedListBlock>,
-}
-
-/// `pub.leaflet.blocks.image`: an image, its bytes a blob.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.blocks.image")]
-pub struct ImageBlock {
-	/// The image's blob.
-	pub image: BlobRef,
-	/// The image's alt text.
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub alt: Option<String>,
-	/// The image's proportions, which the lexicon requires.
-	#[serde(rename = "aspectRatio")]
-	pub aspect_ratio: AspectRatio,
-	/// The width to display the image at, in pixels, capped at the page's.
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub width: Option<u32>,
-}
-
-/// `#aspectRatio`, a width to height proportion.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AspectRatio {
-	/// The width.
-	pub width: u32,
-	/// The height.
-	pub height: u32,
-}
-
-/// `pub.leaflet.blocks.website`: a link card.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.blocks.website")]
-pub struct WebsiteBlock {
-	/// The page the card links.
-	pub src: Uri,
-	/// The card's title.
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub title: Option<String>,
-}
-
-/// `pub.leaflet.blocks.iframe`: an embedded page.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "$type", rename = "pub.leaflet.blocks.iframe")]
-pub struct IframeBlock {
-	/// The embedded page.
-	pub url: Uri,
-	/// The embed's proportions.
-	#[serde(
-		default,
-		rename = "aspectRatio",
-		skip_serializing_if = "Option::is_none"
-	)]
-	pub aspect_ratio: Option<AspectRatio>,
-}
-
-/// `pub.leaflet.richtext.facet`: inline markup over a byte range of a block's
-/// `plaintext`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LeafletFacet {
-	/// The byte range the features apply to.
-	pub index: LeafletByteSlice,
-	/// What the range is.
-	pub features: Vec<LeafletFacetFeature>,
-}
-
-/// `#byteSlice`: a range of UTF-8 bytes, start inclusive, end exclusive.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LeafletByteSlice {
-	/// The first byte.
-	#[serde(rename = "byteStart")]
-	pub byte_start: usize,
-	/// One past the last byte.
-	#[serde(rename = "byteEnd")]
-	pub byte_end: usize,
-}
-
-/// A feature of a facet, naming its def in `$type`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "$type")]
-pub enum LeafletFacetFeature {
-	/// A link to `uri`.
-	#[serde(rename = "pub.leaflet.richtext.facet#link")]
-	Link {
-		/// Where the link goes.
-		uri: Uri,
-	},
-	/// Bold text.
-	#[serde(rename = "pub.leaflet.richtext.facet#bold")]
-	Bold,
-	/// Italic text.
-	#[serde(rename = "pub.leaflet.richtext.facet#italic")]
-	Italic,
-	/// Inline code.
-	#[serde(rename = "pub.leaflet.richtext.facet#code")]
-	Code,
-	/// Highlighted text.
-	#[serde(rename = "pub.leaflet.richtext.facet#highlight")]
-	Highlight,
-	/// Underlined text.
-	#[serde(rename = "pub.leaflet.richtext.facet#underline")]
-	Underline,
-	/// Struck text.
-	#[serde(rename = "pub.leaflet.richtext.facet#strikethrough")]
-	Strikethrough,
-}
-
-/// The Leaflet doc renderer: a page's tree as [`LeafletContent`], answering
-/// [`MEDIA_TYPE`](Self::MEDIA_TYPE) and embedding images, so the media
-/// resolve step fetches an `img`'s bytes before it renders.
+/// The Leaflet renderer: a page's tree as [`LeafletContent`], a
+/// [`LexiconRenderer`] of `pub.leaflet.content`. An image is a blob when the
+/// media resolve step fetched it, which a request naming a media ingest policy
+/// asks for, and a link card otherwise.
 ///
 /// Renders the body alone, never the whole `site.standard.document`: the
 /// record needs what a page cannot know (the publication's at-uri, the
@@ -421,48 +17,30 @@ pub enum LeafletFacetFeature {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct LeafletRenderer;
 
-impl LeafletRenderer {
-	/// The media type a request for Leaflet's content names.
-	pub const MEDIA_TYPE: &'static str =
-		"application/vnd.pub.leaflet.content+json";
+impl LexiconRenderer for LeafletRenderer {
+	fn nsid(&self) -> Nsid { LeafletContent::NSID }
 
-	/// [`MEDIA_TYPE`](Self::MEDIA_TYPE) as a [`MediaType`].
-	pub fn media_type() -> MediaType { MediaType::other(Self::MEDIA_TYPE) }
-}
-
-impl DocRenderer for LeafletRenderer {
-	fn media_types(&self) -> Vec<MediaType> { vec![Self::media_type()] }
-
-	fn render(
-		&mut self,
-		cx: &mut RenderContext,
-	) -> Result<MediaBytes, RenderError> {
-		cx.check_accepts(&[Self::media_type()])?;
+	fn render(&mut self, cx: &mut RenderContext) -> Result<OpenUnion> {
 		let (request, root) = (cx.request, cx.entity);
 		let content = cx.world.with_state::<LeafletQuery, _>(|query| {
 			query.content(request, root)
 		})?;
 		let bytes = MediaType::Json.serialize(&content)?;
 		if bytes.len() > LeafletContent::BUDGET {
-			return Err(RenderError::Other(bevyhow!(
+			bevybail!(
 				"the Leaflet content is {} bytes, over the {} a record holds: \
 				 write its pages to a `blobPages` blob instead",
 				bytes.len(),
 				LeafletContent::BUDGET
-			)));
+			);
 		}
-		MediaBytes::new(Self::media_type(), bytes).xok()
+		OpenUnion::from_serde(LeafletContent::NSID, &content)
 	}
 }
 
-/// Registers the target and `pub.leaflet.content`, the standard site content
-/// format it answers.
 impl Installer for LeafletRenderer {
 	fn install(self, app: &mut App) {
-		app.world_mut()
-			.get_resource_or_init::<StandardSiteContentFormats>()
-			.register(LeafletContent::NSID, Self::media_type());
-		DocRenderers::register_on(app, self);
+		LexiconRenderers::register_on(app, self);
 	}
 }
 
@@ -1299,7 +877,7 @@ mod test {
 			..default()
 		});
 		world
-			.resource_mut::<DocRenderers>()
+			.resource_mut::<LexiconRenderers>()
 			.register(LeafletRenderer);
 		world
 	}
@@ -1309,23 +887,23 @@ mod test {
 
 	/// The tree at `root` as Leaflet's content, answering a request for
 	/// `/blog/post`.
-	fn leaflet(
-		world: &mut World,
-		root: Entity,
-	) -> Result<MediaBytes, RenderError> {
-		DocRenderers::render(
+	fn leaflet(world: &mut World, root: Entity) -> Result<OpenUnion> {
+		LexiconRenderers::render(
 			world,
 			root,
-			&RequestParts::get("/blog/post")
-				.with_accept(LeafletRenderer::media_type()),
+			&RequestParts::get("/blog/post"),
+			&LeafletContent::NSID,
 		)
+	}
+
+	/// `member` as json.
+	fn to_json(member: OpenUnion) -> serde_json::Value {
+		serde_json::to_value(Value::from(member)).unwrap()
 	}
 
 	/// The blocks the tree at `root` renders as, as json.
 	fn blocks(world: &mut World, root: Entity) -> serde_json::Value {
-		let bytes = leaflet(world, root).unwrap();
-		let content: serde_json::Value =
-			serde_json::from_slice(&bytes).unwrap();
+		let content = to_json(leaflet(world, root).unwrap());
 		content["pages"][0]["blocks"]
 			.as_array()
 			.unwrap()
@@ -1640,21 +1218,21 @@ mod test {
 			))
 			.flush();
 		AsyncRunner::settle_async_tasks(&mut world).await;
-		let body = world
-			.entity_mut(router)
-			.exchange(
-				Request::get(format!("/{slug}"))
-					.with_param("root", "content")
-					.with_accept(LeafletRenderer::media_type()),
-			)
-			.await
-			.into_result()
-			.await
-			.unwrap()
-			.text()
+		let content = world
+			.run_async_then(async move |world| {
+				LivePage::scoped(
+					&world.entity(router),
+					Request::get(format!("/{slug}"))
+						.with_param("root", "content"),
+					async |live| {
+						live.render_lexicon(&LeafletContent::NSID).await
+					},
+				)
+				.await
+			})
 			.await
 			.unwrap();
-		serde_json::to_string_pretty(&json(&body)).unwrap()
+		serde_json::to_string_pretty(&to_json(content)).unwrap()
 	}
 
 	#[cfg(all(
@@ -1820,19 +1398,4 @@ mod test {
 			.await
 			.xpect_snapshot();
 	}
-
-	/// The types read the wire form Leaflet's own records write and write it
-	/// back unchanged.
-	#[beet_core::test]
-	fn reads_a_leaflet_record() {
-		let record = json(LEAFLET_RECORD);
-		serde_json::from_value::<LeafletContent>(record.clone())
-			.unwrap()
-			.xmap(|content| serde_json::to_value(content).unwrap())
-			.xpect_eq(record);
-	}
-
-	/// Blocks from a `pub.leaflet.content` record leaflet.pub wrote, read
-	/// 2026-10-08.
-	const LEAFLET_RECORD: &str = r#"{"$type": "pub.leaflet.content", "pages": [{"id": "01a0d961-8ef2-7442-9c75-0579560d0073", "$type": "pub.leaflet.pages.linearDocument", "blocks": [{"$type": "pub.leaflet.pages.linearDocument#block", "block": {"$type": "pub.leaflet.blocks.text", "facets": [{"index": {"byteEnd": 56, "byteStart": 38}, "features": [{"$type": "pub.leaflet.richtext.facet#italic"}]}], "plaintext": "You may not know this, but Leaflet is all about learning."}}, {"$type": "pub.leaflet.pages.linearDocument#block", "block": {"$type": "pub.leaflet.blocks.text", "facets": [{"index": {"byteEnd": 54, "byteStart": 45}, "features": [{"uri": "https://hyperlink.academy/", "$type": "pub.leaflet.richtext.facet#link"}]}], "plaintext": "The three of us first worked together making Hyperlink, which evolved from indie internet school, to software for collaborative learning spaces…seeds that eventually grew into Leaflet!"}}, {"$type": "pub.leaflet.pages.linearDocument#block", "block": {"$type": "pub.leaflet.blocks.text", "facets": [{"index": {"byteEnd": 197, "byteStart": 162}, "features": [{"$type": "pub.leaflet.richtext.facet#highlight"}, {"$type": "pub.leaflet.richtext.facet#italic"}]}], "plaintext": "We care deeply about building tools that help people do meaningful things together. We think learning is one of the most meaningful things there is, and we think publishing tools are learning tools."}}, {"$type": "pub.leaflet.pages.linearDocument#block", "block": {"alt": "hand drawn monochrome pixel art of a student desk overgrown with plant life, wrapped in a tangle of vines", "$type": "pub.leaflet.blocks.image", "image": {"ref": {"$link": "bafkreiethxtad6a254thukly6tjfehwahk3l6k3grxjeox6yp2qcsdlvtu"}, "size": 38490, "$type": "blob", "mimeType": "image/webp"}, "width": 592, "aspectRatio": {"width": 1448, "height": 1074}}}, {"$type": "pub.leaflet.pages.linearDocument#block", "block": {"$type": "pub.leaflet.blocks.header", "level": 2, "plaintext": "Back to School Special"}}, {"$type": "pub.leaflet.pages.linearDocument#block", "block": {"$type": "pub.leaflet.blocks.unorderedList", "children": [{"$type": "pub.leaflet.blocks.unorderedList#listItem", "content": {"$type": "pub.leaflet.blocks.text", "plaintext": "email newsletters (up to 1k subscribers included)"}}, {"$type": "pub.leaflet.blocks.unorderedList#listItem", "content": {"$type": "pub.leaflet.blocks.text", "plaintext": "publication analytics"}}]}}]}]}"#;
 }

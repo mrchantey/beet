@@ -114,10 +114,16 @@ impl DocRenderers {
 				))
 			})?
 			.choose(request)?;
+		Self::settle(world);
+		renderer.render_as(world, entity, request, media_type)
+	}
+
+	/// Settle every tree before a one-shot render: sync the `@` bindings built
+	/// with it and bake any rule registered after its `<Stylesheet/>`.
+	pub(crate) fn settle(world: &mut World) {
 		DocumentSync::settle(world);
 		#[cfg(feature = "template")]
 		crate::widgets::settle_stylesheets(world);
-		renderer.render_as(world, entity, request, media_type)
 	}
 
 	/// The negotiated media type of [`negotiate`](Self::negotiate) and the
@@ -172,7 +178,8 @@ impl DocRenderers {
 
 /// Registers the built-in doc renderers: html, xml, markdown, plain text,
 /// and with their features ansi (`style`) and the serialized scene
-/// (`template_serde`).
+/// (`template_serde`), and the empty lexicon registries ([`LexiconRenderers`],
+/// [`LexiconParsers`]).
 #[derive(Default)]
 pub struct RenderPlugin;
 
@@ -188,6 +195,10 @@ impl Plugin for RenderPlugin {
 		app.install(AnsiTermRenderer::default());
 		#[cfg(feature = "template_serde")]
 		app.install(TemplateRenderer::default());
+		// the lexicon registries, filled by each lexicon's installer
+		app.init_resource::<LexiconRenderers>()
+			.init_resource::<LexiconParsers>()
+			.register_type::<UnknownLexicon>();
 	}
 }
 

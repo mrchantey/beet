@@ -11,6 +11,7 @@ extern crate std;
 mod document;
 mod edit;
 mod input;
+mod lexicon;
 #[cfg(feature = "ooxml")]
 pub mod ooxml;
 mod parse;
@@ -38,6 +39,7 @@ pub mod prelude {
 	pub use crate::edit::*;
 	pub use crate::inline_class;
 	pub use crate::input::*;
+	pub use crate::lexicon::*;
 	#[cfg(feature = "ooxml")]
 	pub use crate::ooxml::*;
 	#[cfg(feature = "template")]

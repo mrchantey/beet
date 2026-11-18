@@ -174,14 +174,6 @@ impl StandardSitePublish {
 			.unwrap_or_else(|| Tid::now().into());
 		let existing = published.map(|entry| entry.value.clone());
 		let contributors = publishing.contributors(world, page).await?;
-		let formats = world
-			.with(|world: &mut World| {
-				world
-					.get_resource::<StandardSiteContentFormats>()
-					.cloned()
-					.unwrap_or_default()
-			})
-			.await;
 		let (publication, pds, site, page) = (
 			publishing.declaration.clone(),
 			publishing.pds.clone(),
@@ -198,7 +190,6 @@ impl StandardSitePublish {
 					&page.path,
 					&page.meta,
 					&live,
-					&formats,
 				)
 				.await?;
 				let document = StandardSiteDocument {

@@ -5,8 +5,8 @@
 //! resolves the `--root` cascade ([`RenderRoot`]) and, when the request names
 //! a [`MediaIngestPolicy`], the media resolve step ([`InlineBlob`]). The live
 //! page keeps the request it was built for, the [`RequestParts`] every render
-//! of it answers, and renders through any registered target as many times as
-//! its holder likes; its release takes back everything the preparation put on
+//! of it answers, and renders through any registered target, or as any
+//! registered lexicon's member, as many times as its holder likes; its release takes back everything the preparation put on
 //! a tree it does not own. [`LivePage::scoped`] and [`LivePage::respond`]
 //! release it whatever the outcome; a live surface binds one instead.
 use crate::prelude::*;
@@ -396,6 +396,20 @@ impl LivePage {
 			})
 			.await?
 			.xok()
+	}
+
+	/// Render the page as a member of the lexicon def `nsid` through
+	/// [`LexiconRenderers::render`], answering this page's request, as
+	/// [`render`](Self::render) does a media type, so a publish step renders a
+	/// record's `content` off the same tree as its `textContent`.
+	pub async fn render_lexicon(&self, nsid: &Nsid) -> Result<OpenUnion> {
+		let (root, request, nsid) =
+			(self.root, self.request.clone(), nsid.clone());
+		self.world
+			.with(move |world: &mut World| {
+				LexiconRenderers::render(world, root, &request, &nsid)
+			})
+			.await
 	}
 
 	/// Hand the page to a live surface rather than releasing it: the surface
@@ -812,26 +826,6 @@ mod test {
 			.status()
 			.xpect_eq(StatusCode::NOT_ACCEPTABLE);
 		entities(&mut world).xpect_eq(baseline);
-	}
-
-	/// The Leaflet media type is answered by the `leaflet` feature's target,
-	/// and without it `406 Not Acceptable` like any unregistered type.
-	#[beet_core::test]
-	async fn leaflet_answers_with_its_feature() {
-		let (mut world, router) = site();
-		let status = if cfg!(feature = "leaflet") {
-			StatusCode::OK
-		} else {
-			StatusCode::NOT_ACCEPTABLE
-		};
-		world
-			.entity_mut(router)
-			.exchange(at(POST, "content").with_accept(MediaType::other(
-				"application/vnd.pub.leaflet.content+json",
-			)))
-			.await
-			.status()
-			.xpect_eq(status);
 	}
 
 	/// One live page renders as every type its holder asks for, each the body

@@ -33,10 +33,10 @@
 //!   rewritten from the repo), and `StandardSiteProbe`, the live site checked
 //!   against the repo. The repo is their memory, [`StandardSiteRecords`] read
 //!   by listing, so a run interrupted anywhere resumes
-//! - the [`StandardSiteContentFormats`] registry a publication's `content`
-//!   NSID resolves through, and with the `leaflet` feature `LeafletContent`,
-//!   `pub.leaflet.content`, the rich `content` format, rendered by the
-//!   `LeafletRenderer` target
+//! - a document's `content`, the post rendered as a member of the lexicon def
+//!   its publication names, through `beet_ui`'s `LexiconRenderers`; with the
+//!   `standard_site_extra` feature, the optional formats, Leaflet's
+//!   `pub.leaflet.content` today (the `leaflet` module)
 //!
 //! # Limits
 //!
@@ -51,9 +51,8 @@
 //! [`Rkeyed`]: beet_core::prelude::Rkeyed
 //! [`Theme`]: beet_ui::prelude::Theme
 mod comments;
-mod content_format;
 mod document;
-#[cfg(feature = "leaflet")]
+#[cfg(feature = "standard_site_extra")]
 mod leaflet;
 mod publication;
 #[cfg(feature = "json")]
@@ -72,9 +71,8 @@ mod standard_site_pub;
 mod standard_site_publish;
 mod theme;
 pub use comments::*;
-pub use content_format::*;
 pub use document::*;
-#[cfg(feature = "leaflet")]
+#[cfg(feature = "standard_site_extra")]
 pub use leaflet::*;
 pub use publication::*;
 #[cfg(feature = "atproto")]

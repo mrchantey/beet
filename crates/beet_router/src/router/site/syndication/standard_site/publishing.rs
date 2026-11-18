@@ -633,6 +633,30 @@ pub(super) mod test {
 		site.index().await.unwrap().xpect_eq(index);
 	}
 
+	/// A publication naming `pub.leaflet.content` publishes each document's
+	/// `content` as Leaflet blocks, its image blobs uploaded, and a second run
+	/// writes nothing.
+	#[cfg(feature = "standard_site_extra")]
+	#[beet_core::test]
+	async fn publishes_leaflet_content_once_then_holds() {
+		let mut site = Site::new().await;
+		site.world
+			.get_mut::<StandardSitePub>(site.publication)
+			.unwrap()
+			.content = Some(LeafletContent::NSID);
+		site.publish("--only=full-stack-bevy").await.unwrap();
+		site.document("/full-stack-bevy")
+			.await
+			.value
+			.content
+			.unwrap()
+			.r#type()
+			.xpect_eq(LeafletContent::NSID);
+		let versions = site.versions().await;
+		site.publish("--only=full-stack-bevy").await.unwrap();
+		site.versions().await.xpect_eq(versions);
+	}
+
 	/// A bare run updates what is published and creates nothing.
 	#[beet_core::test]
 	async fn a_bare_run_creates_nothing() {

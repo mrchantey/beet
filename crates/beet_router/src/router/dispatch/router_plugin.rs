@@ -380,10 +380,6 @@ impl Plugin for RouterPlugin {
 			// an `<AnalyticsConfig/>` is spawned, so nothing records until a site
 			// opts in with that on-switch.
 			app.register_type::<AnalyticsMiddleware>();
-			// the standard.site `content` formats, each registered by the
-			// doc renderer writing it
-			#[cfg(feature = "dag_cbor")]
-			app.init_resource::<StandardSiteContentFormats>();
 			// the publication declaration, its index and the well-known route
 			// it serves; a build without the data model loads it inert
 			#[cfg(feature = "dag_cbor")]
@@ -408,7 +404,8 @@ impl Plugin for RouterPlugin {
 				.register_type::<StandardSiteAnnounce>()
 				.register_type::<StandardSiteIndexWrite>()
 				.register_type::<StandardSiteProbe>();
-			#[cfg(feature = "leaflet")]
+			// the optional standard site `content` formats, Leaflet today
+			#[cfg(feature = "standard_site_extra")]
 			app.install(LeafletRenderer);
 			#[cfg(feature = "json")]
 			app.add_plugins(analytics_plugin);

@@ -69,12 +69,12 @@ json = ["serde", "dep:serde_json", "beet_core/json", "beet_net/json"]
 # The standard.site records (`router/site/syndication/standard_site`): plain
 # data in the atproto model, beside `beet_net`'s `Pds` family.
 dag_cbor = ["serde", "beet_core/dag_cbor", "beet_net/dag_cbor"]
-# The Leaflet render target (`standard_site/leaflet.rs`), a page as
-# `pub.leaflet.content`, the rich body a standard site document carries by
-# default: json on the wire, its image blocks reading an image's size off its
-# header (`imagesize`). Only a binary that publishes needs it; without it a
-# request for the Leaflet media type answers 406.
-leaflet = ["dag_cbor", "json", "dep:imagesize"]
+# The optional standard site content formats (`standard_site/leaflet/`),
+# Leaflet today: a page rendered as `pub.leaflet.content` through the lexicon
+# registries, json on the wire, its image blocks reading an image's size off
+# its header (`imagesize`). Never a publication's default, and no deployed
+# binary carries it.
+standard_site_extra = ["dag_cbor", "json", "dep:imagesize"]
 # The network half of the standard.site records: an article's comments, the
 # replies to its announcement read live from the Bluesky AppView
 # (`<StandardSiteComments/>`). Without it the comments island fails over to
