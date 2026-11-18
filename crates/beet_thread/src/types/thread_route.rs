@@ -204,11 +204,11 @@ impl ThreadRoute {
 		let window = world.get::<ThreadWindow>(thread)?;
 		window
 			.authored_posts()
-			.filter(|view| {
-				view.actor.kind() == ActorKind::Agent
-					&& !view.post.in_progress()
+			.filter(|authored| {
+				authored.actor.kind() == ActorKind::Agent
+					&& !authored.post.in_progress()
 			})
-			.filter_map(|view| match view.post.as_agent_post() {
+			.filter_map(|authored| match authored.post.as_agent_post() {
 				AgentPost::Text(text) => Some(text.to_string()),
 				_ => None,
 			})
