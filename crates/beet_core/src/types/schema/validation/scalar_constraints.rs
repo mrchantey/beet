@@ -116,7 +116,7 @@ impl ApplyConstraints for BoolSchema {
 }
 
 impl ApplyConstraints for EntitySchema {
-	type Value = u64;
+	type Value = EntityKey;
 
 	fn apply<'a>(
 		&'a self,

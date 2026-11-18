@@ -61,7 +61,15 @@ impl ser::Serializer for ValueSerializer {
 	fn serialize_u16(self, v: u16) -> SerResult { Ok(Value::Uint(v as u64)) }
 	fn serialize_u32(self, v: u32) -> SerResult { Ok(Value::Uint(v as u64)) }
 	fn serialize_u64(self, v: u64) -> SerResult { Ok(Value::Uint(v)) }
-	fn serialize_f32(self, v: f32) -> SerResult { Ok(Value::Float(v as f64)) }
+	/// The `f64` that reads as `v` does, `1.3` and not the `1.2999999523162842`
+	/// a widening holds, so a document shows the number its author wrote. It
+	/// narrows back to the same `f32`.
+	fn serialize_f32(self, v: f32) -> SerResult {
+		v.to_string()
+			.parse::<f64>()
+			.map(Value::Float)
+			.map_err(|err| SerError(err.to_string()))
+	}
 	fn serialize_f64(self, v: f64) -> SerResult { Ok(Value::Float(v)) }
 	fn serialize_char(self, v: char) -> SerResult {
 		Ok(Value::str(v.to_string()))

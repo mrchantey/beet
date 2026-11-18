@@ -7,7 +7,7 @@ use beet_core::prelude::*;
 /// and `<SecretsRoutes/>`, and the vault layer under them ([`VaultPlugin`]),
 /// so an entry names them by tag. A build without the `vault` feature still
 /// knows the `<Secrets>` declaration (`RouterPlugin` registers it, inert),
-/// and loads the verbs a document names as inert `UnregisteredTag` entities.
+/// and loads the verbs a document names as inert entities holding each as `Unregistered`.
 #[derive(Default)]
 pub struct SecretsPlugin;
 

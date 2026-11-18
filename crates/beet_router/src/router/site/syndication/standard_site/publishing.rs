@@ -594,8 +594,9 @@ pub(super) mod test {
 		}
 	}
 
-	/// A run writes the publication and the one page it names, and its index;
-	/// a second writes nothing and leaves the index byte for byte.
+	/// A run writes the publication and the one page it names, its `content`
+	/// the post as a scene, and its index; a second writes nothing and leaves
+	/// the index byte for byte.
 	#[beet_core::test]
 	async fn publishes_once_then_holds() {
 		let mut site = Site::new().await;
@@ -623,6 +624,14 @@ pub(super) mod test {
 			.did
 			.as_str()
 			.xpect_eq("did:plc:hnv7bd4gtxrf7iigjo22qukp");
+		// the repo answers the post as a scene body, read with no registry
+		let content = document.content.clone().unwrap();
+		content.r#type().clone().xpect_eq(SceneBody::NSID);
+		SceneBody::from_value(Value::Map(content.fields().clone()))
+			.unwrap()
+			.entities
+			.is_empty()
+			.xpect_false();
 		let versions = site.versions().await;
 		let index = site.index().await.unwrap();
 		str::from_utf8(&index)

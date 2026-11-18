@@ -233,7 +233,10 @@ token (plus AWS for the social stack's state bucket).
 
 The blog is a standard.site publication on `beet.org`'s repo, one document per
 dated post, each crediting its author and, once announced, pointing at the
-Bluesky post whose replies are its comments. `<StandardSitePub bx:ref="harvest">`
+Bluesky post whose replies are its comments. Each document's `content` is the
+post itself as a beet scene (`org.beet.scene#body`, the default, so the
+declaration names nothing): every entity and component of the post's own
+content, its images by url. `<StandardSitePub bx:ref="harvest">`
 in the served router declares it; `social/publish` converges the repo to it and
 rewrites the committed index the served site reads
 (`site/derived/standard-site.json`), so the index lands with the next deploy or

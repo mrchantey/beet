@@ -247,7 +247,7 @@ async fn the_edit_loop_survives_a_reboot() {
 	SceneEntities::of(&host.document())
 		.unwrap()
 		.target(3, ChildOf::type_path())
-		.xpect_eq(Some(0));
+		.xpect_eq(Some(EntityKey::from(0)));
 	host.press_tab();
 	host.step_until("│ └ #3 p")
 		.xpect_contains("│ ├ Heading")

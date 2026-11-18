@@ -485,7 +485,7 @@ async fn the_edit_loop_survives_a_reload() {
 		let fork = host.fork_landed().await;
 		let landed = {
 			let entities = SceneEntities::of(&fork)?;
-			entities.target(3, ChildOf::type_path()) == Some(1)
+			entities.target(3, ChildOf::type_path()) == Some(EntityKey::from(1))
 				&& entities.component(2, Name::type_path()).is_none()
 		};
 		match landed {
@@ -541,7 +541,7 @@ async fn an_added_child_indents_under_its_parent() {
 	SceneEntities::of(&host.fork_landed().await)
 		.unwrap()
 		.target(15, ChildOf::type_path())
-		.xpect_eq(Some(14));
+		.xpect_eq(Some(EntityKey::from(14)));
 	host.kill().await;
 }
 

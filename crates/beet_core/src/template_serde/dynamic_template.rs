@@ -16,14 +16,15 @@
 //!
 //! # Entity model
 //!
-//! Each in-template [`Entity`] is keyed to a deterministic
-//! [`SceneEntityReference`] on its [index](Entity::index), so the same id always
-//! resolves to the same real entity within one build. The first entity's id is
-//! pinned to the walker's root; the rest, and any `Entity`-typed field, resolve
-//! through [`SceneEntityReferences::get`], which spawns a placeholder on first
-//! lookup and is filled when that entity is built. This is the single remapping
-//! model: cross-entity references and forward references resolve uniformly,
-//! replacing the old standalone scene entity mapper.
+//! An entity of the template is named by its position: a slot references
+//! another with the in-template [`Entity`] of that position
+//! ([`DynamicTemplate::reference`]), which is keyed to a deterministic
+//! [`SceneEntityReference`], so the same position always resolves to the same
+//! real entity within one build. The first entity is pinned to the walker's
+//! root; the rest, and any `Entity`-typed field, resolve through
+//! [`SceneEntityReferences::get`], which spawns a placeholder on first lookup
+//! and is filled when that entity is built. This is the single remapping
+//! model: cross-entity references and forward references resolve uniformly.
 
 use crate::prelude::*;
 use bevy::ecs::component::ComponentCloneBehavior;
@@ -40,8 +41,9 @@ use bevy_reflect::PartialReflect;
 use bevy_reflect::TypeRegistration;
 use bevy_reflect::TypeRegistry;
 
-/// The serde intermediate representation: ordered resources plus an ordered list
-/// of entities, each slot a reflectable value or a named deferred template.
+/// A scene reflected against a type registry: ordered resources plus an ordered
+/// list of entities, each slot a reflectable value or a named deferred
+/// template. What a [`SceneBody`] spawns through ([`SceneBody::reflect`]).
 ///
 /// This is the IR for the serde formats (RON/JSON/postcard), not for markup: BSX
 /// is its own syntax-tree IR ([`BsxTemplate`](crate::prelude::BsxTemplate))
@@ -76,17 +78,17 @@ subtree_template!(DynamicTemplate);
 /// document's [`TemplateEntityMap`]. Absent for a plain `spawn_template`, where
 /// the caller only needs the root.
 #[derive(Default, Resource)]
-pub(crate) struct TemplateBuildSink(pub Vec<(u32, Entity)>);
+pub(crate) struct TemplateBuildSink(pub Vec<(EntityKey, Entity)>);
 
-/// One entity of a [`DynamicTemplate`]: an entity and its ordered component slots.
+/// One entity of a [`DynamicTemplate`]: its file key and its ordered component
+/// slots.
 pub struct DynamicTemplateEntity {
-	/// The in-template entity id, unique within a [`DynamicTemplate`].
-	///
-	/// Component slots that reference this entity (a relationship target, an
-	/// `Entity`-typed field) must use this same id; it remaps to a real world
-	/// entity on the build path.
-	pub entity: Entity,
-	/// The component slots, in order.
+	/// The key the entity is written under in its document, which the loader
+	/// retains so a re-save writes it back.
+	pub key: EntityKey,
+	/// The component slots, in order. A slot referencing an entity of this
+	/// template (a relationship target, an `Entity`-typed field) names it by
+	/// position, [`DynamicTemplate::reference`].
 	pub components: Vec<ComponentSlot>,
 }
 
@@ -130,9 +132,9 @@ impl Template for DynamicTemplate {
 		// pin the root: the first entity's in-template entity maps to cx.entity, so
 		// its components land on the walker's root rather than a fresh spawn.
 		let root = cx.entity.id();
-		if let Some(first) = self.entities.first() {
+		if !self.entities.is_empty() {
 			cx.entity_references
-				.set(scene_reference(first.entity), root);
+				.set(scene_reference(Self::reference(0)), root);
 		}
 		// the build walker exposes the template root via `TemplateBuildRoot`, so a
 		// nested asset/remote value template parks its pending dependency on it.
@@ -145,6 +147,14 @@ impl Template for DynamicTemplate {
 }
 
 impl DynamicTemplate {
+	/// The in-template [`Entity`] naming the entity at `position`, what a slot
+	/// holds to reference it. A position past the last names an entity outside
+	/// the template, which the build spawns empty.
+	pub fn reference(position: usize) -> Entity {
+		Entity::from_raw_u32(position as u32)
+			.expect("a template holds fewer than `u32::MAX` entities")
+	}
+
 	/// Builds every entity onto its mapped real entity, in order, then writes
 	/// resources.
 	///
@@ -156,17 +166,17 @@ impl DynamicTemplate {
 		app_registry: &AppTypeRegistry,
 		cx: &mut TemplateContext,
 	) -> Result<()> {
-		for entity in &self.entities {
+		for (position, entity) in self.entities.iter().enumerate() {
 			// SAFETY: only used to spawn-or-fetch the mapped placeholder entity.
 			let world = unsafe { cx.entity.world_mut() };
 			let entity_id = cx
 				.entity_references
-				.get(scene_reference(entity.entity), world);
+				.get(scene_reference(Self::reference(position)), world);
 			// record the real entity for the loader, if it installed a sink.
 			if let Some(mut sink) =
 				world.get_resource_mut::<TemplateBuildSink>()
 			{
-				sink.0.push((entity.entity.index_u32(), entity_id));
+				sink.0.push((entity.key.clone(), entity_id));
 			}
 			build_entity(entity, entity_id, registry, app_registry, cx)?;
 		}
@@ -201,6 +211,15 @@ fn build_entity(
 			ComponentSlot::Value(value) => {
 				// SAFETY: only used to apply a component onto the mapped entity.
 				let world = unsafe { cx.entity.world_mut() };
+				// what a body's reflection held is inserted as it stands, so
+				// holding needs no registration of the marker itself
+				if let Some(unregistered) = value
+					.try_as_reflect()
+					.and_then(|value| value.downcast_ref::<Unregistered>())
+				{
+					world.entity_mut(entity_id).insert(unregistered.clone());
+					continue;
+				}
 				let (world, mut mapper) =
 					ReferenceMapper::split(world, cx.entity_references);
 				apply_value(
@@ -269,6 +288,10 @@ impl<'a> ReferenceMapper<'a> {
 
 impl EntityMapper for ReferenceMapper<'_> {
 	fn get_mapped(&mut self, source: Entity) -> Entity {
+		// a placeholder names no entity, so none is spawned for it
+		if source == Entity::PLACEHOLDER {
+			return source;
+		}
 		self.references.get(scene_reference(source), self.world)
 	}
 
@@ -355,7 +378,8 @@ pub(super) fn reflect_component<'a>(
 	let registration = type_registration(registry, value)?;
 	registration.data::<ReflectComponent>().ok_or_else(|| {
 		bevyhow!(
-			"template contains the unregistered component `{}`",
+			"template contains `{}`, which is registered but reflects no \
+			component: add `#[reflect(Component)]`",
 			registration.type_info().type_path()
 		)
 	})
@@ -462,18 +486,23 @@ mod test {
 		ComponentSlot::Value(component.to_dynamic().unwrap())
 	}
 
-	/// An in-template id from a raw index.
-	fn entity(index: u32) -> Entity { Entity::from_raw_u32(index).unwrap() }
+	/// The entity at `position`, holding `components`.
+	fn entity(
+		position: u32,
+		components: Vec<ComponentSlot>,
+	) -> DynamicTemplateEntity {
+		DynamicTemplateEntity {
+			key: EntityKey::from(position),
+			components,
+		}
+	}
 
 	#[crate::test]
 	fn builds_value_entity_onto_root() {
 		let mut world = world();
 		let template = DynamicTemplate {
 			resources: vec![],
-			entities: vec![DynamicTemplateEntity {
-				entity: entity(0),
-				components: vec![value(Score(7))],
-			}],
+			entities: vec![entity(0, vec![value(Score(7))])],
 		};
 		let root = world.spawn_template(template).unwrap().id();
 		world
@@ -487,19 +516,13 @@ mod test {
 	fn builds_children_in_order() {
 		let mut world = world();
 		// root entity 0, three children 1,2,3, each holding ChildOf(0).
-		let parent = entity(0);
-		let mut entities = vec![DynamicTemplateEntity {
-			entity: parent,
-			components: vec![],
-		}];
+		let parent = DynamicTemplate::reference(0);
+		let mut entities = vec![entity(0, vec![])];
 		for (index, label) in ["a", "b", "c"].into_iter().enumerate() {
-			entities.push(DynamicTemplateEntity {
-				entity: entity(index as u32 + 1),
-				components: vec![
-					value(ChildOf(parent)),
-					value(Name::new(label)),
-				],
-			});
+			entities.push(entity(index as u32 + 1, vec![
+				value(ChildOf(parent)),
+				value(Name::new(label)),
+			]));
 		}
 		let root = world
 			.spawn_template(DynamicTemplate {
@@ -532,14 +555,8 @@ mod test {
 		let template = DynamicTemplate {
 			resources: vec![],
 			entities: vec![
-				DynamicTemplateEntity {
-					entity: entity(0),
-					components: vec![value(Target(entity(1)))],
-				},
-				DynamicTemplateEntity {
-					entity: entity(1),
-					components: vec![value(Name::new("referent"))],
-				},
+				entity(0, vec![value(Target(DynamicTemplate::reference(1)))]),
+				entity(1, vec![value(Name::new("referent"))]),
 			],
 		};
 		let root = world.spawn_template(template).unwrap().id();
@@ -561,13 +578,12 @@ mod test {
 		patch.insert("text", "deferred".to_string());
 		let template = DynamicTemplate {
 			resources: vec![],
-			entities: vec![DynamicTemplateEntity {
-				entity: entity(0),
-				components: vec![ComponentSlot::Template(DeferredTemplate {
+			entities: vec![entity(0, vec![ComponentSlot::Template(
+				DeferredTemplate {
 					name: "Label".into(),
 					patch: Box::new(patch),
-				})],
-			}],
+				},
+			)])],
 		};
 		let root = world.spawn_template(template).unwrap().id();
 		let child = world.entity(root).get::<Children>().unwrap()[0];

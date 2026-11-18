@@ -55,7 +55,7 @@ An entry declares its build requirements with `<RequireCfg cfg="feature:thread &
 
 ## Downstream binaries
 
-The stock `beet` binary resolves the types beet itself registers, so a workspace that names only those runs through it. A workspace that EXTENDS beet (its own `#[action]`s, deploy blocks, reflect components) builds a binary of its own, because no beet build can know those types: an entry naming one warns, marks the entity `UnregisteredTag` and runs a tree with that behaviour simply missing.
+The stock `beet` binary resolves the types beet itself registers, so a workspace that names only those runs through it. A workspace that EXTENDS beet (its own `#[action]`s, deploy blocks, reflect components) builds a binary of its own, because no beet build can know those types: an entry naming one warns, holds it in the entity's `Unregistered` and runs a tree with that behaviour simply missing.
 
 Such a binary is a thin `main`, and it depends on the `beet` facade alone. Compose `BeetPlugins`, the binary's capability plugin, and `LaunchPlugin`:
 

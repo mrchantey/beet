@@ -69,18 +69,18 @@
 //! # The size ceiling
 //!
 //! A repo block is capped at a megabyte and a reader fetches a record whole, so
-//! the content has a budget. The lexicon's escape hatch is `blobPages`, an
-//! `application/json` blob holding the page array, and when it is set every blob
-//! referenced inside it MUST be mirrored in the record's top level `blobs`
-//! array, because a PDS scans only the top level of a current record when
-//! deciding what to garbage collect.
+//! a document has a budget, checked once where it is rendered whatever its
+//! `content` (`StandardSiteDocument::BUDGET`). The lexicon's escape hatch is
+//! `blobPages`, an `application/json` blob holding the page array, and when it
+//! is set every blob referenced inside it MUST be mirrored in the record's top
+//! level `blobs` array, because a PDS scans only the top level of a current
+//! record when deciding what to garbage collect.
 //!
 //! Beet does not write `blobPages`. The longest post in the corpus is about a
 //! thousand words, which is single digit kilobytes of blocks, and images are
-//! blobs rather than inline bytes. So the renderer asserts the serialised record
-//! stays under the budget and fails loudly naming `blobPages` as the fix. An
-//! unused code path that only a future post would exercise is a path nothing
-//! tests.
+//! blobs rather than inline bytes, so a post over the budget fails loudly at
+//! the document and `blobPages` is the fix to build then. An unused code path
+//! that only a future post would exercise is a path nothing tests.
 //!
 //! # The companion video
 //!

@@ -1,24 +1,24 @@
-//! Extracting a [`DynamicTemplate`] of resolved values from a [`World`].
+//! Extracting a [`SceneBody`] from a [`World`].
 //!
 //! [`TemplateBuilder`] is the save side: it snapshots some entities and
-//! resources by reflection into a [`DynamicTemplate`] whose component slots are
-//! all [`ComponentSlot::Value`]. This is the save-game form, where every entity is
-//! already a resolved value. The deferred-template slot is produced by the
-//! authoring front-ends (the parser and macros), not by extraction.
+//! resources by reflection into a [`SceneBody`], every component a resolved
+//! value. This is the save-game form.
 
-use super::entity_map::FileEntityMapper;
+use super::scene_reflect::ReferenceSentinels;
 use crate::prelude::*;
-use bevy::ecs::component::ComponentId;
 use bevy::ecs::entity_disabling::DefaultQueryFilters;
 use bevy::ecs::reflect::ReflectComponent;
 use bevy::ecs::reflect::ReflectResource;
 use bevy::ecs::relationship::RelationshipAccessor;
 use bevy::ecs::resource::IS_RESOURCE;
 use bevy_reflect::PartialReflect;
+use bevy_reflect::TypeRegistration;
 use bevy_reflect::TypeRegistry;
+use bevy_reflect::serde::TypedReflectSerializer;
 use core::any::TypeId;
+use serde::Serialize;
 
-/// Builds a [`DynamicTemplate`] from a [`World`] by extracting some entities and
+/// Builds a [`SceneBody`] from a [`World`] by extracting some entities and
 /// resources as resolved values.
 ///
 /// # Component Extraction
@@ -41,10 +41,22 @@ use core::any::TypeId;
 /// content. The filters are for scoping a particular dump, never for excluding
 /// state that is derived by nature.
 ///
+/// # Unregistered Components
+///
+/// A component the loader could not resolve is held on its entity in an
+/// [`Unregistered`]. It is never written as itself: each held component goes
+/// back as one of the entity's own keys, beside the resolved ones, so a round
+/// trip through a binary lacking a plugin loses nothing.
+///
+/// # References
+///
+/// An `Entity`-typed field is an entity reference, written as its target's
+/// [`EntityKey`], never its live bits.
+///
 /// # File Order
 ///
 /// Extracted entities are stored in extraction order, not entity-index order, so the
-/// order a parent's children are walked into the template (eg by
+/// order a parent's children are walked into the body (eg by
 /// [`with_entity_tree`](super::TemplateSaver::with_entity_tree)) is the order the
 /// build path applies their `ChildOf`, rebuilding `Children` in the same order.
 /// This is the children-order contract: it must survive a round-trip.
@@ -63,15 +75,18 @@ use core::any::TypeId;
 ///     .register::<ComponentA>();
 /// let entity = world.spawn(ComponentA).id();
 /// let type_registry = world.resource::<AppTypeRegistry>().read();
-/// let template = TemplateBuilder::from_world(&world, &type_registry)
+/// let body = TemplateBuilder::from_world(&world, &type_registry)
 ///     .extract_entity(entity)
-///     .build();
+///     .build()
+///     .unwrap();
+/// body.entities.len().xpect_eq(1);
 /// ```
 pub struct TemplateBuilder<'w> {
-	/// The resources that have been extracted so far.
-	extracted_resources: BTreeMap<ComponentId, Box<dyn PartialReflect>>,
-	/// The entities that have been extracted so far, in extraction order.
-	extracted_entities: Vec<DynamicTemplateEntity>,
+	/// The resources and entities extracted so far, the entities in extraction
+	/// order.
+	body: SceneBody,
+	/// The first component or resource that could not be written.
+	error: Option<BevyError>,
 	/// The set of already-extracted entities, for deduplication.
 	extracted_entity_ids: HashSet<Entity>,
 	/// The filter determining which components to extract.
@@ -96,8 +111,8 @@ impl<'w> TemplateBuilder<'w> {
 		type_registry: &'w TypeRegistry,
 	) -> Self {
 		Self {
-			extracted_resources: default(),
-			extracted_entities: default(),
+			body: default(),
+			error: None,
 			extracted_entity_ids: default(),
 			component_filter: TemplateFilter::default(),
 			resource_filter: TemplateFilter::default(),
@@ -203,24 +218,22 @@ impl<'w> TemplateBuilder<'w> {
 		self
 	}
 
-	/// Consume the builder, producing a [`DynamicTemplate`].
+	/// Consume the builder, producing a [`SceneBody`], or the first error an
+	/// extraction met: a component whose value a scene cannot hold.
 	///
 	/// To avoid entities without any components, call [`Self::remove_empty_entities`]
 	/// first.
-	#[must_use]
-	pub fn build(self) -> DynamicTemplate { self.build_mapped().0 }
+	pub fn build(self) -> Result<SceneBody> {
+		self.build_mapped().map(|(body, _)| body)
+	}
 
-	/// Consume the builder, producing a [`DynamicTemplate`] and the
+	/// Consume the builder, producing a [`SceneBody`] and the
 	/// [`TemplateEntityMap`] its keys came from, for the caller to retain.
-	#[must_use]
-	pub fn build_mapped(self) -> (DynamicTemplate, TemplateEntityMap) {
-		(
-			DynamicTemplate {
-				resources: self.extracted_resources.into_values().collect(),
-				entities: self.extracted_entities,
-			},
-			self.entity_map,
-		)
+	pub fn build_mapped(self) -> Result<(SceneBody, TemplateEntityMap)> {
+		match self.error {
+			Some(error) => Err(error),
+			None => Ok((self.body, self.entity_map)),
+		}
 	}
 
 	/// Extract one entity. Re-extracting an already-extracted entity is a no-op.
@@ -235,8 +248,7 @@ impl<'w> TemplateBuilder<'w> {
 	/// the type registry upon extraction.
 	#[must_use]
 	pub fn remove_empty_entities(mut self) -> Self {
-		self.extracted_entities
-			.retain(|entity| !entity.components.is_empty());
+		self.body.entities.retain(|_, entity| !entity.is_empty());
 		self
 	}
 
@@ -267,90 +279,140 @@ impl<'w> TemplateBuilder<'w> {
 		}
 
 		for entity in entities {
-			let mut extracted = DynamicTemplateEntity {
-				entity: self.entity_map.file_entity(entity),
-				components: Vec::new(),
-			};
-
-			let original_entity = self.original_world.entity(entity);
-
-			// for each component on the entity, extract it through the filter.
-			for &component_id in original_entity.archetype().components().iter()
-			{
-				let mut extract_and_push = || {
-					let info = self
-						.original_world
-						.components()
-						.get_info(component_id)?;
-
-					// never extract a `RelationshipTarget` collection (eg `Children`,
-					// `PortalOf`): it mirrors its `Relationship` source and is
-					// rebuilt by the relationship hook on the build path. Serializing
-					// it would double-apply the relation (the direct write plus the
-					// hook), corrupting order and producing duplicate entries.
-					if let Some(RelationshipAccessor::RelationshipTarget {
-						..
-					}) = info.relationship_accessor()
-					{
-						return None;
-					}
-
-					let type_id = info.type_id()?;
-
-					if self.component_filter.is_denied_by_id(type_id) {
-						return None;
-					}
-
-					// an unregistered component cannot be dumped, so it is
-					// silently absent from the file; say so where a missing route
-					// on the next boot can be traced back
-					let Some(type_registration) =
-						self.type_registry.get(type_id)
-					else {
-						debug!(
-							"skipping unregistered component `{}` on {entity}",
-							info.name()
-						);
-						return None;
-					};
-					// derived state is never authored content, so it never dumps
-					if type_registration.data::<ReflectDerived>().is_some() {
-						return None;
-					}
-					let component = type_registration
-						.data::<ReflectComponent>()?
-						.reflect(original_entity)?;
-
-					let mut value = reflect_ext::clone_reflect_value(
-						component.as_partial_reflect(),
-						type_registration,
-					)
-					.inspect_err(|err| {
-						warn!(
-							"skipping uncloneable component `{}` on {entity}: {err}",
-							info.name()
-						)
-					})
-					.ok()?;
-					// an `Entity`-typed field is an entity reference, so it is
-					// written as the target's file key, never its live bits.
-					if let Some(reflect) = value.try_as_reflect_mut() {
-						type_registration
-							.data::<ReflectComponent>()?
-							.map_entities(
-								reflect,
-								&mut FileEntityMapper(&mut self.entity_map),
-							);
-					}
-					extracted.components.push(ComponentSlot::Value(value));
-					Some(())
-				};
-				extract_and_push();
+			let key = self.entity_map.file_key(entity);
+			let extracted = self.extract_components(entity);
+			match extracted {
+				Ok(extracted) => {
+					self.body.entities.insert(key, extracted);
+				}
+				Err(error) => {
+					self.error.get_or_insert(error);
+				}
 			}
-			self.extracted_entities.push(extracted);
 		}
 
 		self
+	}
+
+	/// Every component of `entity` the filters and the registry let through,
+	/// as data.
+	fn extract_components(&mut self, entity: Entity) -> Result<EntityBody> {
+		let world = self.original_world;
+		let original_entity = world.entity(entity);
+		let mut resolved = EntityBody::default();
+		// what a loader held goes back as the entity's own keys, never as the
+		// marker holding it, read directly so it needs no registration
+		let held = original_entity
+			.get::<Unregistered>()
+			.map(|unregistered| (**unregistered).clone())
+			.unwrap_or_default();
+
+		for &component_id in original_entity.archetype().components().iter() {
+			let Some(info) = world.components().get_info(component_id) else {
+				continue;
+			};
+			// never extract a `RelationshipTarget` collection (eg `Children`,
+			// `PortalOf`): it mirrors its `Relationship` source and is
+			// rebuilt by the relationship hook on the build path. Serializing
+			// it would double-apply the relation (the direct write plus the
+			// hook), corrupting order and producing duplicate entries.
+			if let Some(RelationshipAccessor::RelationshipTarget { .. }) =
+				info.relationship_accessor()
+			{
+				continue;
+			}
+			let Some(type_id) = info.type_id() else {
+				continue;
+			};
+			if type_id == TypeId::of::<Unregistered>()
+				|| self.component_filter.is_denied_by_id(type_id)
+			{
+				continue;
+			}
+			// an unregistered component cannot be dumped, so it is
+			// silently absent from the file; say so where a missing route
+			// on the next boot can be traced back
+			let Some(registration) = self.type_registry.get(type_id) else {
+				debug!(
+					"skipping unregistered component `{}` on {entity}",
+					info.name()
+				);
+				continue;
+			};
+			// derived state is never authored content, so it never dumps
+			if registration.data::<ReflectDerived>().is_some() {
+				continue;
+			}
+			let Some(reflect_component) =
+				registration.data::<ReflectComponent>()
+			else {
+				continue;
+			};
+			let Some(component) = reflect_component.reflect(original_entity)
+			else {
+				continue;
+			};
+			let value = match reflect_ext::clone_reflect_value(
+				component.as_partial_reflect(),
+				registration,
+			) {
+				Ok(value) => value,
+				Err(err) => {
+					warn!(
+						"skipping uncloneable component `{}` on {entity}: {err}",
+						info.name()
+					);
+					continue;
+				}
+			};
+			let type_path = registration.type_info().type_path();
+			let value = self
+				.component_value(value, registration, reflect_component)
+				.map_err(|err| {
+					bevyhow!("component `{type_path}` on {entity}: {err}")
+				})?;
+			resolved.insert_value(type_path, value);
+		}
+		// a resolved component wins the key a held one also names
+		for (name, value) in Map::from(held) {
+			if !resolved.contains_key(&name) {
+				resolved.insert_value(name, value);
+			}
+		}
+		resolved.xok()
+	}
+
+	/// A component as data, each entity it references written as that
+	/// entity's file key.
+	fn component_value(
+		&mut self,
+		mut component: Box<dyn PartialReflect>,
+		registration: &TypeRegistration,
+		reflect_component: &ReflectComponent,
+	) -> Result<Value> {
+		let mut references = ReferenceSentinels::default();
+		if let Some(reflect) = component.try_as_reflect_mut() {
+			reflect_component.map_entities(reflect, &mut references);
+		}
+		Self::reflect_value(
+			component.as_ref(),
+			registration,
+			self.type_registry,
+		)
+		.and_then(|value| references.keyed(value, &mut self.entity_map))
+	}
+
+	/// A reflected value as data, through its registered serde form.
+	fn reflect_value(
+		value: &dyn PartialReflect,
+		registration: &TypeRegistration,
+		registry: &TypeRegistry,
+	) -> Result<Value> {
+		TypedReflectSerializer::new(value, registry)
+			.serialize(ValueSerializer)
+			.map_err(|err| {
+				bevyhow!("`{}`: {err}", registration.type_info().type_path())
+			})
 	}
 
 	/// Extract resources. Re-extracting an already-extracted resource is a no-op.
@@ -371,7 +433,7 @@ impl<'w> TemplateBuilder<'w> {
 			if Some(component_id) == original_world_dqf_id {
 				continue;
 			}
-			let mut extract_and_push = || {
+			let extract_and_push = || {
 				let type_id = self
 					.original_world
 					.components()
@@ -402,10 +464,26 @@ impl<'w> TemplateBuilder<'w> {
 					)
 				})
 				.ok()?;
-				self.extracted_resources.insert(component_id, value);
-				Some(())
+				Some((type_registration, value))
 			};
-			extract_and_push();
+			let Some((registration, value)) = extract_and_push() else {
+				continue;
+			};
+			match Self::reflect_value(
+				value.as_ref(),
+				registration,
+				self.type_registry,
+			) {
+				Ok(value) => {
+					self.body.resources.insert_value(
+						registration.type_info().type_path(),
+						value,
+					);
+				}
+				Err(error) => {
+					self.error.get_or_insert(error);
+				}
+			}
 		}
 
 		self
@@ -435,15 +513,14 @@ mod test {
 	#[reflect(Resource)]
 	struct ResourceB;
 
-	/// The file key an entity was written under.
-	fn key(entity: &DynamicTemplateEntity) -> u32 { entity.entity.index_u32() }
+	/// The file keys a body holds, in file order.
+	fn keys(body: &SceneBody) -> Vec<&str> {
+		body.entities.keys().map(EntityKey::as_str).collect()
+	}
 
-	/// True if the slot is a value that represents `T`.
-	fn slot_represents<T: bevy_reflect::Typed>(slot: &ComponentSlot) -> bool {
-		match slot {
-			ComponentSlot::Value(value) => value.represents::<T>(),
-			ComponentSlot::Template(_) => false,
-		}
+	/// The entity a body holds at the minted key `index`.
+	fn entity(body: &SceneBody, index: u32) -> &EntityBody {
+		&body.entities[&EntityKey::from(index)]
 	}
 
 	#[crate::test]
@@ -451,19 +528,18 @@ mod test {
 		let mut world = World::default();
 		let mut type_registry = TypeRegistry::default();
 		type_registry.register::<ComponentA>();
-		let entity = world.spawn((ComponentA, ComponentB)).id();
+		let entity_id = world.spawn((ComponentA, ComponentB)).id();
 
-		let template = TemplateBuilder::from_world(&world, &type_registry)
-			.extract_entity(entity)
-			.build();
+		let body = TemplateBuilder::from_world(&world, &type_registry)
+			.extract_entity(entity_id)
+			.build()
+			.unwrap();
 
-		template.entities.len().xpect_eq(1);
 		// keys are minted from zero in extraction order, never derived from the
 		// live entity's bits
-		key(&template.entities[0]).xpect_eq(0);
-		template.entities[0].components.len().xpect_eq(1);
-		slot_represents::<ComponentA>(&template.entities[0].components[0])
-			.xpect_true();
+		keys(&body).xpect_eq(vec!["0"]);
+		entity(&body, 0).len().xpect_eq(1);
+		entity(&body, 0).contains::<ComponentA>().xpect_true();
 	}
 
 	#[crate::test]
@@ -472,14 +548,15 @@ mod test {
 		let mut type_registry = TypeRegistry::default();
 		type_registry.register::<ComponentA>();
 		type_registry.register::<ComponentB>();
-		let entity = world.spawn((ComponentA, ComponentB)).id();
+		let entity_id = world.spawn((ComponentA, ComponentB)).id();
 
-		let template = TemplateBuilder::from_world(&world, &type_registry)
-			.extract_entity(entity)
-			.build();
+		let body = TemplateBuilder::from_world(&world, &type_registry)
+			.extract_entity(entity_id)
+			.build()
+			.unwrap();
 
-		template.entities.len().xpect_eq(1);
-		template.entities[0].components.len().xpect_eq(2);
+		body.entities.len().xpect_eq(1);
+		entity(&body, 0).len().xpect_eq(2);
 	}
 
 	/// Entities are stored in extraction order, not entity-index order, the
@@ -494,23 +571,19 @@ mod test {
 		let entity_d = world.spawn_empty().id();
 
 		let type_registry = TypeRegistry::default();
-		let (template, entity_map) =
+		let (body, entity_map) =
 			TemplateBuilder::from_world(&world, &type_registry)
 				.extract_entity(entity_b)
 				.extract_entities([entity_d, entity_a].into_iter())
 				.extract_entity(entity_c)
-				.build_mapped();
+				.build_mapped()
+				.unwrap();
 
-		template
-			.entities
-			.iter()
-			.map(key)
-			.collect::<Vec<_>>()
-			.xpect_eq(vec![0, 1, 2, 3]);
+		keys(&body).xpect_eq(vec!["0", "1", "2", "3"]);
 		// extraction order: b, then d, a, then c.
 		[entity_b, entity_d, entity_a, entity_c]
-			.map(|entity| entity_map.get_file_key(entity).unwrap())
-			.xpect_eq([0, 1, 2, 3]);
+			.map(|entity| entity_map.get_file_key(entity).unwrap().to_string())
+			.xpect_eq(["0", "1", "2", "3"].map(str::to_string));
 	}
 
 	#[crate::test]
@@ -525,14 +598,12 @@ mod test {
 		world.spawn(ComponentB);
 
 		let mut query = world.query_filtered::<Entity, With<ComponentA>>();
-		let template = TemplateBuilder::from_world(&world, &type_registry)
+		let body = TemplateBuilder::from_world(&world, &type_registry)
 			.extract_entities(query.iter(&world))
-			.build();
+			.build()
+			.unwrap();
 
-		template.entities.len().xpect_eq(2);
-		let mut keys = template.entities.iter().map(key).collect::<Vec<_>>();
-		keys.sort();
-		keys.xpect_eq(vec![0, 1]);
+		keys(&body).xpect_eq(vec!["0", "1"]);
 	}
 
 	#[crate::test]
@@ -544,13 +615,13 @@ mod test {
 		let entity_a = world.spawn(ComponentA).id();
 		let entity_b = world.spawn(ComponentB).id();
 
-		let template = TemplateBuilder::from_world(&world, &type_registry)
+		let body = TemplateBuilder::from_world(&world, &type_registry)
 			.extract_entities([entity_a, entity_b].into_iter())
 			.remove_empty_entities()
-			.build();
+			.build()
+			.unwrap();
 
-		template.entities.len().xpect_eq(1);
-		key(&template.entities[0]).xpect_eq(0);
+		keys(&body).xpect_eq(vec!["0"]);
 	}
 
 	#[crate::test]
@@ -560,12 +631,13 @@ mod test {
 		type_registry.register::<ResourceA>();
 		world.insert_resource(ResourceA);
 
-		let template = TemplateBuilder::from_world(&world, &type_registry)
+		let body = TemplateBuilder::from_world(&world, &type_registry)
 			.extract_resources()
-			.build();
+			.build()
+			.unwrap();
 
-		template.resources.len().xpect_eq(1);
-		template.resources[0].represents::<ResourceA>().xpect_true();
+		body.resources.len().xpect_eq(1);
+		body.resources.contains::<ResourceA>().xpect_true();
 	}
 
 	#[crate::test]
@@ -579,18 +651,18 @@ mod test {
 		let entity_a = world.spawn(ComponentA).id();
 		let entity_b = world.spawn(ComponentB).id();
 
-		let template = TemplateBuilder::from_world(&world, &type_registry)
+		let body = TemplateBuilder::from_world(&world, &type_registry)
 			.allow_component::<ComponentA>()
 			.extract_entities([entity_a_b, entity_a, entity_b].into_iter())
-			.build();
+			.build()
+			.unwrap();
 
 		// extraction order: a_b, a, b. b has no allowed component.
-		template.entities.len().xpect_eq(3);
-		slot_represents::<ComponentA>(&template.entities[0].components[0])
-			.xpect_true();
-		slot_represents::<ComponentA>(&template.entities[1].components[0])
-			.xpect_true();
-		template.entities[2].components.len().xpect_eq(0);
+		body.entities.len().xpect_eq(3);
+		entity(&body, 0).contains::<ComponentA>().xpect_true();
+		entity(&body, 0).len().xpect_eq(1);
+		entity(&body, 1).contains::<ComponentA>().xpect_true();
+		entity(&body, 2).len().xpect_eq(0);
 	}
 
 	#[crate::test]
@@ -604,18 +676,18 @@ mod test {
 		let entity_a = world.spawn(ComponentA).id();
 		let entity_b = world.spawn(ComponentB).id();
 
-		let template = TemplateBuilder::from_world(&world, &type_registry)
+		let body = TemplateBuilder::from_world(&world, &type_registry)
 			.deny_component::<ComponentA>()
 			.extract_entities([entity_a_b, entity_a, entity_b].into_iter())
-			.build();
+			.build()
+			.unwrap();
 
 		// extraction order: a_b, a, b. a has only the denied component.
-		template.entities.len().xpect_eq(3);
-		slot_represents::<ComponentB>(&template.entities[0].components[0])
-			.xpect_true();
-		template.entities[1].components.len().xpect_eq(0);
-		slot_represents::<ComponentB>(&template.entities[2].components[0])
-			.xpect_true();
+		body.entities.len().xpect_eq(3);
+		entity(&body, 0).contains::<ComponentB>().xpect_true();
+		entity(&body, 0).len().xpect_eq(1);
+		entity(&body, 1).len().xpect_eq(0);
+		entity(&body, 2).contains::<ComponentB>().xpect_true();
 	}
 
 	#[crate::test]
@@ -627,17 +699,20 @@ mod test {
 		world.insert_resource(ResourceA);
 		world.insert_resource(ResourceB);
 
-		let template = TemplateBuilder::from_world(&world, &type_registry)
+		let body = TemplateBuilder::from_world(&world, &type_registry)
 			.deny_resource::<ResourceA>()
 			.extract_resources()
-			.build();
+			.build()
+			.unwrap();
 
-		template.resources.len().xpect_eq(1);
-		template.resources[0].represents::<ResourceB>().xpect_true();
+		body.resources.len().xpect_eq(1);
+		body.resources.contains::<ResourceB>().xpect_true();
 	}
 
+	/// A component is written through its reflected form, a plain value under
+	/// its type path.
 	#[crate::test]
-	fn uses_from_reflect() {
+	fn writes_values() {
 		#[derive(Component, Reflect)]
 		#[reflect(Component)]
 		struct SomeType(i32);
@@ -652,27 +727,23 @@ mod test {
 		type_registry.register::<SomeResource>();
 
 		world.insert_resource(SomeResource(123));
-		let entity = world.spawn(SomeType(123)).id();
+		let entity_id = world.spawn(SomeType(123)).id();
 
-		let template = TemplateBuilder::from_world(&world, &type_registry)
+		let body = TemplateBuilder::from_world(&world, &type_registry)
 			.extract_resources()
-			.extract_entities(vec![entity].into_iter())
-			.build();
+			.extract_entities(vec![entity_id].into_iter())
+			.build()
+			.unwrap();
 
-		match &template.entities[0].components[0] {
-			ComponentSlot::Value(value) => {
-				value
-					.try_as_reflect()
-					.unwrap()
-					.is::<SomeType>()
-					.xpect_true();
-			}
-			ComponentSlot::Template(_) => panic!("expected a value slot"),
-		}
-		template.resources[0]
-			.try_as_reflect()
+		entity(&body, 0)
+			.value(SomeType::type_path())
 			.unwrap()
-			.is::<SomeResource>()
-			.xpect_true();
+			.clone()
+			.xpect_eq(Value::Int(123));
+		body.resources
+			.value(SomeResource::type_path())
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::Int(123));
 	}
 }

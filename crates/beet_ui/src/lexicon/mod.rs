@@ -18,7 +18,7 @@
 //!   ([`LexiconParseContext::parse_child`]) and a reader degrades member by
 //!   member.
 //!
-//! Both are installed by value, `app.install(LeafletRenderer)`, the last
+//! Both are installed by value, `app.install(SceneBodyLexicon)`, the last
 //! registered for a def winning, so a downstream crate replaces a built-in by
 //! registering its own. Rendering a def nothing registered is an error naming
 //! the registered ones.
@@ -40,13 +40,20 @@
 //!
 //! # The targets
 //!
+//! - `org.beet.scene#body` ([`SceneBodyLexicon`], with `template_serde`): the
+//!   tree as a scene body, every component keyed by type path and read back
+//!   without loss. A standard site document's `content` by default.
 //! - Leaflet (`pub.leaflet.content`, `beet_router`'s `standard_site_extra`
 //!   feature): the tree as Leaflet's block model, lossy by design.
 //!
 //! [`OpenUnion`]: beet_core::prelude::OpenUnion
 mod lexicon_parsers;
 mod lexicon_renderers;
+#[cfg(feature = "template_serde")]
+mod scene_body;
 mod unknown_lexicon;
 pub use lexicon_parsers::*;
 pub use lexicon_renderers::*;
+#[cfg(feature = "template_serde")]
+pub use scene_body::*;
 pub use unknown_lexicon::*;

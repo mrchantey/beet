@@ -249,15 +249,16 @@ fn held_children(
 	)
 }
 
-/// Build a tag nothing is registered under: warn, record the name in an
-/// [`UnregisteredTag`] marker, and build the node's directives, spreads and
-/// children onto the now-inert entity.
+/// Build a tag nothing is registered under: warn, hold the component it names
+/// in the entity's [`Unregistered`], and build the node's directives, spreads
+/// and children onto the now-inert entity.
 ///
 /// Structure is universal, so the entity exists in every binary and only its
 /// behavior is missing: a `bx:ref` into the region still names a real entity,
-/// and a lean build's tree has the same shape as a full one's. Attributes are
-/// dropped, since they are props of a type this binary does not have; a spread
-/// is not, since it names its own types and skips the ones it cannot resolve.
+/// and a lean build's tree has the same shape as a full one's. The tag's
+/// attributes are the fields of a type this binary does not have, so they are
+/// held as its value rather than applied; a spread names its own types, each
+/// resolved or held on its own.
 ///
 /// The tag always warns. There used to be a "declared inertness" demotion to
 /// `debug!` for a subtree that had announced its behavior was feature-dependent,
@@ -272,7 +273,11 @@ fn build_unregistered(
 	entity_refs: &HashMap<SmolStr, Entity>,
 	cx: &mut TemplateContext,
 ) -> Result<()> {
-	cx.entity.insert(UnregisteredTag::new(el.tag.as_str()));
+	let value = match &el.tag_literal {
+		Some(named) => named_to_held(named),
+		None => attributes_to_held(el),
+	};
+	Unregistered::hold(cx.entity, el.tag.as_str(), value);
 	apply_common_directives(el, refs, cx)?;
 	apply_spreads(el, cx.entity, entity_refs)?;
 	warn!(

@@ -25,15 +25,6 @@ impl LexiconRenderer for LeafletRenderer {
 		let content = cx.world.with_state::<LeafletQuery, _>(|query| {
 			query.content(request, root)
 		})?;
-		let bytes = MediaType::Json.serialize(&content)?;
-		if bytes.len() > LeafletContent::BUDGET {
-			bevybail!(
-				"the Leaflet content is {} bytes, over the {} a record holds: \
-				 write its pages to a `blobPages` blob instead",
-				bytes.len(),
-				LeafletContent::BUDGET
-			);
-		}
 		OpenUnion::from_serde(LeafletContent::NSID, &content)
 	}
 }
@@ -54,7 +45,7 @@ struct LeafletQuery<'w, 's> {
 	inline_blobs: Query<'w, 's, &'static InlineBlob>,
 	metas: Query<'w, 's, &'static DocMeta>,
 	package: Option<Res<'w, PackageConfig>>,
-	unregistered: Query<'w, 's, (), With<UnregisteredTag>>,
+	unregistered: UnregisteredQuery<'w, 's>,
 	#[cfg(feature = "mermaid")]
 	diagrams: Query<'w, 's, &'static MermaidDiagram>,
 }
@@ -1158,7 +1149,7 @@ mod test {
 	fn degrades_an_unregistered_element() {
 		render((
 			Element::new("Counter"),
-			UnregisteredTag("Counter".into()),
+			Unregistered::new("Counter", Value::map()),
 			children![Value::from("You clicked 3 times")],
 		))
 		.xpect_eq(json(
@@ -1181,21 +1172,6 @@ mod test {
 			.xpect_eq(json(
 				r#"{"$type":"pub.leaflet.blocks.iframe","url":"https://www.youtube.com/embed/7koepBSRoUI","aspectRatio":{"width":16,"height":9}}"#,
 			));
-	}
-
-	/// Content over a record's budget fails naming the escape hatch.
-	#[beet_core::test]
-	fn refuses_content_over_the_budget() {
-		let mut world = world();
-		let root = world
-			.spawn((Element::new("p"), children![Value::from(
-				"x".repeat(LeafletContent::BUDGET)
-			)]))
-			.id();
-		leaflet(&mut world, root)
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("blobPages");
 	}
 
 	/// The `--root=content` Leaflet render of the site's own blog post at

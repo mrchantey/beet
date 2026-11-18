@@ -26,15 +26,50 @@ type DeResult<T> = core::result::Result<T, DeError>;
 ///
 /// This avoids round-tripping through `serde_json::Value`, preserving the
 /// signed/unsigned distinction.
-pub struct ValueDeserializer {
+pub struct ValueDeserializer<'a> {
 	value: Value,
-}
-impl ValueDeserializer {
-	/// Read from `value`.
-	pub fn new(value: Value) -> Self { Self { value } }
+	references: References<'a>,
 }
 
-impl<'de> de::Deserializer<'de> for ValueDeserializer {
+/// Resolves the `u64` a string names, see
+/// [`ValueDeserializer::with_references`].
+type References<'a> = Option<&'a dyn Fn(&str) -> Option<u64>>;
+
+impl ValueDeserializer<'static> {
+	/// Read from `value`.
+	pub fn new(value: Value) -> Self {
+		Self {
+			value,
+			references: None,
+		}
+	}
+}
+
+impl<'a> ValueDeserializer<'a> {
+	/// Read a string as the `u64` `references` resolves it to, wherever the
+	/// target asks for a `u64`, at any depth.
+	///
+	/// How a document writes a reference by name: a scene body writes an entity
+	/// reference as its target's key, and the `Entity` its component expects
+	/// reads it here. A map key is never resolved, since a number keyed map
+	/// already spells its keys as strings.
+	pub fn with_references<'b>(
+		self,
+		references: &'b dyn Fn(&str) -> Option<u64>,
+	) -> ValueDeserializer<'b> {
+		ValueDeserializer {
+			value: self.value,
+			references: Some(references),
+		}
+	}
+
+	/// A deserializer over `value` resolving references as this one does.
+	fn nested(value: Value, references: References<'a>) -> Self {
+		Self { value, references }
+	}
+}
+
+impl<'de, 'a> de::Deserializer<'de> for ValueDeserializer<'a> {
 	type Error = DeError;
 
 	fn deserialize_any<V: de::Visitor<'de>>(
@@ -51,11 +86,27 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
 			Value::Str(s) => visitor.visit_string(s.to_string()),
 			Value::List(list) => visitor.visit_seq(SeqAccess {
 				iter: list.into_iter(),
+				references: self.references,
 			}),
 			Value::Map(map) => visitor.visit_map(MapAccess {
 				iter: map.into_iter(),
 				value: None,
+				references: self.references,
 			}),
+		}
+	}
+
+	fn deserialize_u64<V: de::Visitor<'de>>(
+		self,
+		visitor: V,
+	) -> DeResult<V::Value> {
+		let resolved = match (&self.value, self.references) {
+			(Value::Str(name), Some(references)) => references(name.as_str()),
+			_ => None,
+		};
+		match resolved {
+			Some(number) => visitor.visit_u64(number),
+			None => self.deserialize_any(visitor),
 		}
 	}
 
@@ -106,39 +157,45 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
 				)));
 			}
 		};
-		visitor.visit_enum(EnumAccess { variant, payload })
+		visitor.visit_enum(EnumAccess {
+			variant,
+			payload,
+			references: self.references,
+		})
 	}
 
 	::serde::forward_to_deserialize_any! {
-		bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str
+		bool i8 i16 i32 i64 i128 u8 u16 u32 u128 f32 f64 char str
 		string bytes byte_buf unit unit_struct seq tuple tuple_struct
 		map struct identifier ignored_any
 	}
 }
 
-struct SeqAccess {
+struct SeqAccess<'a> {
 	iter: alloc::vec::IntoIter<Value>,
+	references: References<'a>,
 }
-impl<'de> de::SeqAccess<'de> for SeqAccess {
+impl<'de, 'a> de::SeqAccess<'de> for SeqAccess<'a> {
 	type Error = DeError;
 	fn next_element_seed<T: de::DeserializeSeed<'de>>(
 		&mut self,
 		seed: T,
 	) -> DeResult<Option<T::Value>> {
 		match self.iter.next() {
-			Some(value) => {
-				seed.deserialize(ValueDeserializer::new(value)).map(Some)
-			}
+			Some(value) => seed
+				.deserialize(ValueDeserializer::nested(value, self.references))
+				.map(Some),
 			None => Ok(None),
 		}
 	}
 }
 
-struct MapAccess {
+struct MapAccess<'a> {
 	iter: <Map as IntoIterator>::IntoIter,
 	value: Option<Value>,
+	references: References<'a>,
 }
-impl<'de> de::MapAccess<'de> for MapAccess {
+impl<'de, 'a> de::MapAccess<'de> for MapAccess<'a> {
 	type Error = DeError;
 	fn next_key_seed<K: de::DeserializeSeed<'de>>(
 		&mut self,
@@ -159,7 +216,7 @@ impl<'de> de::MapAccess<'de> for MapAccess {
 		let value = self.value.take().ok_or_else(|| {
 			DeError("next_value called before next_key".into())
 		})?;
-		seed.deserialize(ValueDeserializer::new(value))
+		seed.deserialize(ValueDeserializer::nested(value, self.references))
 	}
 }
 
@@ -244,13 +301,14 @@ impl<'de> de::Deserializer<'de> for MapKeyDeserializer {
 	}
 }
 
-struct EnumAccess {
+struct EnumAccess<'a> {
 	variant: SmolStr,
 	payload: Option<Value>,
+	references: References<'a>,
 }
-impl<'de> de::EnumAccess<'de> for EnumAccess {
+impl<'de, 'a> de::EnumAccess<'de> for EnumAccess<'a> {
 	type Error = DeError;
-	type Variant = VariantAccess;
+	type Variant = VariantAccess<'a>;
 	fn variant_seed<V: de::DeserializeSeed<'de>>(
 		self,
 		seed: V,
@@ -259,14 +317,16 @@ impl<'de> de::EnumAccess<'de> for EnumAccess {
 			seed.deserialize(self.variant.as_str().into_deserializer())?;
 		Ok((variant, VariantAccess {
 			payload: self.payload,
+			references: self.references,
 		}))
 	}
 }
 
-struct VariantAccess {
+struct VariantAccess<'a> {
 	payload: Option<Value>,
+	references: References<'a>,
 }
-impl<'de> de::VariantAccess<'de> for VariantAccess {
+impl<'de, 'a> de::VariantAccess<'de> for VariantAccess<'a> {
 	type Error = DeError;
 	fn unit_variant(self) -> DeResult<()> {
 		match self.payload {
@@ -280,16 +340,22 @@ impl<'de> de::VariantAccess<'de> for VariantAccess {
 		self,
 		seed: T,
 	) -> DeResult<T::Value> {
-		seed.deserialize(ValueDeserializer::new(self.require_payload()?))
+		let references = self.references;
+		seed.deserialize(ValueDeserializer::nested(
+			self.require_payload()?,
+			references,
+		))
 	}
 	fn tuple_variant<V: de::Visitor<'de>>(
 		self,
 		_len: usize,
 		visitor: V,
 	) -> DeResult<V::Value> {
+		let references = self.references;
 		match self.require_payload()? {
 			Value::List(list) => visitor.visit_seq(SeqAccess {
 				iter: list.into_iter(),
+				references,
 			}),
 			other => Err(DeError(format!(
 				"expected a list for tuple variant, got {:?}",
@@ -302,10 +368,12 @@ impl<'de> de::VariantAccess<'de> for VariantAccess {
 		_fields: &'static [&'static str],
 		visitor: V,
 	) -> DeResult<V::Value> {
+		let references = self.references;
 		match self.require_payload()? {
 			Value::Map(map) => visitor.visit_map(MapAccess {
 				iter: map.into_iter(),
 				value: None,
+				references,
 			}),
 			other => Err(DeError(format!(
 				"expected a map for struct variant, got {:?}",
@@ -314,7 +382,7 @@ impl<'de> de::VariantAccess<'de> for VariantAccess {
 		}
 	}
 }
-impl VariantAccess {
+impl VariantAccess<'_> {
 	fn require_payload(self) -> DeResult<Value> {
 		self.payload
 			.ok_or_else(|| DeError("expected a payload for variant".into()))

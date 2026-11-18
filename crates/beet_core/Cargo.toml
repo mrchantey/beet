@@ -163,6 +163,8 @@ serde = [
 	"bevy/serialize",
 	"dep:serde",
 	"smol_str/serde",
+	# `Map` and a scene body's entities serialize in insertion order
+	"indexmap/serde",
 	# `MediaBytes` serializes its shared buffer as a byte string
 	"bytes/serde",
 ]

@@ -1,6 +1,8 @@
 //! [`EntityBody`]: one entity's components as data.
 use crate::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
+#[cfg(feature = "serde")]
 use serde::de::DeserializeOwned;
 
 /// One entity's components as data, each keyed by its type path: the shape
@@ -20,22 +22,22 @@ use serde::de::DeserializeOwned;
 /// 	.unwrap();
 /// body.get::<Provenance>().unwrap().sources.len().xpect_eq(1);
 /// ```
-#[derive(
-	Debug,
-	Default,
-	Clone,
-	PartialEq,
-	Eq,
-	Deref,
-	DerefMut,
-	Reflect,
-	Serialize,
-	serde::Deserialize,
-)]
-#[reflect(opaque, Default, Serialize, Deserialize)]
-#[serde(transparent)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut, Reflect)]
+#[reflect(opaque, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct EntityBody(Map);
 
+impl From<Map> for EntityBody {
+	fn from(components: Map) -> Self { Self(components) }
+}
+
+impl From<EntityBody> for Map {
+	fn from(body: EntityBody) -> Self { body.0 }
+}
+
+#[cfg(feature = "serde")]
 impl EntityBody {
 	/// This body with `component` added, replacing any of its type.
 	pub fn with<T: TypePath + Serialize>(
@@ -60,6 +62,21 @@ impl EntityBody {
 			false => bevybail!("the body carries no `{}`", T::type_path()),
 		}
 	}
+}
+
+impl EntityBody {
+	/// Add a component as data under `name`, the key its source wrote,
+	/// replacing and answering any held there.
+	pub fn insert_value(
+		&mut self,
+		name: impl Into<SmolStr>,
+		value: impl Into<Value>,
+	) -> Option<Value> {
+		self.0.insert(name, value)
+	}
+
+	/// The component held under `name`, as data.
+	pub fn value(&self, name: &str) -> Option<&Value> { self.0.0.get(name) }
 
 	/// Whether the body carries a component of type `T`.
 	pub fn contains<T: TypePath>(&self) -> bool {
@@ -67,7 +84,7 @@ impl EntityBody {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "serde"))]
 mod test {
 	use crate::prelude::*;
 

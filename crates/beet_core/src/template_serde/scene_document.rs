@@ -14,26 +14,27 @@
 //!
 //! Order rides the document. A `Value` map keeps insertion order, so the
 //! document's `entities` are in file order, which is child order; the sync
-//! enforces it onto each parent's `Children`, and the fork writes it back
-//! through the format's own serializer ([`SceneDocument::to_bytes`]), so a
-//! reboot from the store reproduces the edited world.
+//! enforces it onto each parent's `Children`, and the fork writes what the
+//! world reflects back as the [`SceneBody`] it is
+//! ([`SceneDocument::to_bytes`]), so a reboot from the store reproduces the
+//! edited world.
 //!
 //! A write that would leave the scene invalid (a cyclic `ChildOf`, a dangling
 //! reference, an unregistered component, a value its component rejects) is
 //! refused whole: the document is reverted to what the world reflects and the
-//! error names the offence, so the world is never half-applied.
+//! error names the offence, so the world is never half-applied. An
+//! unregistered component a load held ([`Unregistered`]) is not a write: it
+//! stays in the document untouched until an edit removes it.
 
+use super::Placement;
 use super::apply_value;
-use super::serde::TEMPLATE_RESOURCES;
-use super::serde::TypedValueDeserializer;
+use super::scene_reflect::EntityKeys;
 use super::write_resource;
 use crate::prelude::*;
 use bevy::ecs::entity::EntityMapper;
 use bevy::ecs::reflect::ReflectComponent;
 use bevy_reflect::PartialReflect;
 use bevy_reflect::TypeRegistry;
-use serde::Serialize;
-use serde::de::DeserializeSeed;
 
 /// The scene this entity's children were loaded from, as an editable
 /// [`Document`] the world follows.
@@ -76,22 +77,22 @@ impl SceneDocument {
 	const ATTRIBUTE_OF: &'static str =
 		"beet_core::types::snippet::attribute::AttributeOf";
 
-	/// Build `template` as `host`'s children and land its document on `host`.
+	/// Build `body` as `host`'s children and land its document on `host`.
 	///
-	/// The document and the world come from the one parsed template, so they
-	/// start in agreement: the document is the template as a [`Value`], the
-	/// world its build, the [`TemplateEntityMap`] the keys that build handed
-	/// out. Returns every spawned entity.
+	/// The document and the world come from the one body, so they start in
+	/// agreement: the document is the body as a [`Value`], the world its
+	/// build, the [`TemplateEntityMap`] the keys that build handed out.
+	/// Returns every spawned entity.
 	pub fn load(
 		world: &mut World,
 		host: Entity,
-		template: DynamicTemplate,
+		body: &SceneBody,
 	) -> Result<Vec<Entity>> {
-		let value = Self::template_value(world, &template)?;
+		let value = body.to_value()?;
 		let (spawned, entity_map) = TemplateLoader::build(
 			world,
-			Some(host),
-			EntryTemplate::Serde(template),
+			Placement::Under(host),
+			EntryTemplate::Serde(body.reflect(world)?),
 		)?;
 		Self::land(world, host, value, entity_map);
 		Ok(spawned)
@@ -103,15 +104,14 @@ impl SceneDocument {
 		host: Entity,
 		bytes: &MediaBytes,
 	) -> Result<Vec<Entity>> {
-		match EntryTemplate::from_bytes(world, bytes)? {
-			EntryTemplate::Serde(template) => Self::load(world, host, template),
-			#[cfg(feature = "bsx")]
-			EntryTemplate::Bsx(_) => bevybail!(
+		if matches!(bytes.media_type(), MediaType::Bsx | MediaType::Html) {
+			bevybail!(
 				"a scene is a serde document, not markup: build the `{}` \
 				original first and fork it",
 				bytes.media_type()
-			),
+			);
 		}
+		Self::load(world, host, &SceneBody::from_bytes(bytes)?)
 	}
 
 	/// Fork: serialize `host`'s children as one scene, land its document on
@@ -139,34 +139,19 @@ impl SceneDocument {
 			&roots,
 			default(),
 		)?;
-		let value = match EntryTemplate::from_bytes(world, &bytes)? {
-			EntryTemplate::Serde(template) => {
-				Self::template_value(world, &template)?
-			}
-			#[cfg(feature = "bsx")]
-			EntryTemplate::Bsx(_) => unreachable!("a saver writes serde"),
-		};
+		let value = SceneBody::from_bytes(&bytes)?.to_value()?;
 		Self::land(world, host, value, entity_map);
 		Ok(bytes)
 	}
 
-	/// Serialize a scene document's value as the format writes it: entities in
+	/// The scene the world reflects, as the format writes it: entities in
 	/// document order, component and resource maps sorted by type path, so an
 	/// unedited document re-saves byte-identical to the fork it was read from.
 	///
-	/// The document is first read into a [`DynamicTemplate`], which is also what
-	/// proves it persistable: a value its component's type rejects fails here
-	/// rather than at the next boot.
-	pub fn to_bytes(
-		registry: &TypeRegistry,
-		value: &Value,
-		media_type: MediaType,
-	) -> Result<MediaBytes> {
-		let template = Self::value_template(registry, value)?;
-		MediaBytes::serialize(
-			media_type,
-			&DynamicTemplateSerializer::new(&template, registry),
-		)
+	/// Never an edit the sync has yet to apply, so what is written is always a
+	/// scene the world accepted: a refused edit never reaches the store.
+	pub fn to_bytes(&self, media_type: MediaType) -> Result<MediaBytes> {
+		SceneBody::from_value(self.synced.clone())?.to_bytes(media_type)
 	}
 
 	/// The document components a scene lands on its host.
@@ -182,29 +167,6 @@ impl SceneDocument {
 			Self { synced: value },
 			entity_map,
 		));
-	}
-
-	/// A template as the [`Value`] its serialized form reads back to.
-	fn template_value(
-		world: &World,
-		template: &DynamicTemplate,
-	) -> Result<Value> {
-		let registry = world.resource::<AppTypeRegistry>().read();
-		DynamicTemplateSerializer::new(template, &registry)
-			.serialize(ValueSerializer)?
-			.xok()
-	}
-
-	/// A scene document's value as the template it describes.
-	fn value_template(
-		registry: &TypeRegistry,
-		value: &Value,
-	) -> Result<DynamicTemplate> {
-		DynamicTemplateDeserializer {
-			type_registry: registry,
-		}
-		.deserialize(ValueDeserializer::new(value.clone()))?
-		.xok()
 	}
 
 	/// Whether `next` differs from what the world reflects.
@@ -269,8 +231,10 @@ pub(crate) fn sync_scene_documents(world: &mut World) -> Result {
 /// Every change one edit asks of the world, validated and deserialized before
 /// anything is touched, so a refused edit leaves the world exactly as it was.
 struct ScenePlan {
+	/// The entities the planned values reference, by position.
+	keys: EntityKeys,
 	/// Entities the document dropped, whose subtrees despawn.
-	removed: Vec<u32>,
+	removed: Vec<EntityKey>,
 	/// Every entity the document holds, in document order.
 	entities: Vec<EntityPlan>,
 	/// Resource values to write.
@@ -281,7 +245,7 @@ struct ScenePlan {
 
 /// One entity's share of a [`ScenePlan`].
 struct EntityPlan {
-	key: u32,
+	key: EntityKey,
 	/// Whether the document holds an owner for it (a `ChildOf`, or the
 	/// `AttributeOf` of an attribute entity); without one it is a root and sits
 	/// under the host.
@@ -308,18 +272,19 @@ impl ScenePlan {
 		let removed = old
 			.keys()?
 			.into_iter()
-			.filter(|key| !new.contains(*key))
+			.filter(|key| !new.contains(key))
 			.collect();
 
+		let keys = EntityKeys::new(new.keys()?);
 		let mut references = Vec::new();
 		let mut entities = Vec::new();
 		for key in new.keys()? {
-			let components = new.components(key).ok_or_else(|| {
+			let components = new.components(&key).ok_or_else(|| {
 				bevyhow!("entity #{key} is not a component map")
 			})?;
-			let previous = old.components(key);
+			let previous = old.components(&key);
 			let mut plan = EntityPlan {
-				key,
+				key: key.clone(),
 				has_parent: components.contains(SceneDocument::CHILD_OF)
 					|| components.contains(SceneDocument::ATTRIBUTE_OF),
 				apply: Vec::new(),
@@ -331,12 +296,13 @@ impl ScenePlan {
 					continue;
 				}
 				let mut component =
-					deserialize_typed(registry, type_path, value)
+					deserialize_typed(registry, &keys, type_path, value)
 						.map_err(|err| bevyhow!("entity #{key}: {err}"))?;
 				collect_references(
 					registry,
+					&keys,
 					&mut component,
-					key,
+					&key,
 					&mut references,
 				);
 				plan.apply.push(component);
@@ -353,7 +319,7 @@ impl ScenePlan {
 		// a reference must name an entity the document holds: the world would
 		// otherwise gain an entity the document does not describe
 		for (source, target) in references {
-			if !new.contains(target) {
+			if !new.contains(&target) {
 				bevybail!(
 					"entity #{source} references #{target}, which the scene \
 					does not hold"
@@ -362,8 +328,9 @@ impl ScenePlan {
 		}
 
 		let (resources, removed_resources) =
-			Self::resource_diff(registry, synced, next)?;
+			Self::resource_diff(registry, &keys, synced, next)?;
 		Self {
+			keys,
 			removed,
 			entities,
 			resources,
@@ -375,11 +342,12 @@ impl ScenePlan {
 	/// The resources to write and to remove.
 	fn resource_diff(
 		registry: &TypeRegistry,
+		keys: &EntityKeys,
 		synced: &Value,
 		next: &Value,
 	) -> Result<(Vec<Box<dyn PartialReflect>>, Vec<SmolStr>)> {
 		let resources = |scene: &Value| -> Result<Map> {
-			match scene.get(TEMPLATE_RESOURCES) {
+			match scene.get(SceneEntities::RESOURCES) {
 				Some(resources) => resources.as_map()?.clone().xok(),
 				None => Map::default().xok(),
 			}
@@ -389,7 +357,7 @@ impl ScenePlan {
 			.iter()
 			.filter(|(type_path, value)| old.0.get(*type_path) != Some(value))
 			.map(|(type_path, value)| {
-				deserialize_typed(registry, type_path, value)
+				deserialize_typed(registry, keys, type_path, value)
 					.map_err(|err| bevyhow!("resource `{type_path}`: {err}"))
 			})
 			.collect::<Result<Vec<_>>>()?;
@@ -413,7 +381,7 @@ impl ScenePlan {
 	) {
 		// removed entities despawn with their subtrees, which the plan proved
 		// the document no longer references
-		for key in self.removed {
+		for key in &self.removed {
 			let entity = world
 				.get_mut::<TemplateEntityMap>(host)
 				.unwrap()
@@ -430,20 +398,23 @@ impl ScenePlan {
 			let mapped = world
 				.get::<TemplateEntityMap>(host)
 				.unwrap()
-				.world(plan.key)
+				.world(&plan.key)
 				.filter(|entity| world.entities().contains(*entity));
 			if mapped.is_none() {
 				let entity = world.spawn_empty().id();
 				world
 					.get_mut::<TemplateEntityMap>(host)
 					.unwrap()
-					.insert(plan.key, entity);
+					.insert(&plan.key, entity);
 			}
 		}
 		let entity_map = world.get::<TemplateEntityMap>(host).unwrap().clone();
-		let mut mapper = KeyMapper(&entity_map);
+		let mut mapper = KeyMapper {
+			keys: &self.keys,
+			entity_map: &entity_map,
+		};
 		for plan in &self.entities {
-			let entity = entity_map.world(plan.key).unwrap();
+			let entity = entity_map.world(&plan.key).unwrap();
 			for component in &plan.apply {
 				apply_value(
 					world,
@@ -455,8 +426,15 @@ impl ScenePlan {
 				.expect("planned against this registry");
 			}
 			for type_path in &plan.remove {
-				if let Some(reflect) = reflect_component(registry, type_path) {
-					reflect.remove(&mut world.entity_mut(entity));
+				match reflect_component(registry, type_path) {
+					Some(reflect) => {
+						reflect.remove(&mut world.entity_mut(entity));
+					}
+					// a component the load held, dropped from where it is held
+					None => Unregistered::release(
+						&mut world.entity_mut(entity),
+						type_path,
+					),
 				}
 			}
 			// a root sits under the host, which is not a scene entity
@@ -478,18 +456,18 @@ impl ScenePlan {
 		// follow it, so a reparent lands where the document says and a reboot
 		// from the store reproduces the live order
 		let entities = SceneEntities::of(next).expect("planned");
-		let mut children_of = HashMap::<u32, Vec<Entity>>::default();
+		let mut children_of = HashMap::<EntityKey, Vec<Entity>>::default();
 		for key in entities.keys().expect("planned") {
-			if let Some(parent) = entities.target(key, SceneDocument::CHILD_OF)
+			if let Some(parent) = entities.target(&key, SceneDocument::CHILD_OF)
 			{
 				children_of
 					.entry(parent)
 					.or_default()
-					.push(entity_map.world(key).unwrap());
+					.push(entity_map.world(&key).unwrap());
 			}
 		}
 		for (parent, ordered) in children_of {
-			order_children(world, entity_map.world(parent).unwrap(), &ordered);
+			order_children(world, entity_map.world(&parent).unwrap(), &ordered);
 		}
 	}
 }
@@ -525,18 +503,23 @@ fn order_children(world: &mut World, parent: Entity, ordered: &[Entity]) {
 	}
 }
 
-/// Maps a file-key entity (`Entity::from_raw_u32(key)`, as a document writes a
-/// reference) to the live entity the document's [`TemplateEntityMap`] holds
-/// for it. Every key was proved present and made live before this runs.
-struct KeyMapper<'a>(&'a TemplateEntityMap);
+/// Maps the in-template entity a planned value holds in place of a key (see
+/// [`EntityKeys`]) to the live entity the document's [`TemplateEntityMap`]
+/// holds for that key. Every key was proved present and made live before this
+/// runs.
+struct KeyMapper<'a> {
+	keys: &'a EntityKeys,
+	entity_map: &'a TemplateEntityMap,
+}
 
 impl EntityMapper for KeyMapper<'_> {
 	fn get_mapped(&mut self, source: Entity) -> Entity {
 		if source == Entity::PLACEHOLDER {
 			return Entity::PLACEHOLDER;
 		}
-		self.0
-			.world(source.index_u32())
+		self.keys
+			.key(source)
+			.and_then(|key| self.entity_map.world(key))
 			.unwrap_or(Entity::PLACEHOLDER)
 	}
 	fn set_mapped(&mut self, _source: Entity, _target: Entity) {}
@@ -544,15 +527,18 @@ impl EntityMapper for KeyMapper<'_> {
 
 /// Records every entity a component references, mapping nothing.
 struct ReferenceCollector<'a> {
-	source: u32,
-	references: &'a mut Vec<(u32, u32)>,
+	keys: &'a EntityKeys,
+	source: &'a EntityKey,
+	references: &'a mut Vec<(EntityKey, EntityKey)>,
 }
 
 impl EntityMapper for ReferenceCollector<'_> {
 	fn get_mapped(&mut self, entity: Entity) -> Entity {
 		// a placeholder names no entity
-		if entity != Entity::PLACEHOLDER {
-			self.references.push((self.source, entity.index_u32()));
+		if entity != Entity::PLACEHOLDER
+			&& let Some(target) = self.keys.key(entity)
+		{
+			self.references.push((self.source.clone(), target));
 		}
 		entity
 	}
@@ -565,9 +551,10 @@ impl EntityMapper for ReferenceCollector<'_> {
 /// is unchanged by the walk.
 fn collect_references(
 	registry: &TypeRegistry,
+	keys: &EntityKeys,
 	component: &mut Box<dyn PartialReflect>,
-	source: u32,
-	references: &mut Vec<(u32, u32)>,
+	source: &EntityKey,
+	references: &mut Vec<(EntityKey, EntityKey)>,
 ) {
 	let Some(reflect) = component
 		.get_represented_type_info()
@@ -580,37 +567,32 @@ fn collect_references(
 	// `Reflect`; a dynamic that failed to convert holds no mappable entity
 	if let Some(concrete) = component.try_as_reflect_mut() {
 		reflect.map_entities(concrete, &mut ReferenceCollector {
+			keys,
 			source,
 			references,
 		});
 	}
 }
 
-/// Read a component or resource value as the registered type at `type_path`.
+/// Read a component or resource value as the registered type `name` names,
+/// its references as the in-template entities of `keys`.
 fn deserialize_typed(
 	registry: &TypeRegistry,
-	type_path: &str,
+	keys: &EntityKeys,
+	name: &str,
 	value: &Value,
 ) -> Result<Box<dyn PartialReflect>> {
-	let registration = registry
-		.get_with_type_path(type_path)
-		.ok_or_else(|| bevyhow!("`{type_path}` is not a registered type"))?;
-	TypedValueDeserializer {
-		registration,
-		registry,
-	}
-	.deserialize(ValueDeserializer::new(value.clone()))
-	.map_err(|err| bevyhow!("`{type_path}`: {err}"))
+	let registration = SceneBody::registration(registry, name)
+		.ok_or_else(|| bevyhow!("`{name}` is not a registered type"))?;
+	keys.deserialize(registration, registry, value)
 }
 
-/// The reflected component registered at `type_path`, if any.
+/// The reflected component `name` names, if any.
 fn reflect_component<'a>(
 	registry: &'a TypeRegistry,
-	type_path: &str,
+	name: &str,
 ) -> Option<&'a ReflectComponent> {
-	registry
-		.get_with_type_path(type_path)?
-		.data::<ReflectComponent>()
+	SceneBody::registration(registry, name)?.data::<ReflectComponent>()
 }
 
 /// Remove the resource registered at `type_path` from the world, if present.
@@ -738,7 +720,7 @@ mod test {
 	fn child(name: &str, parent: u32) -> Map {
 		Map::new([
 			(NAME, Value::str(name)),
-			(CHILD_OF, EntitySchema::reference(parent).unwrap()),
+			(CHILD_OF, EntityKey::from(parent).reference()),
 		])
 	}
 
@@ -748,7 +730,7 @@ mod test {
 			.insert_component(
 				key,
 				CHILD_OF,
-				EntitySchema::reference(parent).unwrap(),
+				EntityKey::from(parent).reference(),
 			)
 			.unwrap();
 	}
@@ -983,6 +965,46 @@ mod test {
 			.xpect_eq(entity(&world, host, 0));
 	}
 
+	/// A component this binary never registered is held by the load, not
+	/// written by an edit: it stays in the document and the store through
+	/// edits to everything around it, and removing it from the document
+	/// releases it.
+	#[crate::test]
+	fn a_held_component_survives_edits_until_removed() {
+		const SPARKLE: &str = "some_plugin::Sparkle";
+		let mut world = new_world();
+		let host = world.spawn_empty().id();
+		let body = SceneBody::from_bytes(&MediaBytes::new_json(format!(
+			r#"{{"entities":{{"0":{{"{NAME}":"root","{SPARKLE}":{{"amount":3}}}}}}}}"#
+		)))
+		.unwrap();
+		SceneDocument::load(&mut world, host, &body).unwrap();
+		let root = entity(&world, host, 0);
+		world
+			.get::<Unregistered>(root)
+			.unwrap()
+			.contains_key(SPARKLE)
+			.xpect_true();
+
+		edit(&mut world, host, |scene| {
+			entities(scene).insert_component(0, HEALTH, 4u64).unwrap();
+		});
+		world.get::<Health>(root).unwrap().xpect_eq(Health(4));
+		world
+			.get::<SceneDocument>(host)
+			.unwrap()
+			.to_bytes(MediaType::Json)
+			.unwrap()
+			.to_string()
+			.xpect_contains(r#""some_plugin::Sparkle":{"amount":3}"#);
+
+		edit(&mut world, host, |scene| {
+			entities(scene).remove_component(0, SPARKLE);
+		});
+		world.get::<Unregistered>(root).xpect_none();
+		world.get::<Health>(root).unwrap().xpect_eq(Health(4));
+	}
+
 	/// A reboot from the fork reproduces the edited world: same names, same
 	/// order, same values, keys intact.
 	#[crate::test]
@@ -993,14 +1015,11 @@ mod test {
 			reparent(scene, 2, 1);
 			entities(scene).insert_entity(3, child("c", 0));
 		});
-		let registry = world.resource::<AppTypeRegistry>().read();
-		let bytes = SceneDocument::to_bytes(
-			&registry,
-			&world.get::<Document>(host).unwrap().0,
-			MediaType::Json,
-		)
-		.unwrap();
-		drop(registry);
+		let bytes = world
+			.get::<SceneDocument>(host)
+			.unwrap()
+			.to_bytes(MediaType::Json)
+			.unwrap();
 
 		let mut rebooted = new_world();
 		let host = rebooted.spawn_empty().id();
@@ -1044,16 +1063,14 @@ mod conformance {
 	}
 
 	fn to_bytes(world: &World, host: Entity) -> String {
-		let registry = world.resource::<AppTypeRegistry>().read();
-		SceneDocument::to_bytes(
-			&registry,
-			&world.get::<Document>(host).unwrap().0,
-			MediaType::Json,
-		)
-		.unwrap()
-		.as_utf8()
-		.unwrap()
-		.to_string()
+		world
+			.get::<SceneDocument>(host)
+			.unwrap()
+			.to_bytes(MediaType::Json)
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.to_string()
 	}
 
 	/// Fork, then write the document: byte-identical to the fork. Boot from

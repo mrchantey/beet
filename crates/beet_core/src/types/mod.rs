@@ -28,7 +28,11 @@ pub use snippet::*;
 mod document;
 #[cfg(feature = "serde")]
 pub use document::*;
-#[cfg(feature = "serde")]
 mod entity_body;
-#[cfg(feature = "serde")]
 pub use entity_body::*;
+mod entity_key;
+pub use entity_key::*;
+#[cfg(feature = "serde")]
+mod scene_body;
+#[cfg(feature = "serde")]
+pub use scene_body::*;

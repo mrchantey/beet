@@ -78,8 +78,10 @@ standard_site_extra = ["dag_cbor", "json", "dep:imagesize"]
 # The network half of the standard.site records: an article's comments, the
 # replies to its announcement read live from the Bluesky AppView
 # (`<StandardSiteComments/>`). Without it the comments island fails over to
-# its fallback, the link to reply on Bluesky.
-atproto = ["dag_cbor", "json", "beet_net/atproto"]
+# its fallback, the link to reply on Bluesky. And the publish sequence, which
+# writes each document's `content` as a scene (`org.beet.scene#body`) by
+# default, so it carries the scene lexicon (`template_serde`).
+atproto = ["dag_cbor", "json", "template_serde", "beet_net/atproto"]
 # Deriving the site's images: an `<IconSet/>`'s files from its source image
 # (decode, resize and encode through `image`, `ico` for the multi-size favicon,
 # svg rasterisation through `resvg`) and a `<SocialCards/>` set (an svg per

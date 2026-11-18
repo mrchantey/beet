@@ -104,8 +104,8 @@ impl CheckReport {
 	/// `bx:style`/`inline_class!` rule a route registers at build time is matched
 	/// rather than flagged unknown.
 	///
-	/// The pass opens on `root`'s own structure: an unresolvable tag loads as an
-	/// inert [`UnregisteredTag`] entity in every binary, so this, run by a
+	/// The pass opens on `root`'s own structure: an unresolvable tag or spread
+	/// loads held in an [`Unregistered`] in every binary, so this, run by a
 	/// binary that registers everything, is where the typo it might be surfaces
 	/// as an error. It closes on the derived files the document declares, each
 	/// missing or stale one a diagnostic, which a narrowed pass skips since no
@@ -190,8 +190,8 @@ impl CheckReport {
 	}
 }
 
-/// Every [`UnregisteredTag`] in `root`'s subtree, as an
-/// [`UnknownTag`](DiagnosticKind::UnknownTag) diagnostic.
+/// Every component held [`Unregistered`] in `root`'s subtree, as an
+/// [`Unregistered`](DiagnosticKind::Unregistered) diagnostic.
 ///
 /// Route *content* is scanned per route by [`render_diagnostics`] once it is
 /// built; this covers the document's own structure, which is present from load.
@@ -200,19 +200,17 @@ fn unregistered_tags(
 	root: Entity,
 	config: &RenderDiagnostics,
 ) -> Vec<Diagnostic> {
-	let severity = config.severity(DiagnosticKind::UnknownTag);
+	let severity = config.severity(DiagnosticKind::Unregistered);
 	if severity == DiagnosticSeverity::Off {
 		return Vec::new();
 	}
-	world.with_state::<(Query<&UnregisteredTag>, Query<&Children>), _>(
-		|(tags, children)| {
-			children
-				.iter_descendants_inclusive(root)
-				.filter_map(|entity| tags.get(entity).ok())
-				.map(|tag| Diagnostic::unregistered_tag(tag, severity))
-				.collect()
-		},
-	)
+	world.with_state::<UnregisteredQuery, _>(|query| {
+		query
+			.names(root)
+			.into_iter()
+			.map(|name| Diagnostic::unregistered(name, severity))
+			.collect()
+	})
 }
 
 /// Every file a [`RoutesDir`] in `root`'s subtree failed to serve
@@ -415,12 +413,12 @@ async fn build_and_scan(
 				.await
 		}
 		// a build that bailed with an `Err` (not riding `TemplateError`) is still a
-		// loud, route-attached unknown-tag error rather than a silent skip.
-		Err(error) => match config.severity(DiagnosticKind::UnknownTag) {
+		// loud, route-attached unregistered error rather than a silent skip.
+		Err(error) => match config.severity(DiagnosticKind::Unregistered) {
 			DiagnosticSeverity::Off => Vec::new(),
 			severity => vec![
 				Diagnostic::new(
-					DiagnosticKind::UnknownTag,
+					DiagnosticKind::Unregistered,
 					severity,
 					format!("failed to build route: {error}"),
 				)
@@ -660,27 +658,58 @@ mod test {
 		report.warn_count().xpect_eq(1);
 	}
 
-	/// An unresolvable tag loads as an inert entity in every binary, so this pass,
-	/// run by a binary that registers everything, is where it surfaces as the
-	/// typo it is, even though it sits in the document rather than in any route's
-	/// rendered content.
+	/// An unresolvable tag or spread loads held on its entity in every binary,
+	/// so this pass, run by a binary that registers everything, is where each
+	/// surfaces as the typo it is, even though it sits in the document rather
+	/// than in any route's rendered content.
 	#[beet_core::test]
-	async fn unregistered_tag_errors() {
+	async fn unregistered_errors() {
 		let mut world = check_world();
-		let router = world
-			.spawn((Router, children![
-				render_action::fixed_func_route("", || rsx! { <p>"home"</p> }),
-				UnregisteredTag::new("Butonn"),
-			]))
-			.flush();
+		let router = world.spawn(Router).id();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(router),
+			&MediaBytes::new_bsx(
+				r#"<Butonn label="go"/><div {Mispelt{size: 2}}/>"#,
+			),
+		))
+		.unwrap();
+		world.flush();
+		let report = check(&mut world, router).await;
+		report.has_errors().xpect_true();
+		for name in ["Butonn", "Mispelt"] {
+			report
+				.diagnostics
+				.iter()
+				.any(|diagnostic| {
+					diagnostic.kind == DiagnosticKind::Unregistered
+						&& diagnostic.message.contains(name)
+				})
+				.xpect_true();
+		}
+	}
+
+	/// A scene body naming a component this binary never registered spawns its
+	/// entity without it and holds it, which this pass elevates to an error
+	/// exactly as it does a tag markup wrote.
+	#[cfg(all(feature = "json", feature = "template_serde"))]
+	#[beet_core::test]
+	async fn an_unregistered_scene_component_errors() {
+		let mut world = check_world();
+		let router = world.spawn(Router).id();
+		TemplateLoader::new(&mut world)
+			.with_entity(router)
+			.load(&MediaBytes::new_json(
+				r#"{"entities":{"0":{"some_plugin::Sparkle":{"amount":3}}}}"#,
+			))
+			.unwrap();
 		let report = check(&mut world, router).await;
 		report.has_errors().xpect_true();
 		report
 			.diagnostics
 			.iter()
 			.any(|diagnostic| {
-				diagnostic.kind == DiagnosticKind::UnknownTag
-					&& diagnostic.message.contains("Butonn")
+				diagnostic.kind == DiagnosticKind::Unregistered
+					&& diagnostic.message.contains("some_plugin::Sparkle")
 			})
 			.xpect_true();
 	}

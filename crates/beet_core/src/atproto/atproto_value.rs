@@ -6,7 +6,9 @@ use base64::Engine;
 /// what lets every consumer (the DAG-CBOR encoder, a cid) be infallible.
 ///
 /// Bytes are `{"$bytes": "<base64>"}`, a link is `{"$link": "<cid>"}`,
-/// integers are signed 64 bit, and there are no floats at all, since a float
+/// integers are signed 64 bit, held the one way the wire reads them back
+/// (unsigned when not negative) so a value compares equal to its own round
+/// trip, and there are no floats at all, since a float
 /// has no canonical encoding to hash. A beet component holds floats freely, so a float crosses into the
 /// data model as a self-describing object:
 ///
@@ -154,6 +156,9 @@ impl AtprotoValue {
 
 	fn encode(value: Value) -> Value {
 		match value {
+			// the data model has one integer, which json and DAG-CBOR both
+			// read back unsigned when it is not negative
+			Value::Int(int) if int >= 0 => Value::Uint(int as u64),
 			Value::Float(float) => value!({
 				"$type": (Self::FLOAT.as_str()),
 				"value": (float.to_string())
@@ -315,6 +320,25 @@ impl<'de> Deserialize<'de> for AtprotoValue {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+
+	/// An integer has one form however it was typed, so a record equals what
+	/// a repo answers for it.
+	#[crate::test]
+	fn integers_have_one_form() {
+		let record = AtprotoValue::try_from(value!({
+			"signed": 3i64,
+			"unsigned": 3u64,
+			"negative": (-3i64)
+		}))
+		.unwrap();
+		record.clone().decode().xpect_eq(
+			value!({ "signed": 3u64, "unsigned": 3u64, "negative": (-3i64) }),
+		);
+		#[cfg(feature = "json")]
+		AtprotoValue::from_json(record.to_json())
+			.unwrap()
+			.xpect_eq(record);
+	}
 
 	/// Every float survives exactly, the ones a decimal string most often
 	/// loses included.

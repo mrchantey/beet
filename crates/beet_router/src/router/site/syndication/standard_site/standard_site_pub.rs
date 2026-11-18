@@ -57,10 +57,11 @@ pub async fn StandardSitePub(
 	/// `textContent`.
 	#[field(no_clone, default = true)]
 	text_content: bool,
-	/// The lexicon def each document's `content` carries the post as, ie
-	/// `pub.leaflet.content` with the `standard_site_extra` feature; none, the
-	/// default, for no `content`. Rendered through the [`LexiconRenderers`]
-	/// where the publish step renders, never resolved at build.
+	/// The lexicon def each document's `content` carries the post as:
+	/// `org.beet.scene#body` by default, the post itself as a beet scene, else
+	/// ie `pub.leaflet.content` with the `standard_site_extra` feature.
+	/// Rendered through the [`LexiconRenderers`] where the publish step
+	/// renders, never resolved at build.
 	///
 	/// [`LexiconRenderers`]: beet_ui::prelude::LexiconRenderers
 	#[field(no_clone, default = StandardSitePub::default_content())]
@@ -110,9 +111,9 @@ impl StandardSitePub {
 	/// uri from, a publication at a path appending it.
 	const WELL_KNOWN: &str = ".well-known/site.standard.publication";
 
-	/// The `content` def a declaration names unless it says otherwise: none,
-	/// so a document carries its post as `textContent` alone.
-	fn default_content() -> Option<Nsid> { None }
+	/// The `content` def a declaration names unless it says otherwise:
+	/// `org.beet.scene#body`, the post itself as a beet scene.
+	fn default_content() -> Option<Nsid> { Some(SceneBody::NSID) }
 
 	/// The publication's url: [`PackageConfig::homepage`] joined with the
 	/// declaration's path, its trailing slash trimmed as the lexicon asks.

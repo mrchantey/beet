@@ -1,7 +1,9 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A [`DocRenderer`] that serializes the entity subtree via [`TemplateSaver`].
+/// A [`DocRenderer`] that serializes the entity subtree via [`TemplateSaver`],
+/// as the scene whose root the entity is: a parent above it is no part of the
+/// document.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct TemplateRenderer {}
 
@@ -44,8 +46,8 @@ impl DocRenderer for TemplateRenderer {
 	) -> Result<MediaBytes, RenderError> {
 		let media_type = Self::negotiate(&cx.accepts())?;
 		TemplateSaver::new()
-			.with_entity_tree(cx.world, cx.entity)
-			.save(cx.world, media_type)?
+			.save_roots_mapped(cx.world, media_type, &[cx.entity], default())?
+			.0
 			.xok()
 	}
 }

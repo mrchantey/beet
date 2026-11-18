@@ -15,7 +15,7 @@ use beet_core::prelude::*;
 /// On first boot the authored original at `from` (a `.bsx` in the same store)
 /// is built, its first entity marked [`SceneFork`], and the built scene saved to
 /// `path`; every later boot loads `path` and never reads the original again.
-/// Every edit to the scene document is written back to `path`, so an edit
+/// Every edit the world accepted is written back to `path`, so an edit
 /// outlives the process and the next boot reproduces the edited world.
 ///
 /// ```rsx
@@ -129,13 +129,12 @@ async fn read_scene_blob(
 	store.insert(&path, fork).await
 }
 
-/// Write each edited scene document back to its store.
+/// Write each edited scene document back to its store, once the world
+/// follows the edit: a [`SceneDocument`] changes when its sync applies one, so
+/// an edit the sync refused is never written.
 pub(crate) fn write_scene_blobs(
 	mut async_commands: AsyncCommands,
-	edited: Populated<
-		(Entity, &SceneBlob, &Blob),
-		(With<SceneDocument>, Changed<Document>),
-	>,
+	edited: Populated<(Entity, &SceneBlob, &Blob), Changed<SceneDocument>>,
 	just_loaded: Query<(), Added<SceneDocument>>,
 ) {
 	for (entity, blob, handle) in edited.iter() {
@@ -159,8 +158,8 @@ pub(crate) fn write_scene_blobs(
 	}
 }
 
-/// One write: the document as it stands *now*, through the format's own
-/// serializer so entity order and the sorted component maps match the fork.
+/// One write: the scene the world reflects *now*, as the format writes it, so
+/// entity order and the sorted component maps match the fork.
 async fn write_scene_blob(
 	entity: &AsyncEntity,
 	blob: &Blob,
@@ -169,11 +168,12 @@ async fn write_scene_blob(
 	let subject = blob.path().clone();
 	let bytes = entity
 		.with(move |entity| -> Result<MediaBytes> {
-			let document = entity.get::<Document>().ok_or_else(|| {
-				bevyhow!("`{subject}` holds no scene document to write")
-			})?;
-			let registry = entity.world().resource::<AppTypeRegistry>().read();
-			SceneDocument::to_bytes(&registry, &document.0, media_type)
+			entity
+				.get::<SceneDocument>()
+				.ok_or_else(|| {
+					bevyhow!("`{subject}` holds no scene document to write")
+				})?
+				.to_bytes(media_type)
 		})
 		.await??;
 	blob.insert(bytes).await
@@ -309,7 +309,7 @@ mod test {
 			.unwrap()
 			.xpect_false();
 		// the first edit is the visitor's fork
-		edit_heading(&mut app, host, key, "Groceries").await;
+		edit_heading(&mut app, host, &key, "Groceries").await;
 		local
 			.exists(&RelPath::from("app.json"))
 			.await
@@ -324,11 +324,11 @@ mod test {
 			.xnot()
 			.xpect_contains("Groceries");
 		let (rebooted, host) = boot(fork).await;
-		heading(&rebooted, host, key).xpect_eq("Groceries");
+		heading(&rebooted, host, &key).xpect_eq("Groceries");
 	}
 
 	/// The file key of the entity whose text is the heading.
-	fn heading_key(app: &App, host: Entity) -> u32 {
+	fn heading_key(app: &App, host: Entity) -> EntityKey {
 		let scene = &app.world().get::<Document>(host).unwrap().0;
 		let entities = SceneEntities::of(scene).unwrap();
 		entities
@@ -337,7 +337,7 @@ mod test {
 			.into_iter()
 			.find(|key| {
 				entities
-					.component(*key, VALUE)
+					.component(key, VALUE)
 					.is_some_and(|value| value.as_str().ok() == Some("Todos"))
 			})
 			.unwrap()
@@ -345,7 +345,12 @@ mod test {
 
 	/// Retype the heading through the document, settled so the world followed
 	/// and the write landed.
-	async fn edit_heading(app: &mut App, host: Entity, key: u32, text: &str) {
+	async fn edit_heading(
+		app: &mut App,
+		host: Entity,
+		key: &EntityKey,
+		text: &str,
+	) {
 		SceneEntities::of_mut(
 			&mut app.world_mut().get_mut::<Document>(host).unwrap().0,
 		)
@@ -357,7 +362,7 @@ mod test {
 	}
 
 	/// The heading's live text.
-	fn heading(app: &App, host: Entity, key: u32) -> String {
+	fn heading(app: &App, host: Entity, key: &EntityKey) -> String {
 		let entity = app
 			.world()
 			.get::<TemplateEntityMap>(host)
@@ -381,12 +386,12 @@ mod test {
 		// the element entities carry `Element`, and a text node its `Value`;
 		// rename the heading by editing the text
 		let key = heading_key(&app, host);
-		edit_heading(&mut app, host, key, "Groceries").await;
+		edit_heading(&mut app, host, &key, "Groceries").await;
 		// the live world followed
-		heading(&app, host, key).xpect_eq("Groceries");
+		heading(&app, host, &key).xpect_eq("Groceries");
 
 		// a fresh process over the same store boots from the fork
 		let (rebooted, host) = boot(store).await;
-		heading(&rebooted, host, key).xpect_eq("Groceries");
+		heading(&rebooted, host, &key).xpect_eq("Groceries");
 	}
 }

@@ -466,10 +466,10 @@ fn qualified_transform_tag_disambiguates() {
 		.xpect_false();
 	world
 		.entity(root)
-		.get::<UnregisteredTag>()
+		.get::<Unregistered>()
 		.unwrap()
-		.as_str()
-		.xpect_eq("Transform");
+		.contains_key("Transform")
+		.xpect_true();
 }
 
 // ---- template formats: a `.js` file registers as a `<script>` template ------

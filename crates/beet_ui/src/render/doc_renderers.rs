@@ -178,8 +178,8 @@ impl DocRenderers {
 
 /// Registers the built-in doc renderers: html, xml, markdown, plain text,
 /// and with their features ansi (`style`) and the serialized scene
-/// (`template_serde`), and the empty lexicon registries ([`LexiconRenderers`],
-/// [`LexiconParsers`]).
+/// (`template_serde`), and the lexicon registries ([`LexiconRenderers`],
+/// [`LexiconParsers`]), holding `org.beet.scene#body` (`template_serde`).
 #[derive(Default)]
 pub struct RenderPlugin;
 
@@ -193,12 +193,12 @@ impl Plugin for RenderPlugin {
 		));
 		#[cfg(feature = "style")]
 		app.install(AnsiTermRenderer::default());
-		#[cfg(feature = "template_serde")]
-		app.install(TemplateRenderer::default());
 		// the lexicon registries, filled by each lexicon's installer
 		app.init_resource::<LexiconRenderers>()
 			.init_resource::<LexiconParsers>()
 			.register_type::<UnknownLexicon>();
+		#[cfg(feature = "template_serde")]
+		app.install((TemplateRenderer::default(), SceneBodyLexicon));
 	}
 }
 

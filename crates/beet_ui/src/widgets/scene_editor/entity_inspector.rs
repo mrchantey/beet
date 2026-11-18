@@ -38,7 +38,7 @@ pub(super) struct InspectorHolder {
 }
 
 /// What an inspector's generation was built for.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 enum Shown {
 	#[default]
 	Nothing,
@@ -47,7 +47,7 @@ enum Shown {
 	/// A scene with nothing selected.
 	NoSelection,
 	/// The entity at this key.
-	Entity(u32),
+	Entity(EntityKey),
 }
 
 /// The structural edits the inspector's header offers, which the form over
@@ -76,12 +76,12 @@ pub(super) fn rebuild_inspectors(
 		let wanted = match selection {
 			None => Shown::NoScene,
 			Some(SceneSelection(None)) => Shown::NoSelection,
-			Some(SceneSelection(Some(key))) => Shown::Entity(*key),
+			Some(SceneSelection(Some(key))) => Shown::Entity(key.clone()),
 		};
 		if holder.shown == wanted {
 			continue;
 		}
-		holder.shown = wanted;
+		holder.shown = wanted.clone();
 		for child in children.into_iter().flat_map(|children| children.iter()) {
 			commands.entity(child).despawn();
 		}
@@ -99,7 +99,7 @@ fn generation(shown: Shown) -> Snippet {
 		}
 		Shown::NoSelection => empty_note("Select an entity in the tree"),
 		Shown::Entity(key) => {
-			let field = FieldRef::new(SceneEntities::entity_path(key));
+			let field = FieldRef::new(SceneEntities::entity_path(&key));
 			rsx! {
 				<div {Classes::new([SCENE_INSPECTOR_HEADER])}>
 					{title(key)}
@@ -129,11 +129,12 @@ fn generation(shown: Shown) -> Snippet {
 /// The entity's label as the tree shows it, riding its own rebuild keyed on
 /// the label so a rename reaches the title without regenerating the form
 /// being typed into.
-fn title(key: u32) -> Snippet {
+fn title(key: EntityKey) -> Snippet {
+	let label_key = key.clone();
 	let rebuild = ValueRebuild::new(
-		move |scene| vec![RebuildKey::Name(label(scene, key).into())],
+		move |scene| vec![RebuildKey::Name(label(scene, &label_key).into())],
 		move |_resolver, scene, _key| {
-			let label = label(scene, key);
+			let label = label(scene, &key);
 			rsx! { <span {Classes::new([SCENE_INSPECTOR_TITLE])}>{label}</span> }
 				.any_snippet()
 		},
@@ -143,7 +144,7 @@ fn title(key: u32) -> Snippet {
 
 /// The label of the entity at `key` in `scene`, or the key alone while the
 /// document has not synced.
-fn label(scene: &Value, key: u32) -> String {
+fn label(scene: &Value, key: &EntityKey) -> String {
 	SceneEntities::of(scene)
 		.map(|entities| entities.label(key))
 		.unwrap_or_else(|_| key.to_string())
@@ -166,14 +167,14 @@ fn apply_inspector_action(
 	let Some(host) = scene.host(target) else {
 		return OK;
 	};
-	let Some(selected) = selections.get(host)?.0 else {
+	let Some(selected) = selections.get(host)?.0.clone() else {
 		return OK;
 	};
 	let action = *action;
 	let next =
 		docs.with_field(target, &FieldRef::default(), |scene| match action {
-			InspectorAction::AddChild => add_child(scene, selected),
-			InspectorAction::Remove => remove(scene, selected),
+			InspectorAction::AddChild => add_child(scene, &selected),
+			InspectorAction::Remove => remove(scene, &selected),
 		})??;
 	selections.get_mut(host)?.set_if_neq(SceneSelection(next));
 	OK
@@ -181,40 +182,38 @@ fn apply_inspector_action(
 
 /// Add an entity under `parent`, keyed above every key the scene holds, and
 /// answer its key for selection.
-fn add_child(scene: &mut Value, parent: u32) -> Result<Option<u32>> {
-	let key = SceneEntities::of(scene)?
-		.keys()?
-		.into_iter()
-		.max()
-		.map(|key| key + 1)
-		.unwrap_or_default();
+fn add_child(
+	scene: &mut Value,
+	parent: &EntityKey,
+) -> Result<Option<EntityKey>> {
+	let key = SceneEntities::of(scene)?.mint()?;
 	SceneEntities::of_mut(scene)?.insert_entity(
-		key,
-		Map::new([(ChildOf::type_path(), EntitySchema::reference(parent)?)]),
+		&key,
+		Map::new([(ChildOf::type_path(), parent.reference())]),
 	);
 	Some(key).xok()
 }
 
 /// Remove `key` and every entity it owns, transitively, answering the parent
 /// it sat under for selection.
-fn remove(scene: &mut Value, key: u32) -> Result<Option<u32>> {
+fn remove(scene: &mut Value, key: &EntityKey) -> Result<Option<EntityKey>> {
 	let entities = SceneEntities::of(scene)?;
 	let parent = entities.target(key, ChildOf::type_path());
 	// an owner is a parent or, for an attribute entity, its element
-	let owner = |key: u32| {
+	let owner = |key: &EntityKey| {
 		entities
 			.target(key, ChildOf::type_path())
 			.or_else(|| entities.target(key, AttributeOf::type_path()))
 	};
-	let mut removed = vec![key];
-	let mut frontier = vec![key];
+	let mut removed = vec![key.clone()];
+	let mut frontier = vec![key.clone()];
 	while let Some(current) = frontier.pop() {
 		for owned in entities
 			.keys()?
 			.into_iter()
-			.filter(|candidate| owner(*candidate) == Some(current))
+			.filter(|candidate| owner(candidate).as_ref() == Some(&current))
 		{
-			removed.push(owned);
+			removed.push(owned.clone());
 			frontier.push(owned);
 		}
 	}
@@ -353,7 +352,7 @@ mod test {
 		world
 			.get::<SceneSelection>(host)
 			.unwrap()
-			.xpect_eq(SceneSelection(Some(6)));
+			.xpect_eq(SceneSelection(Some(6.into())));
 		let paragraph = test_ext::live(&world, host, 3);
 		let child = test_ext::live(&world, host, 6);
 		world
@@ -369,7 +368,7 @@ mod test {
 		world
 			.get::<SceneSelection>(host)
 			.unwrap()
-			.xpect_eq(SceneSelection(Some(0)));
+			.xpect_eq(SceneSelection(Some(0.into())));
 		world.get_entity(paragraph).is_err().xpect_true();
 		world.get_entity(child).is_err().xpect_true();
 		let scene = test_ext::document_of(&mut world, host);

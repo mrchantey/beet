@@ -181,7 +181,7 @@ impl BsxTemplateRegistry {
 /// a registry tag (`Styles.bsx` reading `<widgets::Swatch/>`) makes one entity
 /// the instance of both.
 ///
-/// The positive twin of [`UnregisteredTag`]: that marks a tag nothing resolved,
+/// The positive twin of [`Unregistered`]: that holds a tag nothing resolved,
 /// this marks one the [`BsxTemplateRegistry`] did. A built tree so names every
 /// template it instantiated, which is what promotes an edit to one of them to a
 /// structural rebuild of that tree (the live-reload driver) and lets a devtool

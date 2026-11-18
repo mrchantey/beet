@@ -103,8 +103,8 @@ pub struct SceneEditorRoot;
 /// Written by the [`SceneTree`]'s rows, read by the [`EntityInspector`], and
 /// `None` until something is selected or when the selected entity was removed
 /// from the document.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Component)]
-pub struct SceneSelection(pub Option<u32>);
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component)]
+pub struct SceneSelection(pub Option<EntityKey>);
 
 /// System: bind each unbound editor to its scene, and give the scene a
 /// selection.
@@ -147,7 +147,7 @@ pub(super) fn clear_stale_selections(
 	mut hosts: Populated<(&Document, &mut SceneSelection), Changed<Document>>,
 ) {
 	for (document, mut selection) in hosts.iter_mut() {
-		let stale = selection.0.is_some_and(|key| {
+		let stale = selection.0.as_ref().is_some_and(|key| {
 			!SceneEntities::of(&document.0)
 				.is_ok_and(|entities| entities.contains(key))
 		});

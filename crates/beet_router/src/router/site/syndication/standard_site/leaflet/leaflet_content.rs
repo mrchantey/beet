@@ -13,9 +13,6 @@ pub struct LeafletContent {
 impl LeafletContent {
 	/// The def a document's `content` names this format by.
 	pub const NSID: Nsid = Nsid::new_static("pub.leaflet.content");
-	/// The most a record's content may weigh: a repo block is capped at a
-	/// megabyte.
-	pub const BUDGET: usize = 1_000_000;
 }
 
 /// `pub.leaflet.pages.linearDocument`: one page, its blocks top to bottom.

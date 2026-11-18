@@ -206,10 +206,10 @@ impl<'a> Exporter<'a> {
 				}
 				map
 			}
-			// a file key rather than a number, but it travels as one.
+			// the file key of the entity referenced, never an empty one.
 			ValueSchema::Entity(_) => {
-				let mut map = keyword("integer");
-				map.insert("minimum", 0u64);
+				let mut map = keyword("string");
+				map.insert("minLength", 1u64);
 				map
 			}
 			ValueSchema::Struct(schema) => {
@@ -714,7 +714,7 @@ mod test {
 		.xpect_eq("#/$defs/Leaf");
 	}
 
-	/// An entity field is a file key, exported as a non-negative integer rather
+	/// An entity field is a file key, exported as a non-empty string rather
 	/// than the opaque fallthrough.
 	#[crate::test]
 	fn an_entity_field_is_a_file_key() {
@@ -723,10 +723,10 @@ mod test {
 			target: Entity,
 		}
 		let schema = schema_of::<Link>();
-		string_at(&schema, "properties/target/type").xpect_eq("integer");
-		at(&schema, "properties/target/minimum")
+		string_at(&schema, "properties/target/type").xpect_eq("string");
+		at(&schema, "properties/target/minLength")
 			.clone()
-			.xpect_eq(Value::Uint(0));
+			.xpect_eq(Value::Uint(1));
 	}
 
 	/// Nothing is known about an unregistered opaque type, which JSON Schema

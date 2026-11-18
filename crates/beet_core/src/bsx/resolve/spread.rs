@@ -84,10 +84,12 @@ fn apply_spread(
 ///
 /// A name with no registered type is a capability this binary did not link (eg a
 /// `<Router {(.., TuiServer)}>` spread loaded by a lean http-only deploy that
-/// dropped the `tui` feature). Skip it with a warning rather than failing the
-/// whole load, so the same site serves the subset each binary supports; a name
-/// the binary marked [`AllowedUnregistered`] is known to be featured out (the
-/// browser runtime's `TuiServer`), so it skips silently.
+/// dropped the `tui` feature). Leave it off with a warning rather than failing
+/// the whole load, so the same site serves the subset each binary supports,
+/// and hold its literal in the entity's [`Unregistered`], where `beet check`
+/// finds the typo it might be; a name the binary marked
+/// [`AllowedUnregistered`] is known to be featured out (the browser runtime's
+/// `TuiServer`), so it skips silently and is held nowhere.
 pub(super) fn apply_spread_named(
 	named: &NamedLiteral,
 	entity: &mut EntityWorldMut,
@@ -111,8 +113,13 @@ pub(super) fn apply_spread_named(
 				.is_some_and(|allowed| allowed.contains(&named.name));
 			if !featured_out {
 				warn!(
-					"skipping spread `{}`: no component or template of that name is registered in this binary",
+					"spread `{}` left off: no component or template of that name is registered in this binary",
 					named.name
+				);
+				Unregistered::hold(
+					entity,
+					named.name.clone(),
+					named_to_held(named),
 				);
 			}
 			return Ok(());

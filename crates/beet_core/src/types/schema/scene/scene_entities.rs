@@ -51,7 +51,9 @@ impl<'a> SceneEntities<'a> {
 	/// A scene document holding `entities`, each exactly its component map, in
 	/// the given order, and no resources: the fixture every scene test starts
 	/// from.
-	pub fn scene(entities: impl IntoIterator<Item = (u32, Map)>) -> Value {
+	pub fn scene<K: Into<EntityKey>>(
+		entities: impl IntoIterator<Item = (K, Map)>,
+	) -> Value {
 		let mut scene = Value::map();
 		scene.insert(Self::RESOURCES, Map::default()).unwrap();
 		scene.insert(Self::ENTITIES, Map::default()).unwrap();
@@ -69,17 +71,17 @@ impl<'a> SceneEntities<'a> {
 	#[cfg(feature = "json")]
 	pub fn entity_json(
 		scene: &serde_json::Value,
-		key: u32,
+		key: impl Into<EntityKey>,
 	) -> &serde_json::Value {
-		&scene[Self::ENTITIES][key.to_string()]
+		&scene[Self::ENTITIES][key.into().as_str()]
 	}
 
 	/// The path of the entity at `key` within its scene document: its
 	/// component map, what a form over it binds.
-	pub fn entity_path(key: u32) -> FieldPath {
+	pub fn entity_path(key: impl Into<EntityKey>) -> FieldPath {
 		FieldPath::new([
 			FieldSegment::key(Self::ENTITIES),
-			FieldSegment::key(key.to_string()),
+			FieldSegment::key(key.into().as_str()),
 		])
 	}
 
@@ -88,7 +90,7 @@ impl<'a> SceneEntities<'a> {
 	/// `entities.3.bevy_ecs::hierarchy::ChildOf[.target]`. `None` for a path
 	/// into anything else, which an entity picker takes to mean no relation to
 	/// filter by.
-	pub fn position(path: &[FieldSegment]) -> Option<(u32, &str)> {
+	pub fn position(path: &[FieldSegment]) -> Option<(EntityKey, &str)> {
 		match path {
 			[
 				FieldSegment::ObjectKey(entities),
@@ -96,7 +98,7 @@ impl<'a> SceneEntities<'a> {
 				FieldSegment::ObjectKey(type_path),
 				..,
 			] if entities == Self::ENTITIES => {
-				Some((key.parse().ok()?, type_path.as_str()))
+				Some((EntityKey::parse(key).ok()?, type_path.as_str()))
 			}
 			_ => None,
 		}
@@ -105,49 +107,71 @@ impl<'a> SceneEntities<'a> {
 	/// The file key of every entity, in **document order**, which is child
 	/// order: the build path applies each `ChildOf` in this order, so a parent's
 	/// `Children` come out in it.
-	pub fn keys(&self) -> Result<Vec<u32>> {
+	pub fn keys(&self) -> Result<Vec<EntityKey>> {
 		self.entities
 			.0
 			.keys()
-			.map(|key| {
-				key.parse::<u32>().map_err(|_| {
-					bevyhow!("entity key `{key}` is not a file key")
-				})
-			})
+			.map(|key| EntityKey::parse(key))
 			.collect()
+	}
+
+	/// The key a new entity takes: minted above every minted key the scene
+	/// holds, so it collides with none.
+	pub fn mint(&self) -> Result<EntityKey> {
+		self.keys()?
+			.iter()
+			.filter_map(EntityKey::index)
+			.max()
+			.map(|index| index.saturating_add(1))
+			.unwrap_or_default()
+			.xmap(EntityKey::minted)
+			.xok()
 	}
 
 	/// The file keys of the entities whose `relation` targets `parent`, in
 	/// document order: for `ChildOf`, the `Children` the document describes.
-	pub fn related(&self, relation: &str, parent: u32) -> Result<Vec<u32>> {
+	pub fn related(
+		&self,
+		relation: &str,
+		parent: impl Into<EntityKey>,
+	) -> Result<Vec<EntityKey>> {
+		let parent = Some(parent.into());
 		self.keys()?
 			.into_iter()
-			.filter(|key| self.target(*key, relation) == Some(parent))
+			.filter(|key| self.target(key, relation) == parent)
 			.collect::<Vec<_>>()
 			.xok()
 	}
 
 	/// Whether the scene holds an entity at `key`.
-	pub fn contains(&self, key: u32) -> bool {
-		self.entities.contains(&key.to_string())
+	pub fn contains(&self, key: impl Into<EntityKey>) -> bool {
+		self.entities.contains(key.into().as_str())
 	}
 
 	/// The components of the entity at `key`, which is the entity itself, if
 	/// the scene holds one.
-	pub fn components(&self, key: u32) -> Option<&'a Map> {
-		self.entities.0.get(key.to_string().as_str())?.as_map().ok()
+	pub fn components(&self, key: impl Into<EntityKey>) -> Option<&'a Map> {
+		self.entities.0.get(key.into().as_str())?.as_map().ok()
 	}
 
 	/// The component at `type_path` of the entity at `key`, if it holds one.
-	pub fn component(&self, key: u32, type_path: &str) -> Option<&'a Value> {
+	pub fn component(
+		&self,
+		key: impl Into<EntityKey>,
+		type_path: &str,
+	) -> Option<&'a Value> {
 		self.components(key)?.0.get(type_path)
 	}
 
 	/// The entity `key`'s target under `relation` (a component type path), when
 	/// it holds one.
-	pub fn target(&self, key: u32, relation: &str) -> Option<u32> {
+	pub fn target(
+		&self,
+		key: impl Into<EntityKey>,
+		relation: &str,
+	) -> Option<EntityKey> {
 		self.component(key, relation)
-			.and_then(EntitySchema::file_key)
+			.and_then(EntityKey::of_reference)
 	}
 
 	/// Whether pointing `source`'s `relation` at `target` would form a cycle:
@@ -158,16 +182,16 @@ impl<'a> SceneEntities<'a> {
 	pub fn would_cycle(
 		&self,
 		relation: &str,
-		source: u32,
-		target: u32,
+		source: impl Into<EntityKey>,
+		target: impl Into<EntityKey>,
 	) -> bool {
-		let mut current = target;
+		let (source, mut current) = (source.into(), target.into());
 		// a chain longer than the entity count is already a cycle elsewhere
 		for _ in 0..=self.entities.0.len() {
 			if current == source {
 				return true;
 			}
-			match self.target(current, relation) {
+			match self.target(&current, relation) {
 				Some(next) => current = next,
 				None => return false,
 			}
@@ -185,14 +209,15 @@ impl<'a> SceneEntities<'a> {
 		&self,
 		types: &TypeRegistry,
 		relation: &str,
-		source: u32,
-	) -> Result<Vec<u32>> {
+		source: impl Into<EntityKey>,
+	) -> Result<Vec<EntityKey>> {
+		let source = source.into();
 		let acyclic =
 			RelationMeta::of(types, relation).is_some_and(|meta| meta.acyclic);
 		self.keys()?
 			.into_iter()
 			.filter(|target| {
-				!acyclic || !self.would_cycle(relation, source, *target)
+				!acyclic || !self.would_cycle(relation, &source, target)
 			})
 			.collect::<Vec<_>>()
 			.xok()
@@ -203,8 +228,9 @@ impl<'a> SceneEntities<'a> {
 	/// for an attribute, `#5 "hi"` for a text node, else the first component it
 	/// holds that is not an owner relation, so a `<ToggleSceneEditor/>` reads
 	/// as one.
-	pub fn label(&self, key: u32) -> String {
-		let Some(components) = self.components(key) else {
+	pub fn label(&self, key: impl Into<EntityKey>) -> String {
+		let key = key.into();
+		let Some(components) = self.components(&key) else {
 			return format!("#{key}");
 		};
 		let text = |type_path: &str| {
@@ -260,7 +286,7 @@ impl<'a> SceneEntities<'a> {
 	/// discover the cycle by panicking, so the document refuses it first.
 	pub fn assert_acyclic(&self, types: &TypeRegistry) -> Result {
 		for key in self.keys()? {
-			let Some(components) = self.components(key) else {
+			let Some(components) = self.components(&key) else {
 				continue;
 			};
 			for (relation, value) in components.0.iter() {
@@ -271,10 +297,10 @@ impl<'a> SceneEntities<'a> {
 				else {
 					continue;
 				};
-				let Some(target) = EntitySchema::file_key(value) else {
+				let Some(target) = EntityKey::of_reference(value) else {
 					continue;
 				};
-				if acyclic && self.would_cycle(relation, key, target) {
+				if acyclic && self.would_cycle(relation, &key, &target) {
 					match target == key {
 						true => bevybail!(
 							"relation `{relation}` on entity #{key} targets itself"
@@ -301,33 +327,45 @@ pub struct SceneEntitiesMut<'a> {
 impl<'a> SceneEntitiesMut<'a> {
 	/// Insert an entity holding `components` at `key`, last in document order
 	/// (so last among its siblings), replacing any entity there.
-	pub fn insert_entity(&mut self, key: u32, components: Map) {
-		self.entities.insert(key.to_string(), components);
+	pub fn insert_entity(
+		&mut self,
+		key: impl Into<EntityKey>,
+		components: Map,
+	) {
+		self.entities.insert(key.into().as_str(), components);
 	}
 
 	/// Remove the entity at `key`, answering whether the scene held one. What
 	/// it owned stays: an editor removes a subtree by walking the view first.
-	pub fn remove_entity(&mut self, key: u32) -> bool {
-		self.entities.remove(&key.to_string()).is_some()
+	pub fn remove_entity(&mut self, key: impl Into<EntityKey>) -> bool {
+		self.entities.remove(key.into().as_str()).is_some()
 	}
 
 	/// Move the entity at `key` to document position `index`, the edit a
 	/// reorder makes: document order is child order.
-	pub fn move_entity(&mut self, key: u32, index: usize) -> Result {
+	pub fn move_entity(
+		&mut self,
+		key: impl Into<EntityKey>,
+		index: usize,
+	) -> Result {
+		let key = key.into();
 		let from = self
 			.entities
 			.0
-			.get_index_of(key.to_string().as_str())
+			.get_index_of(key.as_str())
 			.ok_or_else(|| bevyhow!("the scene holds no entity #{key}"))?;
 		self.entities.0.move_index(from, index);
 		OK
 	}
 
 	/// The components of the entity at `key`, to edit.
-	pub fn components_mut(&mut self, key: u32) -> Option<&mut Map> {
+	pub fn components_mut(
+		&mut self,
+		key: impl Into<EntityKey>,
+	) -> Option<&mut Map> {
 		self.entities
 			.0
-			.get_mut(key.to_string().as_str())?
+			.get_mut(key.into().as_str())?
 			.as_map_mut()
 			.ok()
 	}
@@ -335,7 +373,7 @@ impl<'a> SceneEntitiesMut<'a> {
 	/// The component at `type_path` of the entity at `key`, to edit.
 	pub fn component_mut(
 		&mut self,
-		key: u32,
+		key: impl Into<EntityKey>,
 		type_path: &str,
 	) -> Option<&mut Value> {
 		self.components_mut(key)?.0.get_mut(type_path)
@@ -345,11 +383,12 @@ impl<'a> SceneEntitiesMut<'a> {
 	/// if the entity lacks one; an error for an entity the scene lacks.
 	pub fn insert_component(
 		&mut self,
-		key: u32,
+		key: impl Into<EntityKey>,
 		type_path: impl Into<SmolStr>,
 		value: impl Into<Value>,
 	) -> Result {
-		self.components_mut(key)
+		let key = key.into();
+		self.components_mut(&key)
 			.ok_or_else(|| bevyhow!("the scene holds no entity #{key}"))?
 			.insert(type_path, value);
 		OK
@@ -359,7 +398,7 @@ impl<'a> SceneEntitiesMut<'a> {
 	/// it if there was one.
 	pub fn remove_component(
 		&mut self,
-		key: u32,
+		key: impl Into<EntityKey>,
 		type_path: &str,
 	) -> Option<Value> {
 		self.components_mut(key)?.remove(type_path)
@@ -385,7 +424,7 @@ mod test {
 
 	/// The components of a child of `parent`.
 	fn child(parent: u32) -> Map {
-		Map::new([(CHILD_OF, EntitySchema::reference(parent).unwrap())])
+		Map::new([(CHILD_OF, EntityKey::from(parent).reference())])
 	}
 
 	/// A root with a chain of two children: `0 <- 1 <- 2`.
@@ -404,7 +443,7 @@ mod test {
 			.insert_component(
 				key,
 				CHILD_OF,
-				EntitySchema::reference(parent).unwrap(),
+				EntityKey::from(parent).reference(),
 			)
 			.unwrap();
 	}
@@ -415,6 +454,7 @@ mod test {
 		let entities = SceneEntities::of(&scene).unwrap();
 		entities.assert_acyclic(&types()).unwrap();
 		entities.keys().unwrap().xpect_eq(vec![0, 1, 2]);
+		entities.mint().unwrap().xpect_eq(3);
 		entities.target(2, CHILD_OF).unwrap().xpect_eq(1);
 		entities.target(0, CHILD_OF).xpect_none();
 	}
@@ -522,7 +562,7 @@ mod test {
 				1,
 				Map::new([
 					(ELEMENT, Value::str("div")),
-					(CHILD_OF, EntitySchema::reference(0).unwrap()),
+					(CHILD_OF, EntityKey::from(0).reference()),
 				]),
 			),
 			(2, Map::new([(ATTRIBUTE, "class"), (VALUE, "card")])),
@@ -531,7 +571,7 @@ mod test {
 			(
 				4,
 				Map::new([
-					(CHILD_OF, EntitySchema::reference(0).unwrap()),
+					(CHILD_OF, EntityKey::from(0).reference()),
 					("my_crate::widgets::Toggle", Value::map()),
 				]),
 			),

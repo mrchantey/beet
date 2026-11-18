@@ -212,70 +212,185 @@ where
 	}
 }
 
-/// The name of a tag nothing was registered under, recorded on the inert entity
-/// the loader spawned for it anyway.
+/// The components a loader could not resolve on an entity, held as values
+/// keyed by the name their source wrote (`TofuApply` from BSX,
+/// `beet_infra::TofuApply` from a scene body), so the entity and its children
+/// exist in every binary and only behavior is missing. Never saved as itself:
+/// a saver writes each held component back as one of the entity's own keys,
+/// so a binary with the plugin reads it on the next load and a round trip
+/// through a lean one loses nothing. `beet check`, which registers
+/// everything, elevates every one.
 ///
 /// Structure is universal: a document builds the same entity tree in every
 /// binary, and what a lean build lacks is behavior (unlinked components, absent
-/// actions), never structure. So an unresolvable uppercase tag warns, marks its
-/// entity with the name it named, and still builds its directives, spreads and
-/// children, which keeps `bx:ref` targets and the shape of the tree stable
+/// actions), never structure. So an unresolvable uppercase tag or spread, and
+/// a scene body's key naming a type this binary never registered, each warn,
+/// are held here, and leave the entity's directives, spreads and children to
+/// build, which keeps `bx:ref` targets and the shape of the tree stable
 /// across builds.
 ///
 /// Loudness arrives later, where it can distinguish a lean binary from a typo:
 /// a subtree excluded by `bx:cfg` reports its condition rather than the missing
 /// features, a failed sequence route appends its unregistered children's names
-/// at the reporting edge, and `beet check` (which registers everything)
-/// elevates every marker it finds to an error.
+/// at the reporting edge, and a strict caller refuses through
+/// [`UnregisteredQuery`].
 ///
-/// The narrower [`AllowedUnregistered`] opts a tag out of even this: it resolves
-/// to nothing at all, children included.
-#[derive(Debug, Clone, Deref, Component, Reflect)]
-#[reflect(Component)]
-pub struct UnregisteredTag(pub SmolStr);
+/// The narrower [`AllowedUnregistered`] opts a name out of even this: it
+/// resolves to nothing at all, a tag's children included.
+#[derive(
+	Debug, Default, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
+)]
+#[reflect(Component, Default)]
+pub struct Unregistered(EntityBody);
 
-impl UnregisteredTag {
-	/// Record `tag` as unresolvable in this binary.
-	pub fn new(tag: impl Into<SmolStr>) -> Self { Self(tag.into()) }
+/// A marker holding each `(name, value)`, in order.
+impl<K: Into<SmolStr>, V: Into<Value>> FromIterator<(K, V)> for Unregistered {
+	fn from_iter<I: IntoIterator<Item = (K, V)>>(entries: I) -> Self {
+		Self(Map::new(entries).into())
+	}
+}
 
-	/// Allow `tag` to resolve to nothing when nothing is registered under
-	/// it, see [`AllowedUnregistered`]:
-	/// `app.install(UnregisteredTag::allow("LiveReloadScript"))`.
-	pub fn allow(tag: impl Into<SmolStr>) -> impl Installer {
-		let tag = tag.into();
+impl Unregistered {
+	/// A marker holding `value` under `name`.
+	pub fn new(name: impl Into<SmolStr>, value: impl Into<Value>) -> Self {
+		let mut unregistered = Self::default();
+		unregistered.insert_value(name, value);
+		unregistered
+	}
+
+	/// Hold `value` under `name` on `entity`, beside whatever it already
+	/// holds.
+	pub fn hold(
+		entity: &mut EntityWorldMut,
+		name: impl Into<SmolStr>,
+		value: impl Into<Value>,
+	) {
+		match entity.get_mut::<Self>() {
+			Some(mut unregistered) => {
+				unregistered.insert_value(name, value);
+			}
+			None => {
+				entity.insert(Self::new(name, value));
+			}
+		}
+	}
+
+	/// Drop what `entity` holds under `name`, and the marker with its last
+	/// entry.
+	pub fn release(entity: &mut EntityWorldMut, name: &str) {
+		let Some(mut unregistered) = entity.get_mut::<Self>() else {
+			return;
+		};
+		unregistered.remove(name);
+		if unregistered.is_empty() {
+			entity.remove::<Self>();
+		}
+	}
+
+	/// Allow `name`, a component's short type path, to resolve to nothing,
+	/// see [`AllowedUnregistered`]:
+	/// `app.install(Unregistered::allow("LiveReloadScript"))`.
+	pub fn allow(name: impl Into<SmolStr>) -> impl Installer {
+		let name = name.into();
 		move |app: &mut App| {
 			app.world_mut()
 				.get_resource_or_init::<AllowedUnregistered>()
-				.insert(tag);
+				.insert(name);
 		}
 	}
 }
 
-/// Tag names allowed to resolve to nothing when nothing is registered under them.
+/// Every [`Unregistered`] under a root: what `beet check`, a failed
+/// sequence's report and a strict caller read.
+#[derive(SystemParam)]
+pub struct UnregisteredQuery<'w, 's> {
+	unregistered: Query<'w, 's, &'static Unregistered>,
+	children: Query<'w, 's, &'static Children>,
+	attributes: Query<'w, 's, &'static Attributes>,
+}
+
+impl UnregisteredQuery<'_, '_> {
+	/// Every marked entity under `root`, inclusive, in tree order: an entity,
+	/// then its attributes, then its children.
+	pub fn collect(&self, root: Entity) -> Vec<(Entity, &Unregistered)> {
+		let mut found = Vec::new();
+		let mut stack = vec![root];
+		while let Some(entity) = stack.pop() {
+			if let Ok(unregistered) = self.unregistered.get(entity) {
+				found.push((entity, unregistered));
+			}
+			let owned = self
+				.attributes
+				.get(entity)
+				.into_iter()
+				.flat_map(|attributes| attributes.iter())
+				.chain(
+					self.children
+						.get(entity)
+						.into_iter()
+						.flat_map(|children| children.iter()),
+				)
+				.collect::<Vec<_>>();
+			stack.extend(owned.into_iter().rev());
+		}
+		found
+	}
+
+	/// Whether `entity` itself holds an unresolved component.
+	pub fn contains(&self, entity: Entity) -> bool {
+		self.unregistered.contains(entity)
+	}
+
+	/// The name of every unresolved component under `root`, in tree order.
+	pub fn names(&self, root: Entity) -> Vec<&SmolStr> {
+		self.collect(root)
+			.into_iter()
+			.flat_map(|(_, unregistered)| unregistered.keys())
+			.collect()
+	}
+
+	/// An error naming every unresolved component under `root`, `Ok` when none.
+	pub fn refuse(&self, root: Entity) -> Result {
+		let names = self.names(root);
+		match names.is_empty() {
+			true => OK,
+			false => bevybail!(
+				"unregistered in this binary: {}",
+				names
+					.iter()
+					.map(|name| format!("`{name}`"))
+					.collect::<Vec<_>>()
+					.join(", ")
+			),
+		}
+	}
+}
+
+/// Names allowed to resolve to nothing when nothing is registered under them.
 ///
-/// The narrow opt-out from [`UnregisteredTag`]: a featured-out widget (eg
-/// `<LiveReloadScript/>` when `client_io` is compiled out) marks its tag here via
-/// [`UnregisteredTag::allow`] and the
-/// loader resolves it to nothing at all, silently and without its children. Only
-/// a tag whose whole *content* is the missing behavior belongs here; anything
-/// else takes the inert-entity path so its children survive. Uniform over
-/// components, resources and templates: the check sits on the shared not-found
-/// path of both lookups.
+/// The narrow opt-out from [`Unregistered`]: a featured-out widget (eg
+/// `<LiveReloadScript/>` when `client_io` is compiled out) marks its name here via
+/// [`Unregistered::allow`] and the
+/// loader resolves it to nothing at all, silently and, for a tag, without its
+/// children. Only a name whose whole *content* is the missing behavior belongs
+/// here; anything else takes the inert-entity path so its children survive.
+/// Uniform over components, resources and templates: the check sits on the
+/// shared not-found path of every lookup.
 #[derive(Debug, Default, Clone, Resource)]
 pub struct AllowedUnregistered {
 	names: HashSet<SmolStr>,
 }
 
 impl AllowedUnregistered {
-	/// Allow `tag` to resolve to a no-op when nothing is registered under it.
-	pub fn insert(&mut self, tag: impl Into<SmolStr>) {
-		self.names.insert(tag.into());
+	/// Allow `name` to resolve to a no-op when nothing is registered under it.
+	pub fn insert(&mut self, name: impl Into<SmolStr>) {
+		self.names.insert(name.into());
 	}
-	/// Whether `tag` is allowed to be unregistered.
-	pub fn contains(&self, tag: &str) -> bool { self.names.contains(tag) }
-	/// Whether `tag` was [allowed](UnregisteredTag::allow) in `cx`'s world, ie a known featured-out name the loader resolves to
-	/// nothing rather than error. Consulted by both lookup paths on a missing
-	/// registration.
+	/// Whether `name` is allowed to be unregistered.
+	pub fn contains(&self, name: &str) -> bool { self.names.contains(name) }
+	/// Whether `tag` was [allowed](Unregistered::allow) in `cx`'s world, ie a
+	/// known featured-out name the loader resolves to nothing rather than
+	/// error. Consulted by both lookup paths on a missing registration.
 	pub fn allows(cx: &mut TemplateContext, tag: &str) -> bool {
 		cx.entity.world_scope(|world| {
 			world
@@ -432,14 +547,14 @@ mod test {
 			.xpect_true();
 	}
 
-	/// A tag [allowed](UnregisteredTag::allow) builds to nothing instead of erroring (the featured-out widget contract).
+	/// A tag [allowed](Unregistered::allow) builds to nothing instead of erroring (the featured-out widget contract).
 	#[crate::test]
 	fn allowed_unregistered_tag_is_noop() {
 		let world = TemplatePlugin::world();
 		let registry = world.resource::<AppTypeRegistry>().clone();
 		let patch = DynamicStruct::default();
 		let mut app = App::new();
-		app.install(UnregisteredTag::allow("Nope"));
+		app.install(Unregistered::allow("Nope"));
 		let other = app.world_mut();
 		let root = other.spawn_empty().id();
 		other
@@ -447,6 +562,57 @@ mod test {
 			.template_context(|cx| {
 				ReflectTemplate::build_named(&registry, "Nope", &patch, cx)
 			})
+			.unwrap();
+	}
+
+	/// The query walks an entity, its attributes, then its children, and a
+	/// strict caller's refusal names every held component in that order.
+	#[crate::test]
+	fn refuses_naming_everything_under_a_root() {
+		let mut world = TemplatePlugin::world();
+		let root = world
+			.spawn((Unregistered::new("Rooty", Value::map()), children![
+				(Unregistered::new("my_crate::First", 1u64), children![
+					Unregistered::new("Deep", Value::Null)
+				]),
+				Unregistered::new("Second", Value::Null),
+			]))
+			.flush();
+		let attribute = world
+			.spawn((
+				Attribute::new("class"),
+				AttributeOf::new(root),
+				Unregistered::new("OnAttribute", Value::Null),
+			))
+			.id();
+		let outside = world.spawn(Unregistered::new("Outside", 0u64)).id();
+
+		world.with_state::<UnregisteredQuery, _>(|query| {
+			query
+				.names(root)
+				.into_iter()
+				.map(SmolStr::as_str)
+				.collect::<Vec<_>>()
+				.xpect_eq(vec![
+					"Rooty",
+					"OnAttribute",
+					"my_crate::First",
+					"Deep",
+					"Second",
+				]);
+			query.collect(root)[1].0.xpect_eq(attribute);
+			query
+				.refuse(root)
+				.unwrap_err()
+				.to_string()
+				.xpect_contains("`Rooty`, `OnAttribute`, `my_crate::First`");
+			query.refuse(outside).unwrap_err();
+		});
+		// releasing the last entry drops the marker
+		Unregistered::release(&mut world.entity_mut(outside), "Outside");
+		world.get::<Unregistered>(outside).xpect_none();
+		world
+			.with_state::<UnregisteredQuery, _>(|query| query.refuse(outside))
 			.unwrap();
 	}
 }

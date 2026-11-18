@@ -80,8 +80,11 @@ impl MediaIngestPolicy {
 ///
 /// An ordinary component, so a later step hooks in by query or observer, ie
 /// an image optimiser or a size check against a PDS's blob limit.
+///
+/// Derived state, so no saver writes it: a scene carries the source's url as
+/// the page has it, never the bytes fetched from it.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Derived)]
 pub struct InlineBlob {
 	/// The bytes' content id under the raw codec, what `uploadBlob` answers.
 	pub cid: Cid,

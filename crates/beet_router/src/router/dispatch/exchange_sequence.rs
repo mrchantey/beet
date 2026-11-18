@@ -25,7 +25,7 @@ use beet_net::prelude::*;
 /// [`NONE_VALID`](ChildError::NONE_VALID) is deliberately NOT bypassed: a route
 /// that skipped every child ran nothing, and a `200` for work that never
 /// happened is the one outcome worse than a failure. A failed run over
-/// children with [`UnregisteredTag`] markers appends their names, so a lean
+/// children holding [`Unregistered`] components appends their names, so a lean
 /// binary's error explains itself even where no
 /// `bx:cfg` excluded the branch (the tombstone is the better error: it
 /// names the missing features before any step runs).
@@ -59,7 +59,7 @@ fn sequence_overload() -> ExchangeOverload {
 	))
 }
 
-/// Append the names of any [`UnregisteredTag`] descendants to a failed run:
+/// Append the names of everything [`Unregistered`] under a failed run:
 /// the backstop explanation for a binary that loaded steps it never linked,
 /// raised at the edge that reports the failure rather than by the sequence
 /// itself (which stays blind to how its children loaded).
@@ -68,15 +68,13 @@ async fn name_unregistered_children(
 	err: BevyError,
 ) -> BevyError {
 	caller
-		.with_state::<(Query<&UnregisteredTag>, Query<&Children>), _>(
-			|entity, (tags, children)| {
-				children
-					.iter_descendants(entity)
-					.filter_map(|child| tags.get(child).ok())
-					.map(|tag| format!("`<{}>`", tag.as_str()))
-					.collect::<Vec<_>>()
-			},
-		)
+		.with_state::<UnregisteredQuery, _>(|entity, query| {
+			query
+				.names(entity)
+				.into_iter()
+				.map(|name| format!("`{name}`"))
+				.collect::<Vec<_>>()
+		})
 		.await
 		.ok()
 		.filter(|tags| !tags.is_empty())
@@ -164,7 +162,7 @@ mod test {
 			.spawn((Router::with_defaults(), children![(
 				PathPartial::new("deploy"),
 				ExchangeSequence,
-				children![UnregisteredTag::new("TofuApply")],
+				children![Unregistered::new("TofuApply", Value::map())],
 			)]))
 			.exchange(Request::get("deploy"))
 			.await
@@ -173,7 +171,7 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("skipped all 1 of its steps")
-			.xpect_contains("this binary did not register: `<TofuApply>`");
+			.xpect_contains("this binary did not register: `TofuApply`");
 	}
 
 	/// A `() -> Outcome` leaf serves as a step through [`OutcomeOverload`],

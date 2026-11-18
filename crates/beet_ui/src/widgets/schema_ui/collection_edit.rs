@@ -262,8 +262,7 @@ fn keyed_zero(
 		(Ok(entities), Some(types), Some((source, relation))) => entities
 			.candidates(types, relation, source)?
 			.first()
-			.map(|target| EntitySchema::reference(*target))
-			.transpose()?,
+			.map(EntityKey::reference),
 		_ => None,
 	};
 	if let Some(reference) = candidate {

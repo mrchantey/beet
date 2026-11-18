@@ -270,10 +270,14 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect_eq("last x\n");
+		// replaced, not registered beside it, and sorted with the built-ins
 		world
 			.resource::<LexiconParsers>()
 			.available()
-			.xpect_eq(vec![Nsid::new_static("com.example.item")]);
+			.xpect_eq(vec![
+				Nsid::new_static("com.example.item"),
+				SceneBody::NSID,
+			]);
 	}
 
 	/// An unknown member parses to an [`UnknownLexicon`] and renders back as

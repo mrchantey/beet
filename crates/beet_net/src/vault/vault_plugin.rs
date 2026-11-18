@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 
 /// Registers the `vault` verbs and `<VaultRoutes/>`, so an entry names them
 /// by tag. A build without the `vault` feature loads a document naming them
-/// with inert `UnregisteredTag` entities in their place.
+/// with inert entities holding each as `Unregistered` in their place.
 #[derive(Default)]
 pub struct VaultPlugin;
 

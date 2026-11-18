@@ -260,10 +260,11 @@ mod test {
 			.unwrap()
 			.clone()
 			.xpect_eq(Value::from("last"));
+		// replaced, not registered beside it, and sorted with the built-ins
 		world
 			.resource::<LexiconRenderers>()
 			.available()
-			.xpect_eq(vec![Nsid::new_static("com.example.a")]);
+			.xpect_eq(vec![Nsid::new_static("com.example.a"), SceneBody::NSID]);
 	}
 
 	/// A member naming another def than the one asked for is refused.

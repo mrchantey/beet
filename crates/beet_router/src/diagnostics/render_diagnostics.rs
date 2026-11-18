@@ -43,9 +43,10 @@ pub enum DiagnosticSeverity {
 /// by kind independent of the configured [`DiagnosticSeverity`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub enum DiagnosticKind {
-	/// An uppercase tag resolving to no component/resource/template/tag-resolver,
-	/// incl a build [`TemplateError`].
-	UnknownTag,
+	/// A tag, a spread or a scene body's key resolving to no
+	/// component/resource/template/tag-resolver ([`Unregistered`]), incl a
+	/// build [`TemplateError`].
+	Unregistered,
 	/// An internal `href="/.."` with no matching route in the route tree.
 	BrokenHref,
 	/// A `class`/[`Classes`] token with no matching selector in the [`RuleSet`].
@@ -86,8 +87,8 @@ pub enum DiagnosticKind {
 #[derive(Debug, Clone, Resource, Reflect)]
 #[reflect(Resource, Default)]
 pub struct RenderDiagnostics {
-	/// An uppercase tag resolving to nothing. Default [`Error`](DiagnosticSeverity::Error).
-	pub unknown_tag: DiagnosticSeverity,
+	/// A tag, spread or body key resolving to nothing. Default [`Error`](DiagnosticSeverity::Error).
+	pub unregistered: DiagnosticSeverity,
 	/// An internal href with no matching route. Default [`Error`](DiagnosticSeverity::Error).
 	pub broken_href: DiagnosticSeverity,
 	/// A class with no matching selector. Default [`Warn`](DiagnosticSeverity::Warn).
@@ -107,7 +108,7 @@ pub struct RenderDiagnostics {
 impl Default for RenderDiagnostics {
 	fn default() -> Self {
 		Self {
-			unknown_tag: DiagnosticSeverity::Error,
+			unregistered: DiagnosticSeverity::Error,
 			broken_href: DiagnosticSeverity::Error,
 			unknown_class: DiagnosticSeverity::Warn,
 			missing_derived_file: DiagnosticSeverity::Error,
@@ -123,7 +124,7 @@ impl RenderDiagnostics {
 	/// The configured [`DiagnosticSeverity`] for a [`DiagnosticKind`].
 	pub fn severity(&self, kind: DiagnosticKind) -> DiagnosticSeverity {
 		match kind {
-			DiagnosticKind::UnknownTag => self.unknown_tag,
+			DiagnosticKind::Unregistered => self.unregistered,
 			DiagnosticKind::BrokenHref => self.broken_href,
 			DiagnosticKind::UnknownClass => self.unknown_class,
 			DiagnosticKind::MissingDerivedFile => self.missing_derived_file,
@@ -167,22 +168,18 @@ impl Diagnostic {
 		}
 	}
 
-	/// The [`UnknownTag`](DiagnosticKind::UnknownTag) diagnostic for an inert
-	/// entity the loader left behind.
+	/// The [`Unregistered`](DiagnosticKind::Unregistered) diagnostic for one
+	/// component a loader held unresolved, by the name its source wrote.
 	///
 	/// The loader warns and builds on, so the whole document loads in every
 	/// binary; this is the other half of that bargain, raised by a pass whose
-	/// binary registers everything, where an inert entity means a typo.
-	pub fn unregistered_tag(
-		tag: &UnregisteredTag,
-		severity: DiagnosticSeverity,
-	) -> Self {
+	/// binary registers everything, where a held component means a typo.
+	pub fn unregistered(name: &str, severity: DiagnosticSeverity) -> Self {
 		Self::new(
-			DiagnosticKind::UnknownTag,
+			DiagnosticKind::Unregistered,
 			severity,
 			format!(
-				"unknown tag `<{}>`: no component, resource or template registered",
-				tag.as_str()
+				"unregistered `{name}`: no component, resource or template registered"
 			),
 		)
 	}
@@ -225,9 +222,9 @@ impl Diagnostic {
 /// Walks the [`Element`]/[`Attribute`]/[`Classes`] tree with [`DiagnosticsQuery`]
 /// (a [`SystemParam`], not ad-hoc world poking), validating internal hrefs
 /// against `route_tree` and classes against `rule_set`. Any [`TemplateError`] or
-/// [`UnregisteredTag`] on the tree folds in as an
-/// [`UnknownTag`](DiagnosticKind::UnknownTag) error, so a no-code author sees the
-/// build failure loudly rather than as a blank page.
+/// [`Unregistered`] on the tree folds in as an
+/// [`Unregistered`](DiagnosticKind::Unregistered) error, one per name, so a
+/// no-code author sees the build failure loudly rather than as a blank page.
 pub(crate) fn render_diagnostics(
 	world: &mut World,
 	root: Entity,
@@ -242,12 +239,12 @@ pub(crate) fn render_diagnostics(
 
 /// The render-tree traversal backing [`render_diagnostics`]: every [`Element`]
 /// (with its attributes/classes) plus any [`TemplateError`] or
-/// [`UnregisteredTag`] reachable from a render root.
+/// [`Unregistered`] reachable from a render root.
 #[derive(SystemParam)]
 struct DiagnosticsQuery<'w, 's> {
 	elements: ElementQuery<'w, 's>,
 	errors: Query<'w, 's, &'static TemplateError>,
-	unregistered: Query<'w, 's, &'static UnregisteredTag>,
+	unregistered: UnregisteredQuery<'w, 's>,
 	children: Query<'w, 's, &'static Children>,
 }
 
@@ -261,9 +258,9 @@ impl DiagnosticsQuery<'_, '_> {
 		config: &RenderDiagnostics,
 	) -> Vec<Diagnostic> {
 		let mut out = Vec::new();
-		// a build failure rides `TemplateError` and an unresolvable tag rides
-		// `UnregisteredTag`; fold every one reachable from the root in as an
-		// unknown-tag error so neither is silently dropped.
+		// a build failure rides `TemplateError` and an unresolvable component
+		// rides `Unregistered`; fold every one reachable from the root in as
+		// an unregistered error so neither is silently dropped.
 		self.collect_build_errors(root, config, &mut out);
 		// then the per-element href/class/literal-uppercase-tag checks, in
 		// document order. An inline `<svg>` (a rendered diagram) is skipped
@@ -284,17 +281,17 @@ impl DiagnosticsQuery<'_, '_> {
 		out
 	}
 
-	/// Fold every [`TemplateError`] and [`UnregisteredTag`] in `root`'s subtree
-	/// into an [`UnknownTag`](DiagnosticKind::UnknownTag) error: the surfacing
-	/// path for a build that bailed, and for one whose tag resolved to nothing
-	/// and built an inert entity instead.
+	/// Fold every [`TemplateError`] and [`Unregistered`] in `root`'s subtree
+	/// into an [`Unregistered`](DiagnosticKind::Unregistered) error: the
+	/// surfacing path for a build that bailed, and for one whose tag or spread
+	/// resolved to nothing and was held instead.
 	fn collect_build_errors(
 		&self,
 		root: Entity,
 		config: &RenderDiagnostics,
 		out: &mut Vec<Diagnostic>,
 	) {
-		let severity = config.severity(DiagnosticKind::UnknownTag);
+		let severity = config.severity(DiagnosticKind::Unregistered);
 		if severity == DiagnosticSeverity::Off {
 			return;
 		}
@@ -302,18 +299,21 @@ impl DiagnosticsQuery<'_, '_> {
 		while let Some(entity) = stack.pop() {
 			if let Ok(error) = self.errors.get(entity) {
 				out.push(Diagnostic::new(
-					DiagnosticKind::UnknownTag,
+					DiagnosticKind::Unregistered,
 					severity,
 					format!("template build error: {}", error.error),
 				));
-			}
-			if let Ok(tag) = self.unregistered.get(entity) {
-				out.push(Diagnostic::unregistered_tag(tag, severity));
 			}
 			if let Ok(children) = self.children.get(entity) {
 				stack.extend(children.iter());
 			}
 		}
+		out.extend(
+			self.unregistered
+				.names(root)
+				.into_iter()
+				.map(|name| Diagnostic::unregistered(name, severity)),
+		);
 	}
 
 	/// Run the per-element checks (literal uppercase tag, internal href, classes).
@@ -326,11 +326,11 @@ impl DiagnosticsQuery<'_, '_> {
 		out: &mut Vec<Diagnostic>,
 	) {
 		// an uppercase tag that survived as a literal element resolved to nothing.
-		let tag_severity = config.severity(DiagnosticKind::UnknownTag);
+		let tag_severity = config.severity(DiagnosticKind::Unregistered);
 		if tag_severity != DiagnosticSeverity::Off && is_uppercase_tag(el.tag())
 		{
 			out.push(Diagnostic::new(
-				DiagnosticKind::UnknownTag,
+				DiagnosticKind::Unregistered,
 				tag_severity,
 				format!(
 					"unknown tag `<{}>`: no component, resource, template or tag-resolver registered",
@@ -541,7 +541,7 @@ mod test {
 			&rules,
 			&RenderDiagnostics::default(),
 		);
-		let tag = of_kind(&diagnostics, DiagnosticKind::UnknownTag);
+		let tag = of_kind(&diagnostics, DiagnosticKind::Unregistered);
 		tag.is_empty().xpect_false();
 		tag.iter().all(|d| d.is_error()).xpect_true();
 	}
@@ -692,7 +692,7 @@ mod test {
 			&rules,
 			&RenderDiagnostics::default(),
 		);
-		let tag = of_kind(&diagnostics, DiagnosticKind::UnknownTag);
+		let tag = of_kind(&diagnostics, DiagnosticKind::Unregistered);
 		tag.len().xpect_eq(1);
 		tag[0].is_error().xpect_true();
 		tag[0].message.as_str().xpect_contains("boom");

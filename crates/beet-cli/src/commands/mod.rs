@@ -56,7 +56,7 @@ impl Plugin for CliCommandsPlugin {
 		app.register_type::<QrCode>();
 		// NOTE: deploy tags are NOT allowlisted here. Structure is universal: a
 		// build without those features loads the same document and leaves an
-		// inert `UnregisteredTag` entity behind for each, instead of relying on a
+		// inert entity holding each as `Unregistered`, instead of relying on a
 		// hand-maintained list of tags to treat as inert — a list that silently
 		// went stale every time an entry named a new one. Loudness is the
 		// entry's own `bx:cfg` exclusion, reported at dispatch.

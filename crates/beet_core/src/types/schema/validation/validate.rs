@@ -299,30 +299,20 @@ fn as_bytes(items: &[Value]) -> Option<Vec<u8>> {
 		.collect()
 }
 
-/// An entity reference names an entity by its file key, written as the bits of
-/// the generation-stripped file entity ([`EntitySchema::file_key`]), so it
-/// reads as an unsigned integer. That the key names a live entity is checked
-/// where a world is in hand (the build path's entity map), not here.
+/// An entity reference names an entity by its file key
+/// ([`EntityKey::of_reference`]), so it reads as a non-empty string. That the
+/// key names a live entity is checked where a world is in hand (the build
+/// path's entity map), not here.
 async fn validate_entity(
 	schema: &EntitySchema,
 	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
-	let Value::Uint(mut key) = *value else {
-		// an entity key written as a signed integer (every json number parses
-		// signed) coerces when it fits.
-		if let Value::Int(signed) = *value
-			&& let Ok(unsigned) = u64::try_from(signed)
-		{
-			let mut key = unsigned;
-			let errors = schema.apply(path, &mut key).await;
-			*value = Value::Uint(key);
-			return errors;
-		}
+	let Some(mut key) = EntityKey::of_reference(value) else {
 		return type_mismatch(path, "entity", value);
 	};
 	let errors = schema.apply(path, &mut key).await;
-	*value = Value::Uint(key);
+	*value = key.reference();
 	errors
 }
 
@@ -697,26 +687,28 @@ mod test {
 			.xpect_true();
 	}
 
-	/// An [`Entity`] field is its own schema kind, not a number: a UI dispatches
+	/// An [`Entity`] field is its own schema kind, not a string: a UI dispatches
 	/// an entity picker on it, and the serde layer routes it through the entity map.
 	#[crate::test]
 	async fn entity_is_its_own_kind() {
 		let schema = ValueSchema::of::<Entity>();
 		schema.clone().xpect_eq(ValueSchema::Entity(default()));
-		// a file key validates, and a signed json number coerces to one
-		schema
-			.validate(&mut value!(3u64))
-			.await
-			.is_empty()
-			.xpect_true();
-		let mut signed = value!(3);
-		schema.validate(&mut signed).await.is_empty().xpect_true();
-		signed.xpect_eq(value!(3u64));
-		// anything that is not a key does not
-		schema
-			.validate(&mut value!("some-entity"))
-			.await
-			.is_empty()
-			.xpect_false();
+		// a file key validates, minted or not
+		for key in ["3", "main/p.3"] {
+			schema
+				.validate(&mut value!(key))
+				.await
+				.is_empty()
+				.xpect_true();
+		}
+		// anything that is not a key does not: the bits bevy writes an entity
+		// as, or the empty string
+		for mut not_a_key in [value!(3u64), value!("")] {
+			schema
+				.validate(&mut not_a_key)
+				.await
+				.is_empty()
+				.xpect_false();
+		}
 	}
 }

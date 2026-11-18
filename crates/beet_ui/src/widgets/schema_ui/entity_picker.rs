@@ -1,7 +1,7 @@
 //! The `Entity` arm of a [`DynamicForm`](super::DynamicForm): a picker over
 //! the entities of the scene document the field binds into.
 //!
-//! An entity reference is a file key ([`EntitySchema::reference`]), which no
+//! An entity reference is a file key ([`EntityKey::reference`]), which no
 //! typed control can produce, so the arm is a [`Select`] whose options are the
 //! scene's entities, labelled as the tree labels them
 //! ([`SceneEntities::label`]) and filtered by the [`RelationMeta`] of the
@@ -80,10 +80,10 @@ fn fingerprint(scene: &Value, field: &FieldRef) -> SmolStr {
 }
 
 /// The file key the field currently references, if any.
-fn current(scene: &Value, field: &FieldRef) -> Option<u32> {
+fn current(scene: &Value, field: &FieldRef) -> Option<EntityKey> {
 	scene
 		.get_path(&field.field_path)
-		.and_then(EntitySchema::file_key)
+		.and_then(EntityKey::of_reference)
 }
 
 /// One generation: the `<select>` over the entities the field may reference,
@@ -110,7 +110,7 @@ fn picker(
 	let options = candidates
 		.into_iter()
 		.map(|key| {
-			let label = entities.label(key);
+			let label = entities.label(&key);
 			rsx! { <option value=key.to_string()>{label}</option> }
 				.any_snippet()
 		})
@@ -143,19 +143,17 @@ impl EntityPicker {
 		value: &Value,
 		docs: &mut DocumentQuery,
 	) -> Result {
-		let Some(key) =
-			value.as_str().ok().and_then(|key| key.parse::<u32>().ok())
-		else {
+		let Some(key) = EntityKey::of_reference(value) else {
 			return OK;
 		};
 		let current = docs
 			.field_value(entity, &self.field)
 			.ok()
-			.and_then(|value| EntitySchema::file_key(&value));
-		if current == Some(key) {
+			.and_then(|value| EntityKey::of_reference(&value));
+		if current.as_ref() == Some(&key) {
 			return OK;
 		}
-		let reference = EntitySchema::reference(key)?;
+		let reference = key.reference();
 		docs.with_field(entity, &self.field, move |slot| *slot = reference)?;
 		OK
 	}
@@ -175,11 +173,11 @@ pub(in crate::widgets) fn follow_picked_entity(
 		let Some(key) = docs
 			.field_value(entity, &picker.field)
 			.ok()
-			.and_then(|value| EntitySchema::file_key(&value))
+			.and_then(|value| EntityKey::of_reference(&value))
 		else {
 			continue;
 		};
-		value.set_if_neq(Value::str(key.to_string()));
+		value.set_if_neq(key.reference());
 	}
 }
 
@@ -215,7 +213,7 @@ mod test {
 	/// `root { a, b }` as a scene document, with `b` the entity under edit.
 	fn scene() -> Value {
 		let child = |parent: u32| {
-			Map::new([(CHILD_OF, EntitySchema::reference(parent).unwrap())])
+			Map::new([(CHILD_OF, EntityKey::from(parent).reference())])
 		};
 		SceneEntities::scene([
 			(0, Map::new([(NAME, "root")])),
@@ -231,7 +229,7 @@ mod test {
 			.insert_component(
 				key,
 				CHILD_OF,
-				EntitySchema::reference(parent).unwrap(),
+				EntityKey::from(parent).reference(),
 			)
 			.unwrap();
 	}

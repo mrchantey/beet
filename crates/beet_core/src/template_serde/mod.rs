@@ -1,7 +1,7 @@
 //! Template serialization and deserialization.
 //!
-//! Every serde format deserializes into one [`DynamicTemplate`], which builds
-//! itself into the world through the
+//! Every serde format reads as one [`SceneBody`], which reflects into a
+//! [`DynamicTemplate`] that builds itself into the world through the
 //! [`spawn_template`](crate::prelude::WorldTemplateExt::spawn_template) path. A
 //! fully resolved save-game and a hand-authored page are the same kind of thing
 //! at different points on one axis: how much of the template is a resolved value
@@ -13,29 +13,69 @@
 //!
 //! The serialized document is `{ resources, entities }`, flat at every level:
 //! the resources are a map of type path to value and so is each entity, keyed
-//! by file key (see the [serde](DynamicTemplateSerializer) module's wire
-//! shape).
+//! by file key, a reference to an entity being its key (see [`SceneBody`]'s
+//! module for the wire shape). The body is plain data and lives with the
+//! other value types; this module is its way to and from a world.
+//!
+//! # `org.beet.scene#body`
+//!
+//! The wire shape is the scene body, [`SceneBody`], and as an atproto lexicon
+//! object it is `org.beet.scene#body`: the same `{resources, entities}` with
+//! `"$type": "org.beet.scene#body"` at its root, which is how any structured
+//! document says it is a scene body. A standard site document carries one
+//! inline as its `content`, the post itself, rendered and parsed by
+//! `beet_ui`'s `SceneBodyLexicon`. Its components are keyed by Rust type path,
+//! not NSID, and published as the saver writes them, a reader keeping the ones
+//! it understands; floats and bytes take the data model's forms at the record
+//! boundary (`AtprotoValue`), never in the body.
+//!
+//! It is not the `org.beet.scene` record, which describes one compiled
+//! document, its provenance, its scene meta and the `BlobRef` of its body, a
+//! postcard blob beside it. The body is the scene; the record is about one.
+//!
+//! # Unregistered components
+//!
+//! A body is read as values and needs no type registry; reflection happens
+//! when it spawns. A component whose type path this binary never registered is
+//! left off its entity with a warning and its value held in the entity's
+//! [`Unregistered`], the marker the BSX loader writes for an unknown tag or
+//! spread, so the entity and its children survive, `beet check`, which
+//! registers everything, elevates it to an error, and a strict caller refuses
+//! through [`UnregisteredQuery`]. A saver writes each held component back as
+//! one of the entity's own keys, so a round trip through a binary lacking a
+//! plugin loses nothing, and a binary with it reads the component on the next
+//! load. A name [allowed](AllowedUnregistered) is skipped silently.
 //!
 //! # High-level API
 //!
 //! - [`TemplateSaver`] - Serialize a world or entity subtree to RON, JSON, or
-//!   postcard, producing a resolved-value [`DynamicTemplate`].
+//!   postcard, as a [`SceneBody`].
 //! - [`TemplateLoader`] - Deserialize bytes into a [`DynamicTemplate`] and build
 //!   it through `spawn_template`.
 //!
 //! # Building blocks
 //!
-//! - [`DynamicTemplate`] - The intermediate representation: ordered resources and
-//!   entities, each entity's component slots a resolved value or a deferred template.
-//! - [`TemplateBuilder`] - Extracts a resolved-value [`DynamicTemplate`] from a
+//! - [`SceneBody`] - The scene as data, the serde form of every format: its
+//!   resources and its entities, each a map of type path to [`Value`], and
+//!   [`SceneBody::reflect`], the unregistered rule.
+//! - [`DynamicTemplate`] - A body reflected against the type registry: ordered
+//!   resources and entities, each entity's component slots a resolved value or
+//!   a deferred template.
+//! - [`TemplateBuilder`] - Extracts a [`SceneBody`] from a
 //!   [`World`](bevy::prelude::World).
 //! - [`TemplateFilter`] - Allow/deny lists controlling which types are extracted.
 //! - [`TemplateEntityMap`] - The file-key to world-entity map a loaded document
 //!   retains, so a re-save writes every entity back under the key it loaded from.
 //! - [`SceneDocument`] - A loaded scene as an editable [`Document`] the world
 //!   follows per component, forked from an authored original on first boot.
-//! - [`DynamicTemplateSerializer`] / [`DynamicTemplateDeserializer`] - The serde
-//!   implementations for the resolved-value form.
+//!
+//! [`Value`]: crate::prelude::Value
+//! [`SceneBody`]: crate::prelude::SceneBody
+//! [`SceneBody::reflect`]: crate::prelude::SceneBody::reflect
+//! [`Unregistered`]: crate::prelude::Unregistered
+//! [`UnregisteredQuery`]: crate::prelude::UnregisteredQuery
+//! [`AllowedUnregistered`]: crate::prelude::AllowedUnregistered
+//! [`Document`]: crate::prelude::Document
 
 #[cfg(feature = "bevy_asset")]
 mod asset;
@@ -44,20 +84,19 @@ mod entity_map;
 mod loader;
 mod saver;
 mod scene_document;
+mod scene_reflect;
 mod template_builder;
 mod template_filter;
-// kept private so the `serde` name does not shadow the `serde` crate when this
-// module is glob re-exported into the crate prelude.
-mod serde;
 
 #[cfg(feature = "bevy_asset")]
 pub use asset::*;
 pub use dynamic_template::*;
 pub use entity_map::*;
-pub use loader::*;
+pub use loader::EntryTemplate;
+pub use loader::LoadTemplateSerde;
+pub(self) use loader::Placement;
+pub use loader::TemplateLoader;
 pub use saver::*;
 pub use scene_document::*;
-pub use serde::DynamicTemplateDeserializer;
-pub use serde::DynamicTemplateSerializer;
 pub use template_builder::*;
 pub use template_filter::*;

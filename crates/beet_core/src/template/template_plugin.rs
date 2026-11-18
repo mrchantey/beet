@@ -3,7 +3,7 @@
 use crate::prelude::*;
 
 /// Registers the template lifecycle events, slot and pending markers, the
-/// [`TemplateError`], the [`UnregisteredTag`] marker, the
+/// [`TemplateError`], the [`Unregistered`] marker, the
 /// [`ReflectTemplate`] registry bridge, and the markup node types
 /// ([`Element`], [`Attribute`], ..) so a built page dumps and reloads whole.
 ///
@@ -27,8 +27,8 @@ impl Plugin for TemplatePlugin {
 			.register_type::<SlotChild>()
 			.register_type::<TemplatePending>()
 			.register_type::<TemplatesLoaded>()
-			// the inert marker an unresolvable tag leaves behind.
-			.register_type::<UnregisteredTag>()
+			// the marker holding what a loader could not resolve on an entity.
+			.register_type::<Unregistered>()
 			// the markup nodes every front-end authors: registered here rather
 			// than by a renderer, so a page forked into a scene keeps its
 			// elements and attributes whichever binary dumps it

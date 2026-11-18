@@ -65,7 +65,7 @@ mod test {
 	}
 
 	/// A root with a name and one child, as the saver writes it: entity keys are
-	/// file keys and a `ChildOf` holds the parent's file entity bits.
+	/// file keys and a `ChildOf` holds the parent's.
 	fn scene() -> Value {
 		SceneEntities::scene([
 			(
@@ -75,10 +75,7 @@ mod test {
 					(HEALTH, Value::Uint(3)),
 				]),
 			),
-			(
-				1,
-				Map::new([(CHILD_OF, EntitySchema::reference(0).unwrap())]),
-			),
+			(1, Map::new([(CHILD_OF, EntityKey::from(0).reference())])),
 		])
 	}
 

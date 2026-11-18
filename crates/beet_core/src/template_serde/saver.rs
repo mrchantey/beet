@@ -1,6 +1,5 @@
 use super::TemplateBuilder;
 use super::TemplateFilter;
-use super::serde::DynamicTemplateSerializer;
 use crate::prelude::*;
 use bevy::ecs::query::QueryFilter;
 
@@ -11,8 +10,8 @@ use bevy::ecs::query::QueryFilter;
 /// traversed ([`with_entity_tree`](Self::with_entity_tree)) or serialized
 /// ([`save`](Self::save)).
 ///
-/// The output is a resolved-value [`DynamicTemplate`]: every component is a
-/// concrete value, the save-game form.
+/// The output is a [`SceneBody`]: every component a resolved value, the
+/// save-game form.
 ///
 /// # A dump is never a source
 ///
@@ -115,17 +114,32 @@ impl TemplateSaver {
 	/// seeding the file keys, returning the map the save wrote for the caller to
 	/// retain wherever its document lives.
 	///
-	/// A root may sit under a parent (eg a loaded template reparented under a
-	/// server); that [`ChildOf`] is detached before serializing and restored
-	/// after, so the saved template carries no dangling parent reference (which
-	/// would fail to build on load).
+	/// See [`roots_body`](Self::roots_body) for what a root's own parent
+	/// becomes.
 	pub fn save_roots_mapped(
-		mut self,
+		self,
 		world: &mut World,
 		media_type: MediaType,
 		roots: &[Entity],
 		entity_map: TemplateEntityMap,
 	) -> Result<(MediaBytes, TemplateEntityMap)> {
+		let (body, entity_map) = self.roots_body(world, roots, entity_map)?;
+		body.to_bytes(media_type).map(|bytes| (bytes, entity_map))
+	}
+
+	/// `roots` and their descendants as one [`SceneBody`], `entity_map`
+	/// seeding the file keys (an empty one mints every key), returning the map
+	/// the save wrote for the caller to retain.
+	///
+	/// A root may sit under a parent (eg a loaded template reparented under a
+	/// server); that [`ChildOf`] is detached before extracting and restored
+	/// after, so the body carries no reference to a parent it does not hold.
+	pub fn roots_body(
+		mut self,
+		world: &mut World,
+		roots: &[Entity],
+		entity_map: TemplateEntityMap,
+	) -> Result<(SceneBody, TemplateEntityMap)> {
 		// detach each root from its parent, remembering them to re-attach once
 		// serialized.
 		let roots_with_parents = roots
@@ -144,7 +158,7 @@ impl TemplateSaver {
 		for root in roots {
 			self = self.with_entity_tree(world, *root);
 		}
-		let result = self.save_mapped(world, media_type, default(), entity_map);
+		let result = self.body_mapped(world, entity_map);
 
 		roots_with_parents.into_iter().for_each(|(root, parent)| {
 			world.entity_mut(root).insert(ChildOf(parent));
@@ -198,6 +212,18 @@ impl TemplateSaver {
 		options: SerializeOptions,
 		entity_map: TemplateEntityMap,
 	) -> Result<(MediaBytes, TemplateEntityMap)> {
+		let (body, entity_map) = self.body_mapped(world, entity_map)?;
+		body.to_bytes_with_options(media_type, options)
+			.map(|bytes| (bytes, entity_map))
+	}
+
+	/// The configured entities and resources as a [`SceneBody`], `entity_map`
+	/// seeding the file keys.
+	fn body_mapped(
+		self,
+		world: &World,
+		entity_map: TemplateEntityMap,
+	) -> Result<(SceneBody, TemplateEntityMap)> {
 		let registry = world.resource::<AppTypeRegistry>();
 		let registry = registry.read();
 		let mut builder = TemplateBuilder::from_world(world, &registry)
@@ -208,10 +234,7 @@ impl TemplateSaver {
 		if self.extract_resources {
 			builder = builder.extract_resources();
 		}
-		let (template, entity_map) = builder.build_mapped();
-		let serializer = DynamicTemplateSerializer::new(&template, &registry);
-		MediaBytes::serialize_with_options(media_type, &serializer, options)
-			.map(|bytes| (bytes, entity_map))
+		builder.build_mapped()
 	}
 
 	/// Collects an entity, its attribute entities and all its descendants into
@@ -280,7 +303,8 @@ mod test {
 			.as_object()
 			.unwrap()
 			.keys()
-			.map(|key| SceneEntities::entity_json(&json, key.parse().unwrap()))
+			.map(|key| EntityKey::parse(key).unwrap())
+			.map(|key| SceneEntities::entity_json(&json, key))
 			.flat_map(|entity| entity.as_object().unwrap().keys())
 			.cloned()
 			.collect::<Vec<_>>();

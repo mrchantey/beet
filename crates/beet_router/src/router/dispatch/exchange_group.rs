@@ -109,20 +109,20 @@ fn group_overload() -> ExchangeOverload {
 	ActionOverload::new(Action::new_async(ExchangeGroup::run))
 }
 
-/// Append the names of any [`UnregisteredTag`] members to a failed run, the
-/// group counterpart of the sequence's descendant sweep: a group's steps are
-/// authored anywhere, so the tags that did not link are found through
-/// [`Members`] rather than through the hierarchy.
+/// Append the names of everything [`Unregistered`] under a failed run's
+/// members, the group counterpart of the sequence's descendant sweep: a
+/// group's steps are authored anywhere, so what did not link is found through
+/// [`Members`] rather than through the group's own hierarchy.
 async fn name_unregistered_members(
 	caller: &AsyncEntity,
 	err: BevyError,
 ) -> BevyError {
 	caller
 		.with_state::<(
-			Query<&UnregisteredTag>,
+			UnregisteredQuery,
 			Query<&Members>,
 			Query<&RunGroup<Request, Response>>,
-		), _>(|entity, (tags, members, runs)| {
+		), _>(|entity, (unregistered, members, runs)| {
 			runs.get(entity)
 				.ok()
 				.and_then(|run| run.group.clone())
@@ -130,8 +130,8 @@ async fn name_unregistered_members(
 				.map(|members| {
 					members
 						.iter()
-						.filter_map(|member| tags.get(member).ok())
-						.map(|tag| format!("`<{}>`", tag.as_str()))
+						.flat_map(|member| unregistered.names(member))
+						.map(|name| format!("`{name}`"))
 						.collect::<Vec<_>>()
 				})
 				.unwrap_or_default()
@@ -252,7 +252,10 @@ mod test {
 	async fn inert_members_fail_loudly() {
 		let mut world = router_world();
 		let group = world
-			.spawn((Group, children![UnregisteredTag::new("TofuApply")]))
+			.spawn((Group, children![Unregistered::new(
+				"TofuApply",
+				Value::map()
+			)]))
 			.flush();
 		world
 			.spawn((Router::with_defaults(), children![(
@@ -267,6 +270,6 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("skipped all 1 of its steps")
-			.xpect_contains("this binary did not register: `<TofuApply>`");
+			.xpect_contains("this binary did not register: `TofuApply`");
 	}
 }

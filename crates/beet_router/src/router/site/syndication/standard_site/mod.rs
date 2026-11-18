@@ -34,9 +34,11 @@
 //!   against the repo. The repo is their memory, [`StandardSiteRecords`] read
 //!   by listing, so a run interrupted anywhere resumes
 //! - a document's `content`, the post rendered as a member of the lexicon def
-//!   its publication names, through `beet_ui`'s `LexiconRenderers`; with the
-//!   `standard_site_extra` feature, the optional formats, Leaflet's
-//!   `pub.leaflet.content` today (the `leaflet` module)
+//!   its publication names, through `beet_ui`'s `LexiconRenderers`: by default
+//!   `org.beet.scene#body`, the post itself as a beet scene, and with the
+//!   `standard_site_extra` feature the optional formats, Leaflet's
+//!   `pub.leaflet.content` today (the `leaflet` module). The whole document is
+//!   held to one budget, `StandardSiteDocument::BUDGET`
 //!
 //! # Limits
 //!

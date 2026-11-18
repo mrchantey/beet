@@ -49,16 +49,16 @@ pub fn SceneTree() -> impl Bundle {
 
 /// Marks a [`SceneTree`] row, carrying the file key of the entity it stands
 /// for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Component)]
+#[derive(Debug, Clone, PartialEq, Eq, Component)]
 #[component(on_add = hook_ext::observe(select_row_on_activate))]
 pub struct SceneTreeRow {
 	/// The entity's file key.
-	pub key: u32,
+	pub key: EntityKey,
 }
 
 /// One row of the tree as the document describes it.
 struct TreeRow {
-	key: u32,
+	key: EntityKey,
 	/// The guide glyphs that draw the row's place in the tree.
 	guides: String,
 	label: String,
@@ -98,15 +98,15 @@ fn rows(scene: &Value) -> Vec<TreeRow> {
 	// what owns each entity: its parent, else the element an attribute
 	// belongs to, else nothing (a root), an owner outside the scene counting
 	// as nothing rather than as a hole in the tree
-	let owner = |key: u32| {
+	let owner = |key: &EntityKey| {
 		entities
 			.target(key, ChildOf::type_path())
 			.or_else(|| entities.target(key, AttributeOf::type_path()))
-			.filter(|owner| entities.contains(*owner))
+			.filter(|owner| entities.contains(owner))
 	};
-	let mut children = HashMap::<Option<u32>, Vec<u32>>::default();
+	let mut children = HashMap::<Option<EntityKey>, Vec<EntityKey>>::default();
 	for key in &keys {
-		children.entry(owner(*key)).or_default().push(*key);
+		children.entry(owner(key)).or_default().push(key.clone());
 	}
 	let mut rows = Vec::with_capacity(keys.len());
 	// a root draws no guides; below it each frame carries whether every
@@ -137,9 +137,9 @@ fn rows(scene: &Value) -> Vec<TreeRow> {
 			})
 			.unwrap_or_default();
 		rows.push(TreeRow {
-			key,
+			label: entities.label(&key),
+			key: key.clone(),
 			guides,
-			label: entities.label(key),
 		});
 		let lineage = place
 			.map(|(mut ancestors, has_next)| {
@@ -174,7 +174,7 @@ fn select_row_on_activate(
 	};
 	selections
 		.get_mut(host)?
-		.set_if_neq(SceneSelection(Some(row.key)));
+		.set_if_neq(SceneSelection(Some(row.key.clone())));
 	OK
 }
 
@@ -204,7 +204,7 @@ pub(super) fn sync_tree_selection(
 		if !added.contains(entity) && !selection.is_changed() {
 			continue;
 		}
-		let selected = selection.0 == Some(row.key);
+		let selected = selection.0.as_ref() == Some(&row.key);
 		set_attr_str(
 			&mut commands,
 			&mut values,
@@ -247,7 +247,7 @@ mod test {
 		world
 			.get::<SceneSelection>(host)
 			.unwrap()
-			.xpect_eq(SceneSelection(Some(3)));
+			.xpect_eq(SceneSelection(Some(3.into())));
 		let html = test_ext::render_world(&mut world, host);
 		html.matches("aria-selected=\"true\"").count().xpect_eq(1);
 		test_ext::row(&mut world, 1).xpect_not_eq(row);
@@ -257,7 +257,7 @@ mod test {
 		world
 			.get::<SceneSelection>(host)
 			.unwrap()
-			.xpect_eq(SceneSelection(Some(1)));
+			.xpect_eq(SceneSelection(Some(1.into())));
 	}
 
 	/// A child of the last sibling indents under it: its guides open with
@@ -271,7 +271,7 @@ mod test {
 				6,
 				Map::new([(
 					ChildOf::type_path(),
-					EntitySchema::reference(5).unwrap(),
+					EntityKey::from(5).reference(),
 				)]),
 			);
 		});

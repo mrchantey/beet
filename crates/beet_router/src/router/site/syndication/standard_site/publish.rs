@@ -29,6 +29,11 @@ impl StandardSitePub {
 }
 
 impl StandardSiteDocument {
+	/// The most a document may weigh as the repo block it is stored as, its
+	/// canonical DAG-CBOR: a block is capped at a megabyte and a reader
+	/// fetches a record whole.
+	pub const BUDGET: usize = 1_000_000;
+
 	/// The document the listed page at `path` publishes as within
 	/// `publication`, written to the publication record at `site`, rendered
 	/// off `live`, the page prepared with the publication's
@@ -39,6 +44,11 @@ impl StandardSiteDocument {
 	/// failing with the registered ones), and the cover image the media
 	/// resolve step fetched as `coverImage`. The contributors and the
 	/// announcement are the publish step's.
+	///
+	/// # Errors
+	/// Errors naming the page when its `content` cannot be rendered or holds a
+	/// value the data model cannot, and when the document weighs more than
+	/// [`BUDGET`](Self::BUDGET): never a truncation.
 	pub async fn render(
 		publication: &StandardSitePub,
 		site: AtUri,
@@ -57,10 +67,44 @@ impl StandardSiteDocument {
 				.xmap(Some);
 		}
 		if let Some(nsid) = &publication.content {
-			document.content = Some(live.render_lexicon(nsid).await?);
+			document.content =
+				Some(live.render_lexicon(nsid).await.map_err(|err| {
+					bevyhow!("page '{path}' did not render as `{nsid}`: {err}")
+				})?);
 		}
 		document.cover_image = live.cover().await.map(|cover| cover.blob_ref());
+		document.assert_within_budget(path)?;
 		document.xok()
+	}
+
+	/// Refuse a document over [`BUDGET`](Self::BUDGET), naming the page at
+	/// `path`, the record's size, its `content`'s and the budget.
+	fn assert_within_budget(&self, path: &RelPath) -> Result {
+		let block = |value: AtprotoValue| -> Result<usize> {
+			MediaType::DagCbor.serialize(&value)?.len().xok()
+		};
+		let record = AtprotoValue::from_serde(self)
+			.and_then(|record| record.into_record(&Self::COLLECTION))
+			.and_then(block)
+			.map_err(|err| {
+				bevyhow!("page '{path}' is no standard site document: {err}")
+			})?;
+		if record <= Self::BUDGET {
+			return OK;
+		}
+		let content = self
+			.content
+			.clone()
+			.map(|content| AtprotoValue::try_from(Value::from(content)))
+			.transpose()?
+			.map(block)
+			.transpose()?
+			.unwrap_or_default();
+		bevybail!(
+			"page '{path}' publishes as a {record} byte document, its `content` \
+			 {content} bytes of that, over the {} a record holds",
+			Self::BUDGET
+		)
 	}
 }
 
@@ -100,7 +144,9 @@ impl LivePage {
 	}
 }
 
-#[cfg(test)]
+// the fixture publication's `content` is the default, a scene, which the
+// scene lexicon renders
+#[cfg(all(test, feature = "template_serde"))]
 mod test {
 	use super::super::test_fixtures::*;
 	use crate::prelude::*;
@@ -198,9 +244,9 @@ mod test {
 			.await
 	}
 
-	/// The document carries the post as plain text and its cover a blob,
-	/// rendered off one tree, and no `content` when its publication names no
-	/// def.
+	/// The document carries the post as plain text, as a scene and its cover
+	/// a blob, all rendered off one tree, and no `content` when its
+	/// publication names no def.
 	#[beet_core::test]
 	async fn renders_the_body_forms() {
 		let (mut world, router) = site().await;
@@ -209,7 +255,174 @@ mod test {
 		document
 			.cover_image
 			.xpect_eq(Some(BlobRef::of(&png(2, 1), MediaType::Png)));
-		document.content.xpect_none();
+		document
+			.content
+			.unwrap()
+			.r#type()
+			.clone()
+			.xpect_eq(SceneBody::NSID);
+		publish_as(
+			&mut world,
+			router,
+			StandardSitePub {
+				content: None,
+				..harvest()
+			},
+			None,
+		)
+		.await
+		.unwrap()
+		.0
+		.content
+		.xpect_none();
+	}
+
+	/// The fixture post's `content`, read as the scene body it is.
+	async fn scene(world: &mut World, router: Entity) -> SceneBody {
+		let content = publish(world, router, None).await.unwrap().0.content;
+		SceneBody::from_value(Value::Map(content.unwrap().fields().clone()))
+			.unwrap()
+			.in_record_order()
+	}
+
+	/// By default a document's `content` is the post itself as a scene: the
+	/// route's own content with nothing filtered, its metadata included, and
+	/// the root the post, whatever the page hung it under.
+	#[beet_core::test]
+	async fn renders_the_scene_body() {
+		let (mut world, router) = site().await;
+		let body = scene(&mut world, router).await;
+		let root = &body.entities[&EntityKey::from(0)];
+		root.contains::<ChildOf>().xpect_false();
+		root.get::<DocMeta>()
+			.unwrap()
+			.title
+			.xpect_eq(Some("Full Stack Bevy".to_string()));
+		let tags = body
+			.entities
+			.values()
+			.filter_map(|entity| entity.get::<Element>().ok())
+			.map(|element| element.tag().to_string())
+			.collect::<Vec<_>>();
+		tags.xpect_eq(vec!["p", "strong", "img"]);
+	}
+
+	/// The publication's own request fetches each image onto the tree, and
+	/// none of those bytes reach the scene: an `img` keeps the `src` the page
+	/// has.
+	#[beet_core::test]
+	async fn the_scene_carries_urls_not_image_bytes() {
+		let (mut world, router) = site().await;
+		let body = scene(&mut world, router).await;
+		let text = body.to_bytes(MediaType::Json).unwrap().to_string();
+		text.xref().xnot().xpect_contains("InlineBlob");
+		// a fetched png would be thousands of bytes of integers
+		(text.len() < 2_000).xpect_true();
+		body.entities
+			.values()
+			.filter(|entity| {
+				entity
+					.get::<Attribute>()
+					.is_ok_and(|attribute| attribute.to_string() == "src")
+			})
+			.map(|entity| entity.get::<Value>().unwrap())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![Value::str("/media/photo.png")]);
+	}
+
+	/// The document stored as the DAG-CBOR block a repo holds and read back,
+	/// its `content` parsed into a fresh world, renders the html the page's
+	/// own content does, byte for byte: the reader's half of the format.
+	#[beet_core::test]
+	async fn the_scene_reads_back_from_a_record() {
+		let (mut world, router) = site().await;
+		let (document, html) = world
+			.run_async_then(async move |world| {
+				let (publication, path) =
+					(harvest(), RelPath::new("blog/full-stack-bevy"));
+				LivePage::scoped(
+					&world.entity(router),
+					publication.request(&path),
+					async |live| {
+						let html =
+							live.render(&MediaType::Html).await?.to_string();
+						let document = StandardSiteDocument::render(
+							&publication,
+							harvest_uri(),
+							&path,
+							&meta(),
+							&live,
+						)
+						.await?;
+						(document, html).xok()
+					},
+				)
+				.await
+			})
+			.await
+			.unwrap();
+		html.xref().xpect_contains("<strong>post</strong>");
+
+		let block = AtprotoValue::from_serde(&document)
+			.unwrap()
+			.into_record(&StandardSiteDocument::COLLECTION)
+			.unwrap()
+			.xmap(|record| MediaType::DagCbor.serialize(&record))
+			.unwrap();
+		let content = MediaType::DagCbor
+			.deserialize::<AtprotoValue>(&block)
+			.unwrap()
+			.into_serde::<StandardSiteDocument>()
+			.unwrap()
+			.content
+			.unwrap();
+
+		let mut reader = syndication_world(None);
+		let mut entity = reader.spawn_empty();
+		LexiconParsers::parse(&mut entity, &content, None).unwrap();
+		let entity = entity.id();
+		DocRenderers::render(
+			&mut reader,
+			entity,
+			&RequestParts::default().with_accept(MediaType::Html),
+		)
+		.unwrap()
+		.to_string()
+		.xpect_eq(html);
+	}
+
+	/// A document over the budget is refused naming the page, the record's
+	/// size, its content's and the budget, never truncated.
+	#[beet_core::test]
+	async fn refuses_a_document_over_the_budget() {
+		let mut world = syndication_world(Some("https://beet.org"));
+		let router = world
+			.spawn((Router::with_defaults(), children![
+				render_action::fixed_func_route("blog/full-stack-bevy", || {
+					let body = "x".repeat(StandardSiteDocument::BUDGET);
+					(
+						post("Full Stack Bevy", "2025-07-11"),
+						rsx! { <p>{body}</p> },
+					)
+				}),
+			]))
+			.flush();
+		publish_as(
+			&mut world,
+			router,
+			StandardSitePub {
+				text_content: false,
+				..harvest()
+			},
+			None,
+		)
+		.await
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("page 'blog/full-stack-bevy'")
+		.xpect_contains("byte document")
+		.xpect_contains("its `content` 1000")
+		.xpect_contains("over the 1000000 a record holds");
 	}
 
 	/// The fixture publication, its `content` Leaflet's.
@@ -291,7 +504,9 @@ mod test {
 		.await
 		.unwrap_err()
 		.to_string()
-		.xpect_contains("no lexicon renderer for `com.example.unknown`");
+		.xpect_contains("page 'blog/full-stack-bevy'")
+		.xpect_contains("no lexicon renderer for `com.example.unknown`")
+		.xpect_contains("org.beet.scene#body");
 		#[cfg(feature = "standard_site_extra")]
 		error.xpect_contains("pub.leaflet.content");
 		#[cfg(not(feature = "standard_site_extra"))]
@@ -326,7 +541,8 @@ mod test {
 		again.xpect_eq(stored);
 	}
 
-	/// The cover uploads, the one blob a record with no `content` references.
+	/// The cover uploads, the one blob a record references when its `content`
+	/// is a scene, which names its images by url.
 	#[beet_core::test]
 	async fn uploads_the_referenced_blobs() { uploads(harvest(), 1).await; }
 

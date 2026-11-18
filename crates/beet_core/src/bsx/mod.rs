@@ -29,10 +29,10 @@
 //! grammar: a `{literal}` lowers to a [`Value`], an `{@source:path}` binding to
 //! its reactive sync components. The `bx:` directives (`bx:scope`, `bx:ref`,
 //! `bx:click`, ...) attach their document-system and slot-marker components.
-//! An uppercase tag nothing is registered under is not an error: it warns,
-//! marks its entity [`UnregisteredTag`] and builds its children anyway, so a
-//! lean binary loads the same document shape a full one does and only its
-//! behavior is missing.
+//! An uppercase tag or a spread nothing is registered under is not an error:
+//! it warns, is held with its value in the entity's [`Unregistered`] and, for
+//! a tag, builds its children anyway, so a lean binary loads the same document
+//! shape a full one does and only its behavior is missing.
 //!
 //! [`bx:cfg`](BuildCondition) is the one directive that breaks that last
 //! sentence, deliberately: it removes its node and subtree from the syntax tree
@@ -166,7 +166,7 @@
 //! [`FieldRef`]: crate::prelude::FieldRef
 //! [`ReflectFieldRef`]: crate::prelude::ReflectFieldRef
 //! [`ResourceFieldRef`]: crate::prelude::ResourceFieldRef
-//! [`UnregisteredTag`]: crate::prelude::UnregisteredTag
+//! [`Unregistered`]: crate::prelude::Unregistered
 //! [`Value`]: crate::prelude::Value
 //!
 //! # Authoring
@@ -211,8 +211,8 @@
 //! ```
 //!
 //! A sequence route that skipped every child fails naming its unregistered
-//! tags, and `beet check` elevates [`UnregisteredTag`] to an error;
-//! `UnregisteredTag::allow` opts out a tag whose whole content is the missing
+//! tags, and `beet check` elevates [`Unregistered`] to an error;
+//! `Unregistered::allow` opts out a tag whose whole content is the missing
 //! behavior (`<LiveReloadScript/>`). `bx:cfg` atoms are `namespace:argument`
 //! resolved through the `BsxConditions` seam (`feature:`, `version:`, `env:` in
 //! core, downstream registers its own) with Rust's `#[cfg]` operators and

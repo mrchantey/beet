@@ -390,20 +390,24 @@ mod test {
 		})
 	}
 
-	/// Structure is universal: an unresolvable tag is an inert entity recording
-	/// the name it named, and its children build under it exactly as they would
-	/// in a binary that linked the type.
+	/// Structure is universal: an unresolvable tag is an inert entity holding
+	/// the component it named, attributes and all, and its children build
+	/// under it exactly as they would in a binary that linked the type.
 	#[crate::test]
 	fn unregistered_tag_is_inert_and_builds_children() {
-		let (world, root) =
-			build("<NotRegistered><PackageConfig/></NotRegistered>");
+		let (world, root) = build(
+			r#"<NotRegistered name="ada" count=3 on><PackageConfig/></NotRegistered>"#,
+		);
 		let inert = world.entity(root).get::<Children>().unwrap()[0];
 		world
 			.entity(inert)
-			.get::<UnregisteredTag>()
+			.get::<Unregistered>()
 			.unwrap()
-			.as_str()
-			.xpect_eq("NotRegistered");
+			.clone()
+			.xpect_eq(Unregistered::new(
+				"NotRegistered",
+				value!({ "name": "ada", "count": 3u64, "on": true }),
+			));
 		// the child built, and the resource declaration it carries applied.
 		world
 			.entity(inert)
@@ -458,10 +462,7 @@ mod test {
 		let host = world.entity(root).get::<Children>().unwrap()[0];
 		let children = world.entity(host).get::<Children>().unwrap();
 		let (target, consumer) = (children[0], children[1]);
-		world
-			.entity(target)
-			.contains::<UnregisteredTag>()
-			.xpect_true();
+		world.entity(target).contains::<Unregistered>().xpect_true();
 		world
 			.entity(consumer)
 			.get::<Bound>()
@@ -495,7 +496,7 @@ mod test {
 	fn allowed_unregistered_tag_builds_nothing() {
 		let mut app = App::new();
 		app.add_plugins((TemplatePlugin, DocumentPlugin))
-			.install(UnregisteredTag::allow("NotRegistered"));
+			.install(Unregistered::allow("NotRegistered"));
 		let world = app.world_mut();
 		let nodes = BsxNode::parse_document(
 			"<NotRegistered><NorThis/></NotRegistered>",
@@ -519,10 +520,53 @@ mod test {
 			.len()
 			.xpect_eq(1);
 		let inert = world.entity(root).get::<Children>().unwrap()[0];
-		world
-			.entity(inert)
-			.contains::<UnregisteredTag>()
-			.xpect_false();
+		world.entity(inert).contains::<Unregistered>().xpect_false();
 		world.entity(inert).get::<Children>().is_none().xpect_true();
+	}
+
+	/// A spread naming nothing registered is left off and held with its
+	/// literal, beside whatever else the entity holds, where a strict caller
+	/// finds the typo it might be; an allowed name is held nowhere.
+	#[crate::test]
+	fn an_unregistered_spread_is_held() {
+		let mut app = App::new();
+		app.add_plugins((TemplatePlugin, DocumentPlugin))
+			.install(Unregistered::allow("FeaturedOut"));
+		let world = app.world_mut();
+		let nodes = BsxNode::parse_document(
+			r#"<div {(Mispelt{size: 2}, Tagged("x"), Bare, FeaturedOut)}/>"#,
+			&BsxParseConfig::bsx(),
+		)
+		.unwrap();
+		let root = world
+			.spawn_template(BsxTemplate::container(
+				nodes,
+				BsxTemplateRegistry::default(),
+			))
+			.unwrap()
+			.id();
+		world.flush();
+		let div = world.entity(root).get::<Children>().unwrap()[0];
+		world
+			.entity(div)
+			.get::<Element>()
+			.unwrap()
+			.tag()
+			.xpect_eq("div");
+		world
+			.entity(div)
+			.get::<Unregistered>()
+			.unwrap()
+			.clone()
+			.xpect_eq(Unregistered::from_iter([
+				("Mispelt", value!({ "size": 2u64 })),
+				("Tagged", Value::str("x")),
+				("Bare", Value::map()),
+			]));
+		world
+			.with_state::<UnregisteredQuery, _>(|query| query.refuse(root))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`Mispelt`, `Tagged`, `Bare`");
 	}
 }

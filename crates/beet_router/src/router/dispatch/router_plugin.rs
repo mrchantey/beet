@@ -306,7 +306,7 @@ impl Plugin for RouterPlugin {
 				feature = "client_io",
 				not(target_arch = "wasm32")
 			)))]
-			app.install(UnregisteredTag::allow("LiveReloadScript"));
+			app.install(Unregistered::allow("LiveReloadScript"));
 			// the site widgets' own rules (the app shell's scroll region, the
 			// index heading link), extending the shared rule set the way the
 			// card-stack rules do, so they compose with the material set and
@@ -338,7 +338,7 @@ impl Plugin for RouterPlugin {
 			// a binary without the terminal (the browser runtime) still loads
 			// an entry declaring it, the spread a known featured-out name
 			#[cfg(not(feature = "tui"))]
-			app.install(UnregisteredTag::allow("TuiServer"));
+			app.install(Unregistered::allow("TuiServer"));
 			// the multi-tenant SSH-TUI server, likewise declarable in a markup
 			// spread. Registered by feature rather than by `SshTuiPlugin` (which
 			// adds the per-connection behavior), so an entry naming it resolves in
@@ -351,7 +351,7 @@ impl Plugin for RouterPlugin {
 				>(),
 			);
 			#[cfg(not(feature = "ssh"))]
-			app.install(UnregisteredTag::allow("SshTuiServer"));
+			app.install(Unregistered::allow("SshTuiServer"));
 			// the scripted route marker in the one instantiation `<ScriptRoute>`
 			// builds: the whole request in, whatever the script returned out.
 			// `Script<Value, Value>` itself is registered upstream by
@@ -385,7 +385,7 @@ impl Plugin for RouterPlugin {
 			#[cfg(feature = "dag_cbor")]
 			app.install_type::<StandardSitePub>();
 			#[cfg(not(feature = "dag_cbor"))]
-			app.install(UnregisteredTag::allow("StandardSitePub"));
+			app.install(Unregistered::allow("StandardSitePub"));
 			// an article's comments and the link to reply, registered with
 			// the records so a build without `atproto` fails the comments
 			// island over to its fallback rather than swapping in nothing
@@ -393,8 +393,8 @@ impl Plugin for RouterPlugin {
 			app.install_type::<(StandardSiteComments, StandardSiteReplyLink)>();
 			#[cfg(not(feature = "dag_cbor"))]
 			app.install((
-				UnregisteredTag::allow("StandardSiteComments"),
-				UnregisteredTag::allow("StandardSiteReplyLink"),
+				Unregistered::allow("StandardSiteComments"),
+				Unregistered::allow("StandardSiteReplyLink"),
 			));
 			// the publish sequence's steps, which write to a repo and fetch
 			// the live site; the route declaring them is gated on the same
@@ -414,7 +414,7 @@ impl Plugin for RouterPlugin {
 			#[cfg(feature = "json")]
 			app.install_type::<VisitCount>();
 			#[cfg(not(feature = "json"))]
-			app.install(UnregisteredTag::allow("VisitCount"));
+			app.install(Unregistered::allow("VisitCount"));
 		}
 	}
 }
@@ -711,7 +711,7 @@ mod test {
 		declared.len().xpect_eq(1);
 		world
 			.entity(declared[0])
-			.contains::<UnregisteredTag>()
+			.contains::<Unregistered>()
 			.xpect_false();
 		world.entity(root).get::<TemplateError>().xpect_none();
 	}

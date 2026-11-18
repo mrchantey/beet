@@ -1,0 +1,130 @@
+{
+  "resources": {},
+  "entities": {
+    "0": {},
+    "1": {
+      "beet_core::types::element::element::Element": "h1",
+      "bevy_ecs::hierarchy::ChildOf": "0"
+    },
+    "2": {
+      "beet_core::types::value::value::Value": "Full Stack Bevy",
+      "bevy_ecs::hierarchy::ChildOf": "1"
+    },
+    "3": {
+      "beet_core::types::element::element::Element": "p",
+      "bevy_ecs::hierarchy::ChildOf": "0"
+    },
+    "4": {
+      "beet_core::types::value::value::Value": "A paragraph with ",
+      "bevy_ecs::hierarchy::ChildOf": "3"
+    },
+    "5": {
+      "beet_core::types::element::element::Element": "em",
+      "bevy_ecs::hierarchy::ChildOf": "3"
+    },
+    "6": {
+      "beet_core::types::value::value::Value": "emphasis",
+      "bevy_ecs::hierarchy::ChildOf": "5"
+    },
+    "7": {
+      "beet_core::types::value::value::Value": ", ",
+      "bevy_ecs::hierarchy::ChildOf": "3"
+    },
+    "8": {
+      "beet_core::types::element::element::Element": "code",
+      "bevy_ecs::hierarchy::ChildOf": "3"
+    },
+    "9": {
+      "beet_core::types::value::value::Value": "code",
+      "bevy_ecs::hierarchy::ChildOf": "8"
+    },
+    "10": {
+      "beet_core::types::value::value::Value": " and ",
+      "bevy_ecs::hierarchy::ChildOf": "3"
+    },
+    "11": {
+      "beet_core::types::element::element::Element": "a",
+      "bevy_ecs::hierarchy::ChildOf": "3"
+    },
+    "12": {
+      "beet_core::types::snippet::attribute::Attribute": "href",
+      "beet_core::types::snippet::attribute::AttributeOf": "11",
+      "beet_core::types::value::value::Value": "https://beet.org/docs"
+    },
+    "13": {
+      "beet_core::types::value::value::Value": "a link",
+      "bevy_ecs::hierarchy::ChildOf": "11"
+    },
+    "14": {
+      "beet_core::types::value::value::Value": ".",
+      "bevy_ecs::hierarchy::ChildOf": "3"
+    },
+    "15": {
+      "beet_core::types::element::element::Element": "pre",
+      "bevy_ecs::hierarchy::ChildOf": "0"
+    },
+    "16": {
+      "beet_core::types::element::element::Element": "code",
+      "bevy_ecs::hierarchy::ChildOf": "15"
+    },
+    "17": {
+      "beet_core::types::snippet::attribute::Attribute": "class",
+      "beet_core::types::snippet::attribute::AttributeOf": "16",
+      "beet_core::types::value::value::Value": "rust"
+    },
+    "18": {
+      "beet_core::types::value::value::Value": "fn main() { println!(\"hello\"); }\n",
+      "bevy_ecs::hierarchy::ChildOf": "16"
+    },
+    "19": {
+      "beet_core::types::element::element::Element": "ul",
+      "bevy_ecs::hierarchy::ChildOf": "0"
+    },
+    "20": {
+      "beet_core::types::element::element::Element": "li",
+      "bevy_ecs::hierarchy::ChildOf": "19"
+    },
+    "21": {
+      "beet_core::types::value::value::Value": "one",
+      "bevy_ecs::hierarchy::ChildOf": "20"
+    },
+    "22": {
+      "beet_core::types::element::element::Element": "li",
+      "bevy_ecs::hierarchy::ChildOf": "19"
+    },
+    "23": {
+      "beet_core::types::value::value::Value": "two",
+      "bevy_ecs::hierarchy::ChildOf": "22"
+    },
+    "24": {
+      "beet_core::types::element::element::Element": "blockquote",
+      "bevy_ecs::hierarchy::ChildOf": "0"
+    },
+    "25": {
+      "beet_core::types::element::element::Element": "p",
+      "bevy_ecs::hierarchy::ChildOf": "24"
+    },
+    "26": {
+      "beet_core::types::value::value::Value": "A quote.",
+      "bevy_ecs::hierarchy::ChildOf": "25"
+    },
+    "27": {
+      "beet_core::types::element::element::Element": "p",
+      "bevy_ecs::hierarchy::ChildOf": "0"
+    },
+    "28": {
+      "beet_core::types::element::element::Element": "img",
+      "bevy_ecs::hierarchy::ChildOf": "27"
+    },
+    "29": {
+      "beet_core::types::snippet::attribute::Attribute": "src",
+      "beet_core::types::snippet::attribute::AttributeOf": "28",
+      "beet_core::types::value::value::Value": "/assets/diagram.png"
+    },
+    "30": {
+      "beet_core::types::snippet::attribute::Attribute": "alt",
+      "beet_core::types::snippet::attribute::AttributeOf": "28",
+      "beet_core::types::value::value::Value": "a diagram"
+    }
+  }
+}
