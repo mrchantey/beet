@@ -15,6 +15,10 @@ use alloc::borrow::Cow;
 /// - **Floats compare by bits**, so `NaN == NaN` and `0.0 != -0.0`, which is
 ///   what makes `Value` [`Eq`]. A float never equals an integer: the
 ///   distinction is real in every format beet writes.
+///
+/// So `==` means *the same data*: two values that write the same bytes and
+/// read back into the same types. A comparison of user facing numbers, as
+/// javascript makes, is [`numeric_eq`](Self::numeric_eq).
 #[derive(Debug, Default, Clone, Reflect, Component)]
 #[reflect(Default, Component)]
 // a `Value` is json by nature, so a scene writes it through its own json-native
@@ -542,6 +546,51 @@ impl Ord for Value {
 }
 
 impl Value {
+	/// Whether `self` and `other` are the same number, as javascript compares
+	/// them: `Int(3)`, `Uint(3)` and `Float(3.0)` all match, `0.0` matches
+	/// `-0.0` and `NaN` matches nothing. Any other kind compares by `==`.
+	///
+	/// Not [`PartialEq`], which means *the same data*: `Float(3.0)` and
+	/// `Int(3)` write different bytes (json `3.0` and `3`, distinct DAG-CBOR
+	/// major types, an `org.beet.core#float` object in a record) and only one
+	/// reads back into an `i32`, so treating them as equal would hide a real
+	/// change from a document sync or a converge. Numeric equality also
+	/// cannot be transitive alongside bitwise floats (`0.0 == Int(0) ==
+	/// -0.0`), which [`Hash`] and [`Eq`] require. Use this where a person's
+	/// idea of a number is what matters: a script, a query, a filter.
+	///
+	/// An integer and a float compare exactly, never through a cast, so an
+	/// integer past what an `f64` holds matches no float it would round to.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// Value::Int(3).numeric_eq(&Value::Float(3.0)).xpect_true();
+	/// (Value::Int(3) == Value::Float(3.0)).xpect_false();
+	/// ```
+	pub fn numeric_eq(&self, other: &Self) -> bool {
+		match (self, other) {
+			(Value::Float(a), Value::Float(b)) => a == b,
+			(Value::Float(float), other) | (other, Value::Float(float)) => {
+				match other.integer() {
+					Some(integer) => Self::float_is_integer(*float, integer),
+					None => false,
+				}
+			}
+			_ => self == other,
+		}
+	}
+
+	/// Whether `float` is exactly `integer`.
+	fn float_is_integer(float: f64, integer: i128) -> bool {
+		// every finite integral f64 within the i64 and u64 ranges converts
+		// exactly; anything beyond them is no integer a `Value` holds
+		float.is_finite()
+			&& float.fract() == 0.0
+			&& float >= i64::MIN as f64
+			&& float <= u64::MAX as f64
+			&& float as i128 == integer
+	}
+
 	/// The integer this value holds in either form, `None` for any other kind.
 	fn integer(&self) -> Option<i128> {
 		match self {
@@ -772,6 +821,29 @@ mod test {
 		// integers order as numbers across both forms
 		(Value::Int(-1) < Value::Uint(0)).xpect_true();
 		(Value::Uint(2) < Value::Int(3)).xpect_true();
+	}
+
+	/// Numbers compare as javascript compares them, exactly, while `==` keeps
+	/// them distinct.
+	#[crate::test]
+	fn numeric_eq_compares_numbers() {
+		let numeric = |left: Value, right: Value| left.numeric_eq(&right);
+		numeric(Value::Int(3), Value::Float(3.0)).xpect_true();
+		numeric(Value::Float(3.0), Value::Uint(3)).xpect_true();
+		numeric(Value::Float(0.0), Value::Float(-0.0)).xpect_true();
+		numeric(Value::Float(-0.0), Value::Int(0)).xpect_true();
+		numeric(Value::Float(f64::NAN), Value::Float(f64::NAN)).xpect_false();
+		numeric(Value::Float(3.5), Value::Int(3)).xpect_false();
+		numeric(Value::Float(f64::INFINITY), Value::Uint(u64::MAX))
+			.xpect_false();
+		// 2^53 + 1 has no f64, so it matches neither neighbour it would round to
+		numeric(Value::Int((1 << 53) + 1), Value::Float((1u64 << 53) as f64))
+			.xpect_false();
+		numeric(Value::Int(1 << 53), Value::Float((1u64 << 53) as f64))
+			.xpect_true();
+		// other kinds compare as data
+		numeric(Value::str("3"), Value::Int(3)).xpect_false();
+		numeric(Value::str("a"), Value::str("a")).xpect_true();
 	}
 
 	#[crate::test]
