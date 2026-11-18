@@ -20,10 +20,6 @@ use beet_net::prelude::*;
 ///   owns policy), except content-negotiated non-html requests, which bypass
 ///   the cache (edges key on the URL alone, so a markdown `Accept` must never
 ///   be answered by a cached html body).
-/// - PUT the `http_request_dynamic_redirect` entrypoint ruleset when the setup
-///   names `apex_aliases`, ie `<CloudflareZoneSetup apex_aliases=["www"]/>`:
-///   each alias answers a `301` to the same path on the zone apex, query
-///   kept, so a page has one address. With none, no redirect is published.
 /// - PATCH the `ssl` setting to `strict`: the origin presents a publicly
 ///   trusted ACM cert, so the edge-to-origin leg verifies it.
 /// - PATCH `always_use_https` on: the `ssl` mode governs the HTTPS leg only, so
@@ -32,24 +28,18 @@ use beet_net::prelude::*;
 ///   without this http://<site> is a 521. Redirecting at the edge also means the
 ///   request never reaches the origin at all.
 ///
-/// A redirect rule fires only on proxied traffic, so every alias needs a
-/// proxied DNS record of its own, ie the `AAAA 100::` placeholder once no
-/// origin backs it.
+/// Apex alias redirects are their own action, [`CloudflareApexRedirect`], so
+/// a zone publishing none never asks the token for the redirect group.
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-// the cache and redirect entrypoint rulesets, then the `ssl` and
-// `always_use_https` settings
+// the cache-phase entrypoint ruleset, then the `ssl` and `always_use_https`
+// settings
 #[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
 	TokenPermission::CACHE_SETTINGS_WRITE,
-	TokenPermission::DYNAMIC_URL_REDIRECTS_WRITE,
 	TokenPermission::ZONE_SETTINGS_WRITE,
 ]))]
 pub async fn CloudflareZoneSetup(
-	/// Subdomain labels redirected to the zone apex, ie `www` for
-	/// `www.beet.org`.
-	#[field]
-	apex_aliases: Vec<SmolStr>,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let access = CloudflareAccess::resolve(&cx.caller).await?;
@@ -67,20 +57,6 @@ pub async fn CloudflareZoneSetup(
 	)
 	.await?;
 	info!("published the edge cache ruleset");
-
-	// the alias redirects, the same idempotent entrypoint PUT
-	if let Some(rules) = redirect_rules(&zone, &apex_aliases) {
-		cloudflare_api_ext::send(
-			Request::put(format!(
-				"{API_BASE}/zones/{zone_id}/rulesets/phases/http_request_dynamic_redirect/entrypoint"
-			))
-			.with_auth_bearer(&token)
-			.with_json_body(&rules)?,
-			"publishing the apex alias redirects",
-		)
-		.await?;
-		info!("redirecting {} to {}", apex_aliases.join(", "), zone.domain);
-	}
 
 	// strict TLS on the edge-to-origin leg
 	cloudflare_api_ext::send(
@@ -104,6 +80,50 @@ pub async fn CloudflareZoneSetup(
 	.await?;
 	info!("zone redirects http to https");
 
+	Pass(cx.input).xok()
+}
+
+/// Converges the zone's `http_request_dynamic_redirect` entrypoint ruleset to
+/// exactly the declared aliases, ie `<CloudflareApexRedirect aliases=["www"]/>`:
+/// each alias answers a `301` to the same path on the zone apex, query kept,
+/// so a page has one address. The PUT replaces the whole ruleset, so an empty
+/// list clears every redirect a previous deploy published.
+///
+/// A redirect rule fires only on proxied traffic, so every alias needs a
+/// proxied DNS record of its own, ie the `AAAA 100::` placeholder once no
+/// origin backs it.
+#[action]
+#[derive(Default, Component, Reflect)]
+#[reflect(Component, Default)]
+#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
+	TokenPermission::DYNAMIC_URL_REDIRECTS_WRITE,
+]))]
+pub async fn CloudflareApexRedirect(
+	/// Subdomain labels redirected to the zone apex, ie `www` for
+	/// `www.beet.org`.
+	#[field]
+	aliases: Vec<SmolStr>,
+	cx: ActionContext<Request>,
+) -> Result<Outcome<Request, Response>> {
+	let access = CloudflareAccess::resolve(&cx.caller).await?;
+	let (zone, token) = access.zone_auth(&cx.caller).await?;
+	// an entrypoint PUT creates or replaces, idempotent
+	cloudflare_api_ext::send(
+		Request::put(format!(
+			"{API_BASE}/zones/{}/rulesets/phases/http_request_dynamic_redirect/entrypoint",
+			zone.id
+		))
+		.with_auth_bearer(&token)
+		.with_json_body(&redirect_rules(&zone, &aliases))?,
+		"publishing the apex alias redirects",
+	)
+	.await?;
+	match aliases.is_empty() {
+		true => info!("cleared the apex alias redirects"),
+		false => {
+			info!("redirecting {} to {}", aliases.join(", "), zone.domain)
+		}
+	}
 	Pass(cx.input).xok()
 }
 
@@ -137,14 +157,14 @@ fn cache_rules() -> serde_json::Value {
 }
 
 /// The entrypoint redirect-ruleset body: one rule answering every alias of
-/// the zone apex with a `301` to the same path on the apex, query kept, or
-/// `None` when there are no aliases.
+/// the zone apex with a `301` to the same path on the apex, query kept, or no
+/// rules at all when there are no aliases.
 fn redirect_rules(
 	zone: &CloudflareZone,
 	aliases: &[SmolStr],
-) -> Option<serde_json::Value> {
+) -> serde_json::Value {
 	if aliases.is_empty() {
-		return None;
+		return serde_json::json!({ "rules": [] });
 	}
 	let hosts = aliases
 		.iter()
@@ -170,7 +190,6 @@ fn redirect_rules(
 			},
 		}],
 	})
-	.xsome()
 }
 
 /// Purges the whole Cloudflare zone cache: the invalidation step after a
@@ -227,7 +246,6 @@ mod test {
 			"www".into(),
 			"old".into(),
 		])
-		.unwrap()
 		.xpect_eq(serde_json::json!({
 			"rules": [{
 				"action": "redirect",
@@ -253,23 +271,23 @@ mod test {
 		world.init_resource::<PackageConfig>();
 		let entity = BsxTemplate::parse_entry(
 			&world,
-			r#"<CloudflareZoneSetup apex_aliases=["www"]/>"#,
+			r#"<CloudflareApexRedirect aliases=["www"]/>"#,
 		)
 		.unwrap()
 		.spawn(&mut world)
 		.unwrap();
 		world
 			.entity(entity)
-			.get::<CloudflareZoneSetup>()
+			.get::<CloudflareApexRedirect>()
 			.unwrap()
-			.apex_aliases
+			.aliases
 			.xpect_eq(vec![SmolStr::from("www")]);
 	}
 
-	/// beet assumes nothing: no aliases publishes no redirect.
+	/// No aliases converges to no rules, clearing any a deploy published.
 	#[beet_core::test]
-	fn no_aliases_publishes_no_redirect() {
+	fn no_aliases_clears_the_redirects() {
 		redirect_rules(&CloudflareZone::new("beet.org", "zone"), &[])
-			.xpect_none();
+			.xpect_eq(serde_json::json!({ "rules": [] }));
 	}
 }

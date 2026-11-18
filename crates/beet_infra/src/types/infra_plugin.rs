@@ -351,6 +351,7 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::TofuDestroy>()
 			.register_type::<crate::prelude::StackTeardown>()
 			.register_type::<crate::prelude::CloudflareZoneSetup>()
+			.register_type::<crate::prelude::CloudflareApexRedirect>()
 			.register_type::<crate::prelude::CloudflarePurgeCache>();
 
 		// the create-if-missing secret step, which every stack holding a

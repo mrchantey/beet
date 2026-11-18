@@ -779,7 +779,7 @@ impl TokenPermission {
 		Self::zone("Cache Settings Write", "9ff81cbbe65c400b97d92c3c1033cab6");
 
 	/// The redirect-phase ruleset, ie the `http_request_dynamic_redirect`
-	/// entrypoint the zone setup publishes for its apex aliases. The dashboard
+	/// entrypoint `<CloudflareApexRedirect/>` publishes. The dashboard
 	/// calls it `Single Redirect: Edit`.
 	pub const DYNAMIC_URL_REDIRECTS_WRITE: Self = Self::zone(
 		"Dynamic URL Redirects Write",
@@ -899,7 +899,7 @@ mod test {
 	}
 
 	/// What the frequent work needs: the three zone verbs every deploy runs ask
-	/// for five zone groups, no account group at all, and nothing that can mint
+	/// for four zone groups, no account group at all, and nothing that can mint
 	/// a credential. Read off the actions' own declarations, so a change to one
 	/// of them is a change to this answer.
 	#[cfg(all(
@@ -929,7 +929,6 @@ mod test {
 				"Cache Purge",
 				"Cache Settings Write",
 				"DNS Write",
-				"Dynamic URL Redirects Write",
 				"Zone Settings Write",
 			]);
 		// the account is where the token LIVES, never what it reaches: a zone

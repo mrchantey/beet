@@ -149,9 +149,9 @@ at the static IP, ssh (and future live apps) ride the DNS-only `app.beet.org` /
 `app.dev.beet.org` hostnames straight to it. Caddy's Let's Encrypt certificates
 are saved to the repo bucket's `caddy/` prefix and restored on a rebuild, so a replaced box
 serves on the certificate the last one held rather than issuing at boot.
-`<CloudflareZoneSetup/>` converges the zone-level edge config, its
-`apex_aliases` answering every `www.beet.org` url with a `301` to the same path on
-`beet.org`, so a page has one address, and every deploy or sync ends with a
+`<CloudflareZoneSetup/>` converges the zone-level edge config,
+`<CloudflareApexRedirect aliases=["www"]/>` answers every `www.beet.org` url with a
+`301` to the same path on `beet.org`, so a page has one address, and every deploy or sync ends with a
 `<CloudflarePurgeCache/>`. On the deploy route the purge comes *after*
 `<LightsailWatch/>`, since purging while the old instance still serves just
 re-caches the old responses for the full edge TTL.
@@ -465,7 +465,8 @@ feature links: the deployed binary serves the records and the comments
 				<TofuApply/>
 				<PruneVersions/>
 				<LightsailRelease/>
-				<CloudflareZoneSetup apex_aliases=["www"]/>
+				<CloudflareZoneSetup/>
+				<CloudflareApexRedirect aliases=["www"]/>
 				<LightsailWatch timeout="300s"/>
 				<CloudflarePurgeCache/>
 			</Group>
