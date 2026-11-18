@@ -189,8 +189,9 @@ impl AwsDeployCredential {
 	/// ..and that account's name in the Organization, absent for the
 	/// management account itself.
 	const ACCOUNT_NAME: &'static str = "account_name";
-	/// Stands in for a member account's id in a dry run, which only the
-	/// elevated deploy learns, as [`AwsAccount`]'s own description writes it.
+	/// Stands in for a member account's id before the key lives there, which
+	/// only the elevated deploy learns, as [`AwsAccount`]'s own description
+	/// writes it.
 	const UNKNOWN_ACCOUNT: &'static str = "<id>";
 
 	/// The grant line naming a service-linked role the account must hold, ie
@@ -233,9 +234,10 @@ impl AwsDeployCredential {
 		&self,
 		caller: &AsyncEntity,
 	) -> Result<CredentialStatus> {
-		// the launch's own state bucket: a key not yet in the declared account
-		// is stale for living elsewhere, below, and one inside resolves its own
-		let Some(apps) = Self::apps(caller, None).await? else {
+		// a key not yet in the declared account is stale for living elsewhere,
+		// below, and one inside resolves its own state bucket
+		let Some(apps) = Self::apps(caller, Self::moving_to(caller).await?).await?
+		else {
 			return CredentialStatus::not_needed().xok();
 		};
 		let grants = Self::grant_lines(&apps)?;
@@ -257,6 +259,23 @@ impl AwsDeployCredential {
 				.extend(Self::elsewhere(held, &account.resolved_name()?));
 		}
 		status.xok()
+	}
+
+	/// The account to lower the policies against when the sealed key is absent
+	/// or lives outside the declared account: [`Self::UNKNOWN_ACCOUNT`], since
+	/// only the elevated deploy learns a new member's id, and the launch's own
+	/// credential (none, on a repo's first deploy) cannot resolve it. `None`
+	/// lowers against the account the launch runs as.
+	async fn moving_to(caller: &AsyncEntity) -> Result<Option<&'static str>> {
+		let Some((account, _)) = AwsAccount::declared(caller).await? else {
+			return None.xok();
+		};
+		let name = account.resolved_name()?;
+		DeployCredential::sealed(caller, Self::KEY_ID)
+			.await
+			.is_none_or(|held| Self::elsewhere(&held, &name).is_some())
+			.then_some(Self::UNKNOWN_ACCOUNT)
+			.xok()
 	}
 
 	/// Why the sealed key id `held` is not the declared account `name`'s,
@@ -534,20 +553,7 @@ impl AwsDeployCredential {
 	/// not make.
 	async fn describe_of(caller: &AsyncEntity) -> Result<String> {
 		let declared = AwsAccount::declared(caller).await?;
-		// a key not yet in the declared account is described as it will be
-		// there, granted that account's state bucket, whose id the elevated
-		// deploy learns
-		let moving = match &declared {
-			Some((account, _)) => {
-				let name = account.resolved_name()?;
-				DeployCredential::sealed(caller, Self::KEY_ID)
-					.await
-					.is_none_or(|held| Self::elsewhere(&held, &name).is_some())
-			}
-			None => false,
-		};
-		let Some(apps) =
-			Self::apps(caller, moving.then_some(Self::UNKNOWN_ACCOUNT)).await?
+		let Some(apps) = Self::apps(caller, Self::moving_to(caller).await?).await?
 		else {
 			return "aws: this launch declares no stack keeping its state at AWS\n"
 				.to_string()
