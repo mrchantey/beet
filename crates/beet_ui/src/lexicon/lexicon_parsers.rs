@@ -15,20 +15,21 @@ pub trait LexiconParser: 'static + Send + Sync + Clone + Installer {
 }
 
 /// Every [`LexiconParser`] this world reads, keyed by NSID, the last
-/// registered for a def winning.
+/// registered for a def replacing any before it.
 ///
 /// Initialized empty by [`RenderPlugin`], each parser registered by
-/// installing it.
+/// installing it. One parser type serving several defs registers a
+/// configured instance per def.
 #[derive(Default, Clone, Resource)]
 pub struct LexiconParsers {
-	parsers: Vec<Arc<dyn ErasedLexiconParser>>,
+	parsers: HashMap<Nsid, Arc<dyn ErasedLexiconParser>>,
 }
 
 impl LexiconParsers {
-	/// Register `parser`, reading its def ahead of any parser registered
-	/// before it.
+	/// Register `parser` for its def, replacing any parser registered for it
+	/// before.
 	pub fn register(&mut self, parser: impl LexiconParser) -> &mut Self {
-		self.parsers.push(Arc::new(parser));
+		self.parsers.insert(parser.nsid(), Arc::new(parser));
 		self
 	}
 
@@ -40,14 +41,10 @@ impl LexiconParsers {
 			.register(parser);
 	}
 
-	/// Every registered def, in registration order, deduplicated.
+	/// Every registered def, sorted.
 	pub fn available(&self) -> Vec<Nsid> {
-		let mut available = Vec::new();
-		for nsid in self.parsers.iter().map(|parser| parser.nsid()) {
-			if !available.contains(&nsid) {
-				available.push(nsid);
-			}
-		}
+		let mut available: Vec<Nsid> = self.parsers.keys().cloned().collect();
+		available.sort();
 		available
 	}
 
@@ -85,13 +82,9 @@ impl LexiconParsers {
 		}
 	}
 
-	/// The parser reading `nsid`, the last registered winning.
+	/// The parser reading `nsid`.
 	fn parser(&self, nsid: &Nsid) -> Option<Arc<dyn ErasedLexiconParser>> {
-		self.parsers
-			.iter()
-			.rev()
-			.find(|parser| &parser.nsid() == nsid)
-			.cloned()
+		self.parsers.get(nsid).cloned()
 	}
 }
 
@@ -144,13 +137,10 @@ impl LexiconSource {
 
 /// The object-safe face of a [`LexiconParser`], which a registry can hold.
 trait ErasedLexiconParser: 'static + Send + Sync {
-	fn nsid(&self) -> Nsid;
 	fn parse(&self, cx: LexiconParseContext) -> Result;
 }
 
 impl<T: LexiconParser> ErasedLexiconParser for T {
-	fn nsid(&self) -> Nsid { LexiconParser::nsid(self) }
-
 	fn parse(&self, cx: LexiconParseContext) -> Result {
 		LexiconParser::parse(&mut self.clone(), cx)
 	}

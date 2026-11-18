@@ -16,20 +16,21 @@ pub trait LexiconRenderer: 'static + Send + Sync + Clone + Installer {
 }
 
 /// Every [`LexiconRenderer`] this world writes, keyed by NSID, the last
-/// registered for a def winning.
+/// registered for a def replacing any before it.
 ///
 /// Initialized empty by [`RenderPlugin`], each renderer registered by
-/// installing it, `app.install(LeafletRenderer)`.
+/// installing it, `app.install(LeafletRenderer)`. One renderer type serving
+/// several defs registers a configured instance per def.
 #[derive(Default, Clone, Resource)]
 pub struct LexiconRenderers {
-	renderers: Vec<Arc<dyn ErasedLexiconRenderer>>,
+	renderers: HashMap<Nsid, Arc<dyn ErasedLexiconRenderer>>,
 }
 
 impl LexiconRenderers {
-	/// Register `renderer`, answering its def ahead of any renderer
-	/// registered before it.
+	/// Register `renderer` for its def, replacing any renderer registered
+	/// for it before.
 	pub fn register(&mut self, renderer: impl LexiconRenderer) -> &mut Self {
-		self.renderers.push(Arc::new(renderer));
+		self.renderers.insert(renderer.nsid(), Arc::new(renderer));
 		self
 	}
 
@@ -41,14 +42,10 @@ impl LexiconRenderers {
 			.register(renderer);
 	}
 
-	/// Every registered def, in registration order, deduplicated.
+	/// Every registered def, sorted.
 	pub fn available(&self) -> Vec<Nsid> {
-		let mut available = Vec::new();
-		for nsid in self.renderers.iter().map(|renderer| renderer.nsid()) {
-			if !available.contains(&nsid) {
-				available.push(nsid);
-			}
-		}
+		let mut available: Vec<Nsid> = self.renderers.keys().cloned().collect();
+		available.sort();
 		available
 	}
 
@@ -89,29 +86,23 @@ impl LexiconRenderers {
 		member.xok()
 	}
 
-	/// The renderer writing `nsid`, the last registered winning, else an
-	/// error listing the registered defs.
+	/// The renderer writing `nsid`, else an error listing the registered
+	/// defs.
 	fn choose(&self, nsid: &Nsid) -> Result<Arc<dyn ErasedLexiconRenderer>> {
-		self.renderers
-			.iter()
-			.rev()
-			.find(|renderer| &renderer.nsid() == nsid)
-			.cloned()
-			.ok_or_else(|| {
-				bevyhow!(
-					"no lexicon renderer for `{nsid}`: the registered defs are {:?}",
-					self.available()
-						.iter()
-						.map(Nsid::as_str)
-						.collect::<Vec<_>>()
-				)
-			})
+		self.renderers.get(nsid).cloned().ok_or_else(|| {
+			bevyhow!(
+				"no lexicon renderer for `{nsid}`: the registered defs are {:?}",
+				self.available()
+					.iter()
+					.map(Nsid::as_str)
+					.collect::<Vec<_>>()
+			)
+		})
 	}
 }
 
 /// The object-safe face of a [`LexiconRenderer`], which a registry can hold.
 trait ErasedLexiconRenderer: 'static + Send + Sync {
-	fn nsid(&self) -> Nsid;
 	fn render(
 		&self,
 		world: &mut World,
@@ -121,8 +112,6 @@ trait ErasedLexiconRenderer: 'static + Send + Sync {
 }
 
 impl<T: LexiconRenderer> ErasedLexiconRenderer for T {
-	fn nsid(&self) -> Nsid { LexiconRenderer::nsid(self) }
-
 	fn render(
 		&self,
 		world: &mut World,
