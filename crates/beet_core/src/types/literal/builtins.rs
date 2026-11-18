@@ -199,6 +199,9 @@ fn add_atproto(table: &mut Table) {
 /// structure.
 fn add_domain(table: &mut Table) {
 	table
+		// a `Value` is any value, taken as authored: what a param of no fixed
+		// shape reads, ie a row given as a JSON object in a request body
+		.add(|value: &Value| Ok(Some(value.clone())))
 		// a `"true"`/`"false"` string, so a markup `<RouteSidebar home="false"/>`
 		// authors a flag. Any other string errors rather than silently applying
 		// `false`.

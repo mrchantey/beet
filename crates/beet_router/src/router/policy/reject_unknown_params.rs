@@ -119,11 +119,103 @@ mod test {
 	}
 
 	async fn send(world: &mut World, root: Entity, args: &str) -> Response {
+		exchange(world, root, Request::from_cli_str(args)).await
+	}
+
+	async fn exchange(
+		world: &mut World,
+		root: Entity,
+		request: Request,
+	) -> Response {
 		let router = router(world, root);
-		world
-			.entity_mut(router)
-			.exchange(Request::from_cli_str(args))
+		world.entity_mut(router).exchange(request).await
+	}
+
+	/// `path` sent with `json` as its body, as an agent's tool call is.
+	#[cfg(feature = "json")]
+	async fn send_json(
+		world: &mut World,
+		root: Entity,
+		path: &str,
+		json: &str,
+	) -> Response {
+		Request::get(path)
+			.with_body(json.to_string())
+			.with_content_type(MediaType::Json)
+			.xmap(|request| exchange(world, root, request))
 			.await
+	}
+
+	/// A JSON object body supplies a route's params exactly as flags do, a
+	/// list one value per item of a repeated param.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn reads_params_from_a_json_body() {
+		let mut world = router_world();
+		let root = spawn_cli(&mut world, CliServer::default());
+		let flags =
+			send(&mut world, root, "tag --name=a --times=2 --tags=x --tags=y")
+				.await
+				.unwrap_str()
+				.await;
+		flags.as_str().xpect_eq(r#"a 2 ["x", "y"] "#);
+		send_json(
+			&mut world,
+			root,
+			"tag",
+			r#"{"name":"a","times":2,"tags":["x","y"]}"#,
+		)
+		.await
+		.unwrap_str()
+		.await
+		.xpect_eq(flags);
+	}
+
+	/// A nested value keeps its structure: a `Value` param takes the object
+	/// from a body, and parses the same from its JSON text as a flag.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn reads_a_nested_param_from_a_json_body() {
+		let mut world = router_world();
+		let root = spawn_cli(&mut world, CliServer::default());
+		let row = r#"{"id":"r","n":[1,2]}"#;
+		send_json(
+			&mut world,
+			root,
+			"tag",
+			&format!(r#"{{"name":"a","times":1,"row":{row}}}"#),
+		)
+		.await
+		.unwrap_str()
+		.await
+		.xpect_ends_with(row);
+		Request::get("tag")
+			.with_param("name", "a")
+			.with_param("times", "1")
+			.with_param("row", row)
+			.xmap(|request| exchange(&mut world, root, request))
+			.await
+			.unwrap_str()
+			.await
+			.xpect_ends_with(row);
+	}
+
+	/// A strict url space refuses an undeclared body field exactly as it
+	/// refuses an undeclared flag.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn refuses_an_undeclared_body_field() {
+		let mut world = router_world();
+		let root = spawn_cli(&mut world, CliServer::default());
+		let response =
+			send_json(&mut world, root, "tag", r#"{"nam":"a","times":1}"#)
+				.await;
+		response.status().xpect_eq(StatusCode::BAD_REQUEST);
+		response
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("unknown param `--nam`, did you mean `--name`?");
 	}
 
 	#[beet_core::test]

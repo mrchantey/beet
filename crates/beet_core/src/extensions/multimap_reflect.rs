@@ -475,13 +475,26 @@ fn build_field_value(
 /// Parse the values under one key through `type_id`'s [`LiteralParser`], per
 /// the seam contract: one value is a [`Value::Str`], a repeated key a
 /// [`Value::List`], and a type with no entry declines to the structural rules.
+///
+/// One value holding a JSON object or list is first offered as its structure,
+/// so a nested value keeps its shape: a [`Value`] param, or any type whose
+/// parser reads a map, takes `--row='{"id":"a"}'` as the object it spells,
+/// and a parser declining the structure reads the text as written.
 fn parse_leaf_literal(
 	values: &[String],
 	type_id: TypeId,
 ) -> Result<Option<Box<dyn PartialReflect>>> {
 	match values {
 		[] => Ok(None),
-		[one] => LiteralParser::parse_type(type_id, &Value::str(one.as_str())),
+		[one] => {
+			if let Some(structure) = json_structure(one)
+				&& let Some(parsed) =
+					LiteralParser::parse_type(type_id, &structure)?
+			{
+				return Ok(Some(parsed));
+			}
+			LiteralParser::parse_type(type_id, &Value::str(one.as_str()))
+		}
 		many => LiteralParser::parse_type(
 			type_id,
 			&Value::List(
@@ -490,6 +503,23 @@ fn parse_leaf_literal(
 					.collect(),
 			),
 		),
+	}
+}
+
+/// The object or list a param's text spells as JSON, `None` for any other
+/// text, a scalar included, which reads as written.
+fn json_structure(text: &str) -> Option<Value> {
+	cfg_if! {
+		if #[cfg(feature = "json")] {
+			text.trim_start()
+				.starts_with(['{', '['])
+				.then(|| serde_json::from_str::<serde_json::Value>(text).ok())
+				.flatten()
+				.map(Value::from_json)
+		} else {
+			let _ = text;
+			None
+		}
 	}
 }
 
@@ -945,5 +975,27 @@ mod test {
 		validate("--port=abc", false)
 			.unwrap_err()
 			.xpect_eq(param_error::<Serve>("--port=abc"));
+	}
+
+	/// A `Value` param keeps the structure its JSON text spells, and reads any
+	/// other text as written.
+	#[cfg(feature = "json")]
+	#[crate::test]
+	fn value_param_reads_json_structure() {
+		#[derive(Debug, Reflect)]
+		struct Put {
+			row: Value,
+		}
+		let mut params = MultiMap::<String, String>::new();
+		params.insert("row".into(), r#"{"id":"a","tags":["x"]}"#.into());
+		let row = params.parse_reflect::<Put>().unwrap().row;
+		row.get("id").unwrap().xpect_eq(Value::str("a"));
+		row.get("tags")
+			.unwrap()
+			.xpect_eq(Value::List(vec![Value::str("x")]));
+		parse::<Put>("--row=plain")
+			.unwrap()
+			.row
+			.xpect_eq(Value::str("plain"));
 	}
 }

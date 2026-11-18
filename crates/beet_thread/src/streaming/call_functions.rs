@@ -8,7 +8,8 @@ use beet_net::prelude::*;
 /// An agent's tools are the routes of the [`Router`] beneath it, its own url
 /// space, so each call decodes its name to a route path
 /// ([`FunctionToolDefinition::decode_name`]) and is exchanged with that
-/// router. Whatever answers is the call's output, the router's not-found
+/// router, its arguments a JSON body, which a route reading its params off
+/// the request reads as params and a typed-input route as its input. Whatever answers is the call's output, the router's not-found
 /// with its "did you mean" included, so an agent reaches only the tools it
 /// was given.
 ///

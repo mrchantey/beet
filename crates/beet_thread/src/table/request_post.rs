@@ -43,7 +43,7 @@ pub fn RequestPost(
 }
 
 /// `text` with each `{param}` replaced by its value in `parts`.
-fn fill(text: &str, parts: &RequestParts) -> Result<String> {
+pub(crate) fn fill(text: &str, parts: &RequestParts) -> Result<String> {
 	let mut out = String::with_capacity(text.len());
 	let mut chars = text.chars().peekable();
 	while let Some(next) = chars.next() {

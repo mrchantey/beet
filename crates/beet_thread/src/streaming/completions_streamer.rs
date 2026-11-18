@@ -132,7 +132,7 @@ impl CompletionsStreamer {
 						.into_iter()
 						.map(|(_entity, tool_def)| {
 							completions_mapper::tool_to_completions_tool(
-								tool_def,
+								&tool_def,
 							)
 						})
 						.collect::<Vec<_>>();

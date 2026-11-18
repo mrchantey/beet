@@ -131,7 +131,7 @@ impl O11sStreamer {
 						.tools(actor_entity)?
 						.into_iter()
 						.map(|(_entity, tool_def)| {
-							o11s_mapper::tool_to_function_param(tool_def)
+							o11s_mapper::tool_to_function_param(&tool_def)
 						})
 						.collect::<Vec<_>>();
 

@@ -188,6 +188,15 @@ impl ParamsPattern {
 		})
 	}
 
+	/// Whether the declared param `key` names takes several values, ie a
+	/// `Vec` param, so a list sent for it is one value per item.
+	pub fn repeats(&self, key: &str) -> bool {
+		let flag = Self::flag(key);
+		self.params().any(|meta| {
+			meta.name() == flag && meta.value == ParamValue::Multiple
+		})
+	}
+
 	/// Refuses, as a `400` [`HttpError`] carrying the
 	/// [`refusal`](Self::refusal) message, params this pattern does not take
 	/// under `validation`: the read of a request without running its route,
@@ -319,6 +328,9 @@ pub struct ParamMeta {
 	/// hint (`a YYYY-MM-DD date`), a unit enum's variants, else the
 	/// [`type_name`](Self::type_name)'s short form, ie `String`.
 	kind: SmolStr,
+	/// The words a unit enum param takes, kebab case, empty for any other
+	/// type.
+	variants: Vec<SmolStr>,
 	/// Additional details for the param
 	options: ParamOptions,
 	/// Whether specifying the param is required, usually inferred
@@ -347,6 +359,7 @@ impl ParamMeta {
 		let type_name = value.placeholder_type_name();
 		Self {
 			kind: type_name.short(),
+			variants: Vec::new(),
 			type_name,
 			value,
 			key: name.into(),
@@ -396,14 +409,16 @@ impl ParamMeta {
 		let leaf_id = some_inner.map_or(field.type_id(), TypeInfo::type_id);
 		let value = ParamValue::of_leaf(leaf_id, some_inner.or(info));
 		let type_name = TypeName::new(strip_option(field.type_path()));
+		let variants = unit_variants(some_inner.or(info));
 
 		Self {
 			key: field.name().to_kebab_case().into(),
 			required: value == ParamValue::Single && some_inner.is_none(),
 			value,
 			kind: authored_kind(leaf_id)
-				.or_else(|| variant_kind(some_inner.or(info)))
+				.or_else(|| variant_kind(&variants))
 				.unwrap_or_else(|| type_name.short()),
+			variants,
 			type_name,
 			options: ParamOptions::from_reflect(field),
 		}
@@ -527,6 +542,113 @@ impl ParamMeta {
 
 	/// The param value type
 	pub fn value(&self) -> &ParamValue { &self.value }
+
+	/// The words a unit enum param takes, empty for any other type.
+	pub fn variants(&self) -> &[SmolStr] { &self.variants }
+
+	/// The JSON schema of the object `params` are the fields of, keyed by
+	/// each param's flag spelling: what a route's params are as a tool's
+	/// input, its arguments sent as a JSON body
+	/// ([`Request::merge_body_params`]). An optional param also takes
+	/// `null`, which a body reads as absent, so a provider requiring every
+	/// field can still leave it out.
+	pub fn object_schema<'a>(
+		params: impl IntoIterator<Item = &'a ParamMeta>,
+	) -> JsonSchema {
+		let mut properties = Map::default();
+		let mut required = Vec::new();
+		for param in params {
+			if param.required {
+				required.push(Value::str(param.key.as_str()));
+			}
+			properties.insert(param.key.clone(), param.json_schema());
+		}
+		let mut schema = Map::default();
+		schema.insert("type", "object");
+		schema.insert("properties", Value::Map(properties));
+		schema.insert("required", Value::List(required));
+		schema.insert("additionalProperties", false);
+		JsonSchema::from_value(Value::Map(schema))
+	}
+
+	/// The JSON schema of this param's value as a body field: a flag a
+	/// boolean, a repeated param an array of its items, a number a number, a
+	/// [`Value`] anything, a unit enum one of its words and any other type
+	/// the string it parses from, described by its doc line and, where the
+	/// type is written some particular way, how.
+	pub fn json_schema(&self) -> Value {
+		let mut schema = match self.value {
+			ParamValue::Flag => Self::leaf_schema("bool", &[]),
+			ParamValue::Single => {
+				Self::leaf_schema(self.type_name.as_str(), &self.variants)
+			}
+			ParamValue::Multiple => {
+				let item = self
+					.type_name
+					.as_str()
+					.strip_prefix("alloc::vec::Vec<")
+					.and_then(|inner| inner.strip_suffix('>'))
+					.unwrap_or_default();
+				let mut array = Map::default();
+				array.insert("type", "array");
+				array.insert(
+					"items",
+					Value::Map(Self::leaf_schema(item, &self.variants)),
+				);
+				array
+			}
+		};
+		// an optional param is a null-or-value union, the shape a typed
+		// input's `Option` field takes
+		if !self.required {
+			let mut null = Map::default();
+			null.insert("type", "null");
+			let mut union = Map::default();
+			union.insert(
+				"oneOf",
+				Value::List(vec![Value::Map(null), Value::Map(schema)]),
+			);
+			schema = union;
+		}
+		let hint = (self.variants.is_empty()
+			&& self.kind != self.type_name.short())
+		.then(|| self.kind.clone());
+		let description = match (self.description(), hint) {
+			(Some(description), Some(hint)) => {
+				Some(format!("{description} ({hint})"))
+			}
+			(Some(description), None) => Some(description.to_string()),
+			(None, Some(hint)) => Some(hint.to_string()),
+			(None, None) => None,
+		};
+		if let Some(description) = description {
+			schema.insert("description", description);
+		}
+		Value::Map(schema)
+	}
+
+	/// The schema of one value of the type at `type_path`.
+	fn leaf_schema(type_path: &str, variants: &[SmolStr]) -> Map {
+		let mut schema = Map::default();
+		if type_path == TypeName::of::<Value>().as_str() {
+			return schema;
+		}
+		let kind = match type_path {
+			"bool" => "boolean",
+			"u8" | "u16" | "u32" | "u64" | "u128" | "usize" | "i8" | "i16"
+			| "i32" | "i64" | "i128" | "isize" => "integer",
+			"f32" | "f64" => "number",
+			_ => "string",
+		};
+		schema.insert("type", kind);
+		if !variants.is_empty() {
+			schema.insert(
+				"enum",
+				Value::List(variants.iter().cloned().map(Value::Str).collect()),
+			);
+		}
+		schema
+	}
 }
 
 /// The kind of value a param takes
@@ -582,23 +704,28 @@ fn authored_kind(type_id: TypeId) -> Option<SmolStr> {
 	LiteralParser::get(type_id)?.hint().map(SmolStr::from)
 }
 
-/// How a unit-only enum is written: its variants as the kebab-case words a
-/// flag takes, ie `one of: main, content` for a `--root`, since the
-/// type path names none of them.
-fn variant_kind(info: Option<&TypeInfo>) -> Option<SmolStr> {
+/// The variants of a unit-only enum as the kebab-case words a flag takes,
+/// empty for any other type.
+fn unit_variants(info: Option<&TypeInfo>) -> Vec<SmolStr> {
 	let Some(TypeInfo::Enum(info)) = info else {
-		return None;
+		return Vec::new();
 	};
 	info.iter()
 		.map(|variant| match variant {
 			bevy::reflect::enums::VariantInfo::Unit(unit) => {
-				Some(unit.name().to_kebab_case())
+				Some(unit.name().to_kebab_case().into())
 			}
 			_ => None,
 		})
 		.collect::<Option<Vec<_>>>()
-		.filter(|variants| !variants.is_empty())
-		.map(|variants| format!("one of: {}", variants.join(", ")).into())
+		.unwrap_or_default()
+}
+
+/// How a unit-only enum is written: its variants, ie `one of: main, content`
+/// for a `--root`, since the type path names none of them.
+fn variant_kind(variants: &[SmolStr]) -> Option<SmolStr> {
+	(!variants.is_empty())
+		.then(|| format!("one of: {}", variants.join(", ")).into())
 }
 
 /// `type_path` with a `core::option::Option<..>` wrapper stripped, since a

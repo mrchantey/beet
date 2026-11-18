@@ -32,9 +32,15 @@ impl Plugin for ThreadPlugin {
 			// markup window bounding: stub older images so an endless loop's
 			// request stays bounded without dropping a post
 			.register_type::<StubOldImages>()
+			// a host verb as an agent's tool, `<HostTool path=".."/>`
+			.register_type::<HostRoute>()
+			.install_type::<HostTool>()
+			// a seed post read from a route's answer
+			.install_type::<RoutePost>()
 			// the OpenResponses streamer is an action
 			.register_type::<O11sStreamer>()
-			.add_observer(insert_tool_definition);
+			.add_observer(insert_tool_definition)
+			.add_observer(refresh_tool_params);
 
 		// the async-openai-backed completions streamer, plus the model selection
 		// driven by the provider constructors beside it

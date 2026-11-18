@@ -51,6 +51,44 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
+	/// A typed-input tool reads its JSON body as its input, never as params,
+	/// so a strict server passes its fields: an agent's `write-text` call
+	/// lands.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn typed_calls_pass_a_strict_server() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let store = BlobStore::temp();
+		let router = BsxTemplate::parse_entry(
+			&world,
+			"<Router><StoreToolset/></Router>",
+		)
+		.unwrap()
+		.spawn(&mut world)
+		.unwrap();
+		world
+			.spawn((CliServer::default(), store.clone()))
+			.add_child(router);
+		world.flush();
+		world
+			.entity_mut(router)
+			.exchange(
+				Request::get("write-text")
+					.with_body(r#"{"path":"a.txt","text":"hi"}"#)
+					.with_content_type(MediaType::Json),
+			)
+			.await
+			.into_result()
+			.await
+			.unwrap();
+		store
+			.get(&RelPath::new("a.txt"))
+			.await
+			.unwrap()
+			.to_vec()
+			.xpect_eq(b"hi".to_vec());
+	}
+
 	/// Two toolsets under one router are two routes on each path of one url
 	/// space, which the tree build refuses, naming both entities.
 	#[beet_core::test]

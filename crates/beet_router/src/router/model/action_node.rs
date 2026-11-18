@@ -59,6 +59,13 @@ impl ActionNode {
 	/// Whether this action is a scene route (output type is [`PageRequest`]).
 	pub fn is_scene(&self) -> bool { self.meta.output_is::<PageRequest>() }
 
+	/// Whether the action's input is the request itself, a [`Request`] or its
+	/// [`RequestParts`], so it reads its params off the request rather than
+	/// taking a typed input deserialized from the body.
+	pub fn reads_request(&self) -> bool {
+		self.meta.input_is::<Request>() || self.meta.input_is::<RequestParts>()
+	}
+
 	/// What this route does: its own [`RouteDescription`] where it has one,
 	/// else the handler's doc comment.
 	pub fn description(&self) -> Option<&str> {

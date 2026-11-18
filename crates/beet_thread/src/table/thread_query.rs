@@ -21,6 +21,10 @@ pub struct ThreadQuery<'w, 's> {
 	pub routers: Query<'w, 's, (), With<Router>>,
 	pub actors: Query<'w, 's, (), Or<(With<Actor>, With<ActorRef>)>>,
 	pub path_partials: Query<'w, 's, &'static PathPartial>,
+	/// The [`HostTool`]s, whose definitions are read off the host's routes.
+	#[cfg(feature = "action")]
+	pub host_routes: Query<'w, 's, &'static HostRoute>,
+	pub route_trees: Query<'w, 's, &'static RouteTree>,
 }
 
 impl<'w, 's> ThreadQuery<'w, 's> {
@@ -67,23 +71,29 @@ impl<'w, 's> ThreadQuery<'w, 's> {
 	}
 
 	/// The agent's tools in author (DFS) order, each entity with its
-	/// definition: every [`ToolDefinition`] beneath `actor`, a function tool
-	/// being a route of the [`Router`] beneath it, its url space.
+	/// definition: every [`ToolDefinition`] beneath `actor`, and every
+	/// [`HostTool`] with its definition read off the host's route, a
+	/// function tool being a route of the [`Router`] beneath it, its url
+	/// space.
 	///
 	/// ## Errors
 	///
-	/// Errors when a function tool sits outside that router, or the actor
-	/// holds more than one, naming the fix.
+	/// Errors when a function tool sits outside that router, the actor holds
+	/// more than one, or a [`HostTool`] names no host route, naming the fix.
 	pub fn tools(
 		&self,
 		actor: Entity,
-	) -> Result<Vec<(Entity, &ToolDefinition)>> {
+	) -> Result<Vec<(Entity, ToolDefinition)>> {
 		let router = self.tool_router(actor)?;
 		let tools = self
 			.children
 			.iter_descendants_inclusive(actor)
-			.filter_map(|entity| self.tools.get(entity).ok())
-			.collect::<Vec<_>>();
+			.filter_map(|entity| {
+				self.tool(entity)
+					.transpose()
+					.map(|tool| tool.map(|tool| (entity, tool)))
+			})
+			.collect::<Result<Vec<_>>>()?;
 		let stray = tools
 			.iter()
 			.filter(|(_, tool)| matches!(tool, ToolDefinition::Function(_)))
@@ -109,6 +119,25 @@ impl<'w, 's> ThreadQuery<'w, 's> {
 			);
 		}
 		tools.xok()
+	}
+
+	/// The tool `entity` is, if any: a [`HostTool`]'s definition read off
+	/// the host's route, else its [`ToolDefinition`].
+	fn tool(&self, entity: Entity) -> Result<Option<ToolDefinition>> {
+		#[cfg(feature = "action")]
+		if let Ok(host_route) = self.host_routes.get(entity) {
+			let host = self.agent_host(entity)?;
+			return host_route
+				.definition(self, &self.route_trees, host)?
+				.xmap(ToolDefinition::from)
+				.xsome()
+				.xok();
+		}
+		self.tools
+			.get(entity)
+			.ok()
+			.map(|(_, tool)| tool.clone())
+			.xok()
 	}
 
 	/// The url space the agent at or above `entity` is authored in, the host
