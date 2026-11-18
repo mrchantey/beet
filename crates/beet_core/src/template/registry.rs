@@ -254,20 +254,20 @@ impl Unregistered {
 	/// A marker holding `value` under `name`.
 	pub fn new(name: impl Into<SmolStr>, value: impl Into<Value>) -> Self {
 		let mut unregistered = Self::default();
-		unregistered.insert_value(name, value);
+		unregistered.insert(name, value);
 		unregistered
 	}
 
-	/// Hold `value` under `name` on `entity`, beside whatever it already
-	/// holds.
-	pub fn hold(
+	/// Insert `value` under `name` into `entity`'s marker, adding the marker
+	/// when it has none.
+	pub fn insert_on(
 		entity: &mut EntityWorldMut,
 		name: impl Into<SmolStr>,
 		value: impl Into<Value>,
 	) {
 		match entity.get_mut::<Self>() {
 			Some(mut unregistered) => {
-				unregistered.insert_value(name, value);
+				unregistered.insert(name, value);
 			}
 			None => {
 				entity.insert(Self::new(name, value));
@@ -275,9 +275,9 @@ impl Unregistered {
 		}
 	}
 
-	/// Drop what `entity` holds under `name`, and the marker with its last
+	/// Remove `name` from `entity`'s marker, and the marker with its last
 	/// entry.
-	pub fn release(entity: &mut EntityWorldMut, name: &str) {
+	pub fn remove_from(entity: &mut EntityWorldMut, name: &str) {
 		let Some(mut unregistered) = entity.get_mut::<Self>() else {
 			return;
 		};
@@ -608,8 +608,8 @@ mod test {
 				.xpect_contains("`Rooty`, `OnAttribute`, `my_crate::First`");
 			query.refuse(outside).unwrap_err();
 		});
-		// releasing the last entry drops the marker
-		Unregistered::release(&mut world.entity_mut(outside), "Outside");
+		// removing the last entry drops the marker
+		Unregistered::remove_from(&mut world.entity_mut(outside), "Outside");
 		world.get::<Unregistered>(outside).xpect_none();
 		world
 			.with_state::<UnregisteredQuery, _>(|query| query.refuse(outside))

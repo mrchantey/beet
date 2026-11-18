@@ -431,7 +431,7 @@ impl ScenePlan {
 						reflect.remove(&mut world.entity_mut(entity));
 					}
 					// a component the load held, dropped from where it is held
-					None => Unregistered::release(
+					None => Unregistered::remove_from(
 						&mut world.entity_mut(entity),
 						type_path,
 					),

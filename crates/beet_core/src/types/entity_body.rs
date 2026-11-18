@@ -18,9 +18,9 @@ use serde::de::DeserializeOwned;
 /// ```
 /// # use beet_core::prelude::*;
 /// let body = EntityBody::default()
-/// 	.with(&Provenance::new([ProvenanceSource::file("logo.png", b"logo")]))
+/// 	.with_typed(&Provenance::new([ProvenanceSource::file("logo.png", b"logo")]))
 /// 	.unwrap();
-/// body.get::<Provenance>().unwrap().sources.len().xpect_eq(1);
+/// body.get_typed::<Provenance>().unwrap().sources.len().xpect_eq(1);
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut, Reflect)]
 #[reflect(opaque, Default)]
@@ -37,26 +37,32 @@ impl From<EntityBody> for Map {
 	fn from(body: EntityBody) -> Self { body.0 }
 }
 
+/// The typed accessors: each component crosses through its serde form under
+/// its type path. The untyped ones are the [`Map`]'s own (`insert`, `get`,
+/// `contains`, `remove`), keyed by the name as a source wrote it.
 #[cfg(feature = "serde")]
 impl EntityBody {
 	/// This body with `component` added, replacing any of its type.
-	pub fn with<T: TypePath + Serialize>(
+	pub fn with_typed<T: TypePath + Serialize>(
 		mut self,
 		component: &T,
 	) -> Result<Self> {
-		self.insert(component)?;
+		self.insert_typed(component)?;
 		self.xok()
 	}
 
 	/// Add `component`, replacing any of its type.
-	pub fn insert<T: TypePath + Serialize>(&mut self, component: &T) -> Result {
+	pub fn insert_typed<T: TypePath + Serialize>(
+		&mut self,
+		component: &T,
+	) -> Result {
 		self.0.insert(T::type_path(), Value::from_serde(component)?);
 		Ok(())
 	}
 
 	/// The component of type `T`, an error naming it when absent, so a
 	/// required component reads with `?`.
-	pub fn get<T: TypePath + DeserializeOwned>(&self) -> Result<T> {
+	pub fn get_typed<T: TypePath + DeserializeOwned>(&self) -> Result<T> {
 		match self.0.contains(T::type_path()) {
 			true => self.0.get(T::type_path())?.clone().into_serde(),
 			false => bevybail!("the body carries no `{}`", T::type_path()),
@@ -65,21 +71,8 @@ impl EntityBody {
 }
 
 impl EntityBody {
-	/// Add a component as data under `name`, the key its source wrote,
-	/// replacing and answering any held there.
-	pub fn insert_value(
-		&mut self,
-		name: impl Into<SmolStr>,
-		value: impl Into<Value>,
-	) -> Option<Value> {
-		self.0.insert(name, value)
-	}
-
-	/// The component held under `name`, as data.
-	pub fn value(&self, name: &str) -> Option<&Value> { self.0.0.get(name) }
-
 	/// Whether the body carries a component of type `T`.
-	pub fn contains<T: TypePath>(&self) -> bool {
+	pub fn contains_typed<T: TypePath>(&self) -> bool {
 		self.0.contains(T::type_path())
 	}
 }
@@ -90,15 +83,17 @@ mod test {
 
 	#[crate::test]
 	fn keys_components_by_type_path() {
-		let body = EntityBody::default().with(&Provenance::default()).unwrap();
-		body.contains::<Provenance>().xpect_true();
+		let body = EntityBody::default()
+			.with_typed(&Provenance::default())
+			.unwrap();
+		body.contains_typed::<Provenance>().xpect_true();
 		body.keys()
 			.next()
 			.unwrap()
 			.as_str()
 			.xpect_eq("beet_core::atproto::provenance::Provenance");
 		EntityBody::default()
-			.get::<Provenance>()
+			.get_typed::<Provenance>()
 			.unwrap_err()
 			.to_string()
 			.xpect_contains(

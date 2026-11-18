@@ -6,10 +6,9 @@ use beet_core::prelude::*;
 ///
 /// Rendering saves the tree at the entity through [`TemplateSaver`] with
 /// nothing filtered: every component the saver writes is in the member, keyed
-/// by type path, its keys minted afresh in tree order. The member is exactly
-/// what a record answers for it, an integer in the one form the data model
-/// reads back, so a document rendered twice equals itself in a repo; a value
-/// the data model cannot hold (an integer past `i64`) is an error here. Parsing spawns the
+/// by type path, its keys minted afresh in tree order, and a value the data
+/// model cannot hold (an integer past `i64`) is an error here rather than at
+/// the record's write. Parsing spawns the
 /// member through [`TemplateLoader`], its first entity the one parsed onto,
 /// under the body's unregistered rule: a component this binary never
 /// registered is left off and held ([`Unregistered`]).
@@ -32,10 +31,9 @@ impl LexiconRenderer for SceneBodyLexicon {
 			&[cx.entity],
 			default(),
 		)?;
-		OpenUnion::new(
-			SceneBody::NSID,
-			AtprotoValue::try_from(body.to_value()?)?.decode(),
-		)
+		let body = body.to_value()?;
+		AtprotoValue::try_from(body.clone())?;
+		OpenUnion::new(SceneBody::NSID, body)
 	}
 }
 
@@ -171,7 +169,7 @@ fn main() { println!("hello"); }
 		let body =
 			SceneBody::from_value(Value::Map(member.fields().clone())).unwrap();
 		body.entities[&EntityKey::from(0)]
-			.contains::<ChildOf>()
+			.contains_typed::<ChildOf>()
 			.xpect_false();
 		// the detach left the live tree as it was
 		source.get::<ChildOf>(post).xpect_some();
@@ -242,7 +240,7 @@ fn main() { println!("hello"); }
 		read.get::<Element>(entity).unwrap().tag().xpect_eq("p");
 		read.get::<Unregistered>(entity)
 			.unwrap()
-			.value("some_plugin::Sparkle")
+			.get("some_plugin::Sparkle")
 			.unwrap()
 			.clone()
 			.xpect_eq(value!({ "amount": 3 }));

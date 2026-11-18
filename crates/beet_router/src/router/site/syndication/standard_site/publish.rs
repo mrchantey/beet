@@ -293,15 +293,15 @@ mod test {
 		let (mut world, router) = site().await;
 		let body = scene(&mut world, router).await;
 		let root = &body.entities[&EntityKey::from(0)];
-		root.contains::<ChildOf>().xpect_false();
-		root.get::<DocMeta>()
+		root.contains_typed::<ChildOf>().xpect_false();
+		root.get_typed::<DocMeta>()
 			.unwrap()
 			.title
 			.xpect_eq(Some("Full Stack Bevy".to_string()));
 		let tags = body
 			.entities
 			.values()
-			.filter_map(|entity| entity.get::<Element>().ok())
+			.filter_map(|entity| entity.get_typed::<Element>().ok())
 			.map(|element| element.tag().to_string())
 			.collect::<Vec<_>>();
 		tags.xpect_eq(vec!["p", "strong", "img"]);
@@ -322,10 +322,10 @@ mod test {
 			.values()
 			.filter(|entity| {
 				entity
-					.get::<Attribute>()
+					.get_typed::<Attribute>()
 					.is_ok_and(|attribute| attribute.to_string() == "src")
 			})
-			.map(|entity| entity.get::<Value>().unwrap())
+			.map(|entity| entity.get_typed::<Value>().unwrap())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![Value::str("/media/photo.png")]);
 	}

@@ -116,7 +116,7 @@ pub(super) fn apply_spread_named(
 					"spread `{}` left off: no component or template of that name is registered in this binary",
 					named.name
 				);
-				Unregistered::hold(
+				Unregistered::insert_on(
 					entity,
 					named.name.clone(),
 					named_to_held(named),

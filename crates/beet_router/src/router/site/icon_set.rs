@@ -278,11 +278,11 @@ impl IconSet {
 			)
 			.await?;
 		EntityBody::default()
-			.with(&Provenance::new([ProvenanceSource::file(
+			.with_typed(&Provenance::new([ProvenanceSource::file(
 				self.src.clone(),
 				bytes,
 			)]))?
-			.with(&outputs)
+			.with_typed(&outputs)
 	}
 
 	/// The web app manifest, its icons relative to it since it sits beside

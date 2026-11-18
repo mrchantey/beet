@@ -143,9 +143,9 @@ pub(crate) mod test_fixtures {
 	/// `publish` writes it.
 	pub async fn write_index(store: &BlobStore, index: &StandardSiteIndex) {
 		let body = EntityBody::default()
-			.with(index)
+			.with_typed(index)
 			.unwrap()
-			.with(&Provenance::new([]))
+			.with_typed(&Provenance::new([]))
 			.unwrap();
 		store
 			.insert(&harvest().index, MediaType::Json.serialize(&body).unwrap())

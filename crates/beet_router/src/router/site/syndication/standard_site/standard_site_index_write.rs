@@ -37,7 +37,7 @@ pub async fn StandardSiteIndexWrite(
 			derivation
 				.read(&publishing.store)
 				.await?
-				.map(|body| body.get::<StandardSiteIndex>())
+				.map(|body| body.get_typed::<StandardSiteIndex>())
 				.transpose()?
 				.is_none_or(|current| current != index)
 		}

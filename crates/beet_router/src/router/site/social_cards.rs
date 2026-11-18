@@ -476,8 +476,8 @@ impl SocialCards {
 				.await?;
 		}
 		EntityBody::default()
-			.with(&Provenance::new(sources.0))?
-			.with(&outputs)
+			.with_typed(&Provenance::new(sources.0))?
+			.with_typed(&outputs)
 	}
 }
 

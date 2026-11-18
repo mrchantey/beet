@@ -277,7 +277,7 @@ fn build_unregistered(
 		Some(named) => named_to_held(named),
 		None => attributes_to_held(el),
 	};
-	Unregistered::hold(cx.entity, el.tag.as_str(), value);
+	Unregistered::insert_on(cx.entity, el.tag.as_str(), value);
 	apply_common_directives(el, refs, cx)?;
 	apply_spreads(el, cx.entity, entity_refs)?;
 	warn!(

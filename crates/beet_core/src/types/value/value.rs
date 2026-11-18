@@ -4,10 +4,18 @@ use alloc::borrow::Cow;
 
 /// A json-like value type suitable for application level operations.
 ///
-/// ## Floats
-/// A wrapper around f64 that implements Eq and Hash by comparing the bit
-/// representation of the float.
-#[derive(Debug, Default, Clone, PartialEq, Reflect, Component)]
+/// ## Equality
+///
+/// [`PartialEq`], [`Hash`] and [`Ord`] agree, so a `Value` is a sound map
+/// key and set member:
+/// - **Integers are numbers.** [`Int`](Self::Int) and [`Uint`](Self::Uint)
+///   are two storage forms of one integer, so `Int(3) == Uint(3)`. A decoder
+///   picks the form (json and DAG-CBOR read a non-negative number unsigned),
+///   so a value equals its own round trip whatever type wrote it.
+/// - **Floats compare by bits**, so `NaN == NaN` and `0.0 != -0.0`, which is
+///   what makes `Value` [`Eq`]. A float never equals an integer: the
+///   distinction is real in every format beet writes.
+#[derive(Debug, Default, Clone, Reflect, Component)]
 #[reflect(Default, Component)]
 // a `Value` is json by nature, so a scene writes it through its own json-native
 // serde rather than the reflect-structural `{"Map": ..}` form, which is what
@@ -465,21 +473,44 @@ impl core::fmt::Display for Value {
 	}
 }
 
+impl PartialEq for Value {
+	fn eq(&self, other: &Self) -> bool {
+		match (self, other) {
+			(Value::Null, Value::Null) => true,
+			(Value::Bool(a), Value::Bool(b)) => a == b,
+			(Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
+			(Value::Bytes(a), Value::Bytes(b)) => a == b,
+			(Value::Str(a), Value::Str(b)) => a == b,
+			(Value::List(a), Value::List(b)) => a == b,
+			(Value::Map(a), Value::Map(b)) => a == b,
+			_ => match (self.integer(), other.integer()) {
+				(Some(a), Some(b)) => a == b,
+				_ => false,
+			},
+		}
+	}
+}
+
 impl core::hash::Hash for Value {
 	fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-		core::mem::discriminant(self).hash(state);
-		match self {
-			Value::Null => {}
-			Value::Bool(val) => val.hash(state),
-			Value::Int(val) => val.hash(state),
-			Value::Uint(val) => val.hash(state),
-			Value::Float(val) => {
-				val.to_bits().hash(state);
+		// one tag for both integer forms, so `Int(3)` and `Uint(3)` hash alike
+		match self.integer() {
+			Some(integer) => {
+				ValueKind::Int.hash(state);
+				integer.hash(state);
 			}
-			Value::Bytes(val) => val.hash(state),
-			Value::Str(val) => val.hash(state),
-			Value::Map(map) => map.hash(state),
-			Value::List(list) => list.hash(state),
+			None => {
+				self.kind().hash(state);
+				match self {
+					Value::Bool(val) => val.hash(state),
+					Value::Float(val) => val.to_bits().hash(state),
+					Value::Bytes(val) => val.hash(state),
+					Value::Str(val) => val.hash(state),
+					Value::Map(map) => map.hash(state),
+					Value::List(list) => list.hash(state),
+					Value::Null | Value::Int(_) | Value::Uint(_) => {}
+				}
+			}
 		}
 	}
 }
@@ -493,18 +524,45 @@ impl PartialOrd for Value {
 impl Ord for Value {
 	fn cmp(&self, other: &Self) -> core::cmp::Ordering {
 		use core::cmp::Ordering;
+		if let (Some(a), Some(b)) = (self.integer(), other.integer()) {
+			return a.cmp(&b);
+		}
 		match (self, other) {
 			(Value::Null, Value::Null) => Ordering::Equal,
 			(Value::Bool(a), Value::Bool(b)) => a.cmp(b),
-			(Value::Int(a), Value::Int(b)) => a.cmp(b),
-			(Value::Uint(a), Value::Uint(b)) => a.cmp(b),
 			(Value::Float(a), Value::Float(b)) => a.to_bits().cmp(&b.to_bits()),
 			(Value::Str(a), Value::Str(b)) => a.cmp(b),
 			(Value::Bytes(a), Value::Bytes(b)) => a.cmp(b),
 			(Value::List(a), Value::List(b)) => a.cmp(b),
 			(Value::Map(a), Value::Map(b)) => a.cmp(b),
-			// For different types, order by discriminant
-			_ => self.kind().to_string().cmp(&other.kind().to_string()),
+			// different kinds order by kind, both integer forms ranking as one
+			_ => self.order_kind().cmp(&other.order_kind()),
+		}
+	}
+}
+
+impl Value {
+	/// The integer this value holds in either form, `None` for any other kind.
+	fn integer(&self) -> Option<i128> {
+		match self {
+			Value::Int(int) => Some(*int as i128),
+			Value::Uint(uint) => Some(*uint as i128),
+			_ => None,
+		}
+	}
+
+	/// The rank of this value's kind among kinds, both integer forms sharing
+	/// one, so the order between kinds agrees with equality.
+	fn order_kind(&self) -> u8 {
+		match self {
+			Value::Null => 0,
+			Value::Bool(_) => 1,
+			Value::Int(_) | Value::Uint(_) => 2,
+			Value::Float(_) => 3,
+			Value::Bytes(_) => 4,
+			Value::Str(_) => 5,
+			Value::List(_) => 6,
+			Value::Map(_) => 7,
 		}
 	}
 }
@@ -672,6 +730,49 @@ macro_rules! value {
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	fn hash(value: &Value) -> u64 {
+		use core::hash::BuildHasher;
+		FixedHasher.hash_one(value)
+	}
+
+	/// Equality, hashing and ordering agree on every pair: both integer
+	/// forms are one number, floats compare by bits, and a float is never an
+	/// integer.
+	#[crate::test]
+	fn equality_hash_and_order_agree() {
+		let equal = [
+			(Value::Int(3), Value::Uint(3)),
+			(Value::Int(0), Value::Uint(0)),
+			(Value::Float(f64::NAN), Value::Float(f64::NAN)),
+			(
+				Value::Map(Map::new([("count", Value::Int(2))])),
+				Value::Map(Map::new([("count", Value::Uint(2))])),
+			),
+			(
+				Value::new_list([Value::Int(1)]),
+				Value::new_list([Value::Uint(1)]),
+			),
+		];
+		for (left, right) in equal {
+			(left == right).xpect_true();
+			hash(&left).xpect_eq(hash(&right));
+			left.cmp(&right).xpect_eq(core::cmp::Ordering::Equal);
+		}
+		let unequal = [
+			(Value::Int(-1), Value::Uint(u64::MAX)),
+			(Value::Float(0.0), Value::Float(-0.0)),
+			(Value::Float(3.0), Value::Int(3)),
+			(Value::Str("3".into()), Value::Uint(3)),
+		];
+		for (left, right) in unequal {
+			(left == right).xpect_false();
+			left.cmp(&right).xpect_not_eq(core::cmp::Ordering::Equal);
+		}
+		// integers order as numbers across both forms
+		(Value::Int(-1) < Value::Uint(0)).xpect_true();
+		(Value::Uint(2) < Value::Int(3)).xpect_true();
+	}
 
 	#[crate::test]
 	fn parse_string_bool() {

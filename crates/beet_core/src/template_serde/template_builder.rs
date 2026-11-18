@@ -371,12 +371,12 @@ impl<'w> TemplateBuilder<'w> {
 				.map_err(|err| {
 					bevyhow!("component `{type_path}` on {entity}: {err}")
 				})?;
-			resolved.insert_value(type_path, value);
+			resolved.insert(type_path, value);
 		}
 		// a resolved component wins the key a held one also names
 		for (name, value) in Map::from(held) {
 			if !resolved.contains_key(&name) {
-				resolved.insert_value(name, value);
+				resolved.insert(name, value);
 			}
 		}
 		resolved.xok()
@@ -475,10 +475,9 @@ impl<'w> TemplateBuilder<'w> {
 				self.type_registry,
 			) {
 				Ok(value) => {
-					self.body.resources.insert_value(
-						registration.type_info().type_path(),
-						value,
-					);
+					self.body
+						.resources
+						.insert(registration.type_info().type_path(), value);
 				}
 				Err(error) => {
 					self.error.get_or_insert(error);
@@ -539,7 +538,7 @@ mod test {
 		// live entity's bits
 		keys(&body).xpect_eq(vec!["0"]);
 		entity(&body, 0).len().xpect_eq(1);
-		entity(&body, 0).contains::<ComponentA>().xpect_true();
+		entity(&body, 0).contains_typed::<ComponentA>().xpect_true();
 	}
 
 	#[crate::test]
@@ -637,7 +636,7 @@ mod test {
 			.unwrap();
 
 		body.resources.len().xpect_eq(1);
-		body.resources.contains::<ResourceA>().xpect_true();
+		body.resources.contains_typed::<ResourceA>().xpect_true();
 	}
 
 	#[crate::test]
@@ -659,9 +658,9 @@ mod test {
 
 		// extraction order: a_b, a, b. b has no allowed component.
 		body.entities.len().xpect_eq(3);
-		entity(&body, 0).contains::<ComponentA>().xpect_true();
+		entity(&body, 0).contains_typed::<ComponentA>().xpect_true();
 		entity(&body, 0).len().xpect_eq(1);
-		entity(&body, 1).contains::<ComponentA>().xpect_true();
+		entity(&body, 1).contains_typed::<ComponentA>().xpect_true();
 		entity(&body, 2).len().xpect_eq(0);
 	}
 
@@ -684,10 +683,10 @@ mod test {
 
 		// extraction order: a_b, a, b. a has only the denied component.
 		body.entities.len().xpect_eq(3);
-		entity(&body, 0).contains::<ComponentB>().xpect_true();
+		entity(&body, 0).contains_typed::<ComponentB>().xpect_true();
 		entity(&body, 0).len().xpect_eq(1);
 		entity(&body, 1).len().xpect_eq(0);
-		entity(&body, 2).contains::<ComponentB>().xpect_true();
+		entity(&body, 2).contains_typed::<ComponentB>().xpect_true();
 	}
 
 	#[crate::test]
@@ -706,7 +705,7 @@ mod test {
 			.unwrap();
 
 		body.resources.len().xpect_eq(1);
-		body.resources.contains::<ResourceB>().xpect_true();
+		body.resources.contains_typed::<ResourceB>().xpect_true();
 	}
 
 	/// A component is written through its reflected form, a plain value under
@@ -736,12 +735,12 @@ mod test {
 			.unwrap();
 
 		entity(&body, 0)
-			.value(SomeType::type_path())
+			.get(SomeType::type_path())
 			.unwrap()
 			.clone()
 			.xpect_eq(Value::Int(123));
 		body.resources
-			.value(SomeResource::type_path())
+			.get(SomeResource::type_path())
 			.unwrap()
 			.clone()
 			.xpect_eq(Value::Int(123));

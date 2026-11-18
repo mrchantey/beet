@@ -120,7 +120,7 @@ impl StandardSiteIndex {
 			)
 			.await??;
 		let index = match derivation.read(&store).await? {
-			Some(body) => body.get::<Self>()?.xmap(Some),
+			Some(body) => body.get_typed::<Self>()?.xmap(Some),
 			None => {
 				debug!(
 					"no standard site index at `{}`: nothing published yet",
@@ -489,7 +489,7 @@ mod test {
 			.await
 			.unwrap()
 			.unwrap()
-			.get::<StandardSiteIndex>()
+			.get_typed::<StandardSiteIndex>()
 			.unwrap()
 			.xpect_eq(
 				StandardSiteIndex::from_repo(&pds, &publication.url)

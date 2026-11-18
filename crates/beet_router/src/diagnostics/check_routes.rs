@@ -808,9 +808,9 @@ mod test {
 						async |cx: ActionContext<BlobStore>| {
 							let bytes =
 								cx.input.get(&"notes.md".into()).await?;
-							EntityBody::default().with(&Provenance::new([
-								ProvenanceSource::file("notes.md", &bytes),
-							]))
+							EntityBody::default().with_typed(&Provenance::new(
+								[ProvenanceSource::file("notes.md", &bytes)],
+							))
 						}
 					)
 				)

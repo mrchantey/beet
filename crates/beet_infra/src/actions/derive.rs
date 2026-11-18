@@ -130,7 +130,7 @@ mod test {
 			Action::<BlobStore, EntityBody>::new_async(
 				async |cx: ActionContext<BlobStore>| {
 					let bytes = cx.input.get(&RelPath::new(SOURCE)).await?;
-					EntityBody::default().with(&Provenance::new([
+					EntityBody::default().with_typed(&Provenance::new([
 						ProvenanceSource::file(SOURCE, &bytes),
 					]))
 				},

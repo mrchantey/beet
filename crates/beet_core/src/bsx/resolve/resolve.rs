@@ -406,7 +406,7 @@ mod test {
 			.clone()
 			.xpect_eq(Unregistered::new(
 				"NotRegistered",
-				value!({ "name": "ada", "count": 3u64, "on": true }),
+				value!({ "name": "ada", "count": 3, "on": true }),
 			));
 		// the child built, and the resource declaration it carries applied.
 		world
@@ -559,7 +559,7 @@ mod test {
 			.unwrap()
 			.clone()
 			.xpect_eq(Unregistered::from_iter([
-				("Mispelt", value!({ "size": 2u64 })),
+				("Mispelt", value!({ "size": 2 })),
 				("Tagged", Value::str("x")),
 				("Bare", Value::map()),
 			]));

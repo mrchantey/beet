@@ -33,7 +33,7 @@ use beet_core::prelude::*;
 /// 		Action::<BlobStore, EntityBody>::new_async(
 /// 			async |cx: ActionContext<BlobStore>| {
 /// 				let notes = cx.input.get(&RelPath::new("notes.md")).await?;
-/// 				EntityBody::default().with(&Provenance::new([
+/// 				EntityBody::default().with_typed(&Provenance::new([
 /// 					ProvenanceSource::file("notes.md", &notes),
 /// 				]))
 /// 			},
@@ -252,7 +252,11 @@ impl Derivation {
 			.media_type()?
 			.deserialize::<EntityBody>(&bytes)
 			.and_then(|body| {
-				(body.get::<Provenance>()?, DerivationOutputs::of(&body)?).xok()
+				(
+					body.get_typed::<Provenance>()?,
+					DerivationOutputs::of(&body)?,
+				)
+					.xok()
 			}) {
 			Ok(read) => read,
 			Err(error) => return Freshness::Invalid(error.to_string()).xok(),
@@ -338,14 +342,14 @@ impl Derivation {
 			.unwrap_or_default();
 		let mut body =
 			entity.call::<BlobStore, EntityBody>(store.clone()).await?;
-		if !body.contains::<Provenance>() {
+		if !body.contains_typed::<Provenance>() {
 			bevybail!(
 				"the producing action of derived file `{}` answered no \
 				 `Provenance`: a derived file names the sources it was computed from",
 				self.path
 			);
 		}
-		let produced = body.get::<Provenance>()?;
+		let produced = body.get_typed::<Provenance>()?;
 		let mut provenance = Provenance {
 			created: Timestamp::now(),
 			ttl: self.ttl,
@@ -359,16 +363,16 @@ impl Derivation {
 		// unchanged but for when it was made: keep the file in place
 		if keep_unchanged
 			&& let Some(previous) = &previous
-			&& let Ok(previous_provenance) = previous.get::<Provenance>()
+			&& let Ok(previous_provenance) = previous.get_typed::<Provenance>()
 		{
 			provenance.created = previous_provenance.created;
-			body.insert(&provenance)?;
+			body.insert_typed(&provenance)?;
 			if self.encode(&body)? == self.encode(previous)? {
 				return Ok(false);
 			}
 			provenance.created = Timestamp::now();
 		}
-		body.insert(&provenance)?;
+		body.insert_typed(&provenance)?;
 		store.insert(&self.path, self.encode(&body)?).await?;
 		let outputs = DerivationOutputs::of(&body)?;
 		for output in superseded
@@ -402,7 +406,7 @@ impl Derivation {
 /// let store = BlobStore::temp();
 /// let mut outputs = DerivationOutputs::default();
 /// outputs.write(&store, "icons/icon-16.png", vec![0u8; 4]).await?;
-/// let body = EntityBody::default().with(&outputs)?;
+/// let body = EntityBody::default().with_typed(&outputs)?;
 /// # let _ = body;
 /// # Ok(()) }
 /// ```
@@ -425,8 +429,8 @@ pub struct DerivationOutput {
 impl DerivationOutputs {
 	/// The outputs `body` lists, none when it lists none.
 	pub fn of(body: &EntityBody) -> Result<Self> {
-		match body.contains::<Self>() {
-			true => body.get::<Self>(),
+		match body.contains_typed::<Self>() {
+			true => body.get_typed::<Self>(),
 			false => Self::default().xok(),
 		}
 	}
@@ -654,10 +658,12 @@ mod test {
 						runs.set(runs.get() + 1);
 						let bytes = cx.input.get(&RelPath::new(SOURCE)).await?;
 						EntityBody::default()
-							.with(&Provenance::new([ProvenanceSource::file(
-								SOURCE, &bytes,
-							)]))?
-							.with(&Echo(str::from_utf8(&bytes)?.to_string()))
+							.with_typed(&Provenance::new([
+								ProvenanceSource::file(SOURCE, &bytes),
+							]))?
+							.with_typed(&Echo(
+								str::from_utf8(&bytes)?.to_string(),
+							))
 					},
 				),
 			))
@@ -692,7 +698,7 @@ mod test {
 			.await
 			.unwrap()
 			.unwrap()
-			.get::<Echo>()
+			.get_typed::<Echo>()
 			.unwrap()
 			.0
 	}
@@ -789,9 +795,9 @@ mod test {
 		// the ttl rides the file, and an hour passes
 		let derivation = Derivation::new(DERIVED);
 		let mut body = derivation.read(&store).await.unwrap().unwrap();
-		let provenance = body.get::<Provenance>().unwrap();
+		let provenance = body.get_typed::<Provenance>().unwrap();
 		provenance.ttl.xpect_eq(Some(Duration::from_secs(60)));
-		body.insert(&Provenance {
+		body.insert_typed(&Provenance {
 			created: Timestamp::UNIX_EPOCH,
 			..provenance
 		})
@@ -922,10 +928,10 @@ mod test {
 							)
 							.await?;
 						EntityBody::default()
-							.with(&Provenance::new([ProvenanceSource::file(
-								SOURCE, &bytes,
-							)]))?
-							.with(&outputs)
+							.with_typed(&Provenance::new([
+								ProvenanceSource::file(SOURCE, &bytes),
+							]))?
+							.with_typed(&outputs)
 					},
 				),
 			))
@@ -1019,7 +1025,7 @@ mod test {
 						let sources = sources.clone();
 						async move {
 							EntityBody::default()
-								.with(&Provenance::new(sources))
+								.with_typed(&Provenance::new(sources))
 						}
 					},
 				),

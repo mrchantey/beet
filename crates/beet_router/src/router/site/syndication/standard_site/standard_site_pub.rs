@@ -98,8 +98,8 @@ pub async fn StandardSitePub(
 	// no sources: the index is a copy of the repo, which the probe compares
 	// against, see `StandardSiteIndex`
 	EntityBody::default()
-		.with(&index)?
-		.with(&Provenance::new([]))
+		.with_typed(&index)?
+		.with_typed(&Provenance::new([]))
 }
 
 impl StandardSitePub {

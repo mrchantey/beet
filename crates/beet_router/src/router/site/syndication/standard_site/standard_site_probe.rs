@@ -92,12 +92,13 @@ impl StandardSiteProbe {
 				derivation.path,
 				StandardSitePub::WRITTEN_BY
 			)),
-			Some(body) if body.get::<StandardSiteIndex>()? != index => failures
-				.push(format!(
+			Some(body) if body.get_typed::<StandardSiteIndex>()? != index => {
+				failures.push(format!(
 					"the index at `{}` differs from the repo: `{}` rewrites it",
 					derivation.path,
 					StandardSitePub::WRITTEN_BY
-				)),
+				))
+			}
 			Some(_) => {}
 		}
 		let unannounced = index

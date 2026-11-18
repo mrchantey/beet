@@ -91,7 +91,7 @@ impl SceneBody {
 					warn!(
 						"entity `{key}`: no type registered for `{name}`, left off and held unregistered"
 					);
-					unregistered.insert_value(name.clone(), value.clone());
+					unregistered.insert(name.clone(), value.clone());
 				}
 			}
 		}
@@ -494,7 +494,7 @@ mod test {
 			.map(SmolStr::as_str)
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![SHIELD]);
-		held.value(SHIELD)
+		held.get(SHIELD)
 			.unwrap()
 			.clone()
 			.xpect_eq(Value::Map(Map::new([("strength", 1.3)])));
