@@ -328,11 +328,11 @@ pub struct ParamMeta {
 	/// hint (`a YYYY-MM-DD date`), a unit enum's variants, else the
 	/// [`type_name`](Self::type_name)'s short form, ie `String`.
 	kind: SmolStr,
-	/// The shape of one value of the param, as a tool argument or any other
-	/// structured caller writes it ([`value_schema`](Self::value_schema)),
-	/// any `Option<..>` wrapper stripped as for
-	/// [`type_name`](Self::type_name).
-	schema: ValueSchema,
+	/// The reflected type of [`type_name`](Self::type_name), absent for a
+	/// param built from data, kept so its schema is built only when asked
+	/// for ([`field_schema`](Self::field_schema)).
+	#[reflect(ignore)]
+	leaf: Option<ParamType>,
 	/// Additional details for the param
 	options: ParamOptions,
 	/// Whether specifying the param is required, usually inferred
@@ -361,7 +361,7 @@ impl ParamMeta {
 		let type_name = value.placeholder_type_name();
 		Self {
 			kind: type_name.short(),
-			schema: value.placeholder_schema(),
+			leaf: None,
 			type_name,
 			value,
 			key: name.into(),
@@ -419,7 +419,7 @@ impl ParamMeta {
 			kind: authored_kind(leaf_id)
 				.or_else(|| variant_kind(some_inner.or(info)))
 				.unwrap_or_else(|| type_name.short()),
-			schema: Self::value_schema(some_inner.or(info), leaf_id),
+			leaf: some_inner.or(info).map(ParamType),
 			type_name,
 			options: ParamOptions::from_reflect(field),
 		}
@@ -504,14 +504,14 @@ impl ParamMeta {
 	}
 
 	/// Sets the type the param parses into, as [`from_field`](Self::from_field)
-	/// reads a field of it: its name, how it is written and its schema.
+	/// reads a field of it: its name, how it is written and its type.
 	pub fn with_type<T: 'static + Typed>(mut self) -> Self {
 		let info = T::type_info();
 		self.type_name = TypeName::of::<T>();
 		self.kind = authored_kind(TypeId::of::<T>())
 			.or_else(|| variant_kind(Some(info)))
 			.unwrap_or_else(|| self.type_name.short());
-		self.schema = Self::value_schema(Some(info), TypeId::of::<T>());
+		self.leaf = Some(ParamType(info));
 		self
 	}
 
@@ -563,21 +563,25 @@ impl ParamMeta {
 	/// read as absent) where the param is, described by its doc line and,
 	/// where its type is written some particular way, how.
 	pub fn field_schema(&self) -> NamedFieldSchema {
-		let mut field = match self.required {
-			true => {
-				NamedFieldSchema::new(self.key.clone(), self.schema.clone())
+		let schema = match self.leaf {
+			Some(ParamType(info)) => {
+				Self::value_schema(Some(info), info.type_id())
 			}
-			false => NamedFieldSchema::new(
-				self.key.clone(),
-				ValueSchema::Optional(Box::new(self.schema.clone())),
-			)
-			.optional(),
+			None => self.value.placeholder_schema(),
 		};
 		// a unit enum's words are its schema's own, a plain type's kind its
 		// type name, so only an authored hint adds to the doc line
-		let hint = (!matches!(self.schema, ValueSchema::Enum(_))
+		let hint = (!matches!(schema, ValueSchema::Enum(_))
 			&& self.kind != self.type_name.short())
 		.then_some(self.kind.as_str());
+		let mut field = match self.required {
+			true => NamedFieldSchema::new(self.key.clone(), schema),
+			false => NamedFieldSchema::new(
+				self.key.clone(),
+				ValueSchema::Optional(Box::new(schema)),
+			)
+			.optional(),
+		};
 		field.description = match (self.description(), hint) {
 			(Some(description), Some(hint)) => {
 				Some(format!("{description} ({hint})").into())
@@ -625,6 +629,41 @@ impl ParamMeta {
 			},
 			None => string(),
 		}
+	}
+}
+
+/// The reflected type a [`ParamMeta`] parses into, compared by type, so a
+/// meta is as cheap to build and clone as its name.
+#[derive(Clone, Copy)]
+struct ParamType(&'static TypeInfo);
+
+impl core::fmt::Debug for ParamType {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		write!(f, "{}", self.0.type_path())
+	}
+}
+
+impl PartialEq for ParamType {
+	fn eq(&self, other: &Self) -> bool { self.0.type_id() == other.0.type_id() }
+}
+
+impl Eq for ParamType {}
+
+impl PartialOrd for ParamType {
+	fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl Ord for ParamType {
+	fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+		self.0.type_path().cmp(other.0.type_path())
+	}
+}
+
+impl core::hash::Hash for ParamType {
+	fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+		self.0.type_id().hash(state);
 	}
 }
 
