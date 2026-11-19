@@ -279,9 +279,8 @@ pub trait ThreadStoreProvider: 'static + Send + Sync {
 
 	/// The window `thread` enters with, bounded however long it has run:
 	/// every actor, the last `tail` posts of its [`Self::history`] (all of
-	/// them when `None`), never
-	/// opening on a call output whose call it cut, and the current post of
-	/// each of its seed slots ([`Thread::seed`]) however old. The window is
+	/// them when `None`), never opening on a call output whose call it cut,
+	/// and its seed however old ([`ThreadWindow::seed_of`]). The window is
 	/// the model's context, so this is its context policy, beside
 	/// [`StubOldImages`]'s bound on image bytes; older posts are paged by a
 	/// view ([`Self::page_before`]), never entering the window.
@@ -296,6 +295,7 @@ pub trait ThreadStoreProvider: 'static + Send + Sync {
 				window.insert_actor(actor);
 			}
 			let history = self.history(thread).await?;
+			let seed = ThreadWindow::seed_of(&history);
 			let mut start = tail
 				.map(|tail| history.len().saturating_sub(tail as usize))
 				.unwrap_or_default();
@@ -305,11 +305,11 @@ pub trait ThreadStoreProvider: 'static + Send + Sync {
 				start += 1;
 			}
 			for (index, post) in history.into_iter().enumerate() {
-				if index >= start || thread.seed().contains(&post.id()) {
+				if index >= start || seed.contains(&post.id()) {
 					window.upsert_post(post);
 				}
 			}
-			window.xok()
+			window.with_seed(seed).xok()
 		})
 	}
 
@@ -569,10 +569,27 @@ pub mod thread_store_test {
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["post 0", "post 1", "left"]);
 
-		// a bounded window enters with the tail alone, keeping each current
-		// seed however old, and a view pages the rest
-		let mut seeded = provider.thread(thread_id).await.unwrap().unwrap();
-		seeded.set_seed(vec![expected[0].id()]);
+		// a bounded window enters with the tail alone, keeping the seed, the
+		// posts before the first session opened, however old, and a view
+		// pages the rest
+		let seeded = Thread::new("Seeded");
+		provider.insert_thread(seeded.clone()).await.unwrap();
+		let seeded_posts = ["seed", "opened", "first", "second"]
+			.into_iter()
+			.map(|text| {
+				let mut post = AgentPost::new_text(
+					actor_id,
+					seeded.id(),
+					text,
+					PostStatus::Completed,
+				);
+				if text == "opened" {
+					post.set_intent(PostIntent::SESSION_OPENED);
+				}
+				post
+			})
+			.collect::<Vec<_>>();
+		provider.insert_posts(seeded_posts.clone()).await.unwrap();
 		texts(
 			provider
 				.materialize_window(&seeded, Some(1))
@@ -581,14 +598,14 @@ pub mod thread_store_test {
 				.posts()
 				.to_vec(),
 		)
-		.xpect_eq(vec!["post 0", "post 2"]);
+		.xpect_eq(vec!["seed", "second"]);
 		texts(
 			provider
-				.page_before(&seeded, expected[2].id(), 1)
+				.page_before(&seeded, seeded_posts[3].id(), 2)
 				.await
 				.unwrap(),
 		)
-		.xpect_eq(vec!["post 1"]);
+		.xpect_eq(vec!["opened", "first"]);
 
 		provider.store_remove().await.unwrap();
 	}

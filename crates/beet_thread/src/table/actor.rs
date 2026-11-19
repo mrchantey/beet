@@ -43,7 +43,7 @@ impl Actor {
 	}
 	/// Create an actor with a pinned, stable [`ActorId`] carried in the scene.
 	/// Required for persisted threads, where each session's `ActorRef`
-	/// bindings and seed slots depend on stable actor identity.
+	/// bindings and stored posts depend on stable actor identity.
 	pub fn new_with_id(
 		id: ActorId,
 		name: impl Into<String>,

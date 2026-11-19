@@ -527,7 +527,7 @@ mod test {
 				&mut app,
 				router,
 				Request::get("review/product")
-					.with_param("spawned-by", spawned_by.as_str()),
+					.with_param("spawned-by", &spawned_by.to_string()),
 			)
 			.await
 			.0
@@ -563,7 +563,7 @@ mod test {
 			window.upsert_post(post);
 		}
 		window
-			.model_posts(&thread, None)
+			.model_posts(None)
 			.iter()
 			.any(|view| view.post.intent().is_session())
 			.xpect_false();

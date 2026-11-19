@@ -150,10 +150,11 @@ impl Thread {
 	/// session: reduce it, then pick the stored thread `entry` continues from
 	/// its [`MountThreadStore`] and mount it.
 	///
-	/// A continued thread adopts the stored id, enters with its bounded
-	/// window ([`ThreadStoreProvider::materialize_window`]) and brings each
-	/// seed slot current ([`ThreadWindow::reconcile_seed`]); a created one is
-	/// stamped by `entry`, a branch entering with its parent's history. Either
+	/// A continued thread adopts the stored id and enters with its bounded
+	/// window ([`ThreadStoreProvider::materialize_window`]), its stored seed
+	/// standing for the one this session resolved; a created one is stamped
+	/// by `entry` and keeps its resolved seed, a branch entering with its
+	/// parent's history before it. Either
 	/// way the session opens with a [`SessionOpened`] post. A thread with no
 	/// mount persists nothing, and opens its session all the same.
 	///
@@ -226,11 +227,11 @@ impl Thread {
 		// never flushes an un-adopted thread
 		store.store_try_create().await?;
 		let stored = entry.find(&store).await?;
+		let continued = stored.is_some();
 		let record = match stored {
 			Some(stored) => stored,
 			None => {
 				entry.stamp(&mut fresh);
-				fresh.set_seed(default());
 				fresh
 			}
 		};
@@ -241,15 +242,13 @@ impl Thread {
 				let mut window = world
 					.get_mut::<ThreadWindow>(entity)
 					.ok_or_else(|| bevyhow!("thread {entity} despawned"))?;
-				let resolved = window.take_posts();
+				if continued {
+					window.clear_posts();
+				}
 				window.merge_stored(loaded);
-				let seed =
-					window.reconcile_seed(record.seed(), record.id(), resolved);
 				window.open_session(record.id(), entry.opened())?;
-				let mut thread = record;
-				thread.set_seed(seed);
 				world.entity_mut(entity).insert((
-					thread,
+					record,
 					SyncedPosts::new(synced),
 					store,
 				));
@@ -345,83 +344,40 @@ mod test {
 		)
 	}
 
-	/// The text of every seed post the window holds, sessions aside, in
-	/// order, and the text model input carries.
-	fn seeds(
-		thread: &Thread,
-		window: &ThreadWindow,
-	) -> (Vec<String>, Vec<String>) {
-		let texts = |posts: Vec<&Post>| {
-			posts
-				.iter()
-				.map(|post| post.to_string())
-				.collect::<Vec<_>>()
-		};
+	/// The text of the window's seed posts and of what model input carries,
+	/// in order.
+	fn seeds(window: &ThreadWindow) -> (Vec<String>, Vec<String>) {
 		(
-			texts(
-				window
-					.posts()
-					.iter()
-					.filter(|post| post.seed_slot().is_some())
-					.collect(),
-			),
-			texts(
-				window
-					.model_posts(thread, None)
-					.into_iter()
-					.map(|view| view.post)
-					.collect(),
-			),
+			window
+				.posts()
+				.iter()
+				.filter(|post| window.seed().contains(&post.id()))
+				.map(|post| post.to_string())
+				.collect(),
+			window
+				.model_posts(None)
+				.into_iter()
+				.map(|view| view.post.to_string())
+				.collect(),
 		)
 	}
 
-	/// A continued thread whose seed is unchanged appends nothing.
+	/// A continued thread enters with its stored seed, never the one its
+	/// session resolved, edited or not.
 	#[beet_core::test]
-	async fn an_unchanged_seed_appends_nothing() {
+	async fn a_continued_thread_keeps_its_stored_seed() {
 		let store = BlobStore::temp();
 		let (first, _) = session(&store, &["be brief"], None).await;
-		let (thread, window) = session(&store, &["be brief"], None).await;
+		let (thread, window) =
+			session(&store, &["be thorough", "cite sources"], None).await;
 		thread.id().xpect_eq(first.id());
-		seeds(&thread, &window).xpect_eq((vec!["be brief".to_string()], vec![
+		seeds(&window).xpect_eq((vec!["be brief".to_string()], vec![
 			"be brief".to_string(),
 		]));
 	}
 
-	/// An edited seed post appends its new version, the history before it
-	/// intact, and model input carries only the current one.
-	#[beet_core::test]
-	async fn an_edited_seed_appends_its_new_version() {
-		let store = BlobStore::temp();
-		session(&store, &["be brief"], None).await;
-		let (thread, window) = session(&store, &["be thorough"], None).await;
-		seeds(&thread, &window).xpect_eq((
-			vec!["be brief".to_string(), "be thorough".to_string()],
-			vec!["be thorough".to_string()],
-		));
-		thread.seed().len().xpect_eq(1);
-	}
-
-	/// A slot the template added appends, and one it removed drops from the
-	/// list, its posts staying in the record.
-	#[beet_core::test]
-	async fn slots_are_added_and_removed() {
-		let store = BlobStore::temp();
-		session(&store, &["be brief"], None).await;
-		let (thread, window) =
-			session(&store, &["be brief", "cite sources"], None).await;
-		seeds(&thread, &window)
-			.1
-			.xpect_eq(vec!["be brief".to_string(), "cite sources".to_string()]);
-		let (thread, window) = session(&store, &["be brief"], None).await;
-		thread.seed().len().xpect_eq(1);
-		seeds(&thread, &window).xpect_eq((
-			vec!["be brief".to_string(), "cite sources".to_string()],
-			vec!["be brief".to_string()],
-		));
-	}
-
 	/// A thread of more posts than its bound enters with only its tail,
-	/// keeping its current seed however old.
+	/// keeping its seed however old.
 	#[beet_core::test]
 	async fn a_long_thread_enters_with_its_tail() {
 		let store = BlobStore::temp();

@@ -2,36 +2,29 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A post named across threads, `<thread id>/<post id>`: what a record holds
-/// to point at another thread's post, ie [`Thread::spawned_by`] and
-/// [`Thread::branch_of`], never an [`Entity`].
+/// A post named across threads: what a record holds to point at another
+/// thread's post, ie [`Thread::spawned_by`] and [`Thread::branch_of`], never
+/// an [`Entity`].
 ///
-/// A string primitive, so it travels the same as a flag, a query param or a
-/// body field: `--spawned-by=<thread id>/<post id>`. [`Self::parse`] is the
-/// one way in.
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	Hash,
-	Reflect,
-	StringPrimitive,
-	Serialize,
-	Deserialize,
-)]
-#[serde(try_from = "SmolStr", into = "SmolStr")]
+/// Its text form, `<thread id>/<post id>`, is how it travels as a flag, a
+/// query param or a body field (`--spawned-by=<thread id>/<post id>`), and
+/// its serde form is that same string, as with [`Url`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect, Get)]
 #[reflect(opaque)]
 #[reflect(Debug, PartialEq, Hash, Serialize, Deserialize)]
-pub struct PostRef(SmolStr);
+#[get(copy)]
+pub struct PostRef {
+	/// The thread holding the post.
+	thread: ThreadId,
+	/// The post.
+	post: PostId,
+}
 
 impl PostRef {
 	/// Name `post` of `thread`.
-	pub fn new(thread: ThreadId, post: PostId) -> Self {
-		Self(format!("{thread}/{post}").into())
-	}
+	pub fn new(thread: ThreadId, post: PostId) -> Self { Self { thread, post } }
 
-	/// Parse `<thread id>/<post id>`.
+	/// Parse the text form, `<thread id>/<post id>`.
 	///
 	/// ## Errors
 	///
@@ -41,20 +34,6 @@ impl PostRef {
 			bevyhow!("`{text}` names no post: expected `<thread id>/<post id>`")
 		})?;
 		Self::new(ThreadId::parse(thread)?, PostId::parse(post)?).xok()
-	}
-
-	/// The thread holding the post.
-	pub fn thread(&self) -> ThreadId { self.split().0 }
-	/// The post.
-	pub fn post(&self) -> PostId { self.split().1 }
-
-	/// Both halves, which [`Self::parse`] validated on the way in.
-	fn split(&self) -> (ThreadId, PostId) {
-		let (thread, post) = self.0.split_once('/').unwrap_or_default();
-		(
-			ThreadId::parse(thread).unwrap_or_default(),
-			PostId::parse(post).unwrap_or_default(),
-		)
 	}
 
 	/// Teach every authoring seam, a flag, a query param, a markup attribute,
@@ -75,6 +54,30 @@ impl PostRef {
 	}
 }
 
+impl std::fmt::Display for PostRef {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}/{}", self.thread, self.post)
+	}
+}
+
+impl Serialize for PostRef {
+	fn serialize<S: serde::Serializer>(
+		&self,
+		serializer: S,
+	) -> Result<S::Ok, S::Error> {
+		serializer.collect_str(self)
+	}
+}
+
+impl<'de> Deserialize<'de> for PostRef {
+	fn deserialize<D: serde::Deserializer<'de>>(
+		deserializer: D,
+	) -> Result<Self, D::Error> {
+		let text = SmolStr::deserialize(deserializer)?;
+		Self::parse(&text).map_err(serde::de::Error::custom)
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -85,11 +88,9 @@ mod test {
 		let thread = ThreadId::new_now();
 		let post = PostId::new_now();
 		let post_ref = PostRef::new(thread, post);
-		PostRef::parse(post_ref.as_str())
+		PostRef::parse(&post_ref.to_string())
 			.unwrap()
-			.xpect_eq(post_ref.clone());
-		post_ref.thread().xpect_eq(thread);
-		post_ref.post().xpect_eq(post);
+			.xpect_eq(post_ref);
 		serde_json::to_string(&post_ref)
 			.unwrap()
 			.xpect_eq(format!("\"{thread}/{post}\""));

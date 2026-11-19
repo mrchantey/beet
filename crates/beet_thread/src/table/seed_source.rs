@@ -16,9 +16,9 @@ use beet_net::prelude::*;
 /// as an include is, so `Ready` waits for it. Its action is called on the
 /// source's own entity, resolving what it reads by ancestry, and its text
 /// lands as a [`SeedPost`] in its place. The thread reduces only once every
-/// source has landed ([`ThreadWindow::reduce`]). It is read once per
-/// session: a continued thread whose file was edited since appends the new
-/// text as its slot's next version ([`ThreadWindow::reconcile_seed`]).
+/// source has landed ([`ThreadWindow::reduce`]). Only a fresh thread keeps
+/// what it read: a continued thread enters with its stored seed
+/// ([`Thread::enter`]).
 ///
 /// A failed read leaves the source in place and a [`TemplateError`] on the
 /// build root, so the thread never reduces and its entry names the seed.
@@ -182,7 +182,7 @@ mod test {
 	}
 
 	/// A `src` seed is read while its thread builds, landing as the thread's
-	/// first seed slot.
+	/// first seed post.
 	#[beet_core::test]
 	async fn a_src_seed_is_read_at_build() {
 		let store = BlobStore::temp();
@@ -194,11 +194,7 @@ mod test {
 		let thread = thread.unwrap();
 		let window = app.world().get::<ThreadWindow>(thread).unwrap();
 		window.posts()[0].to_string().xpect_eq("be brief");
-		app.world()
-			.get::<Thread>(thread)
-			.unwrap()
-			.seed()
-			.xpect_eq(&[window.posts()[0].id()][..]);
+		window.seed().contains(&window.posts()[0].id()).xpect_true();
 	}
 
 	/// A seed that cannot be read leaves its thread unreduced, and entering it

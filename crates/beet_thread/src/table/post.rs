@@ -179,13 +179,6 @@ impl Post {
 
 	pub fn set_intent(&mut self, intent: PostIntent) { self.intent = intent; }
 
-	/// This post on `thread`, ie a seed resolved before its entry adopted a
-	/// stored thread's id.
-	pub fn with_thread(mut self, thread: ThreadId) -> Self {
-		self.thread = thread;
-		self
-	}
-
 	/// Returns the body as a `&str`.
 	/// ## Errors
 	/// Errors if the body is not valid utf-8.
@@ -205,31 +198,6 @@ impl Post {
 			.get("file_stem")
 			.and_then(|val| val.as_str())
 			.ok()
-	}
-
-	/// The seed slot this post is a version of, if it is a seed post: its
-	/// position in the template's seed order ([`Thread::seed`]).
-	pub fn seed_slot(&self) -> Option<usize> {
-		self.metadata
-			.get(SEED_SLOT)
-			.ok()
-			.and_then(|slot| slot.as_u64().ok())
-			.map(|slot| slot as usize)
-	}
-
-	/// Mark this post a version of seed slot `slot`.
-	pub fn set_seed_slot(&mut self, slot: usize) {
-		self.metadata.insert(SEED_SLOT, slot as u64);
-	}
-
-	/// Whether `other` says what this post says: the same author, intent,
-	/// media type and body, so a re-resolved seed equal to its current
-	/// version appends nothing.
-	pub fn same_content(&self, other: &Post) -> bool {
-		self.author == other.author
-			&& self.intent == other.intent
-			&& self.media_type == other.media_type
-			&& self.body == other.body
 	}
 
 	/// Hash self, used for change detection during streaming.
@@ -258,9 +226,6 @@ impl Post {
 		self.media_type = media_type;
 	}
 }
-
-/// The metadata key naming a seed post's slot.
-const SEED_SLOT: &str = "seed_slot";
 
 // ═══════════════════════════════════════════════════════════════════════
 // Display

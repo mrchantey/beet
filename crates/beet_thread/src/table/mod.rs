@@ -25,9 +25,11 @@
 //!   them ([`ThreadStoreProvider::history`]).
 //!
 //! A thread continues across sessions by the metadata its route declares
-//! ([`ThreadEntry`]), never its seed: each seed slot is kept current
-//! ([`Thread::seed`]), an edited seed appending its new version, and each
-//! session is bracketed by its [`SessionOpened`] and [`SessionClosed`] posts.
+//! ([`ThreadEntry`]), never its seed. A seed is the thread's initial posts,
+//! kept by a fresh thread and pinned in its window however long it runs
+//! ([`ThreadWindow::seed_of`]); a continued thread enters with its stored
+//! seed, so a changed seed reaches a new thread (`--new`). Each session is
+//! bracketed by its [`SessionOpened`] and [`SessionClosed`] posts.
 mod actor;
 mod create_actor;
 pub use create_actor::*;

@@ -40,12 +40,6 @@ pub struct Thread {
 	/// The post this thread branches from, continuing its history.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	branch_of: Option<PostRef>,
-	/// The current post of each seed slot, a slot being a seed post's position
-	/// in the template's seed order. A continued thread whose seed changed
-	/// appends the new version and points the slot at it, so model input
-	/// carries only the current one ([`ThreadWindow::model_posts`]).
-	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	seed: Vec<PostId>,
 	/// Extensible key-value metadata, the entries a request continues a
 	/// stored thread by ([`ThreadEntry`]).
 	metadata: Map,
@@ -68,7 +62,6 @@ impl Thread {
 			name: name.into(),
 			spawned_by: None,
 			branch_of: None,
-			seed: default(),
 			metadata: default(),
 		}
 	}
@@ -101,10 +94,6 @@ impl Thread {
 		self.branch_of = Some(branch_of);
 		self
 	}
-
-	/// The current post of each seed slot, in slot order.
-	pub fn seed(&self) -> &[PostId] { &self.seed }
-	pub fn set_seed(&mut self, seed: Vec<PostId>) { self.seed = seed; }
 
 	pub fn metadata(&self) -> &Map { &self.metadata }
 	pub fn metadata_mut(&mut self) -> &mut Map { &mut self.metadata }

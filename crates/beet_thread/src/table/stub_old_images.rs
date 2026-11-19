@@ -21,8 +21,8 @@ use beet_core::prelude::*;
 /// arrive from a tool call or an upload bounds them the same way.
 ///
 /// The window's other bound is by count: a continued thread enters with the
-/// newest [`MountThreadStore::tail`] posts and the current post of each seed
-/// slot, never its whole history ([`ThreadStoreProvider::materialize_window`]),
+/// newest [`MountThreadStore::tail`] posts and its seed, never its whole
+/// history ([`ThreadStoreProvider::materialize_window`]),
 /// so however long a thread runs, its context starts bounded and a view pages
 /// the rest from the store.
 #[action]

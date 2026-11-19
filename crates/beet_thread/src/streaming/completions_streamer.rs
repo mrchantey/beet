@@ -119,7 +119,7 @@ impl CompletionsStreamer {
 
 					// Convert window posts to completions messages
 					let post_messages = window
-						.model_posts(thread, None)
+						.model_posts(None)
 						.into_iter()
 						.xtry_map(|post| {
 							completions_mapper::post_to_completions_message(

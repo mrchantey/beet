@@ -426,7 +426,7 @@ pub(crate) fn load_older_posts(
 			window
 				.posts()
 				.iter()
-				.find(|post| post.seed_slot().is_none())
+				.find(|post| !window.seed().contains(&post.id()))
 		})
 		.map(Post::id)
 	else {
