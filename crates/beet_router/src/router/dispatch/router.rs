@@ -147,19 +147,6 @@ impl Router {
 							return Response::permanent_redirect(location)
 								.xok();
 						}
-						// a route reading its params off the request reads a
-						// JSON object body's fields as params too, while a
-						// typed input keeps its body as that input
-						#[cfg(feature = "json")]
-						if node.reads_request()
-							&& let Err(err) = request
-								.merge_body_params(|key| {
-									node.params.repeats(key)
-								})
-								.await
-						{
-							return err.into_response().xok();
-						}
 						// refuse a param the route cannot take before it runs,
 						// a strict url space an undeclared one too, before the
 						// path's own segments join the params

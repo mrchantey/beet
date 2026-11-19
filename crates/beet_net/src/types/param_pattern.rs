@@ -328,9 +328,11 @@ pub struct ParamMeta {
 	/// hint (`a YYYY-MM-DD date`), a unit enum's variants, else the
 	/// [`type_name`](Self::type_name)'s short form, ie `String`.
 	kind: SmolStr,
-	/// The words a unit enum param takes, kebab case, empty for any other
-	/// type.
-	variants: Vec<SmolStr>,
+	/// The shape of one value of the param, as a tool argument or any other
+	/// structured caller writes it ([`value_schema`](Self::value_schema)),
+	/// any `Option<..>` wrapper stripped as for
+	/// [`type_name`](Self::type_name).
+	schema: ValueSchema,
 	/// Additional details for the param
 	options: ParamOptions,
 	/// Whether specifying the param is required, usually inferred
@@ -359,7 +361,7 @@ impl ParamMeta {
 		let type_name = value.placeholder_type_name();
 		Self {
 			kind: type_name.short(),
-			variants: Vec::new(),
+			schema: value.placeholder_schema(),
 			type_name,
 			value,
 			key: name.into(),
@@ -409,16 +411,15 @@ impl ParamMeta {
 		let leaf_id = some_inner.map_or(field.type_id(), TypeInfo::type_id);
 		let value = ParamValue::of_leaf(leaf_id, some_inner.or(info));
 		let type_name = TypeName::new(strip_option(field.type_path()));
-		let variants = unit_variants(some_inner.or(info));
 
 		Self {
 			key: field.name().to_kebab_case().into(),
 			required: value == ParamValue::Single && some_inner.is_none(),
 			value,
 			kind: authored_kind(leaf_id)
-				.or_else(|| variant_kind(&variants))
+				.or_else(|| variant_kind(some_inner.or(info)))
 				.unwrap_or_else(|| type_name.short()),
-			variants,
+			schema: Self::value_schema(some_inner.or(info), leaf_id),
 			type_name,
 			options: ParamOptions::from_reflect(field),
 		}
@@ -502,7 +503,20 @@ impl ParamMeta {
 		self
 	}
 
-	/// Sets the type the param parses into, shown as its short name.
+	/// Sets the type the param parses into, as [`from_field`](Self::from_field)
+	/// reads a field of it: its name, how it is written and its schema.
+	pub fn with_type<T: 'static + Typed>(mut self) -> Self {
+		let info = T::type_info();
+		self.type_name = TypeName::of::<T>();
+		self.kind = authored_kind(TypeId::of::<T>())
+			.or_else(|| variant_kind(Some(info)))
+			.unwrap_or_else(|| self.type_name.short());
+		self.schema = Self::value_schema(Some(info), TypeId::of::<T>());
+		self
+	}
+
+	/// Sets the type the param parses into by name alone, shown as its short
+	/// name, for a declaration built from data with no reflected type.
 	pub fn with_type_name(mut self, type_name: TypeName) -> Self {
 		self.kind = type_name.short();
 		self.type_name = type_name;
@@ -543,111 +557,74 @@ impl ParamMeta {
 	/// The param value type
 	pub fn value(&self) -> &ParamValue { &self.value }
 
-	/// The words a unit enum param takes, empty for any other type.
-	pub fn variants(&self) -> &[SmolStr] { &self.variants }
-
-	/// The JSON schema of the object `params` are the fields of, keyed by
-	/// each param's flag spelling: what a route's params are as a tool's
-	/// input, its arguments sent as a JSON body
-	/// ([`Request::merge_body_params`]). An optional param also takes
-	/// `null`, which a body reads as absent, so a provider requiring every
-	/// field can still leave it out.
-	pub fn object_schema<'a>(
-		params: impl IntoIterator<Item = &'a ParamMeta>,
-	) -> JsonSchema {
-		let mut properties = Map::default();
-		let mut required = Vec::new();
-		for param in params {
-			if param.required {
-				required.push(Value::str(param.key.as_str()));
+	/// This param as a field of an object, its key the flag spelling: what a
+	/// route's params are as one structured value, ie the arguments of a tool
+	/// forwarding to the route. Its schema is its value's, optional (`null`
+	/// read as absent) where the param is, described by its doc line and,
+	/// where its type is written some particular way, how.
+	pub fn field_schema(&self) -> NamedFieldSchema {
+		let mut field = match self.required {
+			true => {
+				NamedFieldSchema::new(self.key.clone(), self.schema.clone())
 			}
-			properties.insert(param.key.clone(), param.json_schema());
-		}
-		let mut schema = Map::default();
-		schema.insert("type", "object");
-		schema.insert("properties", Value::Map(properties));
-		schema.insert("required", Value::List(required));
-		schema.insert("additionalProperties", false);
-		JsonSchema::from_value(Value::Map(schema))
-	}
-
-	/// The JSON schema of this param's value as a body field: a flag a
-	/// boolean, a repeated param an array of its items, a number a number, a
-	/// [`Value`] anything, a unit enum one of its words and any other type
-	/// the string it parses from, described by its doc line and, where the
-	/// type is written some particular way, how.
-	pub fn json_schema(&self) -> Value {
-		let mut schema = match self.value {
-			ParamValue::Flag => Self::leaf_schema("bool", &[]),
-			ParamValue::Single => {
-				Self::leaf_schema(self.type_name.as_str(), &self.variants)
-			}
-			ParamValue::Multiple => {
-				let item = self
-					.type_name
-					.as_str()
-					.strip_prefix("alloc::vec::Vec<")
-					.and_then(|inner| inner.strip_suffix('>'))
-					.unwrap_or_default();
-				let mut array = Map::default();
-				array.insert("type", "array");
-				array.insert(
-					"items",
-					Value::Map(Self::leaf_schema(item, &self.variants)),
-				);
-				array
-			}
+			false => NamedFieldSchema::new(
+				self.key.clone(),
+				ValueSchema::Optional(Box::new(self.schema.clone())),
+			)
+			.optional(),
 		};
-		// an optional param is a null-or-value union, the shape a typed
-		// input's `Option` field takes
-		if !self.required {
-			let mut null = Map::default();
-			null.insert("type", "null");
-			let mut union = Map::default();
-			union.insert(
-				"oneOf",
-				Value::List(vec![Value::Map(null), Value::Map(schema)]),
-			);
-			schema = union;
-		}
-		let hint = (self.variants.is_empty()
+		// a unit enum's words are its schema's own, a plain type's kind its
+		// type name, so only an authored hint adds to the doc line
+		let hint = (!matches!(self.schema, ValueSchema::Enum(_))
 			&& self.kind != self.type_name.short())
-		.then(|| self.kind.clone());
-		let description = match (self.description(), hint) {
+		.then_some(self.kind.as_str());
+		field.description = match (self.description(), hint) {
 			(Some(description), Some(hint)) => {
-				Some(format!("{description} ({hint})"))
+				Some(format!("{description} ({hint})").into())
 			}
-			(Some(description), None) => Some(description.to_string()),
-			(None, Some(hint)) => Some(hint.to_string()),
+			(Some(description), None) => Some(description.into()),
+			(None, Some(hint)) => Some(hint.into()),
 			(None, None) => None,
 		};
-		if let Some(description) = description {
-			schema.insert("description", description);
-		}
-		Value::Map(schema)
+		field
 	}
 
-	/// The schema of one value of the type at `type_path`.
-	fn leaf_schema(type_path: &str, variants: &[SmolStr]) -> Map {
-		let mut schema = Map::default();
-		if type_path == TypeName::of::<Value>().as_str() {
-			return schema;
+	/// The schema of a value of the type `info` describes, as a param reads
+	/// it: a type its [`LiteralParser`] reads from text, an authored form
+	/// like a date or a url, is a string; a repeated param a list of its
+	/// items; a number, bool, unit enum or [`Value`] as reflected; and a
+	/// structure with no authored form the structure, which the param reads
+	/// from its JSON text.
+	fn value_schema(info: Option<&TypeInfo>, type_id: TypeId) -> ValueSchema {
+		let string = || ValueSchema::String(default());
+		let parser = LiteralParser::get(type_id);
+		match info {
+			_ if parser
+				.as_ref()
+				.is_some_and(|parser| parser.hint().is_some()) =>
+			{
+				string()
+			}
+			Some(TypeInfo::List(list)) => ValueSchema::List(ListSchema {
+				item: Box::new(Self::value_schema(
+					list.item_info(),
+					list.item_ty().id(),
+				)),
+				..default()
+			}),
+			Some(info) => match ValueSchema::from_type_info(info) {
+				schema @ (ValueSchema::Any
+				| ValueSchema::Bool(_)
+				| ValueSchema::I64(_)
+				| ValueSchema::U64(_)
+				| ValueSchema::F64(_)
+				| ValueSchema::String(_)
+				| ValueSchema::Enum(_)) => schema,
+				_ if parser.is_some() => string(),
+				schema => schema,
+			},
+			None => string(),
 		}
-		let kind = match type_path {
-			"bool" => "boolean",
-			"u8" | "u16" | "u32" | "u64" | "u128" | "usize" | "i8" | "i16"
-			| "i32" | "i64" | "i128" | "isize" => "integer",
-			"f32" | "f64" => "number",
-			_ => "string",
-		};
-		schema.insert("type", kind);
-		if !variants.is_empty() {
-			schema.insert(
-				"enum",
-				Value::List(variants.iter().cloned().map(Value::Str).collect()),
-			);
-		}
-		schema
 	}
 }
 
@@ -683,6 +660,18 @@ impl ParamValue {
 		}
 	}
 
+	/// The schema of [`placeholder_type_name`](Self::placeholder_type_name).
+	fn placeholder_schema(&self) -> ValueSchema {
+		match self {
+			Self::Flag => ValueSchema::Bool(default()),
+			Self::Single => ValueSchema::String(default()),
+			Self::Multiple => ValueSchema::List(ListSchema {
+				item: Box::new(ValueSchema::String(default())),
+				..default()
+			}),
+		}
+	}
+
 	/// A representative concrete type for this arity, used when a
 	/// [`ParamMeta`] is built without a reflected field (eg [`ParamMeta::new`]).
 	fn placeholder_type_name(&self) -> TypeName {
@@ -704,28 +693,23 @@ fn authored_kind(type_id: TypeId) -> Option<SmolStr> {
 	LiteralParser::get(type_id)?.hint().map(SmolStr::from)
 }
 
-/// The variants of a unit-only enum as the kebab-case words a flag takes,
-/// empty for any other type.
-fn unit_variants(info: Option<&TypeInfo>) -> Vec<SmolStr> {
+/// How a unit-only enum is written: its variants as the kebab-case words a
+/// flag takes, ie `one of: main, content` for a `--root`, since the type path
+/// names none of them.
+fn variant_kind(info: Option<&TypeInfo>) -> Option<SmolStr> {
 	let Some(TypeInfo::Enum(info)) = info else {
-		return Vec::new();
+		return None;
 	};
 	info.iter()
 		.map(|variant| match variant {
 			bevy::reflect::enums::VariantInfo::Unit(unit) => {
-				Some(unit.name().to_kebab_case().into())
+				Some(unit.name().to_kebab_case())
 			}
 			_ => None,
 		})
 		.collect::<Option<Vec<_>>>()
-		.unwrap_or_default()
-}
-
-/// How a unit-only enum is written: its variants, ie `one of: main, content`
-/// for a `--root`, since the type path names none of them.
-fn variant_kind(variants: &[SmolStr]) -> Option<SmolStr> {
-	(!variants.is_empty())
-		.then(|| format!("one of: {}", variants.join(", ")).into())
+		.filter(|variants| !variants.is_empty())
+		.map(|variants| format!("one of: {}", variants.join(", ")).into())
 }
 
 /// `type_path` with a `core::option::Option<..>` wrapper stripped, since a
@@ -1096,18 +1080,17 @@ mod test {
 
 		ParamMeta::of::<MyParams>().xpect_eq(vec![
 			ParamMeta::new("foo", ParamValue::Single)
-				.with_type_name(TypeName::of::<u32>())
+				.with_type::<u32>()
 				.required(),
 			ParamMeta::new("bar", ParamValue::Single)
-				.with_type_name(TypeName::of::<String>())
+				.with_type::<String>()
 				.with_description("all about 'bar'"),
 			ParamMeta::new("bazz", ParamValue::Multiple)
-				.with_type_name(TypeName::of::<Vec<f64>>())
+				.with_type::<Vec<f64>>()
 				.with_description("all about 'bazz'")
 				.with_short('b'),
 			// .required(),
-			ParamMeta::new("boo", ParamValue::Flag)
-				.with_type_name(TypeName::of::<bool>()),
+			ParamMeta::new("boo", ParamValue::Flag).with_type::<bool>(),
 		]);
 	}
 

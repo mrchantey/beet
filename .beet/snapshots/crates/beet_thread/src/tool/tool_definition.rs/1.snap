@@ -1,1 +1,0 @@
-{"additionalProperties":false,"properties":{"eval":{"description":"The eval to grade.","type":"string"},"force":{"description":"Grade again though graded.","oneOf":[{"type":"null"},{"type":"boolean"}]},"level":{"description":"The level reached.","oneOf":[{"type":"null"},{"type":"integer"}]}},"required":["eval"],"type":"object"}

@@ -39,8 +39,7 @@ impl Plugin for ThreadPlugin {
 			.install_type::<RoutePost>()
 			// the OpenResponses streamer is an action
 			.register_type::<O11sStreamer>()
-			.add_observer(insert_tool_definition)
-			.add_observer(refresh_tool_params);
+			.add_observer(insert_tool_definition);
 
 		// the async-openai-backed completions streamer, plus the model selection
 		// driven by the provider constructors beside it

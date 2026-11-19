@@ -11,58 +11,26 @@ use beet_net::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// Rebuilds a route's [`ToolDefinition`] when its path lands, inserted with
-/// its [`ActionMeta`].
+/// Builds a route's [`ToolDefinition`] when its path lands, inserted with its
+/// [`ActionMeta`]. A [`HostRoute`]'s is read off the host when the tools are
+/// listed instead.
 #[cfg(feature = "action")]
 pub(crate) fn insert_tool_definition(
 	ev: On<Insert<PathPattern>>,
-	commands: Commands,
-	query: Query<
-		(&ActionMeta, &PathPattern, Option<&RouteParams>),
-		Without<HostRoute>,
-	>,
-) -> Result {
-	refresh_tool_definition(ev.entity, commands, query)
-}
-
-/// Rebuilds a route's [`ToolDefinition`] when its declared params land, which
-/// a request-reading route's schema is built from: each extractor's hook
-/// queues its declaration, so it lands after the path.
-#[cfg(feature = "action")]
-pub(crate) fn refresh_tool_params(
-	ev: On<Insert<RouteParams>>,
-	commands: Commands,
-	query: Query<
-		(&ActionMeta, &PathPattern, Option<&RouteParams>),
-		Without<HostRoute>,
-	>,
-) -> Result {
-	refresh_tool_definition(ev.entity, commands, query)
-}
-
-#[cfg(feature = "action")]
-fn refresh_tool_definition(
-	entity: Entity,
 	mut commands: Commands,
-	query: Query<
-		(&ActionMeta, &PathPattern, Option<&RouteParams>),
-		Without<HostRoute>,
-	>,
+	query: Query<(&ActionMeta, &PathPattern), Without<HostRoute>>,
 ) -> Result {
-	let Ok((meta, pattern, params)) = query.get(entity) else {
+	let Ok((meta, pattern)) = query.get(ev.entity) else {
 		return Ok(());
 	};
-	let params = params
-		.into_iter()
-		.flat_map(|params| params.iter())
-		.flat_map(|declaration| declaration.metas())
-		.collect::<Vec<_>>();
-	// only routes shaped as a callable tool become a `FunctionToolDefinition`,
-	// see `from_meta`: the observer fires on every route, but most routes are
-	// not tools.
-	if let Some(def) = FunctionToolDefinition::from_meta(meta, pattern, params)?
-	{
-		commands.entity(entity).insert(ToolDefinition::from(def));
+	// only routes shaped as a callable tool, a static path with a description
+	// and an input schema, become a `FunctionToolDefinition`. Other routes
+	// (wildcard or parameterized paths like `run-wasm/*args`, and system
+	// routes with no tool metadata) are not agent-callable tools, so they are
+	// skipped rather than erroring: the observer fires on every route, but
+	// most routes are not tools.
+	if let Some(def) = FunctionToolDefinition::from_meta(meta, pattern)? {
+		commands.entity(ev.entity).insert(ToolDefinition::from(def));
 	}
 	Ok(())
 }
@@ -198,49 +166,34 @@ impl FunctionToolDefinition {
 		&mut self.params_schema
 	}
 
-	/// Build a tool definition from a route's metadata, or `None` if the route
-	/// is not a callable tool: a wildcard/parameterized path (eg
-	/// `run-wasm/*args`) cannot be a tool, and a route with no description is
-	/// a plain route rather than an agent tool. The observer fires on every
-	/// route, so this skips the non-tools instead of erroring.
-	///
-	/// A route reading its params off the request, its input a [`Request`]
-	/// or [`RequestParts`], takes its tool arguments as a JSON body of those
-	/// params, so its declared `params` are its input schema
-	/// ([`ParamMeta::object_schema`]); any other route's input type is. A
-	/// request-reading route whose path a provider cannot name is no tool,
-	/// since most such routes are pages and files (`sitemap.xml`), never
-	/// meant for an agent.
+	/// Build a tool definition from a route's metadata, or `None` if the route is
+	/// not a callable tool: a wildcard/parameterized path (eg `run-wasm/*args`)
+	/// cannot be a tool, and a route with no description or input schema is a plain
+	/// route rather than an agent tool. The observer fires on every route, so this
+	/// skips the non-tools instead of erroring.
 	///
 	/// ## Errors
 	///
-	/// Errors when a typed-input tool route cannot be named to a provider
-	/// ([`Self::new`]).
+	/// Errors when a tool route cannot be named to a provider ([`Self::new`]).
 	#[cfg(feature = "action")]
-	pub fn from_meta<'a>(
+	pub fn from_meta(
 		meta: &ActionMeta,
 		pattern: &PathPattern,
-		params: impl IntoIterator<Item = &'a ParamMeta>,
 	) -> Result<Option<Self>> {
-		let (true, Some(description)) =
-			(pattern.is_static(), meta.description())
-		else {
+		// a tool needs a concrete callable path with a description and input schema.
+		let (true, Some(description), Some(params_schema)) = (
+			pattern.is_static(),
+			meta.description(),
+			meta.input_json_schema()?,
+		) else {
 			return Ok(None);
 		};
-		let path = pattern.annotated_path().to_string();
-		if meta.input_is::<Request>() || meta.input_is::<RequestParts>() {
-			return Self::new(
-				path,
-				description,
-				ParamMeta::object_schema(params),
-			)
-			.ok()
-			.xok();
-		}
-		match meta.input_json_schema()? {
-			Some(schema) => Self::new(path, description, schema).map(Some),
-			None => Ok(None),
-		}
+		Self::new(
+			pattern.annotated_path().to_string(),
+			description,
+			params_schema,
+		)
+		.map(Some)
 	}
 }
 
@@ -266,53 +219,9 @@ pub enum ToolChoice {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_router::prelude::*;
 
 	fn tool(path: &str) -> Result<FunctionToolDefinition> {
 		FunctionToolDefinition::new(path, "a tool", serde_json::json!({}))
-	}
-
-	/// Stands in for a verb whose flags are its tool arguments.
-	#[action(route = "eval/grade")]
-	#[derive(Default, Clone, Component, Reflect)]
-	#[reflect(Component)]
-	async fn Grade(
-		/// The eval to grade.
-		#[param]
-		eval: String,
-		/// The level reached.
-		#[param]
-		level: Option<u8>,
-		/// Grade again though graded.
-		#[param]
-		force: bool,
-	) -> Result<String> {
-		let _ = (level, force);
-		Ok(eval)
-	}
-
-	/// A route reading its params off the request is a tool whose schema is
-	/// those params, each with its type, doc line and whether it is required.
-	#[beet_core::test]
-	fn route_params_are_the_tool_schema() {
-		let mut app = App::new();
-		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
-		let router = app
-			.world_mut()
-			.spawn((Router, children![Grade::default()]))
-			.flush();
-		let route = app.world().entity(router).get::<Children>().unwrap()[0];
-		app.update();
-		let Some(ToolDefinition::Function(tool)) =
-			app.world().entity(route).get::<ToolDefinition>()
-		else {
-			panic!("expected a function tool");
-		};
-		tool.path().xpect_eq("eval/grade");
-		tool.description().xpect_contains("Stands in for a verb");
-		let schema = Value::clone(tool.params_schema());
-		schema.to_json_string().xpect_snapshot();
 	}
 
 	/// A provider sees the route path with each `/` as `__`, and a call's name

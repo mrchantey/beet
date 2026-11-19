@@ -2,6 +2,10 @@ mod execution_outcome;
 pub use execution_outcome::*;
 mod tool_definition;
 pub use tool_definition::*;
+#[cfg(feature = "action")]
+mod host_tool;
+#[cfg(feature = "action")]
+pub use host_tool::*;
 mod string_enum_options;
 pub use string_enum_options::*;
 // `StoreToolset` moved upstream to `beet_router::extra`; re-export so a thread

@@ -9,6 +9,10 @@ pub use create_post::*;
 pub use load_thread::*;
 pub use request_post::*;
 #[cfg(feature = "action")]
+mod route_post;
+#[cfg(feature = "action")]
+pub use route_post::*;
+#[cfg(feature = "action")]
 mod seed_source;
 mod thread;
 mod thread_query;
