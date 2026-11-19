@@ -241,13 +241,20 @@ in the served router declares it; `social/publish` converges the repo to it and
 rewrites the committed index the served site reads
 (`site/derived/standard-site.json`), so the index lands with the next deploy or
 `just beet-sync`. A post publishes only when named, so the back catalogue drips
-out rather than landing at once, and every step takes `--dry-run`:
+out rather than landing at once, oldest first, one a week, each published and
+announced in one run, a dry run first:
 
-    just site-social publish --only=<slug> --dry-run          # read every line first
-    just site-social publish --only=<slug>                    # the publication and that post
-    just site-social publish --announce=<slug>                # its announcement, and the reposts
-    just site-social publish                                  # update what is published, create nothing
-    just site-social probe --stage=prod                       # the handles, then the live site against the repo
+    just site-social publish --only=<slug> --announce=<slug> --dry-run   # read every line first
+    just site-social publish --only=<slug> --announce=<slug>             # the week's post, its announcement and the reposts
+    just site-social publish                                             # update what is published, create nothing
+    just site-social probe --stage=prod                                  # the handles, then the live site against the repo
+
+An announcement's text is the post's description. A post announced more than
+a week after its `created` day opens with a date line, `Published 11 July 2025`
+and a blank line, while the Bluesky post itself is dated the day it is made.
+A text over a Bluesky post's 300 graphemes refuses the run before anything is
+written, and `beet check site` flags it first: a dated post's description
+budget reserves the length of its own date line.
 
 The verb writes with the accounts' app passwords (`BEET_ORG_APP_PASSWORD`,
 `PETE_BEET_ORG_APP_PASSWORD`, `env_var` records in `secrets.toml`), and renders

@@ -35,6 +35,10 @@ use beet_ui::prelude::*;
 /// is an orphan, reported, and deleted under `--prune`; one merely outside
 /// `--only` never is.
 ///
+/// A run refuses before it writes anything when a page it names is a draft
+/// or missing, or when an announcement `--announce` names would be refused
+/// (see `<StandardSiteAnnounce/>`).
+///
 /// The repo itself is the memory: every record carries its natural key, so
 /// the step finds what an earlier run wrote by listing, and a run
 /// interrupted anywhere resumes without writing anything twice.
@@ -43,6 +47,7 @@ use beet_ui::prelude::*;
 #[reflect(Component, Default)]
 pub async fn StandardSitePublish(
 	publish: Params<StandardSiteWriteParams>,
+	announce: Params<StandardSiteAnnounceParams>,
 	/// Delete the documents whose page is gone or became a draft, rather
 	/// than only reporting them.
 	#[param]
@@ -65,6 +70,12 @@ pub async fn StandardSitePublish(
 		.iter()
 		.map(|slug| publishing.page(slug).map(|page| page.route))
 		.collect::<Result<Vec<_>>>()?;
+	// and the announcements after it, so one too long to post refuses before
+	// any document is written
+	let day = Date::today();
+	for slug in &announce.0.announce {
+		publishing.announcement(slug, day)?;
+	}
 	let site = StandardSitePublish::publication(
 		&world,
 		&publishing,

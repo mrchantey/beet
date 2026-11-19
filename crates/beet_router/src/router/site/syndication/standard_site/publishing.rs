@@ -13,6 +13,16 @@ pub(crate) struct StandardSiteWriteParams {
 	pub dry_run: bool,
 }
 
+/// The `--announce` the announce step acts on and the publish step checks
+/// before it writes, so an announcement that would be refused refuses the
+/// whole run.
+#[derive(Reflect)]
+pub(crate) struct StandardSiteAnnounceParams {
+	/// Announce the published page this slug names, ie `full-stack-bevy`.
+	/// Repeatable; a page already announced is left as it is.
+	pub announce: Vec<String>,
+}
+
 /// One publication as its publish steps see it: the declaration a step's
 /// [`PublicationRef`] names, the account's repo, the store its derived files
 /// live in, and the listed dated pages beneath it, each a document.
@@ -190,6 +200,38 @@ impl Publishing {
 		)
 	}
 
+	/// The text announcing the listed page `slug` names on `day`, its
+	/// description opened by its date line when it is late (see
+	/// [`DocMeta::announcement`]).
+	///
+	/// # Errors
+	/// Errors as [`page`](Self::page) does, for a page with no description,
+	/// and for a text over [`TextLimit::BSKY_POST_TEXT`], naming the post and
+	/// its length.
+	pub fn announcement(&self, slug: &str, day: Date) -> Result<String> {
+		let page = self.page(slug)?;
+		let text = page.meta.announcement(day).ok_or_else(|| {
+			bevyhow!(
+				"page '{}' has no description, which its announcement's text is",
+				page.path
+			)
+		})?;
+		let limit = TextLimit::BSKY_POST_TEXT;
+		if let Some(length) = limit.exceeded_by(&text) {
+			bevybail!(
+				"the announcement of page '{}' is {} graphemes and {} bytes, \
+				 over a Bluesky post's limit of {} graphemes and {} bytes: \
+				 shorten its description",
+				page.path,
+				length.graphemes,
+				length.bytes,
+				limit.graphemes,
+				limit.bytes
+			);
+		}
+		Ok(text)
+	}
+
 	/// The record the page at route `page` was published as: the document at
 	/// its path, else one at a path a `<Redirect>` renamed it from.
 	pub fn published<'a>(
@@ -363,6 +405,7 @@ pub(super) mod test {
 	use beet_core::prelude::*;
 	use beet_net::exports::bytes::Bytes;
 	use beet_net::prelude::*;
+	use beet_ui::prelude::*;
 
 	/// The fixture site with its accounts' repos: `beet` holds the
 	/// publication, `pete` authors every post and reposts its announcements.
@@ -804,11 +847,12 @@ pub(super) mod test {
 		card.thumb
 			.xpect_eq(Some(BlobRef::of(&png(1200, 630), MediaType::Png)));
 		card.associated_refs.len().xpect_eq(2);
+		// the fixture post is long past its week, so it opens dated
 		posts[0]
 			.value
 			.text
 			.as_str()
-			.xpect_eq("all about Full Stack Bevy");
+			.xpect_eq("Published 11 July 2025\n\nall about Full Stack Bevy");
 		let post = posts[0].strong_ref();
 		let document = site.document("/full-stack-bevy").await;
 		document
@@ -868,6 +912,35 @@ pub(super) mod test {
 		site.clean().await;
 		announce_suite(&mut site).await;
 		site.clean().await;
+	}
+
+	/// An announcement over a Bluesky post's limit, only once its date line
+	/// opens it, refuses the run before anything is written, the error
+	/// naming the post and its length.
+	#[beet_core::test]
+	async fn refuses_an_announcement_over_the_limit() {
+		let mut site = Site::new().await;
+		// 24 graphemes of date line beside 277 of description
+		for mut meta in site
+			.world
+			.query::<&mut DocMeta>()
+			.iter_mut(&mut site.world)
+			.filter(|meta| meta.title.as_deref() == Some("Full Stack Bevy"))
+		{
+			meta.description = Some("a".repeat(277));
+		}
+		for args in ["", " --dry-run"] {
+			site.publish(&format!(
+				"--only=full-stack-bevy --announce=full-stack-bevy{args}"
+			))
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("page 'blog/full-stack-bevy' is 301 graphemes")
+			.xpect_contains("limit of 300 graphemes");
+		}
+		site.versions().await.xpect_empty();
+		site.index().await.xpect_none();
 	}
 
 	/// A dry run writes nothing anywhere.

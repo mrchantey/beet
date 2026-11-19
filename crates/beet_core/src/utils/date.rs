@@ -133,6 +133,15 @@ impl Date {
 		(yoe as i64 + era * 400 + (month <= 2) as i64, month, day)
 	}
 
+	/// The days from this day to `later`, negative when `later` is earlier.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let day = Date::parse("2026-02-27").unwrap();
+	/// day.days_until(Date::parse("2026-03-01").unwrap()).xpect_eq(2);
+	/// ```
+	pub fn days_until(&self, later: Date) -> i64 { later.0 - self.0 }
+
 	/// Midnight UTC, the instant this day begins.
 	pub fn timestamp(&self) -> Timestamp {
 		Timestamp::from_millis(self.0 * Self::MILLIS_PER_DAY)

@@ -27,7 +27,11 @@
 //!   3000 bytes. The same string is the page's meta description, its feed entry
 //!   summary and its link card description. Graphemes rather than chars because
 //!   an emoji with a skin-tone modifier is one thing a reader sees and should
-//!   cost one unit of the budget.
+//!   cost one unit of the budget. A dated page reserves the length of its own
+//!   [date line](DocMeta::date_line) within that budget, since a post announced
+//!   more than [a week](DocMeta::UNDATED_ANNOUNCE_DAYS) after its `created`
+//!   day opens with one, ie `Published 11 July 2025` and a blank line, and
+//!   which week a post is announced in is not known when it is written.
 //! - [`title`](DocMeta::title): at most 500 graphemes and 5000 bytes, the
 //!   `site.standard.document` limit, which nothing downstream undercuts.
 //! - [`tags`](DocMeta::tags): each matching `^[a-z0-9]+(-[a-z0-9]+)*$` and drawn from the
@@ -50,9 +54,10 @@ use beet_core::prelude::*;
 ///
 /// Flat by design: every field is a frontmatter key by the same name, so a
 /// document's authored surface maps onto the component 1:1 through reflection
-/// with no hand-written mapping. It is the default [`FrontmatterType`], so its
+/// with no hand-written mapping. It is the default
+/// [`FrontmatterType`](crate::prelude::FrontmatterType), so its
 /// keys are written unsectioned; a route's own keys sit in a `[RouteMeta]`
-/// table (see [`RouteMeta`]).
+/// table (see [`RouteMeta`](crate::prelude::RouteMeta)).
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -122,7 +127,7 @@ impl Default for DocMetaRules {
 	fn default() -> Self {
 		Self {
 			title: TextLimit::new(500, 5000),
-			description: TextLimit::new(300, 3000),
+			description: TextLimit::BSKY_POST_TEXT,
 			tag: TextLimit::new(128, 1280),
 			tags: Vec::new(),
 		}
@@ -141,6 +146,10 @@ pub struct TextLimit {
 }
 
 impl TextLimit {
+	/// The `app.bsky.feed.post.text` limit, 300 graphemes and 3000 bytes:
+	/// the whole text of a Bluesky post.
+	pub const BSKY_POST_TEXT: Self = Self::new(300, 3000);
+
 	/// A limit of `graphemes` and `bytes`.
 	pub const fn new(graphemes: usize, bytes: usize) -> Self {
 		Self { graphemes, bytes }
@@ -193,6 +202,22 @@ pub enum DocMetaViolation {
 		/// Its actual length.
 		length: TextLength,
 	},
+	/// A dated page's description within its limit alone, but over it once
+	/// the [date line](DocMeta::date_line) its announcement may open with is
+	/// counted.
+	#[error(
+		"`description` is {} graphemes and {} bytes with the date line its announcement may open with, over the limit of {} graphemes and {} bytes",
+		length.graphemes,
+		length.bytes,
+		limit.graphemes,
+		limit.bytes
+	)]
+	TooLongToAnnounce {
+		/// The description limit it breaks.
+		limit: TextLimit,
+		/// The length of the date line and the description together.
+		length: TextLength,
+	},
 	/// A tag that is not lowercase kebab.
 	#[error("tag `{0}` is not lowercase kebab, ie `local-first`")]
 	MalformedTag(SmolStr),
@@ -221,7 +246,18 @@ impl DocMeta {
 		);
 		violations.extend(self.description.as_deref().and_then(
 			|description| {
-				too_long("description", rules.description, description)
+				too_long("description", rules.description, description).or_else(
+					|| {
+						let dated =
+							format!("{}{description}", self.date_line()?);
+						rules.description.exceeded_by(&dated).map(|length| {
+							DocMetaViolation::TooLongToAnnounce {
+								limit: rules.description,
+								length,
+							}
+						})
+					},
+				)
 			},
 		));
 		for tag in &self.tags {
@@ -233,6 +269,38 @@ impl DocMeta {
 			violations.extend(too_long("tags", rules.tag, tag));
 		}
 		violations
+	}
+
+	/// The days after its [`created`](Self::created) day a page is announced
+	/// without a [date line](Self::date_line).
+	pub const UNDATED_ANNOUNCE_DAYS: i64 = 7;
+
+	/// The line a late announcement of this page opens with, its `created`
+	/// day and the blank line after it, ie `Published 11 July 2025\n\n`;
+	/// `None` for an undated page.
+	pub fn date_line(&self) -> Option<String> {
+		self.created
+			.map(|created| format!("Published {}\n\n", created.format_long()))
+	}
+
+	/// The text of the Bluesky post announcing this page on `day`, `None`
+	/// without a description.
+	///
+	/// The description, opened by the [date line](Self::date_line) when
+	/// `day` is more than [`UNDATED_ANNOUNCE_DAYS`](Self::UNDATED_ANNOUNCE_DAYS)
+	/// after the page's `created`, so a back catalogue post says when it was
+	/// written while the post itself is dated the day it is made, never
+	/// backdated.
+	pub fn announcement(&self, day: Date) -> Option<String> {
+		let description = self.description.as_deref()?;
+		self.created
+			.filter(|created| {
+				created.days_until(day) > Self::UNDATED_ANNOUNCE_DAYS
+			})
+			.and_then(|_| self.date_line())
+			.unwrap_or_default()
+			.xmap(|line| format!("{line}{description}"))
+			.xsome()
 	}
 
 	/// Whether `tag` matches `^[a-z0-9]+(-[a-z0-9]+)*$`.
@@ -431,6 +499,66 @@ mod test {
 			..default()
 		}
 		.validate(&DocMetaRules::default())
+		.xpect_empty();
+	}
+
+	/// A post announced within a week of its `created` day is its
+	/// description alone; one announced later opens with its date line.
+	#[beet_core::test]
+	fn announces_old_posts_with_a_date_line() {
+		let meta = DocMeta {
+			description: Some("all about ecs".into()),
+			created: Date::parse("2025-07-11").ok(),
+			..default()
+		};
+		let day = |text: &str| Date::parse(text).unwrap();
+		meta.announcement(day("2025-07-18"))
+			.unwrap()
+			.xpect_eq("all about ecs");
+		meta.announcement(day("2025-07-19"))
+			.unwrap()
+			.xpect_eq("Published 11 July 2025\n\nall about ecs");
+		DocMeta {
+			created: None,
+			..meta
+		}
+		.announcement(day("2026-01-01"))
+		.unwrap()
+		.xpect_eq("all about ecs");
+	}
+
+	/// A dated page reserves its date line within the description limit,
+	/// so a description that only overflows beside it is flagged, and an
+	/// undated one is not.
+	#[beet_core::test]
+	fn reserves_the_date_line() {
+		let rules = DocMetaRules::default();
+		// `Published 11 July 2025` and a blank line, 24 graphemes
+		let meta = DocMeta {
+			description: Some("a".repeat(277)),
+			created: Date::parse("2025-07-11").ok(),
+			..default()
+		};
+		meta.validate(&rules).xpect_eq(vec![
+			DocMetaViolation::TooLongToAnnounce {
+				limit: rules.description,
+				length: TextLength {
+					graphemes: 301,
+					bytes: 301,
+				},
+			},
+		]);
+		DocMeta {
+			description: Some("a".repeat(276)),
+			..meta.clone()
+		}
+		.validate(&rules)
+		.xpect_empty();
+		DocMeta {
+			created: None,
+			..meta
+		}
+		.validate(&rules)
 		.xpect_empty();
 	}
 
