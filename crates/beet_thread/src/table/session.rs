@@ -65,7 +65,10 @@ impl ThreadWindow {
 			.unwrap_or_else(|| self.insert_actor(Actor::system()))
 	}
 
-	/// Append the [`SessionOpened`] post of a session entering `thread`.
+	/// Append the [`SessionOpened`] post of a session entering `thread`,
+	/// then the messages of the request it serves ([`RequestMessage`]), so
+	/// each lands inside its session whether the thread is fresh or
+	/// continued.
 	pub fn open_session(
 		&mut self,
 		thread: ThreadId,
@@ -74,6 +77,9 @@ impl ThreadWindow {
 		let post = Post::new_log(self.system_actor(), thread, &opened)?;
 		let id = post.id();
 		self.upsert_post(post);
+		for (author, message) in std::mem::take(&mut self.requested) {
+			self.upsert_post(message.into_post(author, thread));
+		}
 		id.xok()
 	}
 

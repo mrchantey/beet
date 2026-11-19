@@ -24,6 +24,9 @@ pub struct ThreadWindow {
 	/// runs: each thread's posts before its first session opened
 	/// ([`Self::seed_of`]).
 	seed: HashSet<PostId>,
+	/// The messages of the request this session serves, by their authors,
+	/// posted as its session opens ([`RequestMessage`]).
+	pub(super) requested: Vec<(ActorId, SeedPost)>,
 }
 
 impl ThreadWindow {
@@ -142,6 +145,7 @@ impl ThreadWindow {
 			posts,
 			metas,
 			seed,
+			requested: _,
 		} = stored;
 		for (id, actor) in actors {
 			self.actors.entry(id).or_insert(actor);
@@ -290,7 +294,7 @@ pub struct ActorRef(pub ActorId);
 /// this component is what the world stores and reduces. (Mirrors the
 /// `<CreateActor>`/[`Actor`] tag/payload pair.) Authored via [`Post::spawn`] /
 /// `<CreatePost>`.
-#[derive(Clone, Component)]
+#[derive(Debug, Clone, Component)]
 pub struct SeedPost {
 	pub content: IntoPost,
 	pub intent: PostIntent,
@@ -323,7 +327,8 @@ impl ThreadWindow {
 	/// A thread still holding a [`SeedSource`] waits: its seed is read while
 	/// the thread builds, and the window reduces once every seed is a
 	/// [`SeedPost`]. The seed posts are the window's [`Self::seed`], kept by
-	/// a fresh thread and dropped by an entry continuing a stored one.
+	/// a fresh thread and dropped by an entry continuing a stored one; a
+	/// [`RequestMessage`] is set aside until its session opens.
 	///
 	/// Idempotent: gated on `Without<ThreadWindow>`, so it runs once per thread.
 	pub fn reduce(
@@ -331,7 +336,7 @@ impl ThreadWindow {
 		threads: Query<(Entity, &Thread), Without<ThreadWindow>>,
 		children: Query<&Children>,
 		actors: Query<&Actor>,
-		seeds: Query<&SeedPost>,
+		seeds: Query<(&SeedPost, Has<RequestMessage>)>,
 		#[cfg(feature = "action")] pending: Query<(), With<SeedSource>>,
 		#[cfg(feature = "action")] behaviors: Query<(), With<ActionMeta>>,
 	) -> Result {
@@ -362,11 +367,18 @@ impl ThreadWindow {
 				// markup `<Slot/>` are still found; actors never nest, so every
 				// `SeedPost` under an actor entity is unambiguously its own.
 				for child in children.iter_descendants(actor_entity) {
-					if let Ok(seed_post) = seeds.get(child) {
-						let post =
-							seed_post.clone().into_post(actor_id, thread_id);
-						window.seed.insert(post.id());
-						window.upsert_post(post);
+					if let Ok((seed_post, requested)) = seeds.get(child) {
+						if requested {
+							window
+								.requested
+								.push((actor_id, seed_post.clone()));
+						} else {
+							let post = seed_post
+								.clone()
+								.into_post(actor_id, thread_id);
+							window.seed.insert(post.id());
+							window.upsert_post(post);
+						}
 						commands.entity(child).despawn();
 					}
 				}

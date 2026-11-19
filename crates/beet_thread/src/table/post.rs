@@ -265,7 +265,7 @@ impl Post {
 ///
 /// Used by spawners like [`Post::spawn`] (via [`SeedPost`]).
 /// Prefer [`AgentPost`] constructors for full control over intent and status.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum IntoPost {
 	Text(String),
 	Url {

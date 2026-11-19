@@ -434,9 +434,9 @@ mod test {
 			.xpect_eq(tree);
 	}
 
-	/// Two requests with the same filled metadata continue one thread, an
-	/// unchanged seed appending nothing, and another value starts its own,
-	/// stamped with its entries and the template.
+	/// Two requests with the same filled metadata continue one thread, each
+	/// posting its own message, and another value starts its own, stamped
+	/// with its entries and the template.
 	#[beet_core::test]
 	async fn continues_by_its_metadata() {
 		let (mut app, router, store) = host(BY_DOCUMENT);
@@ -454,6 +454,7 @@ mod test {
 			vec![
 				"review product".to_string(),
 				"you said: review product".to_string(),
+				"review product".to_string(),
 				"you said: review product".to_string(),
 			],
 		]);
@@ -500,12 +501,14 @@ mod test {
 				.0
 				.xpect_eq(StatusCode::OK);
 		}
-		let reply = "you said: review product".to_string();
-		let seed = "review product".to_string();
-		stored(&store).await.xpect_eq(vec![
-			vec![seed.clone(), reply.clone(), reply.clone()],
-			vec![seed, reply.clone(), reply],
-		]);
+		// two sessions of each thread, each request asking and answered
+		let session = ["review product", "you said: review product"];
+		let twice = session
+			.repeat(2)
+			.into_iter()
+			.map(str::to_string)
+			.collect::<Vec<_>>();
+		stored(&store).await.xpect_eq(vec![twice.clone(), twice]);
 		review(
 			&mut app,
 			router,

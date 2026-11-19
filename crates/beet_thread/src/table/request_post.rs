@@ -1,12 +1,15 @@
-//! A seed post naming the request its thread is built for.
+//! The message of the request a thread's session serves.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-/// A seed post naming the request its thread is built for: `text` with each
+/// The message of the request a thread's session serves: `text` with each
 /// `{param}` replaced by that request param, ie a path param of the
-/// [`ThreadRoute`] building the thread.
+/// [`ThreadRoute`] building the thread. Authored beside the seed, it is no
+/// part of it: every request posts it as its session opens, a continued
+/// thread included ([`RequestMessage`]), so each request asks its thread
+/// something.
 ///
 /// ```bsx
 /// <Route path="review/:document" {ThreadRoute{template:"ReviewThread"}}/>
@@ -14,8 +17,7 @@ use beet_router::prelude::*;
 /// <CreateActor name="User" kind="User"><RequestPost text="review {document}"/></CreateActor>
 /// ```
 ///
-/// Read once per session, from the [`RequestContextStack`] while the thread
-/// builds. Which thread a request continues is the route's metadata
+/// Read from the [`RequestContextStack`] while the thread builds. Which thread a request continues is the route's metadata
 /// ([`ThreadEntry`]), never this text. `{{` and `}}` spell a literal brace.
 ///
 /// ## Errors
@@ -38,8 +40,14 @@ pub fn RequestPost(
 			)
 		})?
 		.parts();
-	fill(&text, parts)?.xmap(Post::spawn).xok()
+	(Post::spawn(fill(&text, parts)?), RequestMessage).xok()
 }
+
+/// Marks a [`SeedPost`] as the message of the request its thread's session
+/// serves: the reduction sets it aside rather than seeding the thread, and
+/// [`ThreadWindow::open_session`] posts it after the session's opened post.
+#[derive(Debug, Default, Clone, Copy, Component)]
+pub struct RequestMessage;
 
 /// `text` with each `{param}` replaced by its value in `parts`.
 pub(crate) fn fill(text: &str, parts: &RequestParts) -> Result<String> {
