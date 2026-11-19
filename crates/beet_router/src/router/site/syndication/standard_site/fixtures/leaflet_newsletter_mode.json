@@ -1,0 +1,636 @@
+{
+  "$type": "pub.leaflet.content",
+  "pages": [
+    {
+      "id": "019de501-1472-7443-a358-8204b86e35b8",
+      "$type": "pub.leaflet.pages.linearDocument",
+      "blocks": [
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 36,
+                  "byteStart": 0
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ]
+              },
+              {
+                "index": {
+                  "byteEnd": 57,
+                  "byteStart": 36
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  },
+                  {
+                    "uri": "https://buttondown.com/leaflet",
+                    "$type": "pub.leaflet.richtext.facet#link"
+                  }
+                ]
+              },
+              {
+                "index": {
+                  "byteEnd": 126,
+                  "byteStart": 57
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "NOTE: you may have signed up to our Buttondown newsletter — we've migrated to use Leaflet's new built-in newsletter feature!"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.horizontalRule"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 53,
+                  "byteStart": 50
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "Leaflet: now in your browser, your Bluesky feeds, and your inbox!"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 31,
+                  "byteStart": 16
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#bold"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "We just shipped Newsletter Mode, so your Leaflet publications can now be newsletters, and subscribers can sign up by email whether or not they have an atproto account."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "If you're not on the list yet (or are subscribed via atproto) you can head to our Lab Notes homepage and drop your email!"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "url": "https://lab.leaflet.pub/",
+            "text": "Leaflet Lab Notes",
+            "$type": "pub.leaflet.blocks.button"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": ""
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Turning on Newsletter Mode"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Newsletter Mode is available with Leaflet Pro."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 86,
+                  "byteStart": 71
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#bold"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "If you've signed up for Leaflet Pro, you now have the option to enable Newsletter Mode from publication settings."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "This is per-publication, so you can do for all your pubs or just one, and you can set a different reply-to email address for each."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Once you do, readers will see an email subscribe form on your publication and posts."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.image",
+            "image": {
+              "ref": {
+                "$link": "bafkreif5ycvcmpfophtucucl77bvhlwrrjmh657bsanfgo2hptyyizioru"
+              },
+              "size": 32818,
+              "$type": "blob",
+              "mimeType": "image/webp"
+            },
+            "aspectRatio": {
+              "width": 1224,
+              "height": 428
+            }
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "With newsletter mode enabled, the subscribe form defaults to email but subscribers can toggle to atproto-only if they prefer."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "When you publish new posts, you can send them as emails, and readers will get them direct-to-inbox with your pub theme, buttons to view online, and all the usual things you expect."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Many of you are reading this post by email; if anything's missing or looks weird in your mail client, please reply and let us know!"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": ""
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Pricing, list imports, and more"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "A few other important details…and if you have questions not answered here, reach out any time :)"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 42,
+                  "byteStart": 0
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#bold"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "Our initial pricing for email newsletters:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.unorderedList",
+            "children": [
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "Your first 1k email subscribers are included with Leaflet Pro"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "After that, $5/month for each additional 1k email subs"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "We only charge you for months where you actually send emails"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 168,
+                  "byteStart": 164
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "So to start, you pay the base Leaflet Pro cost (currently $12/month or $120/year). If you import a list of 5,000 subscribers you'd pay an additional $20/month, but only if you send emails that month."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 32,
+                  "byteStart": 0
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#bold"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "Want to import an existing list?"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 15,
+                  "byteStart": 7
+                },
+                "features": [
+                  {
+                    "uri": "mailto:contact@leaflet.pub",
+                    "$type": "pub.leaflet.richtext.facet#link"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "Please email us. We're working on UI for that, but for now, glad to do manually."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "This is an alpha feature, and we'll keep improving — we'd love your feedback, both as a subscriber and a creator!"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": ""
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "To the Atmosphere, and Beyond"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 114,
+                  "byteStart": 75
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#atMention",
+                    "atURI": "at://did:plc:btxrwcaeyodrap5mnjw2fvmz/site.standard.document/3lrbss5o6j22t"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "One of the first atproto features we launched for Leaflet publications was Subscribing to publications via atproto — we started with atmospheric subscriptions, but always wanted email subs too: "
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.blockquote",
+            "plaintext": "We think both atproto and email subscriptions are important for what we're trying to do — atproto for social stuff; email for direct audience relationship."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "While email newsletters come with added costs and complexity, they play an important role for many creators, providing a broadcast channel to make sure readers see when they publish."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 97,
+                  "byteStart": 91
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "We'd love to see something more atmospheric eventually supplant email, but for now, we can mostly get the best of both:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.unorderedList",
+            "children": [
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "index": {
+                        "byteEnd": 97,
+                        "byteStart": 93
+                      },
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#italic"
+                        }
+                      ]
+                    }
+                  ],
+                  "plaintext": "Email as direct channel — lowest common denominator that everyone knows how to use, and is also based on an open protocol and portable between tools"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "Atmosphere as the open social layer that makes all kinds of cool features possible — like quote sharing, comments, feeds, and more we haven't built yet!"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Readers have an entry point to follow creators with minimal friction. And once subscribed, a simple path to connect to the Atmosphere for things like social recommendations and discovery."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Discovery, in particular, is a separate problem, and a critical one — how do readers find new, interesting, relevant things in the first place? We can't just provide good notification channels, we also have to solve for distribution!"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 102,
+                  "byteStart": 88
+                },
+                "features": [
+                  {
+                    "did": "did:plc:re3ebnp5v7ffagz6rb6xfei4",
+                    "$type": "pub.leaflet.richtext.facet#didMention"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "This is an area where atproto holds a lot of promise, and we're already starting to see @standard.site tools play in this space. We hope to see (and build) more."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "And right now, let's use email as a leverage point for bringing more people into the atmosphere and giving them great experiences."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": ""
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Get started with Leaflet Pro"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Want to turn on newsletters for one (or all!) of your publications? Consider signing up for Leaflet Pro!"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Right now Pro includes newsletters with up to 1k active subscribers, as well as publication analytics. We have more planned, and would love to hear your top requests as well."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.image",
+            "image": {
+              "ref": {
+                "$link": "bafkreibac3vtjwgjszxcefn42l464xprzypfu56sq7oarndngn7nehchfe"
+              },
+              "size": 33530,
+              "$type": "blob",
+              "mimeType": "image/webp"
+            },
+            "aspectRatio": {
+              "width": 1498,
+              "height": 832
+            }
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 28,
+                  "byteStart": 11
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#highlight"
+                  },
+                  {
+                    "$type": "pub.leaflet.richtext.facet#bold"
+                  },
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ]
+              },
+              {
+                "index": {
+                  "byteEnd": 60,
+                  "byteStart": 43
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#atMention",
+                    "atURI": "at://did:plc:btxrwcaeyodrap5mnjw2fvmz/site.standard.publication/3lppk75kw7k26"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "Finally, a celebratory offer for the first Leaflet Lab Notes post to use Newsletter Mode:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "index": {
+                  "byteEnd": 32,
+                  "byteStart": 0
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ]
+              },
+              {
+                "index": {
+                  "byteEnd": 48,
+                  "byteStart": 32
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  },
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ]
+              },
+              {
+                "index": {
+                  "byteEnd": 105,
+                  "byteStart": 48
+                },
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ]
+              }
+            ],
+            "plaintext": "The first 10 people to use code LEAFLETTERLAUNCH on signup get Leaflet Pro for $10/month or $100/year ✨"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "That's it for now, and again please reach out — if you're in your inbox, just hit reply — with any thoughts or questions :)"
+          }
+        }
+      ]
+    }
+  ]
+}

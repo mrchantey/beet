@@ -1,0 +1,181 @@
+<h1>
+	Full Stack Bevy
+</h1>
+<p>
+	A paragraph with 
+	<em>
+		emphasis
+	</em>
+	, 
+	<strong>
+		strong 
+		<em>
+			and nested
+		</em>
+	</strong>
+	, 
+	<code>
+		code
+	</code>
+	 and 
+	<a href="../docs">
+		a link
+	</a>
+	.
+</p>
+<h2>
+	Lists
+</h2>
+<ul>
+	<li>
+		<div>
+			one
+		</div>
+		<ul>
+			<li>
+				one a
+			</li>
+		</ul>
+	</li>
+	<li>
+		two
+	</li>
+</ul>
+<ol start="3">
+	<li>
+		three
+	</li>
+	<li>
+		four
+	</li>
+</ol>
+<blockquote>
+	<p>
+		A quote with 
+		<em>
+			emphasis
+		</em>
+		.
+	</p>
+	<p>
+		A second paragraph.
+	</p>
+</blockquote>
+<pre>
+	<code class="rust">
+		fn main() { println!(&quot;hello&quot;); }
+
+	</code>
+</pre>
+<hr />
+<p>
+	<img src="/assets/diagram.png" alt="a diagram" />
+</p>
+<div class="table-scroll">
+	<table>
+		<thead>
+			<tr>
+				<td>
+					Name
+				</td>
+				<td>
+					Kind
+				</td>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td>
+					beet
+				</td>
+				<td>
+					engine
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+
+---- round trip ----
+
+<h1>
+	Full Stack Bevy
+</h1>
+<p>
+	A paragraph with 
+	<em>
+		emphasis
+	</em>
+	, 
+	<strong>
+		strong 
+		<em>
+			and nested
+		</em>
+	</strong>
+	, 
+	<code>
+		code
+	</code>
+	 and 
+	<a href="https://beet.org/docs">
+		a link
+	</a>
+	.
+</p>
+<h2>
+	Lists
+</h2>
+<ul>
+	<li>
+		one
+		<ul>
+			<li>
+				one a
+			</li>
+		</ul>
+	</li>
+	<li>
+		two
+	</li>
+</ul>
+<ol start="3">
+	<li>
+		three
+	</li>
+	<li>
+		four
+	</li>
+</ol>
+<blockquote>
+	<p>
+		A quote with 
+		<em>
+			emphasis
+		</em>
+		.
+	</p>
+	<p>
+		A second paragraph.
+	</p>
+</blockquote>
+<pre>
+	<code class="rust">
+		fn main() { println!(&quot;hello&quot;); }
+
+	</code>
+</pre>
+<hr />
+<p>
+	<a href="https://beet.org/assets/diagram.png">
+		a diagram
+	</a>
+</p>
+<pre>
+	<code>
+		| Name | Kind   |
+| ---- | ------ |
+| beet | engine |
+
+	</code>
+</pre>

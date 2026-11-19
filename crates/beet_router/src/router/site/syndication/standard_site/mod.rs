@@ -37,7 +37,8 @@
 //!   its publication names, through `beet_ui`'s `LexiconRenderers`: by default
 //!   `org.beet.scene#body`, the post itself as a beet scene, and with the
 //!   `standard_site_extra` feature the optional formats, Leaflet's
-//!   `pub.leaflet.content` today (the `leaflet` module). The whole document is
+//!   `pub.leaflet.content` today (the `leaflet` module), which also reads a
+//!   Leaflet document back through `LexiconParsers`. The whole document is
 //!   held to one budget, `StandardSiteDocument::BUDGET`
 //!
 //! # Limits

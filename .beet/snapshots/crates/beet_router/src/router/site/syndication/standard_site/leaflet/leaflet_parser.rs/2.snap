@@ -1,0 +1,186 @@
+<p>
+	<em>
+		NOTE: you may have signed up to our 
+		<a href="https://buttondown.com/leaflet">
+			Buttondown newsletter
+		</a>
+		 &mdash; we&apos;ve migrated to use Leaflet&apos;s new built-in newsletter feature!
+	</em>
+</p>
+<hr />
+<p>
+	Leaflet: now in your browser, your Bluesky feeds, 
+	<em>
+		and
+	</em>
+	 your inbox!
+</p>
+<p>
+	We just shipped 
+	<strong>
+		Newsletter Mode
+	</strong>
+	, so your Leaflet publications can now be newsletters, and subscribers can sign up by email whether or not they have an atproto account.
+</p>
+<p>
+	If you&apos;re not on the list yet (or are subscribed via atproto) you can head to our Lab Notes homepage and drop your email!
+</p>
+<p>
+</p>
+<h2>
+	Turning on Newsletter Mode
+</h2>
+<p>
+	Newsletter Mode is available with Leaflet Pro.
+</p>
+<p>
+	If you&apos;ve signed up for Leaflet Pro, you now have the option to enable 
+	<strong>
+		Newsletter Mode
+	</strong>
+	 from publication settings.
+</p>
+<p>
+	This is per-publication, so you can do for all your pubs or just one, and you can set a different reply-to email address for each.
+</p>
+<p>
+	Once you do, readers will see an email subscribe form on your publication and posts.
+</p>
+<img src="https://chanterelle.us-west.host.bsky.network/xrpc/com.atproto.sync.getBlob?cid=bafkreif5ycvcmpfophtucucl77bvhlwrrjmh657bsanfgo2hptyyizioru&amp;did=did:plc:btxrwcaeyodrap5mnjw2fvmz" />
+<p>
+	With newsletter mode enabled, the subscribe form defaults to email but subscribers can toggle to atproto-only if they prefer.
+</p>
+<p>
+	When you publish new posts, you can send them as emails, and readers will get them direct-to-inbox with your pub theme, buttons to view online, and all the usual things you expect.
+</p>
+<p>
+	Many of you are reading this post by email; if anything&apos;s missing or looks weird in your mail client, please reply and let us know!
+</p>
+<p>
+</p>
+<h2>
+	Pricing, list imports, and more
+</h2>
+<p>
+	A few other important details&hellip;and if you have questions not answered here, reach out any time :)
+</p>
+<p>
+	<strong>
+		Our initial pricing for email newsletters:
+	</strong>
+</p>
+<ul>
+	<li>
+		Your first 1k email subscribers are included with Leaflet Pro
+	</li>
+	<li>
+		After that, $5/month for each additional 1k email subs
+	</li>
+	<li>
+		We only charge you for months where you actually send emails
+	</li>
+</ul>
+<p>
+	So to start, you pay the base Leaflet Pro cost (currently $12/month or $120/year). If you import a list of 5,000 subscribers you&apos;d pay an additional $20/month, but 
+	<em>
+		only
+	</em>
+	 if you send emails that month.
+</p>
+<p>
+	<strong>
+		Want to import an existing list?
+	</strong>
+</p>
+<p>
+	Please 
+	<a href="mailto:contact@leaflet.pub">
+		email us
+	</a>
+	. We&apos;re working on UI for that, but for now, glad to do manually.
+</p>
+<p>
+	This is an alpha feature, and we&apos;ll keep improving &mdash; we&apos;d love your feedback, both as a subscriber and a creator!
+</p>
+<p>
+</p>
+<h2>
+	To the Atmosphere, and Beyond
+</h2>
+<p>
+	One of the first atproto features we launched for Leaflet publications was Subscribing to publications via atproto &mdash; we started with atmospheric subscriptions, but always wanted email subs too: 
+</p>
+<blockquote>
+	<p>
+		We think both atproto and email subscriptions are important for what we&apos;re trying to do &mdash; atproto for social stuff; email for direct audience relationship.
+	</p>
+</blockquote>
+<p>
+	While email newsletters come with added costs and complexity, they play an important role for many creators, providing a broadcast channel to make sure readers see when they publish.
+</p>
+<p>
+	We&apos;d love to see something more atmospheric eventually supplant email, but for now, we can 
+	<em>
+		mostly
+	</em>
+	 get the best of both:
+</p>
+<ul>
+	<li>
+		Email as direct channel &mdash; lowest common denominator that everyone knows how to use, and is 
+		<em>
+			also
+		</em>
+		 based on an open protocol and portable between tools
+	</li>
+	<li>
+		Atmosphere as the open social layer that makes all kinds of cool features possible &mdash; like quote sharing, comments, feeds, and more we haven&apos;t built yet!
+	</li>
+</ul>
+<p>
+	Readers have an entry point to follow creators with minimal friction. And once subscribed, a simple path to connect to the Atmosphere for things like social recommendations and discovery.
+</p>
+<p>
+	Discovery, in particular, is a separate problem, and a critical one &mdash; how do readers find new, interesting, relevant things in the first place? We can&apos;t just provide good notification channels, we also have to solve for distribution!
+</p>
+<p>
+	This is an area where atproto holds a lot of promise, and we&apos;re already starting to see @standard.site tools play in this space. We hope to see (and build) more.
+</p>
+<p>
+	And right now, let&apos;s use email as a leverage point for bringing more people into the atmosphere and giving them great experiences.
+</p>
+<p>
+</p>
+<h2>
+	Get started with Leaflet Pro
+</h2>
+<p>
+	Want to turn on newsletters for one (or all!) of your publications? Consider signing up for Leaflet Pro!
+</p>
+<p>
+	Right now Pro includes newsletters with up to 1k active subscribers, as well as publication analytics. We have more planned, and would love to hear your top requests as well.
+</p>
+<img src="https://chanterelle.us-west.host.bsky.network/xrpc/com.atproto.sync.getBlob?cid=bafkreibac3vtjwgjszxcefn42l464xprzypfu56sq7oarndngn7nehchfe&amp;did=did:plc:btxrwcaeyodrap5mnjw2fvmz" />
+<p>
+	Finally, a 
+	<mark>
+		<strong>
+			<em>
+				celebratory offer
+			</em>
+		</strong>
+	</mark>
+	 for the first Leaflet Lab Notes post to use Newsletter Mode:
+</p>
+<p>
+	<em>
+		The first 10 people to use code 
+		<code>
+			LEAFLETTERLAUNCH
+		</code>
+		 on signup get Leaflet Pro for $10/month or $100/year ✨
+	</em>
+</p>
+<p>
+	That&apos;s it for now, and again please reach out &mdash; if you&apos;re in your inbox, just hit reply &mdash; with any thoughts or questions :)
+</p>

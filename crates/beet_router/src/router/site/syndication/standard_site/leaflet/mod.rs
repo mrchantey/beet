@@ -2,13 +2,17 @@
 //! `standard_site_extra` feature: the format Leaflet's own reader, and the
 //! third party standard.site readers built against it, read. It is never a
 //! publication's default and no deployed binary carries it; it is here for
-//! anyone writing their own posts in Leaflet's format, a publication naming
-//! `content="pub.leaflet.content"`.
+//! anyone reading Leaflet documents into beet, or writing their own posts in
+//! Leaflet's format, a publication naming `content="pub.leaflet.content"`.
 //!
 //! - [`LeafletContent`] and its blocks, the lexicon types, each serialized
 //!   with Leaflet's exact wire names
-//! - [`LeafletRenderer`], a [`LexiconRenderer`] of `pub.leaflet.content`,
-//!   installed by `RouterPlugin` with the feature
+//! - [`LeafletRenderer`], a [`LexiconRenderer`] of `pub.leaflet.content`
+//! - [`LeafletParser`], a [`LexiconParser`] per def, reading a Leaflet document
+//!   into the elements the markdown parser produces
+//!
+//! Both are installed by `RouterPlugin` with the feature,
+//! `app.install((LeafletRenderer, LeafletParser::all()))`.
 //!
 //! The format is a small block model, a subset of html. A beet post is a
 //! markdown document whose parsed article is a superset of it, so the
@@ -82,6 +86,36 @@
 //! the document and `blobPages` is the fix to build then. An unused code path
 //! that only a future post would exercise is a path nothing tests.
 //!
+//! # Reading a Leaflet document
+//!
+//! Each def parses onto its own entity, a page's blocks and a list's items
+//! children in order, so the html renderer renders a Leaflet post knowing
+//! nothing of Leaflet:
+//!
+//! | def | elements |
+//! | --- | --- |
+//! | `pub.leaflet.content`, `pages.linearDocument` | no element, its pages and their blocks as children |
+//! | `blocks.text` | `p`, empty when its text is (Leaflet's spacer) |
+//! | `blocks.header` | `h1`..`h6` from `level` |
+//! | `blocks.blockquote` | `blockquote`, a `p` per blank-line-separated paragraph |
+//! | `blocks.code` | `pre > code`, `class` the bare language as a markdown fence writes it |
+//! | `blocks.horizontalRule` | `hr` |
+//! | `blocks.unorderedList`, `blocks.orderedList` | `ul`, `ol` with its `start`; each `#listItem` an `li` holding its text inline, as a tight list does, then its nested lists |
+//! | `blocks.image` | `img`, its `src` the blob on the repo the record was read from ([`LexiconSource::blob_url`]); read with no source, no `src`, warned once per document |
+//! | `blocks.website` | `p > a`, its text the title, else the url |
+//! | `blocks.iframe` | `iframe` |
+//!
+//! Facets become the inline elements the renderer reads them from (`a`,
+//! `strong`, `em`, `code`, `mark`, `u`, `del`), nested where their ranges
+//! nest and split where they cross, and a newline in a block's text is a `br`.
+//! A feature with no element (`#didMention`, `#atMention`, `#footnote`, `#id`)
+//! keeps its text unmarked.
+//!
+//! Any other block (`blocks.button`, `blocks.bskyPost`, `blocks.poll`, ..)
+//! lands whole as an [`UnknownLexicon`], which [`LeafletRenderer`] writes back
+//! verbatim in its slot, so reading a document and rendering it again keeps
+//! every block beet does not know.
+//!
 //! # The companion video
 //!
 //! A post's companion video is its `DocMeta::video_url`, which `ArticleHeader`
@@ -92,7 +126,12 @@
 //! records carry for one, else a `blocks.website` with the url.
 //!
 //! [`LexiconRenderer`]: beet_ui::prelude::LexiconRenderer
+//! [`LexiconParser`]: beet_ui::prelude::LexiconParser
+//! [`LexiconSource::blob_url`]: beet_ui::prelude::LexiconSource::blob_url
+//! [`UnknownLexicon`]: beet_ui::prelude::UnknownLexicon
 mod leaflet_content;
+mod leaflet_parser;
 mod leaflet_renderer;
 pub use leaflet_content::*;
+pub use leaflet_parser::*;
 pub use leaflet_renderer::*;

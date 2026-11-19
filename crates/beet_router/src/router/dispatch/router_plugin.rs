@@ -406,7 +406,7 @@ impl Plugin for RouterPlugin {
 				.register_type::<StandardSiteProbe>();
 			// the optional standard site `content` formats, Leaflet today
 			#[cfg(feature = "standard_site_extra")]
-			app.install(LeafletRenderer);
+			app.install((LeafletRenderer, LeafletParser::all()));
 			#[cfg(feature = "json")]
 			app.add_plugins(analytics_plugin);
 			// the visit count a server island reads back from the analytics

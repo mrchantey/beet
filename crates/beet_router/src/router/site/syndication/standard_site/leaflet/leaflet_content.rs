@@ -37,7 +37,8 @@ pub struct BlockSlot {
 /// A member of the block union, each naming its own def in `$type`.
 ///
 /// Read by that `$type`, since a struct's own serde tag is written but never
-/// checked on read; a block this build does not know is refused naming it.
+/// checked on read; a block this build does not know is held whole as
+/// [`Unknown`](Self::Unknown) and written back unchanged.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum LeafletBlock {
@@ -61,6 +62,9 @@ pub enum LeafletBlock {
 	Website(WebsiteBlock),
 	/// `pub.leaflet.blocks.iframe`
 	Iframe(IframeBlock),
+	/// A block of a def this build does not know, ie
+	/// `pub.leaflet.blocks.button`.
+	Unknown(OpenUnion),
 }
 
 impl<'de> Deserialize<'de> for LeafletBlock {
@@ -97,9 +101,7 @@ impl<'de> Deserialize<'de> for LeafletBlock {
 				value.into_serde().map(Self::Website)
 			}
 			"pub.leaflet.blocks.iframe" => value.into_serde().map(Self::Iframe),
-			other => Err(bevyhow!(
-				"a Leaflet block this build does not write: `{other}`"
-			)),
+			_ => OpenUnion::try_from(value).map(Self::Unknown),
 		}
 		.map_err(D::Error::custom)
 	}
@@ -288,34 +290,94 @@ pub struct LeafletByteSlice {
 	pub byte_end: usize,
 }
 
-/// A feature of a facet, naming its def in `$type`.
+/// A feature of a facet, naming its def in `$type`. One this build has no
+/// variant for is held whole as [`Unknown`](Self::Unknown) and written back
+/// unchanged.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "$type")]
+#[serde(try_from = "Value", into = "Value")]
 pub enum LeafletFacetFeature {
 	/// A link to `uri`.
-	#[serde(rename = "pub.leaflet.richtext.facet#link")]
 	Link {
 		/// Where the link goes.
 		uri: Uri,
 	},
 	/// Bold text.
-	#[serde(rename = "pub.leaflet.richtext.facet#bold")]
 	Bold,
 	/// Italic text.
-	#[serde(rename = "pub.leaflet.richtext.facet#italic")]
 	Italic,
 	/// Inline code.
-	#[serde(rename = "pub.leaflet.richtext.facet#code")]
 	Code,
 	/// Highlighted text.
-	#[serde(rename = "pub.leaflet.richtext.facet#highlight")]
 	Highlight,
 	/// Underlined text.
-	#[serde(rename = "pub.leaflet.richtext.facet#underline")]
 	Underline,
 	/// Struck text.
-	#[serde(rename = "pub.leaflet.richtext.facet#strikethrough")]
 	Strikethrough,
+	/// A feature of a def this build does not know, ie
+	/// `pub.leaflet.richtext.facet#didMention`.
+	Unknown(OpenUnion),
+}
+
+impl LeafletFacetFeature {
+	/// The def this feature names in `$type`.
+	pub fn nsid(&self) -> Nsid {
+		match self {
+			Self::Link { .. } => {
+				Nsid::new_static("pub.leaflet.richtext.facet#link")
+			}
+			Self::Bold => Nsid::new_static("pub.leaflet.richtext.facet#bold"),
+			Self::Italic => {
+				Nsid::new_static("pub.leaflet.richtext.facet#italic")
+			}
+			Self::Code => Nsid::new_static("pub.leaflet.richtext.facet#code"),
+			Self::Highlight => {
+				Nsid::new_static("pub.leaflet.richtext.facet#highlight")
+			}
+			Self::Underline => {
+				Nsid::new_static("pub.leaflet.richtext.facet#underline")
+			}
+			Self::Strikethrough => {
+				Nsid::new_static("pub.leaflet.richtext.facet#strikethrough")
+			}
+			Self::Unknown(member) => member.r#type().clone(),
+		}
+	}
+}
+
+/// The feature as written, `$type` first.
+impl From<LeafletFacetFeature> for Value {
+	fn from(feature: LeafletFacetFeature) -> Self {
+		let name = feature.nsid().to_string();
+		match feature {
+			LeafletFacetFeature::Unknown(member) => member.into(),
+			LeafletFacetFeature::Link { uri } => {
+				let uri = uri.to_string();
+				value!({ "$type": name, "uri": uri })
+			}
+			_ => value!({ "$type": name }),
+		}
+	}
+}
+
+/// A feature read by its `$type`.
+impl TryFrom<Value> for LeafletFacetFeature {
+	type Error = BevyError;
+	fn try_from(value: Value) -> Result<Self> {
+		let member = OpenUnion::try_from(value)?;
+		match member.r#type().as_str() {
+			"pub.leaflet.richtext.facet#link" => Self::Link {
+				uri: Uri::parse(member.fields().get("uri")?.as_str()?)?,
+			},
+			"pub.leaflet.richtext.facet#bold" => Self::Bold,
+			"pub.leaflet.richtext.facet#italic" => Self::Italic,
+			"pub.leaflet.richtext.facet#code" => Self::Code,
+			"pub.leaflet.richtext.facet#highlight" => Self::Highlight,
+			"pub.leaflet.richtext.facet#underline" => Self::Underline,
+			"pub.leaflet.richtext.facet#strikethrough" => Self::Strikethrough,
+			_ => Self::Unknown(member),
+		}
+		.xok()
+	}
 }
 
 #[cfg(test)]

@@ -294,7 +294,10 @@ impl NodeVisitor for HtmlRenderer {
 
 		if self.is_pretty() {
 			self.buffer.push('\n');
-			self.current_depth += 1;
+			// a void element has no close to step back out at
+			if !is_void {
+				self.current_depth += 1;
+			}
 		}
 
 		if let ("textarea", Some(value)) = (view.tag(), view.value) {
@@ -470,6 +473,18 @@ mod test {
 	fn render_void_element() {
 		roundtrip("<div><br>text</div>")
 			.xpect_eq("<div><br />text</div>".to_string());
+	}
+
+	/// A void element, having no close tag, leaves its siblings at its own
+	/// depth.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn pretty_void_element_keeps_its_depth() {
+		roundtrip_with(
+			"<div><hr><p>after</p></div>",
+			HtmlRenderer::new().pretty(),
+		)
+		.xpect_eq("<div>\n\t<hr />\n\t<p>\n\t\tafter\n\t</p>\n</div>\n");
 	}
 
 	#[cfg(feature = "bsx")]

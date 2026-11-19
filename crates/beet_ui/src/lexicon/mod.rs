@@ -43,8 +43,10 @@
 //! - `org.beet.scene#body` ([`SceneBodyLexicon`], with `template_serde`): the
 //!   tree as a scene body, every component keyed by type path and read back
 //!   without loss. A standard site document's `content` by default.
-//! - Leaflet (`pub.leaflet.content`, `beet_router`'s `standard_site_extra`
-//!   feature): the tree as Leaflet's block model, lossy by design.
+//! - Leaflet (`pub.leaflet.content` and its blocks, `beet_router`'s
+//!   `standard_site_extra` feature): the tree as Leaflet's block model, lossy
+//!   by design, and a Leaflet document read into the elements the markdown
+//!   parser produces.
 //!
 //! [`OpenUnion`]: beet_core::prelude::OpenUnion
 mod lexicon_parsers;

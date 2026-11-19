@@ -44,6 +44,7 @@ struct LeafletQuery<'w, 's> {
 	attributes: AttributeQuery<'w, 's>,
 	inline_blobs: Query<'w, 's, &'static InlineBlob>,
 	metas: Query<'w, 's, &'static DocMeta>,
+	unknowns: Query<'w, 's, &'static UnknownLexicon>,
 	package: Option<Res<'w, PackageConfig>>,
 	unregistered: UnregisteredQuery<'w, 's>,
 	#[cfg(feature = "mermaid")]
@@ -184,6 +185,12 @@ impl LeafletQuery<'_, '_> {
 	) -> Result {
 		if let Ok(value) = self.values.get(entity) {
 			run.push_text(&value.to_string());
+			return Ok(());
+		}
+		// a member a reader kept whole goes back in its slot unchanged
+		if let Ok(unknown) = self.unknowns.get(entity) {
+			run.flush_text(out);
+			out.push(LeafletBlock::Unknown(unknown.0.clone()));
 			return Ok(());
 		}
 		let Ok(element) = self.elements.get(entity) else {
