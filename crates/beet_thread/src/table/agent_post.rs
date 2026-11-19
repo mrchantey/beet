@@ -86,8 +86,6 @@ pub enum AgentPost<'a> {
 	FunctionCallOutput(FunctionCallOutputView<'a>),
 	ReasoningContent(ReasoningContentView<'a>),
 	ReasoningSummary(ReasoningSummaryView<'a>),
-	/// A session bracket ([`PostIntent::is_session`]), never model input.
-	Session(SessionView<'a>),
 }
 
 impl std::ops::Deref for AgentPost<'_> {
@@ -98,41 +96,43 @@ impl std::ops::Deref for AgentPost<'_> {
 // ── Classification constructor ──────────────────────────────────────
 
 impl<'a> AgentPost<'a> {
-	/// Classifies the post into the most specific view variant.
-	/// Falls back to [`Text`](AgentPost::Text) for text-like posts
-	/// and [`Bytes`](AgentPost::Bytes) for everything else.
-	pub fn new(post: &'a Post) -> Self {
+	/// Classifies the post into the most specific view variant, falling
+	/// back to [`Text`](AgentPost::Text) for text-like posts and
+	/// [`Bytes`](AgentPost::Bytes) for everything else, or `None` for a
+	/// [`PostIntent::Log`] post, which is no agent content.
+	pub fn new(post: &'a Post) -> Option<Self> {
 		// metadata-based kinds first
 		if let Some(fc) = FunctionCallView::try_new(post) {
-			return AgentPost::FunctionCall(fc);
+			return AgentPost::FunctionCall(fc).xsome();
 		}
 		if let Some(fco) = FunctionCallOutputView::try_new(post) {
-			return AgentPost::FunctionCallOutput(fco);
+			return AgentPost::FunctionCallOutput(fco).xsome();
 		}
-		// intent-based kinds
-		if let Some(view) = SessionView::try_new(post) {
-			return AgentPost::Session(view);
+		// intent-based kinds, reasoning before generic text since it is also
+		// text-like
+		match post.intent() {
+			PostIntent::Log => None,
+			PostIntent::Error => AgentPost::Error(ErrorView { post }).xsome(),
+			PostIntent::Refusal => {
+				AgentPost::Refusal(RefusalView { post }).xsome()
+			}
+			PostIntent::Reasoning => {
+				AgentPost::ReasoningContent(ReasoningContentView { post })
+					.xsome()
+			}
+			PostIntent::ReasoningSummary => {
+				AgentPost::ReasoningSummary(ReasoningSummaryView { post })
+					.xsome()
+			}
+			PostIntent::Message => if let Some(view) = UrlView::try_new(post) {
+				AgentPost::Url(view)
+			} else if post.media_type().is_text() {
+				AgentPost::Text(TextView { post })
+			} else {
+				AgentPost::Bytes(BytesView { post })
+			}
+			.xsome(),
 		}
-		if post.intent().is_server_error() {
-			return AgentPost::Error(ErrorView { post });
-		}
-		if let Some(view) = RefusalView::try_new(post) {
-			return AgentPost::Refusal(view);
-		}
-		// reasoning before generic text, since reasoning is also text-like
-		if post.intent() == PostIntent::REASONING_CONTENT {
-			return AgentPost::ReasoningContent(ReasoningContentView { post });
-		}
-		if post.intent() == PostIntent::REASONING_SUMMARY {
-			return AgentPost::ReasoningSummary(ReasoningSummaryView { post });
-		}
-		if let Some(view) = UrlView::try_new(post) {
-			return AgentPost::Url(view);
-		}
-		if post.media_type().is_text() {
-			return AgentPost::Text(TextView { post });
-		}
-		AgentPost::Bytes(BytesView { post })
 	}
 
 	/// Returns the underlying post reference.
@@ -147,7 +147,6 @@ impl<'a> AgentPost<'a> {
 			AgentPost::FunctionCallOutput(view) => view.post(),
 			AgentPost::ReasoningContent(view) => view.post(),
 			AgentPost::ReasoningSummary(view) => view.post(),
-			AgentPost::Session(view) => view.post(),
 		}
 	}
 
@@ -158,7 +157,7 @@ impl<'a> AgentPost<'a> {
 // ── Classification methods ──────────────────────────────────────────
 
 impl AgentPost<'_> {
-	/// Returns `true` if this is a text post (OK intent, text-like media).
+	/// Returns `true` if this is a text post (a [`PostIntent::Message`] of a text-like media type).
 	pub fn is_text(&self) -> bool { matches!(self, AgentPost::Text(_)) }
 
 	/// Returns `true` if this is a refusal post.
@@ -310,7 +309,7 @@ impl AgentPost<'static> {
 		let mut post = Post::new_raw(
 			author,
 			thread,
-			PostIntent::OK,
+			PostIntent::Message,
 			MediaType::Text,
 			text.into().into_bytes(),
 			Map::default(),
@@ -329,7 +328,7 @@ impl AgentPost<'static> {
 		let mut post = Post::new_raw(
 			author,
 			thread,
-			PostIntent::REFUSAL,
+			PostIntent::Refusal,
 			MediaType::Text,
 			text.into().into_bytes(),
 			Map::default(),
@@ -353,7 +352,7 @@ impl AgentPost<'static> {
 		let mut post = Post::new_raw(
 			author,
 			thread,
-			PostIntent::OK,
+			PostIntent::Message,
 			MediaType::Url,
 			url.into().into_bytes(),
 			metadata,
@@ -378,7 +377,7 @@ impl AgentPost<'static> {
 		let mut post = Post::new_raw(
 			author,
 			thread,
-			PostIntent::OK,
+			PostIntent::Message,
 			media_type,
 			bytes,
 			metadata,
@@ -397,7 +396,7 @@ impl AgentPost<'static> {
 		let mut post = Post::new_raw(
 			author,
 			thread,
-			PostIntent::INTERNAL_ERROR,
+			PostIntent::Error,
 			MediaType::Text,
 			message.into().into_bytes(),
 			Map::default(),
@@ -416,7 +415,7 @@ impl AgentPost<'static> {
 		let mut post = Post::new_raw(
 			author,
 			thread,
-			PostIntent::REASONING_CONTENT,
+			PostIntent::Reasoning,
 			MediaType::Text,
 			text.into().into_bytes(),
 			Map::default(),
@@ -435,7 +434,7 @@ impl AgentPost<'static> {
 		let mut post = Post::new_raw(
 			author,
 			thread,
-			PostIntent::REASONING_SUMMARY,
+			PostIntent::ReasoningSummary,
 			MediaType::Text,
 			text.into().into_bytes(),
 			Map::default(),
@@ -460,7 +459,7 @@ impl AgentPost<'static> {
 		let mut post = Post::new_raw(
 			author,
 			thread,
-			PostIntent::OK,
+			PostIntent::Message,
 			MediaType::Json,
 			arguments.into().into_bytes(),
 			metadata,
@@ -487,7 +486,7 @@ impl AgentPost<'static> {
 		let mut post = Post::new_raw(
 			author,
 			thread,
-			PostIntent::OK,
+			PostIntent::Message,
 			MediaType::Json,
 			output.into().into_bytes(),
 			metadata,
@@ -501,7 +500,7 @@ impl AgentPost<'static> {
 // View types
 // ═══════════════════════════════════════════════════════════════════════
 
-/// A text content post (OK intent, text-like media type).
+/// A text content post (a [`PostIntent::Message`] of a text-like media type).
 #[derive(Deref)]
 pub struct TextView<'a> {
 	post: &'a Post,
@@ -509,7 +508,7 @@ pub struct TextView<'a> {
 
 impl<'a> TextView<'a> {
 	pub fn try_new(post: &'a Post) -> Option<Self> {
-		if post.media_type().is_text() && post.intent() == PostIntent::OK {
+		if post.media_type().is_text() && post.intent() == PostIntent::Message {
 			Some(Self { post })
 		} else {
 			None
@@ -531,7 +530,7 @@ pub struct RefusalView<'a> {
 
 impl<'a> RefusalView<'a> {
 	pub fn try_new(post: &'a Post) -> Option<Self> {
-		(post.intent() == PostIntent::REFUSAL).then_some(Self { post })
+		(post.intent() == PostIntent::Refusal).then_some(Self { post })
 	}
 	pub fn text(&self) -> &str {
 		self.post
@@ -615,7 +614,7 @@ impl<'a> BytesView<'a> {
 	pub fn post(&self) -> &'a Post { self.post }
 }
 
-/// An error post (5xx intent).
+/// An error post ([`PostIntent::Error`]).
 #[derive(Deref)]
 pub struct ErrorView<'a> {
 	post: &'a Post,
@@ -623,7 +622,7 @@ pub struct ErrorView<'a> {
 
 impl<'a> ErrorView<'a> {
 	pub fn try_new(post: &'a Post) -> Option<Self> {
-		post.intent().is_server_error().then_some(Self { post })
+		(post.intent() == PostIntent::Error).then_some(Self { post })
 	}
 	pub fn message(&self) -> &str {
 		self.post.body_str().unwrap_or("[non-utf8 error]")
@@ -737,7 +736,7 @@ impl<'a> FunctionCallOutputView<'a> {
 	pub fn post(&self) -> &'a Post { self.post }
 }
 
-/// A reasoning content post (REASONING_CONTENT intent).
+/// A reasoning content post ([`PostIntent::Reasoning`]).
 #[derive(Deref)]
 pub struct ReasoningContentView<'a> {
 	post: &'a Post,
@@ -745,31 +744,12 @@ pub struct ReasoningContentView<'a> {
 
 impl<'a> ReasoningContentView<'a> {
 	pub fn try_new(post: &'a Post) -> Option<Self> {
-		(post.intent() == PostIntent::REASONING_CONTENT)
-			.then_some(Self { post })
+		(post.intent() == PostIntent::Reasoning).then_some(Self { post })
 	}
 	pub fn text(&self) -> &str {
 		self.post
 			.body_str()
 			.expect("reasoning content view validated on construction")
-	}
-	pub fn post(&self) -> &'a Post { self.post }
-}
-
-/// A session bracket, a [`PostIntent::SESSION_OPENED`] or
-/// [`PostIntent::SESSION_CLOSED`] post, its JSON body the session's record.
-#[derive(Deref)]
-pub struct SessionView<'a> {
-	post: &'a Post,
-}
-
-impl<'a> SessionView<'a> {
-	pub fn try_new(post: &'a Post) -> Option<Self> {
-		post.intent().is_session().then_some(Self { post })
-	}
-	/// Whether this post opens its session rather than closing it.
-	pub fn is_opened(&self) -> bool {
-		self.post.intent() == PostIntent::SESSION_OPENED
 	}
 	pub fn post(&self) -> &'a Post { self.post }
 }
@@ -781,8 +761,7 @@ pub struct ReasoningSummaryView<'a> {
 
 impl<'a> ReasoningSummaryView<'a> {
 	pub fn try_new(post: &'a Post) -> Option<Self> {
-		(post.intent() == PostIntent::REASONING_SUMMARY)
-			.then_some(Self { post })
+		(post.intent() == PostIntent::ReasoningSummary).then_some(Self { post })
 	}
 	pub fn text(&self) -> &str {
 		self.post
@@ -810,6 +789,9 @@ impl Post {
 		set_post_status(self, status)
 	}
 
-	/// Classifies this post into a typed [`AgentPost`] view.
-	pub fn as_agent_post(&self) -> AgentPost<'_> { AgentPost::new(self) }
+	/// Classifies this post into a typed [`AgentPost`] view, `None` for a
+	/// [`PostIntent::Log`] post.
+	pub fn as_agent_post(&self) -> Option<AgentPost<'_>> {
+		AgentPost::new(self)
+	}
 }

@@ -300,7 +300,10 @@ pub trait ThreadStoreProvider: 'static + Send + Sync {
 				.map(|tail| history.len().saturating_sub(tail as usize))
 				.unwrap_or_default();
 			while history.get(start).is_some_and(|post| {
-				matches!(post.as_agent_post(), AgentPost::FunctionCallOutput(_))
+				matches!(
+					post.as_agent_post(),
+					Some(AgentPost::FunctionCallOutput(_))
+				)
 			}) {
 				start += 1;
 			}
@@ -574,21 +577,20 @@ pub mod thread_store_test {
 		// pages the rest
 		let seeded = Thread::new("Seeded");
 		provider.insert_thread(seeded.clone()).await.unwrap();
-		let seeded_posts = ["seed", "opened", "first", "second"]
-			.into_iter()
-			.map(|text| {
-				let mut post = AgentPost::new_text(
-					actor_id,
-					seeded.id(),
-					text,
-					PostStatus::Completed,
-				);
-				if text == "opened" {
-					post.set_intent(PostIntent::SESSION_OPENED);
-				}
-				post
-			})
-			.collect::<Vec<_>>();
+		let text = |text: &str| {
+			AgentPost::new_text(
+				actor_id,
+				seeded.id(),
+				text,
+				PostStatus::Completed,
+			)
+		};
+		// ids are time-ordered, so each post is created in history order
+		let seed = text("seed");
+		let opened =
+			Post::new_log(actor_id, seeded.id(), &SessionOpened::default())
+				.unwrap();
+		let seeded_posts = vec![seed, opened, text("first"), text("second")];
 		provider.insert_posts(seeded_posts.clone()).await.unwrap();
 		texts(
 			provider
@@ -605,7 +607,7 @@ pub mod thread_store_test {
 				.await
 				.unwrap(),
 		)
-		.xpect_eq(vec!["opened", "first"]);
+		.xpect_eq(vec![seeded_posts[1].to_string(), "first".to_string()]);
 
 		provider.store_remove().await.unwrap();
 	}

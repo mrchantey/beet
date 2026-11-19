@@ -380,7 +380,7 @@ mod test {
 		.await
 		.unwrap()
 		.into_iter()
-		.filter_map(|post| match post.as_agent_post() {
+		.filter_map(|post| match post.as_agent_post()? {
 			AgentPost::FunctionCall(fc) => {
 				Some((fc.name().to_string(), fc.arguments().to_string()))
 			}
@@ -448,7 +448,7 @@ mod test {
 		let posts = world.get::<ThreadWindow>(thread).unwrap().posts().to_vec();
 		posts
 			.iter()
-			.find_map(|post| match post.as_agent_post() {
+			.find_map(|post| match post.as_agent_post()? {
 				AgentPost::FunctionCall(fc) => {
 					Some((fc.name().to_string(), fc.arguments().to_string()))
 				}
@@ -461,7 +461,7 @@ mod test {
 		posts
 			.iter()
 			.filter(|post| {
-				matches!(post.as_agent_post(), AgentPost::FunctionCall(_))
+				matches!(post.as_agent_post(), Some(AgentPost::FunctionCall(_)))
 			})
 			.count()
 			.xpect_eq(1);
@@ -535,7 +535,7 @@ mod test {
 		.await
 		.unwrap()
 		.into_iter()
-		.find_map(|post| match post.as_agent_post() {
+		.find_map(|post| match post.as_agent_post()? {
 			AgentPost::FunctionCall(fc) => Some(fc.arguments().to_string()),
 			_ => None,
 		})

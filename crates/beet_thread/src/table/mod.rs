@@ -61,13 +61,13 @@ pub use thread_store_provider::*;
 mod agent_post;
 pub use agent_post::*;
 mod post;
+mod post_log;
 mod post_ref;
 pub use post_ref::*;
-#[cfg(feature = "action")]
 mod session;
 pub use actor::*;
 pub use post::*;
-#[cfg(feature = "action")]
+pub use post_log::*;
 pub use session::*;
 pub use thread::*;
 pub use thread_query::*;

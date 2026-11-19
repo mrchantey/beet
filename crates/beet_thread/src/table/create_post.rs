@@ -12,8 +12,8 @@ use beet_core::prelude::*;
 /// builds, so a long procedure has one source, ie
 /// `<CreatePost src="seeds/system.md"/>`.
 ///
-/// Set `intent` / `status` to author refusals ([`PostIntent::REFUSAL`]),
-/// reasoning ([`PostIntent::REASONING_CONTENT`]), or in-progress posts
+/// Set `intent` / `status` to author refusals ([`PostIntent::Refusal`]),
+/// reasoning ([`PostIntent::Reasoning`]), or in-progress posts
 /// ([`PostStatus::InProgress`]); both default to a completed, OK post.
 #[template]
 pub fn CreatePost(
@@ -22,7 +22,7 @@ pub fn CreatePost(
 	/// A file in the store above the thread holding the post's text, read
 	/// while the thread builds, in place of `text`.
 	src: Option<RelPath>,
-	#[prop(default = PostIntent::OK)] intent: PostIntent,
+	#[prop(default = PostIntent::Message)] intent: PostIntent,
 	#[prop(default = PostStatus::Completed)] status: PostStatus,
 ) -> impl Bundle {
 	OnSpawn::new(move |entity| {

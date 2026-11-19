@@ -129,6 +129,7 @@ impl ThreadEntry {
 	}
 
 	/// Stamp a thread this entry creates.
+	#[cfg(feature = "action")]
 	fn stamp(&self, thread: &mut Thread) {
 		for (key, value) in self.metadata.iter() {
 			thread.metadata_mut().insert(key.clone(), value.clone());
@@ -390,7 +391,7 @@ mod test {
 		window.posts()[0].to_string().xpect_eq("be brief");
 		window.posts()[1..]
 			.iter()
-			.all(|post| post.intent().is_session())
+			.all(|post| post.intent() == PostIntent::Log)
 			.xpect_true();
 	}
 }

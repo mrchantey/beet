@@ -251,7 +251,7 @@ impl ThreadRoute {
 					&& authored.actor.kind() != ActorKind::User
 					&& !authored.post.in_progress()
 			})
-			.filter_map(|authored| match authored.post.as_agent_post() {
+			.filter_map(|authored| match authored.post.as_agent_post()? {
 				AgentPost::Text(text) => Some(text.to_string()),
 				_ => None,
 			})
@@ -387,7 +387,9 @@ mod test {
 	fn texts(posts: &[Post]) -> Vec<String> {
 		posts
 			.iter()
-			.filter(|post| matches!(post.as_agent_post(), AgentPost::Text(_)))
+			.filter(|post| {
+				matches!(post.as_agent_post(), Some(AgentPost::Text(_)))
+			})
 			.map(|post| post.to_string())
 			.collect()
 	}
@@ -537,13 +539,13 @@ mod test {
 		thread.spawned_by().xpect_eq(Some(&creator));
 		posts
 			.iter()
-			.filter_map(SessionOpened::of)
+			.filter_map(|post| post.log::<SessionOpened>())
 			.map(|opened| opened.spawned_by)
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![Some(creator), Some(second)]);
 		let closed = posts
 			.iter()
-			.filter_map(SessionClosed::of)
+			.filter_map(|post| post.log::<SessionClosed>())
 			.collect::<Vec<_>>();
 		closed
 			.iter()
@@ -565,7 +567,7 @@ mod test {
 		window
 			.model_posts(None)
 			.iter()
-			.any(|view| view.post.intent().is_session())
+			.any(|view| view.post.intent() == PostIntent::Log)
 			.xpect_false();
 	}
 
@@ -603,7 +605,7 @@ mod test {
 			.await
 			.1
 			.iter()
-			.filter_map(SessionClosed::of)
+			.filter_map(|post| post.log::<SessionClosed>())
 			.map(|closed| closed.outcome)
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![Outcome::FAIL]);

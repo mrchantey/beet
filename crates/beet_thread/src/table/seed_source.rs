@@ -42,7 +42,7 @@ impl SeedSource {
 		Self {
 			label: label.into(),
 			action,
-			intent: PostIntent::OK,
+			intent: PostIntent::Message,
 			status: PostStatus::Completed,
 		}
 	}

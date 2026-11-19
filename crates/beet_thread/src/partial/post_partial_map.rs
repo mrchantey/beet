@@ -228,9 +228,8 @@ impl PostPartialMap {
 						// existing post to get the call_id.
 						let post_id = self.get_response_item(key)?;
 						let post = posts.get(post_id)?;
-						let agent_post = post.as_agent_post();
 						let fc =
-							agent_post.as_function_call().ok_or_else(|| {
+							FunctionCallView::try_new(post).ok_or_else(|| {
 								bevyhow!(
 									"Expected FunctionCall post for key {:?}",
 									key,

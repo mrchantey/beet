@@ -267,7 +267,7 @@ mod test {
 			.unwrap()
 			.posts()
 			.iter()
-			.filter(|post| !post.intent().is_session())
+			.filter(|post| post.intent() != PostIntent::Log)
 			.count()
 			.xpect_eq(3);
 		stored_threads(&store).await.xpect_eq(1);

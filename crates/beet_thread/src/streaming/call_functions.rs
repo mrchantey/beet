@@ -186,7 +186,7 @@ mod test {
 			.unwrap()
 			.posts()
 			.iter()
-			.filter_map(|post| match post.as_agent_post() {
+			.filter_map(|post| match post.as_agent_post()? {
 				AgentPost::FunctionCallOutput(output) => {
 					Some(output.output().to_string())
 				}

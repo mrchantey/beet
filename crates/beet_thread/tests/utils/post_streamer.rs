@@ -93,7 +93,7 @@ pub async fn tool_calling(streamer: impl Component + PostStreamer + Clone) {
 	.await
 	.unwrap()
 	.into_iter()
-	.filter_map(|post| match post.as_agent_post() {
+	.filter_map(|post| match post.as_agent_post()? {
 		AgentPost::FunctionCall(fc) => {
 			Some((fc.name().to_string(), fc.arguments().to_string()))
 		}

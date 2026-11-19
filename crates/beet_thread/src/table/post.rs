@@ -3,93 +3,43 @@ use beet_core::prelude::*;
 
 pub type PostId = Uuid7<Post>;
 
-/// Analogous to a simplified HTTP status code, declaring the intent of the post.
+/// What a post is for, beside who wrote it, its author's [`ActorKind`]: a
+/// System actor's [`Message`](Self::Message) is a system prompt, its
+/// [`Log`](Self::Log) a session divider.
 #[derive(
 	Debug,
 	Clone,
 	Copy,
+	Default,
 	PartialEq,
 	Eq,
-	PartialOrd,
-	Ord,
 	Hash,
 	Serialize,
 	Deserialize,
 	Reflect,
 )]
 #[reflect(Default, Serialize, Deserialize)]
-pub struct PostIntent(u16);
-
-impl Default for PostIntent {
-	/// Defaults to [`PostIntent::OK`], the common authored intent.
-	fn default() -> Self { Self::OK }
+pub enum PostIntent {
+	/// The conversation: text, a tool call or its output, an attachment.
+	#[default]
+	Message,
+	/// A model's reasoning content.
+	Reasoning,
+	/// A summary of a model's reasoning.
+	ReasoningSummary,
+	/// The model refused the request.
+	Refusal,
+	/// The response failed.
+	Error,
+	/// What happened to the thread rather than what was said in it, never
+	/// model input, its body naming its kind ([`LogKind`]).
+	Log,
 }
 
 impl PostIntent {
-	/// 1xx informational: reasoning content from a model.
-	pub const REASONING_CONTENT: PostIntent = PostIntent(102);
-	/// 1xx informational: reasoning summary from a model.
-	pub const REASONING_SUMMARY: PostIntent = PostIntent(103);
-	/// 1xx informational: a session entered the thread, a [`SessionOpened`]
-	/// body.
-	pub const SESSION_OPENED: PostIntent = PostIntent(104);
-	/// 1xx informational: a session left the thread, a [`SessionClosed`]
-	/// body.
-	pub const SESSION_CLOSED: PostIntent = PostIntent(105);
-	/// 2xx success: a successful response to be surfaced to the user.
-	pub const OK: PostIntent = PostIntent(200);
-	/// 4xx client error: the model refused the request.
-	pub const REFUSAL: PostIntent = PostIntent(403);
-	/// 5xx server error: an internal error occurred.
-	pub const INTERNAL_ERROR: PostIntent = PostIntent(500);
-
-	/// Creates a new [`PostIntent`] with the given code.
-	pub const fn new(code: u16) -> Self { Self(code) }
-
-	/// Returns the raw numeric code.
-	pub const fn code(&self) -> u16 { self.0 }
-
-	/// Returns `true` if this is a 1xx informational status.
-	pub const fn is_informational(&self) -> bool {
-		self.0 >= 100 && self.0 < 200
-	}
-
-	/// Returns `true` if this is a 2xx success status.
-	pub const fn is_success(&self) -> bool { self.0 >= 200 && self.0 < 300 }
-
-	/// Returns `true` if this is a 4xx client error status.
-	pub const fn is_client_error(&self) -> bool {
-		self.0 >= 400 && self.0 < 500
-	}
-
-	/// Returns `true` if this is a 5xx server error status.
-	pub const fn is_server_error(&self) -> bool {
-		self.0 >= 500 && self.0 < 600
-	}
-
 	/// Whether this intent should usually be surfaced to the user.
 	pub const fn is_display(&self) -> bool {
-		self.is_success() || self.is_client_error()
-	}
-
-	/// Whether this post brackets a session, which model input skips.
-	pub const fn is_session(&self) -> bool {
-		self.0 == Self::SESSION_OPENED.0 || self.0 == Self::SESSION_CLOSED.0
-	}
-}
-
-impl std::fmt::Display for PostIntent {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match *self {
-			Self::REASONING_CONTENT => write!(f, "102 Reasoning Content"),
-			Self::REASONING_SUMMARY => write!(f, "103 Reasoning Summary"),
-			Self::SESSION_OPENED => write!(f, "104 Session Opened"),
-			Self::SESSION_CLOSED => write!(f, "105 Session Closed"),
-			Self::OK => write!(f, "200 OK"),
-			Self::REFUSAL => write!(f, "403 Refusal"),
-			Self::INTERNAL_ERROR => write!(f, "500 Internal Error"),
-			other => write!(f, "{}", other.0),
-		}
+		matches!(self, Self::Message | Self::Refusal)
 	}
 }
 
@@ -273,13 +223,13 @@ impl Post {
 	/// resolves its author (the actor parent) and thread, hoists it into the
 	/// [`ThreadWindow`], and despawns the entity, leaving only the record.
 	///
-	/// The intent follows the content (text is [`PostIntent::OK`]); see
+	/// The intent follows the content (text is [`PostIntent::Message`]); see
 	/// [`Self::spawn_with`] / `<CreatePost>` to author refusals, reasoning, or
 	/// in-progress posts.
 	pub fn spawn(content: impl Into<IntoPost>) -> SeedPost {
 		SeedPost {
 			content: content.into(),
-			intent: PostIntent::OK,
+			intent: PostIntent::Message,
 			status: PostStatus::Completed,
 		}
 	}

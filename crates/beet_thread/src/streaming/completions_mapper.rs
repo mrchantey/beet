@@ -45,7 +45,9 @@ pub fn post_to_completions_message(
 ) -> Result<ChatCompletionRequestMessage> {
 	let is_self = post.actor_id() == agent_id;
 	let kind = post.actor.kind();
-	let agent_post = post.post.as_agent_post();
+	let agent_post = post.post.as_agent_post().ok_or_else(|| {
+		bevyhow!("log post {} is no model input", post.post.id())
+	})?;
 
 	let msg = match &agent_post {
 		AgentPost::FunctionCall(fc) if is_self && kind == ActorKind::Agent => {

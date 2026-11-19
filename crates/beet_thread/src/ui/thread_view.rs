@@ -183,7 +183,7 @@ fn post_row(_index: usize, item: &Value) -> OnSpawn {
 		.and_then(|kind| kind.as_str().ok())
 		.unwrap_or("agent")
 		.to_string();
-	if kind == "session" {
+	if kind == LOG_ROW {
 		return OnSpawn::insert(rsx! {
 			<div {divider_style()}>{text}</div>
 		});
@@ -198,7 +198,7 @@ fn post_row(_index: usize, item: &Value) -> OnSpawn {
 	})
 }
 
-/// A session bracket: a dim, centered rule between sessions.
+/// A log post: a dim, centered rule, ie between sessions.
 fn divider_style() -> OnSpawn {
 	inline_class![
 		(style::common_props::TextAlignProp, style::TextAlign::Center),
@@ -576,16 +576,17 @@ fn project_window(window: &ThreadWindow, older: &[Post]) -> Value {
 	Value::Map([("posts".into(), Value::List(posts))].into_iter().collect())
 }
 
-/// The text a row shows: a session bracket as a divider line, any other post
-/// as its body.
+/// The text a row shows: a log post as a divider line, a session's opened
+/// and closed posts in their own words and any other kind by its name, and
+/// any other post as its body.
 fn post_text(view: &AuthoredPost) -> String {
-	if let Some(opened) = SessionOpened::of(view.post) {
+	if let Some(opened) = view.post.log::<SessionOpened>() {
 		return match opened.spawned_by {
 			Some(cause) => format!("── session opened by {cause} ──"),
 			None => "── session opened ──".to_string(),
 		};
 	}
-	if let Some(closed) = SessionClosed::of(view.post) {
+	if let Some(closed) = view.post.log::<SessionClosed>() {
 		let outcome = match closed.outcome {
 			Outcome::Pass(_) => "pass",
 			Outcome::Fail(_) => "fail",
@@ -595,18 +596,24 @@ fn post_text(view: &AuthoredPost) -> String {
 			closed.duration.as_secs()
 		);
 	}
+	if let Some(kind) = view.post.log_kind() {
+		return format!("── {kind} ──");
+	}
 	view.post.to_string()
 }
 
-/// The display role of a post, used by [`post_row`] for styling: a session
-/// bracket renders as `session`, a 5xx error post as `error`, otherwise it
-/// follows the authoring actor's kind.
+/// The row kind a [`PostIntent::Log`] post projects as, which [`post_row`]
+/// renders as a divider.
+const LOG_ROW: &str = "log";
+
+/// The display role of a post, used by [`post_row`] for styling: a log post
+/// renders as [`LOG_ROW`], an error post as `error`, otherwise it follows the
+/// authoring actor's kind.
 fn post_kind(view: &AuthoredPost) -> &'static str {
-	if view.post.intent().is_session() {
-		return "session";
-	}
-	if view.post.intent().is_server_error() {
-		return "error";
+	match view.post.intent() {
+		PostIntent::Log => return LOG_ROW,
+		PostIntent::Error => return "error",
+		_ => {}
 	}
 	match view.actor.kind() {
 		ActorKind::System => "system",
@@ -637,6 +644,39 @@ mod test {
 	use crate::ui::test_ext;
 	use beet_core::prelude::*;
 	use bevy::math::UVec2;
+
+	/// A log post projects as a divider row in its own words, beside the
+	/// posts of the conversation.
+	#[beet_core::test]
+	fn projects_log_posts_as_dividers() {
+		let mut window = ThreadWindow::new();
+		let thread = ThreadId::new_now();
+		let user = window.insert_actor(Actor::user());
+		window.upsert_post(AgentPost::new_text(
+			user,
+			thread,
+			"hello",
+			PostStatus::Completed,
+		));
+		window.open_session(thread, default()).unwrap();
+		let rows = |field: &str| {
+			super::project_window(&window, &[])
+				.get("posts")
+				.unwrap()
+				.as_list()
+				.unwrap()
+				.iter()
+				.map(|row| {
+					row.get(field).unwrap().as_str().unwrap().to_string()
+				})
+				.collect::<Vec<_>>()
+		};
+		rows("kind").xpect_eq(vec!["user".to_string(), "log".to_string()]);
+		rows("text").xpect_eq(vec![
+			"hello".to_string(),
+			"── session opened ──".to_string(),
+		]);
+	}
 
 	/// The live tail: posts appended *after* the first projection must reach the
 	/// view too, both as document entries and as spawned rows. Regression for a

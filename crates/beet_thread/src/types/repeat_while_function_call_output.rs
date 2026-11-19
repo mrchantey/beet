@@ -13,7 +13,8 @@ async fn has_pending_function_call_output(
 			query
 				.window(entity)?
 				.last_post()
-				.map(|post| AgentPost::new(post).is_function_call_output())
+				.and_then(AgentPost::new)
+				.map(|post| post.is_function_call_output())
 				.unwrap_or(false)
 				.xok()
 		})

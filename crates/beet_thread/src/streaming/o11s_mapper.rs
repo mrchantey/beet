@@ -37,7 +37,9 @@ pub fn post_to_o11s_input(
 		ActorKind::User => MessageRole::User,
 	};
 
-	let agent_post = post.post.as_agent_post();
+	let agent_post = post.post.as_agent_post().ok_or_else(|| {
+		bevyhow!("log post {} is no model input", post.post.id())
+	})?;
 
 	let input_item = match &agent_post {
 		AgentPost::FunctionCall(fc) => {

@@ -19,7 +19,7 @@ where
 /// failure as an error post rather than a swallowed error.
 ///
 /// On any streaming failure (missing/invalid key, network error, or a mid-stream
-/// error event) the message is appended to the window as a 5xx error post, so it
+/// error event) the message is appended to the window as a [`PostIntent::Error`] post, so it
 /// renders in the thread view as an `Error` node (TUI mode hides stderr), and the
 /// turn [`Pass`]es so a finite program still completes instead of hanging.
 pub async fn post_streamer_action_stateful<T>(
@@ -81,7 +81,7 @@ where
 			.iter_all()
 			.filter(|post| post.status() == PostStatus::Completed)
 		{
-			if let AgentPost::FunctionCall(view) = AgentPost::new(post) {
+			if let Some(AgentPost::FunctionCall(view)) = AgentPost::new(post) {
 				function_calls.insert(view.id(), view.into_owned());
 			}
 		}

@@ -88,12 +88,12 @@ impl ThreadWindow {
 	}
 
 	/// The posts a model reads, after an exclusive cursor: every authored
-	/// post but the session brackets ([`PostIntent::is_session`]), which stay
-	/// in the window, the record and the view.
+	/// post but the [`PostIntent::Log`] posts, which stay in the window, the
+	/// record and the view.
 	pub fn model_posts(&self, after: Option<PostId>) -> Vec<AuthoredPost<'_>> {
 		self.posts_after(after)
 			.into_iter()
-			.filter(|view| !view.post.intent().is_session())
+			.filter(|view| view.post.intent() != PostIntent::Log)
 			.collect()
 	}
 
@@ -109,16 +109,15 @@ impl ThreadWindow {
 	/// first session opened, so a branch pins its parent's seed and its own.
 	/// A thread that never opened a session has no seed.
 	pub fn seed_of(history: &[Post]) -> HashSet<PostId> {
-		let opens = |post: &&Post| post.intent() == PostIntent::SESSION_OPENED;
 		let mut unopened = history
 			.iter()
-			.filter(opens)
+			.filter(|post| SessionOpened::opens(post))
 			.map(Post::thread)
 			.collect::<HashSet<_>>();
 		history
 			.iter()
 			.filter(|post| {
-				if opens(post) {
+				if SessionOpened::opens(post) {
 					unopened.remove(&post.thread());
 				}
 				unopened.contains(&post.thread())

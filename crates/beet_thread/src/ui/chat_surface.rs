@@ -201,7 +201,7 @@ mod test {
 		scheme_class(&mut app, &classes::DARK_SCHEME).xpect_false();
 	}
 
-	/// Push an error post (5xx intent) authored by the thread's agent into its
+	/// Push an error post ([`PostIntent::Error`]) authored by the thread's agent into its
 	/// window, so the transcript snapshot exercises the `error` role styling
 	/// without a failing network call.
 	fn push_error_post(app: &mut App, thread: Entity) {

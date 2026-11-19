@@ -3,18 +3,18 @@
 //! A session is one thread entity's life, from entry to despawn: one
 //! [`ThreadRoute`] request, one [`RunThread`] entry. Entry appends a
 //! [`SessionOpened`] post and the end a [`SessionClosed`] post, both
-//! informational ([`PostIntent::SESSION_OPENED`],
-//! [`PostIntent::SESSION_CLOSED`]) with a typed JSON body, authored by the
-//! thread's System actor. Model input skips them ([`ThreadWindow::model_posts`])
+//! [`LogKind`]s authored by the thread's System actor. Model input skips them ([`ThreadWindow::model_posts`])
 //! and a `ThreadView` renders them as dividers. An opened post with no closed
 //! post before the next opened post, or before the end, is a session that
 //! aborted.
 use crate::prelude::*;
+#[cfg(feature = "action")]
 use beet_action::prelude::*;
 use beet_core::prelude::*;
+#[cfg(feature = "action")]
 use std::time::Duration;
 
-/// The body of a [`PostIntent::SESSION_OPENED`] post.
+/// The log of a session entering its thread.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionOpened {
 	/// The post whose action asked for this session, ie the loop decision
@@ -24,7 +24,8 @@ pub struct SessionOpened {
 	pub spawned_by: Option<PostRef>,
 }
 
-/// The body of a [`PostIntent::SESSION_CLOSED`] post.
+/// The log of a session leaving its thread.
+#[cfg(feature = "action")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionClosed {
 	/// How the session's behavior ended, an error closing it as a fail.
@@ -35,28 +36,20 @@ pub struct SessionClosed {
 	pub usage: Usage,
 }
 
+impl LogKind for SessionOpened {
+	const KIND: &'static str = "session_opened";
+}
+
 impl SessionOpened {
-	/// The body of `post`, if it opens a session.
-	pub fn of(post: &Post) -> Option<Self> {
-		session_body(post, PostIntent::SESSION_OPENED)
+	/// Whether `post` opens a session.
+	pub fn opens(post: &Post) -> bool {
+		post.log_kind().as_deref() == Some(Self::KIND)
 	}
 }
 
-impl SessionClosed {
-	/// The body of `post`, if it closes a session.
-	pub fn of(post: &Post) -> Option<Self> {
-		session_body(post, PostIntent::SESSION_CLOSED)
-	}
-}
-
-/// The JSON body of `post` when it carries `intent`.
-fn session_body<T: serde::de::DeserializeOwned>(
-	post: &Post,
-	intent: PostIntent,
-) -> Option<T> {
-	(post.intent() == intent)
-		.then(|| serde_json::from_slice(post.body_bytes()).ok())
-		.flatten()
+#[cfg(feature = "action")]
+impl LogKind for SessionClosed {
+	const KIND: &'static str = "session_closed";
 }
 
 impl ThreadWindow {
@@ -78,11 +71,7 @@ impl ThreadWindow {
 		thread: ThreadId,
 		opened: SessionOpened,
 	) -> Result<PostId> {
-		let post = self.session_post(
-			thread,
-			PostIntent::SESSION_OPENED,
-			serde_json::to_vec(&opened)?,
-		);
+		let post = Post::new_log(self.system_actor(), thread, &opened)?;
 		let id = post.id();
 		self.upsert_post(post);
 		id.xok()
@@ -95,6 +84,7 @@ impl ThreadWindow {
 	/// ## Errors
 	///
 	/// Errors when no session is open.
+	#[cfg(feature = "action")]
 	pub fn close_session(
 		&mut self,
 		thread: ThreadId,
@@ -104,7 +94,7 @@ impl ThreadWindow {
 			.posts()
 			.iter()
 			.rev()
-			.find(|post| post.intent() == PostIntent::SESSION_OPENED)
+			.find(|post| SessionOpened::opens(post))
 			.ok_or_else(|| bevyhow!("thread {thread} has no open session"))?;
 		let opened_id = opened.id();
 		let duration = Timestamp::now().millis() - opened.created().millis();
@@ -118,33 +108,13 @@ impl ThreadWindow {
 				.filter_map(|post| self.meta(post.id())?.usage)
 				.sum(),
 		};
-		let post = self.session_post(
-			thread,
-			PostIntent::SESSION_CLOSED,
-			serde_json::to_vec(&closed)?,
-		);
+		let post = Post::new_log(self.system_actor(), thread, &closed)?;
 		self.upsert_post(post);
 		closed.xok()
 	}
-
-	/// A completed session post by the System actor.
-	fn session_post(
-		&mut self,
-		thread: ThreadId,
-		intent: PostIntent,
-		body: Vec<u8>,
-	) -> Post {
-		Post::new_raw(
-			self.system_actor(),
-			thread,
-			intent,
-			MediaType::Json,
-			body,
-			default(),
-		)
-	}
 }
 
+#[cfg(feature = "action")]
 impl Thread {
 	/// Close the session of the thread at `entity` with `outcome`, appending
 	/// its [`SessionClosed`] post. A thread already gone has nothing to close.
