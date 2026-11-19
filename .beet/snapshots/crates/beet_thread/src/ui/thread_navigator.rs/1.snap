@@ -1,0 +1,11 @@
+  LoopThread journal=loop
+  ├ GraderThread
+  └ ClerkThread document=market
+    └ ⑂ ClerkThread document=pricing
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+▏                                                       Send
+
+
+
