@@ -278,7 +278,8 @@ pub trait ThreadStoreProvider: 'static + Send + Sync {
 	}
 
 	/// The window `thread` enters with, bounded however long it has run:
-	/// every actor, the last `tail` posts of its [`Self::history`], never
+	/// every actor, the last `tail` posts of its [`Self::history`] (all of
+	/// them when `None`), never
 	/// opening on a call output whose call it cut, and the current post of
 	/// each of its seed slots ([`Thread::seed`]) however old. The window is
 	/// the model's context, so this is its context policy, beside
@@ -287,7 +288,7 @@ pub trait ThreadStoreProvider: 'static + Send + Sync {
 	fn materialize_window<'a>(
 		&'a self,
 		thread: &'a Thread,
-		tail: usize,
+		tail: Option<u64>,
 	) -> BoxedFuture<'a, Result<ThreadWindow>> {
 		Box::pin(async move {
 			let mut window = ThreadWindow::new();
@@ -295,7 +296,9 @@ pub trait ThreadStoreProvider: 'static + Send + Sync {
 				window.insert_actor(actor);
 			}
 			let history = self.history(thread).await?;
-			let mut start = history.len().saturating_sub(tail);
+			let mut start = tail
+				.map(|tail| history.len().saturating_sub(tail as usize))
+				.unwrap_or_default();
 			while history.get(start).is_some_and(|post| {
 				matches!(post.as_agent_post(), AgentPost::FunctionCallOutput(_))
 			}) {
@@ -391,7 +394,7 @@ impl ThreadStoreProvider for Arc<dyn ThreadStoreProvider> {
 	fn materialize_window<'a>(
 		&'a self,
 		thread: &'a Thread,
-		tail: usize,
+		tail: Option<u64>,
 	) -> BoxedFuture<'a, Result<ThreadWindow>> {
 		self.as_ref().materialize_window(thread, tail)
 	}
@@ -557,7 +560,7 @@ pub mod thread_store_test {
 		texts(provider.history(&right).await.unwrap())
 			.xpect_eq(vec!["post 0", "post 1", "right"]);
 		provider
-			.materialize_window(&left, usize::MAX)
+			.materialize_window(&left, None)
 			.await
 			.unwrap()
 			.posts()
@@ -572,7 +575,7 @@ pub mod thread_store_test {
 		seeded.set_seed(vec![expected[0].id()]);
 		texts(
 			provider
-				.materialize_window(&seeded, 1)
+				.materialize_window(&seeded, Some(1))
 				.await
 				.unwrap()
 				.posts()

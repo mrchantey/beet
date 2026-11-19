@@ -24,15 +24,16 @@ pub struct MountThreadStore {
 	/// above the thread.
 	pub path: RelPath,
 	/// How many of the newest posts a continued thread enters with, its
-	/// window bound ([`ThreadStoreProvider::materialize_window`]).
-	pub tail: usize,
+	/// window bound ([`ThreadStoreProvider::materialize_window`]), or its
+	/// whole history when `None`.
+	pub tail: Option<u64>,
 }
 
 impl Default for MountThreadStore {
 	fn default() -> Self {
 		Self {
 			path: default(),
-			tail: Self::DEFAULT_TAIL,
+			tail: Some(Self::DEFAULT_TAIL),
 		}
 	}
 }
@@ -40,7 +41,7 @@ impl Default for MountThreadStore {
 impl MountThreadStore {
 	/// The posts a continued thread enters with unless its mount says
 	/// otherwise.
-	pub const DEFAULT_TAIL: usize = 200;
+	pub const DEFAULT_TAIL: u64 = 200;
 
 	/// Build the [`ThreadStore`] this declares: a single-JSON-object
 	/// [`BlobThreadStore`] under `path` in `store`.
@@ -171,33 +172,38 @@ impl Thread {
 		entity: Entity,
 		entry: ThreadEntry,
 	) -> Result {
-		let mount = world
-			.with(move |world: &mut World| -> Result<Option<(ThreadStore, usize, Thread)>> {
-				ThreadWindow::reduce_now(world);
-				Self::assert_reduced(world, entity)?;
-				let Some(mount) =
-					world.get::<MountThreadStore>(entity).cloned()
-				else {
-					return Ok(None);
-				};
-				let store = world
-					.with_state::<AncestorQuery<&BlobStore>, _>(|query| {
-						query.get(entity).cloned()
-					})
-					.map_err(|_| {
-						bevyhow!(
-							"no store above the thread to keep its records under `{}`",
-							mount.path
-						)
-					})?;
-				world.entity_mut(entity).remove::<MountThreadStore>();
-				let fresh = world
-					.get::<Thread>(entity)
-					.cloned()
-					.ok_or_else(|| bevyhow!("entered {entity} is no thread"))?;
-				(mount.build(&store), mount.tail, fresh).xsome().xok()
-			})
-			.await?;
+		let mount =
+			world
+				.with(
+					move |world: &mut World| -> Result<
+						Option<(ThreadStore, Option<u64>, Thread)>,
+					> {
+						ThreadWindow::reduce_now(world);
+						Self::assert_reduced(world, entity)?;
+						let Some(mount) =
+							world.get::<MountThreadStore>(entity).cloned()
+						else {
+							return Ok(None);
+						};
+						let store = world
+							.with_state::<AncestorQuery<&BlobStore>, _>(
+								|query| query.get(entity).cloned(),
+							)
+							.map_err(|_| {
+								bevyhow!(
+									"no store above the thread to keep its records under `{}`",
+									mount.path
+								)
+							})?;
+						world.entity_mut(entity).remove::<MountThreadStore>();
+						let fresh =
+							world.get::<Thread>(entity).cloned().ok_or_else(
+								|| bevyhow!("entered {entity} is no thread"),
+							)?;
+						(mount.build(&store), mount.tail, fresh).xsome().xok()
+					},
+				)
+				.await?;
 		let Some((store, tail, mut fresh)) = mount else {
 			return world
 				.with(move |world: &mut World| -> Result {
@@ -295,7 +301,7 @@ mod test {
 	async fn session(
 		store: &BlobStore,
 		seeds: &[&str],
-		tail: usize,
+		tail: Option<u64>,
 	) -> (Thread, ThreadWindow) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
@@ -373,8 +379,8 @@ mod test {
 	#[beet_core::test]
 	async fn an_unchanged_seed_appends_nothing() {
 		let store = BlobStore::temp();
-		let (first, _) = session(&store, &["be brief"], usize::MAX).await;
-		let (thread, window) = session(&store, &["be brief"], usize::MAX).await;
+		let (first, _) = session(&store, &["be brief"], None).await;
+		let (thread, window) = session(&store, &["be brief"], None).await;
 		thread.id().xpect_eq(first.id());
 		seeds(&thread, &window).xpect_eq((vec!["be brief".to_string()], vec![
 			"be brief".to_string(),
@@ -386,9 +392,8 @@ mod test {
 	#[beet_core::test]
 	async fn an_edited_seed_appends_its_new_version() {
 		let store = BlobStore::temp();
-		session(&store, &["be brief"], usize::MAX).await;
-		let (thread, window) =
-			session(&store, &["be thorough"], usize::MAX).await;
+		session(&store, &["be brief"], None).await;
+		let (thread, window) = session(&store, &["be thorough"], None).await;
 		seeds(&thread, &window).xpect_eq((
 			vec!["be brief".to_string(), "be thorough".to_string()],
 			vec!["be thorough".to_string()],
@@ -401,13 +406,13 @@ mod test {
 	#[beet_core::test]
 	async fn slots_are_added_and_removed() {
 		let store = BlobStore::temp();
-		session(&store, &["be brief"], usize::MAX).await;
+		session(&store, &["be brief"], None).await;
 		let (thread, window) =
-			session(&store, &["be brief", "cite sources"], usize::MAX).await;
+			session(&store, &["be brief", "cite sources"], None).await;
 		seeds(&thread, &window)
 			.1
 			.xpect_eq(vec!["be brief".to_string(), "cite sources".to_string()]);
-		let (thread, window) = session(&store, &["be brief"], usize::MAX).await;
+		let (thread, window) = session(&store, &["be brief"], None).await;
 		thread.seed().len().xpect_eq(1);
 		seeds(&thread, &window).xpect_eq((
 			vec!["be brief".to_string(), "cite sources".to_string()],
@@ -421,10 +426,10 @@ mod test {
 	async fn a_long_thread_enters_with_its_tail() {
 		let store = BlobStore::temp();
 		for _ in 0..3 {
-			session(&store, &["be brief"], usize::MAX).await;
+			session(&store, &["be brief"], None).await;
 		}
 		// three sessions of two bracket posts after the seed
-		let (_, window) = session(&store, &["be brief"], 2).await;
+		let (_, window) = session(&store, &["be brief"], Some(2)).await;
 		window.posts().len().xpect_eq(5);
 		window.posts()[0].to_string().xpect_eq("be brief");
 		window.posts()[1..]

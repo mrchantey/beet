@@ -871,7 +871,7 @@ mod test {
 			)
 			.await
 			.unwrap();
-		let window = store.materialize_window(&record, 2).await.unwrap();
+		let window = store.materialize_window(&record, Some(2)).await.unwrap();
 		let synced = window.posts().iter().map(Post::id).collect();
 		let thread = app
 			.world_mut()

@@ -477,7 +477,7 @@ pub(crate) fn bind_navigator_selection(
 					let window = store
 						.materialize_window(
 							&record,
-							MountThreadStore::DEFAULT_TAIL,
+							Some(MountThreadStore::DEFAULT_TAIL),
 						)
 						.await?;
 					let synced = window.posts().iter().map(Post::id).collect();
