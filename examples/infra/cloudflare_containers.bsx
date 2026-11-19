@@ -1,9 +1,11 @@
 <!--
 # Hello Cloudflare Containers
 
-Deploys `examples/bsx_site` to Cloudflare Containers: the SAME native `beet` binary
+Deploys `examples/website` to Cloudflare Containers: the SAME native `beet` binary
 as `fargate`, run in a container that reads the site from R2 at request time
-via `S3Store::r2`. Served on `<name>.workers.dev` (no custom domain). Toggling
+via `S3Store::r2` and boots the example's `serve` command (`exec_route`). Served
+on `<name>.workers.dev` (no custom domain). Run `just example assets` first, so
+the files the site borrows and derives are in the directory it syncs. Toggling
 between this and the wasm Worker (`cloudflare_workers.bsx`) is a small swap:
 
 - block: `CloudflareContainerBlock` <-> `CloudflareWorkerBlock`
@@ -40,14 +42,14 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 <Router {(RequestLogger, HelpHandler, CloudflareAccount("0123456789abcdef0123456789abcdef"))}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Route path="deploy" {ExchangeSequence}>
-		<CloudflareContainerBlock name="beet-hello-container" bucket="beet-hello-site"/>
+		<CloudflareContainerBlock name="beet-hello-container" bucket="beet-hello-site" exec_route="serve"/>
 		<!-- build the native binary, then the deploy bakes it into the image -->
 		<BeetBinaryBuild features="aws_sdk"/>
 		<CloudflareContainerDeployAction/>
 		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
 		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
+		<CloudflareR2Sync local_dir="examples/website" bucket="beet-hello-site"/>
 		<!-- the Cloudflare rollout is instant, so tail briefly then exit -->
 		<CloudflareWatch name="beet-hello-container" timeout="10s"/>
 	</Route>
@@ -55,7 +57,7 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
 		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
+		<CloudflareR2Sync local_dir="examples/website" bucket="beet-hello-site"/>
 	</Route>
 	<Route path="destroy" {ExchangeSequence}>
 		<CloudflareDestroy name="beet-hello-container" bucket="beet-hello-site"/>

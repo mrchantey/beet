@@ -1,4 +1,4 @@
-//! End-to-end test of the no-code site path (the `bsx_site` example's shape):
+//! End-to-end test of the no-code site path (the `website` example's shape):
 //! a `main.bsx` entry declaring the router with middleware spreads, runtime
 //! route discovery from a content directory, and a BSX layout composing the
 //! route-aware widgets (`RouteHead`, `RouteSidebar`).
@@ -159,29 +159,11 @@ async fn serve_blobs_serves_assets() {
 
 /// `<HttpServer port="0"><Router/></HttpServer>`: the http server is declarable
 /// from markup, adding a facet to the root's `RunningSet` with the router as its
-/// dispatch child, via the reflect element path (port 0 keeps any started backend
-/// on an OS-assigned port). The reflect insert adds the facet through its
-/// `on_add`, so calling the entity starts it via the installed runtime hook.
-// Only without a real HTTP backend: the test installs a stand-in runtime hook to
-// prove the wiring without a live server, but with the `http`/`client_io` backend
-// present, the facet boots a real listener (and, under `client_io`, its
-// tungstenite channel on a fixed port) that this test cannot cleanly stop, so it
-// would leak a spinning task into the rest of the single-process suite.
-#[cfg(not(feature = "http"))]
+/// dispatch child, via the reflect element path. The reflect insert adds the
+/// facet through its `on_add`, so calling the entity starts it on the backend
+/// the dev dependencies compile in, bound to an OS-assigned port.
 #[beet_core::test]
 async fn http_server_declarable_in_markup() {
-	// no `server` backend feature here, so install the runtime hook the start
-	// entry invokes (idempotent: a prior test may have set it).
-	HttpServer::set_backend(|entity, _shutdown| {
-		Box::pin(async move {
-			entity
-				.with(|mut entity| {
-					entity.insert(ServerStarted);
-				})
-				.await
-		})
-	})
-	.ok();
 	use beet_action::prelude::AsyncEntityActionExt;
 	// `RouterPlugin` brings in `ServerPlugin`, so it must not be added again.
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
@@ -204,10 +186,9 @@ async fn http_server_declarable_in_markup() {
 		.entity(router)
 		.contains::<RequestLogger>()
 		.xpect_true();
-	// the start walk boots the declared server via the runtime hook: calling the
-	// entity's `RunningSet` action reaches the http entry. The call is
-	// fire-and-forget: the boot never resolves (the server parks on its
-	// `Running<Response>`), so the stub backend flags the entity then parks.
+	// the start walk boots the declared server: calling the entity's
+	// `RunningSet` action reaches the backend. The call is fire-and-forget: the
+	// boot never resolves (the server parks on its `Running<Response>`).
 	world.run_async_local(move |async_world| async move {
 		async_world
 			.entity(server)
@@ -215,21 +196,11 @@ async fn http_server_declarable_in_markup() {
 			.await?;
 		Ok(())
 	});
-	// drive the world so the boot task reaches the stub backend; the boot call
-	// itself never resolves (the server parks on `Running<Response>`), so settle
-	// to its safety cap rather than `flush_async_tasks`, which would wait forever.
+	// the boot call never resolves, so settle to its safety cap rather than
+	// `flush_async_tasks`, which would wait forever.
 	AsyncRunner::settle_async_tasks(&mut world).await;
-	world
-		.entity(server)
-		.contains::<ServerStarted>()
-		.xpect_true();
+	world.entity(server).contains::<Listening>().xpect_true();
 }
-
-/// Flag the test runtime hook inserts, proving the start walk reached the
-/// declared `HttpServer`'s backend.
-#[cfg(not(feature = "http"))]
-#[derive(Component)]
-struct ServerStarted;
 
 /// Regression (`beet --entry=site serve` bound the http server twice, the second bind
 /// failing with "address already in use" and orphaning the live listener's
@@ -237,20 +208,9 @@ struct ServerStarted;
 /// `serve` route, and a server no longer drags a load verb in with it, so the
 /// whole document declares exactly ONE `CallOnReady` and booting it starts each
 /// declared server exactly once.
-#[cfg(not(feature = "http"))]
 #[beet_core::test]
 async fn serving_a_dispatcher_starts_each_server_once() {
 	use beet_action::prelude::*;
-	HttpServer::set_backend(|entity, _shutdown| {
-		Box::pin(async move {
-			entity
-				.with(|mut entity| {
-					entity.insert(ServerStarted);
-				})
-				.await
-		})
-	})
-	.ok();
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	// disarm the load through ancestry, as `serve` does: only the explicit
 	// `CallOnReady::call` below may start servers, never the build's own `Ready`.
@@ -294,10 +254,15 @@ async fn serving_a_dispatcher_starts_each_server_once() {
 	// the boot parks (the serve route holds the process), so settle to the cap
 	AsyncRunner::settle_async_tasks(&mut world).await;
 	let serve_route = world
-		.query_filtered_once::<Entity, With<ServerStarted>>()
+		.query_filtered_once::<Entity, With<Listening>>()
 		.into_iter()
 		.next()
 		.expect("the serve route's http server never started");
+	// bound once: a second bind would have failed rather than listened twice
+	world
+		.query_filtered_once::<Entity, With<Listening>>()
+		.len()
+		.xpect_eq(1);
 	// the root's own set plus the serve route's, each started exactly once
 	starts.get().xpect_eq(2);
 	// ..and the teardown reaches that live listener rather than an orphan

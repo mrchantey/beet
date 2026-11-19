@@ -55,13 +55,15 @@ impl RichText {
 			let feature = match candidate {
 				Candidate::Link(uri) => FacetFeature::Link { uri },
 				Candidate::Tag(tag) => FacetFeature::Tag { tag },
-				Candidate::Mention(handle) => match resolve(handle.clone()).await {
-					Ok(did) => FacetFeature::Mention { did },
-					Err(err) => {
-						warn!("@{handle} stays plain text: {err}");
-						continue;
+				Candidate::Mention(handle) => {
+					match resolve(handle.clone()).await {
+						Ok(did) => FacetFeature::Mention { did },
+						Err(err) => {
+							warn!("@{handle} stays plain text: {err}");
+							continue;
+						}
 					}
-				},
+				}
 			};
 			facets.push(Facet {
 				index,

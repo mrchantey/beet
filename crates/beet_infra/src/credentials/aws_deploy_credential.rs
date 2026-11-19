@@ -236,7 +236,8 @@ impl AwsDeployCredential {
 	) -> Result<CredentialStatus> {
 		// a key not yet in the declared account is stale for living elsewhere,
 		// below, and one inside resolves its own state bucket
-		let Some(apps) = Self::apps(caller, Self::moving_to(caller).await?).await?
+		let Some(apps) =
+			Self::apps(caller, Self::moving_to(caller).await?).await?
 		else {
 			return CredentialStatus::not_needed().xok();
 		};
@@ -389,7 +390,8 @@ impl AwsDeployCredential {
 		// rendered before the code is asked for, so a stack that cannot render
 		// costs no session; a key not yet in the declared account renders
 		// against its placeholder, since the launch may hold no credential
-		let Some(apps) = Self::apps(caller, Self::moving_to(caller).await?).await?
+		let Some(apps) =
+			Self::apps(caller, Self::moving_to(caller).await?).await?
 		else {
 			bevybail!(
 				"this launch declares no stack keeping its state at AWS, so \
@@ -555,7 +557,8 @@ impl AwsDeployCredential {
 	/// not make.
 	async fn describe_of(caller: &AsyncEntity) -> Result<String> {
 		let declared = AwsAccount::declared(caller).await?;
-		let Some(apps) = Self::apps(caller, Self::moving_to(caller).await?).await?
+		let Some(apps) =
+			Self::apps(caller, Self::moving_to(caller).await?).await?
 		else {
 			return "aws: this launch declares no stack keeping its state at AWS\n"
 				.to_string()

@@ -7,7 +7,7 @@
 //!
 //! Client-side interactivity is not asserted here: the deployed site does not
 //! yet boot the wasm runtime its pages could carry (`<Wasm/>`, see
-//! `tests/bsx_site_browser.rs` for the example that does), so a served page is
+//! `tests/website_browser.rs` for the example that does), so a served page is
 //! first paint plus whatever bespoke page script it ships.
 //!
 //! Three collectors gate the whole run, attached before the first navigation

@@ -176,14 +176,15 @@ async fn build_worker_world(
 		entry,
 	)
 	.await?;
-	entry_build::build_entry_owned(&mut world, resolved).await?;
+	let root = entry_build::build_entry_owned(&mut world, resolved).await?;
 
-	// the host carries the `Router` action exchanges dispatch to.
-	let host = world
-		.query_filtered::<Entity, With<Router>>()
-		.iter(&world)
-		.next()
-		.ok_or_else(|| bevyhow!("no `Router` host found in loaded entry"))?;
+	// the host carries the `Router` action exchanges dispatch to: the url
+	// space that serves pages, beneath any command routes the entry declares
+	// (a `CliServer` root's `serve`), never merely the first router built.
+	let host = world.run_system_cached_with::<_, Result<Entity>, _, _>(
+		find_router,
+		root,
+	)??;
 
 	WorkerWorld {
 		world,

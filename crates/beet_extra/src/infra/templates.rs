@@ -206,12 +206,22 @@ pub fn LambdaWatch(timeout: Option<Duration>) -> impl Bundle {
 /// It resolves nothing from its stack for the same reason: the only per-stack
 /// value it wanted was the store name.
 #[template]
-pub fn LightsailSiteBlock(#[prop] features: String) -> impl Bundle {
+pub fn LightsailSiteBlock(
+	#[prop] features: String,
+	/// The route the unit boots, for an entry that is its own CLI and so names
+	/// which of its verbs IS the site.
+	#[prop]
+	exec_route: Option<String>,
+) -> impl Bundle {
+	let block = LightsailBlock::default().with_bootstrap(BootstrapConfig {
+		server: Some(ServerFilter::new("http")),
+		..default()
+	});
 	(
-		LightsailBlock::default().with_bootstrap(BootstrapConfig {
-			server: Some(ServerFilter::new("http")),
-			..default()
-		}),
+		match exec_route {
+			Some(route) => block.with_exec_route(route),
+			None => block,
+		},
 		infra_ext::beet_cargo_build(features).into_build_artifact(),
 	)
 }
@@ -227,22 +237,29 @@ pub fn LightsailWatch(timeout: Option<Duration>) -> impl Bundle {
 	)
 }
 
-/// `<FargateSiteBlock/>` — the fargate deploy block wired to serve the site from
+/// `<FargateSiteBlock exec_route="serve"/>` — the fargate deploy block wired to serve the site from
 /// the stack's repo store: the repo-store config (`http_bootstrap`) lands in
 /// the container `CMD` via the sibling `<BuildDockerImage/>`. Named to avoid
 /// the [`FargateBlock`] it builds, on [`Ready`] through [`RepoStoreQuery`]
 /// once the stack's `{RepoStoreBlock}` declaration has settled.
 #[template]
-pub fn FargateSiteBlock() -> impl Bundle {
+pub fn FargateSiteBlock(
+	/// The route the container boots, for an entry that is its own CLI and so
+	/// names which of its verbs IS the site.
+	#[prop(default)]
+	exec_route: String,
+) -> impl Bundle {
 	OnSpawn::observe(
-		|ev: On<Ready>,
-		 repos: RepoStoreQuery,
-		 mut commands: Commands|
-		 -> Result {
+		move |ev: On<Ready>,
+		      repos: RepoStoreQuery,
+		      mut commands: Commands|
+		      -> Result {
 			commands.entity(ev.entity).insert(
-				FargateBlock::default().with_bootstrap(
-					infra_ext::http_bootstrap(&repos, ev.entity)?,
-				),
+				FargateBlock::default()
+					.with_bootstrap(infra_ext::http_bootstrap(
+						&repos, ev.entity,
+					)?)
+					.with_exec_route(exec_route.clone()),
 			);
 			Ok(())
 		},

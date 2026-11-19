@@ -13,9 +13,9 @@ use beet::prelude::*;
 /// [`DiagnosticsManifest`] of what a future editor would validate and autocomplete.
 ///
 /// ```sh
-/// beet check examples/bsx_site                          # exit 0 if clean, non-zero on an error
-/// beet check examples/bsx_site --manifest out.json      # also dump the manifest to a file
-/// beet check examples/bsx_site --manifest=-             # ..or to stdout (then the summary)
+/// beet check examples/website                          # exit 0 if clean, non-zero on an error
+/// beet check examples/website --manifest out.json      # also dump the manifest to a file
+/// beet check examples/website --manifest=-             # ..or to stdout (then the summary)
 /// ```
 #[action(route = "check/*entry")]
 #[derive(Component, Reflect)]
@@ -82,10 +82,6 @@ async fn write_manifest(world: &AsyncWorld, root: Entity, out: &str) -> Result {
 mod test {
 	use super::*;
 
-	fn site_path() -> AbsPath {
-		AbsPath::new_workspace_rel("examples/bsx_site").unwrap()
-	}
-
 	/// Render `req` through a host carrying only the [`Check`] route, returning the
 	/// response (so a test can assert the status that drives the exit code).
 	async fn run(req: Request) -> Response {
@@ -100,11 +96,12 @@ mod test {
 			.unwrap()
 	}
 
-	/// `beet check` over the clean demo site succeeds (a 2xx status → exit 0) and
+	/// `beet check` over a clean site succeeds (a 2xx status → exit 0) and
 	/// reports the routes it scanned.
 	#[beet::test]
 	async fn checks_clean_site() {
-		let args = CliArgs::parse(&format!("check {}", site_path()));
+		let site = crate::commands::clean_site();
+		let args = CliArgs::parse(&format!("check {}", site.path()));
 		let response = run(Request::from_cli_args(args)).await;
 		// a clean site is a success status, so the CLI exits 0.
 		response.status().is_success().xpect_true();

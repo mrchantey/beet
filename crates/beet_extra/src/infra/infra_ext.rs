@@ -2,7 +2,7 @@
 //!
 //! Everything here is platform-agnostic so the AWS examples differ only in their
 //! deploy target: the block, the build feature set, and the readiness watch. All
-//! the AWS infra examples deploy the same content (`examples/bsx_site`) and serve it
+//! the AWS infra examples deploy the same content (`examples/website`) and serve it
 //! dynamically from an S3 bucket via the generic `beet` binary. The `#[template]`s in
 //! [`templates`](super::templates) wrap these so a `.bsx` deploy entry composes
 //! them.

@@ -23,10 +23,15 @@ pub struct RouteHidden;
 /// the `app-info` scene, `client_io`) are not codegen-emitted, so they
 /// never carry it and stay out of the nav.
 ///
+/// Requires a [`RouteMeta`](beet_ui::prelude::RouteMeta), so a page whose
+/// file declares none is a public page with every default rather than one
+/// the nav, the feeds and publishing all skip.
+///
 /// Distinct from [`PageRequest`]: a `PageRoute` marks a route entity, while a
 /// [`PageRequest`] is the render handle such a route produces per request.
 #[derive(Debug, Default, Clone, Copy, Component, Reflect)]
 #[reflect(Component)]
+#[require(beet_ui::prelude::RouteMeta)]
 pub struct PageRoute;
 
 /// Collects all routes (actions and scene routes) in an entity hierarchy and

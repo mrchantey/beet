@@ -792,6 +792,23 @@ pub(super) mod test {
 			]);
 	}
 
+	/// A named draft refuses before the repo is read, so the refusal holds
+	/// whether or not the repo answers.
+	#[beet_core::test]
+	async fn refuses_before_reading_the_repo() {
+		let unreachable = XrpcPds::new(
+			Did::parse("did:plc:vgxy56shhs3t3b2mu2avizjf").unwrap(),
+		)
+		.with_endpoint("http://127.0.0.1:9");
+		let mut site =
+			Site::with("https://beet.org", Pds::new(unreachable)).await;
+		site.publish("--only=wip --dry-run")
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`wip` is a draft");
+	}
+
 	/// `--prune` deletes a document whose page is gone, never one merely
 	/// outside `--only`.
 	#[beet_core::test]

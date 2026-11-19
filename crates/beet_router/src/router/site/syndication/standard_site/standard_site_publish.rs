@@ -35,9 +35,9 @@ use beet_ui::prelude::*;
 /// is an orphan, reported, and deleted under `--prune`; one merely outside
 /// `--only` never is.
 ///
-/// A run refuses before it writes anything when a page it names is a draft
-/// or missing, or when an announcement `--announce` names would be refused
-/// (see `<StandardSiteAnnounce/>`).
+/// A run refuses before it reads the repo, let alone writes to it, when a
+/// page it names is a draft or missing, or when an announcement `--announce`
+/// names would be refused (see `<StandardSiteAnnounce/>`).
 ///
 /// The repo itself is the memory: every record carries its natural key, so
 /// the step finds what an earlier run wrote by listing, and a run
@@ -64,8 +64,8 @@ pub async fn StandardSitePublish(
 	let dry_run = publish.0.dry_run;
 	let world = cx.world();
 	let publishing = Publishing::resolve(&cx.caller).await?;
-	let records = publishing.records().await?;
 	// the named pages first, so a draft or a typo refuses the whole run
+	// before the repo is even read
 	let named = only
 		.iter()
 		.map(|slug| publishing.page(slug).map(|page| page.route))
@@ -76,6 +76,7 @@ pub async fn StandardSitePublish(
 	for slug in &announce.0.announce {
 		publishing.announcement(slug, day)?;
 	}
+	let records = publishing.records().await?;
 	let site = StandardSitePublish::publication(
 		&world,
 		&publishing,

@@ -1,0 +1,198 @@
+<!--
+A beet website declared entirely in markup, deployed at https://example.beet.org
+with its blog published as a standard.site publication on the `example.beet.org`
+atproto account.
+
+The root is a one-shot `<CliServer always=true {CallOnReady}>` dispatcher whose
+`Router` is its child, so the entry is a set of commands and the served site is
+ONE of them: `serve`. `always=true` dispatches on every boot whatever `--server`
+says, since `--server` selects the served site's transports, not this entry's.
+A `CliServer` refuses a flag the command does not take, naming the nearest
+one it does, rather than running without it.
+
+    beet --entry=examples/website serve --server=http   # the website over http
+    beet --entry=examples/website serve --server=tui    # ..as a live terminal
+    beet --entry=examples/website --help                # every command
+
+## The served site
+
+`<Route path="serve" {(HttpServer, TuiServer, SshTuiServer, DomServer)}>` is the
+serve route and the server host in one. Its `Router` child is the site, a url
+space of its own rooted at `/`, so no http request can reach a sibling command:
+the publish verbs below are commands of this entry, never routes of the site.
+The router's middleware attaches as component spreads (request logging, `--help`,
+terminal link navigation, the layout), `<RoutesDir/>` discovers the pages in
+`routes/`, and the blog is a subtree wearing `templates/ArticleLayout.bsx` inside
+the site `Layout`.
+
+`<ServeBlobs prefix="repo"/>` publishes this directory read-only at `/repo`, the
+store the browser process reads this entry through, and `<AssetsDir src="wasm">`
+mounts the wasm binary the page boots: `wasm/beet-ui.{wasm,js}` link to the build
+output in `target/wasm`, which `just build-wasm-ui` provides and a deploy builds
+before publishing (`<WasmRuntime/>`). The page's `<Wasm route="serve"/>` boots
+this same entry in the tab, dispatching `serve` with the page's own url as the
+opening route (see `templates/Layout.bsx`).
+
+## The assets
+
+`assets/logo/logo.svg` is the one asset this directory owns. `<IconSet/>` derives
+every icon size from it, `<SocialCards/>` draws a link preview per page, set in a
+font this example borrows from the workspace's `assets/` with the images its
+posts show, and `beet check` fails a derived file that is missing. The `assets`
+verb borrows and derives them into this directory for a local serve; the deploy
+does the same into the copy it publishes, so nothing it writes is committed.
+
+    just example assets   # borrow the font and images, derive icons and cards
+
+## The deploy
+
+The site runs on AWS Lambda behind Cloudflare at `example.beet.org`, the
+`beet-example` stack. A `<LambdaSiteBlock>` publishes its `authorities` only from
+a production stage, so the example deploys as `--stage=prod` of its own app; any
+other stage answers only at its gateway url. The deploy machinery sits behind
+`bx:cfg`, absent from a lean binary that only serves.
+
+    just example deploy --stage=prod   # bucket, site, function, hostname
+    just example sync --stage=prod     # republish the site, no redeploy
+    just example watch --stage=prod    # tail the function's logs
+    just example destroy --stage=prod --force
+
+## The publication
+
+The blog is a standard.site publication on `example.beet.org`'s repo, one
+document per dated post, each document's `content` the post as a beet scene
+(`org.beet.scene#body`). `beet-test.bsky.social` is a contributor who reposts each
+announcement it is credited on and replies to it, so the comments island under
+each post has something to show. `social/publish` converges the repo to the
+posts it names and rewrites the committed index the served site reads
+(`derived/standard-site.json`), which lands with the next `sync`.
+
+    just example social deploy --stage=prod                                  # the handle record
+    just example social publish --only=<slug> --announce=<slug> --dry-run   # read every line first
+    just example social publish --only=<slug> --announce=<slug>             # publish and announce
+    just example social probe --stage=prod                                   # the handle, then the live site
+
+The publisher's app password is `EXAMPLE_BEET_ORG_APP_PASSWORD` and the
+contributor's `BEET_TEST_ATPROTO_APP_PASSWORD`, both `env_var` records in the
+repo's `secrets.toml`, loaded by the top-level `<Secrets/>` below.
+-->
+<CliServer always=true {CallOnReady}>
+<Router {HelpHandler}>
+	<!-- the repo's secrets, loaded into the process environment before this
+	     entry builds; a machine without the identity loads nothing -->
+	<Secrets path="../../secrets.toml"/>
+	<PackageConfig
+		title="Beet Example"
+		description="A beet website with zero code"
+		homepage="https://example.beet.org"/>
+	<!-- every icon size derived from the one source image -->
+	<IconSet src="assets/logo/logo.svg"/>
+	<!-- the tags a post may carry; `beet check` fails any other -->
+	<DocMetaRules tags={["examples", "markup", "atproto"]}/>
+	<!-- the publisher and a contributor. The contributor is a throwaway
+	     account, its handle, did and display name written literally. The
+	     publisher's did is a placeholder until its account exists. -->
+	<AtprotoAccount bx:ref="example" handle="example.beet.org"
+		did="did:web:example.beet.org" display_name="Beet Example"
+		secret="EXAMPLE_BEET_ORG_APP_PASSWORD"/>
+	<AtprotoAccount bx:ref="beet_test" handle="beet-test.bsky.social"
+		did="did:plc:syj3wxvm5y7add3xlj3c4cn3" display_name="Beet Test"
+		secret="BEET_TEST_ATPROTO_APP_PASSWORD" auto_repost=true/>
+	<Route path="serve" {(HttpServer, TuiServer, SshTuiServer, DomServer)}>
+		<Router {(RequestLogger, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
+			<Theme color={Srgba(Srgba{red:0.5, green:0.2, blue:0.9, alpha:1.0})}/>
+			<TemplateDir src="templates"/>
+			<Styles/>
+			<DefaultAppRoutes/>
+			<Sitemap/>
+			<ServerIslands/>
+			<!-- the blog as a standard.site publication; its served half reads
+			     the index `social/publish` writes -->
+			<StandardSitePub bx:ref="blog" {AccountRef($example)} path="blog"
+				name="The Example Almanac" description="Made-up posts from the beet example site, for trying out the pipeline that publishes them."/>
+			<SocialCards font="assets/fonts/FiraSans-Bold.ttf"/>
+			<RoutesDir src="routes" filter={GlobFilter{exclude:["blog/**"]}}/>
+			<Route path="blog" {Layout{template:"ArticleLayout"}}>
+				<RoutesDir src="routes/blog"/>
+			</Route>
+			<ServeBlobs prefix="repo"/>
+			<AssetsDir src="assets"/>
+			<AssetsDir src="wasm" prefix="wasm"/>
+		</Router>
+	</Route>
+	<!-- the files the assets borrow from the workspace and derive, into this
+	     directory for a local serve -->
+	<Route path="assets" bx:cfg="feature:infra && feature:extra" {ExchangeSequence}>
+		<DirCopy src="assets" dest="examples/website/assets" paths="fonts/FiraSans-Bold.ttf,screenshots/hello-world.png,screenshots/hello-net.png"/>
+		<Derive/>
+	</Route>
+	<!-- the deploy machinery, absent from a binary that only serves, carrying
+	     the provider addresses its stacks deploy into, resolved by ancestry:
+	     the region, the Cloudflare account and the `beet.org` zone the
+	     example's hostname and handle record live in. On the fragment rather
+	     than the root, so the browser runtime, which links none of them, never
+	     meets them. -->
+	<Fragment bx:cfg="feature:infra && feature:extra" {(AwsRegion("us-west-2"), CloudflareAccount("74aba4da669f57fc6fc3e63ebcfcff26"), CloudflareZone{domain:"beet.org", id:"45905c861559d9eb8c9b72ee87adca7b"})}>
+	<!-- the deploy: a lambda serving the repo bucket at `example.beet.org` -->
+	<Stack app_name="beet-example">
+		<!-- the block + its build artifact share one entity, booting `serve` -->
+		<LambdaSiteBlock features="lambda,aws_sdk,atproto" authorities="example.beet.org" exec_route="serve"/>
+		<S3BucketBlock label="repo" {RepoStoreBlock}/>
+		<Group bx:ref="example_up">
+			<TofuApply layer="storage"/>
+			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
+			<RepoAssemble src="examples/website">
+				<DirCopy src="assets" dest="assets" paths="fonts/FiraSans-Bold.ttf,screenshots/hello-world.png,screenshots/hello-net.png"/>
+				<Derive/>
+			</RepoAssemble>
+			<RepoSync/>
+			<TofuApply/>
+			<LambdaWatch timeout="30s"/>
+		</Group>
+		<Group bx:ref="example_down">
+			<StackTeardown/>
+			<TofuDestroy/>
+		</Group>
+		<DeployRoutes deploy={$example_up} destroy={$example_down}/>
+		<!-- a content-only republish into the version the running function reads -->
+		<Route path="sync" {ExchangeSequence}>
+			<AdoptCurrentDeploy/>
+			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
+			<RepoAssemble src="examples/website">
+				<DirCopy src="assets" dest="assets" paths="fonts/FiraSans-Bold.ttf,screenshots/hello-world.png,screenshots/hello-net.png"/>
+				<Derive/>
+			</RepoAssemble>
+			<RepoSync/>
+		</Route>
+		<Route path="watch" {ExchangeSequence}>
+			<LambdaWatch/>
+		</Route>
+	</Stack>
+	<!-- the handle and the publication: their own stack, since the handle
+	     record shares nothing with the function but the zone, and only
+	     `--stage=prod` publishes it -->
+	<Route path="social" bx:cfg="feature:atproto">
+		<Stack app_name="beet-example-social">
+			<Group bx:ref="social_up">
+				<TofuApply/>
+			</Group>
+			<Group bx:ref="social_down">
+				<StackTeardown/>
+				<TofuDestroy/>
+			</Group>
+			<DeployRoutes deploy={$social_up} destroy={$social_down}/>
+			<AtprotoHandleBlock domain="beet.org" dns_stage="prod" accounts={[$example]}/>
+			<Route path="publish" {(ExchangeSequence, PublicationRef($blog))}>
+				<StandardSitePublish/>
+				<StandardSiteAnnounce/>
+				<StandardSiteIndexWrite/>
+			</Route>
+			<Route path="probe" {ExchangeSequence}>
+				<AtprotoHandleProbe/>
+				<StandardSiteProbe {PublicationRef($blog)}/>
+			</Route>
+		</Stack>
+	</Route>
+	</Fragment>
+</Router>
+</CliServer>

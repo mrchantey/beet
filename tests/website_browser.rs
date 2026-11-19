@@ -1,9 +1,9 @@
-//! The browser half of the no-code `examples/bsx_site` example: the served
+//! The browser half of the no-code `examples/website` example: the served
 //! page boots the wasm `beet` binary on the same entry it was rendered by, the
 //! world adopts every route's served page as it stands, and the counter counts
 //! again through the world running in the tab.
 //!
-//! The site is served exactly as `beet --entry=examples/bsx_site` serves it
+//! The site is served exactly as `beet --entry=examples/website` serves it
 //! (the entry resolved through its own fs repo store, built through the plain
 //! one-shot path, its declared `<HttpServer>` booting), the harness reading the
 //! url off the listener the entry binds. The page's `<Wasm/>` boots the entry
@@ -14,7 +14,7 @@
 //! Needs the wasm runtime and a browser on PATH:
 //!
 //! ```sh
-//! just test-bsx-site-browser   # builds beet-ui.wasm, then runs this
+//! just test-website-browser   # builds beet-ui.wasm, then runs this
 //! ```
 beet::test_main!();
 
@@ -24,11 +24,12 @@ use browser_host::*;
 use beet::prelude::*;
 
 /// The example's directory, the entry's repo root.
-const ENTRY_DIR: &str = "examples/bsx_site";
+const ENTRY_DIR: &str = "examples/website";
 
 /// Serve the on-disk example the way the binary does, on an OS-assigned port.
 async fn serve_site() -> BrowserHost {
-	BrowserHost::serve(BrowserHost::disk_store(ENTRY_DIR), "main.bsx").await
+	BrowserHost::serve(BrowserHost::disk_store(ENTRY_DIR), "main.bsx", "serve")
+		.await
 }
 
 /// Every route under the example's `routes/` directory, by url path.

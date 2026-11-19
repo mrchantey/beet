@@ -20,8 +20,8 @@ answers `did you mean --release?` rather than building a debug module.
 
     cargo install --path crates/beet-cli --all-features   # then, from anywhere in the repo:
     beet run-wasm <module.wasm>            # run a wasm test module
-    beet check examples/bsx_site           # lint a no-code site
-    beet export-static examples/bsx_site   # write its dist/
+    beet check examples/website           # lint a no-code site
+    beet export-static examples/website   # write its dist/
     just build-wasm-min                    # the smallest browser runtime (target/wasm/beet-min.wasm)
     just build-wasm-full                   # ..and the kitchen sink (target/wasm/beet-full.wasm)
 
@@ -32,7 +32,7 @@ launched directly and names its own verb, exactly as its deploy verbs are
     beet --entry=site serve --server=http       # the beet website (site/main.bsx)
     beet --entry=site serve --server=tui        # ..as a live terminal
     beet --entry=site serve --server=http,ssh   # ..http plus a multi-tenant ssh terminal
-    beet --entry=examples/bsx_site --server=http   # a zero-code BSX site, whose root IS the server
+    beet --entry=examples/website serve --server=http   # the example website, a zero-code BSX site
 
 That is the identical path the deployed box takes (`app --repo=s3://.. serve`),
 and it is why the site's resources and deploy verbs live in `site/main.bsx`: the

@@ -12,8 +12,8 @@ const DIST_DIR: &str = "dist";
 /// entry's root element is built into it), so it exports directly.
 ///
 /// ```sh
-/// beet export-static examples/bsx_site             # writes examples/bsx_site/dist
-/// beet export-static examples/bsx_site --out=public # ..or a chosen output dir (cwd-relative)
+/// beet export-static examples/website             # writes examples/website/dist
+/// beet export-static examples/website --out=public # ..or a chosen output dir (cwd-relative)
 /// ```
 #[action(route = "export-static/*entry")]
 #[derive(Component, Reflect)]
@@ -64,10 +64,6 @@ pub async fn ExportStatic(
 mod test {
 	use super::*;
 
-	fn site_path() -> AbsPath {
-		AbsPath::new_workspace_rel("examples/bsx_site").unwrap()
-	}
-
 	/// Run `export-static <args>` through a host carrying only the route, the way the
 	/// CLI invokes it ([`Request::from_cli_args`], so an absolute `<entry>` positional
 	/// round-trips as absolute: `*entry` keeps its leading `/`, which a stringified URL
@@ -93,8 +89,9 @@ mod test {
 	/// the no-main.rs replacement for the example's old `export` route.
 	#[beet::test]
 	async fn exports_static_site() {
-		let dist = site_path().join("dist");
-		run(&site_path().to_string())
+		let site = crate::commands::clean_site();
+		let dist = site.path().join("dist");
+		run(&site.path().to_string())
 			.await
 			.as_str()
 			.xpect_contains("exported")
@@ -104,15 +101,15 @@ mod test {
 			.unwrap()
 			.as_str()
 			.xpect_contains("<html lang=\"en\">")
-			.xpect_contains("BSX Site");
-		fs_ext::remove(&dist).ok();
+			.xpect_contains("<title>Home</title>");
 	}
 
 	/// `--out` redirects the export to a chosen directory rather than `<site>/dist`.
 	#[beet::test]
 	async fn export_out_override() {
+		let site = crate::commands::clean_site();
 		let out = TempDir::new().unwrap();
-		run(&format!("{} --out={}", site_path(), out.path()))
+		run(&format!("{} --out={}", site.path(), out.path()))
 			.await
 			.as_str()
 			.xpect_contains(out.path().as_str());

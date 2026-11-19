@@ -1232,4 +1232,29 @@ mod test {
 			.unwrap()
 			.xpect_eq(2);
 	}
+
+	/// A page declaring no `[RouteMeta]` still carries the default one, so
+	/// every reader of it (the nav's label, the feeds, publishing) sees a
+	/// public page rather than skipping it.
+	#[beet_core::test]
+	async fn a_page_without_route_meta_carries_the_default() {
+		let mut world = router_world();
+		let root = spawn_routes(
+			&mut world,
+			memory_fixture(&[(
+				"blog/post.md",
+				"+++\ntitle = \"A Post\"\n+++\n\n# Post",
+			)])
+			.await,
+			(Router::with_defaults(), children![RoutesDir::default()]),
+		)
+		.await;
+		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
+		let node = tree.find(&["blog", "post"]).unwrap().clone();
+		let route = world.entity(node.entity).get::<RouteMeta>().unwrap();
+		route.clone().xpect_eq(RouteMeta::default());
+		route
+			.sidebar_label(world.entity(node.entity).get::<DocMeta>())
+			.xpect_eq(Some("A Post"));
+	}
 }

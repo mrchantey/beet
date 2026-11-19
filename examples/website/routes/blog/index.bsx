@@ -1,0 +1,11 @@
+<!--
+The blog listing, generated from each post's frontmatter: <RouteIndex/> lists
+this route's children, newest first. The `{DocMeta{..}}` spread is the page's
+metadata, what frontmatter is to a markdown page, and the heading is written
+here because `<ArticleHeader/>` renders nothing for an undated page.
+-->
+<Fragment {DocMeta{title: "The Example Almanac"}} {RouteMeta{sidebar_label: "Blog", order: 1, expanded: true}}>
+	<h1>The Example Almanac</h1>
+	<p>Made-up posts from the beet example site, for trying out the pipeline that publishes them.</p>
+	<RouteIndex reverse="true"/>
+</Fragment>

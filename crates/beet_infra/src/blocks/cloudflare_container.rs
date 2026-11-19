@@ -28,7 +28,7 @@ pub struct CloudflareContainerBlock {
 	/// `None`, resolved from `--port` / `BEET_PORT` or
 	/// [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT) (8337) via
 	/// [`port`](Self::port). Must match the served site's markup `HttpServer{port}`
-	/// (the same default `bsx_site` declares and `FargateBlock` uses).
+	/// (the same default `website` declares and `FargateBlock` uses).
 	#[get(skip)]
 	#[set_with(unwrap_option)]
 	app_port: Option<u16>,
@@ -40,6 +40,11 @@ pub struct CloudflareContainerBlock {
 	/// *not* env: the deploy action bakes `--repo=s3://<bucket>?endpoint=..` into
 	/// the image `CMD`; only the R2 credentials (SDK convention) ride env.
 	env_vars: Vec<Variable>,
+	/// The route the container boots, trailing the `CMD`'s flags, for an entry
+	/// whose root is a `CliServer` dispatcher (`serve`). Empty for an entry
+	/// whose root is its server.
+	#[set_with(into)]
+	exec_route: SmolStr,
 }
 
 impl Default for CloudflareContainerBlock {
@@ -51,6 +56,7 @@ impl Default for CloudflareContainerBlock {
 			sleep_after: "5m".into(),
 			max_instances: 3,
 			env_vars: Vec::new(),
+			exec_route: default(),
 		}
 	}
 }
@@ -104,17 +110,19 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// The image `CMD` is a real JSON array carrying only the argv channel: the
-	/// R2 store uri and the transport selection, with no `serve` positional and no
-	/// `--path=/` workaround (an empty boot path already opens `/`).
+	/// The image `CMD` is a real JSON array carrying the argv channel, the R2
+	/// store uri and the transport selection, then the route the entry boots,
+	/// with no `--path=/` workaround (an empty boot path already opens `/`).
 	#[beet_core::test]
 	fn renders_cmd_json() {
-		CloudflareContainerBlock::new("beet-hello")
+		let block = CloudflareContainerBlock::new("beet-hello")
+			.with_exec_route("serve");
+		block
 			.cmd_bootstrap("https://acc.r2.cloudflarestorage.com")
-			.to_cmd_json("/app")
+			.to_cmd_json("/app", block.exec_route())
 			.unwrap()
 			.xpect_eq(
-				r#"["/app", "--repo=s3://beet-site?endpoint=https://acc.r2.cloudflarestorage.com", "--server=http"]"#,
+				r#"["/app", "--repo=s3://beet-site?endpoint=https://acc.r2.cloudflarestorage.com", "--server=http", "serve"]"#,
 			);
 	}
 

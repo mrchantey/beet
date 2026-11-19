@@ -166,12 +166,44 @@ pub(crate) fn render_world() -> World {
 		.into_world()
 }
 
+/// A small clean site in a temp dir: a router over its `routes/`, wrapped
+/// in a layout from its `templates/`, and a page linking another. Written
+/// rather than borrowed from `examples/`, whose sites declare derived
+/// files a fresh checkout has not generated, for the `check` and
+/// `export-static` tests.
+#[cfg(test)]
+pub(crate) fn clean_site() -> TempDir {
+	let dir = TempDir::new().unwrap();
+	for (path, content) in [
+		(
+			"main.bsx",
+			r#"<Router {Layout{template:"Layout"}}>
+	<PackageConfig title="Clean Site"/>
+	<TemplateDir src="templates"/>
+	<RoutesDir src="routes"/>
+</Router>"#,
+		),
+		(
+			"templates/Layout.bsx",
+			"<html lang=\"en\"><RouteHead/><body><main><Slot/></main></body></html>",
+		),
+		(
+			"routes/index.md",
+			"+++\ntitle = \"Home\"\n+++\n\n# Home\n\nRead [the about page](/about).",
+		),
+		("routes/about.md", "+++\ntitle = \"About\"\n+++\n\n# About"),
+	] {
+		fs_ext::write(dir.path().join(path), content).unwrap();
+	}
+	dir
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
 
 	fn entry_path() -> AbsPath {
-		AbsPath::new_workspace_rel("examples/bsx_site").unwrap()
+		AbsPath::new_workspace_rel("examples/website").unwrap()
 	}
 
 	/// The prescan set the render world registers.
@@ -235,9 +267,10 @@ mod test {
 	}
 
 	/// The entry declares its own servers and app routes: loading its entry document
-	/// through the resolved store yields a markup-declared `<HttpServer>` root
-	/// carrying the router, plus the default app routes it requested with
-	/// `<DefaultAppRoutes/>` (eg `/app-info`).
+	/// through the resolved store yields a command dispatcher root whose `serve`
+	/// route carries a markup-declared `<HttpServer>` over the site's router,
+	/// plus the default app routes it requested with `<DefaultAppRoutes/>`
+	/// (eg `/app-info`).
 	#[beet::test]
 	async fn entry_declares_server_and_app_routes() {
 		let mut world = render_world();
@@ -270,10 +303,22 @@ mod test {
 			DisableCallOnReady,
 		)
 		.unwrap();
-		// the markup `<HttpServer>` owns the boot, with the router as its child
-		world.entity(root).contains::<HttpServer>().xpect_true();
-		// and `<DefaultAppRoutes/>` wired the app-info route
-		// the tree lives on the router's own url space, a child of the server
+		// the `<RoutesDir>` scan settles, so the site's router serves pages
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		// the root dispatches commands, and the markup `<HttpServer>` owns the
+		// `serve` route's boot, with the site's router as its child
+		world.entity(root).contains::<CliServer>().xpect_true();
+		let router = world
+			.run_system_cached_with::<_, Result<Entity>, _, _>(
+				find_router,
+				root,
+			)
+			.unwrap()
+			.unwrap();
+		let serve = world.entity(router).get::<ChildOf>().unwrap().parent();
+		world.entity(serve).contains::<HttpServer>().xpect_true();
+		// and `<DefaultAppRoutes/>` wired the app-info route into the site's
+		// own url space
 		RouteTree::of(&world, root)
 			.unwrap()
 			.find(&["app-info"])

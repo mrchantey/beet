@@ -1,0 +1,17 @@
+<!--
+The chrome every blog post wears, nested INSIDE the site `Layout`: declared on
+`<Route path="blog">` in `main.bsx`, it reaches every post and nothing else, and
+adds only what an article has (no document, no header or footer).
+
+<ArticleHeader/> renders the title, byline and date from the post's frontmatter,
+and nothing for the undated blog index. The comments are the replies to the
+post's announcement on Bluesky, read live in a server island so the page itself
+stays cacheable; its fallback, shown until the island swaps in, is the link to
+reply. A post with no announcement renders neither.
+-->
+<ArticleHeader/>
+<Slot/>
+<ServerIsland name="comments" {CacheHeaders{edge_max_age: "60s"}}>
+	<StandardSiteComments/>
+	<StandardSiteReplyLink slot="fallback"/>
+</ServerIsland>

@@ -1,11 +1,13 @@
 <!--
 # Hello Lightsail
 
-Deploys `examples/bsx_site` as an http-only Lightsail instance. The generic `beet`
+Deploys `examples/website` as an http-only Lightsail instance. The generic `beet`
 binary runs under systemd and reads the site from an S3 bucket at request time
-(its `ExecStart` passes `--repo=s3://<bucket> --server=http`), so a site change
-re-publishes by re-running `sync` with no redeploy. Served on the instance's
-public address.
+(its `ExecStart` passes `--repo=s3://<bucket> --server=http serve`, `serve`
+being the example's command that IS the site), so a site change re-publishes by
+re-running `sync` with no redeploy. Served on the instance's public address. Run
+`just example assets` first, so the files the site borrows and derives are in
+the tree it publishes.
 
 This is `lambda` with the block swapped for a long-running VM: the deploy/sync/
 watch shape and the served content are identical (see `crates/beet_extra/src/infra`).
@@ -27,7 +29,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 	<Stack app_name="lightsail" {AwsRegion("us-west-2")}>
 		<Group bx:ref="deploy_up">
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
-			<LightsailSiteBlock features="aws_sdk"/>
+			<LightsailSiteBlock features="aws_sdk" exec_route="serve"/>
 			<S3BucketBlock label="repo" {RepoStoreBlock}/>
 			<!-- the ssh authority the box trusts, before the apply that boots it -->
 			<EnsureSshAuthority/>
@@ -39,7 +41,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 			<!-- the wasm runtime the site's pages boot, built by this verb rather
 			     than borrowed: the assemble reads it through the site's `wasm/` links -->
 			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<RepoAssemble src="examples/bsx_site"/>
+			<RepoAssemble src="examples/website"/>
 			<RepoSync/>
 			<TofuApply/>
 			<LightsailWatch timeout="30s"/>
@@ -58,7 +60,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 			<!-- the wasm runtime the site's pages boot, built by this verb rather
 			     than borrowed: the assemble reads it through the site's `wasm/` links -->
 			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<RepoAssemble src="examples/bsx_site"/>
+			<RepoAssemble src="examples/website"/>
 			<RepoSync/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>

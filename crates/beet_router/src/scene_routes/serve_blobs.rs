@@ -202,7 +202,7 @@ mod test {
 
 	/// A serve route mounted at `mount`, serving the captured path from a
 	/// self-or-ancestor [`BlobStore`] (the [`ServeBlobs`] template expansion; the
-	/// `DirPath`-scoped subdir case is covered by `bsx_site` end to end).
+	/// `DirPath`-scoped subdir case is covered by `website` end to end).
 	fn serve_route(mount: &str) -> impl Bundle {
 		ServeBlobs {
 			prefix: mount.into(),

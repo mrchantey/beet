@@ -13,7 +13,8 @@
 //! wasm runtime its page boots land in memory and the on-disk fork left by a real
 //! session never leaks into a case; an entry that does not fork is served from
 //! its own directory. Either way the entry is built through the plain one-shot
-//! path the binary runs, its declared `<HttpServer>` booting on an OS port,
+//! path the binary runs, its declared `<HttpServer>` booting on an OS port
+//! (through the command an entry that is its own CLI serves its pages by),
 //! and the harness reads the url off the listener.
 //!
 //! Files in a `tests/` subdirectory are not compiled as their own test target,
@@ -83,14 +84,16 @@ impl BrowserHost {
 
 	/// Serve the entry at `entry` within `store` and open a tab on nothing
 	/// yet, its collectors attached, so the first [`Self::goto`] is watched
-	/// from its first byte. Fails unless the wasm runtime the page boots is
-	/// built, naming the recipe.
-	pub async fn serve(store: BlobStore, entry: &str) -> Self {
+	/// from its first byte. `command` is the route serving the pages of an
+	/// entry that is its own CLI (`serve`), empty for an entry whose root is
+	/// its server. Fails unless the wasm runtime the page boots is built,
+	/// naming the recipe.
+	pub async fn serve(store: BlobStore, entry: &str, command: &str) -> Self {
 		let runtime = AbsPath::new_workspace_rel(RUNTIME).unwrap();
 		if !fs_ext::exists(&runtime).unwrap_or_default() {
 			panic!("missing wasm runtime `{runtime}`, run `{BUILD_RECIPE}`");
 		}
-		let page = serve_entry(store.clone(), entry).await;
+		let page = serve_entry(store.clone(), entry, command).await;
 		let console = page.console().await.unwrap();
 		let responses = page.responses().await.unwrap();
 		Self {
@@ -215,12 +218,21 @@ impl BrowserHost {
 /// first server spawns: only the http server boots (a cli render would exit
 /// the app), on an OS port rather than the default so a suite never fights a
 /// running dev server.
-async fn serve_entry(store: BlobStore, entry: &str) -> PageHarness {
+///
+/// The load's own call is disarmed, since the process argv is the test
+/// runner's, and the harness dispatches `<command> --server=http` itself.
+async fn serve_entry(
+	store: BlobStore,
+	entry: &str,
+	command: &str,
+) -> PageHarness {
 	unsafe {
 		env_ext::set_var("BEET_SERVER", "http").unwrap();
 		env_ext::set_var("BEET_PORT", "0").unwrap();
 	}
 	let entry = entry.to_string();
+	let request =
+		Request::from_cli_str(&format!("{command} --server=http").trim());
 	PageHarness::serve_app(move |app| {
 		app.add_plugins((
 			RouterPlugin,
@@ -255,14 +267,17 @@ async fn serve_entry(store: BlobStore, entry: &str) -> PageHarness {
 				prescan,
 			)
 			.await?;
-			world
+			let root = world
 				.with(move |world: &mut World| {
 					entry_build::build_root(
-						world, repo_store, sources, RepoStore,
+						world,
+						repo_store,
+						sources,
+						(RepoStore, DisableCallOnReady),
 					)
-					.map(|_| ())
 				})
-				.await
+				.await?;
+			CallOnReady::call(world.entity(root), request).await
 		});
 	})
 	.await

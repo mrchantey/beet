@@ -1,4 +1,4 @@
-//! The live-TUI harness for the on-disk `bsx_site` example: the real `main.bsx`
+//! The live-TUI harness for the on-disk `website` example: the real `main.bsx`
 //! entry loaded from disk through a [`BlobStore`] over an [`FsStore`], booted into
 //! an in-process [`ChannelTerminal`] and navigated, asserting the rendered frame.
 //!
@@ -11,9 +11,9 @@ beet::test_main!();
 
 use beet::prelude::*;
 
-#[path = "bsx_site/mod.rs"]
-mod bsx_site;
-use bsx_site::build_site;
+#[path = "website/mod.rs"]
+mod website;
+use website::build_site;
 
 /// A booted live-TUI site app: the on-disk router + a page host + an in-world
 /// navigator, driven through a channel terminal.
@@ -30,7 +30,7 @@ fn sgr(button: u32, col: u32, row: u32, pressed: bool) -> Vec<u8> {
 }
 
 impl SiteHost {
-	/// Boot the on-disk `examples/bsx_site` site at `home` with a `size`-cell
+	/// Boot the on-disk `examples/website` site at `home` with a `size`-cell
 	/// viewport: build the markup entry into a router root (the same store-backed
 	/// load `build_site_root` runs), settle the async `<RoutesDir>` scan, then pair
 	/// a channel terminal with a page host and an in-world navigator on one surface,
@@ -167,7 +167,7 @@ async fn homepage_boots_with_chrome() {
 	let frame = host.step_until("ｓｉｔｅ");
 	// the `<SiteLayout>` chrome renders: the header brand and the sidebar. The
 	// brand is `title-large` (1.375rem), so on the terminal it renders fullwidth.
-	frame.as_str().xpect_contains("ＢＳＸ");
+	frame.as_str().xpect_contains("Ｂｅｅｔ");
 	// the terminal target seeds the dark scheme (no web color-scheme script).
 	host.has_class("dark-scheme").xpect_true();
 }

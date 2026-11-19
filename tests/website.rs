@@ -1,8 +1,8 @@
-//! The on-disk `bsx_site` example rendered as a fixture: its real `main.bsx`
+//! The on-disk `website` example rendered as a fixture: its real `main.bsx`
 //! entry, `templates/`, and `routes/` loaded through a [`BlobStore`] over an
 //! [`FsStore`] (the same store-backed build the `beet` binary runs), then served.
 //!
-//! Where `crates/beet_router/tests/bsx_site.rs` asserts the no-code mechanics from
+//! Where `crates/beet_router/tests/website.rs` asserts the no-code mechanics from
 //! inline `const` BSX, this proves the *committed example files* render: the home
 //! and a markdown route inside the layout, and the no-code counter's bindings
 //! painting. Mirrors `examples/rsx_site/tests/render.rs`'s
@@ -11,18 +11,17 @@ beet::test_main!();
 
 use beet::prelude::*;
 
-#[path = "bsx_site/mod.rs"]
-mod bsx_site;
-use bsx_site::build_site;
+#[path = "website/mod.rs"]
+mod website;
+use website::build_site;
 
 /// A world with the render substrate the on-disk site loads against, then the built
 /// site root and its dispatch router: `RouterPlugin` brings the BSX engine + spread
 /// server/middleware types (+ `AsyncPlugin`), `MaterialStylePlugin` the style rules
 /// the `<Theme>`/`<Rule>` declarations resolve against.
 ///
-/// The entry root is the *server* (`main.bsx` spreads its servers on the root),
-/// which parks on its `RunningSet` action rather than dispatching, so a render
-/// addresses the [`Router`] beneath it.
+/// The entry root is a command dispatcher whose `serve` route holds the servers,
+/// so a render addresses the [`Router`] that serves pages beneath it.
 async fn site_world() -> (World, Entity, Entity) {
 	let mut world =
 		(AsyncPlugin, RouterPlugin, material::MaterialStylePlugin).into_world();
@@ -47,9 +46,13 @@ async fn render(world: &mut World, router: Entity, path: &str) -> String {
 #[beet::test]
 async fn entry_lands_on_root() {
 	let (world, root, router) = site_world().await;
-	// the servers `main.bsx` declares own the entry root, the router is their child
+	// the entry root dispatches commands; the servers sit on the `serve` route,
+	// the site's router their child
 	world.entity(root).contains::<CallOnReady>().xpect_true();
-	world.entity(root).contains::<HttpServer>().xpect_true();
+	world.entity(root).contains::<CliServer>().xpect_true();
+	let serve = world.entity(router).get::<ChildOf>().unwrap().parent();
+	world.entity(serve).contains::<HttpServer>().xpect_true();
+	world.entity(serve).contains::<PathPartial>().xpect_true();
 	// the spread middleware stacks on the router beside its dispatch
 	world.entity(router).contains::<Router>().xpect_true();
 	world
@@ -62,7 +65,7 @@ async fn entry_lands_on_root() {
 		.resource::<PackageConfig>()
 		.title
 		.as_str()
-		.xpect_eq("BSX Site");
+		.xpect_eq("Beet Example");
 	// the on-disk routes assembled into the router's own url space, resolved from
 	// the held root rather than read off it: the tree lives on the `Router` child.
 	let tree = RouteTree::of(&world, root).unwrap();
@@ -86,7 +89,7 @@ async fn home_renders_in_layout() {
 		.xpect_contains("A site with no code")
 		.xpect_contains("Read the docs")
 		// the markup-declared title surfaces through the default head's og:site_name
-		.xpect_contains("BSX Site");
+		.xpect_contains("Beet Example");
 }
 
 #[beet::test]

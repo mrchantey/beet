@@ -41,8 +41,11 @@ use beet_ui::prelude::*;
 /// loads through (the site's `<ServeBlobs prefix="repo"/>`, so `/repo`; an
 /// absolute url reads another origin), `entry` the entry document within it,
 /// and `server` which of the entry's declared servers boot (`dom` paints the
-/// page; none boots the entry headless). A page naming no launch mounts a
-/// module that boots on its own.
+/// page; none boots the entry headless). `route` names the command serving
+/// the page when the entry is its own CLI (`serve` under a `<CliServer>`
+/// root): the process dispatches it, opening at the page's own url rather
+/// than dispatching that. A page naming no launch mounts a module that boots
+/// on its own.
 ///
 /// `js` defaults to `src` with its `.wasm` extension swapped for `.js` (the
 /// wasm-bindgen pair `build-wasm` emits), so a page need only name the `.wasm`.
@@ -58,6 +61,7 @@ use beet_ui::prelude::*;
 ///
 /// ```bsx
 /// <Wasm src="/wasm/beet-ui.wasm" repo="/repo" entry="scene_editor.bsx" server="dom" boot="intent"/>
+/// <Wasm src="/wasm/beet-ui.wasm" repo="/repo" entry="main.bsx" server="dom" route="serve"/>
 /// ```
 #[template]
 pub fn Wasm(
@@ -74,6 +78,10 @@ pub fn Wasm(
 	entry: Option<SmolStr>,
 	/// The `--server` selection the entry boots with, eg `dom`.
 	server: Option<SmolStr>,
+	/// The entry's command serving the page, eg `serve`, for an entry whose
+	/// root is a `CliServer` dispatcher.
+	#[prop(default)]
+	route: SmolStr,
 	/// When the wasm loads: at once, or on intent.
 	#[prop(default)]
 	boot: BootPolicy,
@@ -95,8 +103,8 @@ pub fn Wasm(
 	};
 	// the bootstrap only when the page names a launch: a module booting on its
 	// own gets no empty script to find
-	let bootstrap = (launch != BootstrapConfig::default())
-		.then(|| launch.to_script())
+	let bootstrap = (launch != BootstrapConfig::default() || !route.is_empty())
+		.then(|| launch.to_script(&route))
 		.transpose()?;
 	// a dynamic import (not a static one) so a missing `start` is a `undefined`
 	// property rather than a module-resolution failure. `default` is the glue's
@@ -236,5 +244,21 @@ mod test {
 			.id();
 		render(&mut world, root)
 			.xpect_contains("--entry=hello.bsx --repo=https://beet.org/repo<");
+	}
+
+	// `<Wasm route>` leads the launch with the command serving the page, so
+	// an entry that is its own CLI dispatches it in the browser too.
+	#[beet_core::test]
+	fn wasm_leads_with_the_route() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let root = world
+			.spawn_template(rsx! {
+				<Wasm src="/wasm/beet-ui.wasm" repo="/repo" entry="main.bsx" server="dom" route="serve"/>
+			})
+			.unwrap()
+			.id();
+		render(&mut world, root).xpect_contains(
+			">serve --entry=main.bsx --repo=http:repo --server=dom</script>",
+		);
 	}
 }

@@ -775,12 +775,12 @@ mod test {
 		// the way a `load/*scene` handler reconstructs its captured value
 		parts.path_from(1).join("/").xpect_eq("/abs/scene.json");
 		// a relative positional still splits into route segments
-		RequestParts::from(CliArgs::parse("serve examples/bsx_site"))
+		RequestParts::from(CliArgs::parse("serve examples/website"))
 			.path()
 			.xpect_eq(vec![
 				"serve".to_string(),
 				"examples".to_string(),
-				"bsx_site".to_string(),
+				"website".to_string(),
 			]);
 	}
 

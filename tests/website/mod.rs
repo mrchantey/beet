@@ -1,11 +1,11 @@
-//! Shared loader for the on-disk `examples/bsx_site` no-code example, used by the
-//! project-level `bsx_site` render and `bsx_site_tui` live-terminal test suites.
+//! Shared loader for the on-disk `examples/website` no-code example, used by the
+//! project-level `website` render and `website_tui` live-terminal test suites.
 //!
 //! Files in a `tests/` subdirectory are not compiled as their own test target, so
 //! this module is `#[path]`-included by both suites rather than run on its own.
 use beet::prelude::*;
 
-/// Build the on-disk `examples/bsx_site` site into a router root on `world`,
+/// Build the on-disk `examples/website` site into a router root on `world`,
 /// returning it. The store-backed load the `beet` binary's `build_entry_root`
 /// runs, in miniature: pre-scan the entry's declared `<TemplateDir>`s and register
 /// their templates (so entry-level tags like `<Styles/>` resolve), parse the
@@ -21,7 +21,7 @@ use beet::prelude::*;
 pub async fn build_site(world: &mut World) -> Entity {
 	world.insert_resource(pkg_config!());
 	let store = BlobStore::new(FsStore::new(
-		AbsPath::new_workspace_rel("examples/bsx_site").unwrap(),
+		AbsPath::new_workspace_rel("examples/website").unwrap(),
 	));
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
 	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();

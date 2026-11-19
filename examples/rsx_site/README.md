@@ -1,7 +1,7 @@
 # rsx_site
 
 A deliberately small **typed** beet site, demonstrating the Rust authoring path
-that the no-code `examples/bsx_site` (and the canonical top-level `site/`) does
+that the no-code `examples/website` (and the canonical top-level `site/`) does
 not exercise. It is the compiled counterpart to the no-code `site/`.
 
 Routes exercising the interesting typed mechanisms, scanned from three

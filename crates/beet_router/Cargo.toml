@@ -220,8 +220,8 @@ beet_net = { workspace = true, features = ["ureq", "server"] }
 # required-features = ["interface"]
 
 [[test]]
-name = "bsx_site"
-path = "tests/bsx_site.rs"
+name = "website"
+path = "tests/website.rs"
 harness = false
 # `template_serde` wires the `<Template src>` include handler (the
 # `main_bsx_include_co_resides_boot_with_server` case); without it the tag falls

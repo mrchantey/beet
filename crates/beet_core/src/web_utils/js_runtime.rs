@@ -366,11 +366,14 @@ pub fn remove(path: &str) -> FsResult {
 }
 
 /// The wasm equivalent of process argv (excluding the program name): the deno
-/// runner's `Deno.args` when present, else the browser location's path + query as
-/// CLI args ([`search_params_ext::location_args`]) followed by the page's
-/// bootstrap script ([`bootstrap_args`]), else empty (a Worker has neither). The
-/// global check comes first since deno also polyfills a `window`, so a deno run
-/// must not fall to the browser path.
+/// runner's `Deno.args` when present, else the browser location as CLI args
+/// followed by the page's bootstrap script ([`bootstrap_args`]), else empty (a
+/// Worker has neither). The location is its path + query as positionals and
+/// flags ([`search_params_ext::location_args`]), unless the script names the
+/// command the page is served by, which the location then opens at as one
+/// `--path` ([`search_params_ext::location_path_args`]), as a terminal does with
+/// `serve --server=tui --path=..`. The global check comes first since deno also
+/// polyfills a `window`, so a deno run must not fall to the browser path.
 ///
 /// This is the single wasm arg decision; [`env_ext::args`](crate::prelude::env_ext)
 /// delegates here rather than branching itself.
@@ -379,8 +382,13 @@ pub fn args() -> Vec<SmolStr> {
 		return js_strings(&raw::env_args());
 	}
 	if environment() == JsEnvironment::Browser {
-		let mut args = search_params_ext::location_args();
-		args.extend(bootstrap_args());
+		let bootstrap = bootstrap_args();
+		let mut args = match bootstrap.iter().any(|arg| !arg.starts_with("--"))
+		{
+			true => search_params_ext::location_path_args(),
+			false => search_params_ext::location_args(),
+		};
+		args.extend(bootstrap);
 		return args;
 	}
 	Vec::new()
@@ -388,7 +396,8 @@ pub fn args() -> Vec<SmolStr> {
 
 /// The launch the served page describes: the argv of its
 /// `<script type="application/vnd.beet.bootstrap">`
-/// ([`BootstrapConfig::to_script`]), empty for a page carrying none. Appended
+/// ([`BootstrapConfig::to_script`], led by the command a page served by one
+/// names), empty for a page carrying none. Appended
 /// after the location's own args, so the page's `--entry`/`--repo`/`--server`
 /// reach [`BootstrapConfig::get`] and the entry's start request through the
 /// one channel every target reads, while the location keeps naming the page.

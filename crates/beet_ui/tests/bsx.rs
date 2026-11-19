@@ -866,9 +866,9 @@ async fn scoped_counter_page() {
 	render_html(&mut world, root).xpect_contains("clicked 1 times");
 }
 
-// ---- live TUI counter (the `bsx_site` no-code example) -----------------------
+// ---- live TUI counter (the `website` no-code example) -----------------------
 
-/// The `examples/bsx_site/routes/counter.bsx` markup, the no-code example: a
+/// The `examples/website/routes/counter.bsx` markup, the no-code example: a
 /// scoped document, a display binding, and two event scripts mutating it.
 #[cfg(all(feature = "tui", feature = "scripting"))]
 const COUNTER_BSX: &str = r#"<article bx:scope="counter">

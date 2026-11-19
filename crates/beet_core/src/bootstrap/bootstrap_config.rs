@@ -435,13 +435,38 @@ impl BootstrapConfig {
 	}
 
 	/// This launch as the text of a served page's bootstrap script, the
-	/// [`to_argv`](Self::to_argv) tokens space-joined (each is whitespace-free
-	/// by construction), read back by [`script_argv`](Self::script_argv). A
-	/// page renders it in a `<script type="application/vnd.beet.bootstrap">`
+	/// `command` route's segments then the [`to_argv`](Self::to_argv) tokens,
+	/// space-joined (each is whitespace-free by construction), read back by
+	/// [`script_argv`](Self::script_argv). A page renders it in a
+	/// `<script type="application/vnd.beet.bootstrap">`
 	/// ([`SCRIPT_TYPE`](Self::SCRIPT_TYPE)) beside its module loader, and the
 	/// browser process appends it to the location's own argv.
-	pub fn to_script(&self) -> Result<String> {
-		self.to_argv()?.join(" ").xok()
+	///
+	/// `command` is the route of an entry that is its own CLI which serves the
+	/// page, ie `serve`, empty for an entry whose root is its server. A page
+	/// naming one opens at its location rather than dispatching it, see
+	/// `js_runtime::args`.
+	pub fn to_script(&self, command: &str) -> Result<String> {
+		Self::command_tokens(command)?
+			.into_iter()
+			.chain(self.to_argv()?)
+			.collect::<Vec<_>>()
+			.join(" ")
+			.xok()
+	}
+
+	/// The positional tokens of `command`, a route of an entry that is its own
+	/// CLI (`serve`, `tools/serve`), one per segment and each validated like an
+	/// argv token; none for an empty command.
+	fn command_tokens(command: &str) -> Result<Vec<SmolStr>> {
+		command
+			.split('/')
+			.filter(|segment| !segment.is_empty())
+			.map(|segment| {
+				Self::validate_token(segment)?;
+				SmolStr::from(segment).xok()
+			})
+			.collect()
 	}
 
 	/// The argv a bootstrap script's text carries, the inverse of
@@ -498,16 +523,19 @@ impl BootstrapConfig {
 		pairs
 	}
 
-	/// `[binary, ..to_argv()]` as a JSON array, the container `CMD` form.
+	/// `[binary, ..to_argv(), ..command]` as a JSON array, the container
+	/// `CMD` form, `command` the route an entry that is its own CLI boots
+	/// (`serve`), empty for an entry whose root is its server.
 	///
 	/// Correct by construction: every element is validated by
-	/// [`to_argv`](Self::to_argv) (and `binary` by the same charset), so no
-	/// element can carry a quote, backslash or control character needing an
-	/// escape.
-	pub fn to_cmd_json(&self, binary: &str) -> Result<String> {
+	/// [`to_argv`](Self::to_argv) (and `binary` and `command` by the same
+	/// charset), so no element can carry a quote, backslash or control
+	/// character needing an escape.
+	pub fn to_cmd_json(&self, binary: &str, command: &str) -> Result<String> {
 		Self::validate_token(binary)?;
 		let elements = core::iter::once(SmolStr::from(binary))
 			.chain(self.to_argv()?)
+			.chain(Self::command_tokens(command)?)
 			.map(|token| format!("\"{token}\""))
 			.collect::<Vec<_>>()
 			.join(", ");
@@ -796,7 +824,7 @@ mod test {
 			entry: Some("say\"hi\"".into()),
 			..default()
 		}
-		.to_cmd_json("/app")
+		.to_cmd_json("/app", "")
 		.unwrap_err()
 		.to_string()
 		.xpect_contains("cannot be rendered");
@@ -809,9 +837,17 @@ mod test {
 			server: Some(ServerFilter::new("http,ssh")),
 			..default()
 		}
-		.to_cmd_json("/app")
+		.to_cmd_json("/app", "")
 		.unwrap()
 		.xpect_eq(r#"["/app", "--repo=s3://site", "--server=http,ssh"]"#);
+		// an entry that is its own CLI boots its command, trailing every flag
+		BootstrapConfig {
+			server: Some(ServerFilter::new("http")),
+			..default()
+		}
+		.to_cmd_json("/app", "serve")
+		.unwrap()
+		.xpect_eq(r#"["/app", "--server=http", "serve"]"#);
 	}
 
 	/// Boot selection rides argv, ambient service config rides env, and the
@@ -896,7 +932,7 @@ mod test {
 			server: Some(ServerFilter::new("dom")),
 			..default()
 		};
-		let script = launch.to_script().unwrap();
+		let script = launch.to_script("").unwrap();
 		script.xpect_eq(
 			"--entry=scene_editor.bsx --repo=http:examples/ui --server=dom",
 		);
@@ -914,6 +950,35 @@ mod test {
 		let filter = ServerFilter::from_params(&args.params).unwrap();
 		filter.passes("dom").xpect_true();
 		filter.passes("tui").xpect_false();
+	}
+
+	/// A page served by an entry's command leads its script with that
+	/// command, and with the location as the opening route the request
+	/// dispatches the command rather than the page.
+	#[crate::test]
+	fn script_leads_with_the_command() {
+		let launch = BootstrapConfig {
+			entry: Some("main.bsx".into()),
+			server: Some(ServerFilter::new("dom")),
+			..default()
+		};
+		let script = launch.to_script("serve").unwrap();
+		script.xpect_eq("serve --entry=main.bsx --server=dom");
+		let mut argv = vec![SmolStr::new("--path=/docs?color-scheme=dark")];
+		argv.extend(BootstrapConfig::script_argv(&script));
+		let args = CliArgs::parse_tokens(argv);
+		args.path.xpect_eq(vec![SmolStr::new("serve")]);
+		BootstrapConfig::parse(&args.params, &|_| None)
+			.unwrap()
+			.path
+			.xpect_eq(Some("/docs?color-scheme=dark".into()));
+		// a nested command is one positional per segment, and a segment the
+		// script cannot carry is refused
+		launch
+			.to_script("tools/serve")
+			.unwrap()
+			.xpect_starts_with("tools serve --entry");
+		launch.to_script("my serve").unwrap_err();
 	}
 
 	/// The process request keeps only the knobs a server reads at request

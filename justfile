@@ -137,6 +137,16 @@ site-social *args:
 # are declarations rather than strays.
 site-audit *args:
   cargo run -p beet-cli --features infra,extra,atproto -- --entry=site audit "$@"
+# The example website (`examples/website`, https://example.beet.org), every
+# command its entry declares: `just example serve --server=http` to serve it,
+# `assets` to borrow and derive its icons, cards and images, `deploy|sync|watch
+# --stage=prod` for its lambda stack, `social deploy|probe --stage=prod` for its
+# handle record and `social publish --only=<slug> --announce=<slug>` for its
+# blog. Prod only: its hostname and handle record publish from no other stage.
+# `infra,extra` link the deploy verbs and `atproto` the social ones, one build
+# for all of them.
+example *args:
+  cargo run -p beet-cli --features infra,extra,atproto -- --entry=examples/website "$@"
 # There is no mint recipe: the deploy credentials (`<AwsDeployCredential/>`,
 # `<CloudflareDeployCredential/>`) are kept in line with the declarations by an
 # elevated deploy. Any deploy recipe above takes `--elevated`, which asks for the
@@ -426,19 +436,21 @@ check-wasm-boot *args:
 test-browser *args:
 	cargo test -p beet_net --features webdriver,testing --lib {{ args }} -- --include-ignored --include '*webdriver*'
 	just build-wasm-ui
-	just _test-bsx-site-browser {{ args }}
+	just _test-website-browser {{ args }}
 	just _test-scene-editor-browser {{ args }}
 
-# The bsx_site example in a real browser: build `beet-ui.wasm` (what its page
-# boots), serve the example as the binary does, prove every route's served page
-# is adopted untouched and the counter counts in the tab. Needs chromedriver + a
-# chromium on PATH.
-test-bsx-site-browser *args:
+# The website example in a real browser: build `beet-ui.wasm` (what its page
+# boots), borrow and derive the example's assets (its pages link them, and a
+# missing one fails the run), serve the example as the binary does, prove every
+# route's served page is adopted untouched and the counter counts in the tab.
+# Needs chromedriver + a chromium on PATH, and `./assets` hydrated.
+test-website-browser *args:
 	just build-wasm-ui
-	just _test-bsx-site-browser {{ args }}
+	just _test-website-browser {{ args }}
 
-_test-bsx-site-browser *args:
-	cargo test --test bsx_site_browser --features "router style markdown fs http_server template_serde testing webdriver" {{ args }} -- --include-ignored
+_test-website-browser *args:
+	just example assets
+	cargo test --test website_browser --features "router style markdown fs http_server template_serde testing webdriver" {{ args }} -- --include-ignored
 
 # The scene editor example in a real browser, the terminal suite's twin: build
 # `beet-ui.wasm`, serve the example as the binary does and drive the editor in

@@ -1,7 +1,7 @@
 use beet::prelude::*;
 
 /// A reactive counter, the Rust-authored mirror of the no-code `counter.bsx`
-/// page in `examples/bsx_site`.
+/// page in `examples/website`.
 ///
 /// State is a single typed document atom ([`TypedFieldRef`]); the display reads
 /// it in markup (`{count}`), and each button's `PointerUp` observer mutates it

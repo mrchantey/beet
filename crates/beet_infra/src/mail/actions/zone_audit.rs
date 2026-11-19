@@ -38,9 +38,10 @@ pub enum ZoneAuditScope {
 )]
 #[reflect(Default)]
 pub struct AllowedRecord {
-	/// The record name, ie `beetmash.com`. A leading `*.` matches any label in
-	/// that position, which is how a computed selector is allowed without
-	/// pinning the token.
+	/// The record name, ie `beetmash.com`, matched as a glob: a `*` matches
+	/// any run of characters, dots included, so a computed selector is
+	/// allowed without pinning its token and `*.x.com` covers every name
+	/// beneath `x.com`.
 	name: SmolStr,
 	/// The record type, or empty for every type at this name.
 	record_type: SmolStr,

@@ -3,13 +3,20 @@
 # `./site/assets` from `beet-site--shared--assets` (`just site-shared pull`).
 # The pattern is unanchored, so it covers both.
 assets
+# the example website's assets: its logo is its own, everything else borrowed
+# from `./assets` or derived (`just example assets`)
+!examples/website/assets
+examples/website/assets/*
+!examples/website/assets/logo
+examples/website/assets/logo/*
+!examples/website/assets/logo/logo.svg
 .agents/*
 !.agents/skills
 .claude
 .playwright-cli
 .beet/infra
 out.txt
-examples/bsx_site/dist
+examples/website/dist
 site/dist
 examples/thread/persistent_chat.json
 examples/router/router_serde.json

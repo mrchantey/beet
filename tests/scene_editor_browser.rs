@@ -87,7 +87,7 @@ impl SceneHost {
 	/// for.
 	async fn new() -> Self {
 		let store = BrowserHost::seeded_store(ENTRY_DIR, SEEDED).await;
-		let mut host = Self(BrowserHost::serve(store, ENTRY).await);
+		let mut host = Self(BrowserHost::serve(store, ENTRY, "").await);
 		host.goto("/").await;
 		host.find_text("Garden").await;
 		host

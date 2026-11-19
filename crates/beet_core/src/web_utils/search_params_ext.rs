@@ -79,28 +79,25 @@ fn args_from_location(pathname: &str, search: &str) -> Vec<SmolStr> {
 	args
 }
 
-#[cfg(test)]
-mod test {
-	use super::args_from_location;
-	use crate::prelude::*;
+/// The location as the opening route of a page that names the command it is
+/// served by: one `--path` flag holding the path and query, ie
+/// `example.com/docs?color-scheme=dark` yields `["--path=/docs?color-scheme=dark"]`,
+/// rather than [`location_args`]' positionals, which would name a command.
+pub fn location_path_args() -> Vec<SmolStr> {
+	let location = current_window().location();
+	path_args_from_location(
+		&location.pathname().unwrap_or_default(),
+		&location.search().unwrap_or_default(),
+	)
+}
 
-	/// A location's path becomes positionals and its query becomes `--key=value`
-	/// flags, the browser equivalent of process argv.
-	#[crate::test]
-	fn converts_location_to_args() {
-		args_from_location("/foo/bar.png", "?bazz=boo&boom=boo").xpect_eq(
-			vec![
-				SmolStr::new("foo"),
-				SmolStr::new("bar.png"),
-				SmolStr::new("--bazz=boo"),
-				SmolStr::new("--boom=boo"),
-			],
-		);
-		// a bare flag and an empty path/query degrade cleanly.
-		args_from_location("/", "?verbose")
-			.xpect_eq(vec![SmolStr::new("--verbose")]);
-		args_from_location("", "").xpect_eq(Vec::<SmolStr>::new());
-	}
+/// The pure core of [`location_path_args`], testable off a browser.
+fn path_args_from_location(pathname: &str, search: &str) -> Vec<SmolStr> {
+	let pathname = match pathname.is_empty() {
+		true => "/",
+		false => pathname,
+	};
+	vec![format!("--path={pathname}{search}").into()]
 }
 
 /// Whether the query string contains `key`.
@@ -279,5 +276,40 @@ mod tests {
 		tags[0].xpect_eq("a".to_string());
 		tags[1].xpect_eq("b".to_string());
 		tags[2].xpect_eq("c".to_string());
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use crate::prelude::*;
+
+	/// A location's path becomes positionals and its query becomes `--key=value`
+	/// flags, the browser equivalent of process argv.
+	#[crate::test]
+	fn converts_location_to_args() {
+		args_from_location("/foo/bar.png", "?bazz=boo&boom=boo").xpect_eq(
+			vec![
+				SmolStr::new("foo"),
+				SmolStr::new("bar.png"),
+				SmolStr::new("--bazz=boo"),
+				SmolStr::new("--boom=boo"),
+			],
+		);
+		// a bare flag and an empty path/query degrade cleanly.
+		args_from_location("/", "?verbose")
+			.xpect_eq(vec![SmolStr::new("--verbose")]);
+		args_from_location("", "").xpect_eq(Vec::<SmolStr>::new());
+	}
+
+	/// A page naming its command opens at its location, path and query
+	/// together, rather than dispatching it.
+	#[crate::test]
+	fn converts_location_to_an_opening_route() {
+		path_args_from_location("/docs/form", "?color-scheme=dark").xpect_eq(
+			vec![SmolStr::new("--path=/docs/form?color-scheme=dark")],
+		);
+		path_args_from_location("", "")
+			.xpect_eq(vec![SmolStr::new("--path=/")]);
 	}
 }

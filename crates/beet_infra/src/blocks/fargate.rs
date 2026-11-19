@@ -67,6 +67,13 @@ pub struct FargateBlock {
 	/// render time, so a caller never sets them.
 	#[serde(default)]
 	bootstrap: BootstrapConfig,
+	/// The route the container boots, trailing the `CMD`'s flags, for an entry
+	/// whose root is a `CliServer` dispatcher (`serve`): a deployed site says
+	/// which of its routes IS the site. Empty for an entry whose root is its
+	/// server.
+	#[serde(default)]
+	#[set_with(into)]
+	exec_route: SmolStr,
 	/// DNS + HTTPS configuration, one entry per hostname the NLB answers. When
 	/// non-empty, a single ACM certificate is provisioned covering every
 	/// authority (the first is the cert's primary domain, the rest are subject
@@ -128,6 +135,7 @@ impl Default for FargateBlock {
 			container_image: ContainerImage::default(),
 			env_vars: Vec::new(),
 			bootstrap: default(),
+			exec_route: default(),
 		}
 	}
 }
@@ -1301,9 +1309,13 @@ mod tests {
 			stage: "staging".into(),
 			..default()
 		});
-		block.cmd_bootstrap().to_cmd_json("/app").unwrap().xpect_eq(
-			r#"["/app", "--repo=s3://beet--dev--app", "--server=http,ssh"]"#,
-		);
+		block
+			.cmd_bootstrap()
+			.to_cmd_json("/app", "")
+			.unwrap()
+			.xpect_eq(
+				r#"["/app", "--repo=s3://beet--dev--app", "--server=http,ssh"]"#,
+			);
 		build_json(&block)
 			.as_str()
 			.xnot()
