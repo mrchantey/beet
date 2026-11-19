@@ -1,0 +1,18 @@
+<!-- A BSX page: site templates by module path, document state, and event scripts. -->
+<article bx:scope="counter">
+	<h1>The beet counter</h1>
+	<p>
+		Count the beets you eat today, and check the
+		<a href="/guides/moderation">moderation guide</a> before the number gets
+		silly. This page composes the site's own <code>widgets::Card</code>
+		template and changes a document field from a one-line event script, no
+		rust required.
+	</p>
+	<widgets::Card title="Today">
+		<p>Beets eaten today: {@doc:count=0}</p>
+		<div class="design-row">
+			<button class="btn btn-filled" bx:click="target.with_field('count', count => count + 1)">Ate one</button>
+			<button class="btn btn-tonal" bx:click="target.with_field('count', count => count - 1)">Put one back</button>
+		</div>
+	</widgets::Card>
+</article>

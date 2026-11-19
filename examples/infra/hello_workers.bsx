@@ -1,7 +1,7 @@
 <!--
 # Hello Cloudflare Workers — the real beet site
 
-Deploys the actual beet `site/` (not the smaller `examples/website`) to a Cloudflare
+Deploys the actual beet `site/` (not the smaller `examples/beetmania`) to a Cloudflare
 Worker, where the Worker IS `beet-cli` compiled to wasm (`--features cloudflare`): one
 binary for every target, native on Fargate/Lightsail/Lambda/Containers, wasm here. The
 Worker reads the site from R2 through the native `worker::Bucket` binding (no S3

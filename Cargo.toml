@@ -903,27 +903,27 @@ path = "tests/thread_scenes.rs"
 harness = false
 required-features = ["thread", "router", "fs", "tui_server", "ssh_tui", "testing"]
 
-# The no-code `examples/website` example, loaded on-disk and rendered/navigated
+# The no-code `examples/beetmania` example, loaded on-disk and rendered/navigated
 # through `beet`'s public API. The example is pure `.bsx`/`.md` (not a crate); its
-# render + live-tui suites live here, run via `beet --entry=examples/website/main.bsx`.
+# render + live-tui suites live here, run via `beet --entry=examples/beetmania/main.bsx`.
 [[test]]
-name = "website"
-path = "tests/website.rs"
+name = "beetmania"
+path = "tests/beetmania.rs"
 harness = false
 required-features = ["router", "style", "markdown", "fs", "http_server", "testing"]
 
 [[test]]
-name = "website_tui"
-path = "tests/website_tui.rs"
+name = "beetmania_tui"
+path = "tests/beetmania_tui.rs"
 harness = false
 required-features = ["router", "style", "markdown", "fs", "tui_server", "quickjs", "testing"]
 
 # the browser half: the served page boots the wasm binary on the same entry,
 # every route adopts untouched and the counter counts in the tab. Needs the built
-# runtime, `just test-website-browser`.
+# runtime, `just test-beetmania-browser`.
 [[test]]
-name = "website_browser"
-path = "tests/website_browser.rs"
+name = "beetmania_browser"
+path = "tests/beetmania_browser.rs"
 harness = false
 required-features = ["router", "style", "markdown", "fs", "http_server", "template_serde", "testing", "webdriver"]
 

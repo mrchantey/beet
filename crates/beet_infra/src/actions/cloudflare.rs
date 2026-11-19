@@ -556,7 +556,7 @@ fn worker_wrangler_json(
 ])
 .with_bucket(|entity| entity.get::<Self>().map(|sync| sync.bucket.clone())))]
 pub async fn CloudflareR2Sync(
-	/// Local directory to publish (cwd-relative), eg `examples/website`.
+	/// Local directory to publish (cwd-relative), eg `examples/beetmania`.
 	#[field]
 	local_dir: SmolPath,
 	/// Target R2 bucket.
@@ -1014,7 +1014,7 @@ mod test {
 	fn the_sync_names_its_bucket() {
 		let mut world = World::new();
 		let sync = world
-			.spawn(CloudflareR2Sync::new("examples/website", "site"))
+			.spawn(CloudflareR2Sync::new("examples/beetmania", "site"))
 			.id();
 		let access = CloudflareAccess::of(world.entity(sync)).unwrap();
 		access

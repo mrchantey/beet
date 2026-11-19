@@ -204,12 +204,12 @@ allowlist below holds only what NOTHING here declares, each row a decision with
 a reason. `--fix` deletes the strays rather than reporting them. The audit is
 run from the `atproto` build too, so the handle records count as declared.
 
-`example.beet.org` is delegated whole to `examples/website`, whose own entry
+`beetmania.beet.org` is delegated whole to `examples/beetmania`, whose own entry
 declares and deploys every record under it (its hostname, its certificate's
-validation records, its `_atproto` handle). The allowlist names the subdomain
-rather than its records, so the example adds a record without this entry
-restating it, and the audit never loads another entry's tree to learn what it
-holds.
+validation records, its `_atproto` handle), and with it the handle record of
+its contributor, `beetlover.beet.org`. The allowlist names the subdomain rather
+than its records, so the example adds a record without this entry restating
+it, and the audit never loads another entry's tree to learn what it holds.
 
     just site-social deploy --stage=prod   # publish the handle records
     just site-social probe --stage=prod    # after the claim: does each handle resolve
@@ -620,10 +620,12 @@ binary serves the records and the comments (`atproto`).
 		<ZoneAudit scope="Zone" allowed={[
 			{name:"beet.org", record_type:"TXT",
 				reason:"google search console domain verification, hand-created"},
-			{name:"example.beet.org", record_type:"",
-				reason:"the example website's hostname, declared by examples/website"},
-			{name:"*.example.beet.org", record_type:"",
-				reason:"the example website's handle and validation records, declared by examples/website"},
+			{name:"beetmania.beet.org", record_type:"",
+				reason:"beetmania's hostname, declared by examples/beetmania"},
+			{name:"*.beetmania.beet.org", record_type:"",
+				reason:"beetmania's handle record and certificate validation records, declared by examples/beetmania"},
+			{name:"_atproto.beetlover.beet.org", record_type:"TXT",
+				reason:"the handle of beetmania's contributor account, declared by examples/beetmania"},
 		]}/>
 	</Route>
 </Router>

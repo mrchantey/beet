@@ -1,12 +1,12 @@
 <!--
 # Hello Cloudflare Workers
 
-Deploys `examples/website` to a Cloudflare Worker, where the Worker IS `beet-cli`
+Deploys `examples/beetmania` to a Cloudflare Worker, where the Worker IS `beet-cli`
 compiled to wasm (`--features cloudflare`): one binary for every target, native on
 Fargate/Lightsail/Lambda/Containers, wasm here. The Worker reads the site from R2
 through the native `worker::Bucket` binding (no S3 credentials at runtime), renders
 per request through the url space that serves the example's pages (its `serve`
-command's router), and serves on `<name>.workers.dev`. Run `just example assets`
+command's router), and serves on `<name>.workers.dev`. Run `just beetmania assets`
 first, so the files the site borrows and derives are in the directory it syncs.
 
 The two resources are the Worker and the R2 bucket holding the site, one
@@ -60,7 +60,7 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
 		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-		<CloudflareR2Sync local_dir="examples/website" bucket="beet-hello-site"/>
+		<CloudflareR2Sync local_dir="examples/beetmania" bucket="beet-hello-site"/>
 		<!-- the Cloudflare rollout is instant, so tail briefly then exit -->
 		<CloudflareWatch name="beet-hello-worker" timeout="10s"/>
 	</Route>
@@ -68,7 +68,7 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
 		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-		<CloudflareR2Sync local_dir="examples/website" bucket="beet-hello-site"/>
+		<CloudflareR2Sync local_dir="examples/beetmania" bucket="beet-hello-site"/>
 	</Route>
 	<!-- time a sync against a full rebuild + redeploy; add `url="https://
 	     beet-hello-worker.<subdomain>.workers.dev"` to also time the live fetch -->
@@ -76,7 +76,7 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
 		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-		<CloudflareBench name="beet-hello-worker" bucket="beet-hello-site" local_dir="examples/website"/>
+		<CloudflareBench name="beet-hello-worker" bucket="beet-hello-site" local_dir="examples/beetmania"/>
 	</Route>
 	<Route path="destroy" {ExchangeSequence}>
 		<!-- empties the whole bucket before deleting it -->

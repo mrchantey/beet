@@ -13,9 +13,9 @@ use beet::prelude::*;
 /// [`DiagnosticsManifest`] of what a future editor would validate and autocomplete.
 ///
 /// ```sh
-/// beet check examples/website                          # exit 0 if clean, non-zero on an error
-/// beet check examples/website --manifest out.json      # also dump the manifest to a file
-/// beet check examples/website --manifest=-             # ..or to stdout (then the summary)
+/// beet check examples/beetmania                          # exit 0 if clean, non-zero on an error
+/// beet check examples/beetmania --manifest out.json      # also dump the manifest to a file
+/// beet check examples/beetmania --manifest=-             # ..or to stdout (then the summary)
 /// ```
 #[action(route = "check/*entry")]
 #[derive(Component, Reflect)]

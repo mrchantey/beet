@@ -28,7 +28,7 @@ pub struct CloudflareContainerBlock {
 	/// `None`, resolved from `--port` / `BEET_PORT` or
 	/// [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT) (8337) via
 	/// [`port`](Self::port). Must match the served site's markup `HttpServer{port}`
-	/// (the same default `website` declares and `FargateBlock` uses).
+	/// (the same default `beetmania` declares and `FargateBlock` uses).
 	#[get(skip)]
 	#[set_with(unwrap_option)]
 	app_port: Option<u16>,

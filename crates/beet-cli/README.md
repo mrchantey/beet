@@ -16,8 +16,8 @@ parks its boot call to keep the process alive.
 There is no built-in command, route, host, or retained state. The dev commands
 below are capabilities the repo's own `main.bsx` wires as routes, so
 `beet run-wasm <module>` discovers that entry and dispatches the route. A no-code
-site (eg `examples/website`) declares its own servers and commands in markup, so
-`cd examples/website && beet serve --server=http` serves it.
+site (eg `examples/beetmania`) declares its own servers and commands in markup, so
+`cd examples/beetmania && beet serve --server=http` serves it.
 
 | Capability | Description |
 |------------|-------------|
@@ -36,7 +36,7 @@ site (eg `examples/website`) declares its own servers and commands in markup, so
 cargo install --path crates/beet-cli
 
 beet run-wasm <module.wasm>               # eg the wasm test runner
-cd examples/website && beet serve --server=http
+cd examples/beetmania && beet serve --server=http
 ```
 
 ## Entries

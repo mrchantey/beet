@@ -12,8 +12,8 @@ const DIST_DIR: &str = "dist";
 /// entry's root element is built into it), so it exports directly.
 ///
 /// ```sh
-/// beet export-static examples/website             # writes examples/website/dist
-/// beet export-static examples/website --out=public # ..or a chosen output dir (cwd-relative)
+/// beet export-static examples/beetmania             # writes examples/beetmania/dist
+/// beet export-static examples/beetmania --out=public # ..or a chosen output dir (cwd-relative)
 /// ```
 #[action(route = "export-static/*entry")]
 #[derive(Component, Reflect)]

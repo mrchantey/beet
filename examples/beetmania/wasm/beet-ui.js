@@ -1,0 +1,1 @@
+../../../target/wasm/beet-ui.js

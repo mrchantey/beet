@@ -1,0 +1,284 @@
+//! The live-TUI harness for the on-disk `beetmania` example: the real `main.bsx`
+//! entry loaded from disk through a [`BlobStore`] over an [`FsStore`], booted into
+//! an in-process [`ChannelTerminal`] and navigated, asserting the rendered frame.
+//!
+//! The no-code twin of `examples/rsx_site/tests/tui.rs`: same `PageHost::bundle` +
+//! `Navigator` + channel-terminal harness, but the router is the example's markup
+//! loaded from disk (the binary's `--server=tui` path) rather than a Rust
+//! `rsx_site_router()`. Headless and deterministic, the behavioral gate the binary
+//! cannot be in a sandbox.
+beet::test_main!();
+
+use beet::prelude::*;
+
+#[path = "beetmania/mod.rs"]
+mod beetmania;
+use beetmania::build_site;
+
+/// A booted live-TUI site app: the on-disk router + a page host + an in-world
+/// navigator, driven through a channel terminal.
+struct SiteHost {
+	app: App,
+	host: Entity,
+}
+
+/// An SGR mouse sequence: button `button` at 0-indexed cell `(col, row)`, pressed
+/// (`M`) or released (`m`).
+fn sgr(button: u32, col: u32, row: u32, pressed: bool) -> Vec<u8> {
+	let suffix = if pressed { 'M' } else { 'm' };
+	format!("\x1b[<{button};{};{}{suffix}", col + 1, row + 1).into_bytes()
+}
+
+impl SiteHost {
+	/// Boot the on-disk `examples/beetmania` site at `home` with a `size`-cell
+	/// viewport: build the markup entry into a router root (the same store-backed
+	/// load `build_site_root` runs), settle the async `<RoutesDir>` scan, then pair
+	/// a channel terminal with a page host and an in-world navigator on one surface,
+	/// exactly as the binary's `--server=tui` boot composes them.
+	async fn new(size: UVec2, home: &str) -> Self {
+		let mut app = App::new();
+		// the render substrate (`RouterPlugin` brings the BSX engine + server types
+		// + `AsyncPlugin`) plus the live interactive plugins and the style rules, as
+		// the binary's `tui` arm composes them.
+		app.add_plugins((
+			RouterPlugin,
+			CharcellTuiPlugin,
+			NavigatorPlugin,
+			PageHostPlugin,
+			material::MaterialStylePlugin,
+		))
+		.insert_resource(pkg_config!());
+
+		// the on-disk markup entry, built into its own root; the navigator resolves
+		// routes against the `RouteTree` on the entry's own `Router`, so hop down to
+		// it exactly as the `--server=tui` boot does before pointing the navigator.
+		let root = build_site(app.world_mut()).await;
+		let router = app
+			.world_mut()
+			.run_system_cached_with::<_, Result<Entity>, _, _>(
+				find_router,
+				root,
+			)
+			.unwrap()
+			.unwrap();
+		// the host pairs a channel terminal with the page-host buffer, the in-world
+		// navigator co-located on it (one surface), as the TUI boot composes them.
+		let (channel, terminal) =
+			ChannelTerminal::new(TerminalConfig::default());
+		let host = app
+			.world_mut()
+			.spawn((
+				channel,
+				terminal,
+				PageHost::bundle(size),
+				Navigator::in_world(router, home),
+				// deterministic frames whatever terminal runs the tests: graphics off
+				// per surface, so no kitty escapes interleave with the painted cells.
+				KittyGraphicsSupport { enabled: false },
+			))
+			.id();
+		app.update();
+		Self { app, host }
+	}
+
+	/// Push raw input bytes (keys, SGR mouse) into the channel terminal.
+	fn send(&mut self, data: &[u8]) {
+		self.app
+			.world_mut()
+			.get_mut::<ChannelTerminal>(self.host)
+			.unwrap()
+			.send_input(data)
+			.unwrap();
+	}
+
+	/// The 0-indexed start cell of the first `text` occurrence in the frame.
+	///
+	/// A cell, not a byte: the column is the display width of the row before the
+	/// match, so a focus ring's box-drawing glyphs or a fullwidth title on the
+	/// same row cannot skew the click.
+	fn cell_of(&self, text: &str) -> (u32, u32) {
+		for (row, line) in self.frame().lines().enumerate() {
+			if let Some(idx) = line.find(text) {
+				let col = text_ext::display_width(&line[..idx]);
+				return (col as u32, row as u32);
+			}
+		}
+		panic!("text {text:?} not found in frame:\n{}", self.frame());
+	}
+
+	/// Click (press + release) the cell at `(col, row)`.
+	fn click(&mut self, col: u32, row: u32) {
+		self.send(&sgr(0, col, row, true));
+		self.app.update();
+		self.send(&sgr(0, col, row, false));
+		self.app.update();
+	}
+
+	/// Queue an in-world navigation to `path`.
+	fn navigate(&mut self, path: &str) {
+		let url = Url::coerce(path);
+		self.app
+			.world_mut()
+			.entity_mut(self.host)
+			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
+	}
+
+	/// Whether any rendered element carries the given class.
+	fn has_class(&mut self, class: &str) -> bool {
+		let class = class.to_string();
+		self.app
+			.world_mut()
+			.run_system_once(move |elements: ElementQuery| {
+				elements.iter().any(|view| view.contains_class(&class))
+			})
+			.unwrap_or(false)
+	}
+
+	/// The painted frame as plain text.
+	fn frame(&self) -> String {
+		self.app
+			.world()
+			.get::<DoubleBuffer>(self.host)
+			.unwrap()
+			.front_buffer()
+			.render_plain()
+	}
+
+	/// Advance frames until the frame contains `needle`, returning the frame.
+	fn step_until(&mut self, needle: &str) -> String {
+		for _ in 0..200 {
+			self.app.update();
+			let frame = self.frame();
+			if frame.contains(needle) {
+				return frame;
+			}
+		}
+		panic!("frame never contained '{needle}':\n{}", self.frame());
+	}
+}
+
+/// The homepage boots and renders, with the layout chrome and the dark scheme the
+/// terminal target seeds.
+#[beet::test]
+async fn homepage_boots_with_chrome() {
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/").await;
+	// the hero `<h1>` is 2rem, so on the terminal it renders fullwidth ("The home
+	// of the humble beet" -> "... ｈｕｍｂｌｅ ..."); gate on a contiguous fullwidth word.
+	let frame = host.step_until("ｈｕｍｂｌｅ");
+	// the `<SiteLayout>` chrome renders: the header brand and the sidebar. The
+	// brand is `title-large` (1.375rem), so on the terminal it renders fullwidth.
+	frame.as_str().xpect_contains("Ｂｅｅｔｍａｎｉａ");
+	// the terminal target seeds the dark scheme (no web color-scheme script).
+	host.has_class("dark-scheme").xpect_true();
+}
+
+/// Navigating to the no-code counter page renders its body, the in-world
+/// navigation path the harness exists to cover.
+#[beet::test]
+async fn navigate_to_counter_page() {
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/").await;
+	// homepage loaded: gate on the hero's "Browse the recipes" link (a button, body-
+	// sized so plain ASCII; the hero `<h1>` itself now renders fullwidth).
+	host.step_until("Browse the recipes");
+	host.navigate("/counter");
+	host.step_until("Beets eaten today: 0");
+	// navigated away: the homepage's "Browse the recipes" link is gone.
+	host.frame().xnot().xpect_contains("Browse the recipes");
+}
+
+/// The no-code `routes/counter.bsx` is interactive in the terminal: clicking
+/// "Ate one" writes the `@doc:count` field, which document-sync fans to the display
+/// binding, repainting the count. The markup twin of `rsx_site`'s Rust counter.
+#[beet::test]
+async fn counter_clicks_update_count() {
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/counter").await;
+	host.step_until("Beets eaten today: 0");
+
+	// click "Ate one": the increment verb writes the field, the count repaints.
+	let (col, row) = host.cell_of("Ate one");
+	host.click(col, row);
+	host.step_until("Beets eaten today: 1");
+
+	// click again: the same field accumulates.
+	host.click(col, row);
+	host.step_until("Beets eaten today: 2");
+
+	// click "Put one back": the decrement verb walks the count back down.
+	let (col, row) = host.cell_of("Put one back");
+	host.click(col, row);
+	host.step_until("Beets eaten today: 1");
+}
+
+/// Clicking the sidebar `counter` link (labelled by its path segment) navigates
+/// the TUI to the counter page, the navigate-by-click path against the markup-built
+/// `RouteSidebar`.
+#[beet::test]
+async fn nav_link_click_navigates() {
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/").await;
+	// homepage loaded: gate on the hero's "Browse the recipes" link (plain ASCII; the
+	// hero `<h1>` itself now renders fullwidth).
+	host.step_until("Browse the recipes");
+	// the sidebar grows a link per route, labelled by its last path segment
+	// (`counter.bsx` -> "counter"); click it to navigate.
+	let (col, row) = host.cell_of("counter");
+	host.click(col, row);
+	host.step_until("Beets eaten today: 0");
+	// navigated away: the homepage's "Browse the recipes" link is gone.
+	host.frame().xnot().xpect_contains("Browse the recipes");
+}
+
+/// The page is interactive at a narrow (80x24, the default ssh window) viewport,
+/// where the sidebar rail collapses into the [`MenuButton`] drawer. Regression
+/// for the live-ssh bug: the collapsed drawer is `position: absolute` and
+/// `display: none`, and the layout pass positioned out-of-flow nodes without
+/// consulting display, so the hidden rail kept a full-height 20-cell rect. It
+/// painted nothing yet won every hit-test in that column — an invisible click
+/// shield that swallowed "Ate one" (and every link in the left of the content) on
+/// every narrow terminal, while the wide layout worked.
+#[beet::test]
+async fn narrow_viewport_stays_interactive() {
+	let mut host = SiteHost::new(UVec2::new(80, 24), "/counter").await;
+	host.step_until("Beets eaten today: 0");
+
+	let (col, row) = host.cell_of("Ate one");
+	host.click(col, row);
+	host.step_until("Beets eaten today: 1");
+}
+
+/// A button on a page reached BY NAVIGATION is clickable, not just on a page the
+/// host booted into: navigating swaps the route content under the page host, so
+/// the new content's interactive surfaces must be registered exactly as a booted
+/// page's are.
+#[beet::test]
+async fn button_click_after_navigate() {
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/").await;
+	host.step_until("Browse the recipes");
+	let (col, row) = host.cell_of("counter");
+	host.click(col, row);
+	host.step_until("Beets eaten today: 0");
+
+	let (col, row) = host.cell_of("Ate one");
+	host.click(col, row);
+	host.step_until("Beets eaten today: 1");
+}
+
+/// Clicking an in-content link (not the sidebar chrome) navigates the TUI. The
+/// route content is layouted into the page by reference (a [`Portal`]), so the
+/// link has no `ChildOf` path to the page root's `RenderSurface`; resolving the
+/// navigator must cross the transclusion. Regression for the markdown-link bug:
+/// every in-page link did nothing (the click resolved no surface) while the
+/// sidebar — a real `ChildOf` descendant of the page root — worked.
+#[beet::test]
+async fn content_link_click_navigates() {
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/").await;
+	// homepage loaded: the hero `<h1>` (2rem) renders fullwidth ("The home of the
+	// humble beet" -> "... ｈｕｍｂｌｅ ..."); gate on the contiguous fullwidth word.
+	host.step_until("ｈｕｍｂｌｅ");
+	// the hero's "Browse the recipes" link is an `<a href="/recipes">` in the route
+	// content (not the layout chrome); clicking it navigates to the recipes index.
+	let (col, row) = host.cell_of("Browse the recipes");
+	host.click(col, row);
+	host.step_until("Straight from the patch");
+	// navigated away: the homepage hero's fullwidth heading is gone.
+	host.frame().xnot().xpect_contains("ｈｕｍｂｌｅ");
+}

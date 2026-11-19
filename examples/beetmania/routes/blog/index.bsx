@@ -1,0 +1,11 @@
+<!--
+The blog listing, generated from each post's frontmatter: <RouteIndex/> lists
+this route's children, newest first. The `{DocMeta{..}}` spread is the page's
+metadata, what frontmatter is to a markdown page, and the heading is written
+here because `<ArticleHeader/>` renders nothing for an undated page.
+-->
+<Fragment {DocMeta{title: "The Beetmania Almanac"}} {RouteMeta{sidebar_label: "Almanac", order: 2, expanded: true}}>
+	<h1>The Beetmania Almanac</h1>
+	<p>News, harvests and the odd experiment from the Beetmania patch, also published on Bluesky.</p>
+	<RouteIndex reverse="true"/>
+</Fragment>

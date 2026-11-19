@@ -203,7 +203,7 @@ mod test {
 	use super::*;
 
 	fn entry_path() -> AbsPath {
-		AbsPath::new_workspace_rel("examples/website").unwrap()
+		AbsPath::new_workspace_rel("examples/beetmania").unwrap()
 	}
 
 	/// The prescan set the render world registers.
