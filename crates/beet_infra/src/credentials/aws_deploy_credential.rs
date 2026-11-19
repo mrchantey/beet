@@ -387,8 +387,10 @@ impl AwsDeployCredential {
 		ask: ElevationAsk,
 	) -> Result<CredentialElevation> {
 		// rendered before the code is asked for, so a stack that cannot render
-		// costs no session
-		let Some(apps) = Self::apps(caller, None).await? else {
+		// costs no session; a key not yet in the declared account renders
+		// against its placeholder, since the launch may hold no credential
+		let Some(apps) = Self::apps(caller, Self::moving_to(caller).await?).await?
+		else {
 			bevybail!(
 				"this launch declares no stack keeping its state at AWS, so \
 				there is no AWS deploy credential to elevate"
