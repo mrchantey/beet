@@ -9,6 +9,8 @@ mod register_test;
 mod test_desc;
 pub use test_desc::*;
 mod runner_args;
+mod runner_stalls;
+pub(crate) use runner_stalls::*;
 mod suite_outcome;
 mod test_outcome;
 mod test_plugin;

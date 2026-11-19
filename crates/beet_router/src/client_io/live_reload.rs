@@ -786,27 +786,45 @@ mod test {
 
 	/// Drive the app until the host frame contains `needle`, returning the frame.
 	///
-	/// Each frame updates the app, ticks the async runtime, then yields a slice of
-	/// real time so the route scan + repaint's blocking store I/O can land. The
-	/// painted buffer is snapshotted between frames so the first match is caught
-	/// before any later repaint can blank it. Rather than a fixed time budget (a
-	/// busy shared task pool can stretch the async work arbitrarily), failure is
-	/// concluded only once the runtime has gone idle for several frames with the
-	/// needle still absent, ie the repaint has landed and will never show it.
+	/// The painted buffer is snapshotted between frames so the first match is
+	/// caught before any later repaint can blank it.
 	async fn drive_until(app: &mut App, host: Entity, needle: &str) -> String {
-		let mut idle_without_match = 0;
-		for _ in 0..10_000 {
-			app.update();
-			AsyncRunner::tick(app.world()).await;
-			time_ext::sleep_millis(1).await;
+		let mut matched = None;
+		drive_while(app, |app| {
 			let frame = app
 				.world()
 				.get::<DoubleBuffer>(host)
 				.unwrap()
 				.current_buffer()
 				.render_plain();
-			if frame.contains(needle) {
-				return frame;
+			matched = frame.contains(needle).then_some(frame);
+			matched.is_some()
+		})
+		.await;
+		matched
+			.unwrap_or_else(|| panic!("host frame never contained '{needle}'"))
+	}
+
+	/// Drive the app frame by frame until `done` holds, answering whether it
+	/// did.
+	///
+	/// Each frame updates the app, ticks the async runtime, then yields a slice of
+	/// real time so the route scan + repaint's blocking store I/O can land.
+	/// Rather than a fixed time budget (a busy shared task pool can stretch the
+	/// async work arbitrarily), it gives up only once the runtime has gone idle
+	/// for several frames with `done` still false, ie the work has landed and
+	/// will never satisfy it.
+	async fn drive_while(
+		app: &mut App,
+		mut done: impl FnMut(&App) -> bool,
+	) -> bool {
+		let mut idle_without_match = 0;
+		for _ in 0..10_000 {
+			app.update();
+			AsyncRunner::tick(app.world()).await;
+			time_ext::sleep_millis(1).await;
+			if done(app) {
+				return true;
 			}
 			idle_without_match =
 				if app.world().resource::<AsyncSpawner>().in_flight() == 0 {
@@ -818,7 +836,7 @@ mod test {
 				break;
 			}
 		}
-		panic!("host frame never contained '{needle}'");
+		false
 	}
 
 	/// Editing a card repaints the live terminal: after the watched change
@@ -927,9 +945,11 @@ mod test {
 				.path()
 				.join("/")
 		}
-		// press an arrow (card_nav reads `key_code`), then settle card_nav's queued
-		// async navigation over a few frames.
+		// press an arrow (card_nav reads `key_code`), then drive until card_nav's
+		// queued async navigation moves the navigator, or the runtime idles
+		// without it moving, as a clamped step does.
 		async fn press(app: &mut App, host: Entity, code: KeyCode) {
+			let before = current_card(app, host);
 			app.world_mut().write_message(KeyboardInput {
 				key_code: code,
 				logical_key: Key::ArrowLeft,
@@ -938,11 +958,7 @@ mod test {
 				repeat: false,
 				window: host,
 			});
-			for _ in 0..40 {
-				app.update();
-				AsyncRunner::tick(app.world()).await;
-				time_ext::sleep_millis(1).await;
-			}
+			drive_while(app, |app| current_card(app, host) != before).await;
 		}
 
 		// prev on the first card clamps: still Alpha, never the home or beta.

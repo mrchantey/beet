@@ -85,13 +85,20 @@ pub(crate) fn insert_suite_outcome(
 pub(crate) fn trigger_timeouts(
 	mut commands: Commands,
 	time: Res<Time>,
+	stalls: Res<RunnerStalls>,
 	configs: Query<&TestRunnerConfig>,
 	mut query: Populated<
-		(Entity, &mut Test, &ChildOf, Option<&TestCaseParams>),
-		(With<TestRunning>, Without<TestOutcome>),
+		(
+			Entity,
+			&mut Test,
+			&TestRunning,
+			&ChildOf,
+			Option<&TestCaseParams>,
+		),
+		Without<TestOutcome>,
 	>,
 ) -> Result {
-	for (entity, mut test, parent, test_params) in query.iter_mut() {
+	for (entity, mut test, running, parent, test_params) in query.iter_mut() {
 		let config = configs.get(parent.0)?;
 		// Check per-test timeout first, then fall back to suite timeout
 		let timeout = if let Some(test_params) = test_params {
@@ -116,6 +123,7 @@ pub(crate) fn trigger_timeouts(
 				TestFail::Timeout {
 					elapsed,
 					unattributed_panics,
+					stalls: stalls.since(running.started),
 				},
 			));
 		}
@@ -216,6 +224,47 @@ mod tests {
 			.iter()
 			.any(|text| text.contains("spawned task pizza"))
 			.xpect_true();
+	}
+
+	/// A test holding the runner's thread starves every test in flight, so
+	/// the starved one's timeout report names the test that held it.
+	#[crate::test]
+	async fn timeout_reports_runner_stalls() {
+		let hold = RunnerStalls::THRESHOLD * 2;
+		let stalling = test_ext::new_auto(move || {
+			register_test(TestCaseParams::new(), async move {
+				// CPU bound work never taken off the executor
+				let start = Instant::now();
+				while start.elapsed() < hold {}
+				Ok::<(), String>(())
+			});
+			Ok(())
+		});
+		let stalling_name = stalling.desc.name.to_string();
+		let starved = test_ext::new_auto(|| {
+			register_test(TestCaseParams::new(), async {
+				core::future::pending::<()>().await;
+				Ok::<(), String>(())
+			});
+			Ok(())
+		});
+		let outcomes = test_runner_ext::run_all(
+			Some("--timeout-ms=200 --test-threads=2"),
+			vec![stalling, starved],
+		)
+		.await;
+		let stalls = outcomes
+			.iter()
+			.find_map(|outcome| match outcome {
+				TestOutcome::Fail(TestFail::Timeout { stalls, .. }) => {
+					Some(stalls)
+				}
+				_ => None,
+			})
+			.unwrap();
+		stalls.len().xpect_eq(1);
+		stalls[0].test.xref().xpect_eq(stalling_name);
+		stalls[0].held.xpect_greater_or_equal_to(hold);
 	}
 
 	#[crate::test]

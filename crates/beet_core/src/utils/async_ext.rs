@@ -302,13 +302,21 @@ pub fn try_block_on<F: Future>(fut: F) -> Result<F::Output> {
 /// Runs `func` on the blocking thread pool and awaits its result: a blocking
 /// or CPU-bound call taken off the executor, which beet drives on the world's
 /// thread, so the world keeps updating for the call's duration. One hop
-/// there and back, so a bulk operation (a directory walk, a large parse)
-/// goes as one call rather than one per item.
-#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+/// there and back, so a bulk operation (a directory walk, a large parse, a
+/// set of images) goes as one call rather than one per item.
+///
+/// A target with no threads to take it to (wasm, bare metal) runs `func`
+/// inline, so a caller needs no `cfg` of its own.
 pub async fn unblock<T: 'static + Send>(
 	func: impl 'static + Send + FnOnce() -> T,
 ) -> T {
-	blocking::unblock(func).await
+	cfg_if! {
+		if #[cfg(all(feature = "std", not(target_arch = "wasm32")))] {
+			blocking::unblock(func).await
+		} else {
+			func()
+		}
+	}
 }
 
 /// Blocks the current thread on a future, running it on a [`LocalExecutor`].

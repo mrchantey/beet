@@ -9,12 +9,17 @@ use bevy::ecs::system::SystemParam;
 /// [`test_threads`](TestRunnerConfig::test_threads) slots until its
 /// [`TestOutcome`] lands. Only a running test's timeout clock advances.
 #[derive(Component)]
-pub(crate) struct TestRunning;
+pub(crate) struct TestRunning {
+	/// When its function was called, the start of the window its timeout
+	/// reports [`RunnerStalls`] from.
+	pub started: Instant,
+}
 
 #[track_caller]
 pub(super) fn run_tests_series(
 	mut commands: Commands,
 	async_commands: AsyncCommands,
+	stalls: Res<RunnerStalls>,
 	slots: TestSlots,
 	query: Populated<
 		(Entity, &Test, &TestFunc, &ChildOf),
@@ -29,6 +34,7 @@ pub(super) fn run_tests_series(
 		let started = run_test(
 			commands.reborrow(),
 			&async_commands,
+			&stalls,
 			suite.config,
 			entity,
 			test,
@@ -44,6 +50,7 @@ pub(super) fn run_non_send_tests_series(
 	_: NonSendMarker,
 	mut commands: Commands,
 	async_commands: AsyncCommands,
+	stalls: Res<RunnerStalls>,
 	slots: TestSlots,
 	mut query: Populated<
 		(Entity, &Test, &mut NonSendTestFunc, &ChildOf),
@@ -64,6 +71,7 @@ pub(super) fn run_non_send_tests_series(
 		let started = run_test(
 			commands.reborrow(),
 			&async_commands,
+			&stalls,
 			suite.config,
 			entity,
 			test,
@@ -154,6 +162,7 @@ enum Started {
 fn run_test(
 	mut commands: Commands,
 	async_commands: &AsyncCommands,
+	stalls: &RunnerStalls,
 	config: &TestRunnerConfig,
 	entity: Entity,
 	test: &Test,
@@ -164,13 +173,17 @@ fn run_test(
 		log_case_runs(test, !config.no_color).xprint_display();
 	}
 	let should_panic = test.should_panic;
+	let started = Instant::now();
+	// a sync test runs to its end here, on the thread every test shares
 	let TestRunResult {
 		maybe_async,
 		params,
-	} = super::try_run_async(func);
+	} = stalls.time(test.name.as_slice(), || super::try_run_async(func));
 
 	// Always insert test params (they're always present now)
-	commands.entity(entity).insert((params, TestRunning));
+	commands
+		.entity(entity)
+		.insert((params, TestRunning { started }));
 
 	match maybe_async {
 		MaybeAsync::Sync(panic_result) => {
@@ -180,6 +193,8 @@ fn run_test(
 			Started::Sync.xok()
 		}
 		MaybeAsync::Async(panic_result_fut) => {
+			let panic_result_fut =
+				stalls.watch(test.name.as_slice(), panic_result_fut);
 			// a world task: the test future is `!Send`, so it cannot ride a
 			// queued (entity-scoped) command, and a test entity never despawns.
 			async_commands.run_local(async move |world| {

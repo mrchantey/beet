@@ -644,6 +644,22 @@ mod test {
 			.xpect_true();
 	}
 
+	/// The wasm runner hands the module its workspace root, without which
+	/// every workspace relative path (a `file!()`, a snapshot) resolves
+	/// against the runner's cwd, the crate under test.
+	#[cfg(target_arch = "wasm32")]
+	#[crate::test]
+	fn wasm_runner_passes_workspace_root() {
+		env_ext::var(fs_ext::WORKSPACE_ROOT).expect(
+			"the wasm runner passed no BEET_WORKSPACE_ROOT: is it this tree's beet-cli?",
+		);
+		fs_ext::workspace_root()
+			.join("Cargo.lock")
+			.xmap(fs_ext::exists)
+			.unwrap()
+			.xpect_true();
+	}
+
 	#[crate::test]
 	fn to_string() {
 		let content =

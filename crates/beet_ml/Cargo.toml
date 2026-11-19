@@ -34,6 +34,13 @@ burn = { version = "0.22", default-features = false, features = ["std", "linalg"
 burn-store = { version = "0.22", default-features = false, features = ["std", "safetensors"] }
 tokenizers = { version = "0.23", default-features = false, features = ["unstable_wasm"] }
 
+# Never named in code, and for every target: burn's autotune cache (cubecl
+# `persistence`, always on via `cubecl-wgpu`) pulls `turso`, whose `turso_core`
+# takes `branches` without `std` natively and on wasm alike, and that path calls
+# `core::intrinsics::abort` on nightly, removed from it in 2026-11. `std` routes
+# `branches::abort` through `std::process::abort` instead.
+branches = { version = "0.4", default-features = false, features = ["std"] }
+
 futures.workspace = true
 log.workspace = true
 ron.workspace = true
@@ -49,11 +56,6 @@ console_error_panic_hook.workspace = true
 # 0.4; enable its WebCrypto backend so a wasm build links. beet_core covers 0.3 for
 # every crate.
 getrandom = { workspace = true }
-# Never named in code: burn's autotune cache (cubecl `persistence`, always on via
-# `cubecl-wgpu`) pulls `turso`, which takes `branches` without `std` on wasm, and
-# that path calls `core::intrinsics::abort`, removed from nightly. `std` routes
-# `branches::abort` through `std::process::abort` instead.
-branches = { version = "0.4", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

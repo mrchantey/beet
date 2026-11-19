@@ -353,23 +353,34 @@ fn fail_reason(outcome: &TestFail, color: bool) -> String {
 		TestFail::Timeout {
 			elapsed,
 			unattributed_panics,
+			stalls,
 		} => {
 			let time = time_ext::pretty_print_duration(*elapsed);
 			let time = TermStyle::blue().or_plain(color).paint(time);
-			let heading =
-				format!("{} {}", bold.paint("Timed out after:"), time);
-			if unattributed_panics.is_empty() {
-				heading
-			} else {
-				let mut lines = vec![
-					heading,
+			let mut lines =
+				vec![format!("{} {}", bold.paint("Timed out after:"), time)];
+			if !unattributed_panics.is_empty() {
+				lines.push(
 					bold.paint("Unattributed panics fired during the window:"),
-				];
+				);
 				lines.extend(
 					unattributed_panics.iter().map(|text| format!("- {text}")),
 				);
-				lines.join("\n")
 			}
+			if !stalls.is_empty() {
+				lines.push(bold.paint(
+					"Tests holding the runner's thread during the window, \
+					 starving every test in flight:",
+				));
+				lines.extend(stalls.iter().map(|stall| {
+					format!(
+						"- {} for {}",
+						stall.test,
+						time_ext::pretty_print_duration(stall.held)
+					)
+				}));
+			}
+			lines.join("\n")
 		}
 	}
 }

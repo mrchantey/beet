@@ -244,27 +244,19 @@ impl IconSet {
 		theme: &Theme,
 		package: &PackageConfig,
 	) -> Result<EntityBody> {
-		let source = IconSource::decode(self, bytes)?;
 		let background = theme
 			.resolve(ColorScheme::Light, material::colors::Background)?
 			.to_srgba();
 		let tints = ThemeTints::new(theme)?;
+		let (icon_set, source) = (self.clone(), bytes.to_vec());
+		let rasters = async_ext::unblock(move || {
+			icon_set.rasters(&source, background.to_u8_array())
+		})
+		.await?;
 		let mut outputs = DerivationOutputs::default();
-		for size in Self::PNG_SIZES {
-			outputs
-				.write(store, self.png(size), source.png(size)?)
-				.await?;
+		for (path, raster) in rasters {
+			outputs.write(store, path, raster).await?;
 		}
-		outputs
-			.write(
-				store,
-				self.path(Self::MASKABLE),
-				source.maskable(background.to_u8_array())?,
-			)
-			.await?;
-		outputs
-			.write(store, self.path(Self::FAVICON_ICO), source.ico()?)
-			.await?;
 		if self.is_svg() {
 			outputs
 				.write(store, self.path(Self::FAVICON_SVG), bytes.to_vec())
@@ -283,6 +275,24 @@ impl IconSet {
 				bytes,
 			)]))?
 			.with_typed(&outputs)
+	}
+
+	/// Every raster of the set drawn from the source `bytes`: each png, the
+	/// maskable padded on `background`, then the ico. CPU bound, so
+	/// [`Self::derive`] runs it off the world's thread.
+	fn rasters(
+		&self,
+		bytes: &[u8],
+		background: [u8; 4],
+	) -> Result<Vec<(RelPath, Vec<u8>)>> {
+		let source = IconSource::decode(self, bytes)?;
+		let mut rasters = Self::PNG_SIZES
+			.iter()
+			.map(|size| (self.png(*size), source.png(*size)?).xok())
+			.collect::<Result<Vec<_>>>()?;
+		rasters.push((self.path(Self::MASKABLE), source.maskable(background)?));
+		rasters.push((self.path(Self::FAVICON_ICO), source.ico()?));
+		rasters.xok()
 	}
 
 	/// The web app manifest, its icons relative to it since it sits beside

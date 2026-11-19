@@ -96,6 +96,7 @@ impl Plugin for TestPlugin {
 		Secrets::load_env_vars_nearest();
 
 		app.install_type::<(AsyncPlugin, TimePlugin)>()
+			.init_resource::<RunnerStalls>()
 			.install(InsertSchedule::before(Update, RunTests))
 			// Force single-threaded execution so `spawn_local` in `run_tests_series`
 			// always lands on the runner world's own executor, which only the

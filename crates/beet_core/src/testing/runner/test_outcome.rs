@@ -90,6 +90,9 @@ pub(crate) enum TestFail {
 		/// awaiting work that died), but attribution under concurrent tests is
 		/// ambiguous, so they are reported unattributed rather than guessed.
 		unattributed_panics: Vec<String>,
+		/// Every test that held the runner's thread while this one ran,
+		/// starving it, often the cause rather than this test.
+		stalls: Vec<RunnerStall>,
 	},
 }
 

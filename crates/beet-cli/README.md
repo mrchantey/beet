@@ -78,7 +78,8 @@ It then has the same entry resolution, load and process lifecycle this binary ha
 ## Development
 
 - when editing rust, run the workspace CLI: `cargo run -p beet-cli --features=feat1,feat2 -- arg1 arg2`
-- when editing bsx files, use the installed `beet`: `cargo install --path crates/beet-cli --all-features`
+- when editing bsx files, use the installed `beet`: `just install-cli`
+- the wasm test runner (`.cargo/config.toml`) and the `build-wasm-*` recipes run this tree's `beet-cli` through `cargo run`, never the installed `beet`, which is only as current as its last install
 
 ## Browser binaries
 

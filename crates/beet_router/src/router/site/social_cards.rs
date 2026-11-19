@@ -438,46 +438,71 @@ impl SocialCards {
 		store: &BlobStore,
 		set: CardSet,
 	) -> Result<EntityBody> {
+		// read every source first, so the drawing needs no store
 		let mut sources = CardSources::default();
-		let font = CardFont::new(sources.file(store, &self.font).await?)?;
+		let font = sources.file(store, &self.font).await?;
 		let logo = match &set.logo {
-			Some(icon_set) => sources
-				.file(store, &icon_set.src)
-				.await?
-				.xmap(|bytes| {
-					super::icon_set::IconSource::decode(icon_set, &bytes)
-				})?
-				.render(CardLayout::LOGO as u32)?
-				.xmap(|logo| super::icon_set::IconSource::encode_png(&logo))?
-				.xmap(Some),
+			Some(icon_set) => Some(sources.file(store, &icon_set.src).await?),
 			None => None,
 		};
-		let palette = CardPalette::new(&set.theme)?;
-		let mut outputs = DerivationOutputs::default();
+		let mut media = Vec::with_capacity(set.pages.len());
 		for page in &set.pages {
 			if let Some(source) = &page.source {
 				sources.file(store, source).await?;
 			}
-			let media = match page.meta.social_image_url() {
-				Some(url) => sources
-					.media(store, page, url)
-					.await?
-					.xmap(|bytes| CardMedia::new(page, &bytes))?
-					.xmap(Some),
+			media.push(match page.meta.social_image_url() {
+				Some(url) => Some(sources.media(store, page, url).await?),
 				None => None,
-			};
-			let card = Card::new(&font, &set.package, page, media)?;
-			outputs
-				.write(
-					store,
-					Self::card(&page.path),
-					card.render(&font, &palette, logo.as_deref())?,
-				)
-				.await?;
+			});
+		}
+		let cards =
+			async_ext::unblock(move || set.draw(font, logo, media)).await?;
+		let mut outputs = DerivationOutputs::default();
+		for (path, card) in cards {
+			outputs.write(store, path, card).await?;
 		}
 		EntityBody::default()
 			.with_typed(&Provenance::new(sources.0))?
 			.with_typed(&outputs)
+	}
+}
+
+#[cfg(feature = "site_images")]
+impl CardSet {
+	/// Every card of the set as png, by its store path: set in the `font`
+	/// file, wearing the `logo` source, each page's image its bytes in
+	/// `media`, in page order. CPU bound, so [`SocialCards::derive`] runs it
+	/// off the world's thread.
+	fn draw(
+		self,
+		font: Vec<u8>,
+		logo: Option<Vec<u8>>,
+		media: Vec<Option<Vec<u8>>>,
+	) -> Result<Vec<(RelPath, Vec<u8>)>> {
+		let font = CardFont::new(font)?;
+		let logo = self
+			.logo
+			.as_ref()
+			.zip(logo)
+			.map(|(icon_set, bytes)| {
+				super::icon_set::IconSource::decode(icon_set, &bytes)?
+					.render(CardLayout::LOGO as u32)?
+					.xmap(|logo| super::icon_set::IconSource::encode_png(&logo))
+			})
+			.transpose()?;
+		let palette = CardPalette::new(&self.theme)?;
+		self.pages
+			.iter()
+			.zip(media)
+			.map(|(page, media)| {
+				let media = media
+					.map(|bytes| CardMedia::new(page, &bytes))
+					.transpose()?;
+				let card = Card::new(&font, &self.package, page, media)?
+					.render(&font, &palette, logo.as_deref())?;
+				(SocialCards::card(&page.path), card).xok()
+			})
+			.collect()
 	}
 }
 
