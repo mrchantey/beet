@@ -15,6 +15,8 @@ pub struct ThreadPlugin {}
 impl Plugin for ThreadPlugin {
 	fn build(&self, app: &mut App) {
 		app.install_type::<(AsyncPlugin, RouterPlugin, NetPlugin)>();
+		// a `PostRef` and a `ThreadId` read from a flag, a param or markup
+		PostRef::register_literals();
 
 		#[cfg(feature = "action")]
 		app.install_type::<ActionPlugin>()
@@ -29,6 +31,7 @@ impl Plugin for ThreadPlugin {
 			.register_type::<ThreadRoute>()
 			// markup persistence: declare a thread-record store from `.bsx`
 			.register_type::<MountThreadStore>()
+			.register_type::<ThreadEntryParams>()
 			// markup window bounding: stub older images so an endless loop's
 			// request stays bounded without dropping a post
 			.register_type::<StubOldImages>()
@@ -67,7 +70,8 @@ impl Plugin for ThreadPlugin {
 			.register_type::<Timestamp>()
 			.register_type::<ResponseMeta>()
 			.register_type::<ActorRef>()
-			.register_type::<ThreadConfig>()
+			.register_type::<PostRef>()
+			.register_type::<Usage>()
 			// ── Streaming types ───────────────────────────────────────────
 			.register_type::<EnvVar>()
 			.register_type::<ModelDef>()

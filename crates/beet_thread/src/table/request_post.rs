@@ -14,10 +14,9 @@ use beet_router::prelude::*;
 /// <CreateActor name="User" kind="User"><RequestPost text="review {document}"/></CreateActor>
 /// ```
 ///
-/// Read once, from the [`RequestContextStack`] while the thread builds, so the
-/// text is part of the seed hash: a request for another document is a thread
-/// of its own, the same document again resumes it. `{{` and `}}` spell a
-/// literal brace.
+/// Read once per session, from the [`RequestContextStack`] while the thread
+/// builds. Which thread a request continues is the route's metadata
+/// ([`ThreadEntry`]), never this text. `{{` and `}}` spell a literal brace.
 ///
 /// ## Errors
 ///

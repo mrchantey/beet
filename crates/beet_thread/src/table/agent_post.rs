@@ -86,6 +86,8 @@ pub enum AgentPost<'a> {
 	FunctionCallOutput(FunctionCallOutputView<'a>),
 	ReasoningContent(ReasoningContentView<'a>),
 	ReasoningSummary(ReasoningSummaryView<'a>),
+	/// A session bracket ([`PostIntent::is_session`]), never model input.
+	Session(SessionView<'a>),
 }
 
 impl std::ops::Deref for AgentPost<'_> {
@@ -108,6 +110,9 @@ impl<'a> AgentPost<'a> {
 			return AgentPost::FunctionCallOutput(fco);
 		}
 		// intent-based kinds
+		if let Some(view) = SessionView::try_new(post) {
+			return AgentPost::Session(view);
+		}
 		if post.intent().is_server_error() {
 			return AgentPost::Error(ErrorView { post });
 		}
@@ -142,6 +147,7 @@ impl<'a> AgentPost<'a> {
 			AgentPost::FunctionCallOutput(view) => view.post(),
 			AgentPost::ReasoningContent(view) => view.post(),
 			AgentPost::ReasoningSummary(view) => view.post(),
+			AgentPost::Session(view) => view.post(),
 		}
 	}
 
@@ -746,6 +752,24 @@ impl<'a> ReasoningContentView<'a> {
 		self.post
 			.body_str()
 			.expect("reasoning content view validated on construction")
+	}
+	pub fn post(&self) -> &'a Post { self.post }
+}
+
+/// A session bracket, a [`PostIntent::SESSION_OPENED`] or
+/// [`PostIntent::SESSION_CLOSED`] post, its JSON body the session's record.
+#[derive(Deref)]
+pub struct SessionView<'a> {
+	post: &'a Post,
+}
+
+impl<'a> SessionView<'a> {
+	pub fn try_new(post: &'a Post) -> Option<Self> {
+		post.intent().is_session().then_some(Self { post })
+	}
+	/// Whether this post opens its session rather than closing it.
+	pub fn is_opened(&self) -> bool {
+		self.post.intent() == PostIntent::SESSION_OPENED
 	}
 	pub fn post(&self) -> &'a Post { self.post }
 }

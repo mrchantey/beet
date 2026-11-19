@@ -6,10 +6,12 @@ binary:
     beet --entry=examples/thread/persistent_chat.bsx -- --new   # start fresh
 
 `{MountThreadStore}` persists the thread's records (one JSON object under the
-path, in the entry's own store, so beside this file); `{RunThread}` adopts the
-stored conversation by seed hash before the first turn, so a re-run resumes
-where it left off (`--new` discards it, read off the boot request). The actor ids are pinned so the seed hash, and thus the adopted
-thread, stay stable across runs.
+path, in the entry's own store, so beside this file); `{RunThread}` continues
+the newest stored thread its metadata names before the first turn, so a re-run
+resumes where it left off, each run a session of it. `--new` starts a fresh
+thread, stamped the same so the next run continues that one, and an edited
+system prompt reaches the agent as a new seed post. The actor ids are pinned so
+each run's actors are the stored thread's.
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
 	<RequireCfg cfg="feature:thread && feature:tui && feature:ssh"/>
@@ -18,7 +20,7 @@ thread, stay stable across runs.
 			<ThreadView {OfThread($thread)}/>
 			<CreatePostForm {OfThread($thread)}/>
 		</Route>
-		<Repeat {RunThread}>
+		<Repeat {RunThread{metadata:{chat:"persistent"}}}>
 			<Thread bx:ref="thread" {(Sequence, MountThreadStore{path:"persistent_chat"})}>
 				<CreateActor id=1 name="System" kind="System">
 					<CreatePost text="Ask a single brief, challenging question about the user's life choices. Followup with more brief questions based on the users' answers"/>

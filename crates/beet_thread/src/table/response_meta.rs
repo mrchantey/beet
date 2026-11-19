@@ -18,6 +18,11 @@ pub struct ResponseMeta {
 	/// The provider has indicated that this response is stored,
 	/// enabling previous_response_id
 	pub response_stored: bool,
+	/// The tokens the whole response cost, as the provider reports them, on
+	/// the meta of the response's last post alone so a sum over metas counts
+	/// each response once.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub usage: Option<Usage>,
 }
 
 impl ThreadRecord for ResponseMeta {
@@ -27,4 +32,56 @@ impl ThreadRecord for ResponseMeta {
 impl ResponseMeta {
 	pub fn post_id(&self) -> PostId { self.post_id }
 	pub fn response_id(&self) -> &str { &self.response_id }
+}
+
+/// Tokens as a provider reports them, summed over a session by
+/// [`SessionClosed`].
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	Hash,
+	Serialize,
+	Deserialize,
+	Reflect,
+)]
+#[reflect(Default, Serialize, Deserialize)]
+pub struct Usage {
+	/// Input tokens, cached ones included.
+	pub input_tokens: u32,
+	/// Output tokens, reasoning included.
+	pub output_tokens: u32,
+	/// The input tokens served from the provider's prompt cache.
+	pub cached_input_tokens: u32,
+}
+
+impl std::ops::Add for Usage {
+	type Output = Self;
+	fn add(self, other: Self) -> Self {
+		Self {
+			input_tokens: self.input_tokens + other.input_tokens,
+			output_tokens: self.output_tokens + other.output_tokens,
+			cached_input_tokens: self.cached_input_tokens
+				+ other.cached_input_tokens,
+		}
+	}
+}
+
+impl std::iter::Sum for Usage {
+	fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+		iter.fold(Self::default(), std::ops::Add::add)
+	}
+}
+
+impl From<&TokenUsage> for Usage {
+	fn from(usage: &TokenUsage) -> Self {
+		Self {
+			input_tokens: usage.input_tokens,
+			output_tokens: usage.output_tokens,
+			cached_input_tokens: usage.cached_input_tokens.unwrap_or_default(),
+		}
+	}
 }

@@ -16,10 +16,9 @@ use beet_net::prelude::*;
 /// as an include is, so `Ready` waits for it. Its action is called on the
 /// source's own entity, resolving what it reads by ancestry, and its text
 /// lands as a [`SeedPost`] in its place. The thread reduces only once every
-/// source has landed ([`ThreadWindow::reduce`]), so the text is part of the
-/// seed hash: an edited file built again is a different seed, and adopts or
-/// starts the thread it names. It is never read again during the thread's
-/// life.
+/// source has landed ([`ThreadWindow::reduce`]). It is read once per
+/// session: a continued thread whose file was edited since appends the new
+/// text as its slot's next version ([`ThreadWindow::reconcile_seed`]).
 ///
 /// A failed read leaves the source in place and a [`TemplateError`] on the
 /// build root, so the thread never reduces and its entry names the seed.
@@ -174,31 +173,32 @@ mod test {
 			.world_mut()
 			.run_async_local_then(async move |world: AsyncWorld| {
 				TemplatePending::settle(&world).await;
-				Thread::enter(world, thread, false).await.map(|_| thread)
+				Thread::enter(world, thread, default())
+					.await
+					.map(|_| thread)
 			})
 			.await;
 		(app, result)
 	}
 
-	/// A `src` seed is read while its thread builds and joins the seed hash:
-	/// the file edited and the thread built again is another seed.
+	/// A `src` seed is read while its thread builds, landing as the thread's
+	/// first seed slot.
 	#[beet_core::test]
 	async fn a_src_seed_is_read_at_build() {
 		let store = BlobStore::temp();
-		let seed = async |text: &str| -> (u64, String) {
-			store
-				.insert(&RelPath::new("seeds/system.md"), text.to_string())
-				.await
-				.unwrap();
-			let (app, thread) = enter(&store).await;
-			let window =
-				app.world().get::<ThreadWindow>(thread.unwrap()).unwrap();
-			(window.seed_hash(), window.posts()[0].to_string())
-		};
-		let (brief, text) = seed("be brief").await;
-		text.xpect_eq("be brief");
-		seed("be brief").await.0.xpect_eq(brief);
-		(seed("be thorough").await.0 != brief).xpect_true();
+		store
+			.insert(&RelPath::new("seeds/system.md"), "be brief".to_string())
+			.await
+			.unwrap();
+		let (app, thread) = enter(&store).await;
+		let thread = thread.unwrap();
+		let window = app.world().get::<ThreadWindow>(thread).unwrap();
+		window.posts()[0].to_string().xpect_eq("be brief");
+		app.world()
+			.get::<Thread>(thread)
+			.unwrap()
+			.seed()
+			.xpect_eq(&[window.posts()[0].id()][..]);
 	}
 
 	/// A seed that cannot be read leaves its thread unreduced, and entering it

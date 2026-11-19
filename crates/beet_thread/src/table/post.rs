@@ -30,6 +30,12 @@ impl PostIntent {
 	pub const REASONING_CONTENT: PostIntent = PostIntent(102);
 	/// 1xx informational: reasoning summary from a model.
 	pub const REASONING_SUMMARY: PostIntent = PostIntent(103);
+	/// 1xx informational: a session entered the thread, a [`SessionOpened`]
+	/// body.
+	pub const SESSION_OPENED: PostIntent = PostIntent(104);
+	/// 1xx informational: a session left the thread, a [`SessionClosed`]
+	/// body.
+	pub const SESSION_CLOSED: PostIntent = PostIntent(105);
 	/// 2xx success: a successful response to be surfaced to the user.
 	pub const OK: PostIntent = PostIntent(200);
 	/// 4xx client error: the model refused the request.
@@ -65,6 +71,11 @@ impl PostIntent {
 	pub const fn is_display(&self) -> bool {
 		self.is_success() || self.is_client_error()
 	}
+
+	/// Whether this post brackets a session, which model input skips.
+	pub const fn is_session(&self) -> bool {
+		self.0 == Self::SESSION_OPENED.0 || self.0 == Self::SESSION_CLOSED.0
+	}
 }
 
 impl std::fmt::Display for PostIntent {
@@ -72,6 +83,8 @@ impl std::fmt::Display for PostIntent {
 		match *self {
 			Self::REASONING_CONTENT => write!(f, "102 Reasoning Content"),
 			Self::REASONING_SUMMARY => write!(f, "103 Reasoning Summary"),
+			Self::SESSION_OPENED => write!(f, "104 Session Opened"),
+			Self::SESSION_CLOSED => write!(f, "105 Session Closed"),
 			Self::OK => write!(f, "200 OK"),
 			Self::REFUSAL => write!(f, "403 Refusal"),
 			Self::INTERNAL_ERROR => write!(f, "500 Internal Error"),
@@ -166,6 +179,13 @@ impl Post {
 
 	pub fn set_intent(&mut self, intent: PostIntent) { self.intent = intent; }
 
+	/// This post on `thread`, ie a seed resolved before its entry adopted a
+	/// stored thread's id.
+	pub fn with_thread(mut self, thread: ThreadId) -> Self {
+		self.thread = thread;
+		self
+	}
+
 	/// Returns the body as a `&str`.
 	/// ## Errors
 	/// Errors if the body is not valid utf-8.
@@ -185,6 +205,31 @@ impl Post {
 			.get("file_stem")
 			.and_then(|val| val.as_str())
 			.ok()
+	}
+
+	/// The seed slot this post is a version of, if it is a seed post: its
+	/// position in the template's seed order ([`Thread::seed`]).
+	pub fn seed_slot(&self) -> Option<usize> {
+		self.metadata
+			.get(SEED_SLOT)
+			.ok()
+			.and_then(|slot| slot.as_u64().ok())
+			.map(|slot| slot as usize)
+	}
+
+	/// Mark this post a version of seed slot `slot`.
+	pub fn set_seed_slot(&mut self, slot: usize) {
+		self.metadata.insert(SEED_SLOT, slot as u64);
+	}
+
+	/// Whether `other` says what this post says: the same author, intent,
+	/// media type and body, so a re-resolved seed equal to its current
+	/// version appends nothing.
+	pub fn same_content(&self, other: &Post) -> bool {
+		self.author == other.author
+			&& self.intent == other.intent
+			&& self.media_type == other.media_type
+			&& self.body == other.body
 	}
 
 	/// Hash self, used for change detection during streaming.
@@ -213,6 +258,9 @@ impl Post {
 		self.media_type = media_type;
 	}
 }
+
+/// The metadata key naming a seed post's slot.
+const SEED_SLOT: &str = "seed_slot";
 
 // ═══════════════════════════════════════════════════════════════════════
 // Display

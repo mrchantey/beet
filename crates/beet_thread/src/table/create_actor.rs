@@ -5,8 +5,9 @@ use beet_core::prelude::*;
 ///
 /// A plain [`Actor`] cannot be a BSX tag because its [`ActorId`] (a [`Uuid7`])
 /// is not attribute-coercible; this template wraps it. Set `id` to pin a stable
-/// identity (required for persisted threads, where the seed hash and `ActorRef`
-/// bindings depend on it); omit it for an ephemeral, freshly-minted id.
+/// identity (required for persisted threads, where each session's `ActorRef`
+/// bindings and seed slots depend on it); omit it for an ephemeral,
+/// freshly-minted id.
 ///
 /// Spread behavior and nest seeds as children, and an agent's tools as the
 /// routes of the one `<Router>` beneath it, its own url space, ie

@@ -5,11 +5,11 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-/// A route answering each request with a thread built for it from the named
-/// template, each thread one thread for its whole life:
+/// A route answering each request with a session of a thread built for it
+/// from the named template, each thread entity one session of one thread:
 ///
 /// ```bsx
-/// <Route path="review/:document" {ThreadRoute{template:"ReviewThread"}}/>
+/// <Route path="review/:document" {ThreadRoute{template:"ReviewThread", metadata:{document:"{document}"}}}/>
 /// ```
 ///
 /// On every request it:
@@ -22,14 +22,18 @@ use beet_router::prelude::*;
 ///    beneath the route, where it resolves the ancestor [`BlobStore`] and the
 ///    host url space as if authored there. It is built detached first, so the
 ///    host [`RouteTree`] never rebuilds for it;
-/// 3. enters it ([`Thread::enter`]): a second request seeding the same thread
-///    adopts it by seed hash, another seed is a thread of its own, and
-///    `--new` discards the stored one;
-/// 4. runs the template's behavior to its [`Outcome`];
+/// 3. enters it ([`Thread::enter`]), continuing the newest stored thread
+///    whose metadata holds every entry of `metadata`, each `{param}` filled
+///    from the request, plus `template`; a route declaring no metadata starts
+///    a thread every request. `--thread` continues a stored thread by id,
+///    `--new` starts one stamped the same, and `--spawned-by` names the post
+///    whose action asked for the session ([`ThreadEntryParams`]);
+/// 4. runs the template's behavior to its [`Outcome`], then closes the
+///    session ([`SessionClosed`]), an error closing it as a fail;
 /// 5. waits for every completed post to reach its [`ThreadStore`]
 ///    ([`ThreadStore::flush`]), then despawns the thread;
-/// 6. answers the last completed agent text as the body on a pass, and a `500`
-///    naming the failure on a fail.
+/// 6. answers the last completed text of the thread's acting actors as the
+///    body on a pass, and a `500` naming the failure on a fail.
 ///
 /// A failed build, a seed that could not be read or a behavior that errors
 /// fail the request the same way, the thread despawned all the same.
@@ -41,17 +45,26 @@ pub async fn ThreadRoute(
 	/// [`BsxTemplateRegistry`] or a rust `#[template]`, by name.
 	#[field]
 	template: SmolStr,
-	/// Discard the stored thread this request seeds and start it afresh.
-	#[param]
-	new: bool,
+	/// The entries a thread this route creates is stamped with, each string's
+	/// `{param}` filled from the request, and that a request continues a
+	/// stored thread by. Empty starts a thread every request.
+	#[field]
+	metadata: Map,
+	entry: Params<ThreadEntryParams>,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let route = cx.caller.clone();
 	let world = route.world().clone();
+	let entry = ThreadRoute::entry(
+		&template,
+		&metadata,
+		cx.input.parts(),
+		ThreadEntryParams::clone(&entry),
+	)?;
 	let root =
 		ThreadRoute::build(&route, template.clone(), cx.input.parts().clone())
 			.await?;
-	let answer = ThreadRoute::run(&world.entity(root), &template, new).await;
+	let answer = ThreadRoute::run(&world.entity(root), &template, entry).await;
 	// torn down however the run ended, the response answered after
 	world
 		.with(move |world: &mut World| ThreadRoute::despawn(world, root))
@@ -60,6 +73,33 @@ pub async fn ThreadRoute(
 }
 
 impl ThreadRoute {
+	/// The entry a request makes: `metadata` filled from `parts` and stamped
+	/// with the template, continuing by it when the route declares any.
+	fn entry(
+		template: &SmolStr,
+		metadata: &Map,
+		parts: &RequestParts,
+		params: ThreadEntryParams,
+	) -> Result<ThreadEntry> {
+		let mut stamp = Map::default();
+		for (key, value) in metadata.iter() {
+			let value = match value {
+				Value::Str(text) => {
+					Value::new(crate::table::request_post::fill(text, parts)?)
+				}
+				other => other.clone(),
+			};
+			stamp.insert(key.clone(), value);
+		}
+		stamp.insert("template", template.as_str());
+		ThreadEntry {
+			continues: !metadata.is_empty(),
+			metadata: stamp,
+			params,
+		}
+		.xok()
+	}
+
 	/// Build `template` for the request `parts`, settle it and attach it
 	/// beneath `route`, answering the build root, the container holding the
 	/// template's own root.
@@ -120,45 +160,35 @@ impl ThreadRoute {
 	}
 
 	/// Enter the threads under the build `root`, run the template's behavior,
-	/// flush every thread and answer.
+	/// close and flush every thread and answer.
 	async fn run(
 		root: &AsyncEntity,
 		template: &str,
-		new: bool,
+		entry: ThreadEntry,
 	) -> Result<Response> {
-		RunThread::enter_all(root, new).await?;
-		let (behavior, threads) = root
-			.with_state::<(Query<&Children>, Query<(), With<Thread>>), _>(
-				|root, (children, threads)| {
-					(
-						children.get(root).ok().and_then(|children| {
-							(children.len() == 1).then(|| children[0])
-						}),
-						children
-							.iter_descendants(root)
-							.filter(|entity| threads.contains(*entity))
-							.collect::<Vec<_>>(),
-					)
-				},
-			)
-			.await?;
-		let behavior = behavior.ok_or_else(|| {
-			bevyhow!("the template `{template}` must build exactly one root")
-		})?;
+		let threads = RunThread::enter_all(root, &entry).await?;
+		let behavior = root
+			.with_state::<Query<&Children>, _>(|root, children| {
+				children.get(root).ok().and_then(|children| {
+					(children.len() == 1).then(|| children[0])
+				})
+			})
+			.await?
+			.ok_or_else(|| {
+				bevyhow!(
+					"the template `{template}` must build exactly one root"
+				)
+			})?;
 		let thread = *threads.first().ok_or_else(|| {
 			bevyhow!("the template `{template}` builds no `<Thread>`")
 		})?;
-		let outcome = root
-			.world()
-			.entity(behavior)
-			.call::<(), Outcome>(())
-			.await?;
-		for thread in &threads {
-			ThreadStore::flush(&root.world().entity(*thread)).await?;
-		}
+		let outcome =
+			root.world().entity(behavior).call::<(), Outcome>(()).await;
+		RunThread::close_all(&root.world(), &threads, &outcome).await?;
+		let outcome = outcome?;
 		let last_text = root
 			.world()
-			.with(move |world: &mut World| Self::last_agent_text(world, thread))
+			.with(move |world: &mut World| Self::last_text(world, thread))
 			.await;
 		match (outcome, last_text) {
 			(Outcome::Pass(_), Some(text)) => {
@@ -199,13 +229,26 @@ impl ThreadRoute {
 		}
 	}
 
-	/// The last completed text an agent posted in `thread`.
-	fn last_agent_text(world: &World, thread: Entity) -> Option<String> {
+	/// The last completed text an acting actor of `thread` posted: an actor
+	/// with behavior beneath it ([`ActorRef`]) other than a person, so an
+	/// agent's reply or a loop's decision answers, never the owner's turn.
+	fn last_text(world: &mut World, thread: Entity) -> Option<String> {
+		let acting = world
+			.with_state::<(Query<&Children>, Query<&ActorRef>), _>(
+				|(children, actor_refs)| {
+					children
+						.iter_descendants(thread)
+						.filter_map(|entity| actor_refs.get(entity).ok())
+						.map(|actor_ref| **actor_ref)
+						.collect::<Vec<_>>()
+				},
+			);
 		let window = world.get::<ThreadWindow>(thread)?;
 		window
 			.authored_posts()
 			.filter(|authored| {
-				authored.actor.kind() == ActorKind::Agent
+				acting.contains(&authored.actor.id())
+					&& authored.actor.kind() != ActorKind::User
 					&& !authored.post.in_progress()
 			})
 			.filter_map(|authored| match authored.post.as_agent_post() {
@@ -219,6 +262,7 @@ impl ThreadRoute {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
@@ -237,19 +281,67 @@ mod test {
 </RepeatWhileFunctionCallOutput>
 "#;
 
-	/// A host url space holding the review route over an in-memory store.
-	fn host() -> (App, Entity, BlobStore) {
+	/// A thread delegating a review: its agent requests the host's review
+	/// route as a tool, naming the post that asked for it as a body field.
+	const DELEGATE_THREAD: &str = r#"
+<RepeatWhileFunctionCallOutput>
+	<Thread {(Sequence, MountThreadStore{path:"delegates"})}>
+		<CreateActor name="Agent" kind="Agent" id=3 {MockPostStreamer{script:[Call{tool:"review", arguments:{
+			document:"product",
+			spawned_by:"00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000002",
+		}}]}}>
+			<Router><HostTool path="review"/></Router>
+		</CreateActor>
+	</Thread>
+</RepeatWhileFunctionCallOutput>
+"#;
+
+	/// The post [`DELEGATE_THREAD`]'s call names.
+	fn delegating_post() -> PostRef {
+		PostRef::new(ThreadId::from_u128(1), PostId::from_u128(2))
+	}
+
+	/// A thread whose behavior errors once its session opens.
+	const FAILING_THREAD: &str = r#"
+<Thread {(Sequence, MountThreadStore{path:"threads"})}>
+	<CreateActor name="Agent" kind="Agent" id=2 {Bail}/>
+</Thread>
+"#;
+
+	/// A behavior that errors.
+	async fn bail(_cx: ActionContext) -> Result<Outcome> { bevybail!("boom") }
+	#[derive(Component, Reflect, Default)]
+	#[reflect(Component, Default)]
+	#[require(Action<(), Outcome> = Action::new_async(bail))]
+	struct Bail;
+
+	/// A host url space holding the review route, spread with `review`, over
+	/// an in-memory store.
+	fn host(review: &str) -> (App, Entity, BlobStore) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
-		app.world_mut()
-			.get_resource_or_init::<BsxTemplateRegistry>()
-			.insert_source("ReviewThread", REVIEW_THREAD)
-			.unwrap();
+			.install_type::<ThreadPlugin>()
+			.register_type::<Bail>();
+		let mut registry = app
+			.world_mut()
+			.get_resource_or_init::<BsxTemplateRegistry>();
+		for (name, source) in [
+			("ReviewThread", REVIEW_THREAD),
+			("DelegateThread", DELEGATE_THREAD),
+			("FailingThread", FAILING_THREAD),
+		] {
+			registry.insert_source(name, source).unwrap();
+		}
 		let store = BlobStore::temp();
 		let router = BsxTemplate::parse_entry(
 			app.world(),
-			r#"<Router><Route path="review/:document" {ThreadRoute{template:"ReviewThread"}}/></Router>"#,
+			&format!(
+				r#"<Router>
+	<Route path="review/:document" {{{review}}}/>
+	<Route path="delegate" {{ThreadRoute{{template:"DelegateThread"}}}}/>
+	<Route path="fail" {{ThreadRoute{{template:"FailingThread"}}}}/>
+</Router>"#
+			),
 		)
 		.unwrap()
 		.spawn(app.world_mut())
@@ -257,6 +349,9 @@ mod test {
 		app.world_mut().entity_mut(router).insert(store.clone());
 		(app, router, store)
 	}
+
+	/// The review route continuing by its document.
+	const BY_DOCUMENT: &str = r#"ThreadRoute{template:"ReviewThread", metadata:{document:"{document}"}}"#;
 
 	/// Request `request` of the host, answering its status and body.
 	async fn review(
@@ -269,34 +364,48 @@ mod test {
 		(response.status(), response.text().await.unwrap())
 	}
 
-	/// Every stored thread's text posts, the tool calls aside, in seed order.
+	/// The records under `threads` in `store`.
+	fn records(store: &BlobStore) -> BlobThreadStore {
+		BlobThreadStore::new(store.with_subdir(RelPath::new("threads")))
+	}
+
+	/// Every stored thread's text posts, the tool calls and sessions aside,
+	/// sorted.
 	async fn stored(store: &BlobStore) -> Vec<Vec<String>> {
-		let records =
-			BlobThreadStore::new(store.with_subdir(RelPath::new("threads")));
+		let records = records(store);
 		let mut threads = Vec::new();
 		for thread in records.threads().await.unwrap() {
-			threads.push(
-				records
-					.thread_posts(thread.id(), None)
-					.await
-					.unwrap()
-					.iter()
-					.filter(|post| {
-						matches!(post.as_agent_post(), AgentPost::Text(_))
-					})
-					.map(|post| post.to_string())
-					.collect::<Vec<_>>(),
-			);
+			threads.push(texts(
+				&records.thread_posts(thread.id(), None).await.unwrap(),
+			));
 		}
 		threads.sort();
 		threads
+	}
+
+	/// The text posts of `posts`, the tool calls and sessions aside.
+	fn texts(posts: &[Post]) -> Vec<String> {
+		posts
+			.iter()
+			.filter(|post| matches!(post.as_agent_post(), AgentPost::Text(_)))
+			.map(|post| post.to_string())
+			.collect()
+	}
+
+	/// The one stored thread.
+	async fn only_thread(store: &BlobStore) -> (Thread, Vec<Post>) {
+		let records = records(store);
+		let threads = records.threads().await.unwrap();
+		threads.len().xpect_eq(1);
+		let posts = records.thread_posts(threads[0].id(), None).await.unwrap();
+		(threads[0].clone(), posts)
 	}
 
 	/// The thread answers with its agent's last text, and is gone once it has,
 	/// its posts in the store and the host's route tree untouched.
 	#[beet_core::test]
 	async fn answers_then_despawns_its_thread() {
-		let (mut app, router, store) = host();
+		let (mut app, router, store) = host(BY_DOCUMENT);
 		let tree = app
 			.world()
 			.entity(router)
@@ -323,12 +432,12 @@ mod test {
 			.xpect_eq(tree);
 	}
 
-	/// A second request for one document resumes its stored thread, and a
-	/// request for another, whose seed reads its own path param, is a thread
-	/// of its own.
+	/// Two requests with the same filled metadata continue one thread, an
+	/// unchanged seed appending nothing, and another value starts its own,
+	/// stamped with its entries and the template.
 	#[beet_core::test]
-	async fn each_seed_is_one_thread() {
-		let (mut app, router, store) = host();
+	async fn continues_by_its_metadata() {
+		let (mut app, router, store) = host(BY_DOCUMENT);
 		for path in ["review/product", "review/product", "review/market"] {
 			review(&mut app, router, Request::get(path))
 				.await
@@ -346,32 +455,157 @@ mod test {
 				"you said: review product".to_string(),
 			],
 		]);
+		records(&store)
+			.threads()
+			.await
+			.unwrap()
+			.iter()
+			.any(|thread| {
+				thread.metadata().get("document").ok()
+					== Some(&Value::new("market"))
+					&& thread.metadata().get("template").ok()
+						== Some(&Value::new("ReviewThread"))
+			})
+			.xpect_true();
 	}
 
-	/// `--new` discards the stored thread its request seeds and starts it
-	/// afresh, leaving every other.
+	/// A route declaring no metadata starts a thread every request.
 	#[beet_core::test]
-	async fn new_discards_the_stored_thread() {
-		let (mut app, router, store) = host();
+	async fn no_metadata_is_fresh_every_time() {
+		let (mut app, router, store) =
+			host(r#"ThreadRoute{template:"ReviewThread"}"#);
+		for _ in 0..2 {
+			review(&mut app, router, Request::get("review/product")).await;
+		}
+		stored(&store).await.len().xpect_eq(2);
+	}
+
+	/// `--new` starts a thread stamped the same, which the next request
+	/// continues, and `--thread` continues a stored thread by id.
+	#[beet_core::test]
+	async fn new_and_thread_pick_the_thread() {
+		let (mut app, router, store) = host(BY_DOCUMENT);
+		review(&mut app, router, Request::get("review/product")).await;
+		let (first, _) = only_thread(&store).await;
 		for request in [
-			Request::get("review/product"),
-			Request::get("review/market"),
 			Request::get("review/product").with_param("new", "true"),
+			Request::get("review/product"),
+			Request::get("review/product")
+				.with_param("thread", &first.id().to_string()),
 		] {
 			review(&mut app, router, request)
 				.await
 				.0
 				.xpect_eq(StatusCode::OK);
 		}
+		let reply = "you said: review product".to_string();
+		let seed = "review product".to_string();
 		stored(&store).await.xpect_eq(vec![
-			vec![
-				"review market".to_string(),
-				"you said: review market".to_string(),
-			],
-			vec![
-				"review product".to_string(),
-				"you said: review product".to_string(),
-			],
+			vec![seed.clone(), reply.clone(), reply.clone()],
+			vec![seed, reply.clone(), reply],
 		]);
+		review(
+			&mut app,
+			router,
+			Request::get("review/product").with_param("thread", "nope"),
+		)
+		.await
+		.0
+		.xpect_eq(StatusCode::BAD_REQUEST);
+	}
+
+	/// Each request is a session bracketed by its posts, the second naming
+	/// its own cause while the thread keeps its creator, and model input
+	/// carries neither.
+	#[beet_core::test]
+	async fn sessions_are_bracketed_by_posts() {
+		let (mut app, router, store) = host(BY_DOCUMENT);
+		let creator = delegating_post();
+		let second = PostRef::new(ThreadId::from_u128(1), PostId::from_u128(3));
+		for spawned_by in [&creator, &second] {
+			review(
+				&mut app,
+				router,
+				Request::get("review/product")
+					.with_param("spawned-by", spawned_by.as_str()),
+			)
+			.await
+			.0
+			.xpect_eq(StatusCode::OK);
+		}
+		let (thread, posts) = only_thread(&store).await;
+		thread.spawned_by().xpect_eq(Some(&creator));
+		posts
+			.iter()
+			.filter_map(SessionOpened::of)
+			.map(|opened| opened.spawned_by)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![Some(creator), Some(second)]);
+		let closed = posts
+			.iter()
+			.filter_map(SessionClosed::of)
+			.collect::<Vec<_>>();
+		closed
+			.iter()
+			.map(|closed| closed.outcome)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![Outcome::PASS, Outcome::PASS]);
+		// each totals the usage of its own session's two mock responses
+		for closed in &closed {
+			closed.usage.input_tokens.xpect_eq(20);
+		}
+		// the scripted agent answered the review both times, never a session
+		let mut window = ThreadWindow::new();
+		for actor in records(&store).actors().await.unwrap() {
+			window.insert_actor(actor);
+		}
+		for post in posts {
+			window.upsert_post(post);
+		}
+		window
+			.model_posts(&thread, None)
+			.iter()
+			.any(|view| view.post.intent().is_session())
+			.xpect_false();
+	}
+
+	/// A request without `spawned_by`, ie a unit run by hand, records no
+	/// spawn, and one forwarded by an agent's tool call carries it as a body
+	/// field of the call.
+	#[beet_core::test]
+	async fn spawned_by_travels_as_a_body_field() {
+		let (mut app, router, store) = host(BY_DOCUMENT);
+		review(&mut app, router, Request::get("review/product")).await;
+		only_thread(&store).await.0.spawned_by().xpect_none();
+
+		let (mut app, router, store) = host(BY_DOCUMENT);
+		review(&mut app, router, Request::get("delegate"))
+			.await
+			.0
+			.xpect_eq(StatusCode::OK);
+		only_thread(&store)
+			.await
+			.0
+			.spawned_by()
+			.xpect_eq(Some(&delegating_post()));
+	}
+
+	/// A session whose behavior errors still closes, as a fail, and its
+	/// records reach the store.
+	#[beet_core::test]
+	async fn an_erroring_session_still_closes() {
+		let (mut app, router, store) = host(BY_DOCUMENT);
+		review(&mut app, router, Request::get("fail"))
+			.await
+			.1
+			.xpect_contains("boom");
+		only_thread(&store)
+			.await
+			.1
+			.iter()
+			.filter_map(SessionClosed::of)
+			.map(|closed| closed.outcome)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![Outcome::FAIL]);
 	}
 }

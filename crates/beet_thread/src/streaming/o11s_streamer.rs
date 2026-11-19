@@ -119,7 +119,10 @@ impl O11sStreamer {
 
 					// get input items (from last received if caching)
 					let items = window
-						.posts_after(last_received.map(|(post_id, _)| post_id))
+						.model_posts(
+							thread,
+							last_received.map(|(post_id, _)| post_id),
+						)
 						.into_iter()
 						.xtry_map(|post| {
 							o11s_mapper::post_to_o11s_input(agent_id, post)

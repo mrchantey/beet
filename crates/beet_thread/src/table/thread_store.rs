@@ -11,6 +11,8 @@ impl SyncedPosts {
 	pub fn new(synced: HashSet<PostId>) -> Self { Self(synced) }
 	pub fn contains(&self, id: PostId) -> bool { self.0.contains(&id) }
 	pub fn insert(&mut self, id: PostId) { self.0.insert(id); }
+	/// Mark `id` unflushed, so the next flush writes it again.
+	pub fn remove(&mut self, id: PostId) { self.0.remove(&id); }
 }
 
 /// Flush a thread's window to its [`ThreadStore`] whenever the window changes.

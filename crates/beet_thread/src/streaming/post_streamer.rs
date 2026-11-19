@@ -107,6 +107,7 @@ impl MetaBuilder {
 			model_slug: self.model_slug.clone(),
 			response_id: self.response_id.clone(),
 			response_stored: self.response_stored,
+			usage: None,
 		}
 	}
 }

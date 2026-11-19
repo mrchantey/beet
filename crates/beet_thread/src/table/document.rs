@@ -97,6 +97,19 @@ impl<M> Uuid7<M> {
 		Self::from_uuid(Uuid::from_u128(value))
 	}
 	pub fn uuid(&self) -> Uuid { self.uuid_v7 }
+
+	/// Parse a typed id from its hyphenated text, as [`Display`](std::fmt::Display)
+	/// writes it.
+	///
+	/// ## Errors
+	///
+	/// Errors when the text is not a uuid.
+	pub fn parse(text: &str) -> Result<Self> {
+		Uuid::parse_str(text)
+			.map_err(|err| bevyhow!("`{text}` is not an id: {err}"))?
+			.xmap(Self::from_uuid)
+			.xok()
+	}
 }
 
 impl<M> Default for Uuid7<M> {

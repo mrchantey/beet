@@ -45,6 +45,33 @@ impl BlobThreadStore {
 	/// An in-memory thread store, ie for tests and the hot window.
 	pub fn temp() -> Self { Self::new(BlobStore::temp()) }
 
+	/// Every thread store kept beneath `dir` in `store`, each the directory
+	/// a [`MountThreadStore`] path names, ie the per-role stores under one
+	/// workspace's `threads/`, sorted by directory.
+	pub async fn discover(
+		store: &BlobStore,
+		dir: &RelPath,
+	) -> Result<Vec<Self>> {
+		let scoped = store.with_subdir(dir.clone());
+		if !scoped.store_exists().await? {
+			return Ok(Vec::new());
+		}
+		let mut dirs = scoped
+			.list()
+			.await?
+			.into_iter()
+			.filter(|path| {
+				path.to_string().rsplit('/').next() == Some(STORE_PATH)
+			})
+			.map(|path| path.parent().unwrap_or_default())
+			.collect::<Vec<_>>();
+		dirs.sort_by_key(|dir| dir.to_string());
+		dirs.into_iter()
+			.map(|path| Self::new(scoped.with_subdir(path)))
+			.collect::<Vec<_>>()
+			.xok()
+	}
+
 	/// Read the persisted snapshot, loading it once into memory.
 	async fn read(&self) -> Result<ThreadData> {
 		let mut guard = self.snapshot.lock().await;
@@ -218,23 +245,6 @@ impl ThreadStoreProvider for BlobThreadStore {
 			})
 			.await?;
 			Ok(id)
-		})
-	}
-
-	fn remove_thread(&self, thread_id: ThreadId) -> BoxedFuture<'_, Result> {
-		Box::pin(async move {
-			self.write(move |data| {
-				data.threads.retain(|thread| thread.id() != thread_id);
-				let removed = data
-					.posts
-					.iter()
-					.filter(|post| post.thread() == thread_id)
-					.map(Post::id)
-					.collect::<HashSet<_>>();
-				data.posts.retain(|post| post.thread() != thread_id);
-				data.metas.retain(|meta| !removed.contains(&meta.post_id));
-			})
-			.await
 		})
 	}
 

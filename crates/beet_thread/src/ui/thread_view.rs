@@ -2,6 +2,7 @@
 //! [`Document`] and rendered as a scrollable, keyed list of posts.
 
 use crate::prelude::*;
+use beet_action::prelude::Outcome;
 use beet_core::prelude::*;
 // `ScrollPosition` is beet_ui's renderer-agnostic type; pin it explicitly so it wins
 // over bevy's same-named ui type (reached via `beet_core::prelude` under
@@ -35,11 +36,49 @@ use beet_ui::prelude::style;
 /// <Thread bx:ref="thread" {Sequence}>..</Thread>
 /// <ThreadView {OfThread($thread)}/>
 /// ```
+///
+/// A window is bounded ([`MountThreadStore::tail`]), so a reader scrolling to
+/// the top of the transcript pages older posts from the thread's
+/// [`ThreadStore`] into the view's [`ThreadHistory`], view state that never
+/// enters the window and so never the model's context. Session brackets
+/// render as dividers.
 #[derive(Debug, Default, Clone, Copy, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(Document)]
+#[require(Document, ThreadHistory)]
 #[component(on_add = thread_view_on_add)]
 pub struct ThreadView;
+
+/// The older posts a [`ThreadView`] paged from its thread's store, oldest
+/// first, view state the window never holds. Rebinding the view to another
+/// thread clears it.
+#[derive(Debug, Default, Clone, Component)]
+pub struct ThreadHistory {
+	posts: Vec<Post>,
+	/// Whether the store holds nothing older.
+	exhausted: bool,
+	/// Whether a page is being read.
+	loading: bool,
+}
+
+impl ThreadHistory {
+	/// The paged posts, oldest first.
+	pub fn posts(&self) -> &[Post] { &self.posts }
+	/// Whether the store holds nothing older than these.
+	pub fn exhausted(&self) -> bool { self.exhausted }
+}
+
+/// Ask a [`ThreadView`] to page the posts before the oldest it shows from
+/// its thread's store, triggered as its reader scrolls to the top.
+#[derive(Debug, Clone, Copy, EntityEvent)]
+pub struct LoadOlderPosts {
+	/// The view.
+	pub entity: Entity,
+}
+
+impl LoadOlderPosts {
+	/// How many posts one page reads.
+	pub const PAGE: usize = 50;
+}
 
 impl ThreadView {
 	/// A view bound to `thread`. Its reactive content is attached in `on_add`, so
@@ -97,6 +136,9 @@ pub struct ThreadScroll {
 	/// Frames of pinning left to apply, counted down as the follow re-asserts
 	/// itself over the frames the new rows take to lay out.
 	pending_follow: u8,
+	/// Whether the reader was at the top of an overflowing transcript last
+	/// frame, so arriving there pages older posts once.
+	at_top: bool,
 	/// The scrollable extent last seen, so growing content is not mistaken for
 	/// the reader scrolling.
 	last_max: i32,
@@ -107,6 +149,7 @@ impl Default for ThreadScroll {
 		Self {
 			following: true,
 			pending_follow: 0,
+			at_top: false,
 			last_max: 0,
 		}
 	}
@@ -140,6 +183,11 @@ fn post_row(_index: usize, item: &Value) -> OnSpawn {
 		.and_then(|kind| kind.as_str().ok())
 		.unwrap_or("agent")
 		.to_string();
+	if kind == "session" {
+		return OnSpawn::insert(rsx! {
+			<div {divider_style()}>{text}</div>
+		});
+	}
 	OnSpawn::insert(rsx! {
 		<div {message_block(&kind)}>
 			<div {author_label(&kind)}>{author}</div>
@@ -148,6 +196,17 @@ fn post_row(_index: usize, item: &Value) -> OnSpawn {
 			<div {body_text()}>{(Value::new(text), FieldRef::new("text"))}</div>
 		</div>
 	})
+}
+
+/// A session bracket: a dim, centered rule between sessions.
+fn divider_style() -> OnSpawn {
+	inline_class![
+		(style::common_props::TextAlignProp, style::TextAlign::Center),
+		Declaration::token(
+			style::common_props::ForegroundColor,
+			colors::Outline
+		),
+	]
 }
 
 /// The block wrapping one message: a role-tinted left accent bar with the body
@@ -259,46 +318,139 @@ fn body_text() -> impl Bundle {
 // ═══════════════════════════════════════════════════════════════════════
 
 /// Project every changed [`ThreadWindow`] into the [`Document`] of each
-/// [`ThreadView`] watching its thread, and (per the contract) into a [`Document`]
-/// on the thread entity itself.
+/// [`ThreadView`] bound to its thread, and (per the contract) into a
+/// [`Document`] on the thread entity itself.
 ///
 /// The document holds every post (display intent or not, so reasoning and tool
-/// traffic remain inspectable) as `{ "posts": [{ id, author, text }, ..] }`.
-/// Keyed reconciliation downstream means a grown in-progress body updates a row
-/// rather than rebuilding it, so streaming flows through the bound [`Value`].
+/// traffic remain inspectable) as `{ "posts": [{ id, author, text }, ..] }`,
+/// a view's paged [`ThreadHistory`] before its window. A view re-projects when
+/// its thread's window changes, its history grows, or it is bound to another
+/// thread, which clears its history. Keyed reconciliation downstream means a
+/// grown in-progress body updates a row rather than rebuilding it, so
+/// streaming flows through the bound [`Value`].
 pub(crate) fn project_window_to_document(
 	mut commands: Commands,
-	windows: Query<
-		(Entity, &ThreadWindow, Option<&ThreadItems>),
-		Changed<ThreadWindow>,
+	windows: Query<(Entity, Ref<ThreadWindow>)>,
+	mut views: Query<
+		(Entity, Ref<OfThread>, &mut ThreadHistory),
+		With<ThreadView>,
 	>,
-	views: Query<(), With<ThreadView>>,
 	mut documents: Query<&mut Document>,
 ) -> Result {
-	for (thread_entity, window, items) in windows.iter() {
-		let value = project_window(window);
-		// the contract's thread-side document, inserted if absent
+	// the contract's thread-side document, inserted if absent
+	for (thread_entity, window) in
+		windows.iter().filter(|(_, window)| window.is_changed())
+	{
 		set_document(
 			&mut commands,
 			&mut documents,
 			thread_entity,
-			value.clone(),
+			project_window(&window, &[]),
 		);
-		// every view item of this thread renders against its own co-located document,
-		// reached by traversing the thread's `ThreadItems` instead of scanning views.
-		items
-			.into_iter()
-			.flat_map(|items| items.iter())
-			.filter(|item| views.contains(*item))
-			.for_each(|view_entity| {
-				set_document(
-					&mut commands,
-					&mut documents,
-					view_entity,
-					value.clone(),
-				);
-			});
 	}
+	for (view, of_thread, mut history) in views.iter_mut() {
+		if of_thread.is_changed() && !of_thread.is_added() {
+			*history = default();
+		}
+		let Ok((_, window)) = windows.get(of_thread.thread()) else {
+			continue;
+		};
+		if !(window.is_changed()
+			|| of_thread.is_changed()
+			|| history.is_changed())
+		{
+			continue;
+		}
+		set_document(
+			&mut commands,
+			&mut documents,
+			view,
+			project_window(&window, history.posts()),
+		);
+	}
+	Ok(())
+}
+
+/// Page older posts when the reader arrives at the top of an overflowing
+/// transcript, once per arrival.
+pub(crate) fn page_on_scroll_top(
+	mut commands: Commands,
+	views: Query<(Entity, &ThreadHistory), With<ThreadView>>,
+	children: Query<&Children>,
+	tree: RenderTreeQuery,
+	mut transcripts: Query<&mut ThreadScroll>,
+	scrolls: Query<&ScrollPosition>,
+) {
+	for (view, history) in views.iter() {
+		let Some(transcript) = std::iter::once(view)
+			.chain(children.iter_descendants(view))
+			.find(|entity| transcripts.contains(*entity))
+		else {
+			continue;
+		};
+		let at_top = tree
+			.iter_ancestors_inclusive(transcript)
+			.filter_map(|entity| scrolls.get(entity).ok())
+			.find(|scroll| scroll.max.y > 0)
+			.is_some_and(|scroll| scroll.offset.y <= 0);
+		let Ok(mut scroll) = transcripts.get_mut(transcript) else {
+			continue;
+		};
+		if at_top && !scroll.at_top && !history.exhausted && !history.loading {
+			commands.trigger(LoadOlderPosts { entity: view });
+		}
+		scroll.at_top = at_top;
+	}
+}
+
+/// Observer: read the page before the oldest post a view shows from its
+/// thread's store into its [`ThreadHistory`]. The cursor is the oldest post
+/// of the window's tail rather than a current seed loaded however old, and
+/// a page holding posts the window already shows has them dropped at
+/// projection.
+pub(crate) fn load_older_posts(
+	ev: On<LoadOlderPosts>,
+	async_commands: AsyncCommands,
+	mut views: Query<(&OfThread, &mut ThreadHistory)>,
+	threads: Query<(&Thread, &ThreadWindow, &ThreadStore)>,
+) -> Result {
+	let view = ev.entity;
+	let (of_thread, mut history) = views.get_mut(view)?;
+	let Ok((thread, window, store)) = threads.get(of_thread.thread()) else {
+		return Ok(());
+	};
+	let Some(cursor) = history
+		.posts
+		.first()
+		.or_else(|| {
+			window
+				.posts()
+				.iter()
+				.find(|post| post.seed_slot().is_none())
+		})
+		.map(Post::id)
+	else {
+		history.exhausted = true;
+		return Ok(());
+	};
+	history.loading = true;
+	let (thread, store) = (thread.clone(), store.clone());
+	async_commands.run(async move |world: AsyncWorld| -> Result {
+		let page = store
+			.page_before(&thread, cursor, LoadOlderPosts::PAGE)
+			.await?;
+		world
+			.entity(view)
+			.with(move |mut entity: EntityWorldMut| {
+				if let Some(mut history) = entity.get_mut::<ThreadHistory>() {
+					history.exhausted = page.len() < LoadOlderPosts::PAGE;
+					history.loading = false;
+					let older = std::mem::take(&mut history.posts);
+					history.posts = page.into_iter().chain(older).collect();
+				}
+			})
+			.await
+	});
 	Ok(())
 }
 
@@ -392,17 +544,29 @@ pub(crate) fn follow_thread_scroll(
 /// layout pass and the clamp that gives the containers their extent.
 const FOLLOW_FRAMES: u8 = 4;
 
-/// Build the document value for a window: a `posts` list of `{ id, author, text }`.
-fn project_window(window: &ThreadWindow) -> Value {
-	let posts = window
-		.authored_posts()
+/// Build the document value for a window and the older posts paged before
+/// it: a `posts` list of `{ id, author, kind, text }`, each paged post the
+/// window also holds shown once, as the window's.
+fn project_window(window: &ThreadWindow, older: &[Post]) -> Value {
+	let shown = window.posts().iter().map(Post::id).collect::<HashSet<_>>();
+	let older = older
+		.iter()
+		.filter(|post| !shown.contains(&post.id()))
+		.filter_map(|post| {
+			window
+				.actor(post.author())
+				.ok()
+				.map(|actor| AuthoredPost { post, actor })
+		});
+	let posts = older
+		.chain(window.authored_posts())
 		.map(|view| {
 			Value::Map(
 				[
 					("id".into(), Value::new(view.post.id().to_string())),
 					("author".into(), Value::new(view.actor.name())),
 					("kind".into(), Value::new(post_kind(&view))),
-					("text".into(), Value::new(view.post.to_string())),
+					("text".into(), Value::new(post_text(&view))),
 				]
 				.into_iter()
 				.collect(),
@@ -412,9 +576,35 @@ fn project_window(window: &ThreadWindow) -> Value {
 	Value::Map([("posts".into(), Value::List(posts))].into_iter().collect())
 }
 
-/// The display role of a post, used by [`post_row`] for styling: a 5xx error post
-/// renders as `error`, otherwise it follows the authoring actor's kind.
+/// The text a row shows: a session bracket as a divider line, any other post
+/// as its body.
+fn post_text(view: &AuthoredPost) -> String {
+	if let Some(opened) = SessionOpened::of(view.post) {
+		return match opened.spawned_by {
+			Some(cause) => format!("── session opened by {cause} ──"),
+			None => "── session opened ──".to_string(),
+		};
+	}
+	if let Some(closed) = SessionClosed::of(view.post) {
+		let outcome = match closed.outcome {
+			Outcome::Pass(_) => "pass",
+			Outcome::Fail(_) => "fail",
+		};
+		return format!(
+			"── session closed: {outcome} in {}s ──",
+			closed.duration.as_secs()
+		);
+	}
+	view.post.to_string()
+}
+
+/// The display role of a post, used by [`post_row`] for styling: a session
+/// bracket renders as `session`, a 5xx error post as `error`, otherwise it
+/// follows the authoring actor's kind.
 fn post_kind(view: &AuthoredPost) -> &'static str {
+	if view.post.intent().is_session() {
+		return "session";
+	}
 	if view.post.intent().is_server_error() {
 		return "error";
 	}
@@ -444,14 +634,8 @@ fn set_document(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use crate::ui::test_ext;
 	use beet_core::prelude::*;
-	// the live-TUI render stack the repaint test paints into
-	use beet_router::prelude::*;
-	use beet_ui::prelude::CharcellPlugin;
-	use beet_ui::prelude::DoubleBuffer;
-	use beet_ui::prelude::Portal;
-	use beet_ui::prelude::RealtimeParsePlugin;
-	use beet_ui::prelude::RenderSurface;
 	use bevy::math::UVec2;
 
 	/// The live tail: posts appended *after* the first projection must reach the
@@ -564,67 +748,24 @@ mod test {
 		frame(&app, host).xpect_contains("newest post");
 	}
 
-	/// The live-TUI render stack minus the terminal (as `page_host`'s own tests
-	/// build it), hosting a page-bound view of a fresh thread: the app, the
-	/// thread entity and the host whose buffer is painted.
+	/// A page-bound view of a fresh thread in the live-TUI render stack: the
+	/// app, the thread entity and the host whose buffer is painted.
 	fn live_host() -> (App, Entity, Entity) {
-		let mut app = App::new();
-		app.add_plugins((
-			MinimalPlugins,
-			TemplatePlugin,
-			DocumentPlugin,
-			CharcellPlugin,
-			RealtimeParsePlugin,
-			PageHostPlugin,
-		))
-		.install_type::<(ThreadPlugin, ThreadUiPlugin)>();
+		let mut app = test_ext::render_app();
 		let thread = app
 			.world_mut()
 			.spawn((Thread::default(), ThreadWindow::default()))
 			.id();
-		let host = app
-			.world_mut()
-			.spawn(PageHost::bundle(UVec2::new(40, 12)))
-			.id();
-		let page = app
-			.world_mut()
-			.spawn_template(Snippet::from_bundle(rsx! {
-				<ThreadView {OfThread(thread)}/>
-			}))
-			.unwrap()
-			.id();
-		// bind the page to the host surface (`bind_surface_page` is
-		// router-internal; a fresh host has no outgoing page to clean up). The
-		// slot is a descendant of the host, a grandchild as `PageHost::bundle` spawns it.
-		let mut stack = vec![host];
-		let mut slot = None;
-		while let Some(entity) = stack.pop() {
-			if app.world().get::<PageSlot>(entity).is_some() {
-				slot = Some(entity);
-				break;
-			}
-			if let Some(children) = app.world().get::<Children>(entity) {
-				stack.extend(children.iter());
-			}
-		}
-		let slot = slot.unwrap();
-		app.world_mut().entity_mut(page).insert(RenderSurface(host));
-		app.world_mut().entity_mut(slot).insert(Portal::new(page));
+		let (host, _) = test_ext::mount_page(
+			&mut app,
+			UVec2::new(40, 12),
+			Snippet::from_bundle(rsx! { <ThreadView {OfThread(thread)}/> }),
+		);
 		(app, thread, host)
 	}
 
-	/// A few frames, enough for the projection, the document chain and the
-	/// paint to settle.
-	fn settle(app: &mut App) { (0..4).for_each(|_| app.update()); }
-
-	/// The host's painted frame as plain text.
-	fn frame(app: &App, host: Entity) -> String {
-		app.world()
-			.get::<DoubleBuffer>(host)
-			.unwrap()
-			.current_buffer()
-			.render_plain()
-	}
+	fn settle(app: &mut App) { test_ext::settle(app); }
+	fn frame(app: &App, host: Entity) -> String { test_ext::frame(app, host) }
 
 	/// Append one completed text post to the thread's window.
 	fn push_post(app: &mut App, thread: Entity, text: &str) {
@@ -698,5 +839,64 @@ mod test {
 			.iter()
 			.any(|item| item == view)
 			.xpect_true();
+	}
+
+	/// A thread of more posts than its window's bound shows its tail, and a
+	/// view pages the rest from the store, never into the window.
+	#[beet_core::test]
+	async fn pages_older_posts_from_the_store() {
+		let mut app = App::new();
+		app.add_plugins(MinimalPlugins).install_type::<(
+			DocumentPlugin,
+			ThreadPlugin,
+			ThreadUiPlugin,
+		)>();
+		let store = ThreadStore::default();
+		let record = Thread::default();
+		let actor = Actor::agent();
+		store.insert_thread(record.clone()).await.unwrap();
+		store.insert_actor(actor.clone()).await.unwrap();
+		store
+			.insert_posts(
+				(0..5)
+					.map(|index| {
+						AgentPost::new_text(
+							actor.id(),
+							record.id(),
+							format!("post {index}"),
+							PostStatus::Completed,
+						)
+					})
+					.collect(),
+			)
+			.await
+			.unwrap();
+		let window = store.materialize_window(&record, 2).await.unwrap();
+		let synced = window.posts().iter().map(Post::id).collect();
+		let thread = app
+			.world_mut()
+			.spawn((record, window, store, SyncedPosts::new(synced)))
+			.id();
+		let view = app.world_mut().spawn(ThreadView::new(thread)).id();
+		app.update();
+		app.update();
+		row_count(&app, view).xpect_eq(2);
+
+		app.world_mut().trigger(LoadOlderPosts { entity: view });
+		for _ in 0..6 {
+			app.update();
+		}
+		row_count(&app, view).xpect_eq(5);
+		app.world()
+			.get::<ThreadHistory>(view)
+			.unwrap()
+			.exhausted()
+			.xpect_true();
+		app.world()
+			.get::<ThreadWindow>(thread)
+			.unwrap()
+			.posts()
+			.len()
+			.xpect_eq(2);
 	}
 }

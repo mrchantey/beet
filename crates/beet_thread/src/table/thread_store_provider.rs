@@ -101,8 +101,9 @@ impl Drop for InFlight {
 	fn drop(&mut self) { self.0.fetch_sub(1, Ordering::SeqCst); }
 }
 
-/// The records a window holds that its store does not yet: completed posts
-/// not in [`SyncedPosts`], their authors and response metadata.
+/// The records a window holds that its store does not yet: its own completed
+/// posts not in [`SyncedPosts`], their authors and response metadata. A
+/// branch's inherited posts are its parent's, never written again.
 pub(crate) struct ThreadFlush {
 	thread: Thread,
 	actors: Vec<Actor>,
@@ -122,7 +123,11 @@ impl ThreadFlush {
 		let posts = window
 			.posts()
 			.iter()
-			.filter(|post| !post.in_progress() && !synced.contains(post.id()))
+			.filter(|post| {
+				post.thread() == thread.id()
+					&& !post.in_progress()
+					&& !synced.contains(post.id())
+			})
 			.cloned()
 			.collect::<Vec<_>>();
 		if posts.is_empty() {
@@ -218,31 +223,113 @@ pub trait ThreadStoreProvider: 'static + Send + Sync {
 		after_post: Option<PostId>,
 	) -> BoxedFuture<'_, Result<Vec<(Post, Actor)>>>;
 
-	/// Materialize a [`ThreadWindow`] for a thread (optionally a tail after a
-	/// cursor): the read side of the window/sync seam. Indexed backends override
-	/// this; the default joins [`Self::actors`] with [`Self::thread_posts`].
-	fn materialize_window(
-		&self,
-		thread_id: ThreadId,
-		after_post: Option<PostId>,
-	) -> BoxedFuture<'_, Result<ThreadWindow>> {
+	/// The stored thread `id`, if any. Indexed backends override this; the
+	/// default scans [`Self::threads`].
+	fn thread(&self, id: ThreadId) -> BoxedFuture<'_, Result<Option<Thread>>> {
 		Box::pin(async move {
-			let mut window = ThreadWindow::new();
-			self.actors().await?.into_iter().for_each(|actor| {
-				window.insert_actor(actor);
-			});
-			self.thread_posts(thread_id, after_post)
+			self.threads()
 				.await?
 				.into_iter()
-				.for_each(|post| window.upsert_post(post));
-			Ok(window)
+				.find(|thread| thread.id() == id)
+				.xok()
 		})
 	}
 
-	/// Remove one thread: its record, its posts and their response metadata,
-	/// leaving every other thread and the actors as they are. What `--new`
-	/// discards when one store keeps many threads.
-	fn remove_thread(&self, thread_id: ThreadId) -> BoxedFuture<'_, Result>;
+	/// Every post of `thread`'s history in [`PostId`] order: for a branch, its
+	/// parent's history up to and including the post it branches from,
+	/// recursively, then its own. A branch references its parent's posts,
+	/// never copies them.
+	///
+	/// ## Errors
+	///
+	/// Errors when a branch names a thread the store lacks, or the branches
+	/// form a cycle.
+	fn history<'a>(
+		&'a self,
+		thread: &'a Thread,
+	) -> BoxedFuture<'a, Result<Vec<Post>>> {
+		Box::pin(async move {
+			let mut posts = self.thread_posts(thread.id(), None).await?;
+			let mut visited = vec![thread.id()];
+			let mut branch = thread.branch_of().cloned();
+			while let Some(point) = branch {
+				if visited.contains(&point.thread()) {
+					bevybail!("thread {} branches in a cycle", thread.id());
+				}
+				visited.push(point.thread());
+				let parent =
+					self.thread(point.thread()).await?.ok_or_else(|| {
+						bevyhow!(
+							"thread {} branches from {point}, whose thread the store lacks",
+							thread.id()
+						)
+					})?;
+				posts.extend(
+					self.thread_posts(parent.id(), None)
+						.await?
+						.into_iter()
+						.filter(|post| post.id() <= point.post()),
+				);
+				branch = parent.branch_of().cloned();
+			}
+			posts.sort_by_key(|post| post.id());
+			posts.xok()
+		})
+	}
+
+	/// The window `thread` enters with, bounded however long it has run:
+	/// every actor, the last `tail` posts of its [`Self::history`], never
+	/// opening on a call output whose call it cut, and the current post of
+	/// each of its seed slots ([`Thread::seed`]) however old. The window is
+	/// the model's context, so this is its context policy, beside
+	/// [`StubOldImages`]'s bound on image bytes; older posts are paged by a
+	/// view ([`Self::page_before`]), never entering the window.
+	fn materialize_window<'a>(
+		&'a self,
+		thread: &'a Thread,
+		tail: usize,
+	) -> BoxedFuture<'a, Result<ThreadWindow>> {
+		Box::pin(async move {
+			let mut window = ThreadWindow::new();
+			for actor in self.actors().await? {
+				window.insert_actor(actor);
+			}
+			let history = self.history(thread).await?;
+			let mut start = history.len().saturating_sub(tail);
+			while history.get(start).is_some_and(|post| {
+				matches!(post.as_agent_post(), AgentPost::FunctionCallOutput(_))
+			}) {
+				start += 1;
+			}
+			for (index, post) in history.into_iter().enumerate() {
+				if index >= start || thread.seed().contains(&post.id()) {
+					window.upsert_post(post);
+				}
+			}
+			window.xok()
+		})
+	}
+
+	/// Up to `limit` posts of `thread`'s [`Self::history`] before `before`,
+	/// oldest first: the page a view loads as its reader scrolls back past
+	/// the window.
+	fn page_before<'a>(
+		&'a self,
+		thread: &'a Thread,
+		before: PostId,
+		limit: usize,
+	) -> BoxedFuture<'a, Result<Vec<Post>>> {
+		Box::pin(async move {
+			let history = self
+				.history(thread)
+				.await?
+				.into_iter()
+				.filter(|post| post.id() < before)
+				.collect::<Vec<_>>();
+			let start = history.len().saturating_sub(limit);
+			history[start..].to_vec().xok()
+		})
+	}
 
 	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<ActorId>>;
 	fn insert_thread(
@@ -292,8 +379,29 @@ impl ThreadStoreProvider for Arc<dyn ThreadStoreProvider> {
 	) -> BoxedFuture<'_, Result<Vec<(Post, Actor)>>> {
 		self.as_ref().full_thread_posts(thread_id, after_post)
 	}
-	fn remove_thread(&self, thread_id: ThreadId) -> BoxedFuture<'_, Result> {
-		self.as_ref().remove_thread(thread_id)
+	fn thread(&self, id: ThreadId) -> BoxedFuture<'_, Result<Option<Thread>>> {
+		self.as_ref().thread(id)
+	}
+	fn history<'a>(
+		&'a self,
+		thread: &'a Thread,
+	) -> BoxedFuture<'a, Result<Vec<Post>>> {
+		self.as_ref().history(thread)
+	}
+	fn materialize_window<'a>(
+		&'a self,
+		thread: &'a Thread,
+		tail: usize,
+	) -> BoxedFuture<'a, Result<ThreadWindow>> {
+		self.as_ref().materialize_window(thread, tail)
+	}
+	fn page_before<'a>(
+		&'a self,
+		thread: &'a Thread,
+		before: PostId,
+		limit: usize,
+	) -> BoxedFuture<'a, Result<Vec<Post>>> {
+		self.as_ref().page_before(thread, before, limit)
 	}
 	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<ActorId>> {
 		self.as_ref().insert_actor(actor)
@@ -402,6 +510,7 @@ pub mod thread_store_test {
 				model_slug: "gpt-5-mini".into(),
 				response_id: "resp_1".into(),
 				response_stored: true,
+				usage: None,
 			}])
 			.await
 			.unwrap();
@@ -418,46 +527,65 @@ pub mod thread_store_test {
 			.unwrap()
 			.xpect_none();
 
-		// removing one thread leaves the others and the actors
-		let other = Thread::new("Other Thread");
-		let other_id = other.id();
-		provider.insert_thread(other).await.unwrap();
-		provider
-			.insert_posts(vec![AgentPost::new_text(
+		// a branch of the second post holds the parent's history up to it,
+		// then its own, and a sibling branch of that post is independent
+		let point = PostRef::new(thread_id, expected[1].id());
+		let branch = |text: &'static str| {
+			let branch = Thread::new("Branch").with_branch_of(point.clone());
+			let post = AgentPost::new_text(
 				actor_id,
-				other_id,
-				"other",
+				branch.id(),
+				text,
 				PostStatus::Completed,
-			)])
-			.await
-			.unwrap();
-		provider.remove_thread(thread_id).await.unwrap();
+			);
+			(branch, post)
+		};
+		let (left, left_post) = branch("left");
+		let (right, right_post) = branch("right");
+		for (branch, post) in [(&left, left_post), (&right, right_post)] {
+			provider.insert_thread(branch.clone()).await.unwrap();
+			provider.insert_posts(vec![post]).await.unwrap();
+		}
+		let texts = |posts: Vec<Post>| {
+			posts
+				.iter()
+				.map(|post| post.to_string())
+				.collect::<Vec<_>>()
+		};
+		texts(provider.history(&left).await.unwrap())
+			.xpect_eq(vec!["post 0", "post 1", "left"]);
+		texts(provider.history(&right).await.unwrap())
+			.xpect_eq(vec!["post 0", "post 1", "right"]);
 		provider
-			.threads()
+			.materialize_window(&left, usize::MAX)
 			.await
 			.unwrap()
+			.posts()
 			.iter()
-			.map(|thread| thread.id())
+			.map(|post| post.to_string())
 			.collect::<Vec<_>>()
-			.xpect_eq(vec![other_id]);
-		provider
-			.thread_posts(thread_id, None)
-			.await
-			.unwrap()
-			.len()
-			.xpect_eq(0);
-		provider
-			.stored_response_meta("openai", "gpt-5-mini", thread_id)
-			.await
-			.unwrap()
-			.xpect_none();
-		provider
-			.thread_posts(other_id, None)
-			.await
-			.unwrap()
-			.len()
-			.xpect_eq(1);
-		provider.actors().await.unwrap().len().xpect_eq(1);
+			.xpect_eq(vec!["post 0", "post 1", "left"]);
+
+		// a bounded window enters with the tail alone, keeping each current
+		// seed however old, and a view pages the rest
+		let mut seeded = provider.thread(thread_id).await.unwrap().unwrap();
+		seeded.set_seed(vec![expected[0].id()]);
+		texts(
+			provider
+				.materialize_window(&seeded, 1)
+				.await
+				.unwrap()
+				.posts()
+				.to_vec(),
+		)
+		.xpect_eq(vec!["post 0", "post 2"]);
+		texts(
+			provider
+				.page_before(&seeded, expected[2].id(), 1)
+				.await
+				.unwrap(),
+		)
+		.xpect_eq(vec!["post 1"]);
 
 		provider.store_remove().await.unwrap();
 	}

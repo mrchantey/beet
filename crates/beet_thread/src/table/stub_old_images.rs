@@ -19,6 +19,12 @@ use beet_core::prelude::*;
 /// Standing on its own entity is the point: bounding is a policy of the thread,
 /// not of whichever actor happened to capture the image, so a thread whose images
 /// arrive from a tool call or an upload bounds them the same way.
+///
+/// The window's other bound is by count: a continued thread enters with the
+/// newest [`MountThreadStore::tail`] posts and the current post of each seed
+/// slot, never its whole history ([`ThreadStoreProvider::materialize_window`]),
+/// so however long a thread runs, its context starts bounded and a view pages
+/// the rest from the store.
 #[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]

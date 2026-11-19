@@ -202,6 +202,12 @@ fn add_domain(table: &mut Table) {
 		// a `Value` is any value, taken as authored: what a param of no fixed
 		// shape reads, ie a row given as a JSON object in a request body
 		.add(|value: &Value| Ok(Some(value.clone())))
+		// a `Map` is any object, so markup authors one as a struct literal,
+		// `metadata:{claim:"{claim}"}`; anything else declines
+		.add(|value: &Value| match value {
+			Value::Map(map) => Ok(Some(map.clone())),
+			_ => Ok(None),
+		})
 		// a `"true"`/`"false"` string, so a markup `<RouteSidebar home="false"/>`
 		// authors a flag. Any other string errors rather than silently applying
 		// `false`.
@@ -557,6 +563,9 @@ mod test {
 		parse::<ValueSchema>(Value::str("u64"))
 			.unwrap()
 			.xpect_eq(Some(ValueSchema::U64(default())));
+		parse::<Map>(Value::Map(Map::new([("claim", "{claim}")])))
+			.unwrap()
+			.xpect_eq(Some(Map::new([("claim", "{claim}")])));
 	}
 
 	/// Each entry DECLINES the shape it has nothing to say about, so the
@@ -566,6 +575,7 @@ mod test {
 		parse::<u16>(Value::Bool(true)).unwrap().xpect_none();
 		parse::<bool>(Value::Bool(true)).unwrap().xpect_none();
 		parse::<String>(Value::Int(1)).unwrap().xpect_none();
+		parse::<Map>(Value::str("claim")).unwrap().xpect_none();
 		// a `Timestamp` has no entry, so every value declines to the newtype
 		// cast over its inner i64, which refuses a string
 		parse::<Timestamp>(Value::Int(5)).unwrap().xpect_none();

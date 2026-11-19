@@ -83,6 +83,92 @@ impl ThreadWindow {
 		}
 	}
 
+	/// The posts a model of `thread` reads, after an exclusive cursor: every
+	/// authored post but the session brackets ([`PostIntent::is_session`]) and
+	/// the earlier versions of the thread's own seed slots, so each slot is
+	/// sent as its current post alone. Both stay in the window, the record
+	/// and the view.
+	pub fn model_posts(
+		&self,
+		thread: &Thread,
+		after: Option<PostId>,
+	) -> Vec<AuthoredPost<'_>> {
+		self.posts_after(after)
+			.into_iter()
+			.filter(|view| {
+				!view.post.intent().is_session()
+					&& !Self::superseded(thread, view.post)
+			})
+			.collect()
+	}
+
+	/// Whether `post` is an earlier version of one of `thread`'s seed slots.
+	/// A branched thread's inherited posts are its parent's, and pass as
+	/// they are.
+	fn superseded(thread: &Thread, post: &Post) -> bool {
+		post.thread() == thread.id()
+			&& post.seed_slot().is_some()
+			&& !thread.seed().contains(&post.id())
+	}
+
+	/// Remove and answer every post, ie the freshly resolved seed posts an
+	/// entry reconciles against a stored thread's ([`Self::reconcile_seed`]).
+	pub fn take_posts(&mut self) -> Vec<Post> {
+		std::mem::take(&mut self.posts)
+	}
+
+	/// Bring each seed slot current against the resolved seed posts of this
+	/// session, `resolved` in slot order, answering the new slot list.
+	///
+	/// A slot whose current post (`current[slot]`, held in this window) says
+	/// what its resolved post says keeps it; one that changed, or that the
+	/// template added, appends the resolved post as its new version; a slot
+	/// the template removed drops from the list. Nothing earlier is touched,
+	/// so the history before an edited seed stays intact.
+	pub fn reconcile_seed(
+		&mut self,
+		current: &[PostId],
+		thread: ThreadId,
+		resolved: Vec<Post>,
+	) -> Vec<PostId> {
+		resolved
+			.into_iter()
+			.enumerate()
+			.map(|(slot, post)| {
+				let kept = current.get(slot).copied().filter(|id| {
+					self.posts
+						.iter()
+						.find(|stored| stored.id() == *id)
+						.is_some_and(|stored| stored.same_content(&post))
+				});
+				kept.unwrap_or_else(|| {
+					let id = post.id();
+					self.upsert_post(post.with_thread(thread));
+					id
+				})
+			})
+			.collect()
+	}
+
+	/// Merge a stored window's records under this one's: the stored posts
+	/// and metadata, then every actor of this window over the stored ones, so
+	/// the authored definitions win while the stored authors still resolve.
+	pub fn merge_stored(&mut self, stored: ThreadWindow) {
+		let ThreadWindow {
+			actors,
+			posts,
+			metas,
+		} = stored;
+		for (id, actor) in actors {
+			self.actors.entry(id).or_insert(actor);
+		}
+		for post in posts {
+			self.upsert_post(post);
+		}
+		self.metas.extend(metas);
+		self.posts.sort_by_key(|post| post.id());
+	}
+
 	// ── response metadata ───────────────────────────────────────────────
 
 	pub fn set_meta(&mut self, meta: ResponseMeta) {
@@ -113,16 +199,6 @@ impl ThreadWindow {
 				&& meta.response_stored)
 				.then_some((post.id(), meta))
 		})
-	}
-
-	/// Adopt a stored thread's records, replacing the authored seed with the
-	/// persisted conversation. Used by seed-hash load (see `load_thread`).
-	pub fn load_records(&mut self, actors: Vec<Actor>, posts: Vec<Post>) {
-		actors.into_iter().for_each(|actor| {
-			self.insert_actor(actor);
-		});
-		self.posts = posts;
-		self.posts.sort_by_key(|post| post.id());
 	}
 
 	/// Bound the window's image bytes: replace every image post older than the
@@ -261,19 +337,21 @@ impl ThreadWindow {
 	/// seed-only actor (eg the system prompt) is despawned, leaving no turn behind.
 	/// A thread still holding a [`SeedSource`] waits: its seed is read while
 	/// the thread builds, and the window reduces once every seed is a
-	/// [`SeedPost`], so the seed hash always covers the resolved text.
+	/// [`SeedPost`]. Each seed post is marked with its slot, its position in
+	/// that order, and the slots become the thread's [`Thread::seed`], which an
+	/// entry continuing a stored thread reconciles ([`Self::reconcile_seed`]).
 	///
 	/// Idempotent: gated on `Without<ThreadWindow>`, so it runs once per thread.
 	pub fn reduce(
 		mut commands: Commands,
-		threads: Query<(Entity, &Thread), Without<ThreadWindow>>,
+		mut threads: Query<(Entity, &mut Thread), Without<ThreadWindow>>,
 		children: Query<&Children>,
 		actors: Query<&Actor>,
 		seeds: Query<&SeedPost>,
 		#[cfg(feature = "action")] pending: Query<(), With<SeedSource>>,
 		#[cfg(feature = "action")] behaviors: Query<(), With<ActionMeta>>,
 	) -> Result {
-		for (thread_entity, thread) in threads.iter() {
+		for (thread_entity, mut thread) in threads.iter_mut() {
 			// a seed still being read: reduce once it lands
 			#[cfg(feature = "action")]
 			if children
@@ -284,6 +362,7 @@ impl ThreadWindow {
 			}
 			let thread_id = thread.id();
 			let mut window = ThreadWindow::new();
+			let mut seed = Vec::new();
 
 			// descendant actor entities, in author (DFS) order
 			let actor_entities = children
@@ -300,10 +379,12 @@ impl ThreadWindow {
 				// markup `<Slot/>` are still found; actors never nest, so every
 				// `SeedPost` under an actor entity is unambiguously its own.
 				for child in children.iter_descendants(actor_entity) {
-					if let Ok(seed) = seeds.get(child) {
-						window.upsert_post(
-							seed.clone().into_post(actor_id, thread_id),
-						);
+					if let Ok(seed_post) = seeds.get(child) {
+						let mut post =
+							seed_post.clone().into_post(actor_id, thread_id);
+						post.set_seed_slot(seed.len());
+						seed.push(post.id());
+						window.upsert_post(post);
 						commands.entity(child).despawn();
 					}
 				}
@@ -324,6 +405,7 @@ impl ThreadWindow {
 			}
 
 			window.posts.sort_by_key(|post| post.id());
+			thread.set_seed(seed);
 			commands.entity(thread_entity).insert(window);
 		}
 		Ok(())
@@ -353,35 +435,6 @@ impl ThreadWindow {
 			.await
 			.xok()
 	}
-
-	/// Compute the seed hash of a freshly-reduced [`ThreadWindow`]: the authored
-	/// actor definitions and seed-post content/author, excluding volatile post ids
-	/// and timestamps. Editing the seed changes the hash (forks a thread); editing
-	/// only behavior does not.
-	#[cfg(feature = "action")]
-	pub fn seed_hash(&self) -> u64 {
-		use std::hash::Hash;
-		use std::hash::Hasher;
-		let mut hasher = FixedHasher.build_hasher();
-
-		let mut actors = self.actors().values().collect::<Vec<_>>();
-		actors.sort_by_key(|actor| actor.id());
-		for actor in actors {
-			actor.id().hash(&mut hasher);
-			actor.name().hash(&mut hasher);
-			actor.kind().hash(&mut hasher);
-		}
-
-		let mut posts = self.posts().iter().collect::<Vec<_>>();
-		posts.sort_by_key(|post| post.id());
-		for post in posts {
-			post.author().hash(&mut hasher);
-			post.intent().hash(&mut hasher);
-			post.body_bytes().hash(&mut hasher);
-		}
-
-		hasher.finish()
-	}
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -396,6 +449,7 @@ pub struct ThreadWindowQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	actor_refs: Query<'w, 's, &'static ActorRef>,
 	windows: Query<'w, 's, (&'static Thread, &'static mut ThreadWindow)>,
+	synced: Query<'w, 's, &'static mut SyncedPosts>,
 }
 
 impl ThreadWindowQuery<'_, '_> {
@@ -433,6 +487,27 @@ impl ThreadWindowQuery<'_, '_> {
 	/// Append a post to the thread's window.
 	pub fn push_post(&mut self, entity: Entity, post: Post) -> Result {
 		self.window_mut(entity)?.upsert_post(post);
+		Ok(())
+	}
+
+	/// Record a response's `usage` on the meta of `post`, its last post,
+	/// which the next flush writes again even if it already went.
+	pub fn set_usage(
+		&mut self,
+		entity: Entity,
+		post: PostId,
+		usage: Usage,
+	) -> Result {
+		let thread_entity = self.thread_entity(entity)?;
+		let mut window = self.windows.get_mut(thread_entity)?.1;
+		let Some(mut meta) = window.meta(post).cloned() else {
+			return Ok(());
+		};
+		meta.usage = Some(usage);
+		window.set_meta(meta);
+		if let Ok(mut synced) = self.synced.get_mut(thread_entity) {
+			synced.remove(post);
+		}
 		Ok(())
 	}
 }

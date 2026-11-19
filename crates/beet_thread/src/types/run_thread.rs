@@ -12,8 +12,8 @@ use beet_net::prelude::*;
 /// ```rsx
 /// <TuiServer {(CallOnReady, SweepDescendants)}>
 ///     <Router>
-///         <Repeat {RunThread}>
-///             <Thread {Sequence}> ..actors.. </Thread>
+///         <Repeat {RunThread{metadata:{chat:"main"}}}>
+///             <Thread {(Sequence, MountThreadStore{path:"threads"})}> ..actors.. </Thread>
 ///         </Repeat>
 ///     </Router>
 /// </TuiServer>
@@ -23,35 +23,41 @@ use beet_net::prelude::*;
 ///
 /// - the thread's **entry point**, an [`ActionOverload<Request, Outcome>`]
 ///   adapting the entity's behavior (its `Sequence`, or the loop wrapping it) to
-///   a start request. Calling it adopts the thread's persistent store and reduces
-///   the authored scene *before* running the behavior, so every caller — the
-///   start verb, a test, a serverless scene — gets a correct thread. It claims no
-///   action slot, so the behavior keeps its own.
+///   a start request. Calling it enters every thread under it
+///   ([`Thread::enter`]) *before* running the behavior, and closes their
+///   sessions once it ends, so every caller (the start verb, a test, a
+///   serverless scene) gets a correct thread. It claims no action slot, so
+///   the behavior keeps its own.
 /// - a [`CallOnStart`], which is what calls that entry point when the ancestral
-///   run starts. It gets the start request (for `--new`) without owning argv, and
-///   works identically under a launched entry, which fires the same request shape.
+///   run starts. It gets the start request (for its [`ThreadEntryParams`])
+///   without owning argv, and works identically under a launched entry, which
+///   fires the same request shape.
 ///
 /// The call is detached, so a finite loop ([`RepeatTimes`],
 /// [`RepeatWhileFunctionCallOutput`]) completes and leaves the servers serving
-/// the final transcript, while an endless [`Repeat`] simply never returns.
+/// the final transcript, while an endless [`Repeat`] simply never returns, its
+/// session never closing.
 /// Calling the **thread**, never an "agent", is the whole point: the `Sequence`
 /// is the behavior and runs its actors in order.
 ///
-/// When the thread declares a [`MountThreadStore`] the stored conversation is
-/// adopted by seed hash before the first turn, so a reload resumes instead of
-/// re-replying; `--new` (carried on the start request) discards it and starts
-/// fresh. A thread built per request rather than per entry is a
-/// [`ThreadRoute`].
+/// A thread under it declaring a [`MountThreadStore`] continues the newest
+/// stored thread whose metadata holds every entry of `metadata`, so a restart
+/// resumes; declaring none, it starts a thread every run. A thread built per
+/// request rather than per entry is a [`ThreadRoute`].
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(CallOnStart)]
 #[require(ActionOverload<Request, Outcome> = RunThread::entry())]
-pub struct RunThread;
+pub struct RunThread {
+	/// The entries a thread this verb creates is stamped with, and that an
+	/// entry continues a stored thread by. Empty starts a thread every run.
+	pub metadata: Map,
+}
 
 impl RunThread {
 	/// The thread's entry point: enter every thread at or under the entity
-	/// ([`Thread::enter`], honoring `--new` on the request), then run the
-	/// behavior to completion.
+	/// ([`Thread::enter`], with the request's [`ThreadEntryParams`]), run
+	/// the behavior to completion, then close each session.
 	///
 	/// An [`ActionOverload`] rather than a free function, so the entity's
 	/// [`ActionMeta`] advertises the whole thread as `Request -> Outcome` and no
@@ -62,21 +68,30 @@ impl RunThread {
 		ActionOverload::new(Action::new_async(
 			async |cx: ActionContext<Request>| -> Result<Outcome> {
 				let entity = cx.caller.clone();
-				// `--new` rides the start request, never a global env read mid-load.
-				Self::enter_all(&entity, cx.input.has_param("new")).await?;
+				let metadata = entity.get_cloned::<RunThread>().await?.metadata;
+				// the params ride the start request, never a global env read
+				let params =
+					cx.input.parts().parse_params::<ThreadEntryParams>()?;
+				let entry = ThreadEntry::new(metadata, params);
+				let threads = Self::enter_all(&entity, &entry).await?;
 				// the canonical action, resolved by its own signature: an endless
 				// `Repeat` never returns, a finite loop completes while the servers
 				// stay parked.
-				entity.call::<(), Outcome>(()).await
+				let outcome = entity.call::<(), Outcome>(()).await;
+				Self::close_all(&entity.world(), &threads, &outcome).await?;
+				outcome
 			},
 		))
 	}
 
-	/// Enter every [`Thread`] at or under `root`, in tree order
-	/// ([`Thread::enter`]). Each entry reduces its thread first, ahead of the
-	/// scheduled `First` reduce, so the behavior never receives raw,
-	/// action-less `<CreateActor>` spans.
-	pub(crate) async fn enter_all(root: &AsyncEntity, new: bool) -> Result {
+	/// Enter every [`Thread`] at or under `root` with `entry`, in tree order
+	/// ([`Thread::enter`]), answering them. Each entry reduces its thread
+	/// first, ahead of the scheduled `First` reduce, so the behavior never
+	/// receives raw, action-less `<CreateActor>` spans.
+	pub(crate) async fn enter_all(
+		root: &AsyncEntity,
+		entry: &ThreadEntry,
+	) -> Result<Vec<Entity>> {
 		let world = root.world().clone();
 		let threads = root
 			.with_state::<(Query<&Children>, Query<(), With<Thread>>), _>(
@@ -88,8 +103,27 @@ impl RunThread {
 				},
 			)
 			.await?;
+		for thread in &threads {
+			Thread::enter(world.clone(), *thread, entry.clone()).await?;
+		}
+		threads.xok()
+	}
+
+	/// Close every session `threads` opened with the behavior's `outcome`, an
+	/// error closing as a fail, then wait for each thread's records to reach
+	/// its store.
+	pub(crate) async fn close_all(
+		world: &AsyncWorld,
+		threads: &[Entity],
+		outcome: &Result<Outcome>,
+	) -> Result {
+		let outcome = match outcome {
+			Ok(outcome) => *outcome,
+			Err(_) => Outcome::FAIL,
+		};
 		for thread in threads {
-			Thread::enter(world.clone(), thread, new).await?;
+			Thread::close(world, *thread, outcome).await?;
+			ThreadStore::flush(&world.entity(*thread)).await?;
 		}
 		Ok(())
 	}
@@ -105,16 +139,19 @@ mod test {
 	/// The directory every scene keeps its thread records under.
 	const RECORDS: &str = "threads";
 
-	/// A persistent thread scene: pinned actor ids so the seed hash is stable
-	/// across runs, one system seed and one mock agent. One agent turn, no loop,
-	/// so the run finishes.
+	/// A persistent thread scene continuing by its metadata: pinned actor
+	/// ids, one system seed and one mock agent. One agent turn, no loop, so
+	/// the run finishes.
 	fn scene(system: ActorId, agent: ActorId) -> impl Bundle {
 		(
 			Thread::default(),
 			Sequence::new(),
-			RunThread,
+			RunThread {
+				metadata: Map::new([("chat", "main")]),
+			},
 			MountThreadStore {
 				path: RelPath::new(RECORDS),
+				..default()
 			},
 			children![
 				(
@@ -181,23 +218,23 @@ mod test {
 			.len()
 	}
 
-	/// A `{MountThreadStore}` thread, run twice against the same store, adopts the
-	/// stored thread on reload rather than forking a duplicate. Regression for the
-	/// deferred mount: the sync used to flush the fresh, un-adopted thread before
-	/// adoption ran, growing the store to two threads on the second run.
+	/// A `{MountThreadStore}` thread, run twice against the same store,
+	/// continues the stored thread its metadata names rather than creating a
+	/// duplicate. Regression for the deferred mount: the sync used to flush the
+	/// fresh, un-adopted thread before adoption ran, growing the store to two
+	/// threads on the second run.
 	// runs a full app twice; the async flushes can exceed the 5s default under
 	// parallel test load.
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn reload_adopts_without_duplicating() {
 		let store = BlobStore::temp();
-		// stable ids so the seed hash matches across runs
 		let system = ActorId::from_u128(1);
 		let agent = ActorId::from_u128(2);
 
 		run_once(&store, system, agent);
 		stored_threads(&store).await.xpect_eq(1);
 
-		// reload: the same seed hash adopts the stored thread, no duplicate
+		// reload: the same metadata continues the stored thread, no duplicate
 		run_once(&store, system, agent);
 		stored_threads(&store).await.xpect_eq(1);
 	}
@@ -217,7 +254,7 @@ mod test {
 
 		// .. then re-run it by calling the entity itself. An un-adopted thread
 		// would run its seed alone, ending on two posts rather than continuing the
-		// stored conversation.
+		// stored conversation, its sessions aside.
 		let mut app = app();
 		let root = app.world_mut().spawn(store.clone()).id();
 		let thread = app
@@ -229,7 +266,9 @@ mod test {
 			.get::<ThreadWindow>(thread)
 			.unwrap()
 			.posts()
-			.len()
+			.iter()
+			.filter(|post| !post.intent().is_session())
+			.count()
 			.xpect_eq(3);
 		stored_threads(&store).await.xpect_eq(1);
 	}
@@ -240,10 +279,15 @@ mod test {
 	async fn kicks_only_its_own_entry() {
 		let mut app = app();
 		let ephemeral = || {
-			(Thread::default(), Sequence::new(), RunThread, children![
-				(Actor::user(), children![Post::spawn("hello")]),
-				(Actor::agent(), MockPostStreamer::default()),
-			])
+			(
+				Thread::default(),
+				Sequence::new(),
+				RunThread::default(),
+				children![
+					(Actor::user(), children![Post::spawn("hello")]),
+					(Actor::agent(), MockPostStreamer::default()),
+				],
+			)
 		};
 		let booted = app
 			.world_mut()
@@ -269,5 +313,24 @@ mod test {
 		(replies(&mut app, booted) > 1).xpect_true();
 		// ... while the untouched entry never ran its own
 		replies(&mut app, idle).xpect_eq(1);
+	}
+
+	/// Markup declares the metadata a `RunThread` continues by as a struct
+	/// literal, as `examples/thread/persistent_chat.bsx` does.
+	#[beet_core::test]
+	fn declares_its_metadata_in_markup() {
+		let mut app = app();
+		let entity = BsxTemplate::parse_entry(
+			app.world(),
+			r#"<Repeat {RunThread{metadata:{chat:"persistent"}}}/>"#,
+		)
+		.unwrap()
+		.spawn(app.world_mut())
+		.unwrap();
+		app.world()
+			.get::<RunThread>(entity)
+			.unwrap()
+			.metadata
+			.xpect_eq(Map::new([("chat", "persistent")]));
 	}
 }

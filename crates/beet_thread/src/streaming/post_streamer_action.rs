@@ -71,6 +71,7 @@ where
 	let streamer = cx.input;
 	let mut stream = streamer.stream_posts(cx.caller.clone()).await?;
 	let mut function_calls = HashMap::new();
+	let mut last_created = None;
 
 	while let Some(changes) = stream.next().await {
 		let changes = changes?;
@@ -87,6 +88,9 @@ where
 
 		// build response metas only once posts have been created
 		let PostChanges { created, modified } = changes;
+		if let Some(post) = created.last() {
+			last_created = Some(post.id());
+		}
 		let metas = if created.is_empty() {
 			Vec::new()
 		} else {
@@ -115,18 +119,28 @@ where
 			.await??;
 	}
 
-	// log prompt-cache hit rate, for tuning the append-only window (see perceive-act).
-	if let Some(usage) = stream.token_usage() {
-		let cached = usage.cached_input_tokens.unwrap_or(0);
+	// the response's usage lands on its last post's meta, so a session's
+	// total counts each response once; log the prompt-cache hit rate, for
+	// tuning the append-only window (see perceive-act).
+	if let Some(usage) = stream.token_usage().map(Usage::from) {
 		let pct = if usage.input_tokens > 0 {
-			cached as f32 / usage.input_tokens as f32 * 100.0
+			usage.cached_input_tokens as f32 / usage.input_tokens as f32 * 100.0
 		} else {
 			0.0
 		};
 		info!(
-			"tokens: {} in ({cached} cached {pct:.0}%), {} out",
-			usage.input_tokens, usage.output_tokens
+			"tokens: {} in ({} cached {pct:.0}%), {} out",
+			usage.input_tokens, usage.cached_input_tokens, usage.output_tokens
 		);
+		if let Some(post) = last_created {
+			cx.caller
+				.with_state::<ThreadWindowQuery, _>(
+					move |entity, mut window_mut| {
+						window_mut.set_usage(entity, post, usage)
+					},
+				)
+				.await??;
+		}
 	}
 	call_functions(cx.caller, function_calls.into_values()).await?;
 

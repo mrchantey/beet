@@ -15,14 +15,23 @@
 //! scene wraps its routes in `beet_router`'s chrome-free `AppShell`.
 //! `beet_ui` never depends on `beet_thread`; this layer is additive, behind the
 //! `ui` feature.
+//!
+//! Beside them, a [`ThreadNavigator`] shows the threads of a workspace as a
+//! tree by lineage, read from records and joined with the live thread entities
+//! by id, and binds the view and composer beside it to the thread selected,
+//! following whichever awaits the owner ([`AwaitingOwner`]).
 
 // the served surface's end-to-end suite
 #[cfg(test)]
 mod chat_surface;
 mod input;
+#[cfg(test)]
+mod test_ext;
 pub use input::*;
 mod of_thread;
 pub use of_thread::*;
+mod thread_navigator;
+pub use thread_navigator::*;
 mod thread_view;
 pub use thread_view::*;
 
@@ -44,12 +53,31 @@ impl Plugin for ThreadUiPlugin {
 			// the thread<->UI relationship binding views/forms to their thread
 			.register_type::<OfThread>()
 			.register_type::<ThreadItems>()
-			.register_type::<UserInput>();
+			.register_type::<UserInput>()
+			.register_type::<AwaitingOwner>()
+			.register_type::<ThreadNavigator>()
+			.register_type::<ViewOnlyThread>();
 		// project each window into its views' documents, then pin to the bottom
 		app.add_systems(
 			Update,
-			(project_window_to_document, follow_thread_scroll).chain(),
-		);
+			(
+				(
+					read_navigator_records,
+					follow_awaiting_owner,
+					bind_navigator_selection,
+					project_navigators,
+				)
+					.chain(),
+				(
+					project_window_to_document,
+					page_on_scroll_top,
+					follow_thread_scroll,
+				)
+					.chain(),
+			)
+				.chain(),
+		)
+		.add_observer(load_older_posts);
 		// The form's empty-on-submit (`ClearOnSubmit`) and initial focus
 		// (`FocusOnAdd`) are generic `beet_ui` markers spread by the form's rust
 		// template (see `input.rs`); surface scoping is the host's job (it
