@@ -45,7 +45,7 @@ pub fn RequestPost(
 
 /// Marks a [`SeedPost`] as the message of the request its thread's session
 /// serves: the reduction sets it aside rather than seeding the thread, and
-/// [`ThreadWindow::open_session`] posts it after the session's opened post.
+/// [`ThreadRecords::open_session`] posts it after the session's opened post.
 #[derive(Debug, Default, Clone, Copy, Component)]
 pub struct RequestMessage;
 

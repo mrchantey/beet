@@ -197,12 +197,12 @@ impl PostStreamer for MockPostStreamer {
 						String,
 						Option<(String, JsonSchema)>,
 					)> {
-						let (_, thread, window) =
-							query.thread_and_window(actor_entity)?;
+						let (_, thread, records) =
+							query.thread_and_records(actor_entity)?;
 						let agent_id = query.actor_id(actor_entity)?;
 
 						// Extract last user text
-						let last_text = window
+						let last_text = records
 							.model_posts(None)
 							.into_iter()
 							.filter(|view| view.actor.kind() == ActorKind::User)
@@ -429,7 +429,7 @@ mod test {
 				),
 			]))
 			.id();
-		ThreadWindow::reduce_now(&mut world);
+		ThreadRecords::reduce_now(&mut world);
 		let agent = world
 			.entity(agent)
 			.get::<Children>()
@@ -445,7 +445,8 @@ mod test {
 				.unwrap();
 		}
 		let thread = world.entity(agent).get::<ChildOf>().unwrap().parent();
-		let posts = world.get::<ThreadWindow>(thread).unwrap().posts().to_vec();
+		let posts =
+			world.get::<ThreadRecords>(thread).unwrap().posts().to_vec();
 		posts
 			.iter()
 			.find_map(|post| match post.as_agent_post()? {

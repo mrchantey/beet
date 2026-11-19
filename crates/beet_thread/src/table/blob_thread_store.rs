@@ -42,7 +42,7 @@ impl BlobThreadStore {
 			snapshot: Arc::new(Mutex::new(None)),
 		}
 	}
-	/// An in-memory thread store, ie for tests and the hot window.
+	/// An in-memory thread store, ie for tests and the hot in-memory records.
 	pub fn temp() -> Self { Self::new(BlobStore::temp()) }
 
 	/// Every thread store kept beneath `dir` in `store`, each the directory

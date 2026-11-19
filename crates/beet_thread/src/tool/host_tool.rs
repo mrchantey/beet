@@ -459,7 +459,7 @@ mod test {
 			.unwrap();
 		app.world_mut().entity_mut(host).add_child(thread);
 		app.update();
-		ThreadWindow::reduce_now(app.world_mut());
+		ThreadRecords::reduce_now(app.world_mut());
 		let agent = app
 			.world_mut()
 			.query_filtered::<Entity, With<MockPostStreamer>>()
@@ -483,7 +483,7 @@ mod test {
 				.unwrap();
 		}
 		app.world()
-			.get::<ThreadWindow>(thread)
+			.get::<ThreadRecords>(thread)
 			.unwrap()
 			.posts()
 			.iter()

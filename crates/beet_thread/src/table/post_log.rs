@@ -4,7 +4,7 @@
 //! `{"kind":"session_opened", ..}`, the rest of the object that kind's
 //! fields. The intent is closed and the kinds are open: any crate adds one by
 //! implementing [`LogKind`], and model input skips every log post by its
-//! intent alone ([`ThreadWindow::model_posts`]), so a kind needs no
+//! intent alone ([`ThreadRecords::model_posts`]), so a kind needs no
 //! registration to stay out of it. A view renders a kind it knows its own way
 //! and any other by its name ([`Post::log_kind`]).
 use crate::prelude::*;

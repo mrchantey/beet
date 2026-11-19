@@ -7,8 +7,8 @@ impl Post {
 	/// run the thread to completion, and collect the posts it authored.
 	///
 	/// You **call the thread**, not "the agent": the scene reduces into a
-	/// [`ThreadWindow`], then calling the thread's `Sequence` runs each actor's turn
-	/// in document order. Whatever posts land after the seed window are returned, ie
+	/// [`ThreadRecords`], then calling the thread's `Sequence` runs each actor's turn
+	/// in document order. Whatever posts land after the seed are returned, ie
 	/// the replies. This presumes no topology, so it works for zero, one, or many
 	/// agents, with or without a user actor.
 	///
@@ -31,23 +31,23 @@ impl Post {
 			))
 			.id();
 		world.flush();
-		// reduce the author scene into a ThreadWindow + behavior entities
-		ThreadWindow::reduce_now(world);
+		// reduce the author scene into a ThreadRecords + behavior entities
+		ThreadRecords::reduce_now(world);
 
-		// a cursor past the seed window, so only the turn's posts come back
-		let cursor =
-			world.with_state::<Query<&ThreadWindow>, _>(move |windows| {
-				windows
-					.get(thread)
-					.ok()
-					.and_then(|window| window.last_post().map(|post| post.id()))
-			});
+		// a cursor past the seed, so only the turn's posts come back
+		let cursor = world.with_state::<Query<&ThreadRecords>, _>(
+			move |thread_records| {
+				thread_records.get(thread).ok().and_then(|records| {
+					records.last_post().map(|post| post.id())
+				})
+			},
+		);
 
 		world.entity_mut(thread).call::<(), Outcome>(()).await?;
 
-		world.with_state::<Query<&ThreadWindow>, _>(
-			move |windows| -> Result<Vec<Post>> {
-				windows
+		world.with_state::<Query<&ThreadRecords>, _>(
+			move |thread_records| -> Result<Vec<Post>> {
+				thread_records
 					.get(thread)?
 					.posts_after(cursor)
 					.into_iter()

@@ -33,10 +33,10 @@ pub(crate) async fn call_functions(
 		};
 
 		agent
-			.with_state::<ThreadWindowQuery, Result>(
-				move |entity, mut window_mut| {
-					let actor_id = window_mut.actor_id(entity)?;
-					let thread_id = window_mut.thread_id(entity)?;
+			.with_state::<ThreadRecordsQuery, Result>(
+				move |entity, mut records_mut| {
+					let actor_id = records_mut.actor_id(entity)?;
+					let thread_id = records_mut.thread_id(entity)?;
 
 					let post = AgentPost::new_function_call_output(
 						actor_id,
@@ -46,7 +46,7 @@ pub(crate) async fn call_functions(
 						call.name().to_string().xsome(),
 						PostStatus::Completed,
 					);
-					window_mut.push_post(entity, post)
+					records_mut.push_post(entity, post)
 				},
 			)
 			.await??;
@@ -133,7 +133,7 @@ mod test {
 			.unwrap();
 		app.world_mut().entity_mut(thread).insert(store.clone());
 		app.update();
-		ThreadWindow::reduce_now(app.world_mut());
+		ThreadRecords::reduce_now(app.world_mut());
 		let agents = app
 			.world_mut()
 			.query_filtered::<Entity, With<MockPostStreamer>>()
@@ -182,7 +182,7 @@ mod test {
 			.xpect_false();
 		let outputs = app
 			.world()
-			.get::<ThreadWindow>(thread)
+			.get::<ThreadRecords>(thread)
 			.unwrap()
 			.posts()
 			.iter()
@@ -221,7 +221,7 @@ mod test {
 			.spawn(app.world_mut())
 			.unwrap();
 		app.update();
-		ThreadWindow::reduce_now(app.world_mut());
+		ThreadRecords::reduce_now(app.world_mut());
 		let thread = app.world().entity(root).get::<Children>().unwrap()[0];
 		app.world_mut()
 			.entity_mut(thread)
@@ -229,7 +229,7 @@ mod test {
 			.await
 			.unwrap();
 		app.world()
-			.get::<ThreadWindow>(thread)
+			.get::<ThreadRecords>(thread)
 			.unwrap()
 			.last_post()
 			.unwrap()

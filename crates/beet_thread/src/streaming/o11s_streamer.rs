@@ -102,13 +102,13 @@ impl O11sStreamer {
 				move |actor_entity,
 				      query|
 				      -> Result<(o11s::RequestBody, ActorId, ThreadId)> {
-					let (_, thread, window) =
-						query.thread_and_window(actor_entity)?;
+					let (_, thread, records) =
+						query.thread_and_records(actor_entity)?;
 					let agent_id = query.actor_id(actor_entity)?;
 
 					// get last received response meta
 					let last_received = if this.use_previous_response_id {
-						window.stored_response(
+						records.stored_response(
 							agent_id,
 							&this.model.provider_slug,
 							&this.model.model_slug,
@@ -118,7 +118,7 @@ impl O11sStreamer {
 					};
 
 					// get input items (from last received if caching)
-					let items = window
+					let items = records
 						.model_posts(last_received.map(|(post_id, _)| post_id))
 						.into_iter()
 						.xtry_map(|post| {

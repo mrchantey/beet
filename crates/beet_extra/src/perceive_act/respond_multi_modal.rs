@@ -50,7 +50,7 @@ pub async fn RespondMultiModal(
 			}
 		})
 		.await?;
-	// the model latency: time since the cycle's photo landed in the window
+	// the model latency: time since the cycle's photo landed in the records
 	let (cycle, model_secs) = cx
 		.caller
 		.world()

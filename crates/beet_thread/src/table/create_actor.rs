@@ -94,7 +94,7 @@ mod test {
 			.unwrap()
 			.spawn(app.world_mut())
 			.unwrap();
-		ThreadWindow::reduce_now(app.world_mut());
+		ThreadRecords::reduce_now(app.world_mut());
 		// every remaining direct child of the Sequence must carry ActionMeta, else
 		// `Sequence::valid_children` bails "sequence child has no action".
 		let children: Vec<Entity> = app
@@ -126,7 +126,7 @@ mod test {
 			.unwrap()
 			.spawn(app.world_mut())
 			.unwrap();
-		ThreadWindow::reduce_now(app.world_mut());
+		ThreadRecords::reduce_now(app.world_mut());
 
 		let thread = app
 			.world_mut()
@@ -136,7 +136,7 @@ mod test {
 			.unwrap();
 		let kinds = app
 			.world()
-			.get::<ThreadWindow>(thread)
+			.get::<ThreadRecords>(thread)
 			.unwrap()
 			.actors()
 			.values()
@@ -202,15 +202,15 @@ line three'/>
 			.unwrap()
 			.spawn(app.world_mut())
 			.unwrap();
-		ThreadWindow::reduce_now(app.world_mut());
+		ThreadRecords::reduce_now(app.world_mut());
 
-		let window = app.world().get::<ThreadWindow>(thread).unwrap();
-		window.posts()[0].to_string().xpect_eq(
+		let records = app.world().get::<ThreadRecords>(thread).unwrap();
+		records.posts()[0].to_string().xpect_eq(
 			"line one\nrespond: \"I open the door..\"\nline three".to_string(),
 		);
 	}
 
-	/// A `.bsx` author scene reduces into a `ThreadWindow` + behavior scene just
+	/// A `.bsx` author scene reduces into a `ThreadRecords` + behavior scene just
 	/// like a Rust one: `<CreateActor>` actors, `<CreatePost>` seeds, a spread
 	/// `{ModelStreamer}` behavior.
 	#[beet_core::test]
@@ -232,13 +232,13 @@ line three'/>
 "#;
 		let template = BsxTemplate::parse_entry(app.world(), source).unwrap();
 		let thread = template.spawn(app.world_mut()).unwrap();
-		ThreadWindow::reduce_now(app.world_mut());
+		ThreadRecords::reduce_now(app.world_mut());
 
-		// the window holds both actors and the seed post
-		let window = app.world().get::<ThreadWindow>(thread).unwrap();
-		window.actors().len().xpect_eq(2);
-		window.posts().len().xpect_eq(1);
-		window.posts()[0]
+		// the records hold both actors and the seed post
+		let records = app.world().get::<ThreadRecords>(thread).unwrap();
+		records.actors().len().xpect_eq(2);
+		records.posts().len().xpect_eq(1);
+		records.posts()[0]
 			.to_string()
 			.xpect_eq("be helpful".to_string());
 

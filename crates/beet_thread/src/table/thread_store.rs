@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Tracks which window posts have already been flushed to the [`ThreadStore`],
-/// so a coarse `Changed<ThreadWindow>` only commits newly-completed posts.
+/// Tracks which of a thread's posts have already been flushed to the [`ThreadStore`],
+/// so a coarse `Changed<ThreadRecords>` only commits newly-completed posts.
 /// Loaded history is pre-marked, so it is never re-written.
 #[derive(Debug, Default, Clone, Component)]
 pub struct SyncedPosts(HashSet<PostId>);
@@ -15,24 +15,24 @@ impl SyncedPosts {
 	pub fn remove(&mut self, id: PostId) { self.0.remove(&id); }
 }
 
-/// Flush a thread's window to its [`ThreadStore`] whenever the window changes.
+/// Flush a thread's records to its [`ThreadStore`] whenever its records change.
 ///
-/// The window is the single in-memory truth the scene streams into; this is the
+/// The records are the single in-memory truth the scene streams into; this is the
 /// one channel that persists it. Only completed (`!in_progress`) posts not yet
 /// in [`SyncedPosts`] are committed, with their authoring actors and any
 /// response metadata ([`ThreadFlush`]); the thread record is idempotent (keyed
 /// by id). Each flush is a task counted on its store, which
 /// [`ThreadStore::flush`] awaits. Threads without a [`ThreadStore`] are
 /// ignored.
-pub(crate) fn sync_window_to_store(
+pub(crate) fn sync_records_to_store(
 	async_commands: AsyncCommands,
 	mut changed: Query<
-		(&Thread, &ThreadWindow, &ThreadStore, &mut SyncedPosts),
-		Changed<ThreadWindow>,
+		(&Thread, &ThreadRecords, &ThreadStore, &mut SyncedPosts),
+		Changed<ThreadRecords>,
 	>,
 ) -> Result {
-	for (thread, window, store, mut synced) in changed.iter_mut() {
-		if let Some(flush) = ThreadFlush::take(thread, window, &mut synced) {
+	for (thread, records, store, mut synced) in changed.iter_mut() {
+		if let Some(flush) = ThreadFlush::take(thread, records, &mut synced) {
 			store.spawn_flush(&async_commands, flush);
 		}
 	}
@@ -64,7 +64,7 @@ mod test {
 			.id();
 		app.update();
 
-		// run the agent so it replies into the window
+		// run the agent so it replies into the records
 		let agent = app
 			.world_mut()
 			.with_state::<Query<Entity, (With<ActorRef>, With<Action<(), Outcome>>)>, _>(

@@ -13,7 +13,7 @@ pub type ThreadId = Uuid7<Thread>;
 /// - [`Self::spawned_by`]: the post whose action started this thread, ie a
 ///   loop's decision or a delegate call. Causal only, no context comes with it.
 /// - [`Self::branch_of`]: the post this thread continues the history of before
-///   going its own way. Its window is its ancestors' posts up to each branch
+///   going its own way. Its history is its ancestors' posts up to each branch
 ///   point, referenced rather than copied, then its own.
 ///
 /// A thread may be both: a subagent seeing its parent's context is spawned by

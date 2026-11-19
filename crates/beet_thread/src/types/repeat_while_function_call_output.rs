@@ -11,7 +11,7 @@ async fn has_pending_function_call_output(
 	thread_entity
 		.with_state::<ThreadQuery, _>(|entity, query| -> Result<bool> {
 			query
-				.window(entity)?
+				.records(entity)?
 				.last_post()
 				.and_then(AgentPost::new)
 				.map(|post| post.is_function_call_output())

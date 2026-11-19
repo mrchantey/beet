@@ -3,7 +3,7 @@
 //! `main.bsx` character prompt and an `images/` set it can display. Rotation is an
 //! in-place content swap: the fixed system prompt, socket server, capability routes
 //! and head connection all survive, and each new character is *appended* as a user
-//! turn (never mutating or clearing the window), so the creature carries its memory
+//! turn (never mutating or clearing the records), so the creature carries its memory
 //! across incarnations.
 //!
 //! [`RotateScene`] runs as its own `Sequence` step before the camera turn
@@ -332,18 +332,18 @@ async fn apply_scene(
 	let visited = plan.visited.clone();
 	// append the character prompt as a user turn and update the active scene.
 	caller
-		.with_state::<(ThreadWindowQuery, AncestorQuery<&mut ActiveScene>), _>(
-			move |entity, (mut windows, mut actives)| -> Result {
-				let thread_id = windows.thread_id(entity)?;
+		.with_state::<(ThreadRecordsQuery, AncestorQuery<&mut ActiveScene>), _>(
+			move |entity, (mut thread_records, mut actives)| -> Result {
+				let thread_id = thread_records.thread_id(entity)?;
 				// author as this entity's actor when it runs inside one (an
 				// `ActorRef`), else as the thread's first user-kind actor: the
 				// standalone `<RotateScene/>` step appends scene characters as
 				// user turns, the camera's role.
-				let author = windows.actor_id(entity).ok();
-				let mut window = windows.window_mut(entity)?;
+				let author = thread_records.actor_id(entity).ok();
+				let mut records = thread_records.records_mut(entity)?;
 				let author = author
 					.or_else(|| {
-						window
+						records
 							.actors()
 							.values()
 							.filter(|actor| actor.kind() == ActorKind::User)
@@ -353,10 +353,10 @@ async fn apply_scene(
 					.ok_or_else(|| {
 						bevyhow!(
 							"scene rotation needs an author: no ActorRef on \
-							the caller and no user-kind actor in the window"
+							the caller and no user-kind actor in the records"
 						)
 					})?;
-				window.upsert_post(AgentPost::new_text(
+				records.upsert_post(AgentPost::new_text(
 					author,
 					thread_id,
 					prompt,

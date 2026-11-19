@@ -1,5 +1,5 @@
 //! Each thread example's `.bsx` author scene parses + reduces into the expected
-//! `ThreadWindow` + behavior, guarding the shipped scenes against drift. The
+//! `ThreadRecords` + behavior, guarding the shipped scenes against drift. The
 //! agent scenes use OpenAi, whose streamer resolves an auth env at build, so a
 //! dummy key is set; no network is touched (reduction only).
 beet::test_main!();
@@ -57,7 +57,7 @@ async fn reduce(source: &str) -> App {
 		.unwrap()
 		.spawn(app.world_mut())
 		.unwrap();
-	ThreadWindow::reduce_now(app.world_mut());
+	ThreadRecords::reduce_now(app.world_mut());
 	app.world_mut().flush();
 	app
 }
@@ -141,20 +141,24 @@ fn assert_served_shape(app: &mut App) {
 }
 
 /// The reduced thread's `(actor count, seed-post count)`.
-fn window_counts(app: &mut App) -> (usize, usize) {
+fn record_counts(app: &mut App) -> (usize, usize) {
 	let mut threads = app.world_mut().query_filtered::<Entity, With<Thread>>();
 	let thread = threads.iter(app.world()).next().unwrap();
-	let window = app.world().get::<ThreadWindow>(thread).unwrap();
-	(window.actors().len(), window.posts().len())
+	let records = app.world().get::<ThreadRecords>(thread).unwrap();
+	(records.actors().len(), records.posts().len())
 }
 
-/// The kinds of every actor in the reduced window, so a scene's `kind="..."`
+/// The kinds of every actor in the reduced records, so a scene's `kind="..."`
 /// attributes are verified to resolve (not silently default to `Agent`).
 fn actor_kinds(app: &mut App) -> Vec<ActorKind> {
 	let mut threads = app.world_mut().query_filtered::<Entity, With<Thread>>();
 	let thread = threads.iter(app.world()).next().unwrap();
-	let window = app.world().get::<ThreadWindow>(thread).unwrap();
-	window.actors().values().map(|actor| actor.kind()).collect()
+	let records = app.world().get::<ThreadRecords>(thread).unwrap();
+	records
+		.actors()
+		.values()
+		.map(|actor| actor.kind())
+		.collect()
 }
 
 /// Count of reduced agents: an `ActorRef` carrying a model streamer.
@@ -184,7 +188,7 @@ async fn chat_scene_reduces() {
 	let mut app = reduce(include_str!("../examples/thread/chat.bsx")).await;
 	assert_crate_check_passed(&mut app);
 	assert_served_shape(&mut app);
-	window_counts(&mut app).xpect_eq((3, 1));
+	record_counts(&mut app).xpect_eq((3, 1));
 	agent_count(&mut app).xpect_eq(1);
 	// the `kind="System"` / `kind="User"` attributes resolve, rather than
 	// silently defaulting to `Agent`
@@ -199,7 +203,7 @@ async fn multi_agent_scene_reduces() {
 		reduce(include_str!("../examples/thread/multi_agent.bsx")).await;
 	assert_crate_check_passed(&mut app);
 	assert_served_shape(&mut app);
-	window_counts(&mut app).xpect_eq((3, 1));
+	record_counts(&mut app).xpect_eq((3, 1));
 	// two differently-instructed agents reduce side by side
 	agent_count(&mut app).xpect_eq(2);
 }
@@ -210,7 +214,7 @@ async fn tool_call_scene_reduces() {
 		reduce(include_str!("../examples/thread/tool_call.bsx")).await;
 	assert_crate_check_passed(&mut app);
 	assert_served_shape(&mut app);
-	window_counts(&mut app).xpect_eq((2, 1));
+	record_counts(&mut app).xpect_eq((2, 1));
 	agent_count(&mut app).xpect_eq(1);
 	// the inline `<AgentChoiceAction/>` reduced to a routed tool
 	tool_count(&mut app).xpect_eq(1);
@@ -222,7 +226,7 @@ async fn self_evolving_scene_reduces() {
 		reduce(include_str!("../examples/thread/self_evolving.bsx")).await;
 	assert_crate_check_passed(&mut app);
 	assert_served_shape(&mut app);
-	window_counts(&mut app).xpect_eq((2, 1));
+	record_counts(&mut app).xpect_eq((2, 1));
 	agent_count(&mut app).xpect_eq(1);
 	// the `<StoreToolset/>` reduced to the five blob tools
 	tool_count(&mut app).xpect_eq(5);
@@ -234,7 +238,7 @@ async fn coding_agent_scene_reduces() {
 		reduce(include_str!("../examples/thread/coding_agent.bsx")).await;
 	assert_crate_check_passed(&mut app);
 	assert_served_shape(&mut app);
-	window_counts(&mut app).xpect_eq((2, 1));
+	record_counts(&mut app).xpect_eq((2, 1));
 	agent_count(&mut app).xpect_eq(1);
 	tool_count(&mut app).xpect_eq(5);
 }
@@ -245,7 +249,7 @@ async fn persistent_chat_scene_reduces() {
 		reduce(include_str!("../examples/thread/persistent_chat.bsx")).await;
 	assert_crate_check_passed(&mut app);
 	assert_served_shape(&mut app);
-	window_counts(&mut app).xpect_eq((3, 1));
+	record_counts(&mut app).xpect_eq((3, 1));
 	agent_count(&mut app).xpect_eq(1);
 	let kinds = actor_kinds(&mut app);
 	kinds.contains(&ActorKind::User).xpect_true();

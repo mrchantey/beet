@@ -1,5 +1,5 @@
 //! Entering a thread: which stored thread a session continues, and the
-//! window it continues with.
+//! records it enters with.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -17,32 +17,15 @@ use beet_net::prelude::*;
 /// builds per request. The store it scopes is the same one an agent's tools
 /// resolve, so the records sit beside whatever else the scene keeps there,
 /// under their own path.
-#[derive(Debug, Clone, Component, Reflect)]
+#[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct MountThreadStore {
 	/// The directory the thread's records persist under, in the store at or
 	/// above the thread.
 	pub path: RelPath,
-	/// How many of the newest posts a continued thread enters with, its
-	/// window bound ([`ThreadStoreProvider::materialize_window`]), or its
-	/// whole history when `None`.
-	pub tail: Option<u64>,
-}
-
-impl Default for MountThreadStore {
-	fn default() -> Self {
-		Self {
-			path: default(),
-			tail: Some(Self::DEFAULT_TAIL),
-		}
-	}
 }
 
 impl MountThreadStore {
-	/// The posts a continued thread enters with unless its mount says
-	/// otherwise.
-	pub const DEFAULT_TAIL: u64 = 200;
-
 	/// Build the [`ThreadStore`] this declares: a single-JSON-object
 	/// [`BlobThreadStore`] under `path` in `store`.
 	pub fn build(&self, store: &BlobStore) -> ThreadStore {
@@ -151,8 +134,8 @@ impl Thread {
 	/// session: reduce it, then pick the stored thread `entry` continues from
 	/// its [`MountThreadStore`] and mount it.
 	///
-	/// A continued thread adopts the stored id and enters with its bounded
-	/// window ([`ThreadStoreProvider::materialize_window`]), its stored seed
+	/// A continued thread adopts the stored id and enters with its whole
+	/// history ([`ThreadStoreProvider::load_records`]), its stored seed
 	/// standing for the one this session resolved; a created one is stamped
 	/// by `entry` and keeps its resolved seed, a branch entering with its
 	/// parent's history before it. Either
@@ -178,9 +161,9 @@ impl Thread {
 			world
 				.with(
 					move |world: &mut World| -> Result<
-						Option<(ThreadStore, Option<u64>, Thread)>,
+						Option<(ThreadStore, Thread)>,
 					> {
-						ThreadWindow::reduce_now(world);
+						ThreadRecords::reduce_now(world);
 						Self::assert_reduced(world, entity)?;
 						let Some(mount) =
 							world.get::<MountThreadStore>(entity).cloned()
@@ -202,11 +185,11 @@ impl Thread {
 							world.get::<Thread>(entity).cloned().ok_or_else(
 								|| bevyhow!("entered {entity} is no thread"),
 							)?;
-						(mount.build(&store), mount.tail, fresh).xsome().xok()
+						(mount.build(&store), fresh).xsome().xok()
 					},
 				)
 				.await?;
-		let Some((store, tail, mut fresh)) = mount else {
+		let Some((store, mut fresh)) = mount else {
 			return world
 				.with(move |world: &mut World| -> Result {
 					let mut thread = world
@@ -215,7 +198,7 @@ impl Thread {
 					entry.stamp(&mut thread);
 					let id = thread.id();
 					world
-						.get_mut::<ThreadWindow>(entity)
+						.get_mut::<ThreadRecords>(entity)
 						.ok_or_else(|| bevyhow!("thread {entity} despawned"))?
 						.open_session(id, entry.opened())
 						.map(|_| ())
@@ -224,7 +207,7 @@ impl Thread {
 		};
 
 		// continue the stored thread the entry names, or stamp a fresh one;
-		// either way its window loads before the store mounts, so the sync
+		// either way its records load before the store mounts, so the sync
 		// never flushes an un-adopted thread
 		store.store_try_create().await?;
 		let stored = entry.find(&store).await?;
@@ -236,18 +219,18 @@ impl Thread {
 				fresh
 			}
 		};
-		let loaded = store.materialize_window(&record, tail).await?;
+		let loaded = store.load_records(&record).await?;
 		world
 			.with(move |world: &mut World| -> Result {
 				let synced = loaded.posts().iter().map(Post::id).collect();
-				let mut window = world
-					.get_mut::<ThreadWindow>(entity)
+				let mut records = world
+					.get_mut::<ThreadRecords>(entity)
 					.ok_or_else(|| bevyhow!("thread {entity} despawned"))?;
 				if continued {
-					window.clear_posts();
+					records.clear_posts();
 				}
-				window.merge_stored(loaded);
-				window.open_session(record.id(), entry.opened())?;
+				records.merge_stored(loaded);
+				records.open_session(record.id(), entry.opened())?;
 				world.entity_mut(entity).insert((
 					record,
 					SyncedPosts::new(synced),
@@ -262,7 +245,7 @@ impl Thread {
 	/// never landed, naming each and the error its build recorded.
 	#[cfg(feature = "action")]
 	fn assert_reduced(world: &mut World, entity: Entity) -> Result {
-		if world.get::<ThreadWindow>(entity).is_some() {
+		if world.get::<ThreadRecords>(entity).is_some() {
 			return Ok(());
 		}
 		world.with_state::<(
@@ -297,12 +280,11 @@ mod test {
 
 	/// One session of a thread continuing by `chat=main` under `store`,
 	/// its System actor seeded with `seeds`, closed and flushed: the
-	/// thread's record and window as the session left them.
+	/// thread's record and records as the session left them.
 	async fn session(
 		store: &BlobStore,
 		seeds: &[&str],
-		tail: Option<u64>,
-	) -> (Thread, ThreadWindow) {
+	) -> (Thread, ThreadRecords) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.install_type::<ThreadPlugin>();
@@ -311,7 +293,6 @@ mod test {
 			.world_mut()
 			.spawn((ChildOf(root), Thread::default(), MountThreadStore {
 				path: RelPath::new("threads"),
-				tail,
 			}))
 			.id();
 		let actor = app
@@ -341,25 +322,7 @@ mod test {
 			.unwrap();
 		(
 			app.world().get::<Thread>(thread).unwrap().clone(),
-			app.world().get::<ThreadWindow>(thread).unwrap().clone(),
-		)
-	}
-
-	/// The text of the window's seed posts and of what model input carries,
-	/// in order.
-	fn seeds(window: &ThreadWindow) -> (Vec<String>, Vec<String>) {
-		(
-			window
-				.posts()
-				.iter()
-				.filter(|post| window.seed().contains(&post.id()))
-				.map(|post| post.to_string())
-				.collect(),
-			window
-				.model_posts(None)
-				.into_iter()
-				.map(|view| view.post.to_string())
-				.collect(),
+			app.world().get::<ThreadRecords>(thread).unwrap().clone(),
 		)
 	}
 
@@ -368,30 +331,15 @@ mod test {
 	#[beet_core::test]
 	async fn a_continued_thread_keeps_its_stored_seed() {
 		let store = BlobStore::temp();
-		let (first, _) = session(&store, &["be brief"], None).await;
-		let (thread, window) =
-			session(&store, &["be thorough", "cite sources"], None).await;
+		let (first, _) = session(&store, &["be brief"]).await;
+		let (thread, records) =
+			session(&store, &["be thorough", "cite sources"]).await;
 		thread.id().xpect_eq(first.id());
-		seeds(&window).xpect_eq((vec!["be brief".to_string()], vec![
-			"be brief".to_string(),
-		]));
-	}
-
-	/// A thread of more posts than its bound enters with only its tail,
-	/// keeping its seed however old.
-	#[beet_core::test]
-	async fn a_long_thread_enters_with_its_tail() {
-		let store = BlobStore::temp();
-		for _ in 0..3 {
-			session(&store, &["be brief"], None).await;
-		}
-		// three sessions of two bracket posts after the seed
-		let (_, window) = session(&store, &["be brief"], Some(2)).await;
-		window.posts().len().xpect_eq(5);
-		window.posts()[0].to_string().xpect_eq("be brief");
-		window.posts()[1..]
-			.iter()
-			.all(|post| post.intent() == PostIntent::Log)
-			.xpect_true();
+		records
+			.model_posts(None)
+			.into_iter()
+			.map(|view| view.post.to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["be brief".to_string()]);
 	}
 }

@@ -3,10 +3,10 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-/// Read access to a [`Thread`] and its [`ThreadWindow`] from anywhere in the
+/// Read access to a [`Thread`] and its [`ThreadRecords`] from anywhere in the
 /// thread's entity tree.
 ///
-/// Conversation reads go through the in-memory window ([`Self::window`]); this
+/// Conversation reads go through the in-memory records ([`Self::records`]); this
 /// param only locates the thread entity and reads behavior-entity identity
 /// ([`ActorRef`]), tools, and tool choice.
 #[derive(SystemParam)]
@@ -14,7 +14,7 @@ pub struct ThreadQuery<'w, 's> {
 	pub ancestors: Query<'w, 's, &'static ChildOf>,
 	pub children: Query<'w, 's, &'static Children>,
 	pub threads:
-		Query<'w, 's, (Entity, &'static Thread, &'static ThreadWindow)>,
+		Query<'w, 's, (Entity, &'static Thread, &'static ThreadRecords)>,
 	pub actor_refs: Query<'w, 's, &'static ActorRef>,
 	pub tool_choices: Query<'w, 's, &'static ToolChoice>,
 	pub tools: Query<'w, 's, (Entity, &'static ToolDefinition)>,
@@ -41,20 +41,21 @@ impl<'w, 's> ThreadQuery<'w, 's> {
 			.ok_or_else(|| bevyhow!("No Thread in ancestors of {entity}"))
 	}
 
-	/// The [`Thread`], its entity, and its [`ThreadWindow`].
-	pub fn thread_and_window(
+	/// The [`Thread`], its entity, and its [`ThreadRecords`].
+	pub fn thread_and_records(
 		&self,
 		entity: Entity,
-	) -> Result<(Entity, &Thread, &ThreadWindow)> {
+	) -> Result<(Entity, &Thread, &ThreadRecords)> {
 		self.ancestors
 			.iter_ancestors_inclusive(entity)
 			.find_map(|ancestor| self.threads.get(ancestor).ok())
 			.ok_or_else(|| bevyhow!("No Thread in ancestors of {entity}"))
 	}
 
-	/// The thread's window.
-	pub fn window(&self, entity: Entity) -> Result<&ThreadWindow> {
-		self.thread_and_window(entity).map(|(_, _, window)| window)
+	/// The thread's records.
+	pub fn records(&self, entity: Entity) -> Result<&ThreadRecords> {
+		self.thread_and_records(entity)
+			.map(|(_, _, records)| records)
 	}
 
 	/// The [`ActorId`] a behavior entity acts as.

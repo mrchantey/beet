@@ -474,18 +474,13 @@ pub(crate) fn bind_navigator_selection(
 				};
 				let entity = commands.spawn(ViewOnlyThread).id();
 				async_commands.run(async move |world: AsyncWorld| -> Result {
-					let window = store
-						.materialize_window(
-							&record,
-							Some(MountThreadStore::DEFAULT_TAIL),
-						)
-						.await?;
-					let synced = window.posts().iter().map(Post::id).collect();
+					let records = store.load_records(&record).await?;
+					let synced = records.posts().iter().map(Post::id).collect();
 					world
 						.entity(entity)
 						.insert((
 							record,
-							window,
+							records,
 							store,
 							SyncedPosts::new(synced),
 						))
@@ -687,7 +682,7 @@ mod test {
 			.world_mut()
 			.spawn((
 				threads[2].clone(),
-				ThreadWindow::default(),
+				ThreadRecords::default(),
 				ThreadStore::default(),
 				AwaitingOwner,
 			))

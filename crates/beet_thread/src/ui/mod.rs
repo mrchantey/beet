@@ -1,7 +1,7 @@
-//! Agnostic reactive chat UI for a [`ThreadWindow`], built on `beet_ui`.
+//! Agnostic reactive chat UI for a [`ThreadRecords`], built on `beet_ui`.
 //!
 //! The pipeline is two hops, each renderer-agnostic:
-//! 1. [`project_window_to_document`] projects a thread's [`ThreadWindow`] into a
+//! 1. [`project_records_to_document`] projects a thread's [`ThreadRecords`] into a
 //!    structured [`Document`] (`{ "posts": [{ id, author, text }, ..] }`),
 //! 2. [`ThreadView`] renders that document reactively: a scroll container whose
 //!    rows are a *keyed* [`ReactiveChildren`] over the `posts` field, each row's
@@ -38,7 +38,7 @@ pub use thread_view::*;
 use beet_core::prelude::*;
 use beet_router::prelude::*;
 
-/// Registers the [`ThreadWindow`] -> [`Document`] projection and the reactive
+/// Registers the [`ThreadRecords`] -> [`Document`] projection and the reactive
 /// UI types. Pairs with `beet_ui`'s [`CharcellTuiPlugin`] (or any renderer that
 /// drives the document chain) and the [`ThreadPlugin`].
 #[derive(Default)]
@@ -57,7 +57,7 @@ impl Plugin for ThreadUiPlugin {
 			.register_type::<AwaitingOwner>()
 			.register_type::<ThreadNavigator>()
 			.register_type::<ViewOnlyThread>();
-		// project each window into its views' documents, then pin to the bottom
+		// project each thread's records into its views' documents, then pin to the bottom
 		app.add_systems(
 			Update,
 			(
@@ -68,16 +68,10 @@ impl Plugin for ThreadUiPlugin {
 					project_navigators,
 				)
 					.chain(),
-				(
-					project_window_to_document,
-					page_on_scroll_top,
-					follow_thread_scroll,
-				)
-					.chain(),
+				(project_records_to_document, follow_thread_scroll).chain(),
 			)
 				.chain(),
-		)
-		.add_observer(load_older_posts);
+		);
 		// The form's empty-on-submit (`ClearOnSubmit`) and initial focus
 		// (`FocusOnAdd`) are generic `beet_ui` markers spread by the form's rust
 		// template (see `input.rs`); surface scoping is the host's job (it

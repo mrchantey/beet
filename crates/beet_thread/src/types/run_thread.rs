@@ -263,7 +263,7 @@ mod test {
 			.id();
 		call::<Request>(&mut app, thread);
 		app.world()
-			.get::<ThreadWindow>(thread)
+			.get::<ThreadRecords>(thread)
 			.unwrap()
 			.posts()
 			.iter()
@@ -306,8 +306,8 @@ mod test {
 		let replies = |app: &mut App, root: Entity| {
 			let thread = app.world().entity(root).get::<Children>().unwrap()[0];
 			app.world()
-				.get::<ThreadWindow>(thread)
-				.map(|window| window.posts().len())
+				.get::<ThreadRecords>(thread)
+				.map(|records| records.posts().len())
 				.unwrap_or_default()
 		};
 		(replies(&mut app, booted) > 1).xpect_true();

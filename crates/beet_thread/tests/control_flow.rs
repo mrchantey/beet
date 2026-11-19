@@ -44,7 +44,7 @@ fn assert_and_exit(
 	query: ThreadQuery,
 ) -> Result<Outcome> {
 	query
-		.window(input.id())?
+		.records(input.id())?
 		.authored_posts()
 		.find(|view| {
 			view.intent().is_display() && view.actor.kind() == ActorKind::Agent

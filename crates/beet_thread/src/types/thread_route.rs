@@ -243,8 +243,8 @@ impl ThreadRoute {
 						.collect::<Vec<_>>()
 				},
 			);
-		let window = world.get::<ThreadWindow>(thread)?;
-		window
+		let records = world.get::<ThreadRecords>(thread)?;
+		records
 			.authored_posts()
 			.filter(|authored| {
 				acting.contains(&authored.actor.id())
@@ -365,14 +365,14 @@ mod test {
 	}
 
 	/// The records under `threads` in `store`.
-	fn records(store: &BlobStore) -> BlobThreadStore {
+	fn thread_store(store: &BlobStore) -> BlobThreadStore {
 		BlobThreadStore::new(store.with_subdir(RelPath::new("threads")))
 	}
 
 	/// Every stored thread's text posts, the tool calls and sessions aside,
 	/// sorted.
 	async fn stored(store: &BlobStore) -> Vec<Vec<String>> {
-		let records = records(store);
+		let records = thread_store(store);
 		let mut threads = Vec::new();
 		for thread in records.threads().await.unwrap() {
 			threads.push(texts(
@@ -396,7 +396,7 @@ mod test {
 
 	/// The one stored thread.
 	async fn only_thread(store: &BlobStore) -> (Thread, Vec<Post>) {
-		let records = records(store);
+		let records = thread_store(store);
 		let threads = records.threads().await.unwrap();
 		threads.len().xpect_eq(1);
 		let posts = records.thread_posts(threads[0].id(), None).await.unwrap();
@@ -458,7 +458,7 @@ mod test {
 				"you said: review product".to_string(),
 			],
 		]);
-		records(&store)
+		thread_store(&store)
 			.threads()
 			.await
 			.unwrap()
@@ -560,14 +560,14 @@ mod test {
 			closed.usage.input_tokens.xpect_eq(20);
 		}
 		// the scripted agent answered the review both times, never a session
-		let mut window = ThreadWindow::new();
-		for actor in records(&store).actors().await.unwrap() {
-			window.insert_actor(actor);
+		let mut records = ThreadRecords::new();
+		for actor in thread_store(&store).actors().await.unwrap() {
+			records.insert_actor(actor);
 		}
 		for post in posts {
-			window.upsert_post(post);
+			records.upsert_post(post);
 		}
-		window
+		records
 			.model_posts(None)
 			.iter()
 			.any(|view| view.post.intent() == PostIntent::Log)

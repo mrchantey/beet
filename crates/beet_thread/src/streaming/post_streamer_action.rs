@@ -15,11 +15,11 @@ where
 	.await
 }
 
-/// Stream a model response into the thread's [`ThreadWindow`], surfacing a
+/// Stream a model response into the thread's [`ThreadRecords`], surfacing a
 /// failure as an error post rather than a swallowed error.
 ///
 /// On any streaming failure (missing/invalid key, network error, or a mid-stream
-/// error event) the message is appended to the window as a [`PostIntent::Error`] post, so it
+/// error event) the message is appended to the records as a [`PostIntent::Error`] post, so it
 /// renders in the thread view as an `Error` node (TUI mode hides stderr), and the
 /// turn [`Pass`]es so a finite program still completes instead of hanging.
 pub async fn post_streamer_action_stateful<T>(
@@ -29,21 +29,21 @@ where
 	T: Clone + Component + PostStreamer,
 {
 	let caller = cx.caller.clone();
-	if let Err(err) = stream_into_window(cx).await {
+	if let Err(err) = stream_into_records(cx).await {
 		let message = err.to_string();
 		// also log for headless/non-TUI runs where the thread view isn't visible
 		error!("model streaming failed: {message}");
 		let (actor_id, thread_id) = caller
-			.with_state::<ThreadWindowQuery, _>(
-				|entity, window| -> Result<(ActorId, ThreadId)> {
-					Ok((window.actor_id(entity)?, window.thread_id(entity)?))
+			.with_state::<ThreadRecordsQuery, _>(
+				|entity, records| -> Result<(ActorId, ThreadId)> {
+					Ok((records.actor_id(entity)?, records.thread_id(entity)?))
 				},
 			)
 			.await??;
 		caller
-			.with_state::<ThreadWindowQuery, _>(
-				move |entity, mut window| -> Result {
-					window.push_post(
+			.with_state::<ThreadRecordsQuery, _>(
+				move |entity, mut records| -> Result {
+					records.push_post(
 						entity,
 						AgentPost::new_error(
 							actor_id,
@@ -59,12 +59,12 @@ where
 	Ok(Pass(()))
 }
 
-/// The streaming core: drive the model response into `window.posts` (the live
+/// The streaming core: drive the model response into `records.posts` (the live
 /// slice the scene renders and persists), rather than spawning per-post entities.
 /// Completed function-call posts are collected and dispatched after the stream
 /// finishes. Errors propagate to [`post_streamer_action_stateful`], which renders
 /// them as an error post.
-async fn stream_into_window<T>(cx: ActionContext<T>) -> Result
+async fn stream_into_records<T>(cx: ActionContext<T>) -> Result
 where
 	T: Clone + Component + PostStreamer,
 {
@@ -101,17 +101,17 @@ where
 				.collect::<Vec<_>>()
 		};
 
-		// apply the changes to the thread window
+		// apply the changes to the thread records
 		cx.caller
-			.with_state::<ThreadWindowQuery, _>(
-				move |entity, mut window_mut| -> Result {
-					let mut window = window_mut.window_mut(entity)?;
+			.with_state::<ThreadRecordsQuery, _>(
+				move |entity, mut records_mut| -> Result {
+					let mut records = records_mut.records_mut(entity)?;
 					modified
 						.into_iter()
-						.for_each(|post| window.upsert_post(post));
+						.for_each(|post| records.upsert_post(post));
 					created.into_iter().zip(metas).for_each(|(post, meta)| {
-						window.set_meta(meta);
-						window.upsert_post(post);
+						records.set_meta(meta);
+						records.upsert_post(post);
 					});
 					Ok(())
 				},
@@ -121,7 +121,7 @@ where
 
 	// the response's usage lands on its last post's meta, so a session's
 	// total counts each response once; log the prompt-cache hit rate, for
-	// tuning the append-only window (see perceive-act).
+	// tuning the append-only records (see perceive-act).
 	if let Some(usage) = stream.token_usage().map(Usage::from) {
 		let pct = if usage.input_tokens > 0 {
 			usage.cached_input_tokens as f32 / usage.input_tokens as f32 * 100.0
@@ -134,9 +134,9 @@ where
 		);
 		if let Some(post) = last_created {
 			cx.caller
-				.with_state::<ThreadWindowQuery, _>(
-					move |entity, mut window_mut| {
-						window_mut.set_usage(entity, post, usage)
+				.with_state::<ThreadRecordsQuery, _>(
+					move |entity, mut records_mut| {
+						records_mut.set_usage(entity, post, usage)
 					},
 				)
 				.await??;

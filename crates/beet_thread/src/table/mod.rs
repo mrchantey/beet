@@ -1,4 +1,4 @@
-//! The thread's records and the window they run in.
+//! A thread's records, in the store and in memory.
 //!
 //! **Entities are for what runs, records are for what is remembered.** A
 //! [`Thread`], [`Actor`] or [`Post`] is a serializable record named by its id
@@ -6,8 +6,8 @@
 //! entity is a live process running or showing a record, and one thread is
 //! many entities over its life, each session ([`Thread::enter`]) a fresh one
 //! adopting the stored id. Posts are never entities: the reduction
-//! ([`ThreadWindow::reduce`]) folds actors and seed posts into the
-//! [`ThreadWindow`] records on the thread entity, and an actor survives as an
+//! ([`ThreadRecords::reduce`]) folds actors and seed posts into the
+//! [`ThreadRecords`] on the thread entity, and an actor survives as an
 //! entity only as behavior, an [`ActorRef`] beside its action. Anything
 //! persisted refers to another thread or post by id, never by `Entity`, and a
 //! live view joins records with live entities by id.
@@ -21,14 +21,14 @@
 //! - **branched** ([`Thread::branch_of`]): continues the history of another
 //!   thread up to a post, then goes its own way. A post may have many
 //!   branches and a thread at most one parent, so branches form a tree, and
-//!   a branch's window references its ancestors' posts rather than copying
+//!   a branch's history references its ancestors' posts rather than copying
 //!   them ([`ThreadStoreProvider::history`]).
 //!
 //! A thread continues across sessions by the metadata its route declares
 //! ([`ThreadEntry`]), never its seed. A seed is the thread's initial posts,
-//! kept by a fresh thread and pinned in its window however long it runs
-//! ([`ThreadWindow::seed_of`]); a continued thread enters with its stored
-//! seed, so a changed seed reaches a new thread (`--new`). Each session is
+//! kept by a fresh thread; a continued thread enters with its stored seed,
+//! so a changed seed reaches a new thread (`--new`), and with its whole
+//! history. Each session is
 //! bracketed by its [`SessionOpened`] and [`SessionClosed`] posts.
 mod actor;
 mod create_actor;
@@ -48,8 +48,8 @@ pub use route_post::*;
 mod seed_source;
 mod thread;
 mod thread_query;
+mod thread_records;
 pub mod thread_store;
-mod thread_window;
 #[cfg(feature = "action")]
 pub use seed_source::*;
 pub use thread_store::SyncedPosts;
@@ -71,7 +71,7 @@ pub use post_log::*;
 pub use session::*;
 pub use thread::*;
 pub use thread_query::*;
-pub use thread_window::*;
+pub use thread_records::*;
 mod response_meta;
 pub use response_meta::*;
 #[cfg(feature = "action")]

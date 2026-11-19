@@ -32,7 +32,7 @@ impl Plugin for ThreadPlugin {
 			// markup persistence: declare a thread-record store from `.bsx`
 			.register_type::<MountThreadStore>()
 			.register_type::<ThreadEntryParams>()
-			// markup window bounding: stub older images so an endless loop's
+			// markup image bounding: stub older images so an endless loop's
 			// request stays bounded without dropping a post
 			.register_type::<StubOldImages>()
 			// a host verb as an agent's tool, `<HostTool path=".."/>`
@@ -95,8 +95,8 @@ impl Plugin for ThreadPlugin {
 			// _
 			;
 
-		app.add_systems(First, ThreadWindow::reduce)
+		app.add_systems(First, ThreadRecords::reduce)
 			.add_systems(Update, sync_string_enum_options)
-			.add_systems(PostUpdate, thread_store::sync_window_to_store);
+			.add_systems(PostUpdate, thread_store::sync_records_to_store);
 	}
 }

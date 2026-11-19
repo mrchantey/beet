@@ -16,7 +16,7 @@ use beet_net::prelude::*;
 /// as an include is, so `Ready` waits for it. Its action is called on the
 /// source's own entity, resolving what it reads by ancestry, and its text
 /// lands as a [`SeedPost`] in its place. The thread reduces only once every
-/// source has landed ([`ThreadWindow::reduce`]). Only a fresh thread keeps
+/// source has landed ([`ThreadRecords::reduce`]). Only a fresh thread keeps
 /// what it read: a continued thread enters with its stored seed
 /// ([`Thread::enter`]).
 ///
@@ -164,9 +164,9 @@ mod test {
 			.unwrap();
 		app.world_mut().entity_mut(thread).insert(ChildOf(root));
 		// the read is still in flight, so the thread has not reduced
-		ThreadWindow::reduce_now(app.world_mut());
+		ThreadRecords::reduce_now(app.world_mut());
 		app.world()
-			.get::<ThreadWindow>(thread)
+			.get::<ThreadRecords>(thread)
 			.is_none()
 			.xpect_true();
 		let result = app
@@ -192,9 +192,8 @@ mod test {
 			.unwrap();
 		let (app, thread) = enter(&store).await;
 		let thread = thread.unwrap();
-		let window = app.world().get::<ThreadWindow>(thread).unwrap();
-		window.posts()[0].to_string().xpect_eq("be brief");
-		window.seed().contains(&window.posts()[0].id()).xpect_true();
+		let records = app.world().get::<ThreadRecords>(thread).unwrap();
+		records.posts()[0].to_string().xpect_eq("be brief");
 	}
 
 	/// A seed that cannot be read leaves its thread unreduced, and entering it

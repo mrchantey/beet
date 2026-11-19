@@ -95,8 +95,8 @@ impl CompletionsStreamer {
 					ActorId,
 					ThreadId,
 				)> {
-					let (_, thread, window) =
-						query.thread_and_window(actor_entity)?;
+					let (_, thread, records) =
+						query.thread_and_records(actor_entity)?;
 					let agent_id = query.actor_id(actor_entity)?;
 
 					let mut messages = Vec::new();
@@ -117,15 +117,15 @@ impl CompletionsStreamer {
 						);
 					}
 
-					// Convert window posts to completions messages
-					let post_messages = window
+					// Convert the thread's posts to completions messages
+					let post_messages = records
 						.model_posts(None)
 						.into_iter()
 						.xtry_map(|post| {
-							completions_mapper::post_to_completions_message(
-								agent_id, post,
-							)
-						})?;
+						completions_mapper::post_to_completions_message(
+							agent_id, post,
+						)
+					})?;
 					messages.extend(post_messages);
 
 					// Collect tools

@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 /// Author a seed [`Post`] in markup as a child of a `<CreateActor>`.
 ///
 /// Expands to a [`SeedPost`]; the author-to-behavior reduction resolves its
-/// author (the actor parent) and thread, hoists it into the [`ThreadWindow`],
+/// author (the actor parent) and thread, hoists it into the [`ThreadRecords`],
 /// and despawns the entity, leaving only the record.
 ///
 /// With `src` rather than `text` it expands to a [`SeedSource`] reading the

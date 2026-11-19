@@ -3,7 +3,7 @@
 //! A session is one thread entity's life, from entry to despawn: one
 //! [`ThreadRoute`] request, one [`RunThread`] entry. Entry appends a
 //! [`SessionOpened`] post and the end a [`SessionClosed`] post, both
-//! [`LogKind`]s authored by the thread's System actor. Model input skips them ([`ThreadWindow::model_posts`])
+//! [`LogKind`]s authored by the thread's System actor. Model input skips them ([`ThreadRecords::model_posts`])
 //! and a `ThreadView` renders them as dividers. An opened post with no closed
 //! post before the next opened post, or before the end, is a session that
 //! aborted.
@@ -52,9 +52,9 @@ impl LogKind for SessionClosed {
 	const KIND: &'static str = "session_closed";
 }
 
-impl ThreadWindow {
+impl ThreadRecords {
 	/// The thread's System actor, the author of its session posts: the first
-	/// by id the window holds, or one created here if the template authored
+	/// by id the records hold, or one created here if the template authored
 	/// none, so every template brackets its sessions unchanged.
 	pub fn system_actor(&mut self) -> ActorId {
 		self.actors()
@@ -139,9 +139,9 @@ impl Thread {
 				else {
 					return Ok(());
 				};
-				match world.get_mut::<ThreadWindow>(entity) {
-					Some(mut window) => {
-						window.close_session(id, outcome).map(|_| ())
+				match world.get_mut::<ThreadRecords>(entity) {
+					Some(mut records) => {
+						records.close_session(id, outcome).map(|_| ())
 					}
 					None => Ok(()),
 				}

@@ -3,33 +3,30 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// A materialized view of a [`Thread`], the runtime truth-for-the-scene.
+/// A [`Thread`]'s records in memory: its actors, its whole history and the
+/// response metadata of its posts, the runtime truth-for-the-scene.
 ///
-/// One source of truth (the database) projected twice: the window is the
-/// resident hot slice the scene streams into, renders, and sends as model
-/// context (it is, literally, the model's context window). It is **always** a
-/// projection, never a source of truth.
+/// One source of truth (the [`ThreadStore`]) loaded whole: the scene streams
+/// into it and a view projects it, and each model call derives its input
+/// from it ([`Self::model_posts`]). It is **always** a copy of the store,
+/// never a source of truth.
 ///
-/// Author resolution is in memory (`window.actor(post.author())`), with no
+/// Author resolution is in memory (`records.actor(post.author())`), with no
 /// entity walk; ordering is by [`PostId`] (a time-sortable [`Uuid7`]).
 #[derive(Debug, Default, Clone, Component)]
-pub struct ThreadWindow {
-	/// All actors that appear in the posts of this window, keyed by [`ActorId`].
+pub struct ThreadRecords {
+	/// All actors that appear in the posts of these records, keyed by [`ActorId`].
 	actors: HashMap<ActorId, Actor>,
 	/// Ordered list of posts (by [`PostId`]).
 	posts: Vec<Post>,
 	/// Per-post response metadata, used for `previous_response_id` chaining.
 	metas: HashMap<PostId, ResponseMeta>,
-	/// The seed posts this window holds, pinned however long the thread
-	/// runs: each thread's posts before its first session opened
-	/// ([`Self::seed_of`]).
-	seed: HashSet<PostId>,
 	/// The messages of the request this session serves, by their authors,
 	/// posted as its session opens ([`RequestMessage`]).
 	pub(super) requested: Vec<(ActorId, SeedPost)>,
 }
 
-impl ThreadWindow {
+impl ThreadRecords {
 	pub fn new() -> Self { Self::default() }
 
 	// ── actors ──────────────────────────────────────────────────────────
@@ -41,10 +38,10 @@ impl ThreadWindow {
 	pub fn actor(&self, id: ActorId) -> Result<&Actor> {
 		self.actors
 			.get(&id)
-			.ok_or_else(|| bevyhow!("No actor {id} in window"))
+			.ok_or_else(|| bevyhow!("No actor {id} in records"))
 	}
 
-	/// Insert (or replace) an actor in the window.
+	/// Insert (or replace) an actor in the records.
 	pub fn insert_actor(&mut self, actor: Actor) -> ActorId {
 		let id = actor.id();
 		self.actors.insert(id, actor);
@@ -70,7 +67,7 @@ impl ThreadWindow {
 		}
 	}
 
-	/// Join each post with its authoring [`Actor`] from the window.
+	/// Join each post with its authoring [`Actor`] from the records.
 	pub fn authored_posts(&self) -> impl Iterator<Item = AuthoredPost<'_>> {
 		self.posts.iter().filter_map(|post| {
 			self.actors
@@ -91,7 +88,7 @@ impl ThreadWindow {
 	}
 
 	/// The posts a model reads, after an exclusive cursor: every authored
-	/// post but the [`PostIntent::Log`] posts, which stay in the window, the
+	/// post but the [`PostIntent::Log`] posts, which stay in the records, the
 	/// record and the view.
 	pub fn model_posts(&self, after: Option<PostId>) -> Vec<AuthoredPost<'_>> {
 		self.posts_after(after)
@@ -100,51 +97,18 @@ impl ThreadWindow {
 			.collect()
 	}
 
-	/// The seed posts this window holds, which its bound never drops.
-	pub fn seed(&self) -> &HashSet<PostId> { &self.seed }
-	/// This window marking `seed` as its seed posts.
-	pub fn with_seed(mut self, seed: HashSet<PostId>) -> Self {
-		self.seed = seed;
-		self
-	}
-
-	/// The seed of `history`, oldest first: each thread's posts before its
-	/// first session opened, so a branch pins its parent's seed and its own.
-	/// A thread that never opened a session has no seed.
-	pub fn seed_of(history: &[Post]) -> HashSet<PostId> {
-		let mut unopened = history
-			.iter()
-			.filter(|post| SessionOpened::opens(post))
-			.map(Post::thread)
-			.collect::<HashSet<_>>();
-		history
-			.iter()
-			.filter(|post| {
-				if SessionOpened::opens(post) {
-					unopened.remove(&post.thread());
-				}
-				unopened.contains(&post.thread())
-			})
-			.map(Post::id)
-			.collect()
-	}
-
 	/// Drop every post, ie a continued thread's freshly resolved seed, which
 	/// its stored seed stands for.
-	pub fn clear_posts(&mut self) {
-		self.posts.clear();
-		self.seed.clear();
-	}
+	pub fn clear_posts(&mut self) { self.posts.clear(); }
 
-	/// Merge a stored window's records under this one's: the stored posts
-	/// and metadata, then every actor of this window over the stored ones, so
+	/// Merge stored records under these: the stored posts and metadata,
+	/// then every actor of these records over the stored ones, so
 	/// the authored definitions win while the stored authors still resolve.
-	pub fn merge_stored(&mut self, stored: ThreadWindow) {
-		let ThreadWindow {
+	pub fn merge_stored(&mut self, stored: ThreadRecords) {
+		let ThreadRecords {
 			actors,
 			posts,
 			metas,
-			seed,
 			requested: _,
 		} = stored;
 		for (id, actor) in actors {
@@ -154,7 +118,6 @@ impl ThreadWindow {
 			self.upsert_post(post);
 		}
 		self.metas.extend(metas);
-		self.seed.extend(seed);
 		self.posts.sort_by_key(|post| post.id());
 	}
 
@@ -190,11 +153,11 @@ impl ThreadWindow {
 		})
 	}
 
-	/// Bound the window's image bytes: replace every image post older than the
+	/// Bound the image bytes of these records: replace every image post older than the
 	/// most recent `keep` with a short text stub, in place (same [`PostId`] and
 	/// position).
 	///
-	/// The window stays append-only, which is the point: no post is ever dropped,
+	/// The records stay append-only, which is the point: no post is ever dropped,
 	/// so the provider's prompt-cache prefix stays stable and only the last few
 	/// turns churn. Image posts are oldest-first (posts are id-ordered) and a
 	/// given image is stubbed exactly once, so the prefix grows with the
@@ -225,14 +188,14 @@ impl ThreadWindow {
 }
 
 /// The text a stubbed-out older image is replaced with by
-/// [`ThreadWindow::stub_old_images`].
+/// [`ThreadRecords::stub_old_images`].
 const STUBBED_IMAGE: &str = "[earlier image, no longer shown]";
 
 // ═══════════════════════════════════════════════════════════════════════
 // AuthoredPost
 // ═══════════════════════════════════════════════════════════════════════
 
-/// A post joined with its authoring [`Actor`], sourced from a [`ThreadWindow`].
+/// A post joined with its authoring [`Actor`], sourced from a [`ThreadRecords`].
 #[derive(Debug, Clone, Copy)]
 pub struct AuthoredPost<'a> {
 	pub post: &'a Post,
@@ -265,7 +228,7 @@ impl AuthoredPost<'_> {
 // ═══════════════════════════════════════════════════════════════════════
 
 /// A behavior entity's reference to the [`Actor`] it acts as. The actor's full
-/// definition lives in the [`ThreadWindow`]; the behavior scene carries only
+/// definition lives in the [`ThreadRecords`]; the behavior scene carries only
 /// this id plus the actor's behavior (its [`Action`] and tools).
 ///
 /// Produced by the author-to-behavior reduction, which swaps every in-place
@@ -282,8 +245,8 @@ pub struct ActorRef(pub ActorId);
 /// child of its `<CreateActor>`, awaiting reduction.
 ///
 /// This is the runtime component the author-to-behavior reduction queries
-/// ([`ThreadWindow::reduce`]): it resolves the seed's author (its actor parent)
-/// and thread, hoists the materialized [`Post`] into the [`ThreadWindow`], and
+/// ([`ThreadRecords::reduce`]): it resolves the seed's author (its actor parent)
+/// and thread, hoists the materialized [`Post`] into the [`ThreadRecords`], and
 /// despawns the entity.
 ///
 /// It is the payload, not the tag. `<CreatePost>` is the `#[template]` that
@@ -312,28 +275,28 @@ impl SeedPost {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// The reduction: author scene -> ThreadWindow + behavior scene
+// The reduction: author scene -> ThreadRecords + behavior scene
 // ═══════════════════════════════════════════════════════════════════════
 
-impl ThreadWindow {
-	/// Reduce every freshly-spawned authored [`Thread`] into a [`ThreadWindow`] plus
+impl ThreadRecords {
+	/// Reduce every freshly-spawned authored [`Thread`] into a [`ThreadRecords`] plus
 	/// a lean behavior scene.
 	///
-	/// For each thread lacking a window, walk its descendant actors in author order
-	/// and: hoist each [`Actor`] into `window.actors`, hoist each [`SeedPost`] into
-	/// `window.posts`, then rewrite the actor entity. An actor that carries behavior
+	/// For each thread lacking records, walk its descendant actors in author order
+	/// and: hoist each [`Actor`] into `records.actors`, hoist each [`SeedPost`] into
+	/// `records.posts`, then rewrite the actor entity. An actor that carries behavior
 	/// (an [`Action`]) becomes an [`ActorRef`] keeping its behavior and tools; a
 	/// seed-only actor (eg the system prompt) is despawned, leaving no turn behind.
 	/// A thread still holding a [`SeedSource`] waits: its seed is read while
-	/// the thread builds, and the window reduces once every seed is a
-	/// [`SeedPost`]. The seed posts are the window's [`Self::seed`], kept by
-	/// a fresh thread and dropped by an entry continuing a stored one; a
-	/// [`RequestMessage`] is set aside until its session opens.
+	/// the thread builds, and the records reduce once every seed is a
+	/// [`SeedPost`]. The seed posts are kept by a fresh thread and dropped by
+	/// an entry continuing a stored one; a [`RequestMessage`] is set aside
+	/// until its session opens.
 	///
-	/// Idempotent: gated on `Without<ThreadWindow>`, so it runs once per thread.
+	/// Idempotent: gated on `Without<ThreadRecords>`, so it runs once per thread.
 	pub fn reduce(
 		mut commands: Commands,
-		threads: Query<(Entity, &Thread), Without<ThreadWindow>>,
+		threads: Query<(Entity, &Thread), Without<ThreadRecords>>,
 		children: Query<&Children>,
 		actors: Query<&Actor>,
 		seeds: Query<(&SeedPost, Has<RequestMessage>)>,
@@ -350,7 +313,7 @@ impl ThreadWindow {
 				continue;
 			}
 			let thread_id = thread.id();
-			let mut window = ThreadWindow::new();
+			let mut records = ThreadRecords::new();
 
 			// descendant actor entities, in author (DFS) order
 			let actor_entities = children
@@ -360,7 +323,7 @@ impl ThreadWindow {
 
 			for actor_entity in actor_entities {
 				let actor = actors.get(actor_entity)?.clone();
-				let actor_id = window.insert_actor(actor);
+				let actor_id = records.insert_actor(actor);
 
 				// hoist this actor's seed posts, despawning their entities. Scan all
 				// descendants (not just direct children) so seeds authored through a
@@ -369,15 +332,15 @@ impl ThreadWindow {
 				for child in children.iter_descendants(actor_entity) {
 					if let Ok((seed_post, requested)) = seeds.get(child) {
 						if requested {
-							window
+							records
 								.requested
 								.push((actor_id, seed_post.clone()));
 						} else {
-							let post = seed_post
-								.clone()
-								.into_post(actor_id, thread_id);
-							window.seed.insert(post.id());
-							window.upsert_post(post);
+							records.upsert_post(
+								seed_post
+									.clone()
+									.into_post(actor_id, thread_id),
+							);
 						}
 						commands.entity(child).despawn();
 					}
@@ -398,22 +361,22 @@ impl ThreadWindow {
 				}
 			}
 
-			window.posts.sort_by_key(|post| post.id());
-			commands.entity(thread_entity).insert(window);
+			records.posts.sort_by_key(|post| post.id());
+			commands.entity(thread_entity).insert(records);
 		}
 		Ok(())
 	}
 
-	/// Run [`ThreadWindow::reduce`] immediately and flush, for manual consumers that
+	/// Run [`ThreadRecords::reduce`] immediately and flush, for manual consumers that
 	/// pump the world directly (eg `Post::run_oneshot`, tests) rather than the schedule.
 	pub fn reduce_now(world: &mut World) {
 		let _ = world.run_system_cached::<Result, _, _>(Self::reduce);
 		world.flush();
 	}
 
-	/// Spawn an authored thread `scene` and reduce it into a [`ThreadWindow`] plus
+	/// Spawn an authored thread `scene` and reduce it into a [`ThreadRecords`] plus
 	/// behavior scene in one step, returning the root entity. The behavior is *not*
-	/// triggered; the caller drives it (eg `entity.call(())`), so the window is
+	/// triggered; the caller drives it (eg `entity.call(())`), so the records are
 	/// always populated before any turn runs.
 	pub async fn spawn_reduced(
 		world: AsyncWorld,
@@ -431,27 +394,30 @@ impl ThreadWindow {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// ThreadWindowQuery: mutate the thread window from a behavior entity
+// ThreadRecordsQuery: mutate the thread records from a behavior entity
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Locate and mutate the [`ThreadWindow`] of the thread a behavior entity
+/// Locate and mutate the [`ThreadRecords`] of the thread a behavior entity
 /// belongs to. Behavior entities ([`ActorRef`]) are descendants of their
-/// thread; the window lives on the thread.
+/// thread; the records live on the thread.
 #[derive(SystemParam)]
-pub struct ThreadWindowQuery<'w, 's> {
+pub struct ThreadRecordsQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	actor_refs: Query<'w, 's, &'static ActorRef>,
-	windows: Query<'w, 's, (&'static Thread, &'static mut ThreadWindow)>,
+	thread_records:
+		Query<'w, 's, (&'static Thread, &'static mut ThreadRecords)>,
 	synced: Query<'w, 's, &'static mut SyncedPosts>,
 }
 
-impl ThreadWindowQuery<'_, '_> {
-	/// Walk ancestors to the thread entity carrying the [`ThreadWindow`].
+impl ThreadRecordsQuery<'_, '_> {
+	/// Walk ancestors to the thread entity carrying the [`ThreadRecords`].
 	pub fn thread_entity(&self, entity: Entity) -> Result<Entity> {
 		self.ancestors
 			.iter_ancestors_inclusive(entity)
-			.find(|ancestor| self.windows.contains(*ancestor))
-			.ok_or_else(|| bevyhow!("No ThreadWindow in ancestors of {entity}"))
+			.find(|ancestor| self.thread_records.contains(*ancestor))
+			.ok_or_else(|| {
+				bevyhow!("No ThreadRecords in ancestors of {entity}")
+			})
 	}
 
 	/// The [`ActorId`] a behavior entity acts as.
@@ -465,21 +431,21 @@ impl ThreadWindowQuery<'_, '_> {
 	/// The [`ThreadId`] of the thread a behavior entity belongs to.
 	pub fn thread_id(&self, entity: Entity) -> Result<ThreadId> {
 		let thread_entity = self.thread_entity(entity)?;
-		Ok(self.windows.get(thread_entity)?.0.id())
+		Ok(self.thread_records.get(thread_entity)?.0.id())
 	}
 
-	/// Mutable access to the thread's window.
-	pub fn window_mut(
+	/// Mutable access to the thread's records.
+	pub fn records_mut(
 		&mut self,
 		entity: Entity,
-	) -> Result<Mut<'_, ThreadWindow>> {
+	) -> Result<Mut<'_, ThreadRecords>> {
 		let thread_entity = self.thread_entity(entity)?;
-		Ok(self.windows.get_mut(thread_entity)?.1)
+		Ok(self.thread_records.get_mut(thread_entity)?.1)
 	}
 
-	/// Append a post to the thread's window.
+	/// Append a post to the thread's records.
 	pub fn push_post(&mut self, entity: Entity, post: Post) -> Result {
-		self.window_mut(entity)?.upsert_post(post);
+		self.records_mut(entity)?.upsert_post(post);
 		Ok(())
 	}
 
@@ -492,12 +458,12 @@ impl ThreadWindowQuery<'_, '_> {
 		usage: Usage,
 	) -> Result {
 		let thread_entity = self.thread_entity(entity)?;
-		let mut window = self.windows.get_mut(thread_entity)?.1;
-		let Some(mut meta) = window.meta(post).cloned() else {
+		let mut records = self.thread_records.get_mut(thread_entity)?.1;
+		let Some(mut meta) = records.meta(post).cloned() else {
 			return Ok(());
 		};
 		meta.usage = Some(usage);
-		window.set_meta(meta);
+		records.set_meta(meta);
 		if let Ok(mut synced) = self.synced.get_mut(thread_entity) {
 			synced.remove(post);
 		}
@@ -511,7 +477,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// The reduction hoists every actor and seed post into the window, despawns
+	/// The reduction hoists every actor and seed post into the records, despawns
 	/// seed-only actors, and rewrites behavior actors to id-referencing entities.
 	#[beet_core::test]
 	fn reduction_hoists_and_rewrites() {
@@ -525,17 +491,17 @@ mod test {
 			]))
 			.id();
 		world.flush();
-		ThreadWindow::reduce_now(&mut world);
+		ThreadRecords::reduce_now(&mut world);
 
-		// window holds both actors and the one seed post, author resolvable
-		let window = world.get::<ThreadWindow>(thread).unwrap();
-		window.actors().len().xpect_eq(2);
-		window.posts().len().xpect_eq(1);
-		window.posts()[0]
+		// the records hold both actors and the one seed post, author resolvable
+		let records = world.get::<ThreadRecords>(thread).unwrap();
+		records.actors().len().xpect_eq(2);
+		records.posts().len().xpect_eq(1);
+		records.posts()[0]
 			.to_string()
 			.xpect_eq("sys prompt".to_string());
-		let author = window.posts()[0].author();
-		window
+		let author = records.posts()[0].author();
+		records
 			.actor(author)
 			.unwrap()
 			.kind()
@@ -555,16 +521,16 @@ mod test {
 	}
 
 	/// Bounding replaces older images with a text stub in place: the post count
-	/// and every id are untouched (the window stays append-only), only the newest
+	/// and every id are untouched (the records stay append-only), only the newest
 	/// `keep` images still carry bytes.
 	#[beet_core::test]
-	fn stub_old_images_bounds_the_window() {
+	fn stub_old_images_bounds_the_records() {
 		let thread = ThreadId::new_now();
 		let user = ActorId::new_now();
-		let mut window = ThreadWindow::new();
-		window.insert_actor(Actor::new_with_id(user, "Cam", ActorKind::User));
+		let mut records = ThreadRecords::new();
+		records.insert_actor(Actor::new_with_id(user, "Cam", ActorKind::User));
 		for cycle in 0..3 {
-			window.upsert_post(AgentPost::new_bytes(
+			records.upsert_post(AgentPost::new_bytes(
 				user,
 				thread,
 				MediaType::Jpeg,
@@ -573,33 +539,33 @@ mod test {
 				PostStatus::Completed,
 			));
 		}
-		let ids = window.posts().iter().map(Post::id).collect::<Vec<_>>();
+		let ids = records.posts().iter().map(Post::id).collect::<Vec<_>>();
 
-		window.stub_old_images(1);
+		records.stub_old_images(1);
 
 		// nothing dropped, nothing reordered: only the media types changed
-		window.posts().len().xpect_eq(3);
-		window
+		records.posts().len().xpect_eq(3);
+		records
 			.posts()
 			.iter()
 			.map(Post::id)
 			.collect::<Vec<_>>()
 			.xpect_eq(ids);
-		window
+		records
 			.posts()
 			.iter()
 			.filter(|post| post.media_type().is_image())
 			.count()
 			.xpect_eq(1);
 		// the surviving image is the newest, the stubbed ones carry the stub text
-		window.posts()[2].media_type().is_image().xpect_true();
-		window.posts()[0]
+		records.posts()[2].media_type().is_image().xpect_true();
+		records.posts()[0]
 			.to_string()
 			.xpect_eq(STUBBED_IMAGE.to_string());
 
 		// stubbing again is idempotent: a given image is only ever stubbed once
-		window.stub_old_images(1);
-		window
+		records.stub_old_images(1);
+		records
 			.posts()
 			.iter()
 			.filter(|post| post.media_type().is_image())
@@ -607,30 +573,30 @@ mod test {
 			.xpect_eq(1);
 	}
 
-	/// Streaming-shaped window mutation: upsert appends new posts and replaces
+	/// Streaming-shaped records mutation: upsert appends new posts and replaces
 	/// existing ones in place, ordered by id.
 	#[beet_core::test]
 	fn upsert_appends_then_replaces() {
 		let thread = ThreadId::new_now();
 		let author = ActorId::new_now();
-		let mut window = ThreadWindow::new();
-		window.insert_actor(Actor::new_with_id(author, "A", ActorKind::Agent));
+		let mut records = ThreadRecords::new();
+		records.insert_actor(Actor::new_with_id(author, "A", ActorKind::Agent));
 
 		let mut post =
 			AgentPost::new_text(author, thread, "hel", PostStatus::InProgress);
-		window.upsert_post(post.clone());
-		window.posts().len().xpect_eq(1);
+		records.upsert_post(post.clone());
+		records.posts().len().xpect_eq(1);
 
 		// same id streamed further: replaced in place, not appended
 		post.set_text("hello");
 		post.set_status(PostStatus::Completed);
-		window.upsert_post(post);
-		window.posts().len().xpect_eq(1);
-		window
+		records.upsert_post(post);
+		records.posts().len().xpect_eq(1);
+		records
 			.last_post()
 			.unwrap()
 			.to_string()
 			.xpect_eq("hello".to_string());
-		window.last_post().unwrap().in_progress().xpect_false();
+		records.last_post().unwrap().in_progress().xpect_false();
 	}
 }

@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering;
 /// [`Post`] and [`ResponseMeta`]. Parallels [`BlobStore`] as the source of
 /// truth the ephemeral scene is a view onto.
 ///
-/// The window flushes into it as it changes, each flush a task of its own;
+/// A thread's records flush into it as they change, each flush a task of its own;
 /// [`ThreadStore::flush`] awaits every one, so a thread is torn down only once
 /// its records are written.
 #[derive(Clone, Deref, Component)]
@@ -33,7 +33,7 @@ impl ThreadStore {
 
 	/// Write the thread `entity`'s completed posts not yet flushed, then wait
 	/// out every flush already in flight, so once this returns the store holds
-	/// every completed post of the window. A thread with no store has nothing
+	/// every completed post of the records. A thread with no store has nothing
 	/// to flush.
 	pub async fn flush(entity: &AsyncEntity) -> Result {
 		let id = entity.id();
@@ -43,13 +43,13 @@ impl ThreadStore {
 				let store = world.get::<ThreadStore>(id)?.clone();
 				let flush =
 					world
-						.with_state::<Query<(&Thread, &ThreadWindow, &mut SyncedPosts)>, _>(
+						.with_state::<Query<(&Thread, &ThreadRecords, &mut SyncedPosts)>, _>(
 							|mut query| {
 								query.get_mut(id).ok().and_then(
-									|(thread, window, mut synced)| {
+									|(thread, records, mut synced)| {
 										ThreadFlush::take(
 											thread,
-											window,
+											records,
 											&mut synced,
 										)
 									},
@@ -101,7 +101,7 @@ impl Drop for InFlight {
 	fn drop(&mut self) { self.0.fetch_sub(1, Ordering::SeqCst); }
 }
 
-/// The records a window holds that its store does not yet: its own completed
+/// The records a thread holds that its store does not yet: its own completed
 /// posts not in [`SyncedPosts`], their authors and response metadata. A
 /// branch's inherited posts are its parent's, never written again.
 pub(crate) struct ThreadFlush {
@@ -112,15 +112,15 @@ pub(crate) struct ThreadFlush {
 }
 
 impl ThreadFlush {
-	/// The window's unflushed completed posts, marking them synced, or `None`
+	/// The unflushed completed posts of the records, marking them synced, or `None`
 	/// when every completed post is already flushed. In-progress (streaming)
-	/// posts stay window-local until completion.
+	/// posts stay records-local until completion.
 	pub(crate) fn take(
 		thread: &Thread,
-		window: &ThreadWindow,
+		records: &ThreadRecords,
 		synced: &mut SyncedPosts,
 	) -> Option<Self> {
-		let posts = window
+		let posts = records
 			.posts()
 			.iter()
 			.filter(|post| {
@@ -137,12 +137,12 @@ impl ThreadFlush {
 		let mut actors: Vec<Actor> = Vec::new();
 		let mut metas: Vec<ResponseMeta> = Vec::new();
 		for post in &posts {
-			if let Ok(actor) = window.actor(post.author())
+			if let Ok(actor) = records.actor(post.author())
 				&& !actors.iter().any(|existing| existing.id() == actor.id())
 			{
 				actors.push(actor.clone());
 			}
-			if let Some(meta) = window.meta(post.id()) {
+			if let Some(meta) = records.meta(post.id()) {
 				metas.push(meta.clone());
 			}
 		}
@@ -277,63 +277,21 @@ pub trait ThreadStoreProvider: 'static + Send + Sync {
 		})
 	}
 
-	/// The window `thread` enters with, bounded however long it has run:
-	/// every actor, the last `tail` posts of its [`Self::history`] (all of
-	/// them when `None`), never opening on a call output whose call it cut,
-	/// and its seed however old ([`ThreadWindow::seed_of`]). The window is
-	/// the model's context, so this is its context policy, beside
-	/// [`StubOldImages`]'s bound on image bytes; older posts are paged by a
-	/// view ([`Self::page_before`]), never entering the window.
-	fn materialize_window<'a>(
+	/// The records `thread` enters with: every actor and its whole
+	/// [`Self::history`].
+	fn load_records<'a>(
 		&'a self,
 		thread: &'a Thread,
-		tail: Option<u64>,
-	) -> BoxedFuture<'a, Result<ThreadWindow>> {
+	) -> BoxedFuture<'a, Result<ThreadRecords>> {
 		Box::pin(async move {
-			let mut window = ThreadWindow::new();
+			let mut records = ThreadRecords::new();
 			for actor in self.actors().await? {
-				window.insert_actor(actor);
+				records.insert_actor(actor);
 			}
-			let history = self.history(thread).await?;
-			let seed = ThreadWindow::seed_of(&history);
-			let mut start = tail
-				.map(|tail| history.len().saturating_sub(tail as usize))
-				.unwrap_or_default();
-			while history.get(start).is_some_and(|post| {
-				matches!(
-					post.as_agent_post(),
-					Some(AgentPost::FunctionCallOutput(_))
-				)
-			}) {
-				start += 1;
+			for post in self.history(thread).await? {
+				records.upsert_post(post);
 			}
-			for (index, post) in history.into_iter().enumerate() {
-				if index >= start || seed.contains(&post.id()) {
-					window.upsert_post(post);
-				}
-			}
-			window.with_seed(seed).xok()
-		})
-	}
-
-	/// Up to `limit` posts of `thread`'s [`Self::history`] before `before`,
-	/// oldest first: the page a view loads as its reader scrolls back past
-	/// the window.
-	fn page_before<'a>(
-		&'a self,
-		thread: &'a Thread,
-		before: PostId,
-		limit: usize,
-	) -> BoxedFuture<'a, Result<Vec<Post>>> {
-		Box::pin(async move {
-			let history = self
-				.history(thread)
-				.await?
-				.into_iter()
-				.filter(|post| post.id() < before)
-				.collect::<Vec<_>>();
-			let start = history.len().saturating_sub(limit);
-			history[start..].to_vec().xok()
+			records.xok()
 		})
 	}
 
@@ -394,20 +352,11 @@ impl ThreadStoreProvider for Arc<dyn ThreadStoreProvider> {
 	) -> BoxedFuture<'a, Result<Vec<Post>>> {
 		self.as_ref().history(thread)
 	}
-	fn materialize_window<'a>(
+	fn load_records<'a>(
 		&'a self,
 		thread: &'a Thread,
-		tail: Option<u64>,
-	) -> BoxedFuture<'a, Result<ThreadWindow>> {
-		self.as_ref().materialize_window(thread, tail)
-	}
-	fn page_before<'a>(
-		&'a self,
-		thread: &'a Thread,
-		before: PostId,
-		limit: usize,
-	) -> BoxedFuture<'a, Result<Vec<Post>>> {
-		self.as_ref().page_before(thread, before, limit)
+	) -> BoxedFuture<'a, Result<ThreadRecords>> {
+		self.as_ref().load_records(thread)
 	}
 	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<ActorId>> {
 		self.as_ref().insert_actor(actor)
@@ -563,7 +512,7 @@ pub mod thread_store_test {
 		texts(provider.history(&right).await.unwrap())
 			.xpect_eq(vec!["post 0", "post 1", "right"]);
 		provider
-			.materialize_window(&left, None)
+			.load_records(&left)
 			.await
 			.unwrap()
 			.posts()
@@ -571,43 +520,6 @@ pub mod thread_store_test {
 			.map(|post| post.to_string())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["post 0", "post 1", "left"]);
-
-		// a bounded window enters with the tail alone, keeping the seed, the
-		// posts before the first session opened, however old, and a view
-		// pages the rest
-		let seeded = Thread::new("Seeded");
-		provider.insert_thread(seeded.clone()).await.unwrap();
-		let text = |text: &str| {
-			AgentPost::new_text(
-				actor_id,
-				seeded.id(),
-				text,
-				PostStatus::Completed,
-			)
-		};
-		// ids are time-ordered, so each post is created in history order
-		let seed = text("seed");
-		let opened =
-			Post::new_log(actor_id, seeded.id(), &SessionOpened::default())
-				.unwrap();
-		let seeded_posts = vec![seed, opened, text("first"), text("second")];
-		provider.insert_posts(seeded_posts.clone()).await.unwrap();
-		texts(
-			provider
-				.materialize_window(&seeded, Some(1))
-				.await
-				.unwrap()
-				.posts()
-				.to_vec(),
-		)
-		.xpect_eq(vec!["seed", "second"]);
-		texts(
-			provider
-				.page_before(&seeded, seeded_posts[3].id(), 2)
-				.await
-				.unwrap(),
-		)
-		.xpect_eq(vec![seeded_posts[1].to_string(), "first".to_string()]);
 
 		provider.store_remove().await.unwrap();
 	}

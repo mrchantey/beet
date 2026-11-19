@@ -1,6 +1,6 @@
 //! `PostPhoto`: the camera turn of the perceive-act loop. Each cycle it captures
 //! a photo through the `take-photo` route (a bound head client serves it, else
-//! the local fixtures handler) and pushes it straight into the thread window as
+//! the local fixtures handler) and pushes it straight into the thread records as
 //! this actor's image post, so the agent's single model call sees the photo
 //! directly, with no separate vision round-trip.
 use crate::beet::prelude::*;
@@ -13,8 +13,8 @@ use beet_router::prelude::*;
 /// own preceding step ([`RotateScene`](super::RotateScene)).
 ///
 /// Spread onto a `User`-kind `<CreateActor>` before the agent actor, so each
-/// `Sequence` iteration begins with a fresh photo in the window as a user-role
-/// image message. Bounding is [`ThreadWindow::stub_old_images`], run inline here so
+/// `Sequence` iteration begins with a fresh photo in the records as a user-role
+/// image message. Bounding is [`ThreadRecords::stub_old_images`], run inline here so
 /// a captured photo is bounded in the same turn it lands; a thread whose images
 /// arrive some other way sequences the standalone [`StubOldImages`] action instead.
 #[action]
@@ -52,12 +52,12 @@ pub async fn PostPhoto(
 	// append the photo as this actor's turn, then stub older photos to bound bytes
 	// without dropping posts (append-only keeps the LLM prompt-cache prefix stable).
 	cx.caller
-		.with_state::<ThreadWindowQuery, _>(
-			move |entity, mut windows| -> Result {
-				let actor_id = windows.actor_id(entity)?;
-				let thread_id = windows.thread_id(entity)?;
-				let mut window = windows.window_mut(entity)?;
-				window.upsert_post(AgentPost::new_bytes(
+		.with_state::<ThreadRecordsQuery, _>(
+			move |entity, mut thread_records| -> Result {
+				let actor_id = thread_records.actor_id(entity)?;
+				let thread_id = thread_records.thread_id(entity)?;
+				let mut records = thread_records.records_mut(entity)?;
+				records.upsert_post(AgentPost::new_bytes(
 					actor_id,
 					thread_id,
 					media.media_type().clone(),
@@ -65,7 +65,7 @@ pub async fn PostPhoto(
 					None,
 					PostStatus::Completed,
 				));
-				window.stub_old_images(keep_media);
+				records.stub_old_images(keep_media);
 				Ok(())
 			},
 		)
@@ -107,7 +107,7 @@ pub async fn PostPhoto(
 pub struct CycleClock {
 	/// The current cycle, counting from 1.
 	pub cycle: u64,
-	/// When the current cycle's photo landed in the window.
+	/// When the current cycle's photo landed in the records.
 	pub photo_at: Instant,
 }
 
@@ -135,7 +135,7 @@ mod test {
 	use crate::prelude::*;
 
 	/// Each camera turn captures through `take-photo` and lands exactly one new
-	/// image post in the window, authored by the camera actor.
+	/// image post in the records, authored by the camera actor.
 	#[beet_core::test]
 	async fn posts_a_photo_each_turn() {
 		let mut app = App::new();
@@ -162,7 +162,7 @@ mod test {
 			.spawn((Actor::user(), PostPhoto::default(), ChildOf(thread)))
 			.id();
 		app.world_mut().flush();
-		ThreadWindow::reduce_now(app.world_mut());
+		ThreadRecords::reduce_now(app.world_mut());
 
 		app.world_mut().entity_mut(camera).run_async_local(
 			|camera| async move {
@@ -172,14 +172,14 @@ mod test {
 		);
 		app_ext::update_until(&mut app, move |world| {
 			world
-				.get::<ThreadWindow>(thread)
-				.is_some_and(|window| !window.is_empty())
+				.get::<ThreadRecords>(thread)
+				.is_some_and(|records| !records.is_empty())
 		})
 		.await
 		.xpect_true();
 
-		let window = app.world().get::<ThreadWindow>(thread).unwrap();
-		window.posts().len().xpect_eq(1);
-		window.posts()[0].media_type().is_image().xpect_true();
+		let records = app.world().get::<ThreadRecords>(thread).unwrap();
+		records.posts().len().xpect_eq(1);
+		records.posts()[0].media_type().is_image().xpect_true();
 	}
 }

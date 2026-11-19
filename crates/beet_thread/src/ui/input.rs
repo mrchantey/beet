@@ -147,12 +147,12 @@ async fn user_input_action(cx: ActionContext) -> Result<Outcome> {
 	// resolve which thread + actor this user turn belongs to
 	let (thread_entity, actor_id, thread_id) = cx
 		.caller
-		.with_state::<ThreadWindowQuery, _>(
-			|entity, window_mut| -> Result<(Entity, ActorId, ThreadId)> {
+		.with_state::<ThreadRecordsQuery, _>(
+			|entity, records_mut| -> Result<(Entity, ActorId, ThreadId)> {
 				Ok((
-					window_mut.thread_entity(entity)?,
-					window_mut.actor_id(entity)?,
-					window_mut.thread_id(entity)?,
+					records_mut.thread_entity(entity)?,
+					records_mut.actor_id(entity)?,
+					records_mut.thread_id(entity)?,
 				))
 			},
 		)
@@ -207,9 +207,9 @@ async fn user_input_action(cx: ActionContext) -> Result<Outcome> {
 		})
 		.await;
 	cx.caller
-		.with_state::<ThreadWindowQuery, _>(
-			move |entity, mut window_mut| -> Result {
-				window_mut.push_post(
+		.with_state::<ThreadRecordsQuery, _>(
+			move |entity, mut records_mut| -> Result {
+				records_mut.push_post(
 					entity,
 					AgentPost::new_text(
 						actor_id,

@@ -2,9 +2,9 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// Bound the thread window's image bytes, as a standalone action.
+/// Bound the image bytes of a thread's records, as a standalone action.
 ///
-/// The action form of [`ThreadWindow::stub_old_images`]: every image post older
+/// The action form of [`ThreadRecords::stub_old_images`]: every image post older
 /// than the most recent `keep` is replaced in place by a short text stub, so an
 /// endless loop's request stays bounded without ever dropping a post. Sequence it
 /// after whatever posts the image:
@@ -19,12 +19,6 @@ use beet_core::prelude::*;
 /// Standing on its own entity is the point: bounding is a policy of the thread,
 /// not of whichever actor happened to capture the image, so a thread whose images
 /// arrive from a tool call or an upload bounds them the same way.
-///
-/// The window's other bound is by count: a continued thread enters with the
-/// newest [`MountThreadStore::tail`] posts and its seed, never its whole
-/// history ([`ThreadStoreProvider::materialize_window`]),
-/// so however long a thread runs, its context starts bounded and a view pages
-/// the rest from the store.
 #[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -37,9 +31,9 @@ pub async fn StubOldImages(
 	cx: ActionContext,
 ) -> Result<Outcome> {
 	cx.caller
-		.with_state::<ThreadWindowQuery, _>(
-			move |entity, mut windows| -> Result {
-				windows.window_mut(entity)?.stub_old_images(keep);
+		.with_state::<ThreadRecordsQuery, _>(
+			move |entity, mut thread_records| -> Result {
+				thread_records.records_mut(entity)?.stub_old_images(keep);
 				Ok(())
 			},
 		)

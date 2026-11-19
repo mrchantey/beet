@@ -151,7 +151,7 @@ mod test {
 	/// turn (its `Sequence` child), which projects into the view's document and
 	/// renders as charcell text on the surface, the agent's streamed echo included.
 	#[beet_core::test]
-	async fn renders_window_posts() {
+	async fn renders_record_posts() {
 		let (mut app, surface, thread) = serve_thread(
 			UVec2::new(40, 12),
 			(Thread::default(), Sequence::new(), children![
@@ -202,13 +202,13 @@ mod test {
 	}
 
 	/// Push an error post ([`PostIntent::Error`]) authored by the thread's agent into its
-	/// window, so the transcript snapshot exercises the `error` role styling
+	/// records, so the transcript snapshot exercises the `error` role styling
 	/// without a failing network call.
 	fn push_error_post(app: &mut App, thread: Entity) {
 		let thread_id = app.world().get::<Thread>(thread).unwrap().id();
 		let agent_id = agent_id(app, thread);
 		app.world_mut()
-			.get_mut::<ThreadWindow>(thread)
+			.get_mut::<ThreadRecords>(thread)
 			.unwrap()
 			.upsert_post(AgentPost::new_error(
 				agent_id,
@@ -221,7 +221,7 @@ mod test {
 	/// The id of the thread's agent actor, the author of pushed posts.
 	fn agent_id(app: &App, thread: Entity) -> ActorId {
 		app.world()
-			.get::<ThreadWindow>(thread)
+			.get::<ThreadRecords>(thread)
 			.unwrap()
 			.actors()
 			.values()
@@ -241,7 +241,7 @@ mod test {
 		let agent_id = agent_id(app, thread);
 		for index in lines {
 			app.world_mut()
-				.get_mut::<ThreadWindow>(thread)
+				.get_mut::<ThreadRecords>(thread)
 				.unwrap()
 				.upsert_post(AgentPost::new_text(
 					agent_id,
@@ -272,7 +272,7 @@ mod test {
 			]),
 		)
 		.await;
-		ThreadWindow::reduce_now(app.world_mut());
+		ThreadRecords::reduce_now(app.world_mut());
 		push_error_post(&mut app, thread);
 		drive_until(&mut app, surface, "401 Unauthorized");
 		frame(&mut app, surface).xpect_snapshot();
@@ -296,7 +296,7 @@ mod test {
 			]),
 		)
 		.await;
-		ThreadWindow::reduce_now(app.world_mut());
+		ThreadRecords::reduce_now(app.world_mut());
 		// far more posts than the 16-row viewport can hold
 		push_numbered_posts(&mut app, thread, 1..=14);
 		let frame = drive_until(&mut app, surface, "line 14");
@@ -325,7 +325,7 @@ mod test {
 			]),
 		)
 		.await;
-		ThreadWindow::reduce_now(app.world_mut());
+		ThreadRecords::reduce_now(app.world_mut());
 		push_numbered_posts(&mut app, thread, 1..=12);
 		drive_until(&mut app, surface, "line 12");
 		// settle the follow + the scroll clamp against the laid-out geometry, so
