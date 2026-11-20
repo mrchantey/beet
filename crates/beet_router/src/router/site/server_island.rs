@@ -24,6 +24,11 @@
 //! - The island route builds the one island inline and answers it alone, led
 //!   by a `<style>` of the rules its own subtree selects, with a `beet-island`
 //!   header naming it, which the script checks before it swaps.
+//! - A page painted into a browser tab resolves placeholders too, the page
+//!   it adopts having been served with them: the wrapper is
+//!   [`ForeignChildren`], so the tab adopts it whole, whatever the script
+//!   already swapped in, and a page the tab paints fresh, which runs no
+//!   script, swaps each island in itself ([`IslandPlaceholder::swap`]).
 //! - Every other render (a live surface, a scoped render, a non-html
 //!   response) builds every island inline, like any other content.
 //!
@@ -127,6 +132,55 @@ impl ServerIsland {
 				"a server island's name is one path segment, the last of its \
 				 address, not `{name}`"
 			),
+		}
+	}
+}
+
+/// The `<beet-island>` wrapper of an island's placeholder: which island it
+/// stands in for and where that island is fetched from, so a fresh paint in
+/// a browser tab, which runs no script, swaps the island in as the swap
+/// script would ([`Self::swap`]).
+#[derive(Debug, Clone, PartialEq, Eq, Component)]
+pub(crate) struct IslandPlaceholder {
+	/// The island's name, which the response must name before it swaps.
+	pub name: SmolStr,
+	/// The island's address, ie `/_server-islands/blog/ecs-router/comments`.
+	pub address: String,
+}
+
+impl IslandPlaceholder {
+	/// Fetch the island and set `wrapper`'s html to it when the response
+	/// names the island, leaving the fallback otherwise: the
+	/// [`SWAP_SCRIPT`](ServerIsland::SWAP_SCRIPT), run from the world.
+	#[cfg(target_arch = "wasm32")]
+	pub(crate) async fn swap(
+		self,
+		wrapper: beet_core::exports::web_sys::Element,
+	) {
+		let response = match Request::get(&self.address)
+			.with_header::<header::Accept>(vec![MediaType::Html])
+			.send()
+			.await
+		{
+			Ok(response) => response,
+			Err(err) => {
+				debug!(
+					"server island `{}` kept its fallback: {err}",
+					self.name
+				);
+				return;
+			}
+		};
+		let named = response.parts.headers.first_raw(ServerIsland::HEADER)
+			== Some(self.name.as_str());
+		if !response.status().is_ok() || !named {
+			return;
+		}
+		match response.text().await {
+			Ok(html) => wrapper.set_inner_html(&html),
+			Err(err) => {
+				debug!("server island `{}` kept its fallback: {err}", self.name)
+			}
 		}
 	}
 }

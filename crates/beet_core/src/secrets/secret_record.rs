@@ -51,9 +51,14 @@ impl fmt::Display for SecretRole {
 /// blob. The sealed copy is the truth and the index its mirror, so a hand
 /// edit of the index is caught on open rather than obeyed. The group is
 /// not a field: it is the map the record sits in.
+///
+/// An index field this build does not know refuses the document: a reader
+/// older than the writer would otherwise drop the field and, on its next
+/// seal, write the document back without it.
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize,
 )]
+#[serde(deny_unknown_fields)]
 pub struct SecretRecord {
 	/// What consumes the record automatically.
 	#[serde(default, skip_serializing_if = "Option::is_none")]

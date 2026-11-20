@@ -88,7 +88,8 @@ impl Plugin for PageHostPlugin {
 		app.add_observer(despawn_page_with_surface);
 		#[cfg(target_arch = "wasm32")]
 		app.install_type::<(DomRenderPlugin, DomInputPlugin)>()
-			.add_systems(PostUpdate, mount_dom_hosts.after(DomRenderSet));
+			.add_systems(PostUpdate, mount_dom_hosts.after(DomRenderSet))
+			.add_observer(swap_painted_islands);
 	}
 }
 
@@ -127,7 +128,9 @@ pub(crate) enum LiveNavigation {
 /// - A scene route builds into a living page: [`LivePage::prepare_route`],
 ///   the same route build, layout middleware and `--root` cascade a
 ///   request's [`LivePage::respond`] runs, its tree bound to a surface via
-///   [`bind_surface_page`] instead of rendered and released.
+///   [`bind_surface_page`] instead of rendered and released, its server
+///   islands resolved as `islands` asks: placeholders for a browser tab,
+///   which adopts the served html, inline for a terminal.
 /// - A url the router serves nothing at, or a draft in production, builds
 ///   the [`NotFoundPage`] an http miss renders, live so its chrome stays
 ///   interactive.
@@ -137,6 +140,7 @@ pub(crate) enum LiveNavigation {
 pub(crate) async fn build_live_page(
 	router: &AsyncEntity,
 	request: Request,
+	islands: IslandScope,
 ) -> Result<LiveNavigation> {
 	let node =
 		match LivePage::find_route(router, request.path().clone()).await? {
@@ -155,7 +159,7 @@ pub(crate) async fn build_live_page(
 		};
 	let page = match node {
 		Some(node) if node.is_scene() => {
-			LivePage::prepare_route(router, node, request).await?
+			LivePage::prepare_route_with(router, node, request, islands).await?
 		}
 		None => {
 			let parts = request.parts().clone();
@@ -480,6 +484,53 @@ mod test {
 			.await
 			.xnot()
 			.xpect_contains("Alpha page");
+	}
+
+	/// A browser tab's navigator resolves its page's server islands as the
+	/// placeholders the served html carries, since the tab adopts that html:
+	/// the wrapper foreign, so the document's swap survives the adoption, and
+	/// carrying the address a fresh paint fetches, the content never built.
+	#[beet_core::test]
+	async fn a_browser_surface_resolves_island_placeholders() {
+		let mut app = nav_app();
+		let router = app
+			.world_mut()
+			.spawn((Router, children![
+				render_action::fixed_func_route("blog/post", || rsx! {
+					<ServerIsland
+						name="visits"
+						content={|| rsx! { <span>"post visits"</span> }}
+						fallback={|| rsx! { <em>"counting"</em> }}
+					/>
+				}),
+				rsx! { <ServerIslands/> },
+			]))
+			.flush();
+		let tab = app
+			.world_mut()
+			.spawn((
+				DomHost::bundle(),
+				Navigator::in_world(router, "blog/post"),
+			))
+			.id();
+		drive_while(&mut app, 200, |app| {
+			app.update();
+			!app.world().entity(tab).contains::<RenderSurfaceOf>()
+		})
+		.await;
+		let mut placeholders = app
+			.world_mut()
+			.query_filtered::<&IslandPlaceholder, With<ForeignChildren>>();
+		placeholders
+			.iter(app.world())
+			.map(|placeholder| placeholder.address.clone())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["/_server-islands/blog/post/visits".to_string()]);
+		app.world_mut()
+			.query::<&Value>()
+			.iter(app.world())
+			.any(|value| value.to_string() == "post visits")
+			.xpect_false();
 	}
 
 	/// A router whose pages cross-link, for the link-click navigation tests.

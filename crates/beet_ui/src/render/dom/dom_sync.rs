@@ -74,19 +74,22 @@ fn sync_dom(world: &mut World, state: &mut SystemState<DomChanges>) {
 	}
 	// every changed list under one painted element reconciles that element
 	// once
-	let targets = world.with_state::<(RenderTreeQuery, Query<&DomNode>), _>(
-		|(tree, nodes)| {
-			let mut targets: Vec<(Entity, web_sys::Element)> = Vec::new();
-			for entity in children {
-				if let Some(target) = reconcile_target(&tree, &nodes, entity)
-					&& !targets.iter().any(|(known, _)| *known == target.0)
-				{
-					targets.push(target);
-				}
+	let targets = world.with_state::<(
+		RenderTreeQuery,
+		Query<&DomNode>,
+		Query<(), With<ForeignChildren>>,
+	), _>(|(tree, nodes, foreign)| {
+		let mut targets: Vec<(Entity, web_sys::Element)> = Vec::new();
+		for entity in children {
+			if let Some(target) =
+				reconcile_target(&tree, &nodes, &foreign, entity)
+				&& !targets.iter().any(|(known, _)| *known == target.0)
+			{
+				targets.push(target);
 			}
-			targets
-		},
-	);
+		}
+		targets
+	});
 	for (entity, target) in targets {
 		sync_children(world, entity, target);
 	}
@@ -204,19 +207,25 @@ fn sync_children(world: &mut World, entity: Entity, target: web_sys::Element) {
 
 /// The painted element `entity`'s children land in: itself when it paints as
 /// one, else the nearest visual ancestor that does, crossing a transclusion
-/// to its holder. `None` outside any painted tree.
+/// to its holder. `None` outside any painted tree, and inside a
+/// [`ForeignChildren`] element, whose children are the document's.
 fn reconcile_target(
 	tree: &RenderTreeQuery,
 	nodes: &Query<&DomNode>,
+	foreign: &Query<(), With<ForeignChildren>>,
 	entity: Entity,
 ) -> Option<(Entity, web_sys::Element)> {
-	tree.iter_ancestors_inclusive(entity).find_map(|ancestor| {
-		nodes
-			.get(ancestor)
-			.ok()
-			.and_then(DomNode::element)
-			.map(|element| (ancestor, element.clone()))
-	})
+	for ancestor in tree.iter_ancestors_inclusive(entity) {
+		if foreign.contains(ancestor) {
+			return None;
+		}
+		if let Some(element) =
+			nodes.get(ancestor).ok().and_then(DomNode::element)
+		{
+			return Some((ancestor, element.clone()));
+		}
+	}
+	None
 }
 
 /// What one entity contributes to its parent's DOM child list.

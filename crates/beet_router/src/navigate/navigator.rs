@@ -456,25 +456,35 @@ impl Navigator {
 	) -> Result<Option<Url>> {
 		let navigator = entity.id();
 		let world = entity.world().clone();
+		// a browser tab adopts the served page, whose islands are placeholders
+		let islands =
+			match entity.with(|entity| entity.contains::<DomHost>()).await? {
+				true => IslandScope::Placeholders,
+				false => IslandScope::Inline,
+			};
 		let (send, recv) = OnceValue::oneshot();
 		world
 			.run_async_local(move |world| async move {
-				let bound =
-					match build_live_page(&world.entity(router), request).await
-					{
-						Ok(LiveNavigation::Page(page)) => {
-							world
-								.with(move |world| {
-									bind_or_reclaim(world, navigator, page)
-								})
-								.await;
-							Ok(None)
-						}
-						Ok(LiveNavigation::Redirect(location)) => {
-							Ok(Some(location))
-						}
-						Err(err) => Err(err),
-					};
+				let bound = match build_live_page(
+					&world.entity(router),
+					request,
+					islands,
+				)
+				.await
+				{
+					Ok(LiveNavigation::Page(page)) => {
+						world
+							.with(move |world| {
+								bind_or_reclaim(world, navigator, page)
+							})
+							.await;
+						Ok(None)
+					}
+					Ok(LiveNavigation::Redirect(location)) => {
+						Ok(Some(location))
+					}
+					Err(err) => Err(err),
+				};
 				send.signal(bound);
 			})
 			.await;

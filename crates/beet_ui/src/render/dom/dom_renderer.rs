@@ -31,6 +31,10 @@ const MATHML_NAMESPACE: &str = "http://www.w3.org/1998/Math/MathML";
 /// value intact) and one the world disagrees with is replaced in place by a
 /// fresh paint. The [`Adoption`] it returns is the conformance measure: a
 /// served page and the world that rendered it adopt with nothing replaced.
+///
+/// A [`ForeignChildren`] element is adopted whole, never walked inside, its
+/// children being the document's; painted fresh, it paints the world's
+/// children and is announced with [`ForeignChildrenPainted`] once bound.
 pub struct DomRenderer {
 	target: web_sys::Element,
 }
@@ -61,6 +65,16 @@ impl core::fmt::Display for Adoption {
 			self.adopted, self.replaced, self.patched
 		)
 	}
+}
+
+/// Triggered on a [`ForeignChildren`] element a fresh paint created, once
+/// bound to its [`DomNode`]: the paint ran no script, so whoever owns the
+/// element's fill runs it now.
+#[derive(Debug, Clone, Copy, EntityEvent)]
+pub struct ForeignChildrenPainted {
+	/// The element painted fresh.
+	#[event_target]
+	pub entity: Entity,
 }
 
 impl DomRenderer {
@@ -119,10 +133,14 @@ impl DomRenderer {
 			roots,
 			bindings,
 			edits,
+			foreign,
 			adoption,
 		} = painter.finish();
 		for (entity, binding) in bindings {
 			world.entity_mut(entity).insert(binding);
+		}
+		for entity in foreign {
+			world.trigger(ForeignChildrenPainted { entity });
 		}
 		// a control the user edited before the world existed: the world takes
 		// its value, as it takes every later `input`
@@ -235,6 +253,8 @@ struct Painted {
 	bindings: Vec<(Entity, DomNode)>,
 	/// Controls the served page holds an edit in, with the value to write.
 	edits: Vec<(Entity, LiveValue)>,
+	/// The [`ForeignChildren`] elements painted fresh.
+	foreign: Vec<Entity>,
 	adoption: Adoption,
 }
 
@@ -255,6 +275,8 @@ struct DomPainter<'w> {
 	bindings: Vec<(Entity, DomNode)>,
 	/// Adopted controls holding an edit made before the world existed.
 	edits: Vec<(Entity, LiveValue)>,
+	/// The [`ForeignChildren`] elements painted fresh.
+	foreign: Vec<Entity>,
 	adoption: Adoption,
 	/// The value of the `<select>` being painted fresh, for the `<option>`
 	/// it names; an adopted select's served options already carry theirs.
@@ -279,6 +301,7 @@ impl<'w> DomPainter<'w> {
 			roots: default(),
 			bindings: default(),
 			edits: default(),
+			foreign: default(),
 			adoption: default(),
 			select_value: None,
 		}
@@ -293,6 +316,7 @@ impl<'w> DomPainter<'w> {
 			roots: self.roots,
 			bindings: self.bindings,
 			edits: self.edits,
+			foreign: self.foreign,
 			adoption: self.adoption,
 		}
 	}
@@ -604,6 +628,33 @@ impl<'w> DomPainter<'w> {
 		}
 		self.take_if(|_| true)
 	}
+
+	/// Adopt the served `tag` element at the cursor as a [`ForeignChildren`]
+	/// `entity`: bound with its attribute entities and never walked inside,
+	/// answering whether it was, so a fresh paint (or a mismatch, replaced
+	/// as any element's) walks on instead.
+	fn adopt_foreign(&mut self, entity: Entity, tag: &str) -> bool {
+		let namespace = self.namespace_for(tag);
+		let Some(node) = self.take_if(|node| {
+			node.dyn_ref::<web_sys::Element>().is_some_and(|element| {
+				Self::element_matches(element, tag, namespace.as_deref())
+			})
+		}) else {
+			return false;
+		};
+		let element = node.clone().unchecked_into::<web_sys::Element>();
+		for attribute in self
+			.world
+			.get::<Attributes>(entity)
+			.into_iter()
+			.flat_map(|attributes| attributes.iter())
+		{
+			self.bindings
+				.push((attribute, DomNode::attribute(element.clone())));
+		}
+		self.bind(entity, DomNode::node(node));
+		true
+	}
 }
 
 impl NodeVisitor for DomPainter<'_> {
@@ -621,6 +672,13 @@ impl NodeVisitor for DomPainter<'_> {
 				self.place(&node);
 			}
 			return true;
+		}
+		// a served element whose children are the document's is adopted
+		// whole; one the page lacks paints as any element
+		if let Some(element) = element
+			&& self.world.entity(cx.entity).contains::<ForeignChildren>()
+		{
+			return self.adopt_foreign(cx.entity, element.tag());
 		}
 		let Some(tag) = element
 			.map(|element| element.tag())
@@ -706,6 +764,9 @@ impl NodeVisitor for DomPainter<'_> {
 				self.apply_class(&element, &view);
 				self.place(&element);
 				self.frames.push(Frame::painting(element.clone()));
+				if self.world.entity(cx.entity).contains::<ForeignChildren>() {
+					self.foreign.push(cx.entity);
+				}
 				element
 			}
 		};
@@ -750,6 +811,8 @@ mod test {
 	use super::super::test_ext::*;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use std::sync::Arc;
+	use std::sync::Mutex;
 	use wasm_bindgen::JsCast;
 
 	/// The control-heavy tree the probes run over.
@@ -1039,5 +1102,72 @@ mod test {
 		let host = scene_editor_page(&mut app);
 		let target = serve(&mut app, host);
 		adopt(&mut app, host, &target).is_clean().xpect_true();
+	}
+
+	/// A page holding a [`ForeignChildren`] element, a paragraph inside it
+	/// and one after it, with every element it announces as painted fresh
+	/// recorded.
+	fn foreign_page(app: &mut App) -> (Entity, Arc<Mutex<Vec<Entity>>>) {
+		let painted = Arc::new(Mutex::new(Vec::new()));
+		let record = painted.clone();
+		app.world_mut()
+			.add_observer(move |ev: On<ForeignChildrenPainted>| {
+				record.lock().unwrap().push(ev.entity);
+			});
+		let host = build(app, rsx! {
+			<main>
+				<beet-island name="comments" {ForeignChildren}>
+					<p>"fallback"</p>
+				</beet-island>
+				<p>"after"</p>
+			</main>
+		});
+		(host, painted)
+	}
+
+	/// A served foreign element is adopted whole, whether the document has
+	/// already filled it (a server island's swap landing before the boot)
+	/// or not yet: nothing replaced, nothing inside bound or touched, no
+	/// paint announced, and a later change to the world's children inside
+	/// it leaves the document's alone.
+	#[beet_core::test(browser)]
+	fn a_served_foreign_element_is_adopted_whole() {
+		for swapped in [true, false] {
+			let mut app = dom_app();
+			let (host, painted) = foreign_page(&mut app);
+			let target = serve(&mut app, host);
+			if swapped {
+				target
+					.query_selector("beet-island")
+					.unwrap()
+					.unwrap()
+					.set_inner_html("<ul><li>swapped</li></ul>");
+			}
+			let served = target.inner_html();
+			adopt(&mut app, host, &target).is_clean().xpect_true();
+			target.inner_html().xpect_eq(served.clone());
+			let island = element(app.world_mut(), "beet-island");
+			app.world().get::<DomNode>(island).xpect_some();
+			let fallback = element(app.world_mut(), "p");
+			app.world().get::<DomNode>(fallback).xpect_none();
+			painted.lock().unwrap().xpect_empty();
+			app.world_mut().entity_mut(fallback).despawn();
+			app.update();
+			target.inner_html().xpect_eq(served);
+		}
+	}
+
+	/// A fresh paint runs no script, so it paints a foreign element's
+	/// children as the world holds them and announces the element.
+	#[beet_core::test(browser)]
+	fn a_fresh_foreign_element_is_announced() {
+		let mut app = dom_app();
+		let (host, painted) = foreign_page(&mut app);
+		let target = paint(&mut app, host);
+		target
+			.inner_html()
+			.xpect_eq(ssr_html(app.world_mut(), host));
+		let island = element(app.world_mut(), "beet-island");
+		painted.lock().unwrap().clone().xpect_eq(vec![island]);
 	}
 }

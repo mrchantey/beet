@@ -98,6 +98,10 @@ pub use dom::*;
 // back by the browser world once it has adopted it.
 mod pre_boot;
 pub use pre_boot::*;
+// an element whose children the browser fills in, which the DOM sink
+// adopts whole
+mod foreign_children;
+pub use foreign_children::*;
 mod doc_renderers;
 pub use doc_renderers::*;
 mod plaintext;

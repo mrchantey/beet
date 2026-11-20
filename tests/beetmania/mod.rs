@@ -1,5 +1,6 @@
 //! Shared loader for the on-disk `examples/beetmania` no-code example, used by the
-//! project-level `beetmania` render and `beetmania_tui` live-terminal test suites.
+//! project-level `beetmania` render, `beetmania_tui` live-terminal and
+//! `beetmania_browser` test suites.
 //!
 //! Files in a `tests/` subdirectory are not compiled as their own test target, so
 //! this module is `#[path]`-included by both suites rather than run on its own.

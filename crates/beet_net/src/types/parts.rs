@@ -780,7 +780,7 @@ mod test {
 			.xpect_eq(vec![
 				"serve".to_string(),
 				"examples".to_string(),
-				"website".to_string(),
+				"beetmania".to_string(),
 			]);
 	}
 

@@ -88,6 +88,22 @@ pub(crate) fn mount_dom_hosts(world: &mut World) {
 	}
 }
 
+/// Observer: a server island's placeholder painted fresh (an in-world
+/// navigation) ran no script, so its island is swapped in from here.
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn swap_painted_islands(
+	ev: On<ForeignChildrenPainted>,
+	placeholders: Query<(&IslandPlaceholder, &DomNode)>,
+) {
+	let Ok((placeholder, node)) = placeholders.get(ev.entity) else {
+		return;
+	};
+	let Some(wrapper) = node.element().cloned() else {
+		return;
+	};
+	async_ext::spawn_local(placeholder.clone().swap(wrapper)).detach();
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

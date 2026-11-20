@@ -135,6 +135,8 @@ impl RequestEvent {
 /// One completed response from `network.responseCompleted`.
 #[derive(Debug, Clone)]
 pub struct ResponseEvent {
+	/// The method of the request this answers.
+	pub method: HttpMethod,
 	/// The http status code.
 	pub status: StatusCode,
 	/// The full request url.
@@ -144,11 +146,25 @@ pub struct ResponseEvent {
 impl ResponseEvent {
 	/// Whether this response failed (4xx/5xx). A failed subresource (eg a
 	/// 403 favicon) raises no console error, so a client check needs both.
-	pub fn is_error(&self) -> bool { self.status.as_u16() >= 400 }
+	///
+	/// A `HEAD` answered `404` is not a failure: it asked whether the
+	/// resource exists, and the answer is no, which is how a store reads a
+	/// file that may be absent (`BlobStore::exists`) without fetching it.
+	pub fn is_error(&self) -> bool {
+		self.status.as_u16() >= 400
+			&& !(self.method == HttpMethod::Head
+				&& self.status == StatusCode::NOT_FOUND)
+	}
 
 	fn parse(event: &Value) -> Option<Self> {
-		let response = event.pointer("/params/response")?;
+		let params = event.get("params")?;
+		let response = params.get("response")?;
 		Some(Self {
+			method: params
+				.pointer("/request/method")?
+				.as_str()?
+				.parse()
+				.ok()?,
 			status: StatusCode::new(response.get("status")?.as_u64()? as u16),
 			url: Url::coerce(response.get("url")?.as_str()?),
 		})
@@ -287,5 +303,21 @@ mod test {
 		network.drain().xpect_empty();
 
 		page.kill().await.unwrap();
+	}
+
+	/// A failed `GET` is an error; a `HEAD` answered `404` is an answer.
+	#[beet_core::test]
+	fn an_absent_head_is_not_a_failure() {
+		let event = |method: &str, status: u64| {
+			ResponseEvent::parse(&json!({"params": {
+				"request": {"method": method},
+				"response": {"status": status, "url": "http://localhost/a"},
+			}}))
+			.unwrap()
+		};
+		event("GET", 404).is_error().xpect_true();
+		event("HEAD", 404).is_error().xpect_false();
+		event("HEAD", 500).is_error().xpect_true();
+		event("GET", 200).is_error().xpect_false();
 	}
 }

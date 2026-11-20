@@ -165,12 +165,11 @@ mod test {
 				.roll
 				.xpect_eq(Some(roll));
 		}
-		// a record still carrying the retired `rotation` key opens, rolling by
-		// nothing: a record is lenient where its document and group are not
+		// the retired `rotation` key is refused rather than dropped
 		toml::from_str::<SecretRecord>("rotation = \"remint\"\n")
-			.unwrap()
-			.roll
-			.xpect_none();
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("unknown field `rotation`");
 		"replace:".parse::<SecretRoll>().unwrap_err();
 		"weekly".parse::<SecretRoll>().unwrap_err();
 		SecretRoll::Remint.kind().xpect_eq("remint");

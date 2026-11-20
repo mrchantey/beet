@@ -3,10 +3,11 @@
 //!
 //! [`LivePage::prepare`] runs it after the layouts and before the `--root`
 //! cascade. Which islands resolve is the caller's, never a request param: the
-//! http page handler asks for placeholders when it negotiated html, the
-//! island route ([`ServerIslands`]) names the one island it answers, which
-//! becomes the render root, and every other caller (a live surface, a scoped
-//! render, a non-html response) resolves every island inline.
+//! http page handler asks for placeholders when it negotiated html, as does
+//! a browser tab's navigator, whose page adopts that html; the island route
+//! ([`ServerIslands`]) names the one island it answers, which becomes the
+//! render root; and every other caller (a terminal surface, a scoped render,
+//! a non-html response) resolves every island inline.
 //!
 //! An island's content builds inside its page's [`RequestContext`], so a
 //! widget in it reads the page off [`RequestContextStack`] as a layout widget
@@ -34,7 +35,7 @@ pub(crate) enum IslandScope {
 	/// the edge as html.
 	Inline,
 	/// Every island a placeholder, its content never built: the http page
-	/// handler's html.
+	/// handler's html, and a browser tab's live surface, which adopts it.
 	Placeholders,
 	/// Only the named island, built inline and made the render root: the
 	/// island route. A page with no island of that name is a 404.
@@ -255,7 +256,9 @@ impl IslandScope {
 	/// Spawn under `entity` the placeholder: a `<beet-island>` naming the
 	/// island with the fallback inside it, then the script that swaps the
 	/// island in. A custom element rather than a `<div>`, which the html
-	/// parser would end a surrounding `<p>` at.
+	/// parser would end a surrounding `<p>` at. The wrapper's children are
+	/// [`ForeignChildren`], the script's to replace, and it carries its
+	/// [`IslandPlaceholder`] for a paint that runs no script.
 	fn spawn_placeholder(
 		world: &mut World,
 		entity: Entity,
@@ -264,10 +267,18 @@ impl IslandScope {
 		resolved: &mut ResolvedIslands,
 	) -> Result {
 		let name = island.name.to_string();
+		let placeholder = IslandPlaceholder {
+			name: island.name.clone(),
+			address: ServerIsland::address(cx.parts().path(), &island.name),
+		};
 		let wrapper = world
-			.spawn((IslandResolution, ChildOf(entity), rsx! {
-				<beet-island name=name/>
-			}))
+			.spawn((
+				IslandResolution,
+				ChildOf(entity),
+				ForeignChildren,
+				placeholder,
+				rsx! { <beet-island name=name/> },
+			))
 			.id();
 		resolved.spawned.push(wrapper);
 		if !island.fallback.is_empty() {

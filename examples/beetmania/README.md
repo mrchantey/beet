@@ -93,6 +93,17 @@ There is no framework tier between SSR and the world: below wasm the page is pla
 
 The blog, the Beetmania Almanac, is also a [standard.site](https://standard.site) publication on the `beetmania.beet.org` atproto account: `<StandardSitePub>` declares it, and the `social/publish` command writes one document per dated post to the account's repo, each carrying the post itself as a beet scene, then announces it on Bluesky, where `beetlover.beet.org` reposts and replies. The replies to an announcement are the post's comments, read live in `templates/ArticleLayout.bsx`. Its posts are made up, so the example is where a change to that pipeline is tried before it reaches a real blog; `main.bsx` documents the commands.
 
+## Test accounts
+
+Two Bluesky accounts exist for this example, both made-up characters, their handles, dids and display names written literally in `main.bsx`:
+
+| account | plays | handle | signed up as | did |
+| --- | --- | --- | --- | --- |
+| Beetmania | a test org: publishes the standard.site documents and announces each post | `beetmania.beet.org` | `test-beetmania.bsky.social` | `did:plc:7bxw2ljdoqcny4rio7oiqsru` |
+| Beet Lover | a test user: reposts the announcements it is credited on and replies, the comments under each post | `beetlover.beet.org` | `test-beetlover.bsky.social` | `did:plc:xfhml5eyathkdgloyiresv4d` |
+
+Each `beet.org` handle is a `_atproto` TXT record the `social` stack publishes (`just beetmania social deploy --stage=prod`), claimed once in the account's settings (Handle, "I have my own domain"); `just beetmania social probe --stage=prod` checks both. Their app passwords are `BEETMANIA_BEET_ORG_APP_PASSWORD` and `BEETLOVER_BEET_ORG_APP_PASSWORD` in the repo's `secrets.toml`, rolled at `https://bsky.app/settings/app-passwords`.
+
 ## The deploy
 
 `main.bsx` declares its own infrastructure: a Lambda function serving this directory out of an S3 bucket at `beetmania.beet.org`, and the atproto handle records for its two accounts. Both publish only from the production stage, so the example deploys as `--stage=prod`:

@@ -999,6 +999,18 @@ mod test {
 		.unwrap_err()
 		.to_string()
 		.xpect_contains("unknown field `secrets`");
+		// ..as is a record field from a newer writer, which this build
+		// would otherwise drop on its next seal
+		let mut text = String::from_utf8(document.to_bytes().unwrap()).unwrap();
+		text = text.replacen(
+			"role = \"env_var\"\n",
+			"role = \"env_var\"\nfuture = \"x\"\n",
+			1,
+		);
+		SecretsDocument::parse(MediaType::Toml, text.as_bytes())
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("unknown field `future`");
 		let mut bad = document.clone();
 		bad.groups.get_mut("agents").unwrap().recipients.clear();
 		SecretsDocument::parse(MediaType::Toml, &bad.to_bytes().unwrap())

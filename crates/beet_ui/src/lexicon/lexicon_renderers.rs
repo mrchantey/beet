@@ -261,10 +261,15 @@ mod test {
 			.clone()
 			.xpect_eq(Value::from("last"));
 		// replaced, not registered beside it, and sorted with the built-ins
-		world
-			.resource::<LexiconRenderers>()
-			.available()
-			.xpect_eq(vec![Nsid::new_static("com.example.a"), SceneBody::NSID]);
+		world.resource::<LexiconRenderers>().available().xpect_eq(
+			[Nsid::new_static("com.example.a")]
+				.into_iter()
+				// the built-in, installed with the scene serializer
+				.chain(
+					cfg!(feature = "template_serde").then_some(SceneBody::NSID),
+				)
+				.collect::<Vec<_>>(),
+		);
 	}
 
 	/// A member naming another def than the one asked for is refused.

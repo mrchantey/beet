@@ -20,6 +20,9 @@ beet::test_main!();
 
 mod browser_host;
 use browser_host::*;
+#[path = "beetmania/mod.rs"]
+mod beetmania;
+use beetmania::build_site;
 
 use beet::prelude::*;
 
@@ -32,22 +35,25 @@ async fn serve_site() -> BrowserHost {
 		.await
 }
 
-/// Every route under the example's `routes/` directory, by url path.
+/// Every page the example's router serves, by url path: read off its route
+/// tree, so a post's `slug` (rather than its numbered filename) is the url.
 async fn routes() -> Vec<String> {
-	let dir = AbsPath::new_workspace_rel(ENTRY_DIR)
+	let mut world =
+		(AsyncPlugin, RouterPlugin, material::MaterialStylePlugin).into_world();
+	let root = build_site(&mut world).await;
+	let router = world
+		.run_system_cached_with::<_, Result<Entity>, _, _>(find_router, root)
 		.unwrap()
-		.join("routes");
-	let mut routes: Vec<String> = BlobStore::new(FsStore::new(dir))
-		.list()
-		.await
+		.unwrap();
+	let mut routes = RouteTree::of(&world, router)
 		.unwrap()
+		.flatten_nodes()
 		.into_iter()
-		.map(|path| {
-			let stem = path.with_extension("").to_string();
-			let stem = stem.strip_suffix("index").unwrap_or(&stem);
-			format!("/{}", stem.trim_end_matches('/'))
+		.filter(|node| node.is_page_route)
+		.map(|node| {
+			format!("/{}", node.path.to_string().trim_start_matches('/'))
 		})
-		.collect();
+		.collect::<Vec<_>>();
 	routes.sort();
 	routes
 }
@@ -92,7 +98,8 @@ async fn a_pinned_scheme_tints_the_browser() {
 			.await;
 	};
 	tinted(&host).await;
-	host.painted("/counter").await;
+	// the world opens at the page's own url, its query included
+	host.painted("/counter?color-scheme=dark").await;
 	tinted(&host).await;
 	host.kill().await;
 }

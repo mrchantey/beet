@@ -271,13 +271,15 @@ mod test {
 			.to_string()
 			.xpect_eq("last x\n");
 		// replaced, not registered beside it, and sorted with the built-ins
-		world
-			.resource::<LexiconParsers>()
-			.available()
-			.xpect_eq(vec![
-				Nsid::new_static("com.example.item"),
-				SceneBody::NSID,
-			]);
+		world.resource::<LexiconParsers>().available().xpect_eq(
+			[Nsid::new_static("com.example.item")]
+				.into_iter()
+				// the built-in, installed with the scene serializer
+				.chain(
+					cfg!(feature = "template_serde").then_some(SceneBody::NSID),
+				)
+				.collect::<Vec<_>>(),
+		);
 	}
 
 	/// An unknown member parses to an [`UnknownLexicon`] and renders back as

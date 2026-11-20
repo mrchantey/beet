@@ -388,6 +388,13 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_false();
+		// an absent derived file reads as nothing, asked with a `HEAD` alone,
+		// so a browser reading an unpublished index sees no failed fetch
+		Derivation::new("derived/missing.json")
+			.read(&http)
+			.await
+			.unwrap()
+			.xpect_none();
 		http.get(&RelPath::from("missing.md"))
 			.await
 			.unwrap_err()

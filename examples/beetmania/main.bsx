@@ -65,8 +65,8 @@ The blog is a standard.site publication on `beetmania.beet.org`'s repo, one
 document per dated post, each document's `content` the post as a beet scene
 (`org.beet.scene#body`). `beetlover.beet.org` is a contributor who reposts each
 announcement it is credited on and replies to it, so the comments island under
-each post has something to show. Both are accounts of their own, never the
-throwaway the live tests write to and wipe. `social/publish` converges the repo
+each post has something to show. The README's "Test accounts" lists both.
+`social/publish` converges the repo
 to the posts it names and rewrites the committed index the served site reads
 (`derived/standard-site.json`), which lands with the next `sync`.
 
@@ -92,14 +92,14 @@ repo's `secrets.toml`, loaded by the top-level `<Secrets/>` below.
 	<IconSet src="assets/logo/logo.svg"/>
 	<!-- the tags a post may carry; `beet check` fails any other -->
 	<DocMetaRules tags={["recipes", "growing", "news"]}/>
-	<!-- the publisher and a contributor, each handle, did and display name
-	     written literally. The dids are placeholders until the accounts
-	     exist, so nothing publishes to an account by accident. -->
+	<!-- the publisher, a test org, and the contributor, a test user who
+	     reposts and replies: each handle, did and display name written
+	     literally (see the README's "Test accounts") -->
 	<AtprotoAccount bx:ref="beetmania" handle="beetmania.beet.org"
-		did="did:web:beetmania.beet.org" display_name="Beetmania"
+		did="did:plc:7bxw2ljdoqcny4rio7oiqsru" display_name="Beetmania"
 		secret="BEETMANIA_BEET_ORG_APP_PASSWORD"/>
 	<AtprotoAccount bx:ref="beetlover" handle="beetlover.beet.org"
-		did="did:web:beetlover.beet.org" display_name="Beet Lover"
+		did="did:plc:xfhml5eyathkdgloyiresv4d" display_name="Beet Lover"
 		secret="BEETLOVER_BEET_ORG_APP_PASSWORD" auto_repost=true/>
 	<Route path="serve" {(HttpServer, TuiServer, SshTuiServer, DomServer)}>
 		<Router {(RequestLogger, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
@@ -136,6 +136,14 @@ repo's `secrets.toml`, loaded by the top-level `<Secrets/>` below.
 	     than the root, so the browser runtime, which links none of them, never
 	     meets them. -->
 	<Fragment bx:cfg="feature:infra && feature:extra" {(AwsRegion("us-west-2"), CloudflareAccount("74aba4da669f57fc6fc3e63ebcfcff26"), CloudflareZone{domain:"beet.org", id:"45905c861559d9eb8c9b72ee87adca7b"})}>
+	<!-- the repo's AWS account and deploy credential, shared with `site/`
+	     through the one secrets document: the credential keeps a policy per
+	     app of every entry, so this entry's elevated deploy adds its own apps'
+	     and leaves the site's alone. The Cloudflare token is the site's to
+	     declare, since it converges to exactly what its entry declares; it
+	     already holds the DNS write on `beet.org` this entry's records need. -->
+	<AwsAccount name="beet"/>
+	<AwsDeployCredential/>
 	<!-- the deploy: a lambda serving the repo bucket at `beetmania.beet.org` -->
 	<Stack app_name="beetmania">
 		<!-- the block + its build artifact share one entity, booting `serve` -->
