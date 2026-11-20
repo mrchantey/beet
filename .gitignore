@@ -3,7 +3,7 @@
 # `./site/assets` from `beet-site--shared--assets` (`just site-shared pull`).
 # The pattern is unanchored, so it covers both.
 assets
-# the example website's assets: its logo is its own, everything else borrowed
+# the beetmania example's assets: its logo is its own, everything else borrowed
 # from `./assets` or derived (`just beetmania assets`)
 !examples/beetmania/assets
 examples/beetmania/assets/*

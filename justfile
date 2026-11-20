@@ -369,8 +369,8 @@ _test-pkgs-wasm pkgs *args:
 # `rusqlite`'s master already widened its range to allow 0.6, so this recipe
 # folds back into the one above on its next release.
 # The atproto suites that talk to the network: unauthenticated reads of real
-# accounts, and writes to the throwaway account `beet_net`'s `atproto` module
-# docs set up, skipped with a note naming its secrets when they are absent:
+# accounts, and writes to the test org `beet_net`'s `atproto` module docs set
+# up, skipped with a note naming its secret when it is absent:
 # the converge, then the whole standard.site publish sequence.
 test-atproto-live *args:
 	cargo test -p beet_net --lib --features atproto,ureq,rustls-tls {{ args }} -- --include-ignored --include '*live_test*'

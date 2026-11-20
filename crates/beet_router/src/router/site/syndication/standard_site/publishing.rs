@@ -848,7 +848,7 @@ pub(super) mod test {
 	}
 
 	/// The announcement suite, run against any publishing repo: the emulator
-	/// here, the throwaway account behind the live gate.
+	/// here, the test org behind the live gate.
 	async fn announce_suite(site: &mut Site) {
 		let canonical = format!(
 			"{}/full-stack-bevy",
@@ -916,13 +916,13 @@ pub(super) mod test {
 			.xpect_eq(1);
 	}
 
-	/// The publish sequence against the throwaway account, everything it
-	/// wrote deleted before and after.
+	/// The publish sequence against the test org, everything it wrote
+	/// deleted before and after, so the org's own publication is untouched.
 	#[cfg(not(target_arch = "wasm32"))]
-	#[ignore = "live: writes to the throwaway account"]
+	#[ignore = "live: writes to the test org"]
 	#[beet_core::test(timeout_ms = 180_000)]
 	async fn publishes_to_a_live_repo() {
-		let Some((_, publisher)) = XrpcPds::throwaway() else {
+		let Some(publisher) = XrpcPds::test_org() else {
 			return;
 		};
 		let mut site = Site::with("https://example.com", publisher).await;

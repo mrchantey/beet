@@ -77,7 +77,8 @@ to the posts it names and rewrites the committed index the served site reads
 
 The publisher's app password is `BEETMANIA_BEET_ORG_APP_PASSWORD` and the
 contributor's `BEETLOVER_BEET_ORG_APP_PASSWORD`, both `env_var` records in the
-repo's `secrets.toml`, loaded by the top-level `<Secrets/>` below.
+`agents` group of the repo's `secrets.toml`, loaded by the top-level
+`<Secrets/>` below.
 -->
 <CliServer always=true {CallOnReady}>
 <Router {HelpHandler}>
@@ -136,14 +137,13 @@ repo's `secrets.toml`, loaded by the top-level `<Secrets/>` below.
 	     than the root, so the browser runtime, which links none of them, never
 	     meets them. -->
 	<Fragment bx:cfg="feature:infra && feature:extra" {(AwsRegion("us-west-2"), CloudflareAccount("74aba4da669f57fc6fc3e63ebcfcff26"), CloudflareZone{domain:"beet.org", id:"45905c861559d9eb8c9b72ee87adca7b"})}>
-	<!-- the repo's AWS account and deploy credential, shared with `site/`
-	     through the one secrets document: the credential keeps a policy per
-	     app of every entry, so this entry's elevated deploy adds its own apps'
-	     and leaves the site's alone. The Cloudflare token is the site's to
-	     declare, since it converges to exactly what its entry declares; it
-	     already holds the DNS write on `beet.org` this entry's records need. -->
+	<!-- the repo's AWS account and deploy credentials, shared with `site/`
+	     through the one secrets document: each credential keeps every
+	     entry's grants by app, so this entry's elevated deploy converges its
+	     own apps' and leaves the site's alone -->
 	<AwsAccount name="beet"/>
 	<AwsDeployCredential/>
+	<CloudflareDeployCredential/>
 	<!-- the deploy: a lambda serving the repo bucket at `beetmania.beet.org` -->
 	<Stack app_name="beetmania">
 		<!-- the block + its build artifact share one entity, booting `serve` -->

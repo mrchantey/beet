@@ -41,27 +41,21 @@
 //!
 //! # Live tests
 //!
-//! A test that writes to a real PDS needs a throwaway account, created by
-//! hand once, never one we publish from:
-//!
-//! 1. Sign up at `bsky.app` with a `*.bsky.social` handle and nothing else
-//!    filled in.
-//! 2. Settings -> Privacy and security -> App passwords, add one.
-//! 3. From the beet checkout, seal all three into the `agents` group of its
-//!    `secrets.toml`, which the test runner loads into the process
-//!    environment:
+//! A test that writes to a real PDS writes to the test org,
+//! `beetmania.beet.org`, the account the `beetmania` example publishes from
+//! (its README's "Test accounts" lists it beside the test user). A live test
+//! only ever writes records it deletes again, under its own collection or
+//! publication url, so the org's own publication is never touched. Its app
+//! password is sealed into the `agents` group of the checkout's
+//! `secrets.toml`, which the test runner loads into the process environment:
 //!
 //! ```sh
-//! beet secrets/set BEET_TEST_ATPROTO_HANDLE --group=agents --role=env_var --note="throwaway bsky.social account for live write tests"
-//! beet secrets/set BEET_TEST_ATPROTO_DID --group=agents --role=env_var --note="the did of that account, so a test needs no resolution to start"
-//! beet secrets/set BEET_TEST_ATPROTO_APP_PASSWORD --group=agents --role=env_var --note="app password for that account" --roll="manual:https://bsky.app/settings/app-passwords"
+//! beet secrets/set BEETMANIA_BEET_ORG_APP_PASSWORD --group=agents --role=env_var --note="app password for beetmania.beet.org, the test org" --roll="manual:https://bsky.app/settings/app-passwords"
 //! ```
 //!
-//! A live write test reads the three through `XrpcPds::throwaway`, which
-//! answers `None` with a note naming them when any is absent, so a fresh
-//! checkout passes without the account. The did is stored rather than
-//! resolved because a handle can be renamed and a test should not depend on
-//! a lookup to decide whether to run.
+//! A live write test reads it through `XrpcPds::test_org`, which answers
+//! `None` with a note naming the secret when it is absent, so a fresh
+//! checkout passes without it.
 mod atproto_account;
 mod atproto_plugin;
 mod bsky;

@@ -229,7 +229,7 @@ pub(crate) mod test {
 	}
 
 	/// The converge suite, run against any repo: the emulator here, the
-	/// throwaway account behind the live gate.
+	/// test org behind the live gate.
 	pub(crate) async fn converge_suite(pds: &Pds) {
 		let both = || [doc("aaa", "/one", "One"), doc("bbb", "/two", "Two")];
 		// first write

@@ -28,11 +28,11 @@ Because the site is runtime files, edits to `main.bsx`, the templates, and the r
 ## Layout
 
 ```
-website/
+beetmania/
   main.bsx       the entrypoint: the commands, the served router and its middleware
   templates/     the site's BSX templates, eg Layout.bsx and widgets/Card.bsx
   routes/        the content: every file is a page, eg recipes/borscht.md
-  assets/        the beet logo, plus what the `assets` command borrows and derives
+  assets/        the beetroot logo, plus what the `assets` command borrows and derives
   derived/       the blog's standard.site index, written by `social/publish`
 ```
 
@@ -102,7 +102,9 @@ Two Bluesky accounts exist for this example, both made-up characters, their hand
 | Beetmania | a test org: publishes the standard.site documents and announces each post | `beetmania.beet.org` | `test-beetmania.bsky.social` | `did:plc:7bxw2ljdoqcny4rio7oiqsru` |
 | Beet Lover | a test user: reposts the announcements it is credited on and replies, the comments under each post | `beetlover.beet.org` | `test-beetlover.bsky.social` | `did:plc:xfhml5eyathkdgloyiresv4d` |
 
-Each `beet.org` handle is a `_atproto` TXT record the `social` stack publishes (`just beetmania social deploy --stage=prod`), claimed once in the account's settings (Handle, "I have my own domain"); `just beetmania social probe --stage=prod` checks both. Their app passwords are `BEETMANIA_BEET_ORG_APP_PASSWORD` and `BEETLOVER_BEET_ORG_APP_PASSWORD` in the repo's `secrets.toml`, rolled at `https://bsky.app/settings/app-passwords`.
+Each `beet.org` handle is a `_atproto` TXT record the `social` stack publishes (`just beetmania social deploy --stage=prod`), claimed once in the account's settings (Handle, "I have my own domain"); `just beetmania social probe --stage=prod` checks both. Their app passwords are `BEETMANIA_BEET_ORG_APP_PASSWORD` and `BEETLOVER_BEET_ORG_APP_PASSWORD` in the `agents` group of the repo's `secrets.toml`, rolled at `https://bsky.app/settings/app-passwords`.
+
+Beetmania is also the repo's live test account: `just test-atproto-live` writes to it, only records it deletes again under its own collection and an `https://example.com` publication, so this site's publication is never touched.
 
 ## The deploy
 

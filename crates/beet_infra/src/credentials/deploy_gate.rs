@@ -55,6 +55,9 @@ pub(crate) struct ElevationParams {
 ///   plainly.
 /// - **`--dry-run`** reports, asking for nothing, what each credential would
 ///   become and whether this deploy needs `--elevated`.
+/// - **Any of the three** refuses a launch running as a credential the repo
+///   seals with its grants while the entry declares none for it, since
+///   nothing would check what it holds.
 ///
 /// No provider is named here: each declared credential answers for itself, so
 /// a provider added to an entry adds a credential to the same two commands.
@@ -192,6 +195,66 @@ impl DeployGate {
 		.xok()
 	}
 
+	/// Refuse a launch that runs as a deploy credential the repo seals (a
+	/// record carrying its [grants](DeployCredential::GRANTS)) while declaring
+	/// none for it: nothing would compare what it holds with what the stacks
+	/// need, so a gap would surface mid-apply as the provider's denial, after
+	/// part of the deploy was written. A launch running as another value is the
+	/// provider's to judge, as it is for a declared credential.
+	async fn refuse_undeclared(
+		caller: &AsyncEntity,
+		credentials: &[DeployCredential],
+	) -> Result {
+		let declared = credentials
+			.iter()
+			.flat_map(|credential| credential.records().iter().copied())
+			.collect::<HashSet<_>>();
+		let undeclared = caller
+			.with_world(move |world, _| {
+				world
+					.query::<&OpenSecrets>()
+					.iter(world)
+					.flat_map(|opened| opened.secrets.values())
+					.filter(|secret| {
+						secret
+							.record
+							.metadata
+							.contains_key(DeployCredential::GRANTS)
+							&& !declared.contains(secret.name.as_str())
+					})
+					.cloned()
+					.collect::<Vec<_>>()
+			})
+			.await?
+			.into_iter()
+			.filter(|secret| {
+				env_ext::var(&secret.name)
+					.is_ok_and(|value| value == secret.value.as_str())
+			})
+			.map(|secret| {
+				let what = secret
+					.record
+					.note
+					.as_deref()
+					.and_then(|note| note.split(':').next())
+					.unwrap_or("a deploy credential")
+					.to_string();
+				format!("`{}` ({what})", secret.name)
+			})
+			.collect::<Vec<_>>();
+		if undeclared.is_empty() {
+			return OK;
+		}
+		bevybail!(
+			"this deploy runs as {}, which the repo seals with the grants it \
+			holds, and this entry declares no deploy credential for it, so \
+			nothing checks that it holds what these stacks need before the \
+			provider refuses mid-apply: declare that provider's deploy \
+			credential at the entry's root, beside `<Secrets/>`",
+			undeclared.join(" and ")
+		)
+	}
+
 	/// Ask every declared credential where it stands, once, and plan the
 	/// gated verb on each of `stacks` that declares a type a credential held
 	/// sealed guards; a plan a stale credential cannot run counts as
@@ -205,6 +268,7 @@ impl DeployGate {
 		let credentials = caller
 			.with_state::<DeployCredentialQuery, _>(|_, query| query.all())
 			.await??;
+		Self::refuse_undeclared(caller, &credentials).await?;
 		let mut assessed = Vec::new();
 		// only a credential held sealed is held to what a stored one may do:
 		// one passed for the command is the provider's to judge
@@ -976,6 +1040,54 @@ mod test {
 		deploy(Holding::Another).await.xpect_eq(StatusCode::OK);
 		deploy(Holding::Sealed).await.is_ok().xpect_false();
 		deploy(Holding::None).await.is_ok().xpect_false();
+	}
+
+	/// A deploy running as a credential the repo seals with its grants, which
+	/// the entry declares no credential for, refuses before anything runs,
+	/// naming the record; running as another value of it, the provider judges.
+	///
+	/// REGRESSION: the `beetmania` example declared no deploy credential, so
+	/// its first deploy ran ungated and met the missing grants as AWS
+	/// `AccessDenied` midway through tofu.
+	#[beet_core::test]
+	async fn refuses_an_undeclared_sealed_credential() {
+		const KEY: &str = "BEET_TEST_GATE_UNDECLARED_KEY";
+		let deploy = async |value: &str| {
+			let (mut world, root, _dir) =
+				package(None, RouteMatrix::new(["site"], ["deploy"]));
+			world.spawn(OpenSecrets {
+				secrets: BTreeMap::from([(KEY.into(), Secret {
+					name: KEY.into(),
+					group: "default".into(),
+					value: "sealed".into(),
+					record: SecretRecord {
+						note: Some("test deploy credential `x`: sealed".into()),
+						metadata: BTreeMap::from([(
+							DeployCredential::GRANTS.into(),
+							"x".into(),
+						)]),
+						..default()
+					},
+				})]),
+				..default()
+			});
+			unsafe { env_ext::set_var(KEY, value) }.unwrap();
+			let response = world
+				.entity_mut(root)
+				.exchange(Request::get("site/deploy"))
+				.await;
+			unsafe { env_ext::remove_var(KEY) }.unwrap();
+			response
+		};
+		let refused = deploy("sealed").await;
+		refused.status().is_ok().xpect_false();
+		refused
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains(&format!("`{KEY}` (test deploy credential `x`)"))
+			.xpect_contains("declares no deploy credential");
+		deploy("another").await.status().xpect_eq(StatusCode::OK);
 	}
 
 	/// Deploy `site/deploy --elevated` with `credentials`, each blocking, and

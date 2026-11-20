@@ -1,6 +1,6 @@
 //! The suites that talk to the network: unauthenticated reads of real
-//! accounts, and writes to the throwaway account the module docs' runbook
-//! creates, skipped with a note naming its env vars when any is absent.
+//! accounts, and writes to the test org the module docs' runbook sets up,
+//! skipped with a note naming its secret when it is absent.
 //!
 //! Ignored by default, since they need the network: `just test-atproto-live`
 //! compiles them with a transport and opts in.
@@ -66,15 +66,16 @@ async fn a_read_only_repo_refuses_writes() {
 		.xpect_contains("names no `secret`");
 }
 
-/// The converge suite the emulator passes, against the throwaway account.
+/// The converge suite the emulator passes, against the test org, whose
+/// handle resolves to it once claimed.
 #[ignore = "live: talks to the public network"]
 #[beet_core::test(timeout_ms = 120_000)]
 async fn converges_a_live_repo() {
-	let Some((handle, pds)) = XrpcPds::throwaway() else {
+	let Some(pds) = XrpcPds::test_org() else {
 		return;
 	};
 	HandleResolver::default()
-		.resolve(&handle)
+		.resolve(XrpcPds::TEST_ORG_HANDLE)
 		.await
 		.unwrap()
 		.xpect_eq(pds.did().clone());

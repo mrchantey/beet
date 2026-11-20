@@ -1,4 +1,4 @@
-//! End-to-end test of the no-code site path (the `website` example's shape):
+//! End-to-end test of the no-code site path (the `beetmania` example's shape):
 //! a `main.bsx` entry declaring the router with middleware spreads, runtime
 //! route discovery from a content directory, and a BSX layout composing the
 //! route-aware widgets (`RouteHead`, `RouteSidebar`).
