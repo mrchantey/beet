@@ -136,9 +136,23 @@ impl CssBuilder {
 		css_rule: &CssRule,
 	) -> Result<String, CollisionFound> {
 		let selector = css_rule.selector_to_css();
+		// a direct look outranks every author rule, as a `style` attribute does
+		let important = match css_rule.origin() {
+			RuleOrigin::Direct => " !important",
+			_ => "",
+		};
 		let mut declarations =
 			css_rule.declarations().iter().xtry_map(|(key, value)| {
 				Self::format_declaration(format_variables, declared, key, value)
+					.map(|declaration| match important {
+						"" => declaration,
+						important => declaration
+							.strip_suffix(';')
+							.map(|declaration| {
+								format!("{declaration}{important};")
+							})
+							.unwrap_or(declaration),
+					})
 			})?;
 
 		declarations.sort();
@@ -160,21 +174,32 @@ impl CssBuilder {
 		// gate behind an `@media (…)` at-rule when the rule carries a media query
 		// with a CSS equivalent (`Terminal` has none and is filtered out before
 		// serialization, so `as_css` returning `None` falls through to the bare rule).
-		match css_rule.media().and_then(|media| media.as_css()) {
+		let rule = match css_rule.media().and_then(|media| media.as_css()) {
 			None => rule,
-			Some(media) if self.minify => {
-				format!("@media {}{{{}}}", media, rule)
-			}
-			Some(media) => {
+			Some(media) => self.wrap(&format!("@media {media}"), rule),
+		};
+		// a user agent default sits in a layer, which every unlayered author
+		// rule outranks whatever its specificity, as a browser's own does
+		match css_rule.origin() {
+			RuleOrigin::UserAgent => self.wrap("@layer user-agent", rule),
+			_ => rule,
+		}
+		.xok()
+	}
+
+	/// `rule` inside the block of the at-rule `prelude`, ie `@media print`.
+	fn wrap(&self, prelude: &str, rule: String) -> String {
+		match self.minify {
+			true => format!("{prelude}{{{rule}}}"),
+			false => {
 				let indented = rule
 					.lines()
 					.map(|line| format!("  {line}"))
 					.collect::<Vec<_>>()
 					.join("\n");
-				format!("@media {} {{\n{}\n}}", media, indented)
+				format!("{prelude} {{\n{indented}\n}}")
 			}
 		}
-		.xok()
 	}
 
 	fn format_declaration(
@@ -434,6 +459,42 @@ mod tests {
 			})
 			.xunwrap()
 			.xpect_snapshot();
+	}
+
+	/// A user agent rule serializes inside `@layer user-agent`, its `@media`
+	/// within it, and a direct rule's declarations are `!important`.
+	#[beet_core::test]
+	fn layers_and_marks_origins() {
+		let mut world = World::new();
+		world.insert_resource(
+			CssTokenMap::default().insert(common_props::ForegroundColor),
+		);
+		let color = |rule: Rule| {
+			rule.with_value(common_props::ForegroundColor, Color::BLACK)
+		};
+		world.insert_resource(
+			RuleSet::default().with_rules([
+				color(Rule::tag("p").with_origin(RuleOrigin::UserAgent)),
+				color(
+					Rule::tag("em")
+						.with_origin(RuleOrigin::UserAgent)
+						.with_media(MediaQuery::Print),
+				),
+				color(Rule::class("look").with_origin(RuleOrigin::Direct)),
+				color(Rule::class("theme")),
+			]),
+		);
+		world
+			.with_state::<StyleQuery, _>(|query| {
+				query.build_css(&test_builder())
+			})
+			.unwrap()
+			.xpect_contains("@layer user-agent {\n  p {\n    color: ")
+			.xpect_contains("@layer user-agent {\n  @media print {\n    em {\n")
+			.xpect_contains(" !important;\n}")
+			.xpect_contains(".theme {\n  color: ")
+			.xnot()
+			.xpect_contains("@layer user-agent {\n  .theme");
 	}
 
 	/// A fragment's sheet carries only the rules selecting its classes, each

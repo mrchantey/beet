@@ -3,8 +3,10 @@
 //! every parse takes, the parsing counterpart of [`DocRenderers`].
 //!
 //! [`ParsePlugin`] installs the built-in parsers: plain text, and with their
-//! features BSX, HTML and XML (`bsx`), markdown (`markdown_parser`) and the
-//! Office formats (`ooxml`, through [`OoxmlPlugin`]).
+//! features BSX, HTML and XML (`bsx`) and markdown (`markdown_parser`). The
+//! Office formats (`ooxml`) are [`OoxmlPlugin`]'s, which a router installs:
+//! their writers resolve looks through the style plugin, itself built over
+//! this one.
 
 use crate::prelude::*;
 use alloc::sync::Arc;
@@ -51,9 +53,8 @@ pub trait DocParser: 'static + Send + Sync + Clone + Installer {
 /// parser, since any text reads as a single text node.
 ///
 /// Every parse ends in one [`PostParseTree`] run, whatever the format: the
-/// schedule [`ParsePlugin`] fills, where the document's tables are numbered
-/// ([`NumberTables`]) and whatever else extends a parsed tree runs, ie styles
-/// or a deck's triage.
+/// schedule [`ParsePlugin`] fills, where whatever extends a parsed tree runs,
+/// ie styles.
 #[derive(Default, Clone, Resource)]
 pub struct DocParsers {
 	parsers: Vec<Arc<dyn ErasedDocParser>>,
@@ -118,12 +119,7 @@ impl DocParsers {
 			bytes,
 			path,
 		})?;
-		// the parsed tree is extended once, whatever its format: its tables
-		// numbered, then whatever else is registered, ie styles or a deck's
-		// triage
-		if !entity.contains::<NumberTables>() {
-			entity.insert(NumberTables::default());
-		}
+		// the parsed tree is extended once, whatever its format, ie styled
 		entity.world_scope(|world| {
 			let _ = world.try_run_schedule(PostParseTree);
 		});

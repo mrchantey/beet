@@ -159,9 +159,9 @@ impl DocumentText<'_, '_> {
 			self.push_text(child, skip_tables, false, out);
 		}
 		// a block ends its line
-		let ends_line = element
-			.map(Element::tag)
-			.is_some_and(|tag| Self::is_block(tag) || Cells::is_table_tag(tag));
+		let ends_line = element.map(Element::tag).is_some_and(|tag| {
+			Self::is_block(tag) || TableGrid::is_table_tag(tag)
+		});
 		if ends_line && !is_start && !out.is_empty() && !out.ends_with('\n') {
 			out.push('\n');
 		}

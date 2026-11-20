@@ -1,33 +1,38 @@
 use super::deck_report::*;
 use super::node::OoxmlRead;
-use super::workbook::SheetCellStyle;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Registers what an Office tree carries, so a scene holding one serializes,
-/// the [`OoxmlRenderer`] that writes one back, and appends a deck's triage in
-/// [`PostParseTree`], after its tables are numbered.
+/// The Office formats as media: their readers and writers, the
+/// [`StylePlugin`] whose user agent rules every look reads and writes
+/// through, what the Word and deck trees still carry so a scene holding one
+/// serializes, and a deck's triage appended in [`PostParseTree`].
+///
+/// Each reader is installed after [`OoxmlParser`] and each writer after
+/// [`OoxmlRenderer`], so a reworked format answers its media type.
 #[derive(Default)]
 pub struct OoxmlPlugin;
 
 impl Plugin for OoxmlPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<CoreProperties>()
+		app.install_type::<StylePlugin>()
+			.register_type::<CoreProperties>()
 			.register_type::<ParagraphStyle>()
 			.register_type::<ListLevel>()
 			.register_type::<OoxmlNode>()
 			.register_type::<OoxmlRead>()
-			.register_type::<SheetCellStyle>()
 			.register_type::<Deck>()
 			.register_type::<Slide>()
 			.register_type::<SlidePicture>()
 			.register_type::<DeckReported>()
-			.install((OoxmlParser, OoxmlRenderer))
+			.install((
+				OoxmlParser,
+				OoxmlRenderer,
+				WorkbookParser::default(),
+				WorkbookRenderer,
+			))
 			.init_schedule(PostParseTree)
-			.add_systems(
-				PostParseTree,
-				append_deck_reports.after(TableNumbering),
-			);
+			.add_systems(PostParseTree, append_deck_reports);
 	}
 }
 

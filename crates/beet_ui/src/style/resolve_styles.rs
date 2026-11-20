@@ -8,9 +8,92 @@ use crate::style::common_props::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
+/// An entity's computed style, the cascade's target agnostic output: what
+/// every renderer reads, the charcell painter from the components a live
+/// surface keeps and a document writer from a pure resolve.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ComputedStyle {
+	/// Colours, text decoration, font and alignment.
+	pub visual: VisualStyle,
+	/// The box's display and flex or grid layout.
+	pub layout: LayoutStyle,
+	/// Margins, borders, padding and sizes; default for a non-element.
+	pub box_style: BoxStyle,
+	/// Positioning; default for a non-element.
+	pub position: PositionStyle,
+	/// Scrollbar colours and width; default for a non-element.
+	pub scrollbar: ScrollbarStyle,
+	/// Transition settings.
+	pub transition: TransitionStyle,
+}
+
+/// The pure resolve: an entity's [`ComputedStyle`] from the tree, the
+/// [`RuleSet`] and the media a [`CascadeMemo`] states, reading the world and
+/// writing nothing, so a writer may resolve a tree for its file while the
+/// same tree is on screen. [`resolve_styles`] is its caching driver for live
+/// surfaces.
+#[derive(SystemParam)]
+pub struct CascadeQuery<'w, 's> {
+	rules: RuleSetQuery<'w, 's>,
+	// the box model (margin/border/padding/background) is element-level; text
+	// and fragment nodes must not resolve their nearest ancestor's box and
+	// re-paint it.
+	elements: Query<'w, 's, (), With<Element>>,
+	// a tag-less text node, the anonymous box a run of text lays out as
+	texts: Query<'w, 's, (), (With<Value>, Without<Element>)>,
+}
+
+impl CascadeQuery<'_, '_> {
+	/// The cascade this resolves through.
+	pub fn rules(&self) -> &RuleSetQuery<'_, '_> { &self.rules }
+
+	/// `entity`'s computed style for the media `memo` states, else the media
+	/// of the surface it renders under.
+	pub fn resolve(
+		&self,
+		entity: Entity,
+		memo: &mut CascadeMemo,
+	) -> Result<ComputedStyle> {
+		let rules = &self.rules;
+		let is_element = self.elements.contains(entity);
+		// the box this node is, see `LayoutBox`
+		let layout_box = match (is_element, self.texts.contains(entity)) {
+			(true, _) => LayoutBox::Element,
+			(false, true) => LayoutBox::Text,
+			(false, false) => LayoutBox::Fragment,
+		};
+		ComputedStyle {
+			visual: resolve_visual(rules, entity, memo)?,
+			layout: resolve_layout(rules, entity, layout_box, memo)?,
+			// element-level, so a text or fragment child does not inherit and
+			// re-paint its ancestor element's border, background or position
+			box_style: match is_element {
+				true => resolve_box(rules, entity, memo)?,
+				false => default(),
+			},
+			position: match is_element {
+				true => resolve_position(rules, entity, memo)?,
+				false => default(),
+			},
+			scrollbar: match is_element {
+				true => resolve_scrollbar(rules, entity, memo)?,
+				false => default(),
+			},
+			// every node, not just elements: a text leaf resolves through its
+			// nearest element's rules, so it carries the same transition and
+			// its inherited colours ease in step with the element
+			transition: resolve_transition(rules, entity, memo)?,
+		}
+		.xok()
+	}
+}
+
+/// Resolves every changed tree's [`ComputedStyle`] into the components a
+/// live surface keeps, through [`CascadeQuery`], each written only when it
+/// changed.
 pub(crate) fn resolve_styles(
 	mut commands: Commands,
-	ruleset_query: RuleSetQuery,
+	cascade: CascadeQuery,
 	// classes drive the cascade (eg `.dark-scheme`), so a runtime class change
 	// must re-resolve even when the [`Element`] itself is untouched. Interactive
 	// state (eg `:focus`) does too, so a focus change re-resolves the cascade.
@@ -28,11 +111,6 @@ pub(crate) fn resolve_styles(
 	// traversal follows holders to re-resolve referenced content under the layout's
 	// cascade (eg the color scheme), even when the content itself is unchanged.
 	tree: RenderTreeQuery,
-	// the box model (margin/border/padding/background) is element-level; text and
-	// fragment nodes must not resolve their nearest ancestor's box and re-paint it.
-	elements: Query<(), With<Element>>,
-	// a tag-less text node, the anonymous box a run of text lays out as
-	texts: Query<(), (With<Value>, Without<Element>)>,
 	// the nodes the cascade owns: what the change filters above watch
 	owned: Query<(), Or<(With<Element>, With<Classes>, With<ElementStateMap>)>>,
 	mut styles: Query<(
@@ -54,7 +132,7 @@ pub(crate) fn resolve_styles(
 	// a bare buffer host, or a text node carrying an authored style, is walked
 	// through rather than resolved, so a resize never touches a node nothing
 	// in the cascade would otherwise reach.
-	if !resized.is_empty() && ruleset_query.has_width_media() {
+	if !resized.is_empty() && cascade.rules().has_width_media() {
 		let mut pending = resized
 			.iter()
 			.map(|entity| tree.resolve(entity))
@@ -82,77 +160,52 @@ pub(crate) fn resolve_styles(
 		.collect::<Vec<_>>();
 	while !queue.is_empty() {
 		for entity in queue.drain(..).collect::<Vec<_>>() {
-			// resolve visual style
-			let visual = resolve_visual(&ruleset_query, entity, &mut memo)?;
-			if let Some(mut style) = styles.get_mut(entity)?.0 {
-				style.set_if_neq(visual);
-			} else {
-				commands.entity(entity).insert(visual);
+			let computed = cascade.resolve(entity, &mut memo)?;
+			let (visual, layout, box_style, position, scrollbar) =
+				styles.get_mut(entity)?;
+			match visual {
+				Some(mut style) => {
+					style.set_if_neq(computed.visual);
+				}
+				None => {
+					commands.entity(entity).insert(computed.visual);
+				}
 			}
-
-			// resolve layout style, as the box this node is (see `LayoutBox`)
-			let layout_box =
-				match (elements.contains(entity), texts.contains(entity)) {
-					(true, _) => LayoutBox::Element,
-					(false, true) => LayoutBox::Text,
-					(false, false) => LayoutBox::Fragment,
-				};
-			let layout =
-				resolve_layout(&ruleset_query, entity, layout_box, &mut memo)?;
-			if let Some(mut style) = styles.get_mut(entity)?.1 {
-				style.set_if_neq(layout);
-			} else {
-				commands.entity(entity).insert(layout);
+			match layout {
+				Some(mut style) => {
+					style.set_if_neq(computed.layout);
+				}
+				None => {
+					commands.entity(entity).insert(computed.layout);
+				}
 			}
-
-			// resolve box style — only for elements, so a text/fragment child does
-			// not inherit and re-paint its ancestor element's border/background.
-			let box_s = if elements.contains(entity) {
-				resolve_box(&ruleset_query, entity, &mut memo)?
-			} else {
-				BoxStyle::default()
-			};
-			if let Some(mut style) = styles.get_mut(entity)?.2 {
-				style.set_if_neq(box_s);
-			} else {
-				commands.entity(entity).insert(box_s);
+			match box_style {
+				Some(mut style) => {
+					style.set_if_neq(computed.box_style);
+				}
+				None => {
+					commands.entity(entity).insert(computed.box_style);
+				}
 			}
-
-			// resolve positioning — element-level like the box model, so a text
-			// node never carries its ancestor's position.
-			let position = if elements.contains(entity) {
-				resolve_position(&ruleset_query, entity, &mut memo)?
-			} else {
-				PositionStyle::default()
-			};
-			if let Some(mut style) = styles.get_mut(entity)?.3 {
-				style.set_if_neq(position);
-			} else {
-				commands.entity(entity).insert(position);
+			match position {
+				Some(mut style) => {
+					style.set_if_neq(computed.position);
+				}
+				None => {
+					commands.entity(entity).insert(computed.position);
+				}
 			}
-
-			// resolve scrollbar styling (element-level), read by the charcell
-			// scrollbar paint on scroll containers.
-			let scrollbar = if elements.contains(entity) {
-				resolve_scrollbar(&ruleset_query, entity, &mut memo)?
-			} else {
-				ScrollbarStyle::default()
-			};
-			if let Some(mut style) = styles.get_mut(entity)?.4 {
-				style.set_if_neq(scrollbar);
-			} else {
-				commands.entity(entity).insert(scrollbar);
+			match scrollbar {
+				Some(mut style) => {
+					style.set_if_neq(computed.scrollbar);
+				}
+				None => {
+					commands.entity(entity).insert(computed.scrollbar);
+				}
 			}
-
-			// resolve transition settings for every node, not just elements: a
-			// text leaf resolves through its nearest element's rules, so it
-			// carries the same transition and its inherited colours ease in
-			// step with the element (CSS gets this by re-deriving inherited
-			// used values; beet resolves each node's own). Attached only while
-			// the duration is nonzero, so the animation system iterates
-			// transitioned nodes alone.
-			let transition =
-				resolve_transition(&ruleset_query, entity, &mut memo)?;
+			// attached only while the duration is nonzero, so the animation
+			// system iterates transitioned nodes alone
+			let transition = computed.transition;
 			match transitions.get_mut(entity)? {
 				Some(mut style) if transition.duration > Duration::ZERO => {
 					style.set_if_neq(transition);
@@ -455,4 +508,51 @@ fn resolve_box(
 		max_height: query.resolve(entity, MaxHeight, memo).ok(),
 	}
 	.xok()
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use crate::style::material::MaterialStylePlugin;
+	use crate::style::*;
+	use beet_core::prelude::*;
+
+	/// The page of a tree in `scheme`, resolved live.
+	fn page(world: &mut World, scheme: ColorScheme) -> Entity {
+		world
+			.spawn((rsx! { <div/> }, Classes::new([classes::PAGE]), scheme))
+			.id()
+	}
+
+	/// A pure resolve stating the light scheme over a dark tree answers the
+	/// light tree's tones, and leaves the dark tree's components as they were.
+	#[beet_core::test]
+	fn pure_resolve_states_its_scheme() {
+		let mut world =
+			(MaterialStylePlugin::default(), StylePlugin).into_world();
+		let dark = page(&mut world, ColorScheme::Dark);
+		let light = page(&mut world, ColorScheme::Light);
+		world.run_schedule(PostParseTree);
+		let live = |world: &World, entity: Entity| {
+			world.entity(entity).get::<VisualStyle>().unwrap().clone()
+		};
+		let (dark_live, light_live) = (live(&world, dark), live(&world, light));
+		(dark_live.foreground != light_live.foreground).xpect_true();
+		world
+			.with_state::<CascadeQuery, _>(|cascade| {
+				cascade
+					.resolve(
+						dark,
+						&mut CascadeMemo::for_media(
+							MediaContext::new(Medium::Screen)
+								.with_scheme(ColorScheme::Light),
+						),
+					)
+					.unwrap()
+					.visual
+					.foreground
+			})
+			.xpect_eq(light_live.foreground);
+		live(&world, dark).xpect_eq(dark_live);
+	}
 }

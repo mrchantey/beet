@@ -143,7 +143,7 @@ fn collect_cell_rows(
 	let is_cell = |entity: Entity| {
 		elements
 			.get(entity)
-			.is_ok_and(|view| Cells::is_cell_tag(view.tag()))
+			.is_ok_and(|view| TableGrid::is_cell_tag(view.tag()))
 	};
 	let cells: Vec<Entity> = kids.iter().filter(|&kid| is_cell(kid)).collect();
 	if cells.is_empty() {

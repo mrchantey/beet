@@ -1,5 +1,6 @@
 use super::*;
 use crate::prelude::MediaViewport;
+use crate::prelude::Medium;
 use beet_core::prelude::*;
 use bevy::math::IRect;
 use bevy::math::UVec2;
@@ -22,9 +23,10 @@ pub(crate) const AUTO_GROW_VIEWPORT_HEIGHT: u32 = u16::MAX as u32;
 ///
 /// Requires a [`MediaViewport`], kept in lockstep with the buffer width by
 /// [`sync_media_viewport`](super::plugin), so width-gated media rules apply to
-/// one-shot renders exactly as they do to live surfaces.
+/// one-shot renders exactly as they do to live surfaces, and declares its
+/// [`Medium::Terminal`].
 #[derive(Component)]
-#[require(MediaViewport)]
+#[require(MediaViewport, Medium = Medium::Terminal)]
 pub struct FlexBuffer {
 	width: u32,
 	cells: Vec<Cell>,

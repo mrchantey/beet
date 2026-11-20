@@ -9,9 +9,13 @@ use bevy::reflect::Typed;
 ///
 /// An optional [`media`](Self::media) query gates the rule behind an `@media`
 /// at-rule: such rules serialize to CSS wrapped in `@media (…) { … }`, and the
-/// charcell cascade applies them per [`MediaQuery::applies_in_terminal`]:
-/// `Terminal` rules always, width-gated rules against the surface's
-/// [`MediaViewport`], web-only media never.
+/// cascade applies them per [`MediaQuery::matches`] against the [`Medium`]
+/// and [`MediaViewport`] of the surface an element renders into.
+///
+/// Its [`origin`](Self::origin) ranks it in the cascade before specificity,
+/// as CSS's origins do: a [`Direct`](RuleOrigin::Direct) look outranks every
+/// author rule, and every author rule outranks a
+/// [`UserAgent`](RuleOrigin::UserAgent) default.
 #[derive(Debug, Default, Clone, Reflect, Get, GetMut, SetWith)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rule {
@@ -21,6 +25,30 @@ pub struct Rule {
 	/// Optional `@media` gate; `None` means the rule always applies.
 	#[set_with(unwrap_option)]
 	media: Option<MediaQuery>,
+	/// The cascade origin, [`Author`](RuleOrigin::Author) by default.
+	#[cfg_attr(feature = "serde", serde(default))]
+	origin: RuleOrigin,
+}
+
+/// Where a [`Rule`] comes from, CSS's own cascade origins: the cascade ranks
+/// a declaration by its origin first, then its selector's specificity, then
+/// its order, so a more specific rule of a lower origin always loses.
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum RuleOrigin {
+	/// A browser's own defaults, beet's default element rules (`strong` bold,
+	/// `em` italic). Serialized inside `@layer user-agent`, which every
+	/// unlayered rule outranks.
+	UserAgent,
+	/// A stylesheet's rule: a theme's, a `<Rule>`'s, an `inline_class!`'s.
+	#[default]
+	Author,
+	/// A look an element carries directly, as an HTML `style` attribute does,
+	/// ie a direct look a document reader found on it. Serialized with
+	/// `!important` so the browser ranks it as the cascade does.
+	Direct,
 }
 
 /// An `@media` at-rule gate for a [`Rule`].
@@ -30,26 +58,30 @@ pub struct Rule {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum MediaQuery {
-	/// `@media print` — applies when printing.
+	/// `@media print`, matching a [`Medium::Print`] target: a printed page or
+	/// a Word file.
 	Print,
-	/// `@media screen` — applies on screen, ie the web.
+	/// `@media screen`, matching a [`Medium::Screen`] target: the web, a
+	/// slide deck or a workbook.
 	///
 	/// Prefer [`Terminal`](Self::Terminal) for terminal-only styling: a `Screen`
 	/// rule is dropped in print contexts, so gating layout behind it breaks
 	/// printed output. `Screen` is for the rare rule that is genuinely
 	/// screen-only (eg sticky positioning).
 	Screen,
-	/// Terminal/char-cell only. This is the inverse of the other queries: it has
-	/// no CSS equivalent, so it is *excluded* from the serialized stylesheet and
-	/// *included* by the charcell cascade. The idiom for terminal-only styling
-	/// (eg the colored prose headings) that must not leak into web or print.
+	/// Terminal/char-cell only, matching a [`Medium::Terminal`] target. It has
+	/// no CSS equivalent, so it is *excluded* from the serialized stylesheet.
+	/// The idiom for terminal-only styling (eg the colored prose headings) that
+	/// must not leak into web or print.
 	Terminal,
-	/// `@media (prefers-reduced-motion: reduce)`.
+	/// `@media (prefers-reduced-motion: reduce)`. No target declares the
+	/// preference yet, so the cascade never matches it; the browser evaluates
+	/// the serialized rule.
 	ReducedMotion,
 	/// `@media (max-width: {0}px)` — applies at or below the given viewport width
-	/// in pixels, the idiom for narrow-screen (mobile) overrides. The charcell
-	/// cascade evaluates it too, against the surface's [`MediaViewport`], so
-	/// one responsive rule drives both targets.
+	/// in pixels, the idiom for narrow-screen (mobile) overrides. The cascade
+	/// evaluates it against the surface's [`MediaViewport`], so one responsive
+	/// rule drives every target.
 	MaxWidth(u32),
 }
 
@@ -69,18 +101,76 @@ impl MediaQuery {
 		}
 	}
 
-	/// Whether the charcell cascade applies rules gated by this query.
-	/// [`Terminal`](Self::Terminal) always applies (the query whose context *is*
-	/// that cascade), and [`MaxWidth`](Self::MaxWidth) applies when the surface
-	/// `viewport` sits at or below the breakpoint — `None` (no surface, eg a
-	/// server world building static HTML) leaves width rules to the browser's
-	/// own evaluator. Print/screen/reduced-motion are web media and never apply.
-	pub fn applies_in_terminal(self, viewport: Option<MediaViewport>) -> bool {
+	/// Whether a rule gated by this query applies on a `medium` target whose
+	/// viewport is `viewport`: each medium query its own medium,
+	/// [`MaxWidth`](Self::MaxWidth) a viewport at or below the breakpoint
+	/// (`None`, ie a server building static HTML, leaves width rules to the
+	/// browser's own evaluator), and [`ReducedMotion`](Self::ReducedMotion)
+	/// nothing until a target declares the preference.
+	pub fn matches(
+		self,
+		medium: Medium,
+		viewport: Option<MediaViewport>,
+	) -> bool {
 		match self {
-			Self::Terminal => true,
+			Self::Print => medium == Medium::Print,
+			Self::Screen => medium == Medium::Screen,
+			Self::Terminal => medium == Medium::Terminal,
+			Self::ReducedMotion => false,
 			Self::MaxWidth(px) => viewport
 				.is_some_and(|viewport| viewport.width_px() <= px as f32),
-			_ => false,
+		}
+	}
+}
+
+/// What a render target is, as `@media` names it: every surface declares
+/// one beside its [`MediaViewport`], and the cascade matches each
+/// [`MediaQuery`] against the nearest one an element renders under. A tree
+/// under none resolves as [`Terminal`](Self::Terminal), the charcell
+/// surfaces' medium and the cascade's historical one; the web needs none,
+/// since the browser evaluates the serialized `@media` itself.
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Component, Reflect,
+)]
+#[reflect(Component, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum Medium {
+	/// A screen: a window, a slide deck, a workbook.
+	Screen,
+	/// A printed page, or a Word file laid out as one.
+	Print,
+	/// A character cell grid.
+	#[default]
+	Terminal,
+}
+
+/// The media one cascade resolves for: the target's [`Medium`], its
+/// [`MediaViewport`], and, standing in for the class a tree's root carries,
+/// its [`ColorScheme`]. A live surface's cascade finds the medium and
+/// viewport on the surface itself; a writer resolving a tree for a file it
+/// writes states them here, so the tree on screen and the tree in the file
+/// may resolve differently at once.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Get, SetWith)]
+pub struct MediaContext {
+	/// The target's medium.
+	medium: Medium,
+	/// The target's viewport, `None` skipping width rules.
+	#[set_with(unwrap_option)]
+	viewport: Option<MediaViewport>,
+	/// The scheme the tree resolves in, `None` keeping the scheme classes the
+	/// tree carries. Set, no element's own scheme class matches (a rule whose
+	/// selector is that class alone), and the scheme's class rules apply at
+	/// the root, as if the root alone carried its class.
+	#[set_with(unwrap_option)]
+	scheme: Option<ColorScheme>,
+}
+
+impl MediaContext {
+	/// A context for `medium`, with no viewport and the tree's own scheme.
+	pub fn new(medium: Medium) -> Self {
+		Self {
+			medium,
+			..default()
 		}
 	}
 }
@@ -92,7 +182,8 @@ impl MediaQuery {
 /// windowed target would report logical pixels.
 ///
 /// A *required* component of every render surface (the charcell buffers
-/// require it), so it is never absent where a surface exists; the [`Default`]
+/// require it, beside their [`Medium`]), so it is never absent where a
+/// surface exists; the [`Default`]
 /// zero size (the narrowest possible) is only ever visible before the
 /// surface's first sync, which runs ahead of the cascade in the same frame.
 /// Maintained with `set_if_neq`, so `Changed<MediaViewport>` is a true resize
@@ -127,8 +218,7 @@ impl Rule {
 	pub fn class(class: &str) -> Self {
 		Self {
 			selector: Selector::Class(class.into()),
-			declarations: default(),
-			media: None,
+			..default()
 		}
 	}
 
@@ -136,8 +226,7 @@ impl Rule {
 	pub fn tag(tag: &str) -> Self {
 		Self {
 			selector: Selector::Tag(tag.into()),
-			declarations: default(),
-			media: None,
+			..default()
 		}
 	}
 
@@ -147,8 +236,7 @@ impl Rule {
 	pub fn tags(tags: &[&str]) -> Self {
 		Self {
 			selector: Selector::any_tag(tags.iter().copied()),
-			declarations: default(),
-			media: None,
+			..default()
 		}
 	}
 

@@ -1,5 +1,6 @@
 use super::*;
 use crate::prelude::MediaViewport;
+use crate::prelude::Medium;
 use beet_core::prelude::*;
 use bevy::math::UVec2;
 use core::ops::Deref;
@@ -14,9 +15,10 @@ use core::ops::DerefMut;
 /// Requires a [`MediaViewport`], kept in lockstep with the buffer width by
 /// [`sync_media_viewport`](super::plugin) — the width context width-gated
 /// media rules resolve against, and the change-detection shadow that lets a
-/// resize (and only a resize) re-run the style cascade.
+/// resize (and only a resize) re-run the style cascade, and declares its
+/// [`Medium::Terminal`].
 #[derive(Component)]
-#[require(MediaViewport)]
+#[require(MediaViewport, Medium = Medium::Terminal)]
 pub struct DoubleBuffer {
 	buffers: [Buffer; 2],
 	current: usize,

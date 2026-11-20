@@ -457,9 +457,7 @@ impl ListLevel {
 
 impl WordProjection {
 	/// Reads a Word package under `root`: its headers, its main document,
-	/// its footers and its notes, each a part read and projected, its tables
-	/// left for [`NumberTables`] to number and caption, the main document's
-	/// alone since the rest are headers, footers and notes.
+	/// its footers and its notes, each a part read and projected.
 	pub(crate) fn build(
 		world: &mut World,
 		root: Entity,
@@ -494,9 +492,6 @@ impl WordProjection {
 			}
 			.project(world, entity);
 		}
-		world
-			.entity_mut(root)
-			.insert(NumberTables { caption: true });
 		Ok(())
 	}
 }
@@ -510,7 +505,7 @@ pub(crate) mod test {
 	/// A Word file parsed into a world with the parse plugins.
 	pub(crate) fn parse(bytes: MediaBytes) -> (World, Entity) {
 		let mut world =
-			(TemplatePlugin, DocumentPlugin, ParsePlugin).into_world();
+			(TemplatePlugin, DocumentPlugin, OoxmlPlugin).into_world();
 		let root = world.spawn_empty().id();
 		DocParsers::parse(ParseContext::new(
 			&mut world.entity_mut(root),
@@ -551,7 +546,7 @@ pub(crate) mod test {
 		markdown(&mut world, root)
 			.xpect_contains("# Cover\n\nWhere is it? <span style=\"color: #FF0000\">(Please delete this)</span>\n")
 			.xpect_contains("- one\n  - nested\n")
-			.xpect_contains("t1\n\n| **Name** | <mark>a < b</mark> |  |\n|---|---|---|\n")
+			.xpect_contains("| **Name** | <mark>a < b</mark> |  |\n|---|---|---|\n")
 			// edge whitespace sits outside the emphasis, a field's
 			// instruction is no reader's
 			.xpect_contains("**Date** due\n")
@@ -623,22 +618,6 @@ pub(crate) mod test {
 			.revision
 			.unwrap()
 			.xpect_eq("3");
-	}
-
-	/// The cells a fill addresses, a checkbox read as its box.
-	#[beet_core::test]
-	fn lists_the_cells_of_a_form() {
-		let (mut world, root) = parse(form());
-		CellText::listing(&mut world, root)
-			.iter()
-			.map(ToString::to_string)
-			.collect::<Vec<_>>()
-			.xpect_eq(vec![
-				"| t1r1c1 | Name |".to_string(),
-				"| t1r1c2 | (empty) |".into(),
-				"| t1r2c1 | Describe it: (Please delete this sentence once completed) |".into(),
-				"| t1r2c2 | [ ] Surveys |".into(),
-			]);
 	}
 
 	/// A cell with a prompt and a checkbox, a red sentence and a highlighted

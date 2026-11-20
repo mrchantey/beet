@@ -3,6 +3,7 @@ use crate::parse::PostParseTree;
 #[cfg(feature = "tui")]
 use crate::parse::RealtimeParsePlugin;
 use crate::prelude::MediaViewport;
+use crate::prelude::Medium;
 use crate::style::DiagramSet;
 use crate::style::ResolveStylesSet;
 use crate::style::StylePlugin;
@@ -102,6 +103,7 @@ impl Plugin for CharcellPlugin {
 		app.install_type::<StylePlugin>()
 			.register_type::<crate::prelude::ScrollPosition>()
 			.register_type::<MediaViewport>()
+			.register_type::<Medium>()
 			.add_plugins((
 				// layout + paint pipeline per buffer type; each only acts on entities
 				// carrying its own buffer component, so registering both is harmless.

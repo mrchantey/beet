@@ -1,7 +1,6 @@
 use super::deck::*;
 use super::node::OoxmlRead;
 use super::word::*;
-use super::workbook::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use ooxmlsdk::parts::PartRef;
@@ -16,6 +15,10 @@ use ooxmlsdk::parts::PartRef;
 pub struct OoxmlParser;
 
 impl OoxmlParser {
+	/// The media types this parser reads, a workbook being the
+	/// [`WorkbookParser`]'s.
+	const MEDIA_TYPES: [MediaType; 2] = [MediaType::Docx, MediaType::Pptx];
+
 	/// Reads `part` of `package` as an [`OoxmlNode::Part`] child of `root`,
 	/// holding the part's prolog and document element.
 	pub(crate) fn spawn_part(
@@ -42,9 +45,7 @@ impl Installer for OoxmlParser {
 }
 
 impl DocParser for OoxmlParser {
-	fn media_types(&self) -> Vec<MediaType> {
-		OoxmlPackage::MEDIA_TYPES.to_vec()
-	}
+	fn media_types(&self) -> Vec<MediaType> { Self::MEDIA_TYPES.to_vec() }
 
 	/// The [`DocMeta`] a file's core properties declare, named as
 	/// `frontmatter_type`.
@@ -60,10 +61,10 @@ impl DocParser for OoxmlParser {
 	}
 
 	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
-		if !OoxmlPackage::MEDIA_TYPES.contains(cx.bytes.media_type()) {
+		if !Self::MEDIA_TYPES.contains(cx.bytes.media_type()) {
 			return Err(ParseError::UnsupportedType {
 				unsupported: cx.bytes.media_type().clone(),
-				supported: OoxmlPackage::MEDIA_TYPES.to_vec(),
+				supported: Self::MEDIA_TYPES.to_vec(),
 			});
 		}
 		let file = OoxmlFile::open(cx.bytes)?;
@@ -73,9 +74,6 @@ impl DocParser for OoxmlParser {
 		cx.entity.world_scope(|world| -> Result {
 			match file.media_type() {
 				MediaType::Docx => WordProjection::build(world, root, &file)?,
-				MediaType::Xlsx => {
-					WorkbookProjection::build(world, root, &file)?
-				}
 				_ => SlideProjection::build(world, root, &file)?,
 			}
 			// the read ends here: a value differing from it is an edit

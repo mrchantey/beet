@@ -202,18 +202,41 @@ pub fn text_eyebrow() -> Rule {
 
 // ── Prose element overrides ───────────────────────────────────────────────────
 
-// Theme overrides for prose tags also styled by the user-agent
-// [`default_element_rules`](crate::style::default_element_rules). Appended after
-// them in `all_rules`, so the later (theme) rule wins the same-specificity tag
-// cascade on both the terminal and the serialized stylesheet: links pick up
-// `Primary`, code spans/blocks a `SurfaceContainerHighest` fill with `OnSurface`
-// text.
+// Theme overrides for prose tags also styled by the user agent
+// [`default_element_rules`](crate::style::default_element_rules), which as
+// author rules outrank them on both targets whatever their order: links pick
+// up `Primary`, code spans/blocks a `SurfaceContainerHighest` fill with
+// `OnSurface` text, and the looks the web's reset strips are restated.
 
-/// Anchor text in the theme's primary color.
+/// The gap below each prose block, the user agent's own `block_gap` restated
+/// as the theme's: the vendored preflight's `* { margin: 0 }` is an author
+/// rule, which outranks every user agent default on the web.
+pub fn prose_block_gap() -> Rule {
+	Rule::tags(&[
+		"p", "ul", "ol", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote",
+		"pre", "hr", "iframe",
+	])
+		.with_value(common_props::MarginProp, Spacing {
+			bottom: Length::Rem(1.),
+			..Spacing::DEFAULT
+		})
+}
+
+/// A disclosure's `<summary>` as a plain block header, the user agent's own
+/// restated as the theme's: the preflight's `summary { display: list-item }`
+/// outranks it on the web, drawing a marker beside every summary.
+pub fn summary_prose() -> Rule {
+	Rule::tags(&["summary"]).with_canonical(Display::Block)
+}
+
+/// Anchor text in the theme's primary color, underlined: the preflight's
+/// `a { text-decoration: inherit }` outranks the user agent's underline on
+/// the web.
 pub fn link_prose() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("a"))
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
+		.with_canonical(DecorationLine::underline())
 }
 
 /// The terminal's `<img>`/`<iframe>` link fallbacks in the same primary color,
@@ -284,6 +307,14 @@ pub fn pre_code_prose() -> Rule {
 	Rule::new()
 		.with_selector(Selector::child(Selector::tag("pre"), Selector::tag("code")))
 		.with_value(common_props::Padding, Spacing::DEFAULT)
+}
+
+/// A thematic break `<hr>` in the outline variant, the theme's colour for a
+/// divider, so a rule reads on either scheme.
+pub fn hr_prose() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("hr"))
+		.with_token(common_props::ForegroundColor,colors::OutlineVariant).unwrap()
 }
 
 /// Block `<blockquote>` - a flat tonal callout with an italic body and a primary

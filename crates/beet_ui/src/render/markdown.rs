@@ -775,7 +775,7 @@ impl NodeVisitor for MarkdownRenderer {
 					table.rows.push(Vec::new());
 				}
 			}
-			name if Cells::is_cell_tag(name) => {
+			name if TableGrid::is_cell_tag(name) => {
 				let span = view.colspan() as usize;
 				let start = self.state.buffer.len();
 				if let Some(table) = self.tables.last_mut() {
@@ -926,7 +926,7 @@ impl NodeVisitor for MarkdownRenderer {
 					table.caption = caption;
 				}
 			}
-			name if Cells::is_cell_tag(name) => {
+			name if TableGrid::is_cell_tag(name) => {
 				let Some((start, span)) =
 					self.tables.last_mut().and_then(|table| table.cell.take())
 				else {

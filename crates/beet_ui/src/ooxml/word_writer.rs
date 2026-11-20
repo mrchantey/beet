@@ -151,7 +151,7 @@ impl WordWriter {
 					.filter(|cell| {
 						tree.element(*cell).is_none()
 							&& tag_of(*cell)
-								.is_some_and(|tag| Cells::is_cell_tag(&tag))
+								.is_some_and(|tag| TableGrid::is_cell_tag(&tag))
 					})
 					.filter_map(|cell| {
 						let row = tree.ancestors(cell).into_iter().find(
@@ -261,7 +261,7 @@ impl WordWriter {
 			.into_iter()
 			.take_while(|sibling| *sibling != cell)
 			.filter_map(|sibling| elements.get(sibling).ok())
-			.filter(|view| Cells::is_cell_tag(view.tag()))
+			.filter(|view| TableGrid::is_cell_tag(view.tag()))
 			.map(|view| view.colspan())
 			.sum()
 	}
@@ -278,7 +278,7 @@ impl WordWriter {
 			let Some(view) = elements
 				.get(cell)
 				.ok()
-				.filter(|view| Cells::is_cell_tag(view.tag()))
+				.filter(|view| TableGrid::is_cell_tag(view.tag()))
 			else {
 				continue;
 			};
@@ -307,7 +307,7 @@ impl WordWriter {
 						tree.children(row)
 							.into_iter()
 							.filter_map(|cell| elements.get(cell).ok())
-							.filter(|view| Cells::is_cell_tag(view.tag()))
+							.filter(|view| TableGrid::is_cell_tag(view.tag()))
 							.map(|view| view.colspan())
 							.sum::<u32>()
 					})
@@ -1532,64 +1532,6 @@ mod test {
 		part(bytes, "word/document.xml")
 	}
 
-	#[beet_core::test]
-	fn fills_a_word_form() {
-		let (mut world, root) = parse(&super::super::word::test::form());
-		let cell = |text| CellAddress::parse(text).unwrap();
-		edit(&mut world, |edit| {
-			edit.set_cell_text(
-				root,
-				&cell("t1r1c2"),
-				"Acme Stalls\nSecond line",
-			)
-		})
-		.unwrap();
-		edit(&mut world, |edit| {
-			edit.append_cell_text(root, &cell("t1r1c1"), "appended")
-		})
-		.unwrap();
-		edit(&mut world, |edit| edit.check_labeled_boxes(root, "Surveys"))
-			.unwrap()
-			.xpect_eq(1);
-		edit(&mut world, |edit| edit.check_labeled_boxes(root, "Nothing"))
-			.unwrap()
-			.xpect_eq(0);
-		edit(&mut world, |edit| {
-			edit.remove_paragraphs(root, "Please delete this sentence")
-		})
-		.unwrap()
-		.xpect_eq(1);
-		edit(&mut world, |edit| {
-			edit.replace_text(root, "(Insert name)", "Acme")
-		})
-		.unwrap()
-		.xpect_eq(1);
-		edit(&mut world, |edit| {
-			edit.set_cell_text(root, &cell("t9r1c1"), "x")
-		})
-		.xpect_err();
-		edit(&mut world, |edit| edit.remove_paragraphs(root, " ")).xpect_err();
-
-		let written = write(&mut world, root, MediaType::Docx);
-		let (mut world, root) = parse(&written);
-		cells(&mut world, root).xpect_eq(vec![
-			"Name / appended".to_string(),
-			"Acme Stalls / Second line".into(),
-			String::new(),
-			"[x] Surveys".into(),
-		]);
-		document(&written)
-			.xpect_contains("<w14:checked w14:val=\"1\"/>")
-			.xpect_contains("\u{2612}")
-			// bold goes before the size, highlight after, as the schema orders
-			.xpect_contains("<w:rPr><w:b/><w:sz w:val=\"20\"/><w:highlight w:val=\"yellow\"/></w:rPr>")
-			// a new paragraph keeps the cell's paragraph style
-			.xpect_contains("<w:pPr><w:jc w:val=\"left\"/></w:pPr><w:r><w:t xml:space=\"preserve\">Acme Stalls</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val=\"left\"/></w:pPr><w:r><w:t xml:space=\"preserve\">Second line</w:t>")
-			// and new words the look of the paragraph's first
-			.xpect_contains("<w:r><w:rPr><w:sz w:val=\"20\"/></w:rPr><w:t xml:space=\"preserve\">appended</w:t></w:r>")
-			.xpect_contains("The business is </w:t></w:r><w:r><w:rPr><w:highlight w:val=\"yellow\"/></w:rPr><w:t xml:space=\"preserve\">Acme</w:t>");
-	}
-
 	/// The element `tag` whose text holds `words`.
 	fn find(world: &mut World, tag: &str, words: &str) -> Entity {
 		let tagged = world
@@ -1839,12 +1781,22 @@ mod test {
 		world.entity_mut(parent).insert_child(index, entity);
 	}
 
-	/// The listing's addresses and texts, `t1r1c1 Name`.
-	fn addressed(world: &mut World, root: Entity) -> Vec<String> {
-		CellText::listing(world, root)
-			.iter()
-			.map(|cell| format!("{} {}", cell.address, cell.text))
-			.collect()
+	/// The first table's cells with their positions and texts, `A1 Name`.
+	fn addressed(world: &mut World) -> Vec<String> {
+		let table = world
+			.query::<(Entity, &Element)>()
+			.iter(world)
+			.find(|(_, element)| element.tag() == "table")
+			.map(|(entity, _)| entity)
+			.unwrap();
+		world.with_state::<(TableGrid, DocumentText), _>(|(grid, text)| {
+			grid.cells(table)
+				.into_iter()
+				.map(|(cell, position)| {
+					format!("{position} {}", text.own_text(cell).trim())
+				})
+				.collect()
+		})
 	}
 
 	/// Rows and cells added to a table the file holds are its own: a row in
@@ -1873,14 +1825,14 @@ mod test {
 				add(world, third, "td", &[("colspan", "2")], "Wide");
 			},
 		);
-		let (mut world, root) = parse(&written);
-		addressed(&mut world, root).xpect_eq(vec![
-			"t1r1c1 Name".to_string(),
-			"t1r1c2 Acme".into(),
-			"t1r1c3 Extra".into(),
-			"t1r2c1 Phone".into(),
-			"t1r2c2 555".into(),
-			"t1r3c1 Wide".into(),
+		let (mut world, _) = parse(&written);
+		addressed(&mut world).xpect_eq(vec![
+			"A1 Name".to_string(),
+			"B1 Acme".into(),
+			"C1 Extra".into(),
+			"A2 Phone".into(),
+			"B2 555".into(),
+			"A3 Wide".into(),
 		]);
 		let width = |width: u32| {
 			format!("<w:tcPr><w:tcW w:w=\"{width}\" w:type=\"dxa\"/></w:tcPr>")

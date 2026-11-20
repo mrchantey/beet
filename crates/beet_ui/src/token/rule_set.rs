@@ -10,8 +10,9 @@ use bevy::reflect::Typed;
 /// The default rule is the **lowest-priority fallback**: the cascade only
 /// consults it (via [`RuleSetQuery`]) once the matching rules and the ancestor
 /// walk find nothing, so a matching rule like `.dark-scheme` always overrides a
-/// value baked into `:root`. Among the matching rules the most specific selector
-/// wins, and ties go to the later rule, mirroring CSS source order.
+/// value baked into `:root`. Among the matching rules the highest
+/// [`RuleOrigin`] wins, then the most specific selector, and ties go to the
+/// later rule, mirroring CSS's cascade and source order.
 #[derive(Debug, Clone, Reflect, Resource)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RuleSet {
@@ -189,26 +190,58 @@ impl RuleSet {
 	/// across that element's ~30 property lookups, so the 228-rule selector scan
 	/// runs once per element instead of once per property.
 	///
-	/// `@media`-gated rules apply per [`MediaQuery::applies_in_terminal`]: a
-	/// `Terminal` rule always (the one query whose context is this cascade), a
-	/// width-gated rule when the element's surface `viewport` sits at or below
-	/// its breakpoint, and the web-only queries (print/screen/reduced-motion)
-	/// never — those only affect CSS output.
+	/// `@media`-gated rules apply per [`MediaQuery::matches`] against the
+	/// element's `media`. A context stating a scheme leaves out every scheme
+	/// class rule ([`Self::is_scheme_rule`]), which apply at the root instead
+	/// ([`Self::scheme_value`]).
 	fn matching_rule_indices(
 		&self,
 		el: &ElementView,
 		ancestors: &[ElementView],
-		viewport: Option<MediaViewport>,
+		media: &MediaContext,
 	) -> Vec<usize> {
 		self.rules()
 			.enumerate()
 			.filter(|(_, rule)| {
-				rule.media()
-					.is_none_or(|media| media.applies_in_terminal(viewport))
+				rule.media().is_none_or(|query| {
+					query.matches(*media.medium(), *media.viewport())
+				}) && !(media.scheme().is_some() && Self::is_scheme_rule(rule))
 					&& rule.selector().matches(el, ancestors)
 			})
 			.map(|(index, _)| index)
 			.collect()
+	}
+
+	/// Whether `rule` is a scheme class rule, its selector the
+	/// `.light-scheme` or `.dark-scheme` class alone.
+	fn is_scheme_rule(rule: &Rule) -> bool {
+		[ColorScheme::Light, ColorScheme::Dark]
+			.into_iter()
+			.any(|scheme| *rule.selector() == Selector::class(scheme.class()))
+	}
+
+	/// The winning declaration of `key` among `scheme`'s class rules matching
+	/// `media`, as the root of a tree would resolve it carrying the scheme's
+	/// class alone.
+	fn scheme_value(
+		&self,
+		scheme: ColorScheme,
+		media: &MediaContext,
+		key: &Token,
+	) -> Result<&TokenValue> {
+		let selector = Selector::class(scheme.class());
+		let matched = self
+			.rules()
+			.enumerate()
+			.filter(|(_, rule)| {
+				*rule.selector() == selector
+					&& rule.media().is_none_or(|query| {
+						query.matches(*media.medium(), *media.viewport())
+					})
+			})
+			.map(|(index, _)| index)
+			.collect::<Vec<_>>();
+		self.cascade_in(&matched, key)
 	}
 
 	/// Whether any registered rule is gated on a viewport-width query
@@ -232,10 +265,11 @@ impl RuleSet {
 	/// Pick the winning declaration for `key` among the pre-matched rules. The
 	/// `:root` default rule is the lowest-priority fallback, applied by
 	/// [`RuleSetQuery`] after the ancestor walk, so a matching rule (eg
-	/// `.dark-scheme`) can override a `:root` default, mirroring CSS. The most
-	/// specific matching rule wins (class beats tag); ties go to the later rule,
-	/// mirroring CSS source order (and the serialized stylesheet) so a theme
-	/// override appended after a user-agent default wins on both.
+	/// `.dark-scheme`) can override a `:root` default, mirroring CSS. The
+	/// highest [`RuleOrigin`] wins, then the most specific selector (class
+	/// beats tag); ties go to the later rule, mirroring CSS source order (and
+	/// the serialized stylesheet) so a theme override appended after another
+	/// author rule wins on both.
 	fn cascade_in(
 		&self,
 		matched: &[usize],
@@ -245,9 +279,9 @@ impl RuleSet {
 			.iter()
 			.filter_map(|&index| {
 				let rule = &self.rules[index].rule;
-				rule.get(key)
-					.ok()
-					.map(|value| (rule.selector().specificity(), value))
+				rule.get(key).ok().map(|value| {
+					((*rule.origin(), rule.selector().specificity()), value)
+				})
 			})
 			.reduce(|best, next| if next.0 >= best.0 { next } else { best })
 			.map(|(_, value)| value)
@@ -267,6 +301,12 @@ impl RuleSet {
 ///   element instead of once per property.
 #[derive(Default)]
 pub struct CascadeMemo {
+	/// The media every element resolves for, set by a pure resolve
+	/// ([`Self::for_media`]); `None` finds each element's on its surface.
+	media: Option<MediaContext>,
+	/// entity -> the [`Medium`] it renders under, the nearest self or
+	/// ancestor declaring one, so the surface walk runs once per entity.
+	mediums: HashMap<Entity, Medium>,
 	values: HashMap<(Entity, Token), Option<Value>>,
 	matched_rules: HashMap<Entity, Vec<usize>>,
 	/// query [`Entity`] -> its nearest-ancestor element entity, so the
@@ -283,9 +323,22 @@ pub struct CascadeMemo {
 	has_width_media: Option<bool>,
 }
 
+impl CascadeMemo {
+	/// A memo resolving every element for `media`, whatever surface it is
+	/// under: the pure resolve a writer resolves a tree with.
+	pub fn for_media(media: MediaContext) -> Self {
+		Self {
+			media: Some(media),
+			..default()
+		}
+	}
+}
+
+/// The cascade: resolves a token for an entity through the [`RuleSet`], its
+/// ancestors and the `:root` default, reading the world and writing nothing.
 #[derive(SystemParam)]
 pub struct RuleSetQuery<'w, 's> {
-	rule_set: ResMut<'w, RuleSet>,
+	rule_set: Res<'w, RuleSet>,
 	// the visual ancestry, so the inherited cascade crosses transclusion
 	// boundaries: content transcluded into a layout by reference has no `ChildOf`
 	// edge to the layout, so inheritance (eg the color scheme) continues from the
@@ -294,6 +347,8 @@ pub struct RuleSetQuery<'w, 's> {
 	// the surface viewport width-gated media rules resolve against, found by
 	// walking the same Portal-aware parent chain inheritance uses.
 	viewports: Query<'w, 's, &'static MediaViewport>,
+	// the medium each surface declares, found the same way
+	mediums: Query<'w, 's, &'static Medium>,
 	element_query: ElementQuery<'w, 's>,
 }
 
@@ -360,6 +415,19 @@ impl RuleSetQuery<'_, '_> {
 					&& let Some(ancestor) = self.tree.visual_parent(entity)
 				{
 					self.resolve_untyped(ancestor, token, memo)
+				} else if let Some(media) = memo.media
+					&& let Some(scheme) = media.scheme()
+					&& let Ok(value) =
+						self.rule_set.scheme_value(*scheme, &media, token)
+				{
+					// the stated scheme's class rules, as if the root carried it
+					match value {
+						TokenValue::Value(value) => value.value().clone().xok(),
+						TokenValue::Token(next) => {
+							let next = next.clone();
+							self.resolve_untyped(entity, &next, memo)
+						}
+					}
 				} else {
 					// fall back to the `:root` default declarations
 					self.resolve_default(entity, token, memo).map_err(|_| err)
@@ -393,6 +461,46 @@ impl RuleSetQuery<'_, '_> {
 
 	/// See [`RuleSet::has_width_media`].
 	pub fn has_width_media(&self) -> bool { self.rule_set.has_width_media() }
+
+	/// The [`Medium`] `entity` renders under: the nearest self or
+	/// [visual ancestor](RenderTreeQuery::visual_parent) declaring one, else
+	/// [`Medium::Terminal`], memoized so a tree walks each surface once.
+	fn medium(&self, entity: Entity, memo: &mut CascadeMemo) -> Medium {
+		if let Some(medium) = memo.mediums.get(&entity) {
+			return *medium;
+		}
+		let medium = match self.mediums.get(entity) {
+			Ok(medium) => *medium,
+			Err(_) => match self.tree.visual_parent(entity) {
+				Some(parent) => self.medium(parent, memo),
+				None => Medium::Terminal,
+			},
+		};
+		memo.mediums.insert(entity, medium);
+		medium
+	}
+
+	/// The media `element` resolves for: the memo's stated context, else the
+	/// [`Medium`] and, when a width rule needs it, the viewport of the
+	/// surface it renders under.
+	fn media_of(
+		&self,
+		element: Entity,
+		needs_viewport: bool,
+		memo: &mut CascadeMemo,
+	) -> MediaContext {
+		if let Some(media) = memo.media {
+			return media;
+		}
+		let media = MediaContext::new(self.medium(element, memo));
+		match needs_viewport
+			.then(|| self.surface_viewport(element))
+			.flatten()
+		{
+			Some((_, viewport)) => media.with_viewport(viewport),
+			None => media,
+		}
+	}
 
 	/// The ancestor element views of `entity`, nearest-first, for evaluating the
 	/// combinator selectors (`>`, descendant). Walks the same
@@ -450,19 +558,17 @@ impl RuleSetQuery<'_, '_> {
 		let needs_viewport = *memo
 			.has_width_media
 			.get_or_insert_with(|| self.rule_set.has_width_media());
-		let matched =
-			memo.matched_rules.entry(el.entity).or_insert_with(|| {
-				let ancestors = needs_ancestors
-					.then(|| self.ancestor_elements(el.entity))
-					.unwrap_or_default();
-				let viewport = needs_viewport
-					.then(|| self.surface_viewport(el.entity))
-					.flatten()
-					.map(|(_, viewport)| viewport);
-				self.rule_set
-					.matching_rule_indices(&el, &ancestors, viewport)
-			});
-		self.rule_set.cascade_in(matched, token)
+		if !memo.matched_rules.contains_key(&el.entity) {
+			let ancestors = needs_ancestors
+				.then(|| self.ancestor_elements(el.entity))
+				.unwrap_or_default();
+			let media = self.media_of(el.entity, needs_viewport, memo);
+			let matched =
+				self.rule_set.matching_rule_indices(&el, &ancestors, &media);
+			memo.matched_rules.insert(el.entity, matched);
+		}
+		self.rule_set
+			.cascade_in(&memo.matched_rules[&el.entity], token)
 	}
 }
 
@@ -591,6 +697,141 @@ mod tests {
 		selects(&mut world, exact).xpect_true();
 		selects(&mut world, wide).xpect_false();
 		selects(&mut world, unhosted).xpect_false();
+	}
+
+	/// Whether a rule gated on `media` selects a div under a surface
+	/// declaring `medium`, and under no surface resolved for `medium`.
+	fn selects_in(media: MediaQuery, medium: Medium) -> (bool, bool) {
+		let mut world = World::new();
+		world.insert_resource(
+			RuleSet::default().with_rule(
+				Rule::new()
+					.with_media(media)
+					.with_selector(Selector::Any)
+					.with_value(Foo, 1u32),
+			),
+		);
+		let surface = world.spawn((medium, children![rsx! { <div/> }])).id();
+		let div = world.entity(surface).get::<Children>().unwrap()[0];
+		let unhosted = world.spawn(rsx! { <div/> }).id();
+		let live = selects(&mut world, div);
+		let stated = world.with_state::<RuleSetQuery, _>(|query| {
+			query
+				.cascade(
+					unhosted,
+					&Foo.into(),
+					&mut CascadeMemo::for_media(MediaContext::new(medium)),
+				)
+				.is_ok()
+		});
+		(live, stated)
+	}
+
+	/// Each medium query matches its own medium, on a surface declaring it
+	/// and in a pure resolve stating it, and a tree under no medium resolves
+	/// as the terminal.
+	#[beet_core::test]
+	fn media_match_their_medium() {
+		selects_in(MediaQuery::Print, Medium::Print).xpect_eq((true, true));
+		selects_in(MediaQuery::Print, Medium::Terminal)
+			.xpect_eq((false, false));
+		selects_in(MediaQuery::Terminal, Medium::Terminal)
+			.xpect_eq((true, true));
+		selects_in(MediaQuery::Terminal, Medium::Print)
+			.xpect_eq((false, false));
+		selects_in(MediaQuery::Screen, Medium::Screen).xpect_eq((true, true));
+		selects_in(MediaQuery::ReducedMotion, Medium::Screen)
+			.xpect_eq((false, false));
+		let mut world = World::new();
+		world.insert_resource(
+			RuleSet::default().with_rule(
+				Rule::new()
+					.with_media(MediaQuery::Terminal)
+					.with_selector(Selector::Any)
+					.with_value(Foo, 1u32),
+			),
+		);
+		let unhosted = world.spawn(rsx! { <div/> }).id();
+		selects(&mut world, unhosted).xpect_true();
+	}
+
+	/// A width rule matches a print page's content box as it does a
+	/// terminal's viewport.
+	#[beet_core::test]
+	fn max_width_against_a_print_viewport() {
+		let mut world = World::new();
+		world.insert_resource(RuleSet::default().with_rule(max_width_rule()));
+		let div = world.spawn(rsx! { <div/> }).id();
+		let resolves = |world: &mut World, width_px: f32| {
+			world.with_state::<RuleSetQuery, _>(|query| {
+				query
+					.cascade(
+						div,
+						&Foo.into(),
+						&mut CascadeMemo::for_media(
+							MediaContext::new(Medium::Print).with_viewport(
+								MediaViewport::new(width_px, 0.),
+							),
+						),
+					)
+					.is_ok()
+			})
+		};
+		resolves(&mut world, 602.).xpect_true();
+		resolves(&mut world, 1280.).xpect_false();
+	}
+
+	/// A `UserAgent` rule loses to an author rule of lower specificity, and a
+	/// `Direct` rule beats an author rule of higher specificity.
+	#[beet_core::test]
+	fn origins_rank_before_specificity() {
+		let mut world = World::new();
+		world.insert_resource(
+			RuleSet::default()
+				.with_rule(
+					Rule::new()
+						.with_origin(RuleOrigin::Direct)
+						.with_selector(Selector::class("direct"))
+						.with_value(Foo, 3u32),
+				)
+				.with_rule(
+					Rule::new()
+						.with_selector(Selector::AllOf(vec![
+							Selector::tag("p"),
+							Selector::class("theme"),
+							Selector::class("direct"),
+						]))
+						.with_value(Foo, 2u32),
+				)
+				.with_rule(
+					Rule::new()
+						.with_origin(RuleOrigin::UserAgent)
+						.with_selector(Selector::tag("em"))
+						.with_value(Bar, 1u32),
+				)
+				.with_rule(
+					Rule::new()
+						.with_selector(Selector::Any)
+						.with_value(Bar, 2u32),
+				),
+		);
+		world.spawn(rsx! {
+			<div>
+				<p class="theme direct"/>
+				<em/>
+			</div>
+		});
+		let (para, em) =
+			(tag_entity(&mut world, "p"), tag_entity(&mut world, "em"));
+		world
+			.with_state::<RuleSetQuery, _>(|query| {
+				let memo = &mut CascadeMemo::default();
+				(
+					query.resolve(para, Foo, memo).unwrap(),
+					query.resolve(em, Bar, memo).unwrap(),
+				)
+			})
+			.xpect_eq((3, 2));
 	}
 
 	// transcluded content (eg a live page under a buffer host's `Portal` slot)

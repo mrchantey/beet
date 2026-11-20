@@ -101,8 +101,10 @@ pub fn all_rules() -> Vec<Rule> {
 		footer_side(),
 		container(),
 		grid(),
-		// prose overrides — appended so they win the tag cascade over the
-		// user-agent element defaults (later rule wins ties)
+		// prose overrides of the user agent element defaults, which every
+		// author rule outranks
+		prose_block_gap(),
+		summary_prose(),
 		link_prose(),
 		// terminal-only: the `<img>`/`<iframe>` link fallbacks read as links
 		link_fallback_prose(),
@@ -111,6 +113,7 @@ pub fn all_rules() -> Vec<Rule> {
 		pre_prose(),
 		pre_code_prose(),
 		blockquote_prose(),
+		hr_prose(),
 		// terminal-only heading hue, gated behind `@media` Terminal
 		terminal_headings(),
 		main_content(),
@@ -465,6 +468,37 @@ mod tests {
 				.unwrap();
 			foreground.xpect_eq(primary);
 		});
+	}
+
+	/// A rule reads on a light page: `hr` resolves the outline variant's light
+	/// tone rather than a user agent colour made for a dark one.
+	#[beet_core::test]
+	fn light_scheme_hr_resolves_outline_variant() {
+		let mut world =
+			(MaterialStylePlugin::default(), StylePlugin).into_world();
+		let page = world
+			.spawn((rsx! { <div><hr/></div> }, ColorScheme::Light))
+			.id();
+		world.run_schedule(PostParseTree);
+		let rule = world.entity(page).get::<Children>().unwrap()[0];
+		let light_variant = world.with_state::<RuleSetQuery, _>(|query| {
+			query
+				.resolve(
+					rule,
+					colors::OutlineVariant,
+					&mut CascadeMemo::for_media(
+						MediaContext::new(Medium::Terminal)
+							.with_scheme(ColorScheme::Light),
+					),
+				)
+				.unwrap()
+		});
+		world
+			.entity(rule)
+			.get::<VisualStyle>()
+			.unwrap()
+			.foreground
+			.xpect_eq(Some(light_variant));
 	}
 
 	/// Regression: an `<img>` is a link only as the terminal fallback; its link

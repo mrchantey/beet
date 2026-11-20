@@ -1,5 +1,28 @@
 //! Target-agnostic styling: classes, declarations, design tokens and the
-//! cascade that resolves them for both the web and charcell targets.
+//! cascade that resolves them for every target.
+//!
+//! # The cascade
+//!
+//! Every [`Rule`](crate::prelude::Rule) ranks by its
+//! [`RuleOrigin`](crate::prelude::RuleOrigin) (a user agent default, an author
+//! rule, a direct look), then its selector's specificity, then its order, as
+//! CSS's cascade does. The output is target agnostic: [`ComputedStyle`]'s
+//! components ([`VisualStyle`], [`LayoutStyle`], [`BoxStyle`],
+//! [`PositionStyle`], ..) say nothing about where they are drawn, and each
+//! target maps them onto its own, the terminal onto cells, a document writer
+//! onto a file's formatting, a window onto its nodes.
+//!
+//! A target declares what it is with a [`Medium`](crate::prelude::Medium)
+//! beside its [`MediaViewport`](crate::prelude::MediaViewport) on the surface
+//! entity, and every `@media` rule matches against the nearest surface an
+//! element renders under ([`MediaQuery::matches`](crate::prelude::MediaQuery::matches)):
+//! the charcell buffers are [`Terminal`](crate::prelude::Medium::Terminal),
+//! as is a tree under no surface. A live surface's tree is resolved into its
+//! components by the `resolve_styles` system; a writer resolves a tree for a
+//! file through the pure [`CascadeQuery`], stating its medium, viewport and
+//! colour scheme in a [`MediaContext`](crate::prelude::MediaContext) and
+//! writing nothing, so the same tree may be on screen as it writes. The web
+//! needs neither: the browser cascades the serialized stylesheet itself.
 //!
 //! Conventions:
 //! - Colocate a widget's own classes with the widget: a class only that widget
@@ -33,7 +56,7 @@ pub use bsx_style::*;
 pub use color_scheme::*;
 pub use css::*;
 pub(crate) use elements::*;
-pub(crate) use resolve_styles::*;
+pub use resolve_styles::*;
 pub use style_plugin::*;
 pub use style_query::*;
 pub use values::*;

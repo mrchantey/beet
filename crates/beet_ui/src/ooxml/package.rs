@@ -4,10 +4,7 @@ use ooxmlsdk::parts::PartRef;
 use ooxmlsdk::parts::header_part::HeaderPart;
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 use ooxmlsdk::parts::slide_part::SlidePart;
-use ooxmlsdk::parts::spreadsheet_document::SpreadsheetDocument;
 use ooxmlsdk::parts::wordprocessing_document::WordprocessingDocument;
-use ooxmlsdk::parts::workbook_styles_part::WorkbookStylesPart;
-use ooxmlsdk::parts::worksheet_part::WorksheetPart;
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
 use ooxmlsdk::sdk::SdkPackage;
 
@@ -20,10 +17,6 @@ pub struct OoxmlPackage {
 }
 
 impl OoxmlPackage {
-	/// The media types a package is read from.
-	pub const MEDIA_TYPES: [MediaType; 3] =
-		[MediaType::Docx, MediaType::Xlsx, MediaType::Pptx];
-
 	/// The file `bytes` holds.
 	pub(crate) fn new(bytes: MediaBytes) -> Self { Self { bytes } }
 
@@ -41,8 +34,6 @@ impl OoxmlPackage {
 pub enum OoxmlFile {
 	/// A Word file.
 	Word(WordprocessingDocument),
-	/// A workbook.
-	Workbook(SpreadsheetDocument),
 	/// A slide deck.
 	Deck(PresentationDocument),
 }
@@ -57,10 +48,6 @@ macro_rules! part_handle {
 			PartRef::FooterPart($handle) => $body,
 			PartRef::FootnotesPart($handle) => $body,
 			PartRef::EndnotesPart($handle) => $body,
-			PartRef::WorkbookPart($handle) => $body,
-			PartRef::WorksheetPart($handle) => $body,
-			PartRef::SharedStringTablePart($handle) => $body,
-			PartRef::WorkbookStylesPart($handle) => $body,
 			PartRef::PresentationPart($handle) => $body,
 			PartRef::SlidePart($handle) => $body,
 			PartRef::SlideLayoutPart($handle) => $body,
@@ -74,18 +61,17 @@ macro_rules! part_handle {
 }
 
 impl OoxmlFile {
-	/// Opens the package `bytes` hold, a Word file, a workbook or a deck by
+	/// Opens the package `bytes` hold, a Word file or a deck by
 	/// their media type.
 	pub fn open(bytes: &MediaBytes) -> Result<Self> {
 		let cursor = || std::io::Cursor::new(bytes.bytes().to_vec());
 		match bytes.media_type() {
-			MediaType::Docx => Self::Word(WordprocessingDocument::new(cursor())?),
-			MediaType::Xlsx => {
-				Self::Workbook(SpreadsheetDocument::new(cursor())?)
+			MediaType::Docx => {
+				Self::Word(WordprocessingDocument::new(cursor())?)
 			}
 			MediaType::Pptx => Self::Deck(PresentationDocument::new(cursor())?),
 			other => bevybail!(
-				"`{other}` is no Office file: expected a Word file, a workbook or a slide deck"
+				"`{other}` is no Office file: expected a Word file or a slide deck"
 			),
 		}
 		.xok()
@@ -149,55 +135,6 @@ impl OoxmlFile {
 		MediaBytes::new(MediaType::Docx, file.to_package_bytes()?).xok()
 	}
 
-	/// A new workbook of `sheets`, each a tab name and the worksheet's inner
-	/// SpreadsheetML (`<sheetData>` onwards), styled by `cell_formats`, the
-	/// `<xf>` elements of the styles' `cellXfs`; ie for a test fixture.
-	pub fn workbook(
-		cell_formats: &str,
-		sheets: &[(&str, &str)],
-	) -> Result<MediaBytes> {
-		let (main, relationships) =
-			(OoxmlNamespace::SPREADSHEET, OoxmlNamespace::RELATIONSHIPS);
-		let mut file = SpreadsheetDocument::create(Default::default());
-		let workbook = file.add_workbook_part()?;
-		let mut listed = String::new();
-		for (index, (name, inner)) in sheets.iter().enumerate() {
-			let id = format!("rIdSheet{}", index + 1);
-			let sheet: WorksheetPart = workbook.add_new_part(&mut file, &id)?;
-			sheet.set_data(
-				&mut file,
-				format!(
-					"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n\
-					 <worksheet xmlns=\"{main}\" xmlns:r=\"{relationships}\">{inner}</worksheet>"
-				),
-			)?;
-			listed.push_str(&format!(
-				"<sheet name=\"{name}\" sheetId=\"{}\" r:id=\"{id}\"/>",
-				index + 1
-			));
-		}
-		let styles: WorkbookStylesPart =
-			workbook.add_new_part(&mut file, "rIdStyles")?;
-		styles.set_data(
-			&mut file,
-			format!(
-				"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n\
-				 <styleSheet xmlns=\"{main}\"><fonts count=\"1\"><font/></fonts>\
-				 <fills count=\"1\"><fill/></fills><borders count=\"1\"><border/></borders>\
-				 <cellXfs>{cell_formats}</cellXfs></styleSheet>"
-			),
-		)?;
-		workbook.set_data(
-			&mut file,
-			format!(
-				"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n\
-				 <workbook xmlns=\"{main}\" xmlns:r=\"{relationships}\"><sheets>{listed}</sheets>\
-				 <calcPr calcId=\"191029\"/></workbook>"
-			),
-		)?;
-		MediaBytes::new(MediaType::Xlsx, file.to_package_bytes()?).xok()
-	}
-
 	/// A new slide deck of `slides`, each a slide's shape tree inner
 	/// PresentationML with the `p:`, `a:` and `r:` prefixes bound, on a
 	/// 16:9 slide; ie for a test fixture.
@@ -241,7 +178,6 @@ impl OoxmlFile {
 	pub fn media_type(&self) -> MediaType {
 		match self {
 			Self::Word(_) => MediaType::Docx,
-			Self::Workbook(_) => MediaType::Xlsx,
 			Self::Deck(_) => MediaType::Pptx,
 		}
 	}
@@ -264,7 +200,6 @@ impl OoxmlFile {
 	pub fn parts(&self) -> Vec<PartRef> {
 		match self {
 			Self::Word(file) => all_parts(file),
-			Self::Workbook(file) => all_parts(file),
 			Self::Deck(file) => all_parts(file),
 		}
 	}
@@ -273,7 +208,6 @@ impl OoxmlFile {
 	pub fn path(&self, part: &PartRef) -> Option<SmolStr> {
 		match self {
 			Self::Word(file) => part.path(file),
-			Self::Workbook(file) => part.path(file),
 			Self::Deck(file) => part.path(file),
 		}
 		.map(|path| path.trim_start_matches('/').into())
@@ -288,7 +222,6 @@ impl OoxmlFile {
 		}
 		match self {
 			Self::Word(file) => read!(file),
-			Self::Workbook(file) => read!(file),
 			Self::Deck(file) => read!(file),
 		}
 		.xok()
@@ -351,7 +284,6 @@ impl OoxmlFile {
 		}
 		match self {
 			Self::Word(file) => related!(file),
-			Self::Workbook(file) => related!(file),
 			Self::Deck(file) => related!(file),
 		}
 	}
@@ -368,7 +300,6 @@ impl OoxmlFile {
 		}
 		match self {
 			Self::Word(file) => links!(file),
-			Self::Workbook(file) => links!(file),
 			Self::Deck(file) => links!(file),
 		}
 	}
@@ -402,7 +333,6 @@ impl OoxmlFile {
 		}
 		match self {
 			Self::Word(file) => add!(file),
-			Self::Workbook(file) => add!(file),
 			Self::Deck(file) => add!(file),
 		}
 		.xok()
@@ -430,7 +360,6 @@ impl OoxmlFile {
 		}
 		match self {
 			Self::Word(file) => write!(file),
-			Self::Workbook(file) => write!(file),
 			Self::Deck(file) => write!(file),
 		}
 		Ok(())
@@ -440,7 +369,6 @@ impl OoxmlFile {
 	pub fn to_bytes(&self) -> Result<Vec<u8>> {
 		match self {
 			Self::Word(file) => file.to_package_bytes(),
-			Self::Workbook(file) => file.to_package_bytes(),
 			Self::Deck(file) => file.to_package_bytes(),
 		}?
 		.xok()

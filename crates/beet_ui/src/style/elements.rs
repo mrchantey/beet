@@ -1,12 +1,16 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 //! Default presentation rules for prose HTML elements.
 //!
-//! These are the terminal/char-cell "user agent stylesheet": emphasis is
-//! italic, links are underlined, headings are spaced blocks, and so on.
-//! They are plain [`Rule`]s keyed on tag selectors so all styling flows
-//! through the single [`RuleSet`] cascade rather than any renderer-local
-//! lookup. Registered by [`StylePlugin`] so they are present when
-//! [`resolve_styles`] runs in the [`PostParseTree`] schedule.
+//! These are beet's user agent stylesheet, a browser's own defaults:
+//! emphasis is italic, links are underlined, headings are spaced blocks, and
+//! no colour assumes a scheme. They are plain [`Rule`]s keyed on tag
+//! selectors in the [`UserAgent`](RuleOrigin::UserAgent) origin, so all
+//! styling flows through the single [`RuleSet`] cascade and every author
+//! rule outranks them, on the web too, where they serialize in
+//! `@layer user-agent`. A default the web's reset overrides there (a block's
+//! gap, a link's underline) is restated by a theme as its own. Registered
+//! by [`StylePlugin`] so they are present when [`resolve_styles`] runs in the
+//! [`PostParseTree`] schedule.
 
 use crate::prelude::*;
 use crate::style::Cursor;
@@ -20,13 +24,8 @@ use crate::style::WhiteSpace;
 use crate::style::common_props::*;
 use beet_core::prelude::*;
 
-/// Faint grey used for de-emphasised elements (quotes, rules, h6).
-fn faint() -> Color { Color::srgba(1., 1., 1., 0.4) }
-
-/// Neutral soft white for code text with no syntax highlight, matching the
-/// default syntax theme's plain-token colour. Uncaptured runs inside a code
-/// block (eg JSON keys, HTML text) inherit this rather than a tinted hue.
-fn code_fg() -> Color { Color::srgb(0.85, 0.85, 0.85) }
+/// CSS's `gray`, a browser's colour for a rule, readable on either scheme.
+fn gray() -> Color { Color::srgb_u8(128, 128, 128) }
 
 /// One blank row below a block, separating it from the next (the `\n\n` between
 /// markdown blocks). `li` items stay tight, so they opt out.
@@ -37,12 +36,22 @@ fn block_gap() -> Spacing {
 	}
 }
 
-/// All default prose element rules, in cascade order.
+/// All default prose element rules, in cascade order, each in the
+/// [`UserAgent`](RuleOrigin::UserAgent) origin: as a browser's own defaults,
+/// every author rule outranks them whatever its specificity.
 ///
 /// Each rule also declares its `display` so the charcell layout treats prose
 /// structure correctly: headings/paragraphs/lists/quotes/code blocks flow as
 /// blocks, while emphasis/links/inline code flow inline.
 pub(crate) fn default_element_rules() -> Vec<Rule> {
+	user_agent_rules()
+		.into_iter()
+		.map(|rule| rule.with_origin(RuleOrigin::UserAgent))
+		.collect()
+}
+
+/// The rules of [`default_element_rules`], before their origin is set.
+fn user_agent_rules() -> Vec<Rule> {
 	vec![
 		non_visual_rule(),
 		// ── Block structure ──
@@ -68,15 +77,15 @@ pub(crate) fn default_element_rules() -> Vec<Rule> {
 		// bold itself, so no user-agent weight is set here.
 		block_spaced(&["h1", "h2", "h3", "h4", "h5", "h6"]),
 		blockquote(),
-		block_spaced(&["pre"])
-			.with_canonical(WhiteSpace::Pre)
-			.with_value(ForegroundColor, code_fg()),
-		block_spaced(&["hr"]).with_value(ForegroundColor, faint()),
+		// no colour on code, as in a browser: a theme or the syntax highlighter
+		// colours it for its scheme
+		block_spaced(&["pre"]).with_canonical(WhiteSpace::Pre),
+		block_spaced(&["hr"]).with_value(ForegroundColor, gray()),
 		// ── Inline formatting ──
 		bold(&["strong", "b"]),
 		italic(&["em", "i"]),
 		strikethrough(&["del", "s"]),
-		inline(&["code"]).with_value(ForegroundColor, code_fg()),
+		inline(&["code"]),
 		inline(&["span"]),
 		// the remaining inline text-level tags carry no special default look
 		// beyond flowing inline; without this they default to `display: block`
@@ -150,10 +159,10 @@ pub(crate) fn default_element_rules() -> Vec<Rule> {
 /// skips it (`focusables_in_order`).
 ///
 /// The terminal twin of the web reset's `[hidden]` rule (`preflight.css`),
-/// which also honours `hidden="until-found"`, so the web keeps its own. Ends
-/// every rule set it joins, since an attribute ties a class on specificity and
-/// a later class declaring `display` (`.grid`) would otherwise show the
-/// element.
+/// which also honours `hidden="until-found"`, so the web keeps its own. As a
+/// user agent default any author `display` outranks it, as in a browser, so
+/// a theme repeats it as its own rule, ending its set so it wins the
+/// specificity tie with a later class declaring `display` (`.grid`).
 pub(crate) fn hidden_attribute_rule() -> Rule {
 	Rule::new()
 		.with_selector(Selector::attribute("hidden", None))

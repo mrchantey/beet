@@ -292,6 +292,8 @@ impl<'a> MdTreeBuilder<'a> {
 
 		match event {
 			Event::Start(tag) => self.handle_start(tag, source),
+			// an HTML block pushed no frame of its own, see `Tag::HtmlBlock`
+			Event::End(pulldown_cmark::TagEnd::HtmlBlock) => {}
 			Event::End(_) => self.handle_end(),
 			Event::Text(text) => {
 				if self.in_metadata {
@@ -434,11 +436,10 @@ impl<'a> MdTreeBuilder<'a> {
 				};
 				self.push(StackFrame::with_attributes("code", source, attrs));
 			}
-			Tag::HtmlBlock => {
-				// HtmlBlock content arrives as Text events, but we handle
-				// the whole block in the End event by checking the stack
-				self.push(StackFrame::new("__html_block", source));
-			}
+			// a block's HTML arrives as `Html` events applied straight to the
+			// stack, so an element it leaves open, ie `<details>`, holds the
+			// markdown after it until a later block closes it
+			Tag::HtmlBlock => {}
 			Tag::List(start) => match start {
 				Some(_start_num) => {
 					// Find start number text in source for attribute borrowing
@@ -581,15 +582,6 @@ impl<'a> MdTreeBuilder<'a> {
 				self.in_metadata = false;
 				self.stack.pop();
 				// Don't push to parent — frontmatter is handled separately
-			}
-			"__html_block" => {
-				// `apply_html_fragment` parsed the block's embedded HTML into
-				// this frame's children as it streamed in; splice them into the
-				// parent in place of the synthetic block frame.
-				let frame = self.stack.pop().unwrap();
-				if let Some(parent) = self.stack.last_mut() {
-					parent.children.extend(frame.children);
-				}
 			}
 			"img" => {
 				// `img` is a void element. pulldown-cmark emits alt text

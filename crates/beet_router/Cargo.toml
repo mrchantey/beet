@@ -92,6 +92,9 @@ site_images = ["std", "json", "dep:image", "dep:resvg", "dep:skrifa"]
 postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
 serde = ["dep:serde", "beet_core/serde", "beet_action/serde", "beet_net/serde", "beet_ui?/serde"]
 markdown_parser = ["std", "beet_ui/markdown_parser"]
+# Word files, workbooks and slide decks as media (`beet_ui/ooxml`), every
+# router installing `OoxmlPlugin` so a route serves and writes them.
+ooxml = ["std", "beet_ui/ooxml"]
 # The live, interactive terminal target: the charcell TUI host + stdio terminal,
 # behind which the in-world `Navigator` browses the app's own routes (`TuiServer`).
 tui = ["std", "beet_ui/tui"]

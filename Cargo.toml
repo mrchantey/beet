@@ -256,6 +256,13 @@ hmac = { version = "0.13", default-features = false }
 # `links = "wsqlite3"`, so exactly one version may be in the graph: never depend
 # on it directly, let rusqlite pick it.
 rusqlite = { version = "0.40", default-features = false, features = ["bundled", "ffi-sqlite-wasm-rs"] }
+# the deflate an Office part is stored under (`beet_ui`'s `ooxml`): pure rust
+# (`miniz_oxide`) rather than a zlib link, so it builds on every target.
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+# The zip an Office file is (`beet_ui`'s `ooxml` package, `OpcPackage`): only
+# deflate, through the pure rust `flate2` above, so it builds on every target;
+# the other codecs and encryption an Office file never uses stay off.
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 # Office Open XML (`beet_ui`'s `ooxml`): the package of a Word file, a workbook
 # or a slide deck, its parts and relationships, round-trip tested across
 # thousands of files. Pinned exactly, since the crate is pre-1.0 and its
@@ -545,9 +552,9 @@ lambda = ["net", "beet_net?/lambda"]
 aws = ["net", "beet_net?/aws","beet_infra?/aws","beet_router?/aws"]
 deploy = ["infra", "beet_infra?/deploy"]
 # Office Open XML: Word files, workbooks and slide decks as media, each read
-# into the one document tree and written back by re-projection
-# (`OoxmlParser`, `OoxmlRenderer`).
-ooxml = ["ui", "beet_ui?/ooxml"]
+# into the one document tree and written from it (`OoxmlPlugin`), installed by
+# every router.
+ooxml = ["ui", "beet_ui?/ooxml", "beet_router?/ooxml"]
 tungstenite = ["net", "beet_net?/tungstenite"]
 webdriver = ["net", "beet_net?/webdriver"]
 ureq = ["net", "beet_net?/ureq"]

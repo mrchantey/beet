@@ -13,6 +13,9 @@ pub struct CssRule {
 	/// Optional `@media` gate carried over from the source [`Rule`]; when set,
 	/// serialization wraps this rule in `@media (…) { … }`.
 	media: Option<MediaQuery>,
+	/// The source [`Rule`]'s cascade origin: a user agent rule serializes in
+	/// `@layer user-agent`, a direct one's declarations `!important`.
+	origin: RuleOrigin,
 }
 
 impl CssRule {
@@ -28,6 +31,7 @@ impl CssRule {
 			.with_selector(selector)
 			.with_declarations(declarations)
 			.with_media(*rule.media())
+			.with_origin(*rule.origin())
 			.xok()
 	}
 

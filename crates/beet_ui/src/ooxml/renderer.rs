@@ -1,5 +1,4 @@
 use super::word_writer::WordWriter;
-use super::workbook_writer::WorkbookWriter;
 use super::writer::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -68,9 +67,7 @@ impl Installer for OoxmlRenderer {
 }
 
 impl DocRenderer for OoxmlRenderer {
-	fn media_types(&self) -> Vec<MediaType> {
-		vec![MediaType::Docx, MediaType::Xlsx]
-	}
+	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Docx] }
 
 	fn render(
 		&mut self,
@@ -91,11 +88,6 @@ impl DocRenderer for OoxmlRenderer {
 		let mut file = package.open()?;
 		match media_type {
 			MediaType::Docx => WordWriter::reproject(world, root, &mut file)?,
-			MediaType::Xlsx => {
-				if WorkbookWriter::reproject(world, root)? {
-					WorkbookWriter::recalculate(&mut file)?;
-				}
-			}
 			other => {
 				return Err(
 					bevyhow!("a {other} file is read, never written").into()
@@ -143,7 +135,7 @@ pub(crate) mod test {
 
 	pub(crate) fn parse(bytes: &MediaBytes) -> (World, Entity) {
 		let mut world =
-			(TemplatePlugin, DocumentPlugin, ParsePlugin).into_world();
+			(TemplatePlugin, DocumentPlugin, OoxmlPlugin).into_world();
 		let root = world.spawn_empty().id();
 		DocParsers::parse(ParseContext::new(
 			&mut world.entity_mut(root),
@@ -226,41 +218,12 @@ pub(crate) mod test {
 		}
 	}
 
-	pub(crate) fn cells(world: &mut World, root: Entity) -> Vec<String> {
-		CellText::listing(world, root)
-			.iter()
-			.map(|cell| cell.text.to_string())
-			.collect()
-	}
-
-	/// Runs one edit on `world`'s document, its writes applied after.
-	pub(crate) fn edit<O>(
-		world: &mut World,
-		func: impl FnOnce(&mut DocumentTreeEdit) -> O,
-	) -> O {
-		world.with_state::<DocumentTreeEdit, _>(|mut edit| func(&mut edit))
-	}
-
 	#[beet_core::test]
 	fn untouched_files_write_back_render_identical() {
-		for bytes in [
-			super::super::word::test::form(),
-			super::super::workbook_writer::test::workbook(),
-		] {
-			let (mut world, root) = parse(&bytes);
-			let written = write(&mut world, root, bytes.media_type().clone());
-			canonical(&written).xpect_eq(canonical(&bytes));
-		}
-	}
-
-	/// The text node holding `words`.
-	fn text_node(world: &mut World, words: &str) -> Entity {
-		world
-			.query::<(Entity, &Value)>()
-			.iter(world)
-			.find(|(_, value)| value.as_str().ok() == Some(words))
-			.map(|(entity, _)| entity)
-			.unwrap()
+		let bytes = super::super::word::test::form();
+		let (mut world, root) = parse(&bytes);
+		let written = write(&mut world, root, bytes.media_type().clone());
+		canonical(&written).xpect_eq(canonical(&bytes));
 	}
 
 	/// The part at `path` of `bytes` as text.
@@ -268,48 +231,5 @@ pub(crate) mod test {
 		let file = OoxmlFile::open(bytes).unwrap();
 		String::from_utf8(file.data_at(path).unwrap().unwrap().to_vec())
 			.unwrap()
-	}
-
-	/// An edit is a value differing from its read: every value re-inserted
-	/// as it was is none, and one changed value rewrites that value alone.
-	#[beet_core::test]
-	fn edits_are_found_by_comparison() {
-		for (bytes, path, words, before, after) in [
-			(
-				super::super::word::test::form(),
-				"word/document.xml",
-				"Name",
-				"<w:t>Name</w:t>",
-				"<w:t xml:space=\"preserve\">Named</w:t>",
-			),
-			(
-				super::super::workbook_writer::test::workbook(),
-				"xl/worksheets/sheet1.xml",
-				"Enter it here",
-				"<is><t>Enter it here</t></is>",
-				"<is><t xml:space=\"preserve\">Named</t></is>",
-			),
-		] {
-			let media_type = bytes.media_type().clone();
-			let untouched = {
-				let (mut world, root) = parse(&bytes);
-				write(&mut world, root, media_type.clone())
-			};
-			let (mut world, root) = parse(&bytes);
-			let values = world
-				.query::<(Entity, &Value)>()
-				.iter(&world)
-				.map(|(entity, value)| (entity, value.clone()))
-				.collect::<Vec<_>>();
-			world.insert_batch(values);
-			let reinserted = write(&mut world, root, media_type.clone());
-			canonical(&reinserted).xpect_eq(canonical(&untouched));
-
-			let (mut world, root) = parse(&bytes);
-			let text = text_node(&mut world, words);
-			world.entity_mut(text).insert(Value::str("Named"));
-			part(&write(&mut world, root, media_type), path)
-				.xpect_eq(part(&untouched, path).replacen(before, after, 1));
-		}
 	}
 }

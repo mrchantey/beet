@@ -118,7 +118,11 @@ impl Plugin for RouterPlugin {
 					// target registry
 					ParsePlugin,
 					RenderPlugin,
-				)>()
+				)>();
+			// the Office formats a route serves and writes
+			#[cfg(feature = "ooxml")]
+			app.install_type::<OoxmlPlugin>();
+			app
 				// the scene routes' render params and the media a request resolves
 				.register_type::<RenderRoot>()
 				.register_type::<MediaIngestPolicy>()
@@ -280,10 +284,6 @@ impl Plugin for RouterPlugin {
 				// a served page boots a wasm `beet` binary with.
 				Wasm,
 			)>();
-			// any document's addressed cells (`<DocumentCells/>`, `cells
-			// forms/plan.docx`), whose serde answer needs `serde`
-			#[cfg(feature = "serde")]
-			app.register_type::<DocumentCells>();
 			// the server-to-client websocket channel and the dev-mode live
 			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The
 			// channel rides the main HTTP port: `Router::with_defaults` wires the
@@ -728,10 +728,7 @@ mod test {
 	async fn registers_the_store_file_routes() {
 		let store = BlobStore::temp();
 		store
-			.insert(
-				&"guide.md".into(),
-				"# Guide\n\n| a | b |\n|---|---|\n| c | d |\n".to_owned(),
-			)
+			.insert(&"guide.md".into(), "# Guide\n".to_owned())
 			.await
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
@@ -740,19 +737,14 @@ mod test {
 			&mut root,
 			&MediaBytes::new_bsx(
 				r#"<Route path="guide" {BlobPage{path:"guide.md"}}/>
-					<DocumentView/>
-					<DocumentCells/>"#,
+					<DocumentView/>"#,
 			),
 		))
 		.unwrap();
 		let root = root.flush();
-		for (path, expected) in [
-			("guide", "# Guide"),
-			("view/guide.md", "# Guide"),
-			// a markdown table has cells only where markdown parses
-			#[cfg(all(feature = "serde", feature = "markdown_parser"))]
-			("cells/guide.md", "| t1r2c2 | d |"),
-		] {
+		for (path, expected) in
+			[("guide", "# Guide"), ("view/guide.md", "# Guide")]
+		{
 			world
 				.entity_mut(root)
 				.exchange(

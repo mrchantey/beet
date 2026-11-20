@@ -30,7 +30,8 @@ impl Plugin for ParsePlugin {
 		// adding it to the per-frame main loop (which would repaint the whole world
 		// every tick).
 		app.init_schedule(PostParseTree);
-		// the built-in document formats; OoxmlPlugin adds the office formats
+		// the built-in document formats; `OoxmlPlugin`, which installs the
+		// style plugin over this, adds the Office formats
 		app.world_mut()
 			.get_resource_or_init::<DocParsers>()
 			.register_builtins();
@@ -46,19 +47,8 @@ impl Plugin for ParsePlugin {
 			.register_type::<TextLimit>();
 		#[cfg(feature = "bsx")]
 		app.register_type::<FrontmatterType>();
-		// the cell addresses every parsed document's tables carry, numbered
-		// once per document unless the format supplies them, and a cell's
-		// formula
-		app.register_type::<CellAddress>()
-			.register_type::<CellFormula>()
-			.add_systems(PostParseTree, number_tables.in_set(TableNumbering));
-		#[cfg(feature = "ooxml")]
-		app.install_type::<crate::prelude::OoxmlPlugin>();
 	}
 }
-
-/// Numbers the tables of every document parsed since the last run.
-fn number_tables(world: &mut World) { NumberTables::apply_all(world); }
 
 /// Opt-in plugin for realtime apps driven by the main loop: runs the
 /// [`PostParseTree`] pipeline after every [`Update`] so style changes and

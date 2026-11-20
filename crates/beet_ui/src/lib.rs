@@ -9,7 +9,6 @@ extern crate alloc;
 extern crate std;
 
 mod document;
-mod edit;
 mod input;
 mod lexicon;
 #[cfg(feature = "ooxml")]
@@ -36,7 +35,6 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::css_variable;
 	pub use crate::document::*;
-	pub use crate::edit::*;
 	pub use crate::inline_class;
 	pub use crate::input::*;
 	pub use crate::lexicon::*;

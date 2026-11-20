@@ -35,9 +35,7 @@ mod document_view;
 pub use document_view::*;
 // any document's addressed cells, the map an edit fills a form by
 #[cfg(feature = "serde")]
-mod document_cells;
 #[cfg(feature = "serde")]
-pub use document_cells::*;
 // an answer that is both a scene and its data, rendered or serialized as the
 // request accepts
 #[cfg(feature = "serde")]
