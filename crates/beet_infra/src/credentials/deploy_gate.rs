@@ -103,9 +103,22 @@ impl Assessed {
 		!self.status.stale.is_empty() || !self.protected.is_empty()
 	}
 
-	/// Every reason it blocks, then every note.
+	/// Whether an elevated run elevates this credential: it blocks, something
+	/// is due, or `roll` replaces every needed one.
+	fn elevates(&self, roll: bool) -> bool {
+		self.blocks()
+			|| !self.status.due.is_empty()
+			|| (roll && self.status.needed)
+	}
+
+	/// Every reason it blocks.
 	fn reasons(&self) -> impl Iterator<Item = &String> {
 		self.status.stale.iter().chain(self.protected.iter())
+	}
+
+	/// What blocks nothing: what is due, then what is only said.
+	fn remarks(&self) -> impl Iterator<Item = &String> {
+		self.status.due.iter().chain(self.status.notes.iter())
 	}
 }
 
@@ -141,7 +154,7 @@ impl DeployGate {
 			.await?
 			.assess(&cx.caller, &cx.input, &stacks)
 			.await?;
-		for note in assessed.iter().flat_map(|one| one.status.notes.iter()) {
+		for note in assessed.iter().flat_map(Assessed::remarks) {
 			info!("{note}");
 		}
 		if params.dry_run {
@@ -516,13 +529,16 @@ impl DeployGate {
 		for one in assessed {
 			out.push_str(&format!("{}: {}\n", one.credential.id(), match (
 				one.status.needed,
-				one.blocks()
+				one.blocks(),
+				one.status.due.is_empty()
 			) {
-				(false, _) => "not needed by this launch",
-				(true, false) => "current",
-				(true, true) => "needs `--elevated`",
+				(false, _, _) => "not needed by this launch",
+				(true, false, true) => "current",
+				(true, false, false) =>
+					"current, and `--elevated` converges what is due",
+				(true, true, _) => "needs `--elevated`",
 			}));
-			for line in one.reasons().chain(one.status.notes.iter()) {
+			for line in one.reasons().chain(one.remarks()) {
 				out.push_str(&format!("- {line}\n"));
 			}
 			if one.status.needed {
@@ -554,7 +570,7 @@ impl DeployGate {
 	) -> Result<Response> {
 		let elevating = assessed
 			.iter()
-			.filter(|one| one.blocks() || (roll && one.status.needed))
+			.filter(|one| one.elevates(roll))
 			.collect::<Vec<_>>();
 		if elevating.is_empty() {
 			info!(
@@ -828,6 +844,7 @@ mod test {
 	struct Counted {
 		id: &'static str,
 		stale: Vec<String>,
+		due: Vec<String>,
 		asked: Store<usize>,
 		holding: Holding,
 		/// Where elevating logs `elevated <id>` and its cleanup `cleaned <id>`,
@@ -841,6 +858,7 @@ mod test {
 			Self {
 				id: "counted",
 				stale: stale.iter().map(ToString::to_string).collect(),
+				due: Vec::new(),
 				asked,
 				holding: Holding::Sealed,
 				elevates: None,
@@ -871,11 +889,13 @@ mod test {
 		) -> SendBoxedFuture<Result<CredentialStatus>> {
 			self.asked.set(self.asked.get() + 1);
 			let stale = self.stale.clone();
+			let due = self.due.clone();
 			Box::pin(async move {
 				CredentialStatus {
 					needed: true,
 					stale,
-					notes: Vec::new(),
+					due,
+					..default()
 				}
 				.xok()
 			})
@@ -1322,6 +1342,49 @@ mod test {
 		]);
 	}
 
+	/// A credential with something due and nothing stale blocks no plain
+	/// deploy, says so in a dry run, and an elevated one converges it.
+	///
+	/// REGRESSION: the root entry's credential still held the grants of the
+	/// entries that took their own, each logged as dropped by "the next
+	/// elevated deploy", and `deploy --elevated` ran plainly, dropping none.
+	#[beet_core::test]
+	async fn elevates_what_is_due() {
+		let due = |log: Store<Vec<String>>| {
+			Counted {
+				due: vec![
+					"counted: holds `x`, which nothing declares now".into(),
+				],
+				..elevating("due", log)
+			}
+			.xmap(|counted| Counted {
+				stale: Vec::new(),
+				..counted
+			})
+		};
+		let log = Store::new_vec();
+		let (mut world, root, _dir) =
+			package([due(log)], RouteMatrix::new(["site"], ["deploy"]));
+		world
+			.entity_mut(root)
+			.exchange_str(Request::from_cli_str("site/deploy --dry-run"))
+			.await
+			.xpect_contains("due: current, and `--elevated` converges")
+			.xpect_contains("- counted: holds `x`");
+		world
+			.entity_mut(root)
+			.exchange(Request::from_cli_str("site/deploy"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+		log.get().xpect_empty();
+
+		let log = Store::new_vec();
+		let (response, logged) = deploy_elevated([due(log)], log, || OK).await;
+		response.status().xpect_eq(StatusCode::OK);
+		logged.first().unwrap().xpect_eq("elevated due");
+	}
+
 	/// A package's dry run names every stack it lists, in order, and answers
 	/// for each credential without running any of them.
 	#[beet_core::test]
@@ -1370,7 +1433,7 @@ mod test {
 			status: CredentialStatus {
 				needed: true,
 				stale: stale.iter().map(ToString::to_string).collect(),
-				notes: Vec::new(),
+				..default()
 			},
 			protected: protected.iter().map(ToString::to_string).collect(),
 		}

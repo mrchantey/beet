@@ -266,6 +266,10 @@ impl AwsDeployPolicy {
 	/// The app every name is scoped to, ie `beet-site`.
 	pub fn app(&self) -> &SmolStr { &self.app }
 
+	/// Whether the IAM statement carries the boundary conditions
+	/// ([`Self::with_boundary`]).
+	pub fn bounded(&self) -> bool { self.boundary }
+
 	/// The services whose service-linked role the lowered stacks need at the
 	/// account, ie `ops.apigateway.amazonaws.com`, which the deploy credential
 	/// may never create, so the elevated converge does.

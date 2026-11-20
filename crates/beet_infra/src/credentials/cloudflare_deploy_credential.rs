@@ -266,7 +266,7 @@ impl CloudflareDeployCredential {
 				self.id(),
 				at.format_iso8601_secs()
 			)),
-			Some(SecretExpiry::Expiring { at }) => status.notes.push(format!(
+			Some(SecretExpiry::Expiring { at }) => status.due.push(format!(
 				"{}: the sealed token stops authenticating at {}, so the next \
 				elevated deploy renews it",
 				self.id(),

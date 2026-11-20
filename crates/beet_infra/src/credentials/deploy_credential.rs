@@ -310,8 +310,12 @@ pub struct CredentialStatus {
 	/// Why the sealed credential cannot do what the declarations ask, empty
 	/// when it can: a plain deploy refuses on any of them.
 	pub stale: Vec<String>,
-	/// What is worth saying and blocks nothing, ie a credential wider than the
-	/// declarations now need, which the next elevated deploy narrows.
+	/// What blocks nothing but the next elevated deploy converges, so an
+	/// elevated deploy elevates a credential holding any: a grant the
+	/// declarations no longer ask for, a token near its expiry.
+	pub due: Vec<String>,
+	/// What is only worth saying, ie the sealed credential's shortcomings
+	/// while this launch runs as another.
 	pub notes: Vec<String>,
 }
 
@@ -322,7 +326,7 @@ impl CredentialStatus {
 	/// Compare the grants the declarations need with the ones `record`, the
 	/// credential's identity record, was converged with: a grant missing from
 	/// the record is stale, one the record holds and the declarations no
-	/// longer ask for is a note. `scope` limits the notes to the held lines
+	/// longer ask for is due. `scope` limits what is due to the held lines
 	/// this launch answers for, all of them when `None`: a held line the
 	/// converge keeps without rendering it (the boundary of a stage this
 	/// launch did not render) is no line to drop.
@@ -339,7 +343,7 @@ impl CredentialStatus {
 				stale: vec![format!(
 					"{credential}: no `{record}` is sealed for this entry yet"
 				)],
-				notes: Vec::new(),
+				..default()
 			};
 		};
 		let held = DeployCredential::held_grants(Some(held_secret));
@@ -351,7 +355,7 @@ impl CredentialStatus {
 					it was converged before credentials recorded what they \
 					hold"
 				)],
-				notes: Vec::new(),
+				..default()
 			};
 		}
 		let in_scope =
@@ -361,7 +365,7 @@ impl CredentialStatus {
 			.filter(|line| !held.iter().any(|held| held == line.as_str()))
 			.map(|line| format!("{credential}: needs `{line}`"))
 			.collect::<Vec<_>>();
-		let notes = held
+		let due = held
 			.iter()
 			.filter(|line| in_scope(line))
 			.filter(|line| !needed.iter().any(|needed| needed == line.as_str()))
@@ -375,7 +379,8 @@ impl CredentialStatus {
 		Self {
 			needed: true,
 			stale,
-			notes,
+			due,
+			notes: Vec::new(),
 		}
 	}
 }
@@ -536,7 +541,7 @@ mod test {
 	}
 
 	/// A grant the declarations need and the record lacks is stale; one the
-	/// record holds and nothing asks for is a note, and only within the
+	/// record holds and nothing asks for is due, and only within the
 	/// launch's scope; no record, or one recording nothing, is stale.
 	#[beet_core::test]
 	fn compares_grants_with_the_record() {
@@ -545,8 +550,7 @@ mod test {
 		CredentialStatus::compare("cf", "TOKEN", &needed, Some(&current), None)
 			.xpect_eq(CredentialStatus {
 				needed: true,
-				stale: vec![],
-				notes: vec![],
+				..default()
 			});
 		let short = held("DNS Write\nWorkers R2 Storage Write");
 		let status = CredentialStatus::compare(
@@ -559,7 +563,7 @@ mod test {
 		status
 			.stale
 			.xpect_eq(vec!["cf: needs `Cache Purge`".to_string()]);
-		status.notes.len().xpect_eq(1);
+		status.due.len().xpect_eq(1);
 		// another entry's line is not this launch's to drop
 		let other_entry = |line: &str| !line.starts_with("Workers");
 		CredentialStatus::compare(
@@ -569,7 +573,7 @@ mod test {
 			Some(&short),
 			Some(&other_entry),
 		)
-		.notes
+		.due
 		.xpect_empty();
 		CredentialStatus::compare("cf", "TOKEN", &needed, None, None).stale[0]
 			.as_str()

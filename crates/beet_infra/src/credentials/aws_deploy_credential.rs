@@ -66,8 +66,9 @@ use serde_json::Value;
 /// boundary, so conditioning the policy before the apply that attaches the
 /// first boundaries would deny that apply and block every deploy of the app
 /// until an administrator intervened. So the first converge of an app with
-/// live uncapped principals writes an unconditioned policy and says so; the
-/// apply caps them; the next elevated deploy closes the door. An app whose
+/// live uncapped principals writes an unconditioned policy, says so and
+/// records it on the key id (`unconditioned`); the apply caps them; the record
+/// makes it due, so the next elevated deploy closes the door. An app whose
 /// principals are not at the account yet is conditioned from birth.
 ///
 /// ## What converges
@@ -195,6 +196,10 @@ impl AwsDeployCredential {
 	/// ..and that account's name in the Organization, absent for the
 	/// management account itself.
 	const ACCOUNT_NAME: &'static str = "account_name";
+	/// The key id record's metadata naming each deploy policy last written
+	/// without its boundary conditions, one per line, absent when none was:
+	/// due until an elevated deploy conditions it.
+	const UNCONDITIONED: &'static str = "unconditioned";
 	/// Stands in for a member account's id before the key lives there, which
 	/// only the elevated deploy learns, as [`AwsAccount`]'s own description
 	/// writes it.
@@ -257,6 +262,16 @@ impl AwsDeployCredential {
 			held.as_ref(),
 			Some(&rendered),
 		);
+		status
+			.due
+			.extend(Self::unconditioned(held.as_ref(), &apps).map(|policy| {
+				format!(
+					"{}: `{policy}` was written without its boundary \
+					conditions while a principal wore no boundary yet, and \
+					the next elevated deploy conditions it",
+					self.id()
+				)
+			}));
 		// a credential in another account holds none of what this one needs
 		if let Some((account, _)) = AwsAccount::declared(caller).await?
 			&& let Some(held) = held.as_ref()
@@ -266,6 +281,20 @@ impl AwsDeployCredential {
 				.extend(Self::elsewhere(held, &account.resolved_name()?));
 		}
 		status.xok()
+	}
+
+	/// The deploy policies of `apps` the `held` key id's record says were
+	/// written unconditioned ([`Self::UNCONDITIONED`]).
+	fn unconditioned<'a>(
+		held: Option<&'a Secret>,
+		apps: &'a [AppPolicies],
+	) -> impl Iterator<Item = &'a str> {
+		held.and_then(|held| held.record.metadata.get(Self::UNCONDITIONED))
+			.into_iter()
+			.flat_map(|lines| lines.lines())
+			.filter(|policy| {
+				apps.iter().any(|app| app.deploy.policy_name() == *policy)
+			})
 	}
 
 	/// The account to lower the policies against when the sealed key is absent
@@ -454,18 +483,18 @@ impl AwsDeployCredential {
 		for service in Self::service_linked_roles(&apps) {
 			report.push(admin.ensure_service_linked_role(service).await?);
 		}
+		let mut unconditioned = Vec::new();
 		for app in apps.iter() {
 			// the boundaries FIRST: the deploy policy may only carry the
 			// conditions naming them once they exist and every principal wears one
 			for boundary in app.boundaries.values() {
 				report.push(boundary.converge(&admin, &account).await?);
 			}
-			report.push(
-				app.deploy_policy(&admin, &account)
-					.await?
-					.converge(&admin, &account, &user)
-					.await?,
-			);
+			let policy = app.deploy_policy(&admin, &account).await?;
+			if !policy.bounded() {
+				unconditioned.push(policy.policy_name());
+			}
+			report.push(policy.converge(&admin, &account, &user).await?);
 		}
 		// exactly this entry's: a policy another entry's apps declare is
 		// that entry's user's to hold
@@ -490,7 +519,14 @@ impl AwsDeployCredential {
 		};
 		report.extend(
 			Self::converge_key(
-				caller, &admin, &entry, home, &apps, &grants, ask.roll,
+				caller,
+				&admin,
+				&entry,
+				home,
+				&apps,
+				&grants,
+				&unconditioned,
+				ask.roll,
 			)
 			.await?,
 		);
@@ -625,7 +661,8 @@ impl AwsDeployCredential {
 	}
 
 	/// Converge `entry`'s access key: mint one when the document holds none of
-	/// its user's, or on `roll`, sealing the pair with `grants` before deleting
+	/// its user's, or on `roll`, sealing the pair with `grants` and the deploy
+	/// policies written `unconditioned` before deleting
 	/// what it replaces, then retire the user the record held a key of when it
 	/// is another ([`Self::retiring`]); restate a current pair's records
 	/// otherwise. The key id's record keeps the boundaries of stages this
@@ -639,6 +676,7 @@ impl AwsDeployCredential {
 		home: KeyHome<'_>,
 		apps: &[AppPolicies],
 		grants: &[String],
+		unconditioned: &[String],
 		roll: bool,
 	) -> Result<Vec<String>> {
 		let user = DeployCredential::name(entry);
@@ -681,7 +719,10 @@ impl AwsDeployCredential {
 		if holds_active && !roll {
 			let mut resealed = false;
 			for (secret, record) in [
-				(held_id.as_ref(), Self::id_record(entry, &home, &sealed)),
+				(
+					held_id.as_ref(),
+					Self::id_record(entry, &home, &sealed, unconditioned),
+				),
 				(held_secret.as_ref(), Self::secret_record(entry)),
 			] {
 				if let Some((secret, record)) = secret.and_then(|secret| {
@@ -733,7 +774,7 @@ impl AwsDeployCredential {
 			&group,
 			Self::KEY_ID,
 			&id,
-			Self::id_record(entry, &home, &sealed),
+			Self::id_record(entry, &home, &sealed, unconditioned),
 		)?;
 		document.set(
 			&identity,
@@ -768,12 +809,13 @@ impl AwsDeployCredential {
 	}
 
 	/// `entry`'s key id record: what it is, how it rolls, the entry owning it,
-	/// the account it lives in, and the grants a plain deploy compares the
-	/// declarations against.
+	/// the account it lives in, the grants a plain deploy compares the
+	/// declarations against, and the deploy policies written unconditioned.
 	fn id_record(
 		entry: &str,
 		home: &KeyHome,
 		grants: &[String],
+		unconditioned: &[String],
 	) -> SecretRecord {
 		SecretRecord {
 			role: Some(SecretRole::EnvVar),
@@ -797,6 +839,11 @@ impl AwsDeployCredential {
 				(
 					Self::ACCOUNT_NAME,
 					home.member.map(|member| member.name.clone()),
+				),
+				(
+					Self::UNCONDITIONED,
+					(!unconditioned.is_empty())
+						.then(|| SmolStr::from(unconditioned.join("\n"))),
 				),
 			]
 			.into_iter()
@@ -1495,6 +1542,34 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// The one app `app` an entry declares, rendered at `prod` alone.
+	fn prod_app(app: &str) -> Vec<AppPolicies> {
+		vec![AppPolicies {
+			deploy: AwsDeployPolicy::new(app, "state"),
+			boundaries: BTreeMap::from([(
+				SmolStr::new(BootstrapConfig::PROD_STAGE),
+				RuntimeBoundary::new(app, BootstrapConfig::PROD_STAGE),
+			)]),
+			principals: Vec::new(),
+		}]
+	}
+
+	/// A sealed key id whose record carries `metadata`.
+	fn key_id(metadata: &[(&str, String)]) -> Secret {
+		Secret {
+			name: "AWS_ACCESS_KEY_ID".into(),
+			group: "default".into(),
+			value: "AKIA".into(),
+			record: SecretRecord {
+				metadata: metadata
+					.iter()
+					.map(|(key, value)| (SmolStr::from(*key), value.into()))
+					.collect(),
+				..default()
+			},
+		}
+	}
+
 	/// An elevated prod deploy renders prod alone, so it replaces the lines of
 	/// the policies it lowers and keeps the dev boundary as it was sealed:
 	/// dropping the dev line once left every later dev deploy refusing for
@@ -1502,14 +1577,7 @@ mod test {
 	/// Another entry's line is dropped: its own user holds it.
 	#[beet_core::test]
 	fn keeps_the_grants_of_a_stage_it_did_not_render() {
-		let apps = vec![AppPolicies {
-			deploy: AwsDeployPolicy::new("beet-site", "state"),
-			boundaries: BTreeMap::from([(
-				SmolStr::new(BootstrapConfig::PROD_STAGE),
-				RuntimeBoundary::new("beet-site", BootstrapConfig::PROD_STAGE),
-			)]),
-			principals: Vec::new(),
-		}];
+		let apps = prod_app("beet-site");
 		let held = [
 			"beet--deploy 11",
 			"beet-site--deploy 22",
@@ -1542,17 +1610,10 @@ mod test {
 
 	/// A converge's grants are exactly its entry's: a held line of another
 	/// entry's app or a service-linked role nothing here needs is not kept,
-	/// and a plain deploy notes it as the next elevated deploy's to drop.
+	/// and a plain deploy says it is due, the next elevated deploy's to drop.
 	#[beet_core::test]
 	fn seals_exactly_its_entrys_grants() {
-		let apps = vec![AppPolicies {
-			deploy: AwsDeployPolicy::new("beetmania", "state"),
-			boundaries: BTreeMap::from([(
-				SmolStr::new(BootstrapConfig::PROD_STAGE),
-				RuntimeBoundary::new("beetmania", BootstrapConfig::PROD_STAGE),
-			)]),
-			principals: Vec::new(),
-		}];
+		let apps = prod_app("beetmania");
 		let held = [
 			"beet-site--deploy 22",
 			"beetmania--deploy 11",
@@ -1563,18 +1624,7 @@ mod test {
 		let grants = vec!["beetmania--deploy 33".to_string()];
 		AwsDeployCredential::with_kept(held.clone(), &apps, &grants)
 			.xpect_eq(grants.clone());
-		let secret = Secret {
-			name: "AWS_ACCESS_KEY_ID".into(),
-			group: "default".into(),
-			value: "AKIA".into(),
-			record: SecretRecord {
-				metadata: BTreeMap::from([(
-					DeployCredential::GRANTS.into(),
-					held.join("\n").into(),
-				)]),
-				..default()
-			},
-		};
+		let secret = key_id(&[(DeployCredential::GRANTS, held.join("\n"))]);
 		let rendered = |line: &str| !AwsDeployCredential::keeps(&apps, line);
 		let status = CredentialStatus::compare(
 			"aws",
@@ -1585,10 +1635,48 @@ mod test {
 		);
 		status.stale.len().xpect_eq(1);
 		status
-			.notes
+			.due
 			.join("\n")
 			.xpect_contains("beet-site--deploy")
 			.xpect_contains("service-linked-role");
+	}
+
+	/// A deploy policy written without its boundary conditions is recorded on
+	/// the key id and due until a converge writes it conditioned, and only
+	/// this entry's apps answer for it.
+	///
+	/// REGRESSION: the grant digest is of the unconditioned document, so the
+	/// record read current either way, and the elevated deploy that was to
+	/// close the door never ran.
+	#[beet_core::test]
+	fn an_unconditioned_policy_is_due() {
+		let apps = prod_app("beetmania");
+		let home = super::KeyHome {
+			account: "1",
+			member: None,
+		};
+		let record = |unconditioned: &[String]| {
+			AwsDeployCredential::id_record(
+				"beetmania",
+				&home,
+				&[],
+				unconditioned,
+			)
+			.metadata
+			.get(AwsDeployCredential::UNCONDITIONED)
+			.cloned()
+		};
+		record(&[]).xpect_none();
+		record(&["beetmania--deploy".into()])
+			.unwrap()
+			.xpect_eq("beetmania--deploy");
+		let held = key_id(&[(
+			AwsDeployCredential::UNCONDITIONED,
+			"beet-site--deploy\nbeetmania--deploy".into(),
+		)]);
+		AwsDeployCredential::unconditioned(Some(&held), &apps)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["beetmania--deploy"]);
 	}
 
 	/// A renamed credential retires the user its record held a key of, and
