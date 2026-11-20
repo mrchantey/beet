@@ -305,84 +305,6 @@ impl CloudflareDeployToken {
 		}
 	}
 
-	/// Both lowerings in one token: every address, group and asker of either.
-	/// What the deploy token converges to when several entries share it, each
-	/// entry's own lowering beside the ones held for the others.
-	pub fn merge(mut self, other: Self) -> Self {
-		self.accounts.extend(other.accounts);
-		self.zones.extend(other.zones);
-		for (into, from) in [
-			(&mut self.asked, other.asked),
-			(&mut self.elevated, other.elevated),
-		] {
-			for (permission, askers) in from {
-				into.entry(permission).or_default().extend(askers);
-			}
-		}
-		for (bucket, groups) in other.buckets {
-			let into = self.buckets.entry(bucket).or_default();
-			for (permission, askers) in groups {
-				into.entry(permission).or_default().extend(askers);
-			}
-		}
-		self
-	}
-
-	/// Add one held [`grant_lines`](Self::grant_lines) line as asked for by
-	/// `asker`, resolving a zone's id from `zones` (by domain, as the sealed
-	/// record keeps them): how a converge keeps what another entry asked for,
-	/// which this launch cannot lower. A line naming no group this table knows,
-	/// or a zone `zones` lacks, is an error rather than a group quietly
-	/// dropped from a token another entry deploys with.
-	pub fn with_held(
-		mut self,
-		line: &str,
-		asker: &str,
-		zones: &BTreeMap<SmolStr, SmolStr>,
-	) -> Result<Self> {
-		let unknown = || {
-			bevyhow!(
-				"the held grant `{line}` names no permission group this build \
-				knows: an elevated deploy of the entry that asked for it \
-				restates it"
-			)
-		};
-		let (group, resource) = line.split_once(" on ").ok_or_else(unknown)?;
-		let permission = TokenPermission::ALL
-			.iter()
-			.find(|permission| permission.to_string() == group)
-			.copied()
-			.ok_or_else(unknown)?;
-		let asker = SmolStr::from(asker);
-		match permission.scope {
-			TokenScope::Account => {
-				let account =
-					resource.strip_prefix("account ").ok_or_else(unknown)?;
-				self.accounts.insert(account.into());
-			}
-			TokenScope::Zone => {
-				let id = zones.get(resource).ok_or_else(|| {
-					bevyhow!(
-						"the held grant `{line}` names the zone `{resource}`, \
-						whose id the sealed record does not keep"
-					)
-				})?;
-				self.zones.insert(resource.into(), id.clone());
-			}
-			TokenScope::Bucket => {
-				self.buckets
-					.entry(resource.into())
-					.or_default()
-					.entry(permission)
-					.or_default()
-					.insert(asker);
-				return self.xok();
-			}
-		}
-		self.asked.entry(permission).or_default().insert(asker);
-		self.xok()
-	}
-
 	/// The accounts every account-scoped group is granted over.
 	pub fn accounts(&self) -> &BTreeSet<SmolStr> { &self.accounts }
 
@@ -895,28 +817,6 @@ impl TokenPermission {
 		"2efd5506f9c8494dacb1fa10a3e7d5b6",
 	);
 
-	/// Every group above, how a held grant line is read back into one.
-	pub const ALL: &'static [Self] = &[
-		Self::ACCOUNT_SETTINGS_READ,
-		Self::API_TOKENS_READ,
-		Self::API_TOKENS_WRITE,
-		Self::CLOUDCHAMBER_WRITE,
-		Self::LOAD_BALANCER_POOLS_WRITE,
-		Self::WORKERS_CONTAINERS_WRITE,
-		Self::WORKERS_R2_STORAGE_READ,
-		Self::WORKERS_R2_STORAGE_WRITE,
-		Self::WORKERS_SCRIPTS_WRITE,
-		Self::CACHE_PURGE,
-		Self::CACHE_SETTINGS_WRITE,
-		Self::DYNAMIC_URL_REDIRECTS_WRITE,
-		Self::DNS_WRITE,
-		Self::LOAD_BALANCERS_WRITE,
-		Self::WORKERS_ROUTES_WRITE,
-		Self::ZONE_SETTINGS_WRITE,
-		Self::BUCKET_ITEM_READ,
-		Self::BUCKET_ITEM_WRITE,
-	];
-
 	/// What the group is granted over.
 	pub const fn scope(&self) -> TokenScope { self.scope }
 
@@ -1110,56 +1010,6 @@ mod test {
 		]);
 		CloudflareDeployToken::fingerprint_of(&regrouped)
 			.xpect_eq(token.fingerprint());
-	}
-
-	/// A held grant line reads back into the group it was written from, so a
-	/// converge rebuilds what another entry asked for to the same token: an
-	/// account group, a zone group by the id the record keeps, and a bucket
-	/// group. A zone without a kept id, or a group this build does not know,
-	/// is an error rather than a group quietly dropped.
-	#[beet_core::test]
-	fn rebuilds_a_held_grant() {
-		struct Purge;
-		struct Sync;
-		let (stack, ..) = addressed();
-		let token = CloudflareDeployToken::default()
-			.lower_access(
-				&stack,
-				&CloudflareAccess::new::<Purge>(&[
-					TokenPermission::CACHE_PURGE,
-					TokenPermission::ACCOUNT_SETTINGS_READ,
-				]),
-				None,
-			)
-			.unwrap()
-			.lower_access(
-				&stack,
-				&CloudflareAccess::new::<Sync>(&[
-					TokenPermission::BUCKET_ITEM_WRITE,
-				]),
-				Some("assets"),
-			)
-			.unwrap();
-		let zones = token.zones().clone();
-		token
-			.grant_lines()
-			.iter()
-			.try_fold(CloudflareDeployToken::default(), |rebuilt, line| {
-				rebuilt.with_held(line, "beet-site", &zones)
-			})
-			.unwrap()
-			.fingerprint()
-			.xpect_eq(token.fingerprint());
-		CloudflareDeployToken::default()
-			.with_held("Zone > DNS Write on other.org", "beet-site", &zones)
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("`other.org`");
-		CloudflareDeployToken::default()
-			.with_held("Zone > Telepathy Write on beetmash.com", "x", &zones)
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("names no permission group");
 	}
 
 	/// A rendered record lowers to the one group that publishes it and names

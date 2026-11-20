@@ -1,4 +1,4 @@
-//! A repo's deploy credentials, one per provider, and the seam a deploy and
+//! An entry's deploy credentials, one per provider, and the seam a deploy and
 //! an elevated deploy reach them through.
 
 use crate::prelude::*;
@@ -10,9 +10,13 @@ use std::sync::Arc;
 /// entity of its declaration (`<AwsDeployCredential/>`,
 /// `<CloudflareDeployCredential/>`) and collected by [`DeployCredentialQuery`].
 ///
-/// A deploy credential is infrastructure: derived from what the stacks
-/// declare, sealed in the repo's secrets document, and kept in line with the
-/// declarations by an elevated deploy rather than by anybody's hand. So the
+/// A deploy credential is infrastructure: derived from what the entry's stacks
+/// declare, sealed in the entry's own secrets document, and kept in line with
+/// the declarations by an elevated deploy rather than by anybody's hand. A
+/// document holding a deploy credential belongs to exactly one entry: the
+/// credential is named for it ([`name`](Self::name)), its identity record
+/// names it as owner ([`ENTRY`](Self::ENTRY)), and a launch of any other entry
+/// refuses to deploy as it ([`DeployGate`]). So the
 /// two commands a stack has, `deploy` and `deploy --elevated`
 /// ([`DeployGate`]), never name a provider: each declared credential answers
 /// for itself, and a provider added to an entry adds a credential to the same
@@ -88,33 +92,35 @@ impl DeployCredential {
 		self.provider.describe(caller.clone()).await
 	}
 
-	/// The name the repo's deploy credential carries at every provider (the
-	/// AWS user, the Cloudflare token): the repo's name and `-deploy`. Named
-	/// for the repo rather than an app, since a credential document holds one
-	/// credential per provider however many apps it deploys.
-	pub fn name() -> Result<String> {
-		format!("{}-deploy", Self::repo_name()?).xok()
+	/// The key a credential's identity record names the entry owning it
+	/// under, in the record's [`metadata`](SecretRecord::metadata): the
+	/// [`app_name`](PackageConfig::app_name) of the entry whose converge
+	/// sealed it, so a launch of any other entry refuses to deploy as it.
+	pub const ENTRY: &'static str = "entry";
+
+	/// The entry this launch deploys, by its [`PackageConfig`]'s app name: the
+	/// one owner of every credential it declares, and the name each carries.
+	pub async fn entry(caller: &AsyncEntity) -> Result<SmolStr> {
+		caller
+			.with_world(|world, _| {
+				world
+					.get_resource::<PackageConfig>()
+					.map(|package| SmolStr::from(package.app_name()))
+					.unwrap_or_else(|| PackageConfig::DEFAULT_APP_NAME.into())
+			})
+			.await
 	}
 
-	/// The workspace directory, kebab-cased: the one name a repo has.
-	pub fn repo_name() -> Result<String> {
-		let root = fs_ext::workspace_root();
-		root.file_name()
-			.and_then(|name| name.to_str())
-			.map(|name| name.replace('_', "-"))
-			.filter(|name| {
-				!name.is_empty()
-					&& name
-						.chars()
-						.all(|char| char.is_ascii_alphanumeric() || char == '-')
-			})
-			.ok_or_else(|| {
-				bevyhow!(
-					"cannot name a deploy credential after the workspace \
-					directory `{}`: a credential's name is alphanumeric",
-					root.display()
-				)
-			})
+	/// The name `entry`'s deploy credential carries at every provider (the
+	/// AWS user, the Cloudflare token): `<app_name>-deploy`. Named for the
+	/// entry, since a secrets document holding a deploy credential belongs to
+	/// exactly one entry, whose stacks alone it is lowered from.
+	pub fn name(entry: &str) -> String { format!("{entry}-deploy") }
+
+	/// The entry `secret`, a credential's identity record, names as its
+	/// owner, `None` for a record sealed before records named one.
+	pub fn owner(secret: &Secret) -> Option<&SmolStr> {
+		secret.record.metadata.get(Self::ENTRY)
 	}
 
 	/// See [`DeployCredentialProvider::holding`].
@@ -148,7 +154,7 @@ impl DeployCredential {
 	}
 
 	/// Every stack this launch declares, rendered at the launch's stage and at
-	/// `prod`: what a credential lowers from. A credential is per repo and a
+	/// `prod`: what a credential lowers from. A credential is per entry and a
 	/// launch runs one stage, so lowering the launch's stage alone would let an
 	/// elevated `dev` deploy narrow the credential to what dev declares and
 	/// break the next prod deploy. A stack pinned to a stage renders the same
@@ -316,9 +322,10 @@ impl CredentialStatus {
 	/// Compare the grants the declarations need with the ones `record`, the
 	/// credential's identity record, was converged with: a grant missing from
 	/// the record is stale, one the record holds and the declarations no
-	/// longer ask for is a note. `scope` limits the comparison to the held
-	/// lines this launch is answerable for (a credential shared by several
-	/// entries carries each one's lines), all of them when `None`.
+	/// longer ask for is a note. `scope` limits the notes to the held lines
+	/// this launch answers for, all of them when `None`: a held line the
+	/// converge keeps without rendering it (the boundary of a stage this
+	/// launch did not render) is no line to drop.
 	pub fn compare(
 		credential: &str,
 		record: &str,
@@ -330,7 +337,7 @@ impl CredentialStatus {
 			return Self {
 				needed: true,
 				stale: vec![format!(
-					"{credential}: no `{record}` is sealed for this repo yet"
+					"{credential}: no `{record}` is sealed for this entry yet"
 				)],
 				notes: Vec::new(),
 			};
@@ -412,8 +419,8 @@ pub struct DeployCredentialQuery<'w, 's> {
 }
 
 impl DeployCredentialQuery<'_, '_> {
-	/// Every declared credential, refusing two of one provider: a repo deploys
-	/// with one credential per provider, and two declarations would converge
+	/// Every declared credential, refusing two of one provider: an entry
+	/// deploys with one credential per provider, and two declarations would converge
 	/// the same token or user to two different lowerings in turn.
 	pub fn all(&self) -> Result<Vec<DeployCredential>> {
 		let mut seen = HashSet::<&'static str>::default();
@@ -470,11 +477,30 @@ mod test {
 		}
 	}
 
-	/// The name is the repo's, not an app's, and the same at every provider:
-	/// one document holds one credential per provider.
+	/// The name is the entry's app name, read from its `PackageConfig`, and
+	/// the same at every provider; an entry declaring none is the default
+	/// app's.
 	#[beet_core::test]
-	fn names_the_credential_after_the_repo() {
-		DeployCredential::name().unwrap().xpect_eq("beet-deploy");
+	async fn names_the_credential_after_the_entry() {
+		let entry = async |world: &mut World| -> SmolStr {
+			world
+				.spawn_empty()
+				.run_async_then(async |entity| {
+					DeployCredential::entry(&entity).await
+				})
+				.await
+				.unwrap()
+		};
+		let mut world = InfraPlugin.into_world();
+		entry(&mut world)
+			.await
+			.xpect_eq(PackageConfig::DEFAULT_APP_NAME);
+		world.insert_resource(PackageConfig {
+			app_name: "beetmania".into(),
+			..default()
+		});
+		DeployCredential::name(&entry(&mut world).await)
+			.xpect_eq("beetmania-deploy");
 	}
 
 	/// A credential lowers what `prod` declares from a launch of any stage: a

@@ -172,6 +172,15 @@ pub async fn ZoneAudit(
 	/// [`ZoneAuditScope`].
 	#[field(no_clone)]
 	scope: ZoneAuditScope,
+	/// The names this audit answers for, globs matched as an
+	/// [`AllowedRecord`]'s are, every name in the zone when empty.
+	///
+	/// For a zone several entries publish into: each entry audits the names it
+	/// owns (`["beetmania.beet.org", "*.beetmania.beet.org"]`), so a record
+	/// under them that none of its stacks declares is its stray, and another
+	/// entry's records are never its to judge or delete.
+	#[field(no_clone)]
+	names: Vec<SmolStr>,
 	/// Delete the stray records instead of only reporting them.
 	#[param]
 	fix: bool,
@@ -184,29 +193,27 @@ pub async fn ZoneAudit(
 	let (zone, token) = access.zone_auth(&cx.caller).await?;
 	let zone_id = zone.id;
 	let audited = zone_id.clone();
-	let (declared, allowed) = cx
+	let (declared, allowed, names) = cx
 		.caller
 		.with_world(move |world, entity| audit_inputs(world, entity, &audited))
 		.await??;
 
-	let live = list_records(&zone_id, &token).await?;
+	let live = list_records(&zone_id, &token)
+		.await?
+		.into_iter()
+		.filter(|record| answers_for(&names, &record.name))
+		.collect::<Vec<_>>();
 	info!(
-		"zone holds {} record(s); the stack declares {}",
+		"zone holds {} record(s){}; the stack declares {}",
 		live.len(),
+		match names.is_empty() {
+			true => String::new(),
+			false => format!(" under {}", names.join(", ")),
+		},
 		declared.len()
 	);
 
-	let strays = live
-		.iter()
-		.filter(|record| {
-			!declared
-				.iter()
-				.any(|pattern| pattern.matches(&record.name, &record.kind))
-				&& !allowed
-					.iter()
-					.any(|allowed| allowed.matches(&record.name, &record.kind))
-		})
-		.collect::<Vec<_>>();
+	let strays = strays(&live, &declared, &allowed);
 
 	for allowed in &allowed {
 		let count = live
@@ -243,8 +250,33 @@ pub async fn ZoneAudit(
 	Pass(cx.input).xok()
 }
 
+/// Whether a live record named `name` is one an audit limited to `names`
+/// answers for, every name when `names` is empty.
+fn answers_for(names: &[SmolStr], name: &str) -> bool {
+	names.is_empty() || names.iter().any(|glob| name_matches(glob, name))
+}
+
+/// Every record of `live` neither `declared` nor `allowed`.
+fn strays<'a>(
+	live: &'a [ZoneRecord],
+	declared: &[DeclaredRecord],
+	allowed: &[AllowedRecord],
+) -> Vec<&'a ZoneRecord> {
+	live.iter()
+		.filter(|record| {
+			!declared
+				.iter()
+				.any(|pattern| pattern.matches(&record.name, &record.kind))
+				&& !allowed
+					.iter()
+					.any(|allowed| allowed.matches(&record.name, &record.kind))
+		})
+		.collect()
+}
+
 /// What the audit diffs the zone against: every record the audited scope
-/// declares, and every allowlist entry that scope carries.
+/// declares, every allowlist entry that scope carries, and the names the
+/// audit answers for ([`ZoneAudit::names`]).
 ///
 /// Split out of the action because it is the whole of the scoping decision and
 /// the only part of an audit that can be exercised without a zone to call.
@@ -252,13 +284,13 @@ fn audit_inputs(
 	world: &mut World,
 	entity: Entity,
 	zone_id: &str,
-) -> Result<(Vec<DeclaredRecord>, Vec<AllowedRecord>)> {
-	let scope = world
+) -> Result<(Vec<DeclaredRecord>, Vec<AllowedRecord>, Vec<SmolStr>)> {
+	let (scope, names) = world
 		.entity(entity)
 		.get::<ZoneAudit>()
-		.map(|audit| audit.scope)
+		.map(|audit| (audit.scope, audit.names.clone()))
 		.unwrap_or_default();
-	match scope {
+	let (declared, allowed) = match scope {
 		ZoneAuditScope::Stack => {
 			let (.., config) = RenderScope::render(world, entity)?.finish()?;
 			// every audit declared under this stack, so the list is stated
@@ -277,7 +309,7 @@ fn audit_inputs(
 				)?;
 			// unfiltered: a stack-scoped audit is asking about its own records,
 			// and it has always answered for whichever zone they name.
-			(declared_records(&config, None), allowed).xok()
+			(declared_records(&config, None), allowed)
 		}
 		ZoneAuditScope::Zone => {
 			// every stack in the world, each seeded its own scope, so a block
@@ -296,9 +328,10 @@ fn audit_inputs(
 					.flat_map(|audit| audit.allowed.iter().cloned())
 					.collect::<Vec<_>>()
 			});
-			(declared, allowed).xok()
+			(declared, allowed)
 		}
-	}
+	};
+	(declared, allowed, names).xok()
 }
 
 /// One record as the zone holds it.
@@ -512,12 +545,54 @@ mod tests {
 	#[beet_core::test]
 	fn zone_scope_sees_every_stack() {
 		let (mut world, audit, _dir) = two_stacks("zone1");
-		let (declared, allowed) =
+		let (declared, allowed, names) =
 			audit_inputs(&mut world, audit, "zone1").unwrap();
+		names.xpect_empty();
 		covers(&declared, "stalwart.beetmash.com", "MX").xpect_true();
 		covers(&declared, "news.beetmash.com", "MX").xpect_true();
 		// nothing had to be allowlisted to get there
 		allowed.is_empty().xpect_true();
+	}
+
+	/// An audit limited to its names answers for nothing outside them: a
+	/// record another entry owns is never its stray, and one under its names
+	/// that no stack declares is.
+	#[beet_core::test]
+	fn names_limit_what_an_audit_answers_for() {
+		let (mut world, audit, _dir) = two_stacks("zone1");
+		world.entity_mut(audit).insert(ZoneAudit {
+			names: vec![
+				"news.beetmash.com".into(),
+				"*.news.beetmash.com".into(),
+			],
+			..ZoneAudit::zone_scoped()
+		});
+		let (declared, allowed, names) =
+			audit_inputs(&mut world, audit, "zone1").unwrap();
+		let record = |name: &str, kind: &str| ZoneRecord {
+			id: name.into(),
+			name: name.into(),
+			kind: kind.into(),
+			content: "x".into(),
+		};
+		let live = [
+			// declared, under its names
+			record("news.beetmash.com", "MX"),
+			// a stray under its names
+			record("old.news.beetmash.com", "A"),
+			// another entry's, unrecorded here and never its to judge
+			record("www.beetmash.com", "A"),
+		]
+		.into_iter()
+		.filter(|record| answers_for(&names, &record.name))
+		.collect::<Vec<_>>();
+		strays(&live, &declared, &allowed)
+			.into_iter()
+			.map(|record| record.name.as_str())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["old.news.beetmash.com"]);
+		// unlimited, the other entry's record is a stray too
+		answers_for(&[], "www.beetmash.com").xpect_true();
 	}
 
 	/// The default scope is unchanged: an audit under a stack sees that stack
@@ -542,7 +617,7 @@ mod tests {
 			children![(news(), SesRelay::default())],
 		));
 		world.flush();
-		let (declared, _) = audit_inputs(&mut world, audit, "zone1").unwrap();
+		let (declared, ..) = audit_inputs(&mut world, audit, "zone1").unwrap();
 		covers(&declared, "stalwart.beetmash.com", "MX").xpect_true();
 		// the sibling stack's domain is invisible, hence the allowlist rows the
 		// zone scope exists to retire.
@@ -554,7 +629,7 @@ mod tests {
 	#[beet_core::test]
 	fn zone_scope_ignores_other_zones() {
 		let (mut world, audit, _dir) = two_stacks("zone2");
-		let (declared, _) = audit_inputs(&mut world, audit, "zone1").unwrap();
+		let (declared, ..) = audit_inputs(&mut world, audit, "zone1").unwrap();
 		covers(&declared, "stalwart.beetmash.com", "MX").xpect_true();
 		covers(&declared, "news.beetmash.com", "MX").xpect_false();
 	}
@@ -569,7 +644,7 @@ mod tests {
 				.with_allowed_name("mta-sts.beetmash.com", "wrangler"),
 		);
 		world.flush();
-		let (_, allowed) = audit_inputs(&mut world, audit, "zone1").unwrap();
+		let (_, allowed, _) = audit_inputs(&mut world, audit, "zone1").unwrap();
 		allowed
 			.iter()
 			.any(|allowed| allowed.matches("mta-sts.beetmash.com", "CNAME"))

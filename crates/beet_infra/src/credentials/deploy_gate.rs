@@ -57,7 +57,9 @@ pub(crate) struct ElevationParams {
 ///   become and whether this deploy needs `--elevated`.
 /// - **Any of the three** refuses a launch running as a credential the repo
 ///   seals with its grants while the entry declares none for it, since
-///   nothing would check what it holds.
+///   nothing would check what it holds, and a launch declaring a credential
+///   whose sealed record another entry owns, since a secrets document holding
+///   a deploy credential belongs to exactly one entry.
 ///
 /// No provider is named here: each declared credential answers for itself, so
 /// a provider added to an entry adds a credential to the same two commands.
@@ -255,6 +257,52 @@ impl DeployGate {
 		)
 	}
 
+	/// Refuse a launch whose entry declares a credential whose sealed identity
+	/// record names another entry as its owner ([`DeployCredential::ENTRY`]):
+	/// a document holding a deploy credential belongs to exactly one entry, so
+	/// converging or deploying as another's would lower its grants from the
+	/// wrong stacks. A record naming no owner was sealed before records named
+	/// one, and the next converge names this entry.
+	async fn refuse_foreign(
+		caller: &AsyncEntity,
+		credentials: &[DeployCredential],
+	) -> Result {
+		let entry = DeployCredential::entry(caller).await?;
+		let mut foreign = Vec::new();
+		for credential in credentials {
+			let Some(record) = credential.records().first().copied() else {
+				continue;
+			};
+			let Some(sealed) = DeployCredential::sealed(caller, record).await
+			else {
+				continue;
+			};
+			if let Some(owner) = DeployCredential::owner(&sealed)
+				&& *owner != entry
+			{
+				foreign.push(format!(
+					"the {} credential's `{record}` belongs to the `{owner}` \
+					entry",
+					credential.id()
+				));
+			}
+		}
+		if foreign.is_empty() {
+			return OK;
+		}
+		let document = SecretsHandle::resolve(caller, None)
+			.await
+			.map(|handle| handle.describe())
+			.unwrap_or_else(|_| "the loaded secrets document".into());
+		bevybail!(
+			"this entry, `{entry}`, declares deploy credentials it does not \
+			own: {} in {document}. A secrets document holding a deploy \
+			credential belongs to exactly one entry, so give this entry its \
+			own document (`<Secrets/>` beside its `main.bsx`)",
+			foreign.join(", ")
+		)
+	}
+
 	/// Ask every declared credential where it stands, once, and plan the
 	/// gated verb on each of `stacks` that declares a type a credential held
 	/// sealed guards; a plan a stale credential cannot run counts as
@@ -269,6 +317,7 @@ impl DeployGate {
 			.with_state::<DeployCredentialQuery, _>(|_, query| query.all())
 			.await??;
 		Self::refuse_undeclared(caller, &credentials).await?;
+		Self::refuse_foreign(caller, &credentials).await?;
 		let mut assessed = Vec::new();
 		// only a credential held sealed is held to what a stored one may do:
 		// one passed for the command is the provider's to judge
@@ -296,7 +345,21 @@ impl DeployGate {
 			return assessed.xok();
 		}
 		for (label, stack) in stacks {
-			let project = terra::Project::resolve(stack).await?;
+			// a project that cannot resolve (its state backend unreachable
+			// as no credential at all) is a plan that failed, its declared
+			// types unknown, so every held credential guards it
+			let project = match terra::Project::resolve(stack).await {
+				Ok(project) => project,
+				Err(err) => {
+					Self::unplanned(
+						&mut assessed,
+						&held,
+						label.as_deref(),
+						err,
+					)?;
+					continue;
+				}
+			};
 			let declared = project.config().declared_types();
 			let guarding = held
 				.iter()
@@ -315,7 +378,6 @@ impl DeployGate {
 				Err(err) => {
 					Self::unplanned(
 						&mut assessed,
-						&held,
 						&guarding,
 						label.as_deref(),
 						err,
@@ -357,33 +419,40 @@ impl DeployGate {
 		}
 	}
 
-	/// A stack whose plan failed, settled. A `held` credential already stale
+	/// A stack whose plan failed, settled. A held credential already stale
 	/// may lack what planning reads, ie the state under a grant it is yet to
-	/// hold, and its staleness decides the deploy whatever the plan says. What
-	/// the deploy changes is unknown then, so every credential `guarding` the
-	/// stack counts it as protected, and an elevated run hands the deploy each
-	/// one's elevated credential rather than the sealed one. With every held
-	/// credential current, the failure is the error.
+	/// hold, and a needed credential sealed nowhere yet holds nothing to read
+	/// it with; either staleness decides the deploy whatever the plan says.
+	/// What the deploy changes is unknown then, so every credential `guarding`
+	/// the stack counts it as protected, and an elevated run hands the deploy
+	/// each one's elevated credential rather than the sealed one. With every
+	/// needed credential current, the failure is the error.
 	fn unplanned(
 		assessed: &mut [Assessed],
-		held: &[usize],
 		guarding: &[usize],
 		label: Option<&str>,
 		err: BevyError,
 	) -> Result {
-		let Some(stale) = held
+		// every needed stale one, since which of them the plan lacked is
+		// not something the failure says
+		let stale = assessed
 			.iter()
-			.copied()
-			.find(|index| !assessed[*index].status.stale.is_empty())
-		else {
+			.filter(|one| one.status.needed && !one.status.stale.is_empty())
+			.map(|one| format!("`{}`", one.credential.id()))
+			.collect::<Vec<_>>();
+		if stale.is_empty() {
 			return Err(err);
-		};
-		debug!("the plan failed as a stale credential: {err}");
+		}
+		debug!("the plan failed while a credential is stale: {err}");
 		let reason = format!(
-			"{}could not plan as the stale `{}` credential, so whether this \
-			deploy makes a protected change is unknown",
+			"{}could not plan while the {} credential{} stale, so whether \
+			this deploy makes a protected change is unknown",
 			label.map(|label| format!("{label}: ")).unwrap_or_default(),
-			assessed[stale].credential.id()
+			stale.join(" and "),
+			match stale.len() {
+				1 => " is",
+				_ => "s are",
+			}
 		);
 		for index in guarding {
 			assessed[*index].protected.push(reason.clone());
@@ -1090,6 +1159,75 @@ mod test {
 		deploy("another").await.status().xpect_eq(StatusCode::OK);
 	}
 
+	/// A launch declaring a credential whose sealed record another entry owns
+	/// refuses before anything runs, naming the owner and the document, dry
+	/// run and elevated run alike; a record naming this entry, or none (sealed
+	/// before records named one), deploys.
+	///
+	/// REGRESSION: the repo's one secrets document held a credential every
+	/// entry converged to its own needs, so the example's key could redeploy
+	/// the site's lambda.
+	#[beet_core::test]
+	async fn refuses_a_credential_another_entry_owns() {
+		let deploy = async |owner: Option<&str>, args: &str| {
+			let (mut world, root, _dir) = package(
+				[Counted::sealed(&[], Store::default())],
+				RouteMatrix::new(["site"], ["deploy"]),
+			);
+			world.insert_resource(PackageConfig {
+				app_name: "beetmania".into(),
+				..default()
+			});
+			world.spawn(OpenSecrets {
+				secrets: BTreeMap::from([("COUNTED".into(), Secret {
+					name: "COUNTED".into(),
+					group: "default".into(),
+					value: "sealed".into(),
+					record: SecretRecord {
+						metadata: owner
+							.map(|owner| {
+								(
+									SmolStr::from(DeployCredential::ENTRY),
+									SmolStr::from(owner),
+								)
+							})
+							.into_iter()
+							.collect(),
+						..default()
+					},
+				})]),
+				..default()
+			});
+			world
+				.entity_mut(root)
+				.exchange(Request::from_cli_str(args))
+				.await
+		};
+		for args in [
+			"site/deploy",
+			"site/deploy --dry-run",
+			"site/deploy --elevated",
+		] {
+			let refused = deploy(Some("beet-site"), args).await;
+			refused.status().is_ok().xpect_false();
+			refused
+				.text()
+				.await
+				.unwrap()
+				.xpect_contains("`beetmania`")
+				.xpect_contains("belongs to the `beet-site` entry")
+				.xpect_contains("secrets document");
+		}
+		deploy(Some("beetmania"), "site/deploy")
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+		deploy(None, "site/deploy")
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+	}
+
 	/// Deploy `site/deploy --elevated` with `credentials`, each blocking, and
 	/// the child standing in for the process answering `child`: the
 	/// response, then what the run logged in order, the child's args and
@@ -1263,8 +1401,16 @@ mod test {
 	/// A plan failing while a held credential is stale counts as protected
 	/// for every credential guarding the stack, since what it changes is
 	/// unknown: a key moved into a new account holds no grant on another
-	/// app's state, so its plan cannot take the lock. One failing while every
-	/// held credential is current is the error.
+	/// app's state, so its plan cannot take the lock. So does one whose
+	/// needed credential is sealed nowhere yet, held or not: an entry's fresh
+	/// document holding a carried over token but no AWS pair cannot reach its
+	/// state backend at all. One failing while every needed credential is
+	/// current is the error.
+	///
+	/// REGRESSION: `site/` moved to a document of its own, holding its
+	/// Cloudflare token before its first AWS pair, and its dry run failed
+	/// resolving the stack's state backend as the machine's ambient AWS
+	/// identity rather than saying it needs `--elevated`.
 	#[beet_core::test]
 	fn an_unplanned_stack_runs_elevated() {
 		let mut held = vec![
@@ -1274,7 +1420,6 @@ mod test {
 		];
 		super::DeployGate::unplanned(
 			&mut held,
-			&[0, 1, 2],
 			&[0, 1],
 			Some("shared"),
 			bevyhow!("lock denied"),
@@ -1282,12 +1427,21 @@ mod test {
 		.unwrap();
 		held[0].protected[0]
 			.clone()
-			.xpect_contains("shared: could not plan as the stale");
+			.xpect_contains("shared: could not plan while the");
 		held[1].protected.len().xpect_eq(1);
 		held[2].blocks().xpect_false();
+		// the stale one is needed but not held: still settled
+		let mut fresh = vec![assessed(&[], &[]), assessed(&["no key"], &[])];
+		super::DeployGate::unplanned(
+			&mut fresh,
+			&[0],
+			None,
+			bevyhow!("no backend"),
+		)
+		.unwrap();
+		fresh[0].protected.len().xpect_eq(1);
 		super::DeployGate::unplanned(
 			&mut [assessed(&[], &[])],
-			&[0],
 			&[0],
 			None,
 			bevyhow!("lock denied"),

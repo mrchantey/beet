@@ -141,7 +141,7 @@ binary, verifying the RUNNING process reports this deploy's id. A machine-config
 change still replaces the box, and rolls its access key with it. Either way the
 static IP re-attaches so DNS never moves, and the fingerprint never changes: the
 ssh host key is a `<SecretBlock/>`, a parameter of the stack whose write-only
-value the full apply writes from `secrets.toml`, and the box reads it from
+value the full apply writes from this entry's `secrets.toml`, and the box reads it from
 there at every start, so it is in no rendered config, plan, state or disk.
 
 Cloudflare fronts the box: http hostnames are proxied and edge-cached `A` records
@@ -209,7 +209,9 @@ declares and deploys every record under it (its hostname, its certificate's
 validation records, its `_atproto` handle), and with it the handle record of
 its contributor, `beetlover.beet.org`. The allowlist names the subdomain rather
 than its records, so the example adds a record without this entry restating
-it, and the audit never loads another entry's tree to learn what it holds.
+it, and the audit never loads another entry's tree to learn what it holds. The
+example audits those names itself (`<ZoneAudit names={[..]}/>`, `just
+beetmania audit --stage=prod`), so a stray under them is still found.
 
     just site-social deploy --stage=prod   # publish the handle records
     just site-social probe --stage=prod    # after the claim: does each handle resolve
@@ -223,14 +225,19 @@ it, and the audit never loads another entry's tree to learn what it holds.
     just site-shared pull                  # hydrate site/assets from it (no credentials)
     just site-shared push                  # publish site/assets to it
 
-Live deploy needs the deploy credentials (the AWS pair of this repo's own
-`beet-deploy` user, which `<AwsDeployCredential/>` below declares and an
-elevated deploy converges, and `CLOUDFLARE_API_TOKEN`) and the box's ssh host
-key (`BEET_SSH_HOST_KEY`, which the apply writes into the stack) from the
-repo's `secrets.toml`,
-which the launch loads into the process environment before this entry builds
-(the top-level `<Secrets path="../secrets.toml"/>`; `beet secrets/check` says
-whether this machine's identity opens it), plus `tofu` and `cargo-zigbuild`.
+Live deploy needs the deploy credentials (the AWS pair of this entry's own
+`beet-site-deploy` user and the `beet-site-deploy` Cloudflare token, which
+`<AwsDeployCredential/>` and `<CloudflareDeployCredential/>` below declare and
+an elevated deploy converges), the box's ssh host key (`BEET_SSH_HOST_KEY`,
+which the apply writes into the stack) and `TF_STATE_PASSPHRASE` from this
+entry's own `secrets.toml`, beside this file, which the launch loads into the
+process environment before this entry builds (the top-level `<Secrets/>`;
+`beet --entry=site secrets/check` says whether this machine's identity opens
+it), plus `tofu` and `cargo-zigbuild`. A secrets document holding a deploy
+credential belongs to exactly one entry, so the site's credentials reach none
+of `examples/beetmania`'s resources nor the workspace's (the root `main.bsx`
+keeps its own in the repo's `secrets.toml`), and no deploy publishes the
+document: the assemble leaves it out and `<ServeBlobs/>` never serves it.
 The provider addresses (the region, the Cloudflare account and zone) are
 identifiers, not secrets, declared as spreads on the root `<Router>` below and
 resolved by ancestry. The social stack and the audit need only the Cloudflare
@@ -264,7 +271,7 @@ written, and `beet check site` flags it first: a dated post's description
 budget reserves the length of its own date line.
 
 The verb writes with the accounts' app passwords (`BEET_ORG_APP_PASSWORD`,
-`PETE_BEET_ORG_APP_PASSWORD`, `env_var` records in `secrets.toml`), and renders
+`PETE_BEET_ORG_APP_PASSWORD`, `env_var` records in this entry's `secrets.toml`), and renders
 each document off its post's page with the features every binary carrying
 `atproto` has, so the `site-social` recipe needs no extra one; the deployed
 binary serves the records and the comments (`atproto`).
@@ -275,11 +282,12 @@ binary serves the records and the comments (`atproto`).
      identifiers public in every dashboard url and so declared here rather
      than read from anywhere -->
 <Router {(HelpHandler, AwsRegion("us-west-2"), CloudflareAccount("74aba4da669f57fc6fc3e63ebcfcff26"), CloudflareZone{domain:"beet.org", id:"45905c861559d9eb8c9b72ee87adca7b"})}>
-	<!-- the deploy credentials: the repo's one document, above this
-	     entry's own directory, loaded into the process environment by the
-	     launch before this entry builds. Top level and unconditional so the
-	     prescan sees it; the deployed binary keeps it as an inert tag. -->
-	<Secrets path="../secrets.toml"/>
+	<!-- this entry's own secrets document, `secrets.toml` beside this file,
+	     loaded into the process environment by the launch before this entry
+	     builds. Top level and unconditional so the prescan sees it; the
+	     deployed binary keeps it as an inert tag, and no deploy publishes it. -->
+	<Secrets/>
+	<Route path="secrets" bx:cfg="feature:vault"><SecretsRoutes/></Route>
 	<!-- the ONE location app identity lives: the deploy names its resources from
 	     this, and so does the running binary. -->
 	<PackageConfig
@@ -402,7 +410,8 @@ binary serves the records and the comments (`atproto`).
 	     the served site wrote, locally or (`--service-access=remote`) deployed,
 	     with no binding of its own. -->
 	<AnalyticsReport/>
-	<!-- the deploy credentials this repo deploys with, one per provider:
+	<!-- the deploy credentials this entry deploys with, one per provider,
+	     `beet-site-deploy` at each, sealed in this entry's own document:
 	     declared once outside every `<Stack>`, since a document holds one of
 	     each however many stacks it deploys, and lowered from what the stacks
 	     below render and the zone verbs above declare. Every deploy checks
@@ -621,11 +630,11 @@ binary serves the records and the comments (`atproto`).
 			{name:"beet.org", record_type:"TXT",
 				reason:"google search console domain verification, hand-created"},
 			{name:"beetmania.beet.org", record_type:"",
-				reason:"beetmania's hostname, declared by examples/beetmania"},
+				reason:"beetmania's hostname, declared and audited by examples/beetmania"},
 			{name:"*.beetmania.beet.org", record_type:"",
-				reason:"beetmania's handle record and certificate validation records, declared by examples/beetmania"},
+				reason:"beetmania's handle record and certificate validation records, declared and audited by examples/beetmania"},
 			{name:"_atproto.beetlover.beet.org", record_type:"TXT",
-				reason:"the handle of beetmania's contributor account, declared by examples/beetmania"},
+				reason:"the handle of beetmania's contributor account, declared and audited by examples/beetmania"},
 		]}/>
 	</Route>
 </Router>

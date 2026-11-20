@@ -363,8 +363,8 @@ impl Plugin for InfraPlugin {
 			// `<stack>/ssh` route opens on one of its boxes through it
 			.register_type::<crate::prelude::EnsureSshAuthority>()
 			.register_type::<crate::prelude::SshShell>();
-		// the repo's deploy credentials, declared at an entry's root since one
-		// credential document holds one per provider however many stacks it
+		// an entry's deploy credentials, declared at its root since its one
+		// secrets document holds one per provider however many stacks it
 		// deploys, each landing its handle for the deploy gate. The AWS one is
 		// gated with the IAM lowering it renders (`AwsDeployPolicy`); the
 		// Cloudflare one reads declared type names, so it needs no bindings.

@@ -55,6 +55,7 @@ other stage answers only at its gateway url. The deploy machinery sits behind
 `bx:cfg`, absent from a lean binary that only serves.
 
     just beetmania deploy --stage=prod   # bucket, site, function, hostname
+    just beetmania deploy --stage=prod --elevated   # ..converging this entry's deploy credentials first
     just beetmania sync --stage=prod     # republish the site, no redeploy
     just beetmania watch --stage=prod    # tail the function's logs
     just beetmania destroy --stage=prod --force
@@ -77,16 +78,43 @@ to the posts it names and rewrites the committed index the served site reads
 
 The publisher's app password is `BEETMANIA_BEET_ORG_APP_PASSWORD` and the
 contributor's `BEETLOVER_BEET_ORG_APP_PASSWORD`, both `env_var` records in the
-`agents` group of the repo's `secrets.toml`, loaded by the top-level
-`<Secrets/>` below.
+`agents` group of this entry's own `secrets.toml`, loaded by the top-level
+`<Secrets/>` below. The repo's `secrets.toml` keeps a copy of each for the live
+atproto tests, which write to the same test org.
+
+## The secrets
+
+This entry owns its `secrets.toml`, beside this file: a secrets document
+holding a deploy credential belongs to exactly one entry, so the example's
+credentials are its own and reach none of the site's resources. It holds the
+two app passwords, `TF_STATE_PASSPHRASE` for both stacks' state, and the deploy
+credentials an elevated deploy seals (`beetmania-deploy` at AWS and at
+Cloudflare). The `secrets` verbs address it:
+
+    just beetmania secrets/check   # does this machine's identity open it
+    just beetmania secrets/ls      # what is there, and how each rolls
+
+## The zone audit
+
+The example's records live in the `beet.org` zone beside the site's, so its
+audit answers for the names it owns and nothing else: a record under them that
+no stack here declares is its stray, and the site's records are never its to
+judge or delete.
+
+    just beetmania audit --stage=prod   # the zone holds exactly what we declare, under our names
 -->
 <CliServer always=true {CallOnReady}>
 <Router {HelpHandler}>
-	<!-- the repo's secrets, loaded into the process environment before this
-	     entry builds; a machine without the identity loads nothing -->
-	<Secrets path="../../secrets.toml"/>
+	<!-- this entry's own secrets document, loaded into the process
+	     environment before this entry builds; a machine without the identity
+	     loads nothing -->
+	<Secrets/>
+	<Route path="secrets" bx:cfg="feature:vault"><SecretsRoutes/></Route>
+	<!-- the app identity: the deploy credentials are named for it
+	     (`beetmania-deploy`), the stacks below name their own apps -->
 	<PackageConfig
 		title="Beetmania"
+		app_name="beetmania"
 		description="Recipes, growing guides and gentle warnings for people who love beets"
 		homepage="https://beetmania.beet.org"/>
 	<!-- every icon size derived from the one source image -->
@@ -137,10 +165,9 @@ contributor's `BEETLOVER_BEET_ORG_APP_PASSWORD`, both `env_var` records in the
 	     than the root, so the browser runtime, which links none of them, never
 	     meets them. -->
 	<Fragment bx:cfg="feature:infra && feature:extra" {(AwsRegion("us-west-2"), CloudflareAccount("74aba4da669f57fc6fc3e63ebcfcff26"), CloudflareZone{domain:"beet.org", id:"45905c861559d9eb8c9b72ee87adca7b"})}>
-	<!-- the repo's AWS account and deploy credentials, shared with `site/`
-	     through the one secrets document: each credential keeps every
-	     entry's grants by app, so this entry's elevated deploy converges its
-	     own apps' and leaves the site's alone -->
+	<!-- the repo's AWS account, shared with `site/`, and this entry's own
+	     deploy credentials, `beetmania-deploy` at each provider, sealed in
+	     this entry's document and lowered from the stacks below alone -->
 	<AwsAccount name="beet"/>
 	<AwsDeployCredential/>
 	<CloudflareDeployCredential/>
@@ -203,6 +230,12 @@ contributor's `BEETLOVER_BEET_ORG_APP_PASSWORD`, both `env_var` records in the
 				<StandardSiteProbe {PublicationRef($blog)}/>
 			</Route>
 		</Stack>
+	</Route>
+	<!-- the audit of the names this entry owns in the `beet.org` zone: its
+	     hostname, everything beneath it (the handle record, the certificate's
+	     validation records) and its contributor's handle record -->
+	<Route path="audit" {ExchangeSequence}>
+		<ZoneAudit scope="Zone" names={["beetmania.beet.org", "*.beetmania.beet.org", "_atproto.beetlover.beet.org"]}/>
 	</Route>
 	</Fragment>
 </Router>

@@ -1,6 +1,6 @@
-//! `<CloudflareDeployCredential/>`: the Cloudflare deploy credential, every
-//! token the declarations ask for, minted in the one place that holds the group
-//! which mints.
+//! `<CloudflareDeployCredential/>`: an entry's Cloudflare deploy credential,
+//! every token the declarations ask for, minted in the one place that holds the
+//! group which mints.
 
 use crate::actions::cloudflare_api_ext;
 use crate::actions::cloudflare_api_ext::API_BASE;
@@ -9,15 +9,16 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
 
-/// `<CloudflareDeployCredential/>`: the repo's Cloudflare deploy credential,
+/// `<CloudflareDeployCredential/>`: the entry's Cloudflare deploy credential,
 /// declared at the entry's root like `<Secrets/>`, and every Cloudflare token
 /// its declarations ask for:
 ///
-/// - **the deploy token**: one account-owned token per repo, scoped to exactly
+/// - **the deploy token**: one account-owned token per entry, scoped to exactly
 ///   the permission groups the declarations need ([`CloudflareDeployToken`],
 ///   lowered from what the stacks render and the Cloudflare actions their
-///   routes run), sealed into the credential document as `CLOUDFLARE_API_TOKEN`
-///   with the grants it holds in its record's metadata.
+///   routes run), sealed into the entry's secrets document as
+///   `CLOUDFLARE_API_TOKEN` with the grants it holds and the entry owning it in
+///   its record's metadata.
 /// - **one token per declared `<R2BucketBlock/>`**, scoped to that bucket's
 ///   objects and nothing else, its S3 pair parked in the stack's own secret
 ///   store where the compute beside the bucket reads it. Not sealed in any
@@ -67,7 +68,7 @@ use serde_json::Value;
 /// configuration, since the group that writes its lock also lifts it, over
 /// every bucket in the account. A plain deploy that would change one is
 /// refused before it writes anything. The elevated deploy mints
-/// `<repo>-elevated`, holding the deploy token's groups and the elevated ones,
+/// `<app_name>-elevated`, holding the deploy token's groups and the elevated ones,
 /// proves it, runs the deploy with it in `CLOUDFLARE_API_TOKEN`, and deletes it
 /// once the deploy exits, however it exits. It is never sealed, a token a crash
 /// leaves behind is deleted by the next run, and every one lapses within the
@@ -83,36 +84,39 @@ use serde_json::Value;
 /// Against an apply, which CAN mint a token (`cloudflare_account_token` is a
 /// bound resource, and the R2 bucket's credential was rendered that way once):
 /// an apply that mints needs `Account API Tokens Write` in the credential every
-/// deploy of that repo reads, which is exactly the escalation with no boundary
+/// deploy of that entry reads, which is exactly the escalation with no boundary
 /// to cap it. Minting is rare and deploying is constant, so they hold
 /// different credentials, and the rare one is the only one that can mint.
 ///
 /// ## What converges
 ///
-/// - the token, named `<repo>-deploy` after the workspace directory (a document
-///   holds one token however many stacks it deploys), created unless the
-///   account holds exactly one token of that name, active, granting what the
-///   declarations ask for under the declared terms, and not yet inside its
-///   renewal notice. Every entry of the repo converges the same token, so
-///   what it grants is this launch's lowering beside every held line another
-///   entry's app asked for, each line naming its app and the record keeping
-///   each zone's id to rebuild them by.
+/// - the token, named `<app_name>-deploy` after the entry
+///   ([`DeployCredential::name`]) whose secrets document holds it, created
+///   unless the account holds exactly one token of that name, active, granting
+///   exactly what this entry's declarations ask for under the declared terms,
+///   and not yet inside its renewal notice.
 /// - the record, sealed as `CLOUDFLARE_API_TOKEN` in the document's group with
-///   the token's `expires` and its grants. The value is written only after the
-///   new token has PROVEN itself with a read the deploy actually makes, and
-///   every other token of the name is deleted only after that: a failure
-///   anywhere leaves the previous credential in place, and a token that never
-///   proved itself is deleted on the spot rather than left live beside it. A
-///   current token's record is resealed, value unchanged, when its note, roll
-///   or grants are not what this writes now.
+///   the token's `expires`, its grants and its owning entry. The value is
+///   written only after the new token has PROVEN itself with a read the deploy
+///   actually makes, and every other token of the name is deleted only after
+///   that: a failure anywhere leaves the previous credential in place, and a
+///   token that never proved itself is deleted on the spot rather than left
+///   live beside it. A current token's record is resealed, value unchanged,
+///   when its note, roll, grants or owner are not what this writes now.
+/// - the token the record held before, whatever its name: once the new one is
+///   sealed, the account-owned token the sealed value verifies as is deleted
+///   when it is not of the new name, so a renamed credential, or one whose
+///   record was carried over from another entry's document, leaves nothing
+///   behind.
 /// - a bucket's token, minted unless the account holds exactly one token of its
 ///   name, its pair is parked, and the parked access key id is that token's, or
 ///   on `--roll`. The parked access key id IS the token id, so that
 ///   comparison costs no call of its own.
 ///
-/// What it deliberately does not do is delete a token it did not make. A
-/// hand-made token is user-owned, which `Account API Tokens Write` cannot touch
-/// at all, so it is the operator's to revoke in the dashboard.
+/// What it deliberately does not do is delete a token that is not the
+/// account's. A hand-made token is user-owned, which `Account API Tokens
+/// Write` cannot touch at all and which neither the listing nor the account's
+/// verify ever names, so it is the operator's to revoke in the dashboard.
 ///
 /// ## The two levers that are not a boundary
 ///
@@ -231,17 +235,6 @@ impl CloudflareDeployCredential {
 	/// in its own.
 	const DEFAULT_GROUP: &'static str = SecretsDocument::DEFAULT_GROUP;
 
-	/// What ends a grant line with the app that asked for it, ie
-	/// `Zone > DNS Write on beet.org, for beet-site`: the token is per repo
-	/// and every entry of it converges the token, so each keeps the lines
-	/// another entry's apps asked for, as AWS keeps another app's policy.
-	const FOR: &'static str = ", for ";
-
-	/// The record's metadata naming the id of every zone its grants reach, one
-	/// `<domain> <id>` line each, so a converge can rebuild a group another
-	/// entry asked for over a zone this launch never resolves.
-	const ZONES: &'static str = "zones";
-
 	/// The terms a token minted at `now` is held to.
 	fn terms(&self, now: Timestamp) -> Result<TokenTerms> {
 		TokenTerms::new(self.ttl_days, &self.request_ips, now)
@@ -260,14 +253,12 @@ impl CloudflareDeployCredential {
 		let grants =
 			self.grants(&lowered, &Self::bucket_names(caller).await?)?;
 		let held = DeployCredential::sealed(caller, Self::RECORD).await;
-		// another entry's lines are not this launch's to judge
-		let ours = |line: &str| lowered.answers_for(line);
 		let mut status = CredentialStatus::compare(
 			self.id(),
 			Self::RECORD,
 			&grants,
 			held.as_ref(),
-			Some(&ours),
+			None,
 		);
 		match held.map(|held| held.record.expiry(now)) {
 			Some(SecretExpiry::Expired { at }) => status.stale.push(format!(
@@ -287,27 +278,16 @@ impl CloudflareDeployCredential {
 	}
 
 	/// The grants this launch's declarations ask the credential for, one line
-	/// each: every group over every resource it reaches and each bucket's own
-	/// token, both by the app that asked ([`Self::FOR`]), then the token's
-	/// terms, which every entry answers for. What the sealed record carries in
-	/// its metadata once converged, beside the other entries' lines, and what a
-	/// plain deploy compares against.
+	/// each: every group over every resource it reaches, the token's terms,
+	/// and each bucket's own token. What the sealed record carries in its
+	/// metadata once converged, and what a plain deploy compares against.
 	fn grants(
 		&self,
-		lowered: &Lowered,
-		buckets: &[(SmolStr, String)],
+		lowered: &CloudflareDeployToken,
+		buckets: &[String],
 	) -> Result<Vec<String>> {
 		let terms = self.terms(Timestamp::now())?;
-		let mut grants = lowered
-			.by_app
-			.iter()
-			.flat_map(|(app, token)| {
-				token
-					.grant_lines()
-					.into_iter()
-					.map(move |line| Self::asked_by(&line, app))
-			})
-			.collect::<Vec<_>>();
+		let mut grants = lowered.grant_lines();
 		grants.push(match self.ttl_days {
 			Some(days) => format!("lifetime: {days} days"),
 			None => "lifetime: until rolled".into(),
@@ -316,61 +296,13 @@ impl CloudflareDeployCredential {
 			true => "usable from: any address".into(),
 			false => format!("usable from: {}", terms.request_ips.join(", ")),
 		});
-		grants.extend(buckets.iter().map(|(app, bucket)| {
-			Self::asked_by(&format!("bucket token: {bucket}"), app)
-		}));
+		grants.extend(
+			buckets
+				.iter()
+				.map(|bucket| format!("bucket token: {bucket}")),
+		);
 		grants.sort();
 		grants.xok()
-	}
-
-	/// `line` as asked for by `app`.
-	fn asked_by(line: &str, app: &str) -> String {
-		format!("{line}{}{app}", Self::FOR)
-	}
-
-	/// The line and the app that asked for it, `None` for a line no app owns
-	/// (the token's terms).
-	fn owner(line: &str) -> Option<(&str, &str)> { line.rsplit_once(Self::FOR) }
-
-	/// The token every entry sharing the credential converges it to, and the
-	/// grants it is sealed with: this launch's lowering, beside every held
-	/// line another entry's app asked for, rebuilt over the zones the record
-	/// keeps. A held line no app owns is this launch's, and replaced.
-	fn shared(
-		lowered: &Lowered,
-		grants: Vec<String>,
-		held: Option<&Secret>,
-	) -> Result<(CloudflareDeployToken, Vec<String>)> {
-		let zones = held
-			.and_then(|held| held.record.metadata.get(Self::ZONES))
-			.map(|zones| {
-				zones
-					.lines()
-					.filter_map(|line| line.split_once(' '))
-					.map(|(domain, id)| (SmolStr::from(domain), id.into()))
-					.collect::<BTreeMap<SmolStr, SmolStr>>()
-			})
-			.unwrap_or_default();
-		let kept = DeployCredential::held_grants(held)
-			.into_iter()
-			.filter(|line| !lowered.answers_for(line))
-			.collect::<Vec<_>>();
-		let mut token = lowered.token.clone();
-		for (line, app) in kept.iter().filter_map(|line| Self::owner(line)) {
-			// a bucket's own token is that bucket's converge, not a group
-			if line.starts_with("bucket token: ") {
-				continue;
-			}
-			token =
-				token.with_held(line, &format!("held for {app}"), &zones)?;
-		}
-		let mut grants = grants
-			.into_iter()
-			.chain(kept.into_iter().map(String::from))
-			.collect::<Vec<_>>();
-		grants.sort();
-		grants.dedup();
-		(token, grants).xok()
 	}
 
 	/// Ask for the mint token, converge the deploy token and every bucket's
@@ -386,15 +318,9 @@ impl CloudflareDeployCredential {
 				to elevate"
 			);
 		};
-		let held = DeployCredential::sealed(caller, Self::RECORD).await;
-		let (shared, grants) = Self::shared(
-			&lowered,
-			self.grants(&lowered, &Self::bucket_names(caller).await?)?,
-			held.as_ref(),
-		)?;
-		if let Some(askers) = shared.escalating() {
+		if let Some(askers) = lowered.escalating() {
 			warn!(
-				"the lowered token carries `{}`, so this repo's deploy credential \
+				"the lowered token carries `{}`, so this entry's deploy credential \
 				can mint any token the account holds: asked for by {}. A \
 				bucket's own token is the only thing that needs it, and an apply \
 				that mints one is what puts it here",
@@ -407,17 +333,14 @@ impl CloudflareDeployCredential {
 			);
 		}
 		let terms = self.terms(Timestamp::now())?;
-		let account = shared.account()?.clone();
+		let account = lowered.account()?.clone();
 		let steps =
 			MintSteps::new(&account, &self.mint_token, ask.relay.clone());
+		let entry = DeployCredential::entry(caller).await?;
+		let grants =
+			self.grants(&lowered, &Self::bucket_names(caller).await?)?;
 		let (line, mint) = Self::converge(
-			caller,
-			&DeployCredential::name()?,
-			&shared,
-			&terms,
-			&steps,
-			ask.roll,
-			&grants,
+			caller, &entry, &lowered, &terms, &steps, ask.roll, &grants,
 		)
 		.await?;
 		let mut report = vec![line];
@@ -428,7 +351,7 @@ impl CloudflareDeployCredential {
 		};
 		if ask.run {
 			let (line, env, cleanup) =
-				Self::mint_elevated(mint, &lowered.token, &terms).await?;
+				Self::mint_elevated(mint, &entry, &lowered, &terms).await?;
 			elevation.report.push(line);
 			elevation.env = env;
 			elevation.cleanup = Some(cleanup);
@@ -445,15 +368,9 @@ impl CloudflareDeployCredential {
 				.to_string()
 				.xok();
 		};
-		let held = DeployCredential::sealed(caller, Self::RECORD).await;
-		let (shared, _) = Self::shared(
-			&lowered,
-			self.grants(&lowered, &Self::bucket_names(caller).await?)?,
-			held.as_ref(),
-		)?;
 		let mut out = Self::describe(
-			&DeployCredential::name()?,
-			&shared,
+			&DeployCredential::name(&DeployCredential::entry(caller).await?),
+			&lowered,
 			&self.terms(Timestamp::now())?,
 		)?;
 		for line in Self::buckets(caller, None, false).await? {
@@ -465,29 +382,37 @@ impl CloudflareDeployCredential {
 	/// Lower every stack this launch declares, at the launch's stage and at
 	/// `prod` ([`DeployCredential::render_stages`]), and every Cloudflare
 	/// action its routes carry, in one world pass, so a stack that cannot
-	/// render fails here rather than at the account. Each by the app it
-	/// belongs to, an action by its OWN stack's, since a route's verbs may sit
-	/// outside every `<Stack>`, resolving the addresses above them. `None`
-	/// when this launch asks nothing of Cloudflare.
-	async fn lower(caller: &AsyncEntity) -> Result<Option<Lowered>> {
+	/// render fails here rather than at the account. `None` when this launch
+	/// asks nothing of Cloudflare.
+	async fn lower(
+		caller: &AsyncEntity,
+	) -> Result<Option<CloudflareDeployToken>> {
 		caller
 			.with_world(|world, _| {
-				let mut lowered = Lowered::default();
+				let mut lowered = CloudflareDeployToken::default();
 				for (stack, _deployment, config) in
 					DeployCredential::render_stages(world)?.iter()
 				{
-					lowered.add(stack, |token| token.lower(stack, config))?;
+					lowered = lowered.lower(stack, config)?;
 				}
 				for (entity, access) in Self::declared_access(world) {
+					// the action's OWN stack: a route's verbs may sit outside
+					// every `<Stack>`, resolving the addresses above them
 					let stack = world.with_state::<StackQuery, _>(|stacks| {
 						stacks.resolve(entity)
 					});
 					let bucket = access.bucket(world.entity(entity));
-					lowered.add(&stack, |token| {
-						token.lower_access(&stack, &access, bucket.as_deref())
-					})?;
+					lowered = lowered.lower_access(
+						&stack,
+						&access,
+						bucket.as_deref(),
+					)?;
 				}
-				lowered.finish().xok()
+				match lowered.is_empty() {
+					true => None,
+					false => Some(lowered),
+				}
+				.xok()
 			})
 			.await?
 	}
@@ -504,12 +429,10 @@ impl CloudflareDeployCredential {
 			.collect()
 	}
 
-	/// The token an elevated run holds for its one command, named beside the
-	/// deploy token ([`DeployCredential::name`]) so the account's api tokens
-	/// page reads as one repo's pair.
-	fn elevated_name() -> Result<String> {
-		format!("{}-elevated", DeployCredential::repo_name()?).xok()
-	}
+	/// The token an elevated run of `entry` holds for its one command, named
+	/// beside the deploy token ([`DeployCredential::name`]) so the account's
+	/// api tokens page reads as one entry's pair.
+	fn elevated_name(entry: &str) -> String { format!("{entry}-elevated") }
 
 	/// The token's half of the dry run: the token, its terms, every group with
 	/// what asked for it, and the body a converge would post, pretty printed so
@@ -544,12 +467,13 @@ impl CloudflareDeployCredential {
 	/// this name that grants what the declarations ask for under the declared
 	/// terms, is active and not yet due, and is the one the document holds; or
 	/// on `roll`. The new value is sealed with its `grants` only once proven,
-	/// and every other token of the name deleted only once sealed. Answers the
+	/// and every other token of the name, and the record's previous token of
+	/// another name ([`Self::retiring`]), deleted only once sealed. Answers the
 	/// report and the mint token the run acts as, which the buckets are
 	/// converged with next.
 	async fn converge(
 		caller: &AsyncEntity,
-		name: &str,
+		entry: &str,
 		lowered: &CloudflareDeployToken,
 		terms: &TokenTerms,
 		steps: &MintSteps,
@@ -557,6 +481,8 @@ impl CloudflareDeployCredential {
 		grants: &[String],
 	) -> Result<(String, MintToken)> {
 		let account = lowered.account()?.clone();
+		let name = DeployCredential::name(entry);
+		let name = name.as_str();
 		let handle = SecretsHandle::resolve(caller, None).await?;
 		let identity = AgeIdentityFile::require()?;
 		let mut document = handle.read_or_new().await?;
@@ -591,13 +517,7 @@ impl CloudflareDeployCredential {
 				DeployCredential::restated(
 					secret,
 					group,
-					Self::record(
-						name,
-						&token.id,
-						token.expires_on,
-						grants,
-						lowered.zones(),
-					),
+					Self::record(entry, &token.id, token.expires_on, grants),
 				)
 				.map(|record| (secret, record))
 			});
@@ -611,7 +531,7 @@ impl CloudflareDeployCredential {
 						record,
 					)?;
 					handle.write(&document).await?;
-					", its note, roll and grants resealed"
+					", its note, roll, grants and owner resealed"
 				}
 				None => "",
 			};
@@ -624,6 +544,12 @@ impl CloudflareDeployCredential {
 			);
 			return (line, mint).xok();
 		}
+		// the token the record held, verified before the mint so the new one
+		// is never mistaken for it; a user-owned token verifies as none
+		let previous = match held_value {
+			Some(value) => Self::verified_id(&account, value).await,
+			None => None,
+		};
 		let (id, value) = mint
 			.create_token(&account, terms.body(name, lowered.to_json()))
 			.await?;
@@ -635,11 +561,20 @@ impl CloudflareDeployCredential {
 			group,
 			Self::RECORD,
 			&value,
-			Self::record(name, &id, terms.expires_on, grants, lowered.zones()),
+			Self::record(entry, &id, terms.expires_on, grants),
 		)?;
 		handle.write(&document).await?;
 		// only now: the token that replaces them is sealed and proven
-		let replaced = mint.delete_others(&account, &existing, &id).await?;
+		let mut replaced = mint.delete_others(&account, &existing, &id).await?;
+		if let Some(retiring) =
+			Self::retiring(previous.as_deref(), &existing, &id)
+		{
+			mint.delete_token(&account, &retiring).await?;
+			replaced.push_str(&format!(
+				", retiring {retiring}, the token the record held under \
+				another name"
+			));
+		}
 		let line = format!(
 			"token {name} ({id}) minted, {}, and sealed in {} (group \
 			`{group}`){replaced}",
@@ -649,56 +584,62 @@ impl CloudflareDeployCredential {
 		(line, mint).xok()
 	}
 
-	/// The record the deploy token `id` named `name` is sealed under, expiring
-	/// at `expires` and holding `grants`: what it is, how it rolls, and what a
-	/// plain deploy compares the declarations against.
+	/// The record `entry`'s deploy token `id` is sealed under, expiring at
+	/// `expires` and holding `grants`: what it is, how it rolls, the entry
+	/// owning it, and what a plain deploy compares the declarations against.
 	fn record(
-		name: &str,
+		entry: &str,
 		id: &str,
 		expires: Option<Timestamp>,
 		grants: &[String],
-		zones: &BTreeMap<SmolStr, SmolStr>,
 	) -> SecretRecord {
-		let mut metadata = BTreeMap::from([(
-			DeployCredential::GRANTS.into(),
-			grants.join("\n").into(),
-		)]);
-		if !zones.is_empty() {
-			metadata.insert(
-				Self::ZONES.into(),
-				zones
-					.iter()
-					.map(|(domain, id)| format!("{domain} {id}"))
-					.collect::<Vec<_>>()
-					.join("\n")
-					.into(),
-			);
-		}
 		SecretRecord {
 			role: Some(SecretRole::EnvVar),
 			note: Some(
 				format!(
-					"cloudflare deploy token `{name}` ({id}): account-owned, \
-					scoped to exactly what this repo's stacks and routes \
-					declare; every tofu apply, wrangler call and zone verb \
-					reads it from here"
+					"cloudflare deploy token `{}` ({id}): account-owned, \
+					scoped to exactly what the `{entry}` entry's stacks and \
+					routes declare; every tofu apply, wrangler call and zone \
+					verb it runs reads it from here",
+					DeployCredential::name(entry)
 				)
 				.into(),
 			),
 			expires,
 			roll: Some(SecretRoll::Elevated),
-			metadata,
+			metadata: BTreeMap::from([
+				(DeployCredential::GRANTS.into(), grants.join("\n").into()),
+				(DeployCredential::ENTRY.into(), entry.into()),
+			]),
 			..default()
 		}
 	}
 
-	/// Mint `<repo>-elevated` with `mint`: the deploy token's groups and the
+	/// The token the record held under another name, which a converge that
+	/// just sealed `minted` retires: the one `previous` verified as, unless it
+	/// is of the new name (`existing`, which the converge deletes anyway) or
+	/// the new token itself.
+	fn retiring(
+		previous: Option<&str>,
+		existing: &[HeldToken],
+		minted: &str,
+	) -> Option<SmolStr> {
+		previous
+			.filter(|previous| *previous != minted)
+			.filter(|previous| {
+				!existing.iter().any(|token| token.id == *previous)
+			})
+			.map(SmolStr::from)
+	}
+
+	/// Mint `<app_name>-elevated` with `mint`: the deploy token's groups and the
 	/// elevated ones, proven, held for one deploy. Answers the report line,
 	/// the variable the deploy runs with, and its deletion, which owns the mint
 	/// token so it runs however the deploy exits; a failed deletion names the
 	/// instant the token lapses on its own.
 	async fn mint_elevated(
 		mint: MintToken,
+		entry: &str,
 		lowered: &CloudflareDeployToken,
 		terms: &TokenTerms,
 	) -> Result<(
@@ -707,7 +648,7 @@ impl CloudflareDeployCredential {
 		SendBoxedFuture<Result<String>>,
 	)> {
 		let account = lowered.account()?.clone();
-		let name = Self::elevated_name()?;
+		let name = Self::elevated_name(entry);
 		let elevated = lowered.elevate();
 		let terms = terms.elevated(Timestamp::now());
 		// settled before the mint, so nothing fallible but the proof, which
@@ -756,19 +697,35 @@ impl CloudflareDeployCredential {
 	/// refusal, is.
 	async fn holds(account: &str, held: Option<&str>, id: &str) -> bool {
 		let Some(held) = held else { return false };
-		let verified = cloudflare_api_ext::send_optional(
-			Request::get(format!(
-				"{API_BASE}/accounts/{account}/tokens/verify"
-			))
-			.with_auth_bearer(held),
-			"verifying the sealed token",
-		)
-		.await;
-		match verified {
+		match Self::verify(account, held).await {
 			Ok(Some(body)) => body["result"]["id"] == id,
 			Ok(None) => true,
 			Err(_) => false,
 		}
+	}
+
+	/// The id of the account-owned token `value` is, `None` when it answers
+	/// as none: lapsed, deleted, or a user-owned token, which this never
+	/// deletes.
+	async fn verified_id(account: &str, value: &str) -> Option<SmolStr> {
+		Self::verify(account, value)
+			.await
+			.ok()
+			.flatten()
+			.and_then(|body| body["result"]["id"].as_str().map(SmolStr::from))
+	}
+
+	/// `value` verified at the account, `None` when the endpoint does not
+	/// answer.
+	async fn verify(account: &str, value: &str) -> Result<Option<Value>> {
+		cloudflare_api_ext::send_optional(
+			Request::get(format!(
+				"{API_BASE}/accounts/{account}/tokens/verify"
+			))
+			.with_auth_bearer(value),
+			"verifying the sealed token",
+		)
+		.await
 	}
 
 	/// Prove a freshly minted token before anything relies on it, with a read
@@ -1031,29 +988,22 @@ impl CloudflareDeployCredential {
 		Vec::new().xok()
 	}
 
-	/// The name of each declared bucket's own token by its stack's app, which
-	/// the grants list so a bucket declared since the last converge makes the
-	/// credential stale.
+	/// The name of each declared bucket's own token, which the grants list so
+	/// a bucket declared since the last converge makes the credential stale.
 	#[cfg(feature = "cloudflare_dns")]
-	async fn bucket_names(
-		caller: &AsyncEntity,
-	) -> Result<Vec<(SmolStr, String)>> {
+	async fn bucket_names(caller: &AsyncEntity) -> Result<Vec<String>> {
 		caller
 			.with_world(|world, _| Self::declared_buckets(world))
 			.await??
 			.into_iter()
-			.map(|(block, stack, _)| {
-				(stack.app_name().clone(), block.token_name(&stack))
-			})
+			.map(|(block, stack, _)| block.token_name(&stack))
 			.collect::<Vec<_>>()
 			.xok()
 	}
 
 	/// A launch built without the Cloudflare bindings declares no bucket.
 	#[cfg(not(feature = "cloudflare_dns"))]
-	async fn bucket_names(
-		_caller: &AsyncEntity,
-	) -> Result<Vec<(SmolStr, String)>> {
+	async fn bucket_names(_caller: &AsyncEntity) -> Result<Vec<String>> {
 		Vec::new().xok()
 	}
 
@@ -1062,52 +1012,6 @@ impl CloudflareDeployCredential {
 	/// SHA-256 of the token value, so neither half survives the other.
 	#[cfg(feature = "cloudflare_dns")]
 	fn bucket_roll() -> SecretRoll { SecretRoll::Elevated }
-}
-
-/// What one launch lowers at Cloudflare, by the app each stack or action
-/// belongs to, see [`CloudflareDeployCredential::lower`].
-#[derive(Default)]
-struct Lowered {
-	/// Every app this launch renders or runs a Cloudflare action of, whether
-	/// or not it asks for anything: the apps whose held lines are this
-	/// launch's to judge and replace.
-	apps: BTreeSet<SmolStr>,
-	/// Each app's own lowering, an app asking for nothing absent.
-	by_app: BTreeMap<SmolStr, CloudflareDeployToken>,
-	/// Every app's lowering in one token.
-	token: CloudflareDeployToken,
-}
-
-impl Lowered {
-	/// Lower into `stack`'s app.
-	fn add(
-		&mut self,
-		stack: &ResolvedStack,
-		lower: impl FnOnce(CloudflareDeployToken) -> Result<CloudflareDeployToken>,
-	) -> Result {
-		let app = stack.app_name().clone();
-		self.apps.insert(app.clone());
-		let token = lower(self.by_app.remove(&app).unwrap_or_default())?;
-		self.by_app.insert(app, token);
-		Ok(())
-	}
-
-	/// The lowering once every app is in, `None` when none asks for anything.
-	fn finish(mut self) -> Option<Self> {
-		self.by_app.retain(|_, token| !token.is_empty());
-		self.token = self.by_app.values().cloned().fold(
-			CloudflareDeployToken::default(),
-			CloudflareDeployToken::merge,
-		);
-		(!self.by_app.is_empty()).then_some(self)
-	}
-
-	/// Whether a held grant `line` is this launch's to judge and replace: one
-	/// asked for by an app it lowers, or one no app owns (the token's terms).
-	fn answers_for(&self, line: &str) -> bool {
-		CloudflareDeployCredential::owner(line)
-			.is_none_or(|(_, app)| self.apps.contains(app))
-	}
 }
 
 /// The mint token one run acts as: taken for the run and written nowhere.
@@ -1707,100 +1611,28 @@ mod test {
 			.xpect_contains("1. Run this in a terminal");
 	}
 
-	/// The token is per repo and every entry converges it, so a converge
-	/// keeps each line another entry's app asked for, rebuilt into the token
-	/// over the zone id the record keeps, and replaces its own app's lines and
-	/// the unattributed ones; a plain deploy judges only the lines it answers
-	/// for.
+	/// A renamed credential retires the token its record held: the one the
+	/// sealed value verifies as, unless it is of the new name, which the
+	/// converge deletes as a duplicate, or nothing verified at all.
 	#[beet_core::test]
-	fn keeps_another_entrys_grants() {
-		struct Records;
-		let stack = Stack::new("beetmania")
-			.resolve(&PackageConfig::default())
-			.with_cloudflare_account(CloudflareAccount::new("acct123"))
-			.with_cloudflare_zone(CloudflareZone::new("beet.org", "zone123"));
-		let mut lowered = super::Lowered::default();
-		lowered
-			.add(&stack, |token| {
-				token.lower_access(
-					&stack,
-					&CloudflareAccess::new::<Records>(&[
-						TokenPermission::DNS_WRITE,
-					]),
-					None,
-				)
-			})
-			.unwrap();
-		let lowered = lowered.finish().unwrap();
-		let app = stack.app_name();
-		let ours = format!("Zone > DNS Write on beet.org, for {app}");
-		let theirs = "Zone > Cache Purge on beet.org, for beet-site";
-		let their_bucket = "bucket token: beet-site-assets, for beet-site";
-		let held = Secret {
-			name: "CLOUDFLARE_API_TOKEN".into(),
-			group: "default".into(),
-			value: "token".into(),
-			record: SecretRecord {
-				metadata: BTreeMap::from([
-					(
-						DeployCredential::GRANTS.into(),
-						[
-							theirs,
-							their_bucket,
-							&ours,
-							&format!(
-								"Zone > Zone Settings Write on beet.org, for {app}"
-							),
-							"Zone > DNS Write on beet.org",
-							"lifetime: until rolled",
-							"usable from: any address",
-						]
-						.join("\n")
-						.into(),
-					),
-					("zones".into(), "beet.org zone123".into()),
-				]),
-				..default()
-			},
+	fn retires_the_token_the_record_held_under_another_name() {
+		let named = |id: &str| {
+			super::HeldToken::parse(&serde_json::json!({
+				"id": id,
+				"status": "active",
+				"policies": [],
+			}))
+			.unwrap()
 		};
-		let needed = CloudflareDeployCredential::default()
-			.grants(&lowered, &[])
-			.unwrap();
-		let (token, grants) = super::CloudflareDeployCredential::shared(
-			&lowered,
-			needed.clone(),
-			Some(&held),
-		)
-		.unwrap();
-		token
-			.asked()
-			.keys()
-			.map(TokenPermission::name)
-			.collect::<Vec<_>>()
-			.xpect_eq(vec!["Cache Purge", "DNS Write"]);
-		grants.xpect_eq(vec![
-			theirs.to_string(),
-			ours.clone(),
-			their_bucket.to_string(),
-			"lifetime: until rolled".to_string(),
-			"usable from: any address".to_string(),
-		]);
-		// judged on its own lines: current, and only its own are noted
-		let status = CredentialStatus::compare(
-			"cloudflare",
-			"CLOUDFLARE_API_TOKEN",
-			&needed,
-			Some(&held),
-			Some(&|line: &str| lowered.answers_for(line)),
-		);
-		status.stale.xpect_empty();
-		status.notes.len().xpect_eq(2);
-		status
-			.notes
-			.join("\n")
-			.xpect_contains("Zone Settings Write")
-			.xnot()
-			.xpect_contains("Cache Purge");
+		let retiring = super::CloudflareDeployCredential::retiring;
+		// `beet-deploy`'s token, held by the record `beet-site-deploy` replaces
+		retiring(Some("old"), &[], "new").xpect_eq(Some("old".into()));
+		retiring(Some("old"), &[named("other")], "new")
+			.xpect_eq(Some("old".into()));
+		// of the new name: a duplicate, deleted as one
+		retiring(Some("old"), &[named("old")], "new").xpect_none();
+		retiring(Some("new"), &[], "new").xpect_none();
+		retiring(None, &[], "new").xpect_none();
 	}
 
 	/// A current token's record is resealed only when what is sealed is not
@@ -1809,16 +1641,13 @@ mod test {
 	/// recorded before the declarations changed are stale like an old roll.
 	#[beet_core::test]
 	fn restates_only_a_stale_record() {
-		let grants =
-			vec!["Zone > DNS Write on beet.org, for beet-site".to_string()];
-		let zones = BTreeMap::from([("beet.org".into(), "zone123".into())]);
+		let grants = vec!["Zone > DNS Write on beet.org".to_string()];
 		let today = || {
 			super::CloudflareDeployCredential::record(
-				"beet-deploy",
+				"beet-site",
 				"abc",
 				None,
 				&grants,
-				&zones,
 			)
 		};
 		// sealed at `minted_at` as a converge writes it, then changed by `edit`
@@ -1862,9 +1691,20 @@ mod test {
 		.metadata
 		.get(DeployCredential::GRANTS)
 		.cloned()
-		.xpect_eq(Some(SmolStr::from(
-			"Zone > DNS Write on beet.org, for beet-site",
-		)));
+		.xpect_eq(Some(SmolStr::from("Zone > DNS Write on beet.org")));
+		// a record sealed before records named their owner
+		restate(
+			&held(&|mut record| {
+				record.metadata.remove(DeployCredential::ENTRY);
+				record
+			}),
+			"default",
+		)
+		.unwrap()
+		.metadata
+		.get(DeployCredential::ENTRY)
+		.cloned()
+		.xpect_eq(Some(SmolStr::from("beet-site")));
 	}
 
 	/// A mid-afternoon mint, so a lifetime visibly lands on a midnight.

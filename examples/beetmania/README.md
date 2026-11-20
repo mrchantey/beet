@@ -102,7 +102,7 @@ Two Bluesky accounts exist for this example, both made-up characters, their hand
 | Beetmania | a test org: publishes the standard.site documents and announces each post | `beetmania.beet.org` | `test-beetmania.bsky.social` | `did:plc:7bxw2ljdoqcny4rio7oiqsru` |
 | Beet Lover | a test user: reposts the announcements it is credited on and replies, the comments under each post | `beetlover.beet.org` | `test-beetlover.bsky.social` | `did:plc:xfhml5eyathkdgloyiresv4d` |
 
-Each `beet.org` handle is a `_atproto` TXT record the `social` stack publishes (`just beetmania social deploy --stage=prod`), claimed once in the account's settings (Handle, "I have my own domain"); `just beetmania social probe --stage=prod` checks both. Their app passwords are `BEETMANIA_BEET_ORG_APP_PASSWORD` and `BEETLOVER_BEET_ORG_APP_PASSWORD` in the `agents` group of the repo's `secrets.toml`, rolled at `https://bsky.app/settings/app-passwords`.
+Each `beet.org` handle is a `_atproto` TXT record the `social` stack publishes (`just beetmania social deploy --stage=prod`), claimed once in the account's settings (Handle, "I have my own domain"); `just beetmania social probe --stage=prod` checks both. Their app passwords are `BEETMANIA_BEET_ORG_APP_PASSWORD` and `BEETLOVER_BEET_ORG_APP_PASSWORD` in the `agents` group of this example's own `secrets.toml` (see [The secrets](#the-secrets)), rolled at `https://bsky.app/settings/app-passwords`. The repo's `secrets.toml` keeps a copy of each in its own `agents` group for the live tests, so a roll restates both.
 
 Beetmania is also the repo's live test account: `just test-atproto-live` writes to it, only records it deletes again under its own collection and an `https://example.com` publication, so this site's publication is never touched.
 
@@ -116,3 +116,9 @@ just beetmania social deploy --stage=prod
 ```
 
 The deploy machinery sits behind `bx:cfg`, so a lean binary loads the same entry, serves the site and leaves the deploy commands out.
+
+A first deploy, or one after the declarations change what a deploy credential needs, runs elevated (`just beetmania deploy --stage=prod --elevated`), which asks the operator for the phone code and the Cloudflare mint token's roll and converges `beetmania-deploy` at both providers, lowered from this entry's stacks alone. `just beetmania audit --stage=prod` then checks the `beet.org` zone holds exactly what this entry declares under its own names.
+
+## The secrets
+
+A package owns its secrets document: this example's is `secrets.toml` beside `main.bsx`, which the entry's `<Secrets/>` loads and its `secrets` verbs address (`just beetmania secrets/check`, `secrets/ls`, `secrets/set`). Its `default` group holds `TF_STATE_PASSPHRASE`, the encryption of both stacks' state, and the deploy credentials an elevated deploy seals; its `agents` group the two app passwords. A secrets document holding a deploy credential belongs to exactly one entry, so nothing the example holds reaches the site's resources, and a launch of another entry against this document is refused.

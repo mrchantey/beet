@@ -399,7 +399,7 @@ Because tofu never sees the value again, it cannot tell when the value changes; 
 
 Every credential beet deploys with, at AWS and at Cloudflare, sits on one line: **power and frequency are inversely related, and the line between them is a human factor.** A thing that happens constantly is low power; a thing that is high power is rare and needs something an automated process cannot supply. The corollary is what makes the design tractable: "requires a human" and "an agent cannot reach it" are the same sentence, because an agent cannot type a six-digit code off a phone or log in to a dashboard.
 
-That line is two commands per stack, and the same two per package. **`<stack>/deploy`** runs constantly and never asks a person for anything; **`<stack>/deploy --elevated`** runs rarely and asks for the human factor. A package with several stacks lists them under one verb, **`all/deploy`**, which checks once for all of them, refuses once, and with `--elevated` asks for each human factor at most once. The credentials a repo deploys with are infrastructure like its buckets: derived from what its stacks declare, sealed in its document, and kept in line with the declarations by the elevated deploy, so nobody mints one by hand. A plain deploy that needs more than its stored credentials allow stops before it writes anything and says to add `--elevated`.
+That line is two commands per stack, and the same two per package. **`<stack>/deploy`** runs constantly and never asks a person for anything; **`<stack>/deploy --elevated`** runs rarely and asks for the human factor. A package with several stacks lists them under one verb, **`all/deploy`**, which checks once for all of them, refuses once, and with `--elevated` asks for each human factor at most once. The credentials an entry deploys with are infrastructure like its buckets: derived from what its stacks declare, sealed in its own document, and kept in line with the declarations by the elevated deploy, so nobody mints one by hand. A document holding a deploy credential belongs to exactly one entry, so two entries of one repo (a site and an example beside it) each keep their own, and neither's credentials reach the other's resources. A plain deploy that needs more than its stored credentials allow stops before it writes anything and says to add `--elevated`.
 
 The two providers reach the line by different routes. AWS caps a credential with a permissions boundary, puts the escalating one behind an mfa condition, and gives each repo an account of its own: a member of the operator's Organization, named for the repo and declared as `<AwsAccount/>`, so one repo's credentials reach nothing of another's. Cloudflare offers neither boundary nor accounts by api, so its deploy token is capped by its scope at creation, its repos share one account kept apart by their tokens, and the one token that can mint another is kept in no file at all.
 
@@ -413,7 +413,7 @@ flowchart TB
 
     subgraph sealed["what the age key opens · all of it recoverable"]
         global["~/.config/beet/secrets.toml<br/>committed in arch-config, stowed<br/>beet-agent's pair, the account base email"]
-        repo["each repo's secrets.toml<br/>committed, public"]
+        repo["each entry's secrets.toml<br/>beside its main.bsx, committed, public"]
         ledger["a stack's export<br/>the sealed ledger of its secret store"]
     end
 
@@ -430,14 +430,14 @@ flowchart TB
     subgraph member["a repo's own account · one member per repo, named for it"]
         read["beet-agent-read · tier 0c<br/>ViewOnlyAccess"]
         orgrole["OrganizationAccountAccessRole · tier 0a<br/>what beet-admin chains into, an hour"]
-        deploy["repo-deploy · tier 1<br/>deploy this repo's apps at AWS<br/>capped by each app's boundary"]
+        deploy["entry-deploy · tier 1<br/>deploy one entry's apps at AWS<br/>capped by each app's boundary"]
         runtime["runtime identities · tier 2<br/>lightsail user, SES user, lambda roles<br/>each wears its app and stage's boundary"]
         rbin["Recycle Bin rules · LOCKED<br/>a deleted snapshot or data volume<br/>stays restorable for the declared days"]
     end
 
     global --> agent
     repo --> deploy
-    repo --> cfdeploy["repo-deploy · tier 1<br/>deploy this repo's apps at Cloudflare<br/>exactly the groups its declarations ask for"]
+    repo --> cfdeploy["entry-deploy · tier 1<br/>deploy one entry's apps at Cloudflare<br/>exactly the groups its declarations ask for"]
     repo --> other["TF_STATE_PASSPHRASE,<br/>app secrets, third-party api keys"]
 
     agent -->|"deploy --elevated<br/>+ code from the phone"| admin
@@ -465,8 +465,8 @@ flowchart TB
 | 0a admin | the operator, and any agent on the machine for the session after | when a deploy needs `--elevated` | an AWS session a code buys (1h default, up to 12h), by an elevated deploy or `beet admin`, chained into a repo's account as `OrganizationAccountAccessRole` for an hour at a time | unrecoverable, hence the phone |
 | 0a mint | the operator, and the one elevated deploy the value is pasted into | when a deploy needs `--elevated` at Cloudflare | `beet-mint`, holding `Account API Tokens Write` alone: rolled on the dashboard for each elevated deploy | mints any token the account can hold, hence the login |
 | 0c read | agents, constantly | constantly | `beet-agent`, sealed in the global document, and `beet-agent-read` inside each repo's account, which it assumes | metadata disclosure |
-| 1 deploy | the operator and CI | every deploy | `<repo>-deploy` at AWS, inside the repo's own account, and at Cloudflare, both sealed in that repo's document with what they were converged to grant | its own app, recoverably |
-| 2 runtime | the servers | continuous | minted by an apply, or by an elevated deploy for an R2 bucket, or written from the repo's document by an apply as a write-only parameter (a `<SecretBlock/>`); parked in the stack's store, and in its sealed export where it has one | its own app's data; for a bucket's token, nothing younger than the bucket's lock |
+| 1 deploy | the operator and CI | every deploy | `<app_name>-deploy` at AWS, inside the repo's own account, and at Cloudflare, both named for the entry and sealed in that entry's own document with what they were converged to grant | its own entry's apps, recoverably |
+| 2 runtime | the servers | continuous | minted by an apply, or by an elevated deploy for an R2 bucket, or written from the entry's document by an apply as a write-only parameter (a `<SecretBlock/>`); parked in the stack's store, and in its sealed export where it has one | its own app's data; for a bucket's token, nothing younger than the bucket's lock |
 | break-glass | the operator, in the console | when 0a is broken | `pete`: password + MFA, no key | full admin, behind a phone and a browser |
 
 **The invariant: the age key unlocks everything that is recoverable, and nothing that is not.** Recoverable is a claim about every credential a document holds: it cannot mint a credential wider than itself, and the worst it can destroy is rebuilt from the declarations, a version or a backup. What it can read is a separate question, settled by holding the key at all: whoever holds it reads everything it opens, which is why the key belongs to one person and is backed up rather than shared.
@@ -481,7 +481,7 @@ This is also why the sealed documents may live in public repositories. age's sec
 
 Six flows, day to day:
 
-- **`just cli all/deploy`** opens the repo document for the AWS deploy pair and the Cloudflare deploy token, checks both against the declarations of every stack the package lists, and deploys each, `tofu` minting the runtime identities wearing their boundary; `just cli mail/deploy` does the same for one stack. You, or CI holding the age key. `--dry-run` says, asking for nothing, whether it would need `--elevated`.
+- **`just cli all/deploy`** opens the entry's document for the AWS deploy pair and the Cloudflare deploy token, checks both against the declarations of every stack the package lists, and deploys each, `tofu` minting the runtime identities wearing their boundary; `just cli mail/deploy` does the same for one stack. You, or CI holding the age key. `--dry-run` says, asking for nothing, whether it would need `--elevated`.
 - **`just cli all/deploy --elevated`** when the plain deploy refuses: a stack gained a service, a bucket was declared or its retention changed, the credential lives outside the declared account, or `--roll` is replacing a credential. It asks for the code, the dashboard login, or both, only as the credentials need them, converges the account and the credentials, and runs the same deploy. Rare, one code or one login.
 - **`beet aws -- s3 ls`** opens the global document for `beet-agent`. Lists names, reads nothing. What an agent gets by default, and it says so on stderr. `--account=<repo>` runs it inside that repo's account, as its read role.
 - **`beet admin --duration=30m`** asks for a code and buys a session for account work that is no stack's deploy, ie rolling `beet-agent`'s own key; for that half hour `beet aws` runs as `beet-admin` and says so (inside a repo's account with `--account`), and an elevated deploy or `beet admin -- <verb>` reuses the session rather than asking again.

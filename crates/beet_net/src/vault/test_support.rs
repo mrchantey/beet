@@ -84,6 +84,9 @@ impl VerbWorld {
 			.unwrap();
 	}
 
+	/// The fixture's store, for a second entry root over the same files.
+	pub fn store(&self) -> BlobStore { self.store.clone() }
+
 	/// The secrets document `name` in this fixture's store.
 	pub fn secrets(&self, name: &str) -> SecretsHandle {
 		SecretsHandle::new(self.store.clone(), name).unwrap()

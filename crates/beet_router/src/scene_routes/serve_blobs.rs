@@ -80,8 +80,20 @@ pub(crate) async fn ServeBlobsHandler(
 		.get_params(STORE_PATH_PARAM)
 		.map(|segments| RelPath::from_segments(segments))
 		.unwrap_or_default();
+	// a secrets document sitting in the served store is never served or
+	// listed, however the store is mounted
+	let documents = cx
+		.caller
+		.with_state::<Query<&Secrets>, _>(|_, documents| {
+			documents.iter().cloned().collect::<Vec<_>>()
+		})
+		.await?;
+	let hidden = |key: &str| documents.iter().any(|doc| doc.lands_at(key));
 	if list {
-		return list_blobs(&store, &path).await;
+		return list_blobs(&store, &path, &hidden).await;
+	}
+	if hidden(path.as_str()) {
+		return Err(HttpError::new(StatusCode::NOT_FOUND, "").into());
 	}
 	serve_blob(&store, &path)
 		.await
@@ -89,14 +101,19 @@ pub(crate) async fn ServeBlobsHandler(
 }
 
 /// The keys under `path` as a JSON array, relative to it: the mount's root
-/// lists every key, a subdir the keys beneath it.
+/// lists every key, a subdir the keys beneath it, none that is `hidden`.
 #[cfg(feature = "json")]
-async fn list_blobs(store: &BlobStore, path: &RelPath) -> Result<Response> {
+async fn list_blobs(
+	store: &BlobStore,
+	path: &RelPath,
+	hidden: &(dyn Fn(&str) -> bool + Sync),
+) -> Result<Response> {
 	match path.as_str().is_empty() {
 		true => store.list().await?,
 		false => store.with_subdir(path.clone()).list().await?,
 	}
 	.xmap(|mut keys| {
+		keys.retain(|key| !hidden(path.join(key.as_str()).as_str()));
 		keys.sort();
 		keys
 	})
@@ -106,7 +123,11 @@ async fn list_blobs(store: &BlobStore, path: &RelPath) -> Result<Response> {
 
 /// A listing answers json, so a build without it refuses one.
 #[cfg(not(feature = "json"))]
-async fn list_blobs(_store: &BlobStore, path: &RelPath) -> Result<Response> {
+async fn list_blobs(
+	_store: &BlobStore,
+	path: &RelPath,
+	_hidden: &(dyn Fn(&str) -> bool + Sync),
+) -> Result<Response> {
 	bevybail!(
 		"listing `{path}` answers json, which this build leaves out (the `json` feature)"
 	)
@@ -240,6 +261,51 @@ mod test {
 			.unwrap_str()
 			.await
 			.xpect_contains("color: red");
+	}
+
+	/// A secrets document in the served store, as an entry's conventional
+	/// `secrets.toml` sits beside it in its repo store, is neither served nor
+	/// listed, while the rest of the store is.
+	///
+	/// REGRESSION: `examples/beetmania` gained its own document, and its
+	/// `<ServeBlobs prefix="repo"/>` would have published it at
+	/// `/repo/secrets.toml`.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn never_serves_a_secrets_document() {
+		let store = css_store().await;
+		store
+			.insert(&RelPath::from("secrets.toml"), "sealed")
+			.await
+			.unwrap();
+		let mut world = router_world();
+		world.spawn(Secrets::default());
+		let router = world
+			.spawn((Router::with_defaults(), store, children![serve_route(
+				"repo"
+			)]))
+			.id();
+		world
+			.entity_mut(router)
+			.exchange(Request::get("repo/secrets.toml"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::NOT_FOUND);
+		world
+			.entity_mut(router)
+			.exchange(Request::get("repo/style.css"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+		world
+			.entity_mut(router)
+			.exchange(Request::get("repo?list"))
+			.await
+			.unwrap_str()
+			.await
+			.xpect_contains("style.css")
+			.xnot()
+			.xpect_contains("secrets");
 	}
 
 	/// The real `site/` layout: a store rooted at the entry's dir plus

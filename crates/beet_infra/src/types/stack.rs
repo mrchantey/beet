@@ -59,8 +59,8 @@ impl Default for Stack {
 
 impl Stack {
 	/// The environment variable every stack's state passphrase is read from
-	/// unless declared, one record per repo (`secrets/set TF_STATE_PASSPHRASE
-	/// --generate`).
+	/// unless declared, one record per entry's secrets document
+	/// (`secrets/set TF_STATE_PASSPHRASE --generate`).
 	pub const DEFAULT_STATE_PASSPHRASE: &'static str = "TF_STATE_PASSPHRASE";
 
 	/// A stack naming `app_name` explicitly, the code counterpart of

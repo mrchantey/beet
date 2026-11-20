@@ -74,6 +74,26 @@ impl Secrets {
 		self.label = label.into();
 		self
 	}
+
+	/// Whether `key`, a path within a store, is where this document lands in
+	/// a copy of the store it sits in: its own path, or that path at the end
+	/// of a longer key (a copy rooted elsewhere). A document beside the entry
+	/// it belongs to never travels with that entry's published tree, so no
+	/// assemble copies it and no static route serves or lists it. One that
+	/// climbs above its store (`..`) lands in no copy of it.
+	pub fn lands_at(&self, key: &str) -> bool {
+		let key = key.trim_start_matches('/');
+		self.within_store().is_some_and(|path| {
+			key == path || key.ends_with(&format!("/{path}"))
+		})
+	}
+
+	/// The document's path within the store it sits in, `None` when it
+	/// climbs above it (`..`), so a copy of the store never holds it.
+	pub fn within_store(&self) -> Option<&str> {
+		Some(self.path.as_str().trim_start_matches("./"))
+			.filter(|path| !path.is_empty() && !path.starts_with(".."))
+	}
 }
 
 /// The document itself, only in a build that can open one.
@@ -209,6 +229,28 @@ mod test {
 			.media_type()
 			.unwrap()
 			.xpect_eq(MediaType::Json);
+	}
+
+	/// A document lands at its own path in a copy of its store, at the end of
+	/// a longer key in a copy rooted elsewhere, and nowhere when it climbs
+	/// above the store.
+	#[crate::test]
+	fn lands_at_its_path_in_a_copy_of_its_store() {
+		Secrets::default().lands_at("secrets.toml").xpect_true();
+		Secrets::default().lands_at("/secrets.toml").xpect_true();
+		Secrets::default()
+			.lands_at("repo/secrets.toml")
+			.xpect_true();
+		Secrets::default()
+			.lands_at("secrets.toml.bak")
+			.xpect_false();
+		Secrets::default().lands_at("my-secrets.toml").xpect_false();
+		Secrets::new("infra/mail.toml")
+			.lands_at("infra/mail.toml")
+			.xpect_true();
+		Secrets::new("../secrets.toml")
+			.lands_at("secrets.toml")
+			.xpect_false();
 	}
 
 	/// Native only: the document is found on the filesystem and the identity

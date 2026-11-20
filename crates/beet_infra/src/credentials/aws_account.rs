@@ -51,9 +51,9 @@ use serde_json::json;
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct AwsAccount {
-	/// The account's name in the Organization, found by it. Unset is the
-	/// repo's name ([`DeployCredential::repo_name`]).
-	pub name: Option<SmolStr>,
+	/// The account's name in the Organization, found by it. Required: every
+	/// entry deploying into the account names it, ie `name="beet"`.
+	pub name: SmolStr,
 	/// The days a deleted EBS snapshot stays restorable, 1 to 365.
 	pub snapshot_retention_days: u16,
 	/// The days a deleted EBS volume stays restorable, 1 to 7.
@@ -66,7 +66,7 @@ pub struct AwsAccount {
 impl Default for AwsAccount {
 	fn default() -> Self {
 		Self {
-			name: None,
+			name: SmolStr::default(),
 			snapshot_retention_days: 14,
 			volume_retention_days: 7,
 			unlock_delay_days: 7,
@@ -105,11 +105,15 @@ impl AwsAccount {
 	/// How many times a new account's creation is polled, five seconds apart.
 	const CREATE_POLLS: usize = 60;
 
-	/// The name, the repo's when unset.
+	/// The name, refused when unset: an account is shared by every entry
+	/// deploying into it, so no one entry's name is the account's.
 	pub(crate) fn resolved_name(&self) -> Result<SmolStr> {
-		match &self.name {
-			Some(name) => name.clone().xok(),
-			None => SmolStr::from(DeployCredential::repo_name()?).xok(),
+		match self.name.is_empty() {
+			false => self.name.clone().xok(),
+			true => bevybail!(
+				"`<AwsAccount/>` names the account it deploys into: \
+				`<AwsAccount name=\"..\"/>`, its name in the Organization"
+			),
 		}
 	}
 
@@ -1125,7 +1129,7 @@ mod test {
 
 	fn beetmash() -> AwsAccount {
 		AwsAccount {
-			name: Some("beetmash".into()),
+			name: "beetmash".into(),
 			..default()
 		}
 	}
@@ -1184,10 +1188,15 @@ mod test {
 	}
 
 	/// Retention outside what the Recycle Bin accepts is refused before
-	/// anybody is asked for a code.
+	/// anybody is asked for a code, as is an account with no name.
 	#[beet_core::test]
 	fn refuses_retention_out_of_range() {
 		beetmash().check().unwrap();
+		AwsAccount::default()
+			.resolved_name()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("name=");
 		AwsAccount {
 			volume_retention_days: 8,
 			..beetmash()

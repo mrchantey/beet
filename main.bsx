@@ -61,15 +61,18 @@ addressable, so `--help` still lists it and dispatching a shared verb reports
 the condition that excluded it rather than 404ing.
 
 The shared verbs need the AWS deploy pair, plus `tofu`. That pair is this
-repo's own IAM user, `beet-deploy`, holding one managed policy per app this
-repo declares and nothing else, kept in line with the declarations by an
-elevated deploy (`<stack>/deploy --elevated`; see `crates/beet_infra/README.md`,
-The AWS deploy credential). Every credential this workspace uses (the
-model-provider keys, the AWS pair, the Cloudflare token, the R2 pair, the site
-box's host key) is a record of `secrets.toml`,
+entry's own IAM user, `beet-deploy` (named for its `app_name`), holding the
+managed policy of the `beet` app and nothing else, kept in line with the
+declarations by an elevated deploy (`shared/deploy --elevated`; see
+`crates/beet_infra/README.md`, The AWS deploy credential). Every secret this
+entry and the workspace's tests read (the model-provider keys, this entry's AWS
+pair, the live test accounts' app passwords) is a record of the repo's
+`secrets.toml`,
 age-sealed to the humans in its `default` group and loaded into the process
 environment by the launch before this entry builds (`<Secrets/>` below): there
-is no `.env`. The provider addresses (a region, a Cloudflare account or zone)
+is no `.env`. A secrets document holding a deploy credential belongs to exactly
+one entry, so `site/` and `examples/beetmania` keep their own, each beside its
+`main.bsx`. The provider addresses (a region, a Cloudflare account or zone)
 are identifiers, not secrets: spreads on a stack or an ancestor, resolved by
 ancestry and never read from the environment. Reading the document needs
 this machine's age identity (`~/.config/beet/age/keys.txt`); `beet
@@ -107,8 +110,8 @@ stays, an inert tag in a lean build.
 	     code from a phone, the one thing an automated process cannot supply -->
 	<AwsExec bx:cfg="feature:vault"/>
 	<AdminElevate bx:cfg="feature:vault"/>
-	<!-- the aws identity this workspace deploys as: one iam user for this
-	     document (the site entry shares it) and one managed policy per app the
+	<!-- the aws identity this entry deploys as: one iam user, `beet-deploy`,
+	     sealed in this entry's document, and one managed policy per app the
 	     entry declares, here the `beet` app of the stack below. A deploy checks
 	     it against the declarations before it writes anything, and an elevated
 	     deploy converges it as an administrator: the scoped pair it seals

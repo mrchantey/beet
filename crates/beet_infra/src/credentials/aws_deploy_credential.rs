@@ -1,5 +1,5 @@
-//! `<AwsDeployCredential/>`: this repo's own AWS deploy user, its policies and
-//! the pair its credential document holds.
+//! `<AwsDeployCredential/>`: an entry's own AWS deploy user, its policies and
+//! the pair its secrets document holds.
 
 use crate::actions::aws_cli_ext;
 use crate::prelude::*;
@@ -7,13 +7,14 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
 
-/// `<AwsDeployCredential/>`: the repo's AWS deploy credential, declared at the
-/// entry's root like `<Secrets/>`: one IAM user for the credential document,
-/// one managed policy per app the entry declares ([`AwsDeployPolicy`], lowered
-/// from what the stacks render), one runtime boundary per app and stage
-/// ([`RuntimeBoundary`]), and one access key, sealed into the document as
-/// `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` with the policies it was
-/// converged against in the key id's record.
+/// `<AwsDeployCredential/>`: the entry's AWS deploy credential, declared at
+/// the entry's root like `<Secrets/>`: one IAM user for the entry, one managed
+/// policy per app the entry declares ([`AwsDeployPolicy`], lowered from what
+/// the stacks render), one runtime boundary per app and stage
+/// ([`RuntimeBoundary`]), and one access key, sealed into the entry's secrets
+/// document as `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` with the
+/// policies it was converged against and the entry owning it in the key id's
+/// record.
 ///
 /// Nobody mints it by hand: a deploy checks the sealed grants against the
 /// declarations before it writes anything and refuses naming `--elevated`
@@ -44,7 +45,7 @@ use serde_json::Value;
 ///
 /// ## Every stage that deploys
 ///
-/// A launch renders the stacks of one stage, and a credential is per repo, so
+/// A launch renders the stacks of one stage, and a credential is per entry, so
 /// the policies are lowered at the launch's stage AND at `prod`
 /// ([`DeployCredential::render_stages`]): an elevated `dev` deploy can never
 /// narrow what prod needs. The reverse holds for the sealed record: a prod
@@ -71,16 +72,16 @@ use serde_json::Value;
 ///
 /// ## What converges
 ///
-/// - the user, `<repo>-deploy` ([`DeployCredential::name`]), created when
-///   absent. Named for the
-///   CREDENTIAL DOCUMENT rather than for an app, since a document holds one
-///   `AWS_ACCESS_KEY_ID` however many apps a repo deploys.
+/// - the user, `<app_name>-deploy` ([`DeployCredential::name`]), created when
+///   absent. Named for the ENTRY rather than for one of its apps, since its
+///   secrets document holds one `AWS_ACCESS_KEY_ID` however many apps the
+///   entry deploys, and belongs to that entry alone.
 /// - one managed policy per app, attached to the user, rewritten only when its
 ///   document changed (managed rather than inline: a user's inline budget is
-///   2048 characters for ALL of its policies together, which three apps of a
-///   repo exceed). A policy of an app this launch does not declare is left
-///   alone, so a repo whose entries declare different apps converges each from
-///   its own entry, and the key id's record keeps every entry's grants.
+///   2048 characters for ALL of its policies together, which three apps of an
+///   entry exceed). A policy attached to the user that is no app's of this
+///   entry is detached, and deleted when nothing else holds it, so the key
+///   holds exactly what its entry declares.
 /// - each service-linked role the stacks need at the account
 ///   ([`AwsDeployPolicy::service_linked_roles`]), created when absent: the key
 ///   may never create one, and an account that has never held, ie, an API
@@ -91,7 +92,12 @@ use serde_json::Value;
 ///   `--roll`. The pair is sealed before the key it replaces is deleted, and
 ///   the new one is proven with `sts:GetCallerIdentity` before either. A
 ///   current pair's records are resealed, values unchanged, when their note,
-///   roll or grants are not what this writes now.
+///   roll, grants or owner are not what this writes now.
+/// - the user the record held a key of before, whatever its name: once the
+///   new pair is sealed, a deploy user this converge made (tagged as one)
+///   other than the entry's own is retired, every policy detached (and deleted
+///   when nothing else holds it), its keys deleted, then the user, so a renamed
+///   credential leaves nothing behind.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct AwsDeployCredential;
@@ -228,8 +234,8 @@ impl AwsDeployCredential {
 
 	/// Where the sealed pair stands against the policies this launch's
 	/// declarations render, by the grants its key id's record carries. The
-	/// record holds every entry's apps and every stage's boundary, so only the
-	/// policies this launch lowers are compared.
+	/// record keeps the boundary of a stage this launch did not render
+	/// ([`Self::keeps`]), which is no line to drop.
 	async fn status_of(
 		&self,
 		caller: &AsyncEntity,
@@ -243,13 +249,13 @@ impl AwsDeployCredential {
 		};
 		let grants = Self::grant_lines(&apps)?;
 		let held = DeployCredential::sealed(caller, Self::KEY_ID).await;
-		let ours = |line: &str| Self::lowers(&apps, line);
+		let rendered = |line: &str| !Self::keeps(&apps, line);
 		let mut status = CredentialStatus::compare(
 			self.id(),
 			Self::KEY_ID,
 			&grants,
 			held.as_ref(),
-			Some(&ours),
+			Some(&rendered),
 		);
 		// a credential in another account holds none of what this one needs
 		if let Some((account, _)) = AwsAccount::declared(caller).await?
@@ -265,7 +271,7 @@ impl AwsDeployCredential {
 	/// The account to lower the policies against when the sealed key is absent
 	/// or lives outside the declared account: [`Self::UNKNOWN_ACCOUNT`], since
 	/// only the elevated deploy learns a new member's id, and the launch's own
-	/// credential (none, on a repo's first deploy) cannot resolve it. `None`
+	/// credential (none, on an entry's first deploy) cannot resolve it. `None`
 	/// lowers against the account the launch runs as.
 	async fn moving_to(caller: &AsyncEntity) -> Result<Option<&'static str>> {
 		let Some((account, _)) = AwsAccount::declared(caller).await? else {
@@ -295,23 +301,23 @@ impl AwsDeployCredential {
 		})
 	}
 
-	/// Whether a grant `line` names a policy this launch lowers: an app's
-	/// deploy policy, or the boundary of a stage it rendered, empty or not, or
-	/// a service-linked role its stacks need. Another entry's app is not this
-	/// launch's to judge or replace, and neither is the boundary of a stage it
-	/// did not render: a prod launch renders prod alone, so dev's boundary
-	/// stays as a dev launch sealed it.
-	fn lowers(apps: &[AppPolicies], line: &str) -> bool {
-		let (name, rest) = line.split_once(' ').unwrap_or((line, ""));
-		if name == Self::SERVICE_LINKED_LINE {
-			return Self::service_linked_roles(apps).contains(rest);
-		}
+	/// Whether a held grant `line` is one a converge keeps without rendering
+	/// it: the boundary of one of this entry's `apps` at a stage this launch
+	/// did not render. A prod launch renders prod alone, so dev's boundary
+	/// stays as a dev launch sealed it; every other line is this launch's to
+	/// judge and replace.
+	fn keeps(apps: &[AppPolicies], line: &str) -> bool {
+		let name = line.split_once(' ').map_or(line, |(name, _)| name);
 		apps.iter().any(|app| {
-			app.deploy.policy_name() == name
-				|| app
-					.boundaries
-					.values()
-					.any(|boundary| boundary.policy_name() == name)
+			name.strip_prefix(app.deploy.app().as_str())
+				.and_then(|rest| rest.strip_prefix("--"))
+				.and_then(|rest| rest.strip_suffix(RuntimeBoundary::SUFFIX))
+				.and_then(|stage| stage.strip_suffix("--"))
+				.is_some_and(|stage| {
+					!stage.is_empty()
+						&& !stage.contains("--")
+						&& !app.boundaries.contains_key(stage)
+				})
 		})
 	}
 
@@ -324,22 +330,29 @@ impl AwsDeployCredential {
 	}
 
 	/// The grants a converge seals: this launch's `grants`, beside every
-	/// `held` line naming a policy it does not lower, as that line was sealed.
-	fn merge_grants(
+	/// `held` line it keeps without rendering ([`Self::keeps`]), as that line
+	/// was sealed.
+	fn with_kept(
 		held: Vec<SmolStr>,
 		apps: &[AppPolicies],
 		grants: &[String],
 	) -> Vec<String> {
-		let mut merged = held
+		let mut sealed = held
 			.into_iter()
-			.filter(|line| !Self::lowers(apps, line))
+			.filter(|line| Self::keeps(apps, line))
 			.map(String::from)
 			.chain(grants.iter().cloned())
 			.collect::<Vec<_>>();
-		merged.sort();
-		merged.dedup();
-		merged
+		sealed.sort();
+		sealed.dedup();
+		sealed
 	}
+
+	/// Whether a policy detached from a deploy user is deleted: when the user
+	/// was its one attachment of `attachments`, counted before the detach. An
+	/// unreadable count is never one, so a policy is only ever deleted on a
+	/// count that says nothing else holds it.
+	fn release(attachments: u32) -> bool { attachments == 1 }
 
 	/// One line per policy this launch's apps render: its name and a digest of
 	/// its document, the deploy policy unconditioned since whether it carries
@@ -379,7 +392,8 @@ impl AwsDeployCredential {
 
 	/// Buy an administrator session, converge the declared account
 	/// ([`AwsAccount`]) and act inside it, converge the user, every boundary
-	/// and policy, and the key, and hand the deploy the session whatever
+	/// and policy, the key, and the user it replaces, and hand the deploy the
+	/// session whatever
 	/// `ask.run` says: it is bought already, and the key's policies may have
 	/// changed a moment ago, which IAM takes a while to propagate.
 	async fn elevate_with(
@@ -433,7 +447,8 @@ impl AwsDeployCredential {
 			}
 			None => apps,
 		};
-		let user = DeployCredential::name()?;
+		let entry = DeployCredential::entry(caller).await?;
+		let user = DeployCredential::name(&entry);
 		report.push(admin.ensure_user(&user).await?);
 		// what the account must hold that the key may never create
 		for service in Self::service_linked_roles(&apps) {
@@ -452,14 +467,30 @@ impl AwsDeployCredential {
 					.await?,
 			);
 		}
+		// exactly this entry's: a policy another entry's apps declare is
+		// that entry's user's to hold
+		let own = apps
+			.iter()
+			.map(|app| {
+				format!(
+					"arn:aws:iam::{account}:policy/{}",
+					app.deploy.policy_name()
+				)
+			})
+			.collect::<Vec<_>>();
+		for arn in admin.attached_policies(&user).await? {
+			if !own.contains(&arn.to_string()) {
+				report.push(admin.release_policy(&user, &arn).await?);
+			}
+		}
 		let grants = Self::grant_lines(&apps)?;
 		let home = KeyHome {
 			account: &account,
 			member: home.as_ref(),
 		};
-		report.push(
+		report.extend(
 			Self::converge_key(
-				caller, &admin, &user, home, &apps, &grants, ask.roll,
+				caller, &admin, &entry, home, &apps, &grants, ask.roll,
 			)
 			.await?,
 		);
@@ -564,7 +595,10 @@ impl AwsDeployCredential {
 				.to_string()
 				.xok();
 		};
-		let mut out = format!("user {}\n", DeployCredential::name()?);
+		let mut out = format!(
+			"user {}\n",
+			DeployCredential::name(&DeployCredential::entry(caller).await?)
+		);
 		if let Some((account, region)) = declared {
 			out.push_str(&format!("{}\n", account.describe(&region)?));
 		}
@@ -590,21 +624,25 @@ impl AwsDeployCredential {
 		out.xok()
 	}
 
-	/// Converge the access key: mint one when the document holds none of this
-	/// user's, or on `roll`, sealing the pair with `grants` before deleting
-	/// what it replaces; restate a current pair's records otherwise. The key
-	/// id's record keeps the grants of policies this launch does not lower
-	/// ([`Self::merge_grants`]) while it lives in the same account, and none
-	/// once the credential moves into another, which holds none of them.
+	/// Converge `entry`'s access key: mint one when the document holds none of
+	/// its user's, or on `roll`, sealing the pair with `grants` before deleting
+	/// what it replaces, then retire the user the record held a key of when it
+	/// is another ([`Self::retiring`]); restate a current pair's records
+	/// otherwise. The key id's record keeps the boundaries of stages this
+	/// launch did not render ([`Self::with_kept`]) while it lives in the same
+	/// account, and none once the credential moves into another, which holds
+	/// none of them. One report line per act.
 	async fn converge_key(
 		caller: &AsyncEntity,
 		admin: &AwsAdmin,
-		user: &str,
+		entry: &str,
 		home: KeyHome<'_>,
 		apps: &[AppPolicies],
 		grants: &[String],
 		roll: bool,
-	) -> Result<String> {
+	) -> Result<Vec<String>> {
+		let user = DeployCredential::name(entry);
+		let user = user.as_str();
 		let handle = SecretsHandle::resolve(caller, None).await?;
 		let identity = AgeIdentityFile::require()?;
 		let mut document = handle.read_or_new().await?;
@@ -623,7 +661,7 @@ impl AwsDeployCredential {
 				.map(SmolStr::as_str)
 				== home.member.map(|member| member.name.as_str())
 		});
-		let merged = Self::merge_grants(
+		let sealed = Self::with_kept(
 			match same_home {
 				true => DeployCredential::held_grants(held_id.as_ref()),
 				false => Vec::new(),
@@ -643,8 +681,8 @@ impl AwsDeployCredential {
 		if holds_active && !roll {
 			let mut resealed = false;
 			for (secret, record) in [
-				(held_id.as_ref(), Self::id_record(user, &home, &merged)),
-				(held_secret.as_ref(), Self::secret_record(user)),
+				(held_id.as_ref(), Self::id_record(entry, &home, &sealed)),
+				(held_secret.as_ref(), Self::secret_record(entry)),
 			] {
 				if let Some((secret, record)) = secret.and_then(|secret| {
 					DeployCredential::restated(secret, &group, record)
@@ -663,17 +701,25 @@ impl AwsDeployCredential {
 			if resealed {
 				handle.write(&document).await?;
 			}
-			return format!(
+			return vec![format!(
 				"key {} of {user} is sealed in {}{}",
 				held.unwrap_or_default(),
 				handle.describe(),
 				match resealed {
-					true => ", its note, roll and grants resealed",
+					true => ", its note, roll, grants and owner resealed",
 					false => "",
 				}
-			)
+			)]
 			.xok();
 		}
+		// the user the record held a key of, asked before the mint: a key
+		// this user does not hold is another's, which this converge replaces
+		let previous = match (same_home, held.as_ref()) {
+			(true, Some(held)) if !existing.contains(held) => {
+				admin.key_owner(held).await?
+			}
+			_ => None,
+		};
 		// a user may hold two keys at once, so anything this document does not
 		// name goes before the mint rather than after it
 		for stale in existing.iter().filter(|key| Some(*key) != held.as_ref()) {
@@ -687,14 +733,14 @@ impl AwsDeployCredential {
 			&group,
 			Self::KEY_ID,
 			&id,
-			Self::id_record(user, &home, &merged),
+			Self::id_record(entry, &home, &sealed),
 		)?;
 		document.set(
 			&identity,
 			&group,
 			Self::KEY_SECRET,
 			&secret,
-			Self::secret_record(user),
+			Self::secret_record(entry),
 		)?;
 		handle.write(&document).await?;
 		// only now: the pair that replaces it is sealed and proven
@@ -704,17 +750,28 @@ impl AwsDeployCredential {
 			admin.delete_key(user, &held).await?;
 			info!("deleted the replaced key {held} of {user}");
 		}
-		format!(
+		let mut report = vec![format!(
 			"key {id} minted for {user} and sealed in {} (group `{group}`)",
 			handle.describe()
-		)
-		.xok()
+		)];
+		if let Some(retiring) = Self::retiring(previous.as_deref(), user) {
+			report.extend(admin.retire_user(retiring).await?);
+		}
+		report.xok()
 	}
 
-	/// The key id's record: what it is, how it rolls, the account it lives
-	/// in, and the grants a plain deploy compares the declarations against.
+	/// The user a converge of `user` retires once its pair is sealed: the one
+	/// `previous`, the owner of the key the record held, names, unless that is
+	/// `user` itself.
+	fn retiring<'a>(previous: Option<&'a str>, user: &str) -> Option<&'a str> {
+		previous.filter(|previous| *previous != user)
+	}
+
+	/// `entry`'s key id record: what it is, how it rolls, the entry owning it,
+	/// the account it lives in, and the grants a plain deploy compares the
+	/// declarations against.
 	fn id_record(
-		user: &str,
+		entry: &str,
 		home: &KeyHome,
 		grants: &[String],
 	) -> SecretRecord {
@@ -722,9 +779,10 @@ impl AwsDeployCredential {
 			role: Some(SecretRole::EnvVar),
 			note: Some(
 				format!(
-					"aws deploy credential `{user}`: the access key id of \
-					this repo's own iam user; the deploy verbs and every \
-					`aws s3 sync` read the pair from here, never from ~/.aws"
+					"aws deploy credential `{}`: the access key id of the \
+					`{entry}` entry's own iam user; its deploy verbs and every \
+					`aws s3 sync` read the pair from here, never from ~/.aws",
+					DeployCredential::name(entry)
 				)
 				.into(),
 			),
@@ -734,6 +792,7 @@ impl AwsDeployCredential {
 					DeployCredential::GRANTS,
 					Some(SmolStr::from(grants.join("\n"))),
 				),
+				(DeployCredential::ENTRY, Some(SmolStr::from(entry))),
 				(Self::ACCOUNT, Some(SmolStr::from(home.account))),
 				(
 					Self::ACCOUNT_NAME,
@@ -749,14 +808,15 @@ impl AwsDeployCredential {
 		}
 	}
 
-	/// The secret half's record.
-	fn secret_record(user: &str) -> SecretRecord {
+	/// `entry`'s secret half record.
+	fn secret_record(entry: &str) -> SecretRecord {
 		SecretRecord {
 			role: Some(SecretRole::EnvVar),
 			note: Some(
 				format!(
-					"aws deploy credential `{user}`: the secret half of {}, \
+					"aws deploy credential `{}`: the secret half of {}, \
 					shown once at creation",
+					DeployCredential::name(entry),
 					Self::KEY_ID
 				)
 				.into(),
@@ -855,6 +915,8 @@ impl AwsAdmin {
 
 	/// The tag the deploy user carries, saying what made it.
 	const USER_TAG: &'static str = "Key=beet,Value=deploy-credential";
+	/// Its value, what a retirement checks before deleting a user.
+	const USER_TAG_VALUE: &'static str = "deploy-credential";
 
 	/// `process` as this session: its three variables set, an inherited
 	/// profile dropped, every value redacted from any rendering of the command.
@@ -1014,6 +1076,148 @@ impl AwsAdmin {
 		])
 		.await
 		.map(|_| ())
+	}
+
+	/// The user holding the access key `id`, `None` when the account holds
+	/// no such key.
+	async fn key_owner(&self, id: &str) -> Result<Option<SmolStr>> {
+		match self
+			.iam([
+				"get-access-key-last-used",
+				"--access-key-id",
+				id,
+				"--query",
+				"UserName",
+				"--output",
+				"text",
+			])
+			.await
+		{
+			Ok(out) => Self::text_option(out).xok(),
+			Err(err)
+				if err.to_string().contains("NoSuchEntity")
+					|| err.to_string().contains("AccessDenied") =>
+			{
+				None.xok()
+			}
+			Err(err) => Err(err),
+		}
+	}
+
+	/// Every managed policy attached to `user`, by arn.
+	async fn attached_policies(&self, user: &str) -> Result<Vec<SmolStr>> {
+		self.iam([
+			"list-attached-user-policies",
+			"--user-name",
+			user,
+			"--query",
+			"AttachedPolicies[].PolicyArn",
+			"--output",
+			"json",
+		])
+		.await?
+		.xmap(|body| serde_json::from_str::<Vec<SmolStr>>(&body))?
+		.xok()
+	}
+
+	/// Detach the managed policy `arn` from `user`, deleting it when nothing
+	/// else holds it ([`AwsDeployCredential::release`]), answering the report
+	/// line.
+	async fn release_policy(&self, user: &str, arn: &str) -> Result<String> {
+		let attachments = self
+			.iam([
+				"get-policy",
+				"--policy-arn",
+				arn,
+				"--query",
+				"Policy.AttachmentCount",
+				"--output",
+				"text",
+			])
+			.await?
+			.trim()
+			.parse::<u32>()
+			.unwrap_or(u32::MAX);
+		self.iam([
+			"detach-user-policy",
+			"--user-name",
+			user,
+			"--policy-arn",
+			arn,
+		])
+		.await?;
+		let name = arn.rsplit('/').next().unwrap_or(arn);
+		if !AwsDeployCredential::release(attachments) {
+			return format!("policy {name} detached from {user}").xok();
+		}
+		// a managed policy is deleted only once its other versions are
+		let versions = self
+			.iam([
+				"list-policy-versions",
+				"--policy-arn",
+				arn,
+				"--query",
+				"Versions[?IsDefaultVersion==`false`].VersionId",
+				"--output",
+				"json",
+			])
+			.await?
+			.xmap(|body| serde_json::from_str::<Vec<SmolStr>>(&body))?;
+		for version in versions {
+			self.iam([
+				"delete-policy-version",
+				"--policy-arn",
+				arn,
+				"--version-id",
+				version.as_str(),
+			])
+			.await?;
+		}
+		self.iam(["delete-policy", "--policy-arn", arn]).await?;
+		format!(
+			"policy {name} detached from {user} and deleted, nothing else holding it"
+		)
+		.xok()
+	}
+
+	/// Retire the deploy user `user` a renamed credential replaced: every
+	/// policy released ([`Self::release_policy`]), its keys deleted, then the
+	/// user, one report line per act. A user this converge did not make
+	/// (untagged) is left, and said so.
+	async fn retire_user(&self, user: &str) -> Result<Vec<String>> {
+		let tag = self
+			.iam([
+				"list-user-tags",
+				"--user-name",
+				user,
+				"--query",
+				"Tags[?Key==`beet`].Value",
+				"--output",
+				"text",
+			])
+			.await
+			.ok()
+			.and_then(Self::text_option);
+		if tag.as_deref() != Some(Self::USER_TAG_VALUE) {
+			return vec![format!(
+				"user {user} held the replaced key but is no deploy user this \
+				made, so it is left: delete it at the console if nothing needs \
+				it"
+			)]
+			.xok();
+		}
+		let mut report = Vec::new();
+		for arn in self.attached_policies(user).await? {
+			report.push(self.release_policy(user, &arn).await?);
+		}
+		for key in self.access_keys(user).await? {
+			self.delete_key(user, &key).await?;
+			report.push(format!("key {key} of {user} deleted"));
+		}
+		self.iam(["delete-user", "--user-name", user]).await?;
+		report
+			.push(format!("user {user} retired, replaced by this entry's own"));
+		report.xok()
 	}
 }
 
@@ -1264,19 +1468,12 @@ impl AwsDeployPolicy {
 		arn: &str,
 		user: &str,
 	) -> Result {
-		let attached = admin
-			.iam([
-				"list-attached-user-policies",
-				"--user-name",
-				user,
-				"--query",
-				"AttachedPolicies[].PolicyArn",
-				"--output",
-				"json",
-			])
+		if admin
+			.attached_policies(user)
 			.await?
-			.xmap(|body| serde_json::from_str::<Vec<SmolStr>>(&body))?;
-		if attached.iter().any(|held| held == arn) {
+			.iter()
+			.any(|held| held == arn)
+		{
 			return OK;
 		}
 		admin
@@ -1299,10 +1496,10 @@ mod test {
 	use beet_core::prelude::*;
 
 	/// An elevated prod deploy renders prod alone, so it replaces the lines of
-	/// the policies it lowers and keeps another entry's app and the dev
-	/// boundary as they were sealed: dropping the dev line once left every
-	/// later dev deploy refusing for `--elevated` over a boundary the account
-	/// already held byte for byte.
+	/// the policies it lowers and keeps the dev boundary as it was sealed:
+	/// dropping the dev line once left every later dev deploy refusing for
+	/// `--elevated` over a boundary the account already held byte for byte.
+	/// Another entry's line is dropped: its own user holds it.
 	#[beet_core::test]
 	fn keeps_the_grants_of_a_stage_it_did_not_render() {
 		let apps = vec![AppPolicies {
@@ -1321,21 +1518,104 @@ mod test {
 		]
 		.map(SmolStr::from)
 		.to_vec();
-		AwsDeployCredential::merge_grants(held, &apps, &[
+		AwsDeployCredential::with_kept(held, &apps, &[
 			"beet-site--deploy 55".into(),
 			"beet-site--prod--runtime-boundary 66".into(),
 		])
 		.xpect_eq(vec![
-			"beet--deploy 11".to_string(),
-			"beet-site--deploy 55".into(),
+			"beet-site--deploy 55".to_string(),
 			"beet-site--dev--runtime-boundary 33".into(),
 			"beet-site--prod--runtime-boundary 66".into(),
 		]);
+		// only this entry's apps: a boundary of `beet-site-x` is not one
+		AwsDeployCredential::keeps(
+			&apps,
+			"beet-site-x--dev--runtime-boundary 1",
+		)
+		.xpect_false();
+		AwsDeployCredential::keeps(
+			&apps,
+			"beetmania--prod--runtime-boundary 1",
+		)
+		.xpect_false();
 	}
 
-	/// A service-linked role the stacks need is a grant line of its own,
-	/// judged only by a launch that needs it: one rendering no custom domain
-	/// keeps the line as another entry sealed it.
+	/// A converge's grants are exactly its entry's: a held line of another
+	/// entry's app or a service-linked role nothing here needs is not kept,
+	/// and a plain deploy notes it as the next elevated deploy's to drop.
+	#[beet_core::test]
+	fn seals_exactly_its_entrys_grants() {
+		let apps = vec![AppPolicies {
+			deploy: AwsDeployPolicy::new("beetmania", "state"),
+			boundaries: BTreeMap::from([(
+				SmolStr::new(BootstrapConfig::PROD_STAGE),
+				RuntimeBoundary::new("beetmania", BootstrapConfig::PROD_STAGE),
+			)]),
+			principals: Vec::new(),
+		}];
+		let held = [
+			"beet-site--deploy 22",
+			"beetmania--deploy 11",
+			"service-linked-role ops.apigateway.amazonaws.com",
+		]
+		.map(SmolStr::from)
+		.to_vec();
+		let grants = vec!["beetmania--deploy 33".to_string()];
+		AwsDeployCredential::with_kept(held.clone(), &apps, &grants)
+			.xpect_eq(grants.clone());
+		let secret = Secret {
+			name: "AWS_ACCESS_KEY_ID".into(),
+			group: "default".into(),
+			value: "AKIA".into(),
+			record: SecretRecord {
+				metadata: BTreeMap::from([(
+					DeployCredential::GRANTS.into(),
+					held.join("\n").into(),
+				)]),
+				..default()
+			},
+		};
+		let rendered = |line: &str| !AwsDeployCredential::keeps(&apps, line);
+		let status = CredentialStatus::compare(
+			"aws",
+			"AWS_ACCESS_KEY_ID",
+			&grants,
+			Some(&secret),
+			Some(&rendered),
+		);
+		status.stale.len().xpect_eq(1);
+		status
+			.notes
+			.join("\n")
+			.xpect_contains("beet-site--deploy")
+			.xpect_contains("service-linked-role");
+	}
+
+	/// A renamed credential retires the user its record held a key of, and
+	/// only that user: the entry's own is never retired, and a policy
+	/// detached from it is deleted only when the count says it was the one
+	/// attachment.
+	///
+	/// REGRESSION: the repo's one `beet-deploy` user held every entry's
+	/// policies; naming the credential per entry must leave no user behind.
+	#[beet_core::test]
+	fn retires_the_user_a_renamed_credential_replaced() {
+		AwsDeployCredential::retiring(Some("beet-deploy"), "beet-site-deploy")
+			.xpect_eq(Some("beet-deploy"));
+		AwsDeployCredential::retiring(
+			Some("beet-site-deploy"),
+			"beet-site-deploy",
+		)
+		.xpect_none();
+		AwsDeployCredential::retiring(None, "beet-site-deploy").xpect_none();
+		// `beet-site--deploy` is attached to the new user too
+		AwsDeployCredential::release(2).xpect_false();
+		AwsDeployCredential::release(1).xpect_true();
+		AwsDeployCredential::release(u32::MAX).xpect_false();
+	}
+
+	/// A service-linked role the stacks need is a grant line of its own, so a
+	/// plain deploy into an account the converge has not prepared refuses.
 	#[beet_core::test]
 	fn records_the_service_linked_roles_the_stacks_need() {
 		let app = |declared: &[&str]| AppPolicies {
@@ -1349,11 +1629,10 @@ mod test {
 			.unwrap()
 			.contains(&line.to_string())
 			.xpect_true();
-		AwsDeployCredential::lowers(&domain, line).xpect_true();
+		// a role the entry no longer needs is dropped with the rest
 		let bucket = vec![app(&[])];
-		AwsDeployCredential::lowers(&bucket, line).xpect_false();
-		AwsDeployCredential::merge_grants(vec![line.into()], &bucket, &[])
-			.xpect_eq(vec![line.to_string()]);
+		AwsDeployCredential::with_kept(vec![line.into()], &bucket, &[])
+			.xpect_empty();
 	}
 
 	/// Declaring an account makes a key living anywhere else stale, the

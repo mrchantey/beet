@@ -65,40 +65,46 @@ async fn load(entity: &AsyncEntity) -> Result {
 	let Some(opened) = handle.load_env_vars_of(&document)? else {
 		return OK;
 	};
-	// one map across the world: a name in two documents is an error naming
-	// both, never a silent shadow; a second declaration of the same file (an
-	// entry checked from another entry's process) is the same document
+	// one map per entry: a name in two of its documents is an error naming
+	// both, never a silent shadow. Another entry built into this world (one
+	// checked from another entry's process, a root of its own) keeps its own
+	// documents, which may hold copies of the same records, and a second
+	// declaration of the same file is the same document
 	let mine = opened.clone();
 	let mine_handle = handle.clone();
+	let mine_entity = entity.id();
 	let label = handle.label.clone().unwrap_or_default();
 	entity
 		.world()
-		.with_state::<Query<(&Secrets, &SecretsHandle, &OpenSecrets)>, Result>(
-			move |others| {
-				for (secrets, other_handle, other) in
-					others.iter().filter(|(_, other_handle, _)| {
-						!mine_handle.same_file(other_handle)
-					}) {
-					let overlap = mine.overlap(other);
-					if !overlap.is_empty() {
-						bevybail!(
-							"record(s) {} are declared in both `{label}` ({}) \
+		.with_state::<(
+			Query<(Entity, &Secrets, &SecretsHandle, &OpenSecrets)>,
+			Query<&ChildOf>,
+		), Result>(move |(others, parents)| {
+			let entry = parents.root_ancestor(mine_entity);
+			for (_, secrets, other_handle, other) in
+				others.iter().filter(|(other, _, other_handle, _)| {
+					parents.root_ancestor(*other) == entry
+						&& !mine_handle.same_file(other_handle)
+				}) {
+				let overlap = mine.overlap(other);
+				if !overlap.is_empty() {
+					bevybail!(
+						"record(s) {} are declared in both `{label}` ({}) \
 							and `{}` ({}): a name is loaded from exactly one \
 							document",
-							overlap
-								.iter()
-								.map(|name| format!("`{name}`"))
-								.collect::<Vec<_>>()
-								.join(", "),
-							mine_handle.path,
-							secrets.label,
-							other_handle.path
-						);
-					}
+						overlap
+							.iter()
+							.map(|name| format!("`{name}`"))
+							.collect::<Vec<_>>()
+							.join(", "),
+						mine_handle.path,
+						secrets.label,
+						other_handle.path
+					);
 				}
-				Ok(())
-			},
-		)
+			}
+			Ok(())
+		})
 		.await?;
 	entity.insert((handle, opened)).await
 }
@@ -257,8 +263,9 @@ mod test {
 		}
 	}
 
-	/// A name loaded from two files is refused naming both, while a second
-	/// declaration of the same file is the same document and loads.
+	/// A name loaded from two files of one entry is refused naming both,
+	/// while a second declaration of the same file is the same document and
+	/// loads, and so does another entry's file holding a copy.
 	#[beet_core::test]
 	async fn one_name_loads_from_one_document() {
 		let mut fixture = VerbWorld::new();
@@ -305,6 +312,20 @@ mod test {
 			.id();
 		AsyncRunner::settle_async_tasks(&mut fixture.world).await;
 		fixture.world.get::<OpenSecrets>(other).xpect_none();
+		// another entry built into this world, a root of its own (one checked
+		// from this entry's process), keeps its own documents
+		//
+		// REGRESSION: `site/` and `examples/beetmania` gained documents of
+		// their own holding copies of the repo document's records, and
+		// `beet check site` from the repo's root refused to open the site's
+		let store = fixture.store();
+		let entry = fixture.world.spawn(store).id();
+		let checked = fixture
+			.world
+			.spawn((Secrets::new("b.toml").with_label("b"), ChildOf(entry)))
+			.id();
+		AsyncRunner::settle_async_tasks(&mut fixture.world).await;
+		fixture.world.get::<OpenSecrets>(checked).xpect_some();
 	}
 
 	/// A missing document is not an error: nothing is inserted and the load

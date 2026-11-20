@@ -51,8 +51,8 @@ use serde_json::json;
 /// to another app's buckets or state, and nothing at the account level.
 ///
 /// Every name pattern is per APP and not per stage, so one mint covers every
-/// stage of it. That is not a scoping the pair has to give up: a credential
-/// document is per repo, so the same key deploys `dev` and `prod`, and a policy
+/// stage of it. That is not a scoping the pair has to give up: a credential is
+/// per entry, so the same key deploys `dev` and `prod`, and a policy
 /// split by stage would draw a boundary the key does not have.
 ///
 /// The SERVICES are one stage's, and that is the design rather than a
