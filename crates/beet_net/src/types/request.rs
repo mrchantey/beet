@@ -54,6 +54,8 @@ pub struct Request {
 	/// Whether the client follows a `3xx` itself, [`Redirects::Follow`] by
 	/// default. Ignored by a server, which never follows anything.
 	pub redirects: Redirects,
+	/// What the handlers it threads through carry to the next, never sent.
+	pub extensions: Extensions,
 }
 
 /// Whether a client follows a `3xx` itself, and how far.
@@ -176,6 +178,7 @@ impl Request {
 			parts: RequestParts::new(method, url),
 			body: default(),
 			redirects: default(),
+			extensions: default(),
 		}
 	}
 
@@ -185,6 +188,7 @@ impl Request {
 			parts,
 			body,
 			redirects: default(),
+			extensions: default(),
 		}
 	}
 
@@ -448,7 +452,8 @@ impl Request {
 	/// Returns a mutable reference to the request parts
 	pub fn request_parts_mut(&mut self) -> &mut RequestParts { &mut self.parts }
 
-	/// Consumes the request and returns the parts and body
+	/// Consumes the request and returns the parts and body, dropping its
+	/// [`Extensions`].
 	pub fn into_parts(self) -> (RequestParts, Body) { (self.parts, self.body) }
 
 	/// Creates a request from an http::Request
@@ -466,6 +471,7 @@ impl Request {
 			parts,
 			body,
 			redirects: default(),
+			extensions: default(),
 		}
 	}
 
@@ -483,6 +489,7 @@ impl Request {
 			parts: RequestParts::from(args),
 			body: default(),
 			redirects: default(),
+			extensions: default(),
 		};
 		match body.and_then(|values| values.into_iter().next()) {
 			Some(body) => request

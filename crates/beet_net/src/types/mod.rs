@@ -28,6 +28,7 @@
 
 // core types (moved from beet_core)
 mod body;
+mod extensions;
 pub mod header;
 /// Alias for [`header`] for ergonomic typed header access.
 pub use header as headers;
@@ -41,6 +42,7 @@ mod response;
 #[cfg(feature = "http")]
 mod http_interop;
 pub use body::*;
+pub use extensions::*;
 pub use header_map::*;
 #[cfg(feature = "http")]
 pub(crate) use http_interop::*;
