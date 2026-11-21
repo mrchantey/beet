@@ -197,8 +197,8 @@ impl AwsDeployCredential {
 	/// management account itself.
 	const ACCOUNT_NAME: &'static str = "account_name";
 	/// The key id record's metadata naming each deploy policy last written
-	/// without its boundary conditions, one per line, absent when none was:
-	/// due until an elevated deploy conditions it.
+	/// without the boundary conditions its app has a boundary for, one per
+	/// line, absent when none was: due until an elevated deploy conditions it.
 	const UNCONDITIONED: &'static str = "unconditioned";
 	/// Stands in for a member account's id before the key lives there, which
 	/// only the elevated deploy learns, as [`AwsAccount`]'s own description
@@ -284,7 +284,8 @@ impl AwsDeployCredential {
 	}
 
 	/// The deploy policies of `apps` the `held` key id's record says were
-	/// written unconditioned ([`Self::UNCONDITIONED`]).
+	/// written unconditioned ([`Self::UNCONDITIONED`]), of the apps with a
+	/// boundary to condition them on.
 	fn unconditioned<'a>(
 		held: Option<&'a Secret>,
 		apps: &'a [AppPolicies],
@@ -293,7 +294,9 @@ impl AwsDeployCredential {
 			.into_iter()
 			.flat_map(|lines| lines.lines())
 			.filter(|policy| {
-				apps.iter().any(|app| app.deploy.policy_name() == *policy)
+				apps.iter().any(|app| {
+					app.has_boundary() && app.deploy.policy_name() == *policy
+				})
 			})
 	}
 
@@ -491,7 +494,7 @@ impl AwsDeployCredential {
 				report.push(boundary.converge(&admin, &account).await?);
 			}
 			let policy = app.deploy_policy(&admin, &account).await?;
-			if !policy.bounded() {
+			if app.has_boundary() && !policy.bounded() {
 				unconditioned.push(policy.policy_name());
 			}
 			report.push(policy.converge(&admin, &account, &user).await?);
@@ -1269,6 +1272,13 @@ impl AwsAdmin {
 }
 
 impl AppPolicies {
+	/// Whether any stage of this app has a boundary to condition its deploy
+	/// policy on: none when no stack renders a principal, so its policy is
+	/// unconditioned for good rather than waiting on a cap.
+	fn has_boundary(&self) -> bool {
+		!self.boundaries.values().all(RuntimeBoundary::is_empty)
+	}
+
 	/// This app's deploy policy, carrying the boundary conditions only when
 	/// every principal its stacks render ALREADY wears the boundary.
 	///
@@ -1280,7 +1290,7 @@ impl AppPolicies {
 		admin: &AwsAdmin,
 		account: &str,
 	) -> Result<AwsDeployPolicy> {
-		if self.boundaries.values().all(RuntimeBoundary::is_empty) {
+		if !self.has_boundary() {
 			return self.deploy.clone().xok();
 		}
 		// any boundary OF THIS APP satisfies the condition, so a principal
@@ -1554,6 +1564,26 @@ mod test {
 		}]
 	}
 
+	/// The app a lambda stack renders, whose principal its boundary caps.
+	fn lambda_app() -> AppPolicies {
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(LambdaBlock::default());
+		});
+		let (stack, _deployment, config) = scope.finish().unwrap();
+		let boundary = RuntimeBoundary::new(
+			stack.app_name().clone(),
+			stack.stage().clone(),
+		)
+		.lower(&config)
+		.unwrap();
+		AppPolicies {
+			deploy: AwsDeployPolicy::new(stack.app_name().clone(), "state"),
+			boundaries: BTreeMap::from([(stack.stage().clone(), boundary)]),
+			principals: Vec::new(),
+		}
+	}
+
 	/// A sealed key id whose record carries `metadata`.
 	fn key_id(metadata: &[(&str, String)]) -> Secret {
 		Secret {
@@ -1643,14 +1673,18 @@ mod test {
 
 	/// A deploy policy written without its boundary conditions is recorded on
 	/// the key id and due until a converge writes it conditioned, and only
-	/// this entry's apps answer for it.
+	/// this entry's apps with a boundary answer for it.
 	///
 	/// REGRESSION: the grant digest is of the unconditioned document, so the
 	/// record read current either way, and the elevated deploy that was to
-	/// close the door never ran.
+	/// close the door never ran. Then the root entry's `shared` stack, which
+	/// renders no principal and so has no boundary, was recorded too, due at
+	/// every dry run with nothing an elevated deploy could settle.
 	#[beet_core::test]
 	fn an_unconditioned_policy_is_due() {
-		let apps = prod_app("beetmania");
+		let lambda = lambda_app();
+		let bounded = lambda.deploy.policy_name();
+		let apps = vec![lambda, prod_app("beetmania").remove(0)];
 		let home = super::KeyHome {
 			account: "1",
 			member: None,
@@ -1672,11 +1706,11 @@ mod test {
 			.xpect_eq("beetmania--deploy");
 		let held = key_id(&[(
 			AwsDeployCredential::UNCONDITIONED,
-			"beet-site--deploy\nbeetmania--deploy".into(),
+			format!("beet-site--deploy\nbeetmania--deploy\n{bounded}"),
 		)]);
 		AwsDeployCredential::unconditioned(Some(&held), &apps)
 			.collect::<Vec<_>>()
-			.xpect_eq(vec!["beetmania--deploy"]);
+			.xpect_eq(vec![bounded.as_str()]);
 	}
 
 	/// A renamed credential retires the user its record held a key of, and
