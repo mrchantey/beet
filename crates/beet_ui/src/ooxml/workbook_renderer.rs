@@ -23,18 +23,15 @@ struct SheetWrite {
 	name: String,
 	/// Whether its enclosing article is `hidden`.
 	hidden: bool,
-	/// Every cell with its position and its spans.
+	/// Every cell with its place in the grid.
 	cells: Vec<CellWrite>,
 }
 
 /// One cell as the writer gathers it.
 struct CellWrite {
-	/// The cell's entity, whose look the cascade resolves.
-	entity: Entity,
-	/// Its position.
-	position: TablePosition,
-	/// The columns and rows it spans.
-	span: (u32, u32),
+	/// Its place in the grid, its entity the one whose look the cascade
+	/// resolves.
+	place: GridCell,
 	/// Its text.
 	text: String,
 	/// Its formula without the `=`.
@@ -97,7 +94,7 @@ impl WorkbookRenderer {
 		// every cell's look, what it resolves differently from the root's
 		let entities = sheets
 			.iter()
-			.flat_map(|sheet| sheet.cells.iter().map(|cell| cell.entity))
+			.flat_map(|sheet| sheet.cells.iter().map(|cell| cell.place.entity))
 			.collect::<Vec<_>>();
 		let mut looks = styles.direct(world, &entities, None)?.into_iter();
 		let mut formats = vec![FormatWrite {
@@ -261,12 +258,9 @@ impl WorkbookRenderer {
 					let cells = grid
 						.cells(table)
 						.into_iter()
-						.map(|(cell, position)| {
+						.map(|place| {
+							let cell = place.entity;
 							let view = elements.get(cell).ok();
-							let span = view
-								.as_ref()
-								.map(|view| (view.colspan(), view.rowspan()))
-								.unwrap_or((1, 1));
 							let formula = view
 								.as_ref()
 								.and_then(|view| view.attribute("data-formula"))
@@ -291,9 +285,7 @@ impl WorkbookRenderer {
 										.flatten()
 								});
 							CellWrite {
-								entity: cell,
-								position,
-								span,
+								place,
 								text: text
 									.text(cell)
 									.trim_end_matches('\n')
@@ -403,9 +395,9 @@ impl WorkbookRenderer {
 		let mut links = Vec::new();
 		for (cell, format) in sheet.cells.iter().zip(formats) {
 			let xml = rows
-				.entry(cell.position.row.get())
+				.entry(cell.place.start.y)
 				.or_insert_with(XmlPart::fragment);
-			let reference = cell.position.to_string();
+			let reference = A1Reference(cell.place.start).to_string();
 			let format = format.to_string();
 			let mut attributes = vec![("r", reference.as_str())];
 			if format != "0" {
@@ -453,14 +445,11 @@ impl WorkbookRenderer {
 					xml.close("c");
 				}
 			}
-			let (columns, rows) = cell.span;
-			if columns > 1 || rows > 1 {
-				let last = TablePosition::new(
-					cell.position.column.get() + columns - 1,
-					cell.position.row.get() + rows - 1,
-				)
-				.unwrap_or(cell.position);
-				merges.push(format!("{}:{last}", cell.position));
+			if cell.place.span != UVec2::ONE {
+				merges.push(format!(
+					"{reference}:{}",
+					A1Reference(cell.place.last())
+				));
 			}
 			if let Some(href) = &cell.href {
 				links.push((reference, href.clone()));
@@ -473,7 +462,8 @@ impl WorkbookRenderer {
 		])
 		.open("sheetData", &[]);
 		for (row, cells) in rows {
-			xml.open("row", &[("r", &row.to_string())])
+			// a row's number counts from 1
+			xml.open("row", &[("r", &(row as u64 + 1).to_string())])
 				.raw(cells.as_str())
 				.close("row");
 		}

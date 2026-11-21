@@ -1781,7 +1781,8 @@ mod test {
 		world.entity_mut(parent).insert_child(index, entity);
 	}
 
-	/// The first table's cells with their positions and texts, `A1 Name`.
+	/// The first table's cells as their start's column and row then their
+	/// text, ie `0,0 Name`.
 	fn addressed(world: &mut World) -> Vec<String> {
 		let table = world
 			.query::<(Entity, &Element)>()
@@ -1792,8 +1793,13 @@ mod test {
 		world.with_state::<(TableGrid, DocumentText), _>(|(grid, text)| {
 			grid.cells(table)
 				.into_iter()
-				.map(|(cell, position)| {
-					format!("{position} {}", text.own_text(cell).trim())
+				.map(|cell| {
+					format!(
+						"{},{} {}",
+						cell.start.x,
+						cell.start.y,
+						text.own_text(cell.entity).trim()
+					)
 				})
 				.collect()
 		})
@@ -1827,12 +1833,12 @@ mod test {
 		);
 		let (mut world, _) = parse(&written);
 		addressed(&mut world).xpect_eq(vec![
-			"A1 Name".to_string(),
-			"B1 Acme".into(),
-			"C1 Extra".into(),
-			"A2 Phone".into(),
-			"B2 555".into(),
-			"A3 Wide".into(),
+			"0,0 Name".to_string(),
+			"1,0 Acme".into(),
+			"2,0 Extra".into(),
+			"0,1 Phone".into(),
+			"1,1 555".into(),
+			"0,2 Wide".into(),
 		]);
 		let width = |width: u32| {
 			format!("<w:tcPr><w:tcW w:w=\"{width}\" w:type=\"dxa\"/></w:tcPr>")

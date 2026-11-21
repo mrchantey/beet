@@ -89,10 +89,11 @@
 //! | a cell's bold, italic, underline or strike, font colour, solid fill, horizontal alignment other than left, and font size, each where its cell format differs from the workbook's default format | a direct look on the cell | the default format is the root's look on a write, so a read never carries it as a direct look; a write reads the resolved style and writes each distinct look as one cell format |
 //! | a cell's hyperlink | an `a href` holding the cell's text | |
 //!
-//! A cell's address is its position in the HTML table, never an attribute:
-//! `B3` is the cell in the second column of the third row as HTML's table
-//! model counts them, spans included, which the table grid query
-//! (`TableGrid`) answers for any table whatever it was read from. HTML has
+//! A cell's address is its slot in the HTML table, never an attribute, as
+//! HTML's table model counts them, spans included, which the table grid
+//! query (`TableGrid`) answers for any table whatever it was read from. A
+//! workbook names a slot by its A1 reference (`A1Reference`), so `B3` is the
+//! grid's `UVec2::new(1, 2)`, the second column of the third row. HTML has
 //! no word for a worksheet's name nor for a formula, so a worksheet is a
 //! `data-worksheet` and a formula a `data-formula`, the latter until beet's
 //! scripting gives formulas a home.
@@ -305,6 +306,7 @@
 //! [`DocMeta`]: crate::prelude::DocMeta
 //! [`Element`]: beet_core::prelude::Element
 //! [`Value`]: beet_core::prelude::Value
+mod a1_reference;
 mod core_properties;
 mod deck;
 mod deck_report;
@@ -325,6 +327,7 @@ mod workbook_parser;
 mod workbook_renderer;
 mod writer;
 mod xml_part;
+pub use a1_reference::*;
 pub use core_properties::*;
 pub use deck::*;
 pub use deck_report::DeckReported;

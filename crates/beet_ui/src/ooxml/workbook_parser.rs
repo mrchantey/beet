@@ -4,7 +4,6 @@ use super::office_style::*;
 use super::read_element::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use core::num::NonZeroU32;
 
 /// Reads a workbook into one `article data-worksheet` per worksheet in tab
 /// order, each holding one `table` dense from `A1` to its last used cell,
@@ -61,16 +60,18 @@ struct SheetRead {
 	hidden: bool,
 	/// Whether it is protected, without which no cell is locked.
 	protected: bool,
-	/// Each column range's format, `(min, max, format)`.
+	/// Each column range's format, `(first, last, format)`, its columns
+	/// counted from 0.
 	columns: Vec<(u32, u32, u32)>,
-	/// Each row's format where the row carries one for its absent cells.
+	/// Each row's format, by the row counted from 0, where the row carries
+	/// one for its absent cells.
 	rows: HashMap<u32, u32>,
-	/// Every cell the sheet writes, by `(row, column)`.
-	cells: HashMap<(u32, u32), CellRead>,
-	/// Every merged range, its first cell and its last.
-	merges: Vec<(TablePosition, TablePosition)>,
-	/// Every hyperlink, its range's corners and its `href`.
-	links: Vec<(TablePosition, TablePosition, SmolStr)>,
+	/// Every cell the sheet writes, by its grid slot.
+	cells: HashMap<UVec2, CellRead>,
+	/// Every merged range, its first and last slot inclusive.
+	merges: Vec<URect>,
+	/// Every hyperlink, its range inclusive and its `href`.
+	links: Vec<(URect, SmolStr)>,
 }
 
 /// One cell a sheet writes.
@@ -165,13 +166,13 @@ impl WorkbookParser {
 			let sheet = Self::read_sheet(
 				package, &path, name, hidden, sheet_root, &shared,
 			)?;
-			let (columns, rows) = sheet.extent(&shared);
-			let area = columns as u64 * rows as u64;
+			let size = sheet.extent(&shared);
+			let area = size.x as u64 * size.y as u64;
 			if area > Self::MAX_SHEET_CELLS {
 				bevybail!(
 					"sheet `{}`: its last used cell `{}` pads it to {area} cells, past the {} a sheet may hold",
 					sheet.name,
-					Self::corner(columns, rows),
+					Self::corner(size),
 					Self::MAX_SHEET_CELLS
 				);
 			}
@@ -180,14 +181,14 @@ impl WorkbookParser {
 				bevybail!(
 					"sheet `{}`: its last used cell `{}` pads the workbook to {total} cells, past the {} a workbook may hold",
 					sheet.name,
-					Self::corner(columns, rows),
+					Self::corner(size),
 					Self::MAX_WORKBOOK_CELLS
 				);
 			}
-			read.push((sheet, columns, rows));
+			read.push((sheet, size));
 		}
-		for (sheet, columns, rows) in read {
-			sheet.article(&shared, columns, rows).spawn(
+		for (sheet, size) in read {
+			sheet.article(&shared, size).spawn(
 				world,
 				root,
 				&self.options,
@@ -197,11 +198,9 @@ impl WorkbookParser {
 		Ok(())
 	}
 
-	/// The A1 name of the cell at `columns` and `rows`, ie the last used.
-	fn corner(columns: u32, rows: u32) -> String {
-		TablePosition::new(columns.max(1), rows.max(1))
-			.map(|position| position.to_string())
-			.unwrap_or_default()
+	/// The A1 reference of the last slot of a grid of `size`.
+	fn corner(size: UVec2) -> String {
+		A1Reference(size.max(UVec2::ONE) - UVec2::ONE).to_string()
 	}
 
 	/// The shared strings, each its text or its runs' text joined, a
@@ -399,58 +398,60 @@ impl WorkbookParser {
 				.and_then(|value| value.parse::<u32>().ok())
 		};
 		let a1 = |sheet: &SheetRead, reference: &str| {
-			TablePosition::parse(reference).map_err(|_| {
-				bevyhow!(
-					"sheet `{}`: `{reference}` is not a cell reference, whose column and row count from 1",
-					sheet.name
-				)
-			})
+			A1Reference::parse(reference)
+				.map(|reference| reference.0)
+				.map_err(|err| bevyhow!("sheet `{}`: {err}", sheet.name))
 		};
 		for column in root
 			.child("cols")
 			.into_iter()
 			.flat_map(|cols| cols.children_named("col"))
 		{
-			if let (Some(min), Some(max)) =
-				(number(column, "min"), number(column, "max"))
-			{
+			// `min` and `max` count from 1
+			if let (Some(first), Some(last)) = (
+				number(column, "min").and_then(|min| min.checked_sub(1)),
+				number(column, "max").and_then(|max| max.checked_sub(1)),
+			) {
 				sheet.columns.push((
-					min,
-					max,
+					first,
+					last,
 					number(column, "style").unwrap_or(0),
 				));
 			}
 		}
 		// shared formulas by their index: the master's position and text
-		let mut masters =
-			HashMap::<SmolStr, (TablePosition, String)>::default();
-		let mut row_index = 0;
+		let mut masters = HashMap::<SmolStr, (UVec2, String)>::default();
+		// an unnumbered row or cell follows the one before it
+		let mut next_row = 0;
 		for row in root
 			.child("sheetData")
 			.into_iter()
 			.flat_map(|data| data.children_named("row"))
 		{
-			row_index = match row.attribute("r") {
-				Some(index) => index
-					.parse::<NonZeroU32>()
-					.map_err(|_| {
+			let row_index = match row.attribute("r") {
+				Some(number) => number
+					.parse::<u32>()
+					.ok()
+					.and_then(|number| number.checked_sub(1))
+					.ok_or_else(|| {
 						bevyhow!(
-							"sheet `{}`: row `{index}` is not a row number, which counts from 1",
+							"sheet `{}`: row `{number}` is not a row number, which counts from 1",
 							sheet.name
 						)
-					})?
-					.get(),
-				None => row_index + 1,
+					})?,
+				None => next_row,
 			};
+			next_row = row_index + 1;
 			if matches!(row.attribute("customFormat"), Some("1" | "true")) {
 				sheet.rows.insert(row_index, number(row, "s").unwrap_or(0));
 			}
-			let mut column = 0;
+			let mut next_column = 0;
 			for cell in row.children_named("c") {
-				column = match cell.attribute("r") {
-					Some(reference) => a1(&sheet, reference)?.column.get(),
-					None => column + 1,
+				let column = match cell.attribute("r") {
+					Some(reference) => a1(&sheet, reference)?.x,
+					None => next_column,
 				};
+				next_column = column + 1;
 				let value = cell.child("v").map(|value| value.text());
 				let value = match cell.attribute("t") {
 					Some("s") => value.map(|index| {
@@ -469,13 +470,7 @@ impl WorkbookParser {
 					Some("inlineStr") => cell.child("is").map(Self::rich_text),
 					_ => value,
 				};
-				let position = TablePosition::new(column, row_index)
-					.ok_or_else(|| {
-						bevyhow!(
-							"sheet `{}`: a cell before column A",
-							sheet.name
-						)
-					})?;
+				let slot = UVec2::new(column, row_index);
 				let formula = cell.child("f").and_then(|formula| {
 					let text = formula.text();
 					match formula.attribute("t") {
@@ -487,18 +482,12 @@ impl WorkbookParser {
 									masters.get(&index).map(|(master, text)| {
 										FormulaOffset::apply(
 											text,
-											position.column.get() as i64
-												- master.column.get() as i64,
-											position.row.get() as i64
-												- master.row.get() as i64,
+											slot.as_ivec2() - master.as_ivec2(),
 										)
 									})
 								}
 								false => {
-									masters.insert(
-										index,
-										(position, text.clone()),
-									);
+									masters.insert(index, (slot, text.clone()));
 									Some(text)
 								}
 							}
@@ -506,7 +495,7 @@ impl WorkbookParser {
 						_ => (!text.trim().is_empty()).then_some(text),
 					}
 				});
-				sheet.cells.insert((row_index, column), CellRead {
+				sheet.cells.insert(slot, CellRead {
 					value,
 					formula,
 					format: number(cell, "s").unwrap_or(0),
@@ -525,9 +514,11 @@ impl WorkbookParser {
 					sheet.name
 				);
 			};
-			let (first, last) = (a1(&sheet, first)?, a1(&sheet, last)?);
 			// a range written last corner first is the same range
-			sheet.merges.push(Self::corners(first, last));
+			sheet.merges.push(URect::from_corners(
+				a1(&sheet, first)?,
+				a1(&sheet, last)?,
+			));
 		}
 		for link in root
 			.child("hyperlinks")
@@ -550,71 +541,42 @@ impl WorkbookParser {
 				(None, Some(location)) => format!("#{location}"),
 				(None, None) => continue,
 			};
-			let (first, last) = (a1(&sheet, first)?, a1(&sheet, last)?);
-			let (first, last) = Self::corners(first, last);
-			sheet.links.push((first, last, href.into()));
+			let range =
+				URect::from_corners(a1(&sheet, first)?, a1(&sheet, last)?);
+			sheet.links.push((range, href.into()));
 		}
 		sheet.xok()
-	}
-
-	/// The top left and bottom right of the range two corners span.
-	fn corners(
-		first: TablePosition,
-		last: TablePosition,
-	) -> (TablePosition, TablePosition) {
-		(
-			TablePosition {
-				column: first.column.min(last.column),
-				row: first.row.min(last.row),
-			},
-			TablePosition {
-				column: first.column.max(last.column),
-				row: first.row.max(last.row),
-			},
-		)
 	}
 }
 
 impl SheetRead {
-	/// The columns and rows the sheet pads to: its last used cell, one
-	/// holding a value or a formula, a merged range's last corner, or an
+	/// The columns and rows the sheet pads to: through its last used cell,
+	/// one holding a value or a formula, a merged range's last slot, or an
 	/// unlocked cell of a protected sheet.
-	fn extent(&self, shared: &WorkbookRead) -> (u32, u32) {
-		let used = self
-			.cells
+	fn extent(&self, shared: &WorkbookRead) -> UVec2 {
+		self.cells
 			.iter()
 			.filter(|(_, cell)| {
 				cell.value.is_some()
 					|| cell.formula.is_some()
 					|| (self.protected && shared.format(cell.format).unlocked)
 			})
-			.map(|((row, column), _)| (*column, *row))
-			.chain(
-				self.merges
-					.iter()
-					.map(|(_, last)| (last.column.get(), last.row.get())),
-			);
-		used.fold((0, 0), |(columns, rows), (column, row)| {
-			(columns.max(column), rows.max(row))
-		})
+			.map(|(slot, _)| *slot)
+			.chain(self.merges.iter().map(|merge| merge.max))
+			.fold(UVec2::ZERO, |size, last| size.max(last + UVec2::ONE))
 	}
 
-	/// The article of this sheet: its table of `rows` rows of `columns`
-	/// cells, a merged range's covered cells absent.
-	fn article(
-		&self,
-		shared: &WorkbookRead,
-		columns: u32,
-		rows: u32,
-	) -> ReadElement {
+	/// The article of this sheet: its table of `size` cells, a merged
+	/// range's covered cells absent.
+	fn article(&self, shared: &WorkbookRead, size: UVec2) -> ReadElement {
 		let mut body = ReadElement::new("tbody");
-		for row in 1..=rows {
+		for row in 0..size.y {
 			let mut tr = ReadElement::new("tr");
-			for column in 1..=columns {
-				if self.is_covered(column, row) {
+			for slot in (0..size.x).map(|column| UVec2::new(column, row)) {
+				if self.is_covered(slot) {
 					continue;
 				}
-				tr = tr.with_child(self.cell(shared, column, row));
+				tr = tr.with_child(self.cell(shared, slot));
 			}
 			body = body.with_child(tr);
 		}
@@ -626,24 +588,19 @@ impl SheetRead {
 		article.with_child(ReadElement::new("table").with_child(body))
 	}
 
-	/// The `td` at `column` and `row`.
-	fn cell(
-		&self,
-		shared: &WorkbookRead,
-		column: u32,
-		row: u32,
-	) -> ReadElement {
-		let read = self.cells.get(&(row, column));
+	/// The `td` at `slot`.
+	fn cell(&self, shared: &WorkbookRead, slot: UVec2) -> ReadElement {
+		let read = self.cells.get(&slot);
 		let format = read
 			.map(|cell| cell.format)
-			.unwrap_or_else(|| self.inherited_format(column, row));
+			.unwrap_or_else(|| self.inherited_format(slot));
 		let mut td = ReadElement::new("td");
-		if let Some((columns, rows)) = self.span(column, row) {
-			if columns > 1 {
-				td = td.with_attribute("colspan", columns.to_string());
+		if let Some(span) = self.span(slot) {
+			if span.x > 1 {
+				td = td.with_attribute("colspan", span.x.to_string());
 			}
-			if rows > 1 {
-				td = td.with_attribute("rowspan", rows.to_string());
+			if span.y > 1 {
+				td = td.with_attribute("rowspan", span.y.to_string());
 			}
 		}
 		if self.protected && !shared.format(format).unlocked {
@@ -653,7 +610,7 @@ impl SheetRead {
 			td = td.with_attribute("data-formula", format!("={formula}"));
 		}
 		let text = read.and_then(|cell| cell.value.clone()).unwrap_or_default();
-		td = match self.link(column, row) {
+		td = match self.link(slot) {
 			Some(href) if !text.is_empty() => td.with_child(
 				ReadElement::new("a")
 					.with_attribute("href", href.to_string())
@@ -666,51 +623,37 @@ impl SheetRead {
 
 	/// The format a cell the sheet does not write is drawn with: its row's
 	/// when the row carries one, else its column's.
-	fn inherited_format(&self, column: u32, row: u32) -> u32 {
-		self.rows.get(&row).copied().unwrap_or_else(|| {
+	fn inherited_format(&self, slot: UVec2) -> u32 {
+		self.rows.get(&slot.y).copied().unwrap_or_else(|| {
 			self.columns
 				.iter()
-				.find(|(min, max, _)| *min <= column && column <= *max)
+				.find(|(first, last, _)| (*first..=*last).contains(&slot.x))
 				.map(|(.., format)| *format)
 				.unwrap_or(0)
 		})
 	}
 
-	/// The columns and rows of the merged range whose first cell is at
-	/// `column` and `row`.
-	fn span(&self, column: u32, row: u32) -> Option<(u32, u32)> {
+	/// The columns and rows of the merged range starting at `slot`.
+	fn span(&self, slot: UVec2) -> Option<UVec2> {
 		self.merges
 			.iter()
-			.find(|(first, _)| {
-				(first.column.get(), first.row.get()) == (column, row)
-			})
-			.map(|(first, last)| {
-				(
-					last.column.get() - first.column.get() + 1,
-					last.row.get() - first.row.get() + 1,
-				)
-			})
+			.find(|merge| merge.min == slot)
+			.map(|merge| merge.size() + UVec2::ONE)
 	}
 
-	/// Whether a merged range covers `column` and `row` other than as its
-	/// first cell.
-	fn is_covered(&self, column: u32, row: u32) -> bool {
-		self.merges.iter().any(|(first, last)| {
-			(column, row) != (first.column.get(), first.row.get())
-				&& (first.column.get()..=last.column.get()).contains(&column)
-				&& (first.row.get()..=last.row.get()).contains(&row)
-		})
+	/// Whether a merged range covers `slot` other than as its first.
+	fn is_covered(&self, slot: UVec2) -> bool {
+		self.merges
+			.iter()
+			.any(|merge| merge.min != slot && merge.contains(slot))
 	}
 
-	/// The `href` of the hyperlink over `column` and `row`.
-	fn link(&self, column: u32, row: u32) -> Option<&SmolStr> {
+	/// The `href` of the hyperlink over `slot`.
+	fn link(&self, slot: UVec2) -> Option<&SmolStr> {
 		self.links
 			.iter()
-			.find(|(first, last, _)| {
-				(first.column.get()..=last.column.get()).contains(&column)
-					&& (first.row.get()..=last.row.get()).contains(&row)
-			})
-			.map(|(.., href)| href)
+			.find(|(range, _)| range.contains(slot))
+			.map(|(_, href)| href)
 	}
 }
 
@@ -759,9 +702,9 @@ impl WorkbookRead {
 struct FormulaOffset;
 
 impl FormulaOffset {
-	/// `formula` with its relative references moved `columns` right and
-	/// `rows` down.
-	fn apply(formula: &str, columns: i64, rows: i64) -> String {
+	/// `formula` with its relative references moved `offset.x` columns
+	/// right and `offset.y` rows down.
+	fn apply(formula: &str, offset: IVec2) -> String {
 		let chars = formula.chars().collect::<Vec<_>>();
 		let mut out = String::with_capacity(formula.len());
 		let mut index = 0;
@@ -780,7 +723,7 @@ impl FormulaOffset {
 					|| matches!(chars[index - 1], '_' | '.'));
 			if !follows_name
 				&& let Some((end, moved)) =
-					Self::reference(&chars, index, columns, rows)
+					Self::reference(&chars, index, offset)
 			{
 				out.push_str(&moved);
 				index = end;
@@ -826,8 +769,7 @@ impl FormulaOffset {
 	fn reference(
 		chars: &[char],
 		start: usize,
-		columns: i64,
-		rows: i64,
+		offset: IVec2,
 	) -> Option<(usize, String)> {
 		let mut index = start;
 		let column_fixed = chars.get(index) == Some(&'$');
@@ -854,25 +796,25 @@ impl FormulaOffset {
 			}) {
 			return None;
 		}
-		let (column, row) =
-			TablePosition::parse_a1(&format!("{letters}{digits}"))?;
-		let moved = |value: u32, by: i64, fixed: bool| -> Option<u32> {
-			match fixed {
-				true => Some(value),
-				false => u32::try_from(value as i64 + by)
-					.ok()
-					.filter(|value| *value > 0),
-			}
-		};
-		let column = moved(column.get(), columns, column_fixed)?;
-		let row = moved(row.get(), rows, row_fixed)?;
-		let letters = TablePosition::column_letters(NonZeroU32::new(column)?);
+		let slot = A1Reference::parse(&format!("{letters}{digits}")).ok()?.0;
+		let moved = slot.as_ivec2()
+			+ IVec2::new(
+				(!column_fixed) as i32 * offset.x,
+				(!row_fixed) as i32 * offset.y,
+			);
+		// a reference moved off the grid is left as written
+		let moved = UVec2::try_from(moved)
+			.ok()
+			.filter(|moved| moved.cmple(A1Reference::MAX).all())?;
 		Some((
 			index,
 			format!(
-				"{}{letters}{}{row}",
+				"{}{}{}{}",
 				if column_fixed { "$" } else { "" },
+				A1Reference::column_letters(moved.x),
 				if row_fixed { "$" } else { "" },
+				// the row as A1 counts it, from 1
+				moved.y + 1,
 			),
 		))
 	}
@@ -1205,7 +1147,7 @@ pub(crate) mod test {
 	}
 
 	/// The first table of each article with its cells' positions and texts.
-	fn sheets(world: &mut World) -> Vec<(String, (u32, u32))> {
+	fn sheets(world: &mut World) -> Vec<(String, UVec2)> {
 		let tables = world
 			.query::<(Entity, &Element)>()
 			.iter(world)
@@ -1258,8 +1200,8 @@ pub(crate) mod test {
 			.xnot()
 			.xpect_contains(">9<");
 		sheets(&mut world).xpect_eq(vec![
-			("Data".to_string(), (3, 6)),
-			("Form".into(), (2, 1)),
+			("Data".to_string(), UVec2::new(3, 6)),
+			("Form".into(), UVec2::new(2, 1)),
 		]);
 	}
 
@@ -1373,7 +1315,8 @@ pub(crate) mod test {
 		let (mut world, _) =
 			read("<row r=\"2\"><c r=\"B2\"><v>1</v></c><c><v>2</v></c></row><row><c><v>3</v></c></row>")
 				.unwrap();
-		sheets(&mut world).xpect_eq(vec![("Sheet".to_string(), (3, 3))]);
+		sheets(&mut world)
+			.xpect_eq(vec![("Sheet".to_string(), UVec2::new(3, 3))]);
 		read("<row r=\"0\"><c/></row>")
 			.unwrap_err()
 			.to_string()
@@ -1381,7 +1324,7 @@ pub(crate) mod test {
 		read("<row r=\"1\"><c r=\"A0\"/></row>")
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("`A0` is not a cell reference");
+			.xpect_contains("sheet `Sheet`: `A0` is not an A1 reference");
 	}
 
 	/// A stray value pads the sheet to it, a style alone pads nothing, a
@@ -1410,8 +1353,8 @@ pub(crate) mod test {
 		)
 		.unwrap();
 		sheets(&mut world).xpect_eq(vec![
-			("Stray".to_string(), (26, 99)),
-			("Styled".into(), (1, 1)),
+			("Stray".to_string(), UVec2::new(26, 99)),
+			("Styled".into(), UVec2::new(1, 1)),
 		]);
 		parse(
 			&WorkbookFixture::default()
@@ -1443,12 +1386,15 @@ pub(crate) mod test {
 
 	#[beet_core::test]
 	fn offsets_shared_formulas() {
-		FormulaOffset::apply("A1*2+$B$1+C$2+$D3", 1, 2)
+		FormulaOffset::apply("A1*2+$B$1+C$2+$D3", IVec2::new(1, 2))
 			.xpect_eq("B3*2+$B$1+D$2+$D5");
 		// literals, quoted sheet names and function names stay
-		FormulaOffset::apply("IF(A1>0,\"A1\",'Sheet A1'!A1)&LOG10(B2)", 0, 1)
-			.xpect_eq("IF(A2>0,\"A1\",'Sheet A1'!A2)&LOG10(B3)");
-		FormulaOffset::apply("SUM(Sheet2!A1:A3)", 2, 0)
+		FormulaOffset::apply(
+			"IF(A1>0,\"A1\",'Sheet A1'!A1)&LOG10(B2)",
+			IVec2::new(0, 1),
+		)
+		.xpect_eq("IF(A2>0,\"A1\",'Sheet A1'!A2)&LOG10(B3)");
+		FormulaOffset::apply("SUM(Sheet2!A1:A3)", IVec2::new(2, 0))
 			.xpect_eq("SUM(Sheet2!C1:C3)");
 	}
 }
