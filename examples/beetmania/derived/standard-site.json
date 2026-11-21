@@ -1,0 +1,20 @@
+{
+  "beet_core::atproto::provenance::Provenance": {
+    "created": "2026-11-21T01:07:22.330Z",
+    "sources": [],
+    "ttl": null
+  },
+  "beet_router::router::site::syndication::standard_site::standard_site_index::StandardSiteIndex": {
+    "documents": [
+      {
+        "cid": "bafyreieyew6bxmivo36at2j4skg5zhluyhpvhadegyscpgkxgtqxxurupy",
+        "path": "/the-great-beet-harvest",
+        "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/site.standard.document/3n2rvxnjmwcba"
+      }
+    ],
+    "publication": {
+      "cid": "bafyreiff45hn55j4n53gmces5zw3mhryhkssvh5echbv2wbcxomp4zvu4i",
+      "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/site.standard.publication/3n2rvxjq4vvba"
+    }
+  }
+}

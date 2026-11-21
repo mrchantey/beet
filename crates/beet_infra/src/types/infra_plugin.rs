@@ -104,6 +104,8 @@ impl Plugin for InfraPlugin {
 		// label="rollup"/>` from markup rather than only from Rust.
 		#[cfg(feature = "lambda_block")]
 		app.register_type::<crate::prelude::LambdaBlock>()
+			// a sync's restart, retiring the warm environments a boot built
+			.register_type::<crate::prelude::LambdaRestart>()
 			.add_systems(
 				DeployRender,
 				(

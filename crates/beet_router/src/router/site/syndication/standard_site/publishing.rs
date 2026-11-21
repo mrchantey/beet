@@ -279,7 +279,7 @@ impl Publishing {
 			.await
 	}
 
-	/// Write `record` at its rkey unless `dry_run`, logging it `created`,
+	/// Write `record` at its rkey unless `dry_run`, logging it created,
 	/// answering the version written or, dry, the one a write would produce.
 	/// For a record no listing must look over, the converge's orphan pass
 	/// being for a collection a publication owns.
@@ -297,7 +297,7 @@ impl Publishing {
 			),
 			false => pds.put(&record).await?,
 		};
-		info!("{:<9} {}", "created", strong_ref.uri);
+		info!("{}", ConvergeVerb::Created.line(dry_run, &strong_ref.uri));
 		strong_ref.xok()
 	}
 

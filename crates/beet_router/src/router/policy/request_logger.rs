@@ -3,6 +3,10 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
+/// Middleware dumping both sides of an exchange whose response is not ok, at
+/// `debug`. Every exchange already logs one `info` line, its method, path,
+/// status and duration (`ServerPlugin`'s exchange stats), so this adds only
+/// what that line cannot carry.
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component)]
@@ -10,19 +14,8 @@ use beet_net::prelude::*;
 pub async fn RequestLogger(
 	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {
-	let now = Instant::now();
 	let request_parts = cx.input.0.parts().clone();
-	debug!(
-		"RequestLogger: Received request: \n{:#?}",
-		cx.input.0.parts()
-	);
 	let response = cx.input.1.call(cx.input.0).await?;
-	debug!(
-		"RequestLogger: {} Response in {}",
-		response.status(),
-		time_ext::pretty_print_duration(now.elapsed())
-	);
-	// dump both sides only for a non-ok response
 	if !response.status.is_ok() {
 		debug!(
 			"RequestLogger: Non-ok response:\n Request: {:#?}\n Response: {:#?}",
@@ -30,6 +23,5 @@ pub async fn RequestLogger(
 			response.parts(),
 		);
 	}
-
 	Ok(response)
 }

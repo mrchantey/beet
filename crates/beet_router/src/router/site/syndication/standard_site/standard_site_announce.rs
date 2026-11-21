@@ -64,7 +64,10 @@ pub async fn StandardSiteAnnounce(
 		let Some(document) = records.document(&path).cloned() else {
 			// a dry publish beside it wrote nothing for this run to find
 			if dry_run {
-				info!("`{slug}` is announced once its document is published");
+				info!(
+					"`{slug}` is announced once its document is published, \
+					 as {text:?}"
+				);
 				continue;
 			}
 			bevybail!(
@@ -73,7 +76,7 @@ pub async fn StandardSiteAnnounce(
 			);
 		};
 		if let Some(post) = &document.value.bsky_post_ref {
-			info!("{:<9} {}", "unchanged", post.uri);
+			info!("{}", ConvergeVerb::Unchanged.line(dry_run, &post.uri));
 			continue;
 		}
 		let canonical = publishing.canonical(&path);
@@ -88,10 +91,11 @@ pub async fn StandardSiteAnnounce(
 		});
 		let post = match found {
 			Some(entry) => {
-				info!("{:<9} {}", "unchanged", entry.uri);
+				info!("{}", ConvergeVerb::Unchanged.line(dry_run, &entry.uri));
 				entry.strong_ref()
 			}
 			None => {
+				info!("`{slug}` announces as {text:?}");
 				StandardSiteAnnounce::post(
 					&publishing,
 					&records,
@@ -125,7 +129,7 @@ pub async fn StandardSiteAnnounce(
 					.await?
 			}
 		};
-		info!("{:<9} {}", "updated", written.uri);
+		info!("{}", ConvergeVerb::Updated.line(dry_run, &written.uri));
 		// the reposts below read the document as it now stands
 		if let Some(entry) = records
 			.documents

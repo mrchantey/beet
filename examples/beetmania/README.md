@@ -44,11 +44,11 @@ The site is the router under the `serve` command:
 
 ```html
 <Route path="serve" {(HttpServer, TuiServer, SshTuiServer, DomServer)}>
-	<Router {(RequestLogger, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
+	<Router {(RequestLogger, CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
 		<TemplateDir src="templates"/>
 		<RoutesDir src="routes"/>
 		<ServeBlobs prefix="repo"/>
-		<AssetsDir src="wasm" prefix="wasm"/>
+		<AssetsDir src="wasm" prefix="wasm" cache="1h"/>
 	</Router>
 </Route>
 ```
@@ -57,7 +57,7 @@ The site is the router under the `serve` command:
 - `<Router>` is the `beet_router` dispatch component, the servers' child, and a url space of its own: its pages are rooted at `/` however deep the command, and no request reaches a sibling command.
 - `<ServeBlobs prefix="repo"/>` publishes the site's own directory read-only at `/repo`, the store the browser process reads this entry through; `<AssetsDir>` mounts the wasm binary the page boots, whose `wasm/beet-ui.{wasm,js}` link to the build output in `target/wasm`.
 - `<PackageConfig/>`, beside the commands, is a resource declaration: a capitalized tag naming a `#[reflect(Resource)]` type patches the live resource's named fields (here the site title, description and homepage), leaving the rest, eg the compile-time version, untouched. It produces no markup.
-- The `{(..)}` spread stacks middleware components onto the router entity, exactly as a Rust `world.spawn((Router, RequestLogger, ..))` would: request logging, `--help`, terminal link navigation, and the layout.
+- The `{(..)}` spread stacks middleware components onto the router entity, exactly as a Rust `world.spawn((Router, RequestLogger, ..))` would: request logging, the cache policy (html edge-cacheable, purged by every deploy and `sync`), `--help`, terminal link navigation, and the layout.
 - `Layout{template:"Layout"}` is render middleware: every page's body transcludes into the default `<Slot/>` of the `templates/Layout.bsx` template, resolved by name exactly as the tag `<Layout/>` would be (a `.bsx` file, else a rust `#[template]`). Declared on a child route instead, it nests inside its ancestors', which is how the blog wears `templates/ArticleLayout.bsx`.
 - `<RoutesDir src="routes"/>` scans its directory at spawn time and creates one route per content file (`.md`/`.bsx`/`.html`), served through the shared media-parse pipeline. `index.*` collapses to its directory, and markdown frontmatter is read at scan time so navigation knows every page's title and order.
 

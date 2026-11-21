@@ -2,6 +2,7 @@ use crate::bindings::*;
 use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use serde_json::json;
 
 /// Opinionated terraform configuration for a standard web application:
@@ -78,6 +79,11 @@ impl LambdaBlock {
 	/// under and what an invoker's interpolation resolves against.
 	pub fn ident(&self, stack: &ResolvedStack) -> terra::Ident {
 		stack.resource_ident(self.build_label(Self::FUNCTION))
+	}
+
+	/// The function's code in the repo bucket, under the version `deploy_id`.
+	pub fn code_key(&self, deploy_id: &Uuid) -> RelPath {
+		ArtifactLedger::version_artifact_key(deploy_id, &self.label)
 	}
 
 	/// An interpolated reference to the function's arn, ie what an invoker
@@ -187,11 +193,7 @@ impl LambdaBlock {
 	) -> Result {
 		self.validate()?;
 		let region = stack.aws_region()?.clone();
-		// the function's code, under this launch's version in the repo store
-		let artifact_key = ArtifactLedger::version_artifact_key(
-			deployment.deploy_id(),
-			&self.label,
-		);
+		let artifact_key = self.code_key(deployment.deploy_id());
 
 		// CloudWatch log group for Lambda logs
 		// Must be created before the Lambda function to ensure proper cleanup

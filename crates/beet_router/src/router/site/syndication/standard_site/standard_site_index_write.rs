@@ -52,7 +52,10 @@ pub async fn StandardSiteIndexWrite(
 			written
 		}
 	};
-	let verb = if written { "updated" } else { "unchanged" };
-	info!("{verb:<9} {}", derivation.path);
+	let verb = match written {
+		true => ConvergeVerb::Updated,
+		false => ConvergeVerb::Unchanged,
+	};
+	info!("{}", verb.line(publish.0.dry_run, &derivation.path));
 	Ok(Pass(cx.input))
 }

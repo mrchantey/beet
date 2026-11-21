@@ -47,6 +47,8 @@ impl<T> Converge<T> {
 /// the order the wanted records were given, then rkey order for the listing.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ConvergeReport {
+	/// Whether the run was dry, so its lines say what it would do.
+	pub dry_run: bool,
 	/// Wanted records with nothing at their rkey, written.
 	pub created: Vec<StrongRef>,
 	/// Wanted records that differed from what was there, rewritten.
@@ -69,20 +71,67 @@ impl ConvergeReport {
 }
 
 impl core::fmt::Display for ConvergeReport {
-	/// One line per record, `created at://..`, the line a publish logs.
+	/// One [`ConvergeVerb::line`] per record, the lines a publish logs.
 	fn fmt(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
 		for (verb, refs) in [
-			("created", &self.created),
-			("updated", &self.updated),
-			("unchanged", &self.unchanged),
-			("orphan", &self.orphans),
-			("removed", &self.removed),
+			(ConvergeVerb::Created, &self.created),
+			(ConvergeVerb::Updated, &self.updated),
+			(ConvergeVerb::Unchanged, &self.unchanged),
+			(ConvergeVerb::Orphan, &self.orphans),
+			(ConvergeVerb::Removed, &self.removed),
 		] {
 			for strong_ref in refs {
-				writeln!(formatter, "{verb:<9} {}", strong_ref.uri)?;
+				writeln!(
+					formatter,
+					"{}",
+					verb.line(self.dry_run, &strong_ref.uri)
+				)?;
 			}
 		}
 		Ok(())
+	}
+}
+
+/// What a converge did to one record, the first word of the line a run logs,
+/// so every step of a publish reads alike, dry or not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConvergeVerb {
+	/// Written where nothing was.
+	Created,
+	/// Rewritten, having differed.
+	Updated,
+	/// Already matching, left alone.
+	Unchanged,
+	/// Wanted by nothing, left in place.
+	Orphan,
+	/// Wanted by nothing, deleted.
+	Removed,
+}
+
+impl ConvergeVerb {
+	/// The verb as logged, a write's in its `would` form under a dry run, so
+	/// no line of a dry run reads as done: `would create`.
+	pub fn word(self, dry_run: bool) -> &'static str {
+		match (self, dry_run) {
+			(Self::Created, false) => "created",
+			(Self::Created, true) => "would create",
+			(Self::Updated, false) => "updated",
+			(Self::Updated, true) => "would update",
+			(Self::Unchanged, _) => "unchanged",
+			(Self::Orphan, _) => "orphan",
+			(Self::Removed, false) => "removed",
+			(Self::Removed, true) => "would remove",
+		}
+	}
+
+	/// The logged line, the verb padded so subjects align, ie
+	/// `would create at://did:plc:../site.standard.document/3n2..`.
+	pub fn line(
+		self,
+		dry_run: bool,
+		subject: impl core::fmt::Display,
+	) -> String {
+		format!("{:<12} {subject}", self.word(dry_run))
 	}
 }
 
@@ -123,7 +172,10 @@ impl Pds {
 		wanted: impl IntoIterator<Item = Rkeyed<T>>,
 		options: &Converge<T>,
 	) -> Result<ConvergeReport> {
-		let mut report = ConvergeReport::default();
+		let mut report = ConvergeReport {
+			dry_run: options.dry_run,
+			..default()
+		};
 		let mut wanted_rkeys = HashSet::<Rkey>::default();
 		for record in wanted {
 			let rkey = record.rkey().clone();
@@ -303,11 +355,11 @@ pub(crate) mod test {
 			.await
 			.unwrap();
 		pds.list::<Doc>().await.unwrap().len().xpect_eq(0);
-		pds.converge([wanted], &default())
-			.await
-			.unwrap()
-			.created
-			.xpect_eq(dry.created);
+		// no line of a dry run reads as done
+		dry.to_string().xpect_starts_with("would create at://");
+		let report = pds.converge([wanted], &default()).await.unwrap();
+		report.created.clone().xpect_eq(dry.created);
+		report.to_string().xpect_starts_with("created      at://");
 	}
 
 	/// An interrupted run resumes: what it wrote compares equal, the rest is

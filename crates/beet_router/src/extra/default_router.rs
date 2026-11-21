@@ -7,7 +7,7 @@ impl Router {
 	/// Wires the [`Router`] dispatch action plus the standard middleware and the
 	/// default app-level routes around the provided `routes`:
 	/// - [`Router`] for route lookup and dispatch (always).
-	/// - [`RequestLogger`] middleware for per-request logging (no_std core, always).
+	/// - [`RequestLogger`] middleware dumping a non-ok exchange (no_std core, always).
 	/// - [`HelpHandler`] / [`NavigateHandler`] middleware for `--help` / `--navigate`
 	///   support (std-only: they render through the scene pipeline).
 	/// - an `/app-info` scene route (std-only) and a `POST /analytics` route

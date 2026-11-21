@@ -16,6 +16,8 @@ mod dir_copy;
 #[cfg(feature = "aws_sdk")]
 mod dir_sync;
 mod ensure_secret;
+#[cfg(feature = "lambda_block")]
+mod lambda_restart;
 #[cfg(feature = "aws_sdk")]
 mod lifecycle_probe;
 #[cfg(feature = "lightsail_block")]
@@ -49,6 +51,8 @@ pub use dir_copy::*;
 #[cfg(feature = "aws_sdk")]
 pub use dir_sync::*;
 pub use ensure_secret::*;
+#[cfg(feature = "lambda_block")]
+pub use lambda_restart::*;
 #[cfg(feature = "aws_sdk")]
 pub use lifecycle_probe::*;
 #[cfg(feature = "lightsail_block")]

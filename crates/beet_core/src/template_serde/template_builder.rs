@@ -6,6 +6,7 @@
 
 use super::scene_reflect::ReferenceSentinels;
 use crate::prelude::*;
+use bevy::ecs::component::ComponentId;
 use bevy::ecs::entity_disabling::DefaultQueryFilters;
 use bevy::ecs::reflect::ReflectComponent;
 use bevy::ecs::reflect::ReflectResource;
@@ -99,6 +100,9 @@ pub struct TemplateBuilder<'w> {
 	type_registry: &'w TypeRegistry,
 	/// The file keys every entity and every entity reference is written under.
 	entity_map: TemplateEntityMap,
+	/// Each unregistered component left out, with the number of entities it
+	/// was on, logged once per type by [`Self::build_mapped`].
+	skipped: HashMap<ComponentId, usize>,
 }
 
 impl<'w> TemplateBuilder<'w> {
@@ -119,6 +123,7 @@ impl<'w> TemplateBuilder<'w> {
 			original_world: world,
 			type_registry,
 			entity_map: default(),
+			skipped: default(),
 		}
 	}
 
@@ -230,6 +235,7 @@ impl<'w> TemplateBuilder<'w> {
 	/// Consume the builder, producing a [`SceneBody`] and the
 	/// [`TemplateEntityMap`] its keys came from, for the caller to retain.
 	pub fn build_mapped(self) -> Result<(SceneBody, TemplateEntityMap)> {
+		self.log_skipped();
 		match self.error {
 			Some(error) => Err(error),
 			None => Ok((self.body, self.entity_map)),
@@ -329,14 +335,10 @@ impl<'w> TemplateBuilder<'w> {
 			{
 				continue;
 			}
-			// an unregistered component cannot be dumped, so it is
-			// silently absent from the file; say so where a missing route
-			// on the next boot can be traced back
+			// an unregistered component cannot be dumped, so it is absent
+			// from the file, tallied for the one line `build` logs
 			let Some(registration) = self.type_registry.get(type_id) else {
-				debug!(
-					"skipping unregistered component `{}` on {entity}",
-					info.name()
-				);
+				*self.skipped.entry(component_id).or_default() += 1;
 				continue;
 			};
 			// derived state is never authored content, so it never dumps
@@ -380,6 +382,27 @@ impl<'w> TemplateBuilder<'w> {
 			}
 		}
 		resolved.xok()
+	}
+
+	/// One `debug!` per unregistered component type left out, so a missing
+	/// route on the next boot can be traced back without a line per entity.
+	fn log_skipped(&self) {
+		let components = self.original_world.components();
+		let mut skipped = self
+			.skipped
+			.iter()
+			.filter_map(|(id, count)| {
+				components
+					.get_info(*id)
+					.map(|info| (info.name().to_string(), *count))
+			})
+			.collect::<Vec<_>>();
+		skipped.sort();
+		for (name, count) in skipped {
+			debug!(
+				"skipped unregistered component `{name}` on {count} entities"
+			);
+		}
 	}
 
 	/// A component as data, each entity it references written as that

@@ -21,8 +21,9 @@ one it does, rather than running without it.
 serve route and the server host in one. Its `Router` child is the site, a url
 space of its own rooted at `/`, so no http request can reach a sibling command:
 the publish verbs below are commands of this entry, never routes of the site.
-The router's middleware attaches as component spreads (request logging, `--help`,
-terminal link navigation, the layout), `<RoutesDir/>` discovers the pages in
+The router's middleware attaches as component spreads (request logging, the
+cache policy, `--help`, terminal link navigation, the layout), `<RoutesDir/>`
+discovers the pages in
 `routes/`, and the blog is a subtree wearing `templates/ArticleLayout.bsx` inside
 the site `Layout`.
 
@@ -53,6 +54,15 @@ The site runs on AWS Lambda behind Cloudflare at `beetmania.beet.org`, the
 a production stage, so the example deploys as `--stage=prod` of its own app; any
 other stage answers only at its gateway url. The deploy machinery sits behind
 `bx:cfg`, absent from a lean binary that only serves.
+
+Cloudflare's edge caches what the origin's `Cache-Control` allows:
+`CacheHeadersMiddleware` + `CacheHeaders` mark html edge-cacheable for a week,
+and `cache="1h"` the assets and the wasm. So everything that changes what is
+served purges the zone (`<CloudflarePurgeCache/>`): the deploy after its apply,
+and `sync` after `<LambdaRestart/>`, which retires the function's warm
+environments so the next request boots afresh, re-discovering the routes and
+re-reading this document and the publication's index, all of which a boot
+resolves once.
 
     just beetmania deploy --stage=prod   # bucket, site, function, hostname
     just beetmania deploy --stage=prod --elevated   # ..converging this entry's deploy credentials first
@@ -131,7 +141,7 @@ judge or delete.
 		did="did:plc:xfhml5eyathkdgloyiresv4d" display_name="Beet Lover"
 		secret="BEETLOVER_BEET_ORG_APP_PASSWORD" auto_repost=true/>
 	<Route path="serve" {(HttpServer, TuiServer, SshTuiServer, DomServer)}>
-		<Router {(RequestLogger, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
+		<Router {(RequestLogger, CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
 			<Theme color={Srgba(Srgba{red:0.61, green:0.12, blue:0.29, alpha:1.0})}/>
 			<TemplateDir src="templates"/>
 			<Styles/>
@@ -148,8 +158,8 @@ judge or delete.
 				<RoutesDir src="routes/blog"/>
 			</Route>
 			<ServeBlobs prefix="repo"/>
-			<AssetsDir src="assets"/>
-			<AssetsDir src="wasm" prefix="wasm"/>
+			<AssetsDir src="assets" cache="1h"/>
+			<AssetsDir src="wasm" prefix="wasm" cache="1h"/>
 		</Router>
 	</Route>
 	<!-- the font the assets borrow from the workspace and the files they derive, into this
@@ -185,6 +195,8 @@ judge or delete.
 			</RepoAssemble>
 			<RepoSync/>
 			<TofuApply/>
+			<!-- after the apply rolls the function, so the edge refills from it -->
+			<CloudflarePurgeCache/>
 			<LambdaWatch timeout="30s"/>
 		</Group>
 		<Group bx:ref="beetmania_down">
@@ -201,6 +213,13 @@ judge or delete.
 				<Derive/>
 			</RepoAssemble>
 			<RepoSync/>
+			<!-- a page's bytes are read per request, so the sync above is live
+			     already; the restart is for what a boot resolves once: route
+			     discovery, this document, the publication's index. Before the
+			     purge, since purging while the old environments serve
+			     re-caches them. -->
+			<LambdaRestart/>
+			<CloudflarePurgeCache/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>
 			<LambdaWatch/>

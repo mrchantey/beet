@@ -266,21 +266,16 @@ mod test {
 		.xpect_contains("no entry document");
 	}
 
-	/// The entry declares its own servers and app routes: loading its entry document
-	/// through the resolved store yields a command dispatcher root whose `serve`
-	/// route carries a markup-declared `<HttpServer>` over the site's router,
-	/// plus the default app routes it requested with `<DefaultAppRoutes/>`
-	/// (eg `/app-info`).
-	#[beet::test]
-	async fn entry_declares_server_and_app_routes() {
-		let mut world = render_world();
+	/// The example entry built through its resolved store, its `<RoutesDir>`
+	/// scans settled, answering the root and the site's router.
+	async fn build_example(world: &mut World) -> (Entity, Entity) {
 		let ResolvedEntry {
 			repo_store,
 			entry_name,
 			prescan,
 			..
 		} = entry_build::resolve_entry_path(
-			&prescans(&world),
+			&prescans(world),
 			None,
 			None,
 			entry_path().as_str(),
@@ -297,17 +292,14 @@ mod test {
 		.await
 		.unwrap();
 		let root = entry_build::build_root(
-			&mut world,
+			world,
 			repo_store,
 			sources,
 			DisableCallOnReady,
 		)
 		.unwrap();
 		// the `<RoutesDir>` scan settles, so the site's router serves pages
-		AsyncRunner::settle_async_tasks(&mut world).await;
-		// the root dispatches commands, and the markup `<HttpServer>` owns the
-		// `serve` route's boot, with the site's router as its child
-		world.entity(root).contains::<CliServer>().xpect_true();
+		AsyncRunner::settle_async_tasks(world).await;
 		let router = world
 			.run_system_cached_with::<_, Result<Entity>, _, _>(
 				find_router,
@@ -315,6 +307,21 @@ mod test {
 			)
 			.unwrap()
 			.unwrap();
+		(root, router)
+	}
+
+	/// The entry declares its own servers and app routes: loading its entry document
+	/// through the resolved store yields a command dispatcher root whose `serve`
+	/// route carries a markup-declared `<HttpServer>` over the site's router,
+	/// plus the default app routes it requested with `<DefaultAppRoutes/>`
+	/// (eg `/app-info`).
+	#[beet::test]
+	async fn entry_declares_server_and_app_routes() {
+		let mut world = render_world();
+		let (root, router) = build_example(&mut world).await;
+		// the root dispatches commands, and the markup `<HttpServer>` owns the
+		// `serve` route's boot, with the site's router as its child
+		world.entity(root).contains::<CliServer>().xpect_true();
 		let serve = world.entity(router).get::<ChildOf>().unwrap().parent();
 		world.entity(serve).contains::<HttpServer>().xpect_true();
 		// and `<DefaultAppRoutes/>` wired the app-info route into the site's
@@ -323,5 +330,27 @@ mod test {
 			.unwrap()
 			.find(&["app-info"])
 			.xpect_some();
+	}
+
+	/// The deployed example sits behind an edge that caches what the origin's
+	/// `Cache-Control` allows, and a sync purges it: a page carries the
+	/// edge-cacheable html policy, never the edge's own default, which a
+	/// purge-free sync once left serving the old pages for hours.
+	#[beet::test]
+	async fn pages_carry_the_edge_cache_policy() {
+		let mut world = render_world();
+		let (_, router) = build_example(&mut world).await;
+		world
+			.entity_mut(router)
+			.exchange(
+				Request::get("/")
+					.with_header::<header::Accept>(vec![MediaType::Html]),
+			)
+			.await
+			.headers
+			.get::<header::CacheControl>()
+			.unwrap()
+			.unwrap()
+			.xpect_contains("s-maxage=");
 	}
 }
