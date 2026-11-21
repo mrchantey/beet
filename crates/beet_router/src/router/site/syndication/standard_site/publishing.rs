@@ -8,8 +8,10 @@ use beet_ui::prelude::*;
 /// The `--dry-run` every step writing to a repo or the index takes.
 #[derive(Reflect)]
 pub(crate) struct StandardSiteWriteParams {
-	/// Report every write a run would make, `created`, `updated` or
-	/// `unchanged` as a run logs it, writing and uploading nothing.
+	/// Run against a dry repo per account ([`DryRunPds`]), writing and
+	/// uploading nothing: each step reads what the steps before it would have
+	/// written, so every line is the one a run would log, worded as what it
+	/// would do, ie `would create`.
 	pub dry_run: bool,
 }
 
@@ -85,15 +87,10 @@ impl DerivedImage {
 		.xok()
 	}
 
-	/// Upload the image to `pds`, unless `dry_run`.
-	pub async fn upload(&self, pds: &Pds, dry_run: bool) -> Result {
-		if !dry_run {
-			pds.upload_blob(
-				self.bytes.clone(),
-				self.blob_ref.mime_type.clone(),
-			)
+	/// Upload the image to `pds`.
+	pub async fn upload(&self, pds: &Pds) -> Result {
+		pds.upload_blob(self.bytes.clone(), self.blob_ref.mime_type.clone())
 			.await?;
-		}
 		Ok(())
 	}
 }
@@ -121,6 +118,13 @@ impl Publishing {
 				})
 			})
 			.await?
+	}
+
+	/// This publication as the run `request` is writes it: its repo the dry
+	/// one the request carries when `dry_run` ([`DryRunRepos`]).
+	pub fn in_run(mut self, request: &mut Request, dry_run: bool) -> Self {
+		self.pds = DryRunRepos::resolve(request, self.pds, dry_run);
+		self
 	}
 
 	/// The publication's icon, the `<IconSet>`'s 512, `None` for a world
@@ -279,25 +283,18 @@ impl Publishing {
 			.await
 	}
 
-	/// Write `record` at its rkey unless `dry_run`, logging it created,
-	/// answering the version written or, dry, the one a write would produce.
-	/// For a record no listing must look over, the converge's orphan pass
-	/// being for a collection a publication owns.
+	/// Write `record` at its rkey, logging it created, answering the version
+	/// written. For a record no listing must look over, the converge's orphan
+	/// pass being for a collection a publication owns.
 	pub async fn create<T: AtprotoRecord>(
 		pds: &Pds,
 		record: Rkeyed<T>,
-		dry_run: bool,
 	) -> Result<StrongRef> {
-		let strong_ref = match dry_run {
-			true => StrongRef::new(
-				pds.uri(&T::COLLECTION, record.rkey()),
-				AtprotoValue::from_serde(&*record)?
-					.into_record(&T::COLLECTION)?
-					.cid(),
-			),
-			false => pds.put(&record).await?,
-		};
-		info!("{}", ConvergeVerb::Created.line(dry_run, &strong_ref.uri));
+		let strong_ref = pds.put(&record).await?;
+		info!(
+			"{}",
+			ConvergeVerb::Created.line(pds.is_dry_run(), &strong_ref.uri)
+		);
 		strong_ref.xok()
 	}
 
@@ -406,6 +403,8 @@ pub(super) mod test {
 	use beet_net::exports::bytes::Bytes;
 	use beet_net::prelude::*;
 	use beet_ui::prelude::*;
+	use std::sync::Arc;
+	use std::sync::Mutex;
 
 	/// The fixture site with its accounts' repos: `beet` holds the
 	/// publication, `pete` authors every post and reposts its announcements.
@@ -514,6 +513,46 @@ pub(super) mod test {
 				args,
 			)
 			.await
+		}
+
+		/// The index a dry run of the publish sequence with the command line
+		/// `args` projects: read off the run's dry repo by a step after the
+		/// index's own, `None` when it projects no publication.
+		pub async fn dry_index(
+			&mut self,
+			args: &str,
+		) -> Option<StandardSiteIndex> {
+			let projected = Arc::new(Mutex::new(None));
+			let (stash, pds, url) = (
+				projected.clone(),
+				self.beet.clone(),
+				Uri::parse(&self.publishing_url()).unwrap(),
+			);
+			let probe =
+				Action::<Request, Outcome<Request, Response>>::new_async(
+					async move |cx: ActionContext<Request>| {
+						let mut request = cx.input;
+						let dry = DryRunRepos::resolve(&mut request, pds, true);
+						*stash.lock().unwrap() =
+							StandardSiteRecords::read(&dry, &url)
+								.await?
+								.index();
+						Ok(Pass(request))
+					},
+				);
+			let publication = self.publication;
+			self.run(
+				(PublicationRef(publication), ExchangeSequence, children![
+					StandardSitePublish,
+					StandardSiteAnnounce,
+					StandardSiteIndexWrite,
+					probe
+				]),
+				&format!("{args} --dry-run"),
+			)
+			.await
+			.unwrap();
+			projected.lock().unwrap().take()
 		}
 
 		/// Run `sequence` with the command line `args`.
@@ -958,6 +997,47 @@ pub(super) mod test {
 		}
 		site.versions().await.xpect_empty();
 		site.index().await.xpect_none();
+	}
+
+	/// A dry run's steps read what the steps before them would have written,
+	/// so the announcement finds the document the publish would write, and
+	/// the index it projects is the one the run then writes.
+	///
+	/// REGRESSION: each step of a dry run read the repo as it stood, so an
+	/// edit's index line read `unchanged` where the run wrote `updated`
+	#[beet_core::test]
+	async fn a_dry_run_projects_the_run() {
+		let mut site = Site::new().await;
+		site.dry_index("--only=full-stack-bevy --announce=full-stack-bevy")
+			.await
+			.unwrap()
+			.document("/full-stack-bevy")
+			.unwrap()
+			.bsky_post
+			.xpect_some();
+		site.versions().await.xpect_empty();
+		site.publish("--only=full-stack-bevy").await.unwrap();
+		// an edit the next run writes
+		for mut meta in site
+			.world
+			.query::<&mut DocMeta>()
+			.iter_mut(&mut site.world)
+			.filter(|meta| meta.title.as_deref() == Some("Full Stack Bevy"))
+		{
+			meta.description =
+				Some("all about Full Stack Bevy, revised".into());
+		}
+		let (versions, committed) = (site.versions().await, site.index().await);
+		let projected = site.dry_index("").await.unwrap();
+		site.versions().await.xpect_eq(versions);
+		site.index().await.xpect_eq(committed.clone());
+		site.publish("").await.unwrap();
+		let url = Uri::parse(&site.publishing_url()).unwrap();
+		StandardSiteIndex::from_repo(&site.beet, &url)
+			.await
+			.unwrap()
+			.xpect_eq(projected);
+		(site.index().await != committed).xpect_true();
 	}
 
 	/// A dry run writes nothing anywhere.

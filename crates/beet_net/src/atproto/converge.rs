@@ -10,9 +10,6 @@ use beet_core::prelude::*;
 pub struct Converge<T> {
 	/// Delete the orphans rather than only reporting them.
 	prune: bool,
-	/// Report what a run would do, writing and deleting nothing. The report's
-	/// strong refs carry the cid each write would produce.
-	dry_run: bool,
 	/// Which listed records this converge answers for, so an unwanted one is
 	/// an orphan rather than a stranger's. A collection is often shared: an
 	/// author's reposts hold the ones they made by hand beside the ones a
@@ -25,7 +22,6 @@ impl<T> Default for Converge<T> {
 	fn default() -> Self {
 		Self {
 			prune: false,
-			dry_run: false,
 			scope: Box::new(|_| true),
 		}
 	}
@@ -43,11 +39,13 @@ impl<T> Converge<T> {
 	}
 }
 
-/// What one [`Pds::converge`] did, or under `dry_run` would do, each list in
-/// the order the wanted records were given, then rkey order for the listing.
+/// What one [`Pds::converge`] did, or over a [`DryRunPds`] would do, each
+/// list in the order the wanted records were given, then rkey order for the
+/// listing.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ConvergeReport {
-	/// Whether the run was dry, so its lines say what it would do.
+	/// Whether the run wrote to a [`DryRunPds`], so its lines say what a
+	/// run would do.
 	pub dry_run: bool,
 	/// Wanted records with nothing at their rkey, written.
 	pub created: Vec<StrongRef>,
@@ -173,7 +171,7 @@ impl Pds {
 		options: &Converge<T>,
 	) -> Result<ConvergeReport> {
 		let mut report = ConvergeReport {
-			dry_run: options.dry_run,
+			dry_run: self.is_dry_run(),
 			..default()
 		};
 		let mut wanted_rkeys = HashSet::<Rkey>::default();
@@ -195,14 +193,8 @@ impl Pds {
 					}
 				}
 			};
-			let strong_ref = match (changed, options.dry_run, existing) {
-				(false, _, Some(existing)) => existing.strong_ref(),
-				(_, true, _) => StrongRef::new(
-					self.uri(&T::COLLECTION, &rkey),
-					AtprotoValue::from_serde(&*record)?
-						.into_record(&T::COLLECTION)?
-						.cid(),
-				),
+			let strong_ref = match (changed, existing) {
+				(false, Some(existing)) => existing.strong_ref(),
 				_ => self.put(&record).await?,
 			};
 			list.push(strong_ref);
@@ -222,9 +214,7 @@ impl Pds {
 				report.orphans.push(entry.strong_ref());
 				continue;
 			}
-			if !options.dry_run {
-				self.delete_record(&T::COLLECTION, entry.rkey()).await?;
-			}
+			self.delete_record(&T::COLLECTION, entry.rkey()).await?;
 			report.removed.push(entry.strong_ref());
 		}
 		report.xok()
@@ -315,9 +305,10 @@ pub(crate) mod test {
 			.xpect_some();
 		// a dry run prunes nothing but says what it would
 		let report = pds
+			.dry()
 			.converge(
 				[doc("aaa", "/one", "One")],
-				&Converge::default().with_prune(true).with_dry_run(true),
+				&Converge::default().with_prune(true),
 			)
 			.await
 			.unwrap();
@@ -351,7 +342,8 @@ pub(crate) mod test {
 		let pds = Pds::temp();
 		let wanted = doc("aaa", "/one", "One");
 		let dry = pds
-			.converge([wanted.clone()], &Converge::default().with_dry_run(true))
+			.dry()
+			.converge([wanted.clone()], &default())
 			.await
 			.unwrap();
 		pds.list::<Doc>().await.unwrap().len().xpect_eq(0);

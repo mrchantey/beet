@@ -76,6 +76,17 @@ impl Pds {
 	/// The account whose repo this is.
 	pub fn did(&self) -> &Did { self.provider.did() }
 
+	/// Whether a write here reaches no repo, see [`DryRunPds`].
+	pub fn is_dry_run(&self) -> bool { self.provider.is_dry_run() }
+
+	/// A [`DryRunPds`] over this repo, or this repo when it already is one.
+	pub fn dry(&self) -> Self {
+		match self.is_dry_run() {
+			true => self.clone(),
+			false => Self::new(DryRunPds::new(self.clone())),
+		}
+	}
+
 	/// The address of `rkey` in `collection` of this repo.
 	pub fn uri(&self, collection: &Nsid, rkey: &Rkey) -> AtUri {
 		AtUri::new(self.did().clone(), collection.clone(), rkey.clone())
@@ -191,6 +202,9 @@ pub trait PdsProvider: 'static + Send + Sync {
 
 	/// The account whose repo this is.
 	fn did(&self) -> &Did;
+
+	/// Whether a write here reaches no repo, see [`DryRunPds`].
+	fn is_dry_run(&self) -> bool { false }
 
 	/// See [`Pds::get_record`].
 	fn get_record(

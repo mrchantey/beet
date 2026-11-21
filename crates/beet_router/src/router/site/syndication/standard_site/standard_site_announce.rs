@@ -40,9 +40,12 @@ pub async fn StandardSiteAnnounce(
 	announce: Params<StandardSiteAnnounceParams>,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
+	let ActionContext { caller, mut input } = cx;
+	let world = caller.world().clone();
 	let dry_run = publish.0.dry_run;
-	let world = cx.world();
-	let publishing = Publishing::resolve(&cx.caller).await?;
+	let publishing = Publishing::resolve(&caller)
+		.await?
+		.in_run(&mut input, dry_run);
 	let mut records = publishing.records().await?;
 	// every text composed first, so one too long refuses before any write
 	let day = Date::today();
@@ -62,14 +65,6 @@ pub async fn StandardSiteAnnounce(
 		let page = publishing.page(slug)?;
 		let path = publishing.document_path(page)?;
 		let Some(document) = records.document(&path).cloned() else {
-			// a dry publish beside it wrote nothing for this run to find
-			if dry_run {
-				info!(
-					"`{slug}` is announced once its document is published, \
-					 as {text:?}"
-				);
-				continue;
-			}
 			bevybail!(
 				"`{slug}` has no document to announce: publish it first, \
 				 `--only={slug}`"
@@ -103,7 +98,6 @@ pub async fn StandardSiteAnnounce(
 					&document,
 					canonical,
 					text,
-					dry_run,
 				)
 				.await?
 			}
@@ -112,23 +106,10 @@ pub async fn StandardSiteAnnounce(
 			bsky_post_ref: Some(post),
 			..document.value.clone()
 		};
-		let written = match dry_run {
-			true => StrongRef::new(
-				document.uri.clone(),
-				AtprotoValue::from_serde(&announced)?
-					.into_record(&StandardSiteDocument::COLLECTION)?
-					.cid(),
-			),
-			false => {
-				publishing
-					.pds
-					.put(&Rkeyed::new(
-						document.rkey().clone(),
-						announced.clone(),
-					))
-					.await?
-			}
-		};
+		let written = publishing
+			.pds
+			.put(&Rkeyed::new(document.rkey().clone(), announced.clone()))
+			.await?;
 		info!("{}", ConvergeVerb::Updated.line(dry_run, &written.uri));
 		// the reposts below read the document as it now stands
 		if let Some(entry) = records
@@ -143,9 +124,15 @@ pub async fn StandardSiteAnnounce(
 			};
 		}
 	}
-	StandardSiteAnnounce::reposts(&world, &publishing, &records, dry_run)
-		.await?;
-	Ok(Pass(cx.input))
+	StandardSiteAnnounce::reposts(
+		&world,
+		&publishing,
+		&records,
+		&mut input,
+		dry_run,
+	)
+	.await?;
+	Ok(Pass(input))
 }
 
 impl StandardSiteAnnounce {
@@ -158,14 +145,13 @@ impl StandardSiteAnnounce {
 		document: &RecordEntry<StandardSiteDocument>,
 		canonical: SmolStr,
 		text: String,
-		dry_run: bool,
 	) -> Result<StrongRef> {
 		let publication = records.publication.as_ref().ok_or_else(|| {
 			bevyhow!("the repo holds no publication at `{}`", publishing.url)
 		})?;
 		let thumb = publishing.card(&page.path).await?;
 		if let Some(thumb) = &thumb {
-			thumb.upload(&publishing.pds, dry_run).await?;
+			thumb.upload(&publishing.pds).await?;
 		}
 		let card = EmbedExternal::new(External {
 			uri: canonical,
@@ -185,17 +171,18 @@ impl StandardSiteAnnounce {
 		Publishing::create(
 			&publishing.pds,
 			Rkeyed::new(Tid::now().into(), post),
-			dry_run,
 		)
 		.await
 	}
 
 	/// Converge the reposts of every announced document by each
-	/// `auto_repost` account it credits, the announcing account aside.
+	/// `auto_repost` account it credits, the announcing account aside, each
+	/// account's repo the dry one `request` carries when `dry_run`.
 	async fn reposts(
 		world: &AsyncWorld,
 		publishing: &Publishing,
 		records: &StandardSiteRecords,
+		request: &mut Request,
 		dry_run: bool,
 	) -> Result {
 		let announced = records
@@ -247,7 +234,8 @@ impl StandardSiteAnnounce {
 				.with(move |world: &mut World| {
 					PdsQuery::resolve(world, account)
 				})
-				.await?;
+				.await?
+				.xmap(|pds| DryRunRepos::resolve(request, pds, dry_run));
 			// an existing repost is kept as it is, since its time is its own
 			let existing = pds.list::<FeedRepost>().await?;
 			let wanted = subjects.into_iter().map(|subject| {
@@ -265,11 +253,9 @@ impl StandardSiteAnnounce {
 			let scope = announcements.clone();
 			pds.converge(
 				wanted.collect::<Vec<_>>(),
-				&Converge::default().with_dry_run(dry_run).with_scope(
-					move |repost: &FeedRepost| {
-						scope.contains(&repost.subject.uri)
-					},
-				),
+				&Converge::default().with_scope(move |repost: &FeedRepost| {
+					scope.contains(&repost.subject.uri)
+				}),
 			)
 			.await?
 			.xref()

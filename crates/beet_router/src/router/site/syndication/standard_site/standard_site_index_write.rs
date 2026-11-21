@@ -12,8 +12,9 @@ use beet_net::prelude::*;
 /// byte for byte as it was, so a second run changes nothing in git. The
 /// served site in this process reads the new index at once.
 ///
-/// Under `--dry-run` it reports whether the index would change and writes
-/// nothing; a dry run before the first publish finds no publication to index.
+/// Under `--dry-run` it reports whether the index would change, comparing
+/// the committed index with the one the run's dry repo projects, so the line
+/// is the one the run itself would log; it writes nothing.
 #[action]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -21,10 +22,14 @@ pub async fn StandardSiteIndexWrite(
 	publish: Params<StandardSiteWriteParams>,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let world = cx.world();
-	let publishing = Publishing::resolve(&cx.caller).await?;
+	let ActionContext { caller, mut input } = cx;
+	let world = caller.world().clone();
+	let dry_run = publish.0.dry_run;
+	let publishing = Publishing::resolve(&caller)
+		.await?
+		.in_run(&mut input, dry_run);
 	let derivation = publishing.declaration.derivation();
-	let written = match publish.0.dry_run {
+	let written = match dry_run {
 		true => {
 			let Some(index) = publishing.records().await?.index() else {
 				info!(
@@ -32,7 +37,7 @@ pub async fn StandardSiteIndexWrite(
 					 publish",
 					publishing.url
 				);
-				return Ok(Pass(cx.input));
+				return Ok(Pass(input));
 			};
 			derivation
 				.read(&publishing.store)
@@ -56,6 +61,6 @@ pub async fn StandardSiteIndexWrite(
 		true => ConvergeVerb::Updated,
 		false => ConvergeVerb::Unchanged,
 	};
-	info!("{}", verb.line(publish.0.dry_run, &derivation.path));
-	Ok(Pass(cx.input))
+	info!("{}", verb.line(dry_run, &derivation.path));
+	Ok(Pass(input))
 }

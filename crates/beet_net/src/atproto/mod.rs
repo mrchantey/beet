@@ -3,7 +3,7 @@
 //!
 //! The erased-provider pattern: a [`PdsProvider`] trait, the [`Pds`] handle
 //! every consumer clones, the `<AtprotoAccount/>` declaration whose attach
-//! lands one on its entity, and [`PdsQuery`] to resolve it. Two providers:
+//! lands one on its entity, and [`PdsQuery`] to resolve it. Three providers:
 //!
 //! - [`EmulatorPds`], a repo laid out in any [`BlobStore`] that performs a
 //!   PDS's duties on write, for tests and for a repo that never leaves the
@@ -12,6 +12,9 @@
 //! - `XrpcPds`, a real PDS over xrpc through the `AtprotoAuth` credential
 //!   seam, with did and handle resolution, behind the `atproto` feature,
 //!   which adds `json` for the wire.
+//! - [`DryRunPds`], laid over either, keeping every write in memory: a dry
+//!   run is the real run against one ([`Pds::dry`]), so its later steps read
+//!   what its earlier ones would have written.
 //!
 //! A record body crosses as an `AtprotoValue`, sealed in the data model, which
 //! is how a float reaches a repo that has none, and a record type is its body
@@ -60,6 +63,7 @@ mod atproto_account;
 mod atproto_plugin;
 mod bsky;
 mod converge;
+mod dry_run_pds;
 mod emulator_pds;
 mod pds;
 mod pds_query;
@@ -67,6 +71,7 @@ pub use atproto_account::*;
 pub use atproto_plugin::*;
 pub use bsky::*;
 pub use converge::*;
+pub use dry_run_pds::*;
 pub use emulator_pds::*;
 pub use pds::*;
 pub use pds_query::*;

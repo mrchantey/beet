@@ -61,9 +61,11 @@ pub async fn StandardSitePublish(
 	all: bool,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let dry_run = publish.0.dry_run;
-	let world = cx.world();
-	let publishing = Publishing::resolve(&cx.caller).await?;
+	let ActionContext { caller, mut input } = cx;
+	let world = caller.world().clone();
+	let publishing = Publishing::resolve(&caller)
+		.await?
+		.in_run(&mut input, publish.0.dry_run);
 	// the named pages first, so a draft or a typo refuses the whole run
 	// before the repo is even read
 	let named = only
@@ -77,13 +79,8 @@ pub async fn StandardSitePublish(
 		publishing.announcement(slug, day)?;
 	}
 	let records = publishing.records().await?;
-	let site = StandardSitePublish::publication(
-		&world,
-		&publishing,
-		&records,
-		dry_run,
-	)
-	.await?;
+	let site =
+		StandardSitePublish::publication(&world, &publishing, &records).await?;
 	let mut wanted = Vec::new();
 	for page in &publishing.pages {
 		let published = publishing.published(&records, page)?;
@@ -97,7 +94,6 @@ pub async fn StandardSitePublish(
 				&site,
 				page,
 				published,
-				dry_run,
 			)
 			.await?,
 		);
@@ -107,17 +103,16 @@ pub async fn StandardSitePublish(
 		.pds
 		.converge(
 			wanted,
-			&Converge::default()
-				.with_dry_run(dry_run)
-				.with_prune(prune)
-				.with_scope(move |document: &StandardSiteDocument| {
+			&Converge::default().with_prune(prune).with_scope(
+				move |document: &StandardSiteDocument| {
 					document.site.at_uri().as_ref() == Some(&scope)
-				}),
+				},
+			),
 		)
 		.await?
 		.xref()
 		.xmap(Publishing::log);
-	Ok(Pass(cx.input))
+	Ok(Pass(input))
 }
 
 impl StandardSitePublish {
@@ -126,7 +121,6 @@ impl StandardSitePublish {
 		world: &AsyncWorld,
 		publishing: &Publishing,
 		records: &StandardSiteRecords,
-		dry_run: bool,
 	) -> Result<AtUri> {
 		let existing = records.publication.as_ref();
 		let rkey = existing
@@ -137,7 +131,7 @@ impl StandardSitePublish {
 			&& existing.and_then(|entry| entry.value.icon.as_ref())
 				!= Some(&icon.blob_ref)
 		{
-			icon.upload(&publishing.pds, dry_run).await?;
+			icon.upload(&publishing.pds).await?;
 		}
 		let theme = world
 			.with(|world: &mut World| {
@@ -155,7 +149,7 @@ impl StandardSitePublish {
 			.pds
 			.converge(
 				[Rkeyed::new(rkey.clone(), record)],
-				&Converge::default().with_dry_run(dry_run).with_scope(
+				&Converge::default().with_scope(
 					move |publication: &StandardSitePublication| {
 						publication.url == url
 					},
@@ -179,7 +173,6 @@ impl StandardSitePublish {
 		site: &AtUri,
 		page: &SyndicationPage,
 		published: Option<&RecordEntry<StandardSiteDocument>>,
-		dry_run: bool,
 	) -> Result<Rkeyed<StandardSiteDocument>> {
 		let rkey = published
 			.map(|entry| entry.rkey().clone())
@@ -212,7 +205,7 @@ impl StandardSitePublish {
 					..rendered
 				};
 				// an unchanged document references blobs the repo holds
-				if !dry_run && existing.as_ref() != Some(&document) {
+				if existing.as_ref() != Some(&document) {
 					let record = AtprotoValue::from_serde(&document)?
 						.into_record(&StandardSiteDocument::COLLECTION)?;
 					live.upload_blob_refs(&pds, &record).await?;
