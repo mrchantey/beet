@@ -170,21 +170,6 @@ pub(crate) fn graphics_state() -> ElementState {
 	ElementState::Custom("graphics".into())
 }
 
-/// Pixel dimensions from a PNG header (`IHDR` width/height), or `None` when
-/// the bytes are not a PNG.
-#[cfg(any(feature = "tui", test))]
-pub(crate) fn png_dimensions(bytes: &[u8]) -> Option<UVec2> {
-	(bytes.len() >= 24
-		&& bytes.starts_with(b"\x89PNG\r\n\x1a\n")
-		&& &bytes[12..16] == b"IHDR")
-		.then(|| {
-			UVec2::new(
-				u32::from_be_bytes(bytes[16..20].try_into().unwrap()),
-				u32::from_be_bytes(bytes[20..24].try_into().unwrap()),
-			)
-		})
-}
-
 // ── Detection ─────────────────────────────────────────────────────────────────
 
 /// Whether a surface's terminal renders the kitty graphics protocol.
@@ -461,7 +446,7 @@ pub(crate) struct Png {
 /// when the bytes are not a decodable image.
 #[cfg(feature = "tui")]
 pub(crate) fn to_png_bytes(bytes: Vec<u8>) -> Option<Png> {
-	if png_dimensions(&bytes).is_some() {
+	if raster_ext::png_size(&bytes).is_some() {
 		return Some(Png { bytes, scale: 1 });
 	}
 	if is_svg(&bytes) {
@@ -580,7 +565,7 @@ async fn fetch_image_bytes(src: &str) -> Result<Vec<u8>> {
 #[cfg(feature = "tui")]
 pub(crate) fn encode_png(bytes: Vec<u8>) -> Option<(String, UVec2)> {
 	use base64::Engine;
-	let px = png_dimensions(&bytes)?;
+	let px = raster_ext::png_size(&bytes)?;
 	let data = base64::engine::general_purpose::STANDARD.encode(&bytes);
 	Some((data, px))
 }
@@ -911,13 +896,6 @@ mod test {
 		bytes.extend(height.to_be_bytes());
 		bytes.extend([8, 6, 0, 0, 0]);
 		bytes
-	}
-
-	#[beet_core::test]
-	fn parses_png_dimensions() {
-		png_dimensions(&png_bytes(640, 480))
-			.xpect_eq(Some(UVec2::new(640, 480)));
-		png_dimensions(b"not a png").xpect_eq(None);
 	}
 
 	/// A raster of the given pixel size at scale 1, the fields the sizing

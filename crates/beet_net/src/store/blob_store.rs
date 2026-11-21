@@ -667,6 +667,20 @@ pub mod store_test {
 			.await
 			.unwrap()
 			.xpect_eq(BlobDir::default());
+		// a subdir lists its own keys, never a sibling sharing its name's start
+		let sibling = RelPath::from("dir.txt");
+		store.insert(&sibling, body.clone()).await.unwrap();
+		let mut listed = store
+			.with_subdir(RelPath::from("dir"))
+			.list()
+			.await
+			.unwrap();
+		listed.sort();
+		listed.xpect_eq(vec![
+			RelPath::from("file.txt"),
+			RelPath::from("nested/leaf.txt"),
+		]);
+		store.remove(&sibling).await.unwrap();
 		store.remove(&leaf).await.unwrap();
 		store.remove(&file).await.unwrap();
 

@@ -102,6 +102,8 @@ impl OpcRelationship {
 }
 
 impl OpcPackage {
+	/// The path of the content types part, which every package holds.
+	pub const CONTENT_TYPES_PATH: &str = "[Content_Types].xml";
 	/// The content type of the content types part's own entries.
 	pub const RELATIONSHIPS_TYPE: &str =
 		"application/vnd.openxmlformats-package.relationships+xml";
@@ -113,23 +115,12 @@ impl OpcPackage {
 
 	/// Reads the package `bytes` hold.
 	pub fn read(bytes: &[u8]) -> Result<Self> {
-		let mut archive = zip::ZipArchive::new(Cursor::new(bytes))?;
-		let mut entries = Vec::new();
-		for index in 0..archive.len() {
-			let mut file = archive.by_index(index)?;
-			if file.is_dir() {
-				continue;
-			}
-			let name = file.name()?.trim_start_matches('/').to_string();
-			let mut data = Vec::new();
-			file.read_to_end(&mut data)?;
-			entries.push((name, data));
-		}
+		let entries = Self::read_entries(bytes)?;
 		let mut package = Self::default();
 		// the content types first, every part's type depending on them
 		let overrides = match entries
 			.iter()
-			.find(|(name, _)| name == "[Content_Types].xml")
+			.find(|(name, _)| name == Self::CONTENT_TYPES_PATH)
 		{
 			Some((_, data)) => package.read_content_types(data)?,
 			None => {
@@ -139,7 +130,7 @@ impl OpcPackage {
 			}
 		};
 		for (name, data) in entries {
-			if name == "[Content_Types].xml" {
+			if name == Self::CONTENT_TYPES_PATH {
 				continue;
 			}
 			if let Some(source) = Self::rels_source(&name) {
@@ -154,7 +145,7 @@ impl OpcPackage {
 				.map(|(_, content_type)| content_type.clone())
 				.unwrap_or_else(|| package.default_type(&name));
 			package.parts.push(OpcPart {
-				path: name.into(),
+				path: name,
 				content_type,
 				bytes: data,
 			});
@@ -266,21 +257,57 @@ impl OpcPackage {
 	/// The package's bytes: the content types, every part, then every
 	/// relationships part, deflated.
 	pub fn to_bytes(&self) -> Result<Vec<u8>> {
+		let relationships =
+			self.relationships.iter().map(|(source, relationships)| {
+				(
+					SmolStr::new(Self::rels_path(source.as_deref())),
+					Self::relationships_xml(source.as_deref(), relationships),
+				)
+			});
+		core::iter::once((
+			SmolStr::new(Self::CONTENT_TYPES_PATH),
+			self.content_types_xml(),
+		))
+		.chain(relationships)
+		.chain(
+			self.parts
+				.iter()
+				.map(|part| (part.path.clone(), part.bytes.clone())),
+		)
+		.xmap(Self::write_entries)
+	}
+
+	/// Every file of the zip `bytes` hold, by its path without a leading
+	/// `/`, in archive order: the parts, the content types and every
+	/// relationships part alike, as they are stored, so a package can be
+	/// edited as files and zipped back by [`write_entries`](Self::write_entries).
+	pub fn read_entries(bytes: &[u8]) -> Result<Vec<(SmolStr, Vec<u8>)>> {
+		let mut archive = zip::ZipArchive::new(Cursor::new(bytes))?;
+		let mut entries = Vec::new();
+		for index in 0..archive.len() {
+			let mut file = archive.by_index(index)?;
+			if file.is_dir() {
+				continue;
+			}
+			let name = SmolStr::new(file.name()?.trim_start_matches('/'));
+			let mut data = Vec::new();
+			file.read_to_end(&mut data)?;
+			entries.push((name, data));
+		}
+		entries.xok()
+	}
+
+	/// The zip of `entries`, deflated, in the order given; an Office file
+	/// lists [`CONTENT_TYPES_PATH`](Self::CONTENT_TYPES_PATH) first.
+	pub fn write_entries(
+		entries: impl IntoIterator<Item = (impl AsRef<str>, impl AsRef<[u8]>)>,
+	) -> Result<Vec<u8>> {
 		let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
 		let options = zip::write::SimpleFileOptions::default()
 			.compression_method(zip::CompressionMethod::Deflated);
-		zip.start_file("[Content_Types].xml", options)?;
-		zip.write_all(&self.content_types_xml())?;
-		for (source, relationships) in &self.relationships {
-			zip.start_file(Self::rels_path(source.as_deref()), options)?;
-			zip.write_all(&Self::relationships_xml(
-				source.as_deref(),
-				relationships,
-			))?;
-		}
-		for part in &self.parts {
-			zip.start_file(part.path.as_str(), options)?;
-			zip.write_all(&part.bytes)?;
+		for (path, bytes) in entries {
+			zip.start_file(path.as_ref(), options)?;
+			zip.write_all(bytes.as_ref())?;
 		}
 		zip.finish()?.into_inner().xok()
 	}

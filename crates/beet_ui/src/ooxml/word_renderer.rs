@@ -2739,6 +2739,7 @@ impl DocRenderer for WordRenderer {
 #[cfg(test)]
 mod test {
 	use super::super::office_test::*;
+	use super::super::word_fixture::*;
 	use super::super::word_parser::test::*;
 	use crate::prelude::*;
 	use crate::style::material::*;

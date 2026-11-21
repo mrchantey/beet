@@ -357,6 +357,8 @@ mod office_test;
 mod ooxml_plugin;
 mod opc_package;
 mod read_element;
+#[cfg(any(test, feature = "testing"))]
+mod word_fixture;
 mod word_parser;
 mod word_renderer;
 mod workbook_parser;
@@ -369,6 +371,8 @@ pub use namespace::*;
 pub use office_style::*;
 pub use ooxml_plugin::*;
 pub use opc_package::*;
+#[cfg(any(test, feature = "testing"))]
+pub use word_fixture::*;
 pub use word_parser::*;
 pub use word_renderer::*;
 pub use workbook_parser::*;

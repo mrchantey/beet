@@ -47,6 +47,7 @@ pub mod poll_ext;
 /// Process and command execution utilities.
 #[cfg(feature = "std")]
 pub mod process_ext;
+pub mod raster_ext;
 #[cfg(feature = "rand")]
 mod secure_random;
 #[cfg(feature = "serde")]

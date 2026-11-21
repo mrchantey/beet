@@ -451,7 +451,7 @@ atproto = ["net", "json", "dag_cbor", "beet_net?/atproto", "beet_router?/atproto
 # QR rendering in the terminal, so `vault backup --qr` prints an identity's
 # backup for paper (`beet_net/qrcode`); the cli's png command adds `image`.
 qrcode = ["beet_net?/qrcode"]
-testing = ["beet_core/testing", "beet_net?/testing"]
+testing = ["beet_core/testing", "beet_net?/testing", "beet_ui?/testing"]
 # no_std test runner for bare-metal consumers (eg the esp32 firmware): the beet
 # harness registering via `linkme` instead of `inventory`. See `beet_core`.
 testing_embedded = ["beet_core/testing_embedded"]
