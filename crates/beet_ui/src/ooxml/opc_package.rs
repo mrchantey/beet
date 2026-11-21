@@ -67,6 +67,18 @@ impl OpcRelationship {
 	pub const THEME: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme";
 	/// A part's named styles.
 	pub const STYLES: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+	/// A Word file's list definitions.
+	pub const NUMBERING: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering";
+	/// A Word file's footnotes.
+	pub const FOOTNOTES: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes";
+	/// A Word file's endnotes.
+	pub const ENDNOTES: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes";
+	/// A Word section's header.
+	pub const HEADER: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header";
+	/// A Word section's footer.
+	pub const FOOTER: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer";
+	/// A Word file's settings.
+	pub const SETTINGS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings";
 
 	/// Whether this relationship's type is `kind`, or one whose last segment
 	/// is `kind`'s, as the strict and transitional schemas spell the same

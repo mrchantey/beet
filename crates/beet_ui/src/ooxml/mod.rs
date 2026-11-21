@@ -24,23 +24,29 @@
 //! # Word
 //!
 //! The closest HTML analogy. The body's blocks are the root's children in
-//! order, the section's default header first and its default footer last.
+//! order, the section's default header first, the notes after the body and
+//! the default footer last. Named styles are matched by their built-in
+//! names through `styles.xml` (`heading 1`, `Title`, `Quote`), never their
+//! ids, which Word localizes, ie `berschrift1`; a file with no styles part
+//! is matched by the English ids.
 //!
 //! | Word | HTML | Notes |
 //! |---|---|---|
+//! | the body's last `w:sectPr`'s default `w:headerReference`, `w:footerReference` | the root's first child a `header`, its last a `footer`, each of the part's blocks | a write writes the root's first child as the header when it is a `header`, and its last as the footer when a `footer` |
 //! | `w:p` | `p` | |
 //! | `w:p` styled `Title`, `Heading1` to `Heading6` | `h1` to `h6` | `Title` reads as `h1`; a heading writes with its `Heading<n>` style, defined with its built-in name and outline level so the navigation pane and a contents page find it |
 //! | consecutive `Quote` or `IntenseQuote` paragraphs | `blockquote` of `p`s | each `p` in a `blockquote` writes with `Quote` |
-//! | consecutive `HTMLPreformatted` paragraphs | one `pre`, a line each | |
+//! | consecutive `HTMLPreformatted` paragraphs | one `pre`, a line each, every line wholly `HTMLCode` read as one `code` | |
 //! | a run styled `HTMLCode` | `code` | |
 //! | a `Caption` paragraph directly above a table | that table's `caption` | |
-//! | a paragraph numbered by `w:numPr` | `li`, grouped by `w:ilvl` into nested `ul`, or `ol` when the level's `w:numFmt` counts (decimal, letter, roman) | a write numbers each `li` at its depth with the writer's own bullet or decimal definition, each top level list its own `w:num` so an `ol` restarts |
+//! | a paragraph numbered by `w:numPr`, its own or its style's | `li`, grouped by `w:ilvl` into nested `ul`, or `ol` when the level's `w:numFmt` counts (decimal, letter, roman), a deeper level nested in the item before it, a top level item of another `w:num` starting a new list | a write numbers each `li` at its depth with the writer's own bullet or decimal definition, each top level list, and each nested list of the other kind, its own `w:num` restarting its count |
 //! | an empty paragraph with only a bottom border | `hr` | |
-//! | `w:b`, `w:i`, `w:u`, `w:strike` or `w:dstrike` | `strong`, `em`, `u`, `s` | a write reads the resolved weight, slant and decoration, so any element styled bold writes bold |
+//! | `w:b`, `w:i`, `w:u`, `w:strike` or `w:dstrike` | `strong`, `em`, `u`, `s`; turned off, ie `w:b w:val="0"`, a `span` with a direct look of its weight, slant or decoration | a write reads the resolved weight, slant and decoration, so any element styled bold writes bold, and one resolving less than its paragraph turns it off |
 //! | `w:vertAlign` | `sup`, `sub` | |
 //! | `w:highlight` | `mark`, a colour other than yellow as a direct look of its background | a `mark` with no resolved background writes yellow |
-//! | `w:color` (not `auto`), `w:shd` fill, `w:sz` differing from the document's default | `span` with a direct look of its colour, background and size | a run's look nests outermost first: `mark` or `span`, `strong`, `em`, `u`, `s`, `sub` or `sup` |
-//! | `w:jc` | a direct look of its text alignment on the block | |
+//! | `w:color` (not `auto`), `w:shd` fill, `w:sz` differing from its paragraph style's, else the document's default | `span` with a direct look of its colour, background and size | a run's look nests outermost first: `mark` or `span`, `strong`, `em`, `u`, `s`, `sub` or `sup`, `code` |
+//! | a paragraph's `w:jc` (`center`, `right`) and `w:shd` fill | a direct look of its text alignment and background on the block | |
+//! | `w:pageBreakBefore` | a `PageBreak` before the block | |
 //! | `w:hyperlink r:id` | `a href` to its relationship's target | |
 //! | `w:hyperlink w:anchor`, `w:bookmarkStart w:name` | `a href="#name"`, the `id` of the block the bookmark opens in | `_GoBack` is dropped; a write brackets any block carrying an `id` in a bookmark of that name |
 //! | a complex field `HYPERLINK ".."` | `a href` | |
@@ -51,22 +57,24 @@
 //! | `w:sdt` holding a `w14:checkbox` | `input type="checkbox"`, `checked` as it says | its glyph is dropped; a write writes the control and its glyph, `☒` or `☐` |
 //! | any other `w:sdt` | its content, the wrapper dropped | |
 //! | `w:ins`, `w:moveTo`; `w:del`, `w:moveFrom` | `ins`; `del`, with `datetime` from `w:date` | a write's `w:author` is the document's first author, else `beet` |
-//! | `w:tbl` | `table` | a write spans the page's width with single borders |
+//! | `w:tbl` | `table` | a write spans the page's width with single borders, a cell ending in a table closed by the empty paragraph Word requires, which a read drops |
+//! | a cell holding one plain paragraph | the paragraph's content, its alignment and id the cell's | a cell's inline content writes as one paragraph |
 //! | `w:tr` with `w:tblHeader` | a `tr` of `th`s in `thead`, every other row a `tr` of `td`s in `tbody` | a `th` outside a `thead` writes as a cell and reads back a `td` |
-//! | `w:gridSpan`; `w:vMerge` | `colspan`; `rowspan` on the merge's first cell, its continuations absent | |
+//! | `w:gridSpan`; `w:vMerge`; `w:gridBefore` | `colspan`; `rowspan` on the merge's first cell, its continuations absent; an empty cell per skipped column, so every slot keeps its address | |
 //! | a cell's `w:shd` fill | a direct look of its background on the cell | |
-//! | `w:drawing` of an embedded picture, inline or anchored | `img src="data:<type>;base64,.."` with `alt` from its description and `width` and `height` in CSS px | an anchored picture reads inline where it is anchored; see [Pictures](#pictures) |
-//! | a paragraph holding only a text box, `w:txbxContent` | `aside` | a write writes an `aside` as an inline text box of its blocks |
-//! | `w:footnoteReference`, `w:endnoteReference` | `sup` holding `a href="#fn-<n>"` or `#en-<n>` | the markdown parser's footnote shape |
-//! | the notes parts | each note a `div class="footnote-definition" id="fn-<n>"` (`en-<n>` for an endnote) after the body | a definition whose label leads `en-` writes as an endnote, any other as a footnote |
+//! | `w:drawing` of an embedded picture, inline or anchored, or a VML `v:imagedata` | `img src="data:<type>;base64,.."` with `alt` from its description and `width` and `height` in CSS px | an anchored picture reads inline where it is anchored; see [Pictures](#pictures) |
+//! | a paragraph holding only a text box, `w:txbxContent` | `aside` | a text box beside other content reads as an `aside` after its paragraph; a write writes an `aside` as an inline text box of its blocks |
+//! | `w:footnoteReference`, `w:endnoteReference` | `sup` holding `a href="#fn-<n>"` or `#en-<n>`, `<n>` counting each kind's notes in reference order | the markdown parser's footnote shape; a write numbers each kind in reference order, a `sup` holding only a link to a definition being a reference |
+//! | the notes parts | each note referenced a `div class="footnote-definition" id="fn-<n>"` (`en-<n>` for an endnote) after the body, its mark and the space after it dropped | a definition whose label leads `en-` writes as an endnote, any other as a footnote, one never referenced not at all |
 //! | `mc:AlternateContent` | its `mc:Choice` when the reader reads what it requires (a text box, a checkbox), else its `mc:Fallback` | |
 //!
 //! **Lost on a read**: named styles beyond those listed and every style's own
 //! formatting, theme fonts, page size, margins, columns and section breaks,
 //! first page and even page headers and footers, comments, revision
 //! authorship, field instructions, content control tags and bindings, a
-//! tab's width, table and cell widths, borders and vertical alignment, and
-//! where a floating picture or text box sits.
+//! tab's width, paragraph spacing and indents, justified alignment, table and
+//! cell widths, borders and vertical alignment, every bookmark of a block but
+//! its first, and where a floating picture or text box sits.
 //!
 //! **A write cannot say**: layout (flex rows and columns, positioning,
 //! widths other than a picture's), a `th` outside a `thead`, form controls
@@ -243,24 +251,32 @@
 //!   `Quote`, `pre` as `HTMLPreformatted`, `code` as `HTMLCode`, `a` as
 //!   `Hyperlink`, `caption` as `Caption`, a deck's title and body text)
 //!   writes that style with the look its tag resolves to as a child of the
-//!   root. A run, paragraph, cell or shape then writes as direct formatting
-//!   only what it resolves differently from the style it names, else from
-//!   the defaults. A theme's palette and prose rules so land where the
-//!   format keeps a document's look, and a written file read back resolves
-//!   the same look through the same rules without carrying it as direct
-//!   looks.
+//!   root, a Word heading bold at Word's own sizes where nothing resolves it
+//!   a weight or size of its own. A run, paragraph, cell or shape then
+//!   writes as direct formatting only what it resolves differently from the
+//!   structure a reader reads it back into, resolved as a probe of bare
+//!   elements under the root: its style's tag inside the lists, quote or
+//!   table around it, and the inline elements the format writes as
+//!   structure, ie a link, a mark, code or a revision. A theme's palette and
+//!   prose rules so land where the format keeps a document's look, and a
+//!   written file read back resolves the same look through the same rules
+//!   without carrying it as direct looks.
 //! - **Theme colours.** A writer writes the format's theme colour scheme by
 //!   the slot table, each slot its token resolved for the writer's scheme,
-//!   and a colour it writes that equals a slot's writes as a reference to the
-//!   slot, the first slot in the table winning.
+//!   and where the world's theme resolved those tokens, a colour it writes
+//!   that equals a slot's writes as a reference to the slot, the first slot
+//!   in the table winning. With no theme the scheme is Office's default and
+//!   no colour names a slot, since its token would resolve nothing on a read.
 //! - **Units.** px and rem by CSS's own ratios: 96 px to the inch, 72 pt to
 //!   the inch, 16 px to the rem, so 1 px is 0.75 pt, 15 twips and 9525 EMU.
 //!   A percentage width is of the page's content box.
 //! - **What writes.** Run: weight, slant, decoration line, colour,
 //!   background, font size, and the `sup`, `sub` and `code` elements (a
-//!   monospace font). Paragraph: text alignment, margins as spacing before,
-//!   after and indent, background as shading, `break-after: page`. Cell:
-//!   background, text alignment, and for a workbook the run properties.
+//!   monospace font), a `mark`'s background as the nearest highlight colour.
+//!   Paragraph: text alignment, margins as spacing before, after and indent,
+//!   background as shading, `break-after: page` (and beet's `PageBreak`
+//!   markup, whatever it resolves). Cell: background, text alignment, and
+//!   for a workbook the run properties.
 //!   Shape: a slide's text sizes and colours as runs, its picture's size.
 //!
 //! # Pictures
@@ -313,19 +329,20 @@ mod deck_report;
 mod doc_meta_properties;
 mod namespace;
 mod node;
+mod office_picture;
 mod office_style;
+#[cfg(test)]
+mod office_test;
 mod ooxml_plugin;
 mod ooxml_query;
 mod opc_package;
 mod package;
 mod parser;
 mod read_element;
-mod renderer;
-mod word;
-mod word_writer;
+mod word_parser;
+mod word_renderer;
 mod workbook_parser;
 mod workbook_renderer;
-mod writer;
 mod xml_part;
 pub use a1_reference::*;
 pub use core_properties::*;
@@ -338,7 +355,7 @@ pub use ooxml_plugin::*;
 pub use opc_package::*;
 pub use package::*;
 pub use parser::*;
-pub use renderer::*;
-pub use word::*;
+pub use word_parser::*;
+pub use word_renderer::*;
 pub use workbook_parser::*;
 pub use workbook_renderer::*;

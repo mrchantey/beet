@@ -84,9 +84,8 @@ markdown_parser = ["bsx", "dep:pulldown-cmark"]
 # Word files, workbooks and slide decks as media (`OoxmlPlugin`, which a
 # router installs): each read into the one document tree by a `DocParser` and
 # written from it by a `DocRenderer`, its looks through the style cascade.
-# Word and decks still read through `OoxmlParser` and Word writes through
-# `OoxmlRenderer`, over `ooxmlsdk`; workbooks read and write through
-# `OpcPackage`, over `zip`.
+# Decks still read through `OoxmlParser`, over `ooxmlsdk`; Word files and
+# workbooks read and write through `OpcPackage`, over `zip`.
 ooxml = ["bsx", "dep:ooxmlsdk", "dep:zip", "dep:flate2"]
 # The `beet_ui` BSX front-end: `BsxParser`, a thin `DocParser` delegating to the core BSX
 # parser (`beet_core/bsx`), plus the default `bx:click` event registration.

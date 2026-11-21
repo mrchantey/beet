@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 /// An entity's computed style, the cascade's target agnostic output: what
 /// every renderer reads, the charcell painter from the components a live
 /// surface keeps and a document writer from a pure resolve.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct ComputedStyle {
 	/// Colours, text decoration, font and alignment.
 	pub visual: VisualStyle,

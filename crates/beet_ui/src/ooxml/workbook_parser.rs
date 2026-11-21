@@ -860,9 +860,9 @@ impl DocParser for WorkbookParser {
 
 #[cfg(test)]
 pub(crate) mod test {
+	use super::super::office_test::*;
 	use super::*;
 	use crate::style::*;
-	use beet_net::prelude::*;
 
 	/// A synthetic workbook built over [`OpcPackage`], the one fixture the
 	/// reader's and writer's tests share: a styles part whose first font,
@@ -1110,40 +1110,6 @@ pub(crate) mod test {
 				 <sheetProtection sheet=\"1\"/>",
 			)
 			.bytes()
-	}
-
-	/// `bytes` parsed into a world of the formats and the default style
-	/// rules, and its root.
-	pub(crate) fn parse(bytes: &MediaBytes) -> Result<(World, Entity)> {
-		parse_in(
-			(TemplatePlugin, DocumentPlugin, OoxmlPlugin).into_world(),
-			bytes,
-		)
-	}
-
-	/// `bytes` parsed into `world`, and its root.
-	pub(crate) fn parse_in(
-		mut world: World,
-		bytes: &MediaBytes,
-	) -> Result<(World, Entity)> {
-		let root = world.spawn_empty().id();
-		DocParsers::parse(ParseContext::new(
-			&mut world.entity_mut(root),
-			bytes,
-		))?;
-		(world, root).xok()
-	}
-
-	/// The tree under `root` as HTML.
-	pub(crate) fn html(world: &mut World, root: Entity) -> String {
-		HtmlRenderer::new()
-			.render(&mut RenderContext::new(
-				world,
-				root,
-				&RequestParts::default(),
-			))
-			.unwrap()
-			.to_string()
 	}
 
 	/// The first table of each article with its cells' positions and texts.

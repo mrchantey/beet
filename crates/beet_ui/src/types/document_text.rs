@@ -1,15 +1,15 @@
-//! [`DocumentText`], a document's words, paragraphs, checkboxes and
-//! formatting, read off its tree the same way whichever format it came from.
+//! [`DocumentText`], a document's words, paragraphs and checkboxes, read off
+//! its tree the same way whichever format it came from.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// A document's content read off its tree, the same way for every format
 /// (markdown, HTML, Word, a workbook): its words as plain text
-/// ([`text`](Self::text)), its paragraphs ([`blocks`](Self::blocks)), its
-/// checkboxes ([`checkbox`](Self::checkbox)) and the formatting of its
-/// words ([`formatting`](Self::formatting)).
+/// ([`text`](Self::text)), its paragraphs ([`blocks`](Self::blocks)) and
+/// its checkboxes ([`checkbox`](Self::checkbox)). A look is the cascade's,
+/// never read here.
 ///
-/// Edits and cell listings read a document through this; it is not a
+/// Cell listings and prose checks read a document through this; it is not a
 /// renderer, which writes the tree out in a format of its own.
 #[derive(SystemParam)]
 pub struct DocumentText<'w, 's> {
@@ -24,7 +24,6 @@ pub struct DocumentText<'w, 's> {
 		),
 	>,
 	elements: ElementQuery<'w, 's>,
-	parents: Query<'w, 's, &'static ChildOf>,
 }
 
 impl DocumentText<'_, '_> {
@@ -34,6 +33,12 @@ impl DocumentText<'_, '_> {
 
 	/// Whether `tag` is one of the [`BLOCKS`](Self::BLOCKS).
 	pub fn is_block(tag: &str) -> bool { Self::BLOCKS.contains(&tag) }
+
+	/// Whether `tag` sets its words bold, `strong` or `b`.
+	pub fn is_bold(tag: &str) -> bool { matches!(tag, "strong" | "b") }
+
+	/// Whether `tag` sets its words italic, `em` or `i`.
+	pub fn is_italic(tag: &str) -> bool { matches!(tag, "em" | "i") }
 
 	/// A heading's level, 1 for `h1` to 6 for `h6`, `None` for any other tag.
 	pub fn heading_level(tag: &str) -> Option<u8> {
@@ -74,23 +79,6 @@ impl DocumentText<'_, '_> {
 	/// checked, as [`ElementView::checkbox`] reads it.
 	pub fn checkbox(&self, entity: Entity) -> Option<bool> {
 		self.elements.get(entity).ok()?.checkbox()
-	}
-
-	/// The formatting of the text at `entity`, read from it and the elements
-	/// around it up to its paragraph, the nearest [`BLOCKS`](Self::BLOCKS)
-	/// element.
-	pub fn formatting(&self, entity: Entity) -> TextFormatting {
-		let mut formatting = TextFormatting::default();
-		for view in core::iter::once(entity)
-			.chain(self.parents.iter_ancestors(entity))
-			.filter_map(|entity| self.elements.get(entity).ok())
-		{
-			formatting.apply(&view);
-			if Self::is_block(view.tag()) {
-				break;
-			}
-		}
-		formatting
 	}
 
 	fn children(&self, entity: Entity) -> Vec<Entity> {
@@ -168,47 +156,6 @@ impl DocumentText<'_, '_> {
 	}
 }
 
-/// Whether some text is bold, italic, highlighted or coloured, as
-/// [`DocumentText::formatting`] reads it from the elements around it.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct TextFormatting {
-	/// Inside a `<strong>` or `<b>`.
-	pub bold: bool,
-	/// Inside an `<em>` or `<i>`.
-	pub italic: bool,
-	/// The innermost `<mark>`'s background, `yellow` when its style sets
-	/// none.
-	pub highlight: Option<SmolStr>,
-	/// The innermost `color` a `style` declares.
-	pub colour: Option<SmolStr>,
-}
-
-impl TextFormatting {
-	/// Whether `tag` sets its words bold, `strong` or `b`.
-	pub fn is_bold(tag: &str) -> bool { matches!(tag, "strong" | "b") }
-
-	/// Whether `tag` sets its words italic, `em` or `i`.
-	pub fn is_italic(tag: &str) -> bool { matches!(tag, "em" | "i") }
-
-	/// Adds what `view` says, an inner element's highlight and colour
-	/// already read winning over an outer one's.
-	fn apply(&mut self, view: &ElementView) {
-		let tag = view.tag();
-		self.bold |= Self::is_bold(tag);
-		self.italic |= Self::is_italic(tag);
-		if tag == "mark" && self.highlight.is_none() {
-			self.highlight = view
-				.style_property("background-color")
-				.or_else(|| view.style_property("background"))
-				.unwrap_or_else(|| "yellow".into())
-				.xsome();
-		}
-		if self.colour.is_none() {
-			self.colour = view.style_property("color");
-		}
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -238,75 +185,5 @@ mod test {
 					.xpect_eq(vec![true, false, true, false]);
 			},
 		);
-	}
-
-	/// The formatting of each text under a parsed document, by its words.
-	#[cfg(feature = "markdown_parser")]
-	fn formatting_by_words(bytes: MediaBytes) -> Vec<(String, TextFormatting)> {
-		let mut world = ParsePlugin.into_world();
-		let root = world.spawn_empty().id();
-		DocParsers::parse(ParseContext::new(
-			&mut world.entity_mut(root),
-			&bytes,
-		))
-		.unwrap();
-		world.with_state::<(DocumentText, Query<&Children>, Query<&Value>), _>(
-			|(text, children, values)| {
-				children
-					.iter_descendants(root)
-					.filter_map(|entity| {
-						let words = values.get(entity).ok()?.as_str().ok()?;
-						(words.to_string(), text.formatting(entity)).xsome()
-					})
-					.collect()
-			},
-		)
-	}
-
-	/// The formatting of `words` in `found`.
-	#[cfg(feature = "markdown_parser")]
-	fn formatting_of(
-		found: &[(String, TextFormatting)],
-		words: &str,
-	) -> TextFormatting {
-		found
-			.iter()
-			.find(|(text, _)| text == words)
-			.map(|(_, look)| look.clone())
-			.unwrap()
-	}
-
-	/// Formatting is the same fact whichever format said it: markdown's
-	/// emphasis, an HTML `<mark>` and a styled colour, the innermost
-	/// winning and nothing read from beyond the paragraph.
-	#[cfg(feature = "markdown_parser")]
-	#[beet_core::test]
-	fn reads_formatting_from_any_format() {
-		let markdown =
-			formatting_by_words(MediaBytes::new_markdown("**bold** and *it*"));
-		formatting_of(&markdown, "bold").xpect_eq(TextFormatting {
-			bold: true,
-			..default()
-		});
-		formatting_of(&markdown, "it").xpect_eq(TextFormatting {
-			italic: true,
-			..default()
-		});
-		formatting_of(&markdown, " and ").xpect_eq(TextFormatting::default());
-
-		let html = formatting_by_words(MediaBytes::new_html(
-			"<div style=\"color: red\"><p><mark>hi</mark>\
-			 <span style=\"color: #00F\"><mark style=\"background: green\"><b>there</b></mark></span></p></div>",
-		));
-		formatting_of(&html, "hi").xpect_eq(TextFormatting {
-			highlight: Some("yellow".into()),
-			..default()
-		});
-		formatting_of(&html, "there").xpect_eq(TextFormatting {
-			bold: true,
-			highlight: Some("green".into()),
-			colour: Some("#00F".into()),
-			..default()
-		});
 	}
 }

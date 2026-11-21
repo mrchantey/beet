@@ -2,8 +2,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// What an Office file's XML says at this entity, which [`OoxmlRenderer`]
-/// writes back. No renderer reads it: what a node means to a reader is the
+/// What a slide deck's XML says at this entity, as [`OoxmlParser`] reads a
+/// deck. No renderer reads it: what a node means to a reader is the
 /// [`Element`] and [`Value`] a projection puts beside it, so a node meaning
 /// nothing to a reader, ie a paragraph's properties, is an entity every
 /// renderer walks through. The text a reader reads is a [`Value`] on its own
@@ -129,17 +129,6 @@ impl OoxmlRead {
 			},
 		);
 		world.insert_batch(read);
-	}
-
-	/// Whether `entity`'s [`Value`] differs from its read, or it has a value
-	/// and no read.
-	pub fn edited(world: &World, entity: Entity) -> bool {
-		let entity = world.entity(entity);
-		match (entity.get::<Value>(), entity.get::<Self>()) {
-			(Some(value), Some(read)) => *value != read.0,
-			(Some(_), None) => true,
-			(None, _) => false,
-		}
 	}
 }
 

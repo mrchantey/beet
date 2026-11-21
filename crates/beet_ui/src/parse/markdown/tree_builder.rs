@@ -340,17 +340,21 @@ impl<'a> MdTreeBuilder<'a> {
 				self.apply_html_fragment(source);
 			}
 			Event::FootnoteReference(label) => {
-				let label_str = label.as_ref();
-				// <sup><a href="#fn-{label}">[{label}]</a></sup>
-				let href_text =
-					self.find_substring(source, label_str).unwrap_or(source);
+				// <sup><a href="#{label}">{label}</a></sup>, linking the
+				// definition whose `id` is the label
+				let label_text = self
+					.find_substring(source, label.as_ref())
+					.unwrap_or(source);
 				self.push_leaf(HtmlNode::Element {
 					name: "sup",
 					attributes: vec![],
 					children: vec![HtmlNode::Element {
 						name: "a",
-						attributes: vec![str_attr("href", href_text)],
-						children: vec![HtmlNode::Text(href_text)],
+						attributes: vec![str_attr(
+							"href",
+							&format!("#{label_text}"),
+						)],
+						children: vec![HtmlNode::Text(label_text)],
 						source,
 					}],
 					source,
@@ -1000,6 +1004,30 @@ mod test {
 		let nodes = build("> quoted");
 		nodes.len().xpect_eq(1);
 		node_name(&nodes[0]).xpect_eq("blockquote");
+	}
+
+	/// A footnote reference links its definition by the `id` the
+	/// definition carries, its label.
+	#[beet_core::test]
+	fn footnote_links_its_definition() {
+		let nodes = build("words[^note]\n\n[^note]: the note");
+		let reference = &node_children(&nodes[0])[1];
+		node_name(reference).xpect_eq("sup");
+		let HtmlNode::Element { attributes, .. } = &node_children(reference)[0]
+		else {
+			panic!("the reference holds its link");
+		};
+		attributes[0]
+			.value
+			.clone()
+			.xpect_eq(AttrValue::Str("#note".into()));
+		let HtmlNode::Element { attributes, .. } = &nodes[1] else {
+			panic!("the definition is an element");
+		};
+		attributes[1]
+			.value
+			.clone()
+			.xpect_eq(AttrValue::Str("note".into()));
 	}
 
 	#[beet_core::test]

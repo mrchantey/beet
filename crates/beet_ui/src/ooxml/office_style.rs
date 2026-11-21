@@ -148,18 +148,53 @@ pub struct OfficeLook {
 
 /// The looks a writer writes, resolved through the cascade's pure resolve
 /// for its scheme, medium and viewport: the root's as the format's
-/// defaults, each named style's as its tag resolves as a child of the root,
-/// and the theme's palette by the slot table.
+/// defaults, each named style's as a probe of its tag resolves under the
+/// root, and the theme's palette by the slot table.
 #[derive(Debug, Clone)]
 pub struct OfficeStyleSheet {
+	/// The tree's root, every probe spawned beneath it.
+	root: Entity,
 	/// The media every look is resolved for.
 	media: MediaContext,
 	/// The root's look, the format's document defaults.
 	defaults: OfficeLook,
-	/// Each named style's look by its tag.
-	named: HashMap<SmolStr, OfficeLook>,
 	/// Each slot's colour for the writer's scheme.
 	palette: OfficeTheme,
+	/// Whether a theme's tokens resolved the palette, without which it is
+	/// Office's default and no colour names a slot.
+	themed: bool,
+}
+
+/// One element of a probe chain: a bare element of its tag, and of its
+/// class where the structure a reader reads names one, ie a footnote
+/// definition's.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ProbeTag {
+	/// The tag.
+	pub tag: SmolStr,
+	/// The class.
+	pub class: Option<SmolStr>,
+}
+
+impl ProbeTag {
+	/// A probe of `tag`.
+	pub fn new(tag: impl Into<SmolStr>) -> Self {
+		Self {
+			tag: tag.into(),
+			class: None,
+		}
+	}
+
+	/// A probe of `tag` carrying `class`.
+	pub fn with_class(
+		tag: impl Into<SmolStr>,
+		class: impl Into<SmolStr>,
+	) -> Self {
+		Self {
+			tag: tag.into(),
+			class: Some(class.into()),
+		}
+	}
 }
 
 impl ThemeSlot {
@@ -180,22 +215,37 @@ impl ThemeSlot {
 	];
 
 	/// The slot a DrawingML scheme colour or a theme part's element names,
-	/// `dk1` or its alias `tx1`.
+	/// `dk1` or its alias `tx1`, or a Word `w:themeColor` names, `dark1` or
+	/// its alias `text1`.
 	pub fn parse(name: &str) -> Option<Self> {
 		match name {
-			"dk1" | "tx1" => Some(Self::Dark1),
-			"lt1" | "bg1" => Some(Self::Light1),
-			"dk2" | "tx2" => Some(Self::Dark2),
-			"lt2" | "bg2" => Some(Self::Light2),
+			"dk1" | "tx1" | "dark1" | "text1" => Some(Self::Dark1),
+			"lt1" | "bg1" | "light1" | "background1" => Some(Self::Light1),
+			"dk2" | "tx2" | "dark2" | "text2" => Some(Self::Dark2),
+			"lt2" | "bg2" | "light2" | "background2" => Some(Self::Light2),
 			"accent1" => Some(Self::Accent1),
 			"accent2" => Some(Self::Accent2),
 			"accent3" => Some(Self::Accent3),
 			"accent4" => Some(Self::Accent4),
 			"accent5" => Some(Self::Accent5),
 			"accent6" => Some(Self::Accent6),
-			"hlink" => Some(Self::Hyperlink),
-			"folHlink" => Some(Self::FollowedHyperlink),
+			"hlink" | "hyperlink" => Some(Self::Hyperlink),
+			"folHlink" | "followedHyperlink" => Some(Self::FollowedHyperlink),
 			_ => None,
+		}
+	}
+
+	/// The name a Word `w:themeColor` gives this slot, the inverse of
+	/// [`parse`](Self::parse) for Word.
+	pub fn word_name(self) -> &'static str {
+		match self {
+			Self::Dark1 => "text1",
+			Self::Light1 => "background1",
+			Self::Dark2 => "text2",
+			Self::Light2 => "background2",
+			Self::Hyperlink => "hyperlink",
+			Self::FollowedHyperlink => "followedHyperlink",
+			other => other.name(),
 		}
 	}
 
@@ -650,75 +700,139 @@ impl OfficeStyleSheet {
 	}
 
 	/// Resolves the looks of `root` for `media`: the tree's styles brought
-	/// up to date by a [`PostParseTree`] run, the root's look, each tag of
-	/// `named` resolved as a child of the root, and the theme's palette.
+	/// up to date by a [`PostParseTree`] run, the root's look and the theme's
+	/// palette. A named style's look is a [`probe`](Self::probe) of its tag.
 	pub fn resolve(
 		world: &mut World,
 		root: Entity,
 		media: MediaContext,
-		named: &[&str],
 	) -> Result<Self> {
 		let _ = world.try_run_schedule(PostParseTree);
-		// a probe per named style, a bare element of its tag under the root,
-		// despawned once resolved
-		let probes = named
-			.iter()
-			.map(|tag| {
-				let probe =
-					world.spawn((Element::new(*tag), ChildOf(root))).id();
-				(SmolStr::new(*tag), probe)
-			})
-			.collect::<Vec<_>>();
 		let resolved =
 			world.with_state::<CascadeQuery, _>(|cascade| -> Result<_> {
 				let memo = &mut CascadeMemo::for_media(media);
 				let defaults =
 					OfficeLook::from_computed(&cascade.resolve(root, memo)?);
-				let named = probes
-					.iter()
-					.map(|(tag, probe)| -> Result<_> {
-						(
-							tag.clone(),
-							OfficeLook::from_computed(
-								&cascade.resolve(*probe, memo)?,
-							),
-						)
-							.xok()
-					})
-					.collect::<Result<HashMap<_, _>>>()?;
-				let fallback = OfficeTheme::default();
 				let mut palette = OfficeTheme::default();
+				let mut themed = false;
 				for slot in ThemeSlot::ALL {
-					let color = cascade
+					if let Some(color) = cascade
 						.rules()
 						.resolve_untyped(root, &slot.token(), memo)
 						.ok()
 						.and_then(|value| value.into_serde::<Color>().ok())
-						.unwrap_or(fallback.color(slot));
-					palette = palette.with_color(slot, color);
+					{
+						palette = palette.with_color(slot, color);
+						themed = true;
+					}
 				}
-				(defaults, named, palette).xok()
+				(defaults, palette, themed).xok()
 			});
-		for (_, probe) in probes {
-			world.entity_mut(probe).despawn();
-		}
-		let (defaults, named, palette) = resolved?;
+		let (defaults, palette, themed) = resolved?;
 		Self {
+			root,
 			media,
 			defaults,
-			named,
 			palette,
+			themed,
 		}
 		.xok()
 	}
 
+	/// The media every look is resolved for.
+	pub fn media(&self) -> MediaContext { self.media }
+
+	/// The slot a colour a writer writes names: the first in the table
+	/// holding it, none where no theme resolved the palette.
+	pub fn theme_slot(&self, color: Color) -> Option<ThemeSlot> {
+		self.themed.then(|| self.palette.slot_of(color)).flatten()
+	}
+
+	/// The computed style of every element of each chain, resolved as a
+	/// chain of bare elements spawned under the root and despawned once
+	/// resolved, so a writer learns what the structure a reader will read
+	/// back resolves to with no look of its own.
+	pub fn probe(
+		&self,
+		world: &mut World,
+		chains: &[Vec<ProbeTag>],
+	) -> Result<Vec<Vec<ComputedStyle>>> {
+		let spawned = chains
+			.iter()
+			.map(|chain| {
+				let mut parent = self.root;
+				chain
+					.iter()
+					.map(|probe| {
+						let entity = world
+							.spawn((
+								Element::new(probe.tag.clone()),
+								ChildOf(parent),
+							))
+							.id();
+						if let Some(class) = &probe.class {
+							world.spawn((
+								AttributeOf::new(entity),
+								Attribute::new("class"),
+								Value::Str(class.clone()),
+							));
+						}
+						parent = entity;
+						entity
+					})
+					.collect::<Vec<_>>()
+			})
+			.collect::<Vec<_>>();
+		let resolved = spawned
+			.iter()
+			.map(|chain| self.computed(world, chain))
+			.collect::<Result<Vec<_>>>();
+		for chain in spawned {
+			if let Some(first) = chain.first() {
+				world.entity_mut(*first).despawn();
+			}
+		}
+		resolved
+	}
+
+	/// The computed styles of `entities` for the writer's media in one pass.
+	pub fn computed(
+		&self,
+		world: &mut World,
+		entities: &[Entity],
+	) -> Result<Vec<ComputedStyle>> {
+		world.with_state::<CascadeQuery, _>(|cascade| {
+			let memo = &mut CascadeMemo::for_media(self.media);
+			entities
+				.iter()
+				.map(|entity| cascade.resolve(*entity, memo))
+				.collect()
+		})
+	}
+
+	/// Whether each of `entities` resolves `break-after: page`.
+	pub fn breaks_after(
+		&self,
+		world: &mut World,
+		entities: &[Entity],
+	) -> Result<Vec<bool>> {
+		world.with_state::<RuleSetQuery, _>(|rules| {
+			let memo = &mut CascadeMemo::for_media(self.media);
+			entities
+				.iter()
+				.map(|entity| {
+					rules
+						.resolve(*entity, BreakAfterProp, memo)
+						.map(|value| value == BreakAfter::Page)
+						.unwrap_or(false)
+				})
+				.collect::<Vec<_>>()
+				.xok()
+		})
+	}
+
 	/// The root's look, the format's document defaults.
 	pub fn defaults(&self) -> &OfficeLook { &self.defaults }
-
-	/// The look of the style `tag` names, the defaults when it names none.
-	pub fn named(&self, tag: &str) -> &OfficeLook {
-		self.named.get(tag).unwrap_or(&self.defaults)
-	}
 
 	/// The theme's palette for the writer's scheme.
 	pub fn palette(&self) -> &OfficeTheme { &self.palette }
@@ -730,28 +844,22 @@ impl OfficeStyleSheet {
 		world: &mut World,
 		entities: &[Entity],
 	) -> Result<Vec<OfficeLook>> {
-		world.with_state::<CascadeQuery, _>(|cascade| {
-			let memo = &mut CascadeMemo::for_media(self.media);
-			entities
-				.iter()
-				.map(|entity| {
-					cascade
-						.resolve(*entity, memo)
-						.map(|style| OfficeLook::from_computed(&style))
-				})
-				.collect()
-		})
+		self.computed(world, entities)?
+			.iter()
+			.map(OfficeLook::from_computed)
+			.collect::<Vec<_>>()
+			.xok()
 	}
 
 	/// What each of `entities` writes as direct formatting: what it resolves
-	/// differently from the style `named` names, else from the defaults.
+	/// differently from `base`, else from the defaults.
 	pub fn direct(
 		&self,
 		world: &mut World,
 		entities: &[Entity],
-		named: Option<&str>,
+		base: Option<&OfficeLook>,
 	) -> Result<Vec<OfficeLook>> {
-		let base = named.map_or(&self.defaults, |tag| self.named(tag));
+		let base = base.unwrap_or(&self.defaults);
 		self.looks(world, entities)?
 			.into_iter()
 			.map(|look| look.diff(base))
@@ -826,7 +934,7 @@ mod test {
 		.unwrap();
 		let em = tagged(&mut world, "em");
 		let sheet =
-			OfficeStyleSheet::resolve(&mut world, root, screen(), &[]).unwrap();
+			OfficeStyleSheet::resolve(&mut world, root, screen()).unwrap();
 		let on_surface = sheet.palette().color(ThemeSlot::Dark1);
 		sheet.defaults().color.xpect_eq(Some(on_surface));
 		let direct = sheet.direct(&mut world, &[span, em], None).unwrap();
@@ -845,13 +953,17 @@ mod test {
 			themed(rsx! { <div><h1><span>"Title"</span></h1></div> });
 		let span = tagged(&mut world, "span");
 		let sheet =
-			OfficeStyleSheet::resolve(&mut world, root, screen(), &["h1"])
-				.unwrap();
-		let heading = sheet.named("h1").clone();
+			OfficeStyleSheet::resolve(&mut world, root, screen()).unwrap();
+		let heading = sheet
+			.probe(&mut world, &[vec![ProbeTag::new("h1")]])
+			.unwrap()
+			.remove(0)
+			.remove(0)
+			.xmap(|style| OfficeLook::from_computed(&style));
 		heading.bold.xpect_eq(Some(true));
 		(heading.font_size_px > sheet.defaults().font_size_px).xpect_true();
 		sheet
-			.direct(&mut world, &[span], Some("h1"))
+			.direct(&mut world, &[span], Some(&heading))
 			.unwrap()
 			.remove(0)
 			.is_empty()
@@ -872,8 +984,7 @@ mod test {
 		]);
 		let para = tagged(&mut world, "p");
 		let print = MediaContext::new(Medium::Print);
-		let sheet =
-			OfficeStyleSheet::resolve(&mut world, root, print, &[]).unwrap();
+		let sheet = OfficeStyleSheet::resolve(&mut world, root, print).unwrap();
 		let look = sheet.looks(&mut world, &[para]).unwrap().remove(0);
 		(look.bold, look.italic).xpect_eq((Some(true), Some(false)));
 	}

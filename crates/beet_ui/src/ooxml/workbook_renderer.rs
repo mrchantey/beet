@@ -89,7 +89,7 @@ impl WorkbookRenderer {
 		if let Some(scheme) = OfficeStyleSheet::scheme(world, request) {
 			media = media.with_scheme(scheme);
 		}
-		let styles = OfficeStyleSheet::resolve(world, root, media, &[])?;
+		let styles = OfficeStyleSheet::resolve(world, root, media)?;
 		let sheets = Self::gather(world, root)?;
 		// every cell's look, what it resolves differently from the root's
 		let entities = sheets
@@ -656,7 +656,7 @@ impl WorkbookRenderer {
 		color: Color,
 	) -> String {
 		let mut xml = XmlPart::fragment();
-		match styles.palette().slot_of(color) {
+		match styles.theme_slot(color) {
 			Some(slot) => {
 				xml.empty(name, &[(
 					"theme",
@@ -718,6 +718,7 @@ impl DocRenderer for WorkbookRenderer {
 
 #[cfg(test)]
 mod test {
+	use super::super::office_test::*;
 	use super::super::workbook_parser::test::*;
 	use crate::prelude::*;
 	use crate::style::material::*;
@@ -731,21 +732,7 @@ mod test {
 		root: Entity,
 		request: RequestParts,
 	) -> Result<MediaBytes> {
-		DocRenderers::render(
-			world,
-			root,
-			&request.with_accept(MediaType::Xlsx),
-		)?
-		.xok()
-	}
-
-	/// The part at `path` of a written workbook as text.
-	fn part(bytes: &MediaBytes, path: &str) -> String {
-		OpcPackage::read(bytes.bytes())
-			.unwrap()
-			.part(path)
-			.map(|part| String::from_utf8(part.to_vec()).unwrap())
-			.unwrap()
+		super::super::office_test::write(world, root, MediaType::Xlsx, request)
 	}
 
 	/// The model's round trip: a workbook read, written and read again
@@ -924,32 +911,12 @@ mod test {
 	/// where `soffice` is absent.
 	#[beet_core::test]
 	fn libreoffice_opens_a_written_workbook() {
-		if std::process::Command::new("soffice")
-			.arg("--version")
-			.output()
-			.is_err()
-		{
+		if !has_soffice() {
 			return;
 		}
 		let (mut world, root) = parse(&budget()).unwrap();
 		let written = write(&mut world, root, default()).unwrap();
-		let dir = TempDir::new().unwrap();
-		let path: &std::path::Path = dir.as_ref();
-		let file = path.join("budget.xlsx");
-		fs_ext::write(&file, written.bytes()).unwrap();
-		let output = std::process::Command::new("soffice")
-			.arg(format!(
-				"-env:UserInstallation=file://{}",
-				path.join("profile").display()
-			))
-			.args(["--headless", "--convert-to", "csv", "--outdir"])
-			.arg(path)
-			.arg(&file)
-			.output()
-			.unwrap();
-		output.status.success().xpect_true();
-		fs_ext::read_to_string(path.join("budget.csv"))
-			.unwrap()
+		soffice_convert(&written, "budget.xlsx", "csv")
 			.xpect_contains("Name,Code,Total")
 			.xpect_contains("Acme,007,120.5")
 			.xpect_contains("TRUE,#DIV/0!,241")

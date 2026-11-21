@@ -265,8 +265,8 @@ impl InlineWrapper {
 	/// [`MarkdownRenderer::open_html`] finds it unstyled.
 	fn of(tag: &str) -> Option<Self> {
 		match tag {
-			tag if TextFormatting::is_italic(tag) => Some(Self::Em),
-			tag if TextFormatting::is_bold(tag) => Some(Self::Strong),
+			tag if DocumentText::is_italic(tag) => Some(Self::Em),
+			tag if DocumentText::is_bold(tag) => Some(Self::Strong),
 			"del" | "s" => Some(Self::Del),
 			"sup" => Some(Self::Sup),
 			"sub" => Some(Self::Sub),

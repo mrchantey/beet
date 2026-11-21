@@ -91,73 +91,16 @@ impl OoxmlQuery<'_, '_> {
 			.collect()
 	}
 
-	/// The first descendant `local` in `namespace`.
-	pub fn descendant(
-		&self,
-		entity: Entity,
-		namespace: &str,
-		local: &str,
-	) -> Option<Entity> {
-		self.children
-			.iter_descendants_depth_first(entity)
-			.find(|descendant| self.is(*descendant, namespace, local))
-	}
 
 	/// Every ancestor, the nearest first.
 	pub fn ancestors(&self, entity: Entity) -> Vec<Entity> {
 		self.parents.iter_ancestors(entity).collect()
 	}
 
-	/// The nearest ancestor `local` in `namespace`.
-	pub fn ancestor(
-		&self,
-		entity: Entity,
-		namespace: &str,
-		local: &str,
-	) -> Option<Entity> {
-		self.parents
-			.iter_ancestors(entity)
-			.find(|ancestor| self.is(*ancestor, namespace, local))
-	}
 
-	/// The part holding `entity`, the nearest [`OoxmlNode::Part`] above it.
-	pub fn part_of(&self, entity: Entity) -> Option<Entity> {
-		self.parents
-			.iter_ancestors(entity)
-			.find(|ancestor| self.is_part(*ancestor))
-	}
 
-	/// The path of `part`, when it is one.
-	pub fn path(&self, part: Entity) -> Option<&SmolStr> {
-		match self.nodes.get(part) {
-			Ok(OoxmlNode::Part { path }) => Some(path),
-			_ => None,
-		}
-	}
 
-	/// Whether an element of the file holds `entity`, ie a node an edit
-	/// added among the file's rather than beside them.
-	pub fn within_source(&self, entity: Entity) -> bool {
-		self.parents
-			.iter_ancestors(entity)
-			.any(|ancestor| self.element(ancestor).is_some())
-	}
 
-	/// The prefix bound to `namespace` where `entity` sits, by the nearest
-	/// declaration at or above it.
-	pub fn prefix_for(&self, entity: Entity, namespace: &str) -> Option<&str> {
-		core::iter::once(entity)
-			.chain(self.parents.iter_ancestors(entity))
-			.filter_map(|ancestor| self.element(ancestor))
-			.find_map(|element| {
-				element.attributes.iter().find_map(|attribute| {
-					attribute
-						.name
-						.strip_prefix("xmlns:")
-						.filter(|_| attribute.value == namespace)
-				})
-			})
-	}
 
 	/// The value of `entity`'s attribute `local` in `namespace`, or
 	/// unprefixed when `None`.
@@ -170,39 +113,7 @@ impl OoxmlQuery<'_, '_> {
 		self.element(entity)?.attribute(namespace, local)
 	}
 
-	/// The attribute `attribute` of `entity`'s property `local`, a child of
-	/// its properties element, ie a run's `w:rPr/w:color@w:val`.
-	pub fn property(
-		&self,
-		entity: Entity,
-		properties: &str,
-		namespace: &str,
-		local: &str,
-		attribute: &str,
-	) -> Option<&str> {
-		let properties = self.child(entity, namespace, properties)?;
-		let property = self.child(properties, namespace, local)?;
-		self.attribute(property, Some(namespace), attribute)
-	}
 
-	/// Whether `entity`'s properties carry the toggle `local` switched on, ie
-	/// a run's `w:b`, present and not `0` or `false`.
-	pub fn toggle(
-		&self,
-		entity: Entity,
-		properties: &str,
-		namespace: &str,
-		local: &str,
-	) -> bool {
-		self.child(entity, namespace, properties)
-			.and_then(|properties| self.child(properties, namespace, local))
-			.is_some_and(|toggle| {
-				!matches!(
-					self.attribute(toggle, Some(namespace), "val"),
-					Some("0" | "false")
-				)
-			})
-	}
 
 	/// The text of every text node under `entity`, joined.
 	pub fn text(&self, entity: Entity) -> String {
@@ -240,11 +151,6 @@ impl Tagged {
 		self
 	}
 
-	/// A flag attribute, present with no value, ie `checked`.
-	pub fn flag(mut self, key: impl Into<SmolStr>) -> Self {
-		self.attributes.push((key.into(), Value::Null));
-		self
-	}
 
 	/// Inserts the element and spawns its attributes on `entity`.
 	pub fn insert(self, world: &mut World, entity: Entity) {
@@ -263,18 +169,8 @@ pub(crate) enum Projected {
 	/// A text node no reader sees: its value becomes an
 	/// [`OoxmlNode::Text`].
 	Hide(Entity),
-	/// A node's own words, ie a tab's space, as its own [`Value`].
-	Show(Entity, SmolStr),
-	/// Projection-only elements, outermost first, nested under the node and
-	/// wrapping `content`, ie a bold run's `<strong>` inside its `<mark>`
-	/// around everything after its properties.
-	Wrap {
-		entity: Entity,
-		wrappers: Vec<Tagged>,
-		content: Vec<Entity>,
-	},
-	/// A component the projection reads the node into, ie a paragraph's
-	/// [`ParagraphStyle`](crate::prelude::ParagraphStyle).
+	/// A component the projection reads the node into, ie a slide
+	/// paragraph's [`ListLevel`](crate::prelude::ListLevel).
 	Insert(Entity, Box<dyn FnOnce(&mut EntityWorldMut)>),
 }
 
@@ -299,22 +195,6 @@ impl Projected {
 					if let Some(Value::Str(text)) = entity.take::<Value>() {
 						entity.insert(OoxmlNode::Text(text));
 					}
-				}
-				Self::Show(entity, text) => {
-					world.entity_mut(entity).insert(Value::Str(text));
-				}
-				Self::Wrap {
-					entity,
-					wrappers,
-					content,
-				} => {
-					let mut parent = entity;
-					for wrapper in wrappers {
-						let child = world.spawn(ChildOf(parent)).id();
-						wrapper.insert(world, child);
-						parent = child;
-					}
-					world.entity_mut(parent).add_children(&content);
 				}
 				Self::Insert(entity, insert) => {
 					insert(&mut world.entity_mut(entity));

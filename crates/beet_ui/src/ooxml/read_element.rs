@@ -26,6 +26,24 @@ pub(crate) enum ReadNode {
 	Text(String),
 }
 
+impl ReadNode {
+	/// `nodes` with each run of adjacent texts joined into one, an empty
+	/// text dropped.
+	pub fn merge_text(nodes: Vec<ReadNode>) -> Vec<ReadNode> {
+		let mut out = Vec::<ReadNode>::with_capacity(nodes.len());
+		for node in nodes {
+			match (out.last_mut(), node) {
+				(_, ReadNode::Text(text)) if text.is_empty() => {}
+				(Some(ReadNode::Text(last)), ReadNode::Text(text)) => {
+					last.push_str(&text)
+				}
+				(_, node) => out.push(node),
+			}
+		}
+		out
+	}
+}
+
 impl ReadElement {
 	/// An element `tag` with nothing in it.
 	pub fn new(tag: impl Into<SmolStr>) -> Self {
@@ -72,6 +90,14 @@ impl ReadElement {
 	pub fn with_look(mut self, look: DirectLook) -> Self {
 		self.look = look;
 		self
+	}
+
+	/// Whether `other` is this element's shell: its tag, attributes and
+	/// look, its children aside, so a reader merges runs of equal wrappers.
+	pub fn same_shell(&self, other: &Self) -> bool {
+		self.tag == other.tag
+			&& self.attributes == other.attributes
+			&& self.look == other.look
 	}
 
 	/// Spawns this element and its subtree as the last child of `parent`,

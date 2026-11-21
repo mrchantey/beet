@@ -1,23 +1,21 @@
 use super::deck::*;
 use super::node::OoxmlRead;
-use super::word::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use ooxmlsdk::parts::PartRef;
 
-/// Parses a Word file, a workbook or a slide deck into the one document tree:
-/// the [`DocMeta`] its core properties declare and its [`OoxmlPackage`] on
-/// the root, each part it reads an [`OoxmlNode::Part`] beneath, every node of
-/// the part an entity with its [`OoxmlNode`] and, where it means what an HTML
-/// element means, that [`Element`]. See the [`ooxml`](crate::ooxml) module
-/// for what each format's nodes become.
+/// Parses a slide deck into the one document tree: the [`DocMeta`] its core
+/// properties declare on the root, each part it reads an
+/// [`OoxmlNode::Part`] beneath, every node of the part an entity with its
+/// [`OoxmlNode`] and, where it means what an HTML element means, that
+/// [`Element`].
 #[derive(Debug, Default, Clone)]
 pub struct OoxmlParser;
 
 impl OoxmlParser {
-	/// The media types this parser reads, a workbook being the
-	/// [`WorkbookParser`]'s.
-	const MEDIA_TYPES: [MediaType; 2] = [MediaType::Docx, MediaType::Pptx];
+	/// The media types this parser reads, a Word file being the
+	/// [`WordParser`]'s and a workbook the [`WorkbookParser`]'s.
+	const MEDIA_TYPES: [MediaType; 1] = [MediaType::Pptx];
 
 	/// Reads `part` of `package` as an [`OoxmlNode::Part`] child of `root`,
 	/// holding the part's prolog and document element.
@@ -72,15 +70,9 @@ impl DocParser for OoxmlParser {
 		let properties = file.core_properties()?;
 		cx.entity.insert((properties.doc_meta(), properties));
 		cx.entity.world_scope(|world| -> Result {
-			match file.media_type() {
-				MediaType::Docx => WordProjection::build(world, root, &file)?,
-				_ => SlideProjection::build(world, root, &file)?,
-			}
+			SlideProjection::build(world, root, &file)?;
 			// the read ends here: a value differing from it is an edit
 			OoxmlRead::record(world, root);
-			world
-				.entity_mut(root)
-				.insert(OoxmlPackage::new(cx.bytes.clone()));
 			Ok(())
 		})?;
 		Ok(())

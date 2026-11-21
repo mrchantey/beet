@@ -5,11 +5,8 @@ use beet_core::prelude::*;
 
 /// The Office formats as media: their readers and writers, the
 /// [`StylePlugin`] whose user agent rules every look reads and writes
-/// through, what the Word and deck trees still carry so a scene holding one
+/// through, what a deck's tree still carries so a scene holding one
 /// serializes, and a deck's triage appended in [`PostParseTree`].
-///
-/// Each reader is installed after [`OoxmlParser`] and each writer after
-/// [`OoxmlRenderer`], so a reworked format answers its media type.
 #[derive(Default)]
 pub struct OoxmlPlugin;
 
@@ -17,7 +14,6 @@ impl Plugin for OoxmlPlugin {
 	fn build(&self, app: &mut App) {
 		app.install_type::<StylePlugin>()
 			.register_type::<CoreProperties>()
-			.register_type::<ParagraphStyle>()
 			.register_type::<ListLevel>()
 			.register_type::<OoxmlNode>()
 			.register_type::<OoxmlRead>()
@@ -27,7 +23,8 @@ impl Plugin for OoxmlPlugin {
 			.register_type::<DeckReported>()
 			.install((
 				OoxmlParser,
-				OoxmlRenderer,
+				WordParser::default(),
+				WordRenderer,
 				WorkbookParser::default(),
 				WorkbookRenderer,
 			))

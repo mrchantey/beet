@@ -21,6 +21,12 @@ pub struct Deck {
 	pub unlisted: Vec<SmolStr>,
 }
 
+/// A slide paragraph's list level from 0, one below its `lvl`: the
+/// paragraph is an `<li>` in a projection-only `<ul>` per level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deref, Reflect, Component)]
+#[reflect(Component)]
+pub struct ListLevel(pub u8);
+
 /// One slide as its `<section>` carries it: where it is in the deck and its
 /// part, its layout, and what holds its content, for a triage of the deck.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Reflect, Component)]
@@ -794,6 +800,73 @@ impl SlideProjection {
 	}
 }
 
+impl ListLevel {
+	/// Groups every run of numbered paragraphs under `part` into
+	/// projection-only `<ul>`s, one per level, a deeper level nested in the
+	/// one above it. Any other sibling ends the lists open around it.
+	pub(crate) fn wrap(world: &mut World, part: Entity) {
+		let containers =
+			world
+				.with_state::<(Query<&Children>, Query<&ChildOf, With<ListLevel>>), _>(
+					|(children, items)| {
+						let mut containers = Vec::<Entity>::new();
+						for item in children
+							.iter_descendants_depth_first(part)
+							.filter_map(|entity| items.get(entity).ok())
+						{
+							if !containers.contains(&item.parent()) {
+								containers.push(item.parent());
+							}
+						}
+						containers
+					},
+				);
+		for container in containers {
+			Self::wrap_container(world, container);
+		}
+	}
+
+	fn wrap_container(world: &mut World, container: Entity) {
+		let children = world
+			.entity(container)
+			.get::<Children>()
+			.map(|children| children.to_vec())
+			.unwrap_or_default();
+		// the open lists, outermost first
+		let mut lists = Vec::<Entity>::new();
+		for child in children {
+			let Some(level) = world.entity(child).get::<ListLevel>() else {
+				lists.clear();
+				continue;
+			};
+			let depth = level.0 as usize + 1;
+			lists.truncate(depth);
+			while lists.len() < depth {
+				let list = world.spawn(Element::new("ul")).id();
+				match lists.last() {
+					Some(parent) => {
+						world.entity_mut(*parent).add_child(list);
+					}
+					None => {
+						let index = world
+							.entity(container)
+							.get::<Children>()
+							.and_then(|children| {
+								children
+									.iter()
+									.position(|entity| entity == child)
+							})
+							.unwrap_or_default();
+						world.entity_mut(container).insert_child(index, list);
+					}
+				}
+				lists.push(list);
+			}
+			world.entity_mut(*lists.last().unwrap()).add_child(child);
+		}
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -826,8 +899,9 @@ mod test {
 
 	#[beet_core::test]
 	fn reads_slides_in_reading_order() {
-		let (mut world, root) = super::super::word::test::parse(deck());
-		super::super::word::test::markdown(&mut world, root)
+		let (mut world, root) =
+			super::super::office_test::parse(&deck()).unwrap();
+		super::super::office_test::markdown(&mut world, root)
 			.xpect_starts_with("1 slides, 13.33 x 7.50 inches.\n\n## Slide 1\n\n`ppt/slides/slide1.xml`, layout ``\n")
 			// the title sits above the body, so it reads first
 			.xpect_contains(

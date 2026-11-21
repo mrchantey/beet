@@ -263,9 +263,9 @@ flate2 = { version = "1", default-features = false, features = ["rust_backend"] 
 # deflate, through the pure rust `flate2` above, so it builds on every target;
 # the other codecs and encryption an Office file never uses stay off.
 zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
-# Office Open XML (`beet_ui`'s `ooxml`): the package of a Word file, a workbook
-# or a slide deck, its parts and relationships, round-trip tested across
-# thousands of files. Pinned exactly, since the crate is pre-1.0 and its
+# Office Open XML (`beet_ui`'s `ooxml`): the package of a slide deck, the one
+# format still read through it, its parts and relationships, round-trip
+# tested across thousands of files. Pinned exactly, since the crate is pre-1.0 and its
 # generated api moves between releases; `parts` is the package read and write,
 # everything else it offers stays off, every part read by beet's own markup
 # parser.
