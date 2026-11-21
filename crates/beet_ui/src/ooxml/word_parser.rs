@@ -1941,7 +1941,9 @@ pub(crate) mod test {
 				let path = format!(
 					"word/media/image{}.{}",
 					index + 1,
-					OfficePicture::extension(content_type)
+					OfficePicture::extension(&MediaType::from_content_type(
+						content_type
+					))
 				);
 				package.insert(
 					path.as_str(),

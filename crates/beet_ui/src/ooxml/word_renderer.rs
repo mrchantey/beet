@@ -2094,17 +2094,17 @@ impl WordWrite<'_> {
 			WordRenderer::CONTENT,
 		);
 		let blip = match &picture.source {
-			PictureSource::Embedded(url) => {
+			PictureSource::Embedded(bytes) => {
 				self.images += 1;
 				let path = format!(
 					"word/media/image{}.{}",
 					self.images,
-					OfficePicture::extension(url.essence())
+					OfficePicture::extension(bytes.media_type())
 				);
 				self.package.insert(
 					path.as_str(),
-					url.essence(),
-					url.bytes.clone(),
+					bytes.media_type().as_str(),
+					bytes.bytes().to_vec(),
 				);
 				let id = self.package.relate(
 					Some(part),
@@ -2944,10 +2944,10 @@ mod test {
 	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
 	fn writes_a_markdown_page() {
-		let image = DataUrl::new(
-			"image/png",
+		let image = Url::from_media_bytes(&MediaBytes::new(
+			MediaType::Png,
 			super::super::office_picture::test::png(),
-		)
+		))
 		.to_string();
 		let markdown = format!(
 			"# Title\n\nSome *emphasis*, **strong** and `code`, [a link](https://example.com), a note[^1].\n\n\

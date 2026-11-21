@@ -18,8 +18,8 @@ pub(crate) struct OfficePicture {
 /// Where a picture's bytes are.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum PictureSource {
-	/// Carried in the tree, a `data:` URL's.
-	Embedded(DataUrl),
+	/// Carried in the tree, a `data:` url's.
+	Embedded(MediaBytes),
 	/// Elsewhere, at its `src`, which a writer links.
 	Linked(String),
 }
@@ -36,11 +36,11 @@ impl OfficePicture {
 		emu: Option<UVec2>,
 		alt: &str,
 	) -> super::read_element::ReadElement {
-		Self::read(
-			DataUrl::new(content_type, bytes.to_vec()).to_string(),
-			emu,
-			alt,
-		)
+		let bytes = MediaBytes::new(
+			MediaType::from_content_type(content_type),
+			bytes.to_vec(),
+		);
+		Self::read(Url::from_media_bytes(&bytes).to_string(), emu, alt)
 	}
 
 	/// The `img` a reader reads a picture at `src` as, its size in px from
@@ -78,14 +78,12 @@ impl OfficePicture {
 		resolved: Vec2,
 		bounds: Vec2,
 	) -> Self {
-		let source = match DataUrl::is_data_url(src) {
-			true => DataUrl::parse(src)
-				.map(PictureSource::Embedded)
-				.unwrap_or_else(|_| PictureSource::Linked(src.to_string())),
-			false => PictureSource::Linked(src.to_string()),
-		};
+		let source = Url::coerce(src)
+			.media_bytes()
+			.map(PictureSource::Embedded)
+			.unwrap_or_else(|_| PictureSource::Linked(src.to_string()));
 		let native = match &source {
-			PictureSource::Embedded(url) => Self::native_size(&url.bytes),
+			PictureSource::Embedded(bytes) => Self::native_size(bytes.bytes()),
 			PictureSource::Linked(_) => None,
 		};
 		// each side from the first that says it, the other by aspect
@@ -133,20 +131,27 @@ impl OfficePicture {
 		(OfficeUnits::emu(self.size.x), OfficeUnits::emu(self.size.y))
 	}
 
-	/// The extension a picture part of `media_type` is named with.
-	pub fn extension(media_type: &str) -> &'static str {
-		match media_type {
-			"image/png" => "png",
-			"image/jpeg" | "image/jpg" => "jpeg",
-			"image/gif" => "gif",
-			"image/bmp" => "bmp",
-			"image/tiff" => "tiff",
-			"image/svg+xml" => "svg",
-			"image/webp" => "webp",
-			"image/x-emf" | "image/emf" => "emf",
-			"image/x-wmf" | "image/wmf" => "wmf",
-			_ => "bin",
-		}
+	/// The extension a picture part of `media_type` is named with: the
+	/// type's own, else its subtype, ie `emf` for `image/x-emf`.
+	pub fn extension(media_type: &MediaType) -> String {
+		media_type
+			.extension()
+			.map(str::to_string)
+			.unwrap_or_else(|| {
+				media_type
+					.as_str()
+					.rsplit('/')
+					.next()
+					.map(|subtype| subtype.trim_start_matches("x-"))
+					.filter(|subtype| {
+						!subtype.is_empty()
+							&& subtype
+								.chars()
+								.all(|char| char.is_ascii_alphanumeric())
+					})
+					.unwrap_or("bin")
+					.to_string()
+			})
 	}
 
 	/// The pixel size a PNG, GIF or JPEG's header declares, as CSS px.
@@ -218,7 +223,9 @@ pub(crate) mod test {
 	/// and fitted to its box.
 	#[beet_core::test]
 	fn sizes_a_picture() {
-		let src = DataUrl::new("image/png", png()).to_string();
+		let src =
+			Url::from_media_bytes(&MediaBytes::new(MediaType::Png, png()))
+				.to_string();
 		let size = |attributes: Vec2, resolved: Vec2, bounds: Vec2| {
 			OfficePicture::write(&src, "", attributes, resolved, bounds).size
 		};

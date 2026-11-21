@@ -21,7 +21,10 @@
 //!
 //! Data URIs (RFC 2397) and the other non-hierarchical schemes (`mailto:`,
 //! `tel:`, `javascript:`, ...) hold their payload verbatim as a single opaque
-//! path segment, neither split on `/` nor percent-coded.
+//! path segment, neither split on `/` nor percent-coded. A data url's bytes
+//! are a [`MediaBytes`] both ways: [`from_media_bytes`](Url::from_media_bytes)
+//! and [`media_bytes`](Url::media_bytes), so a document holds what it shows
+//! without a reference elsewhere.
 //!
 //! A url is the form a request is sent by, never the one a stored field
 //! holds: **a field you store or compare is a [`Uri`], a request you send is a
@@ -232,6 +235,81 @@ impl Url {
 
 	/// The scheme of the URL.
 	pub fn scheme(&self) -> &Scheme { &self.scheme }
+
+	/// A `data:` url carrying `bytes` as base64, ie
+	/// `data:image/png;base64,iVBORw0K..`.
+	pub fn from_media_bytes(bytes: &MediaBytes) -> Self {
+		use base64::Engine;
+		let payload = format!(
+			"{};base64,{}",
+			bytes.media_type(),
+			base64::engine::general_purpose::STANDARD.encode(bytes.bytes())
+		);
+		Self::new(Scheme::Data, None, vec![payload.into()], default(), None)
+			.with_rooted(false)
+	}
+
+	/// The bytes a `data:` url carries and their media type: a payload
+	/// marked `;base64` decoded as base64, any other percent-decoded, and
+	/// `text/plain` where the url names no type. Refuses any other scheme.
+	pub fn media_bytes(&self) -> Result<MediaBytes> {
+		use base64::Engine;
+		if self.scheme != Scheme::Data {
+			bevybail!("`{}:` is no `data:` url", self.scheme.as_str());
+		}
+		let payload = self.path.first().map(SmolStr::as_str).unwrap_or("");
+		let Some((header, data)) = payload.split_once(',') else {
+			bevybail!("a `data:` url has no `,` between its type and data");
+		};
+		let (media_type, base64) = match header.strip_suffix(";base64") {
+			Some(media_type) => (media_type, true),
+			None => (header, false),
+		};
+		let bytes = match base64 {
+			// a payload may be wrapped, so whitespace is dropped; a no_std
+			// decode error is no `Error`, so it is named here
+			true => base64::engine::general_purpose::STANDARD
+				.decode(
+					data.bytes()
+						.filter(|byte| !byte.is_ascii_whitespace())
+						.collect::<Vec<_>>(),
+				)
+				.map_err(|err| {
+					bevyhow!("a `data:` url holds malformed base64: {err}")
+				})?,
+			false => Self::percent_decode_bytes(data),
+		};
+		let media_type = match media_type.trim() {
+			"" => MediaType::Text,
+			media_type => MediaType::from_content_type(media_type),
+		};
+		MediaBytes::new(media_type, bytes).xok()
+	}
+
+	/// `text` with every `%XX` escape decoded as a byte, a malformed one
+	/// kept, so a payload need not be utf-8.
+	fn percent_decode_bytes(text: &str) -> Vec<u8> {
+		let bytes = text.as_bytes();
+		let mut out = Vec::with_capacity(bytes.len());
+		let mut index = 0;
+		while index < bytes.len() {
+			let escaped = bytes
+				.get(index + 1..index + 3)
+				.and_then(|hex| core::str::from_utf8(hex).ok())
+				.and_then(|hex| u8::from_str_radix(hex, 16).ok());
+			match (bytes[index], escaped) {
+				(b'%', Some(byte)) => {
+					out.push(byte);
+					index += 3;
+				}
+				(byte, _) => {
+					out.push(byte);
+					index += 1;
+				}
+			}
+		}
+		out
+	}
 
 	/// Set the scheme.
 	pub fn with_scheme(mut self, scheme: Scheme) -> Self {
@@ -1122,6 +1200,31 @@ mod test {
 
 	/// The opaque schemes carry their payload verbatim: never split on `/`,
 	/// never percent-coded, and `?`/`#` inside a data payload are content.
+	#[crate::test]
+	fn round_trips_media_bytes() {
+		let bytes =
+			MediaBytes::new(MediaType::Png, vec![0x89, b'P', b'N', b'G']);
+		let url = Url::from_media_bytes(&bytes);
+		url.to_string().xpect_eq("data:image/png;base64,iVBORw==");
+		Url::coerce(url.to_string())
+			.media_bytes()
+			.unwrap()
+			.xpect_eq(bytes);
+		let plain = Url::coerce("data:,a%20b").media_bytes().unwrap();
+		plain.media_type().clone().xpect_eq(MediaType::Text);
+		plain.bytes().to_vec().xpect_eq(b"a b".to_vec());
+		Url::coerce("data:image/svg+xml;charset=utf-8;base64,PHN2Zy8+")
+			.media_bytes()
+			.unwrap()
+			.media_type()
+			.clone()
+			.xpect_eq(MediaType::Svg);
+		Url::coerce("https://example.com").media_bytes().xpect_err();
+		Url::coerce("data:image/png;base64")
+			.media_bytes()
+			.xpect_err();
+	}
+
 	#[crate::test]
 	fn keeps_opaque_payloads_verbatim() {
 		let url = Url::coerce("data:text/plain;base64,SGVsbG8=");
