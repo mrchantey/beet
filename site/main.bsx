@@ -260,8 +260,23 @@ announced in one run, a dry run first:
 
     just site-social publish --only=<slug> --announce=<slug> --dry-run   # read every line first
     just site-social publish --only=<slug> --announce=<slug>             # the week's post, its announcement and the reposts
-    just site-social publish                                             # update what is published, create nothing
+    just beet-sync                                                       # promptly: serve the index, restart, purge
     just site-social probe --stage=prod                                  # the handles, then the live site against the repo
+    just site-social publish                                             # update what is published, create nothing
+
+A dry run is the real run against a dry repo per account, so every line it
+logs, the announcement's text and the index line included, is the line the run
+will log, and an already published document reads `unchanged` exactly when its
+record matches the page. Nothing needs syncing between the publish and the
+announcement, but the document's `<link>` tag, a pasted url's card and the
+comments island all read the served index, so the sync follows the run in the
+same session, and it is live only once its restart and its purge have run.
+
+A change to the pipeline itself (a renderer, a lexicon, the announcement's
+format) is rehearsed first on `examples/beetmania`'s publication at
+`https://beetmania.beet.org/blog`, on its own test accounts, with the same
+verbs (`just beetmania social publish ..`, `just beetmania sync --stage=prod`).
+The example stays deployed with its records for exactly this.
 
 An announcement's text is the post's description. A post announced more than
 a week after its `created` day opens with a date line, `Published 11 July 2025`
