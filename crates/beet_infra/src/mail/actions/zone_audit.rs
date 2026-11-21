@@ -1,4 +1,5 @@
 //! What the zone holds, against what the stack declared.
+use crate::actions::CloudflareDnsRecords;
 use crate::actions::cloudflare_api_ext;
 use crate::actions::cloudflare_api_ext::API_BASE;
 use crate::prelude::*;
@@ -371,26 +372,15 @@ fn declared_records(
 	config: &terra::Config,
 	zone_id: Option<&str>,
 ) -> Vec<DeclaredRecord> {
-	config.to_json().into_json()["resource"]["cloudflare_dns_record"]
-		.as_object()
-		.map(|records| {
-			records
-				.values()
-				.filter(|record| match zone_id {
-					Some(zone_id) => {
-						record["zone_id"].as_str() == Some(zone_id)
-					}
-					None => true,
-				})
-				.filter_map(|record| {
-					Some(DeclaredRecord {
-						name: to_pattern(record["name"].as_str()?),
-						kind: record["type"].as_str()?.to_string(),
-					})
-				})
-				.collect()
+	CloudflareDnsRecords::of(config, zone_id)
+		.iter()
+		.filter_map(|record| {
+			Some(DeclaredRecord {
+				name: to_pattern(record["name"].as_str()?),
+				kind: record["type"].as_str()?.to_string(),
+			})
 		})
-		.unwrap_or_default()
+		.collect()
 }
 
 /// Turn a declared name into a match pattern: an interpolation whose value is

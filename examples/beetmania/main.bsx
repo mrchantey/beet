@@ -58,7 +58,8 @@ other stage answers only at its gateway url. The deploy machinery sits behind
 Cloudflare's edge caches what the origin's `Cache-Control` allows:
 `CacheHeadersMiddleware` + `CacheHeaders` mark html edge-cacheable for a week,
 and `cache="1h"` the assets and the wasm. So everything that changes what is
-served purges the zone (`<CloudflarePurgeCache/>`): the deploy after its apply,
+served purges this stack's hostnames from the edge (`<CloudflarePurgeCache/>`,
+never the site's, which shares the zone): the deploy after its apply,
 and `sync` after `<LambdaRestart/>`, which retires the function's warm
 environments so the next request boots afresh, re-discovering the routes and
 re-reading this document and the publication's index, all of which a boot

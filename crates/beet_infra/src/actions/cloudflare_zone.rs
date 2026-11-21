@@ -192,21 +192,23 @@ fn redirect_rules(
 	})
 }
 
-/// Purges the whole Cloudflare zone cache: the invalidation step after a
-/// deploy or content sync. The edge may hold responses for their full
-/// `s-maxage` (see the router's `CacheHeaders`), so anything that changes
+/// Purges the edge cache of the hostnames the stack serves: the invalidation
+/// step after a deploy or content sync. The edge may hold responses for their
+/// full `s-maxage` (see the router's `CacheHeaders`), so anything that changes
 /// served content must purge, or the old pages keep serving until the TTL
 /// runs out.
 ///
-/// Zone-wide by design: hostname-scoped purge is Enterprise-only and per-URL
-/// purge needs the changed key list, so purge-everything is the simple
-/// guarantee. Every stage shares the zone, so a dev sync also cools the prod
-/// cache, which repopulates on the next hit.
+/// The hostnames are read off the config the stack's blocks emit, every
+/// proxied `cloudflare_dns_record` in the stack's zone (a record that is not
+/// proxied is never cached), so the purge and the apply cannot disagree about
+/// what the stack serves, and a stack sharing its zone with another (the
+/// example beside the site, a dev stage beside prod) never cools the other's
+/// cache. A stack serving no proxied hostname purges nothing.
 ///
-/// A REST call (`POST zones/{zone}/purge_cache`), not tofu: a purge is an
-/// event, not a resource. The zone is the stack's [`CloudflareZone`] and the
-/// call authenticates with the deploy token, whose `Cache Purge` group this
-/// action declares.
+/// A REST call (`POST zones/{zone}/purge_cache` with `hosts`), not tofu: a
+/// purge is an event, not a resource. The zone is the stack's
+/// [`CloudflareZone`] and the call authenticates with the deploy token, whose
+/// `Cache Purge` group this action declares.
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -219,25 +221,123 @@ pub async fn CloudflarePurgeCache(
 ) -> Result<Outcome<Request, Response>> {
 	let access = CloudflareAccess::resolve(&cx.caller).await?;
 	let (zone, token) = access.zone_auth(&cx.caller).await?;
-	let zone_id = &zone.id;
+	let zone_id = zone.id.clone();
+	let hosts = cx
+		.caller
+		.with_world(move |world, entity| -> Result<_> {
+			let (.., config) = RenderScope::render(world, entity)?.finish()?;
+			CloudflarePurgeCache::hosts(&config, &zone_id).xok()
+		})
+		.await??;
+	if hosts.is_empty() {
+		info!(
+			"the stack serves no proxied hostname in {}: nothing to purge",
+			zone.domain
+		);
+		return Pass(cx.input).xok();
+	}
 	let start = Instant::now();
 	cloudflare_api_ext::send(
-		Request::post(format!("{API_BASE}/zones/{zone_id}/purge_cache"))
+		Request::post(format!("{API_BASE}/zones/{}/purge_cache", zone.id))
 			.with_auth_bearer(&token)
-			.with_json_body(&serde_json::json!({ "purge_everything": true }))?,
-		"purging the zone cache",
+			.with_json_body(&serde_json::json!({ "hosts": hosts }))?,
+		"purging the edge cache",
 	)
 	.await?;
 	info!(
-		"purged zone cache in {}",
+		"purged the edge cache of {} in {}",
+		hosts.join(", "),
 		time_ext::pretty_print_duration(start.elapsed())
 	);
 	Pass(cx.input).xok()
 }
 
+impl CloudflarePurgeCache {
+	/// Every proxied hostname `config` publishes in `zone_id`, sorted and
+	/// deduplicated.
+	fn hosts(config: &terra::Config, zone_id: &str) -> Vec<String> {
+		let mut hosts = CloudflareDnsRecords::of(config, Some(zone_id))
+			.into_iter()
+			.filter(|record| record["proxied"].as_bool() == Some(true))
+			.filter_map(|record| record["name"].as_str().map(str::to_string))
+			// a name only known after apply is never a served hostname
+			.filter(|name| !name.contains("${"))
+			.collect::<Vec<_>>();
+		hosts.sort();
+		hosts.dedup();
+		hosts
+	}
+}
+
+/// The `cloudflare_dns_record` resources a rendered config emits, the one
+/// reading of them the zone verbs share, so a purge and an audit see exactly
+/// the records the apply writes.
+pub(crate) struct CloudflareDnsRecords;
+
+impl CloudflareDnsRecords {
+	/// Every record `config` emits, as its json, only those in `zone_id`
+	/// when named.
+	pub(crate) fn of(
+		config: &terra::Config,
+		zone_id: Option<&str>,
+	) -> Vec<serde_json::Value> {
+		config.to_json().into_json()["resource"]["cloudflare_dns_record"]
+			.as_object()
+			.map(|records| {
+				records
+					.values()
+					.filter(|record| match zone_id {
+						Some(zone_id) => {
+							record["zone_id"].as_str() == Some(zone_id)
+						}
+						None => true,
+					})
+					.cloned()
+					.collect()
+			})
+			.unwrap_or_default()
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	/// A purge names the stack's proxied hostnames and nothing else: not the
+	/// unproxied certificate validation records beside them, and nothing for a
+	/// zone the stack does not publish in, so it never cools a neighbour's
+	/// cache.
+	#[cfg(feature = "lambda_block")]
+	#[beet_core::test]
+	fn purges_the_proxied_hostnames() {
+		let (scope, _dir) =
+			RenderScope::test_render_zoned("example.org", |parent| {
+				parent.spawn(RepoStoreBlock::test_store());
+				parent.spawn(
+					LambdaBlock::default()
+						.with_dns(
+							DnsProvider::cloudflare("www.example.org")
+								.with_proxied(true),
+						)
+						.with_dns(
+							DnsProvider::cloudflare("example.org")
+								.with_proxied(true),
+						),
+				);
+			});
+		let (.., config) = scope.finish().unwrap();
+		let records = CloudflareDnsRecords::of(&config, None);
+		// the validation records are there, and not proxied
+		(records.len() > 2).xpect_true();
+		let zone = records[0]["zone_id"].as_str().unwrap().to_string();
+		CloudflarePurgeCache::hosts(&config, &zone).xpect_eq(vec![
+			"example.org".to_string(),
+			"www.example.org".to_string(),
+		]);
+		CloudflarePurgeCache::hosts(&config, "another-zone")
+			.len()
+			.xpect_eq(0);
+	}
 
 	/// Each alias answers a `301` to the same path on the apex, query kept.
 	#[beet_core::test]
