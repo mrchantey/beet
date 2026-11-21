@@ -103,7 +103,7 @@ mod store_ref;
 #[cfg(feature = "std")]
 mod store_provider;
 #[cfg(feature = "std")]
-mod table;
+mod table_store;
 // the scene fork: a `template_serde` document in a store, the serde form
 // gating with the json format it is written in.
 #[cfg(all(feature = "template_serde", feature = "json"))]
@@ -129,7 +129,7 @@ pub use store_provider::*;
 #[cfg(feature = "std")]
 pub use store_ref::*;
 #[cfg(feature = "std")]
-pub use table::*;
+pub use table_store::*;
 // the `WatchDir` registration component (any `std` target) and the notify-based
 // directory watcher backing it. The watcher itself is native+fs only for now (deno
 // directory watching is unimplemented), so a wasm `FsStore` works without live
