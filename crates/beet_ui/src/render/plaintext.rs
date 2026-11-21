@@ -68,6 +68,8 @@ impl Default for PlainTextRenderer {
 }
 
 impl NodeVisitor for PlainTextRenderer {
+	fn skips_hidden(&self) -> bool { true }
+
 	fn visit_element(&mut self, cx: &VisitContext, view: ElementView) {
 		if Self::breaks(view.element.tag()) {
 			self.end_line();

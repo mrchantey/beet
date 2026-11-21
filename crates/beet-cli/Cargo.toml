@@ -113,6 +113,9 @@ secure = ["beet/secure"]
 # `bx:cfg="feature:vault"` resolves. `aws` signs the `aws` and `admin` verbs'
 # calls as this machine's identity.
 vault = ["beet/vault", "aws"]
+# Word files, workbooks and slide decks as media: a route serves one, `view`
+# reads one, and a card deck's home card writes the whole stack as a `.pptx`.
+ooxml = ["beet/ooxml"]
 # The live terminal target for `beet present`: the navigable charcell host and
 # the markup-declarable `TuiServer` (`beet/tui_server` pulls `beet_router/tui`,
 # which registers it). On by default so a bare `beet present` boots the deck.

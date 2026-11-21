@@ -65,8 +65,14 @@ pub struct RoutesDir {
 	pub filter: GlobFilter,
 }
 
-/// The content file extensions served as [`BlobPage`] routes.
+/// The content file extensions served as [`BlobPage`] routes, an Office
+/// file's among them where the formats are linked.
+#[cfg(not(feature = "ooxml"))]
 const CONTENT_EXTENSIONS: &[&str] = &["md", "mdx", "markdown", "html", "bsx"];
+#[cfg(feature = "ooxml")]
+const CONTENT_EXTENSIONS: &[&str] = &[
+	"md", "mdx", "markdown", "html", "bsx", "docx", "pptx", "xlsx",
+];
 
 impl RoutesDir {
 	/// Discover routes under `src`, relative to the nearest ancestor [`BlobStore`].

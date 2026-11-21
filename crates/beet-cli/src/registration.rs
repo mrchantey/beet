@@ -21,6 +21,7 @@ pub fn cli() -> CrateRegistration {
 			"lambda",
 			"ml",
 			"net",
+			"ooxml",
 			"pdf",
 			"qrcode",
 			"secure",

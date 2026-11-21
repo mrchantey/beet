@@ -172,7 +172,7 @@ pub(crate) fn graphics_state() -> ElementState {
 
 /// Pixel dimensions from a PNG header (`IHDR` width/height), or `None` when
 /// the bytes are not a PNG.
-#[cfg(any(all(feature = "tui", feature = "net"), test))]
+#[cfg(any(feature = "tui", test))]
 pub(crate) fn png_dimensions(bytes: &[u8]) -> Option<UVec2> {
 	(bytes.len() >= 24
 		&& bytes.starts_with(b"\x89PNG\r\n\x1a\n")
@@ -270,11 +270,11 @@ pub struct KittyErrorShown;
 pub struct KittyImageLoading;
 
 /// ECS system: back each new `<img>` with a [`KittyImage`] when the terminal
-/// supports graphics, by fetching its `src` over HTTP (`net` feature) and
-/// attaching on arrival. An absolute `http(s)://` fetches directly; a site-rooted
-/// `/assets/…` loops back to our own canonical server, exactly as a browser
-/// resolves it against the document origin. Without the `net` feature there is no
-/// transport, so an `<img>` is simply marked unavailable.
+/// supports graphics, attaching on arrival. A `data:` `src` decodes from its
+/// own bytes; any other fetches over HTTP (`net` feature), an absolute
+/// `http(s)://` directly and a site-rooted `/assets/…` looping back to our own
+/// canonical server, exactly as a browser resolves it against the document
+/// origin. Without the `net` feature a fetched `<img>` is marked unavailable.
 #[cfg(feature = "tui")]
 pub(crate) fn attach_kitty_images(
 	mut placements: ResMut<KittyPlacements>,
@@ -292,9 +292,6 @@ pub(crate) fn attach_kitty_images(
 	>,
 	mut commands: Commands,
 ) {
-	// `placements` allocates raster ids only on the `net` fetch path.
-	#[cfg(not(feature = "net"))]
-	let _ = &mut placements;
 	for view in elements.iter() {
 		if view.tag() != "img" || !unvisited.contains(view.entity) {
 			continue;
@@ -312,6 +309,18 @@ pub(crate) fn attach_kitty_images(
 		}
 		let src = view.attribute_string("src");
 		if src.is_empty() {
+			continue;
+		}
+		// a `data:` url carries its bytes, ie a picture read from an Office
+		// file, so it decodes with no fetch and no transport
+		if let Ok(bytes) = Url::coerce(&src).media_bytes() {
+			let id = placements.alloc_id();
+			let subject =
+				SmolStr::from(format!("img src data:{}", bytes.media_type()));
+			commands.entity(view.entity).insert(KittyImageLoading);
+			commands.entity(view.entity).queue_async(move |entity| {
+				attach_raster(entity, Ok(bytes.bytes().to_vec()), id, subject)
+			});
 			continue;
 		}
 		// fetch the `src` over HTTP in the background and attach on arrival. An
@@ -335,13 +344,7 @@ pub(crate) fn attach_kitty_images(
 
 /// Insert the raster and the `graphics` element state driving its block box,
 /// merging into any states the element already carries (eg hover).
-// the attach path is reached only by the `net` fetch, the diagram raster (and
-// the test harness that attaches a raster directly); without any there is
-// nothing to attach.
-#[cfg(all(
-	feature = "tui",
-	any(feature = "net", feature = "mermaid_svg", test)
-))]
+#[cfg(feature = "tui")]
 pub(crate) fn attach_image(mut entity: EntityWorldMut, image: KittyImage) {
 	entity.insert(image);
 	match entity.get_mut::<ElementStateMap>() {
@@ -368,7 +371,7 @@ pub(crate) fn attach_image(mut entity: EntityWorldMut, image: KittyImage) {
 /// directory walk freezes every other connection for as long as it runs. On a
 /// throttled 2-vCPU box that is a multi-second stall of the whole server per
 /// raster.
-#[cfg(all(feature = "tui", any(feature = "net", feature = "mermaid_svg")))]
+#[cfg(feature = "tui")]
 pub(crate) async fn attach_raster(
 	entity: AsyncEntity,
 	bytes: Result<Vec<u8>>,
@@ -432,10 +435,7 @@ pub(crate) fn render_image_errors(
 /// The raster an element carries as kitty image `id`, decoded from `bytes`
 /// ([`to_png_bytes`]) and encoded for transmission ([`encode_png`]). `None`
 /// when the bytes are not a decodable image.
-#[cfg(all(
-	feature = "tui",
-	any(feature = "net", feature = "mermaid_svg", test)
-))]
+#[cfg(feature = "tui")]
 pub(crate) fn decode_image(bytes: Vec<u8>, id: u32) -> Option<KittyImage> {
 	let Png { bytes, scale } = to_png_bytes(bytes)?;
 	let (data, px) = encode_png(bytes)?;
@@ -448,10 +448,7 @@ pub(crate) fn decode_image(bytes: Vec<u8>, id: u32) -> Option<KittyImage> {
 }
 
 /// PNG bytes for an image and the raster pixels each of its css pixels took.
-#[cfg(all(
-	feature = "tui",
-	any(feature = "net", feature = "mermaid_svg", test)
-))]
+#[cfg(feature = "tui")]
 pub(crate) struct Png {
 	pub bytes: Vec<u8>,
 	/// See [`KittyImage::scale`].
@@ -462,10 +459,7 @@ pub(crate) struct Png {
 /// PNG ([`svg_to_png`], at its scale); any other format the `image` decoder
 /// understands (eg JPEG) is decoded to RGBA and re-encoded to PNG. `None`
 /// when the bytes are not a decodable image.
-#[cfg(all(
-	feature = "tui",
-	any(feature = "net", feature = "mermaid_svg", test)
-))]
+#[cfg(feature = "tui")]
 pub(crate) fn to_png_bytes(bytes: Vec<u8>) -> Option<Png> {
 	if png_dimensions(&bytes).is_some() {
 		return Some(Png { bytes, scale: 1 });
@@ -491,10 +485,7 @@ pub(crate) fn to_png_bytes(bytes: Vec<u8>) -> Option<Png> {
 /// byte opens a tag and which contains an `<svg` within the sniffed head. PNGs
 /// are returned before this is reached, and the other raster formats are binary
 /// (JPEG `\xff\xd8`, GIF `GIF8`, WebP `RIFF`), so none of them misfire here.
-#[cfg(all(
-	feature = "tui",
-	any(feature = "net", feature = "mermaid_svg", test)
-))]
+#[cfg(feature = "tui")]
 fn is_svg(bytes: &[u8]) -> bool {
 	let head = &bytes[..bytes.len().min(1024)];
 	let text = String::from_utf8_lossy(head);
@@ -505,10 +496,7 @@ fn is_svg(bytes: &[u8]) -> bool {
 /// System fonts for SVG `<text>`, loaded once. `load_system_fonts` walks the
 /// platform font directories, so the database is cached behind a `OnceLock`
 /// rather than rebuilt for every rasterised image.
-#[cfg(all(
-	feature = "tui",
-	any(feature = "net", feature = "mermaid_svg", test)
-))]
+#[cfg(feature = "tui")]
 fn svg_fontdb() -> std::sync::Arc<resvg::usvg::fontdb::Database> {
 	use std::sync::Arc;
 	use std::sync::OnceLock;
@@ -524,10 +512,7 @@ fn svg_fontdb() -> std::sync::Arc<resvg::usvg::fontdb::Database> {
 }
 
 /// Raster pixels per css pixel an svg rasterises at ([`svg_to_png`]).
-#[cfg(all(
-	feature = "tui",
-	any(feature = "net", feature = "mermaid_svg", test)
-))]
+#[cfg(feature = "tui")]
 const SVG_SCALE: u32 = 2;
 
 /// Rasterise an SVG to PNG bytes, or `None` when the bytes do not parse as an
@@ -538,10 +523,7 @@ const SVG_SCALE: u32 = 2;
 /// verbatim — a deck SVG authored in the site palette therefore rasterises
 /// on-theme (the palette lives in the SVG, the single surface a re-theme would
 /// touch).
-#[cfg(all(
-	feature = "tui",
-	any(feature = "net", feature = "mermaid_svg", test)
-))]
+#[cfg(feature = "tui")]
 fn svg_to_png(bytes: &[u8]) -> Option<Vec<u8>> {
 	use resvg::tiny_skia;
 	use resvg::usvg;
@@ -595,10 +577,7 @@ async fn fetch_image_bytes(src: &str) -> Result<Vec<u8>> {
 }
 
 /// Validate and base64-encode PNG bytes, with their parsed dimensions.
-#[cfg(all(
-	feature = "tui",
-	any(feature = "net", feature = "mermaid_svg", test)
-))]
+#[cfg(feature = "tui")]
 pub(crate) fn encode_png(bytes: Vec<u8>) -> Option<(String, UVec2)> {
 	use base64::Engine;
 	let px = png_dimensions(&bytes)?;
@@ -1502,5 +1481,41 @@ mod test {
 			.xpect_contains(
 				"local port not assigned, is the server running yet?",
 			);
+	}
+
+	/// A `data:` `src` decodes from its own bytes, no fetch made, so a
+	/// picture read from an Office file shows with no transport.
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	async fn data_url_img_attaches_without_a_fetch() {
+		let png = {
+			let img = image::DynamicImage::ImageRgb8(
+				image::RgbImage::from_pixel(8, 6, image::Rgb([200, 100, 50])),
+			);
+			let mut buf = std::io::Cursor::new(Vec::new());
+			img.write_to(&mut buf, image::ImageFormat::Png).unwrap();
+			buf.into_inner()
+		};
+		let src = Url::from_media_bytes(&MediaBytes::new(MediaType::Png, png))
+			.to_string();
+		let mut host = TestHost::sized(UVec2::new(40, 8));
+		host.app.install_type::<AsyncPlugin>();
+		host.app.world_mut().entity_mut(host.host).insert((
+			KittyGraphicsSupport { enabled: true },
+			RenderSurface(host.host),
+		));
+		host.spawn_content(rsx! { <div><img src=src alt="dot"/></div> });
+		app_ext::update_until(&mut host.app, |world| {
+			world.query::<&KittyImage>().iter(world).next().is_some()
+		})
+		.await
+		.xpect_true();
+		host.app
+			.world_mut()
+			.query::<&KittyImage>()
+			.single(host.app.world())
+			.unwrap()
+			.px
+			.xpect_eq(UVec2::new(8, 6));
 	}
 }

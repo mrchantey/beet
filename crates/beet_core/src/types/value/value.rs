@@ -584,8 +584,10 @@ impl Value {
 	fn float_is_integer(float: f64, integer: i128) -> bool {
 		// every finite integral f64 within the i64 and u64 ranges converts
 		// exactly; anything beyond them is no integer a `Value` holds
+		// `float as i128` truncates, so equality with its own truncation is
+		// integrality, with no `fract` (std only) needed
 		float.is_finite()
-			&& float.fract() == 0.0
+			&& float == (float as i128) as f64
 			&& float >= i64::MIN as f64
 			&& float <= u64::MAX as f64
 			&& float as i128 == integer

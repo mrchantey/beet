@@ -31,7 +31,7 @@ pub struct RouteHidden;
 /// [`PageRequest`] is the render handle such a route produces per request.
 #[derive(Debug, Default, Clone, Copy, Component, Reflect)]
 #[reflect(Component)]
-#[require(beet_ui::prelude::RouteMeta)]
+#[cfg_attr(feature = "std", require(beet_ui::prelude::RouteMeta))]
 pub struct PageRoute;
 
 /// Collects all routes (actions and scene routes) in an entity hierarchy and

@@ -151,36 +151,53 @@
 //! `<article data-card>` block holding its markdown, its notes after its
 //! `---`.
 //!
+//! Placeholders are matched by type: `ctrTitle` and `title` a title,
+//! `subTitle` a subtitle, `body`, `obj` and an untyped placeholder a body,
+//! and the date, footer, slide number and header placeholders the layout's
+//! chrome, never read. A placeholder with no frame of its own takes its
+//! layout's, else its master's, matched by `idx`, else by type.
+//!
 //! | Deck | HTML | Notes |
 //! |---|---|---|
 //! | the presentation's slide list | the root's `article data-card`s in presentation order | a deleted slide's leftover part is skipped |
 //! | a hidden slide, `show="0"` | the article's `hidden` | |
-//! | a slide of only title and subtitle placeholders | `div class="card-center"`: the title an `h1`, each subtitle paragraph a `p` | writes with the Title Slide layout |
-//! | a slide with a title placeholder and anything else | `div class="card-content"`: `header class="card-heading"` holding the title as an `h1`, then `div class="card-columns"` of `div class="card-column"`s | one column, or one per body placeholder when two or more sit side by side, each other shape joining the column it overlaps most; writes with the Title and Content layout, Two Content for two columns |
-//! | a slide with no title placeholder | its shapes in reading order, no layout wrapper | writes with the Title and Content layout, a leading heading as its title |
-//! | shapes | flattened in reading order, top to bottom then left to right, a group's shapes in its place | positions and sizes are lost, a picture's size kept |
-//! | a body placeholder's paragraphs | `ul` of `li`s nested by `lvl`, `ol` for `a:buAutoNum`, `p` for `a:buNone` | |
-//! | any other text frame's paragraphs | `p`, a list only where a bullet is set on it | |
-//! | `a:r` with `a:b`, `a:i`, `a:u`, `a:strike`, a solid fill colour, a size | as a Word run reads, `strong`, `em`, `u`, `s`, a `span` with a direct look | |
+//! | a slide of a title and only subtitles beside it | `div class="card-center"`: the title an `h1`, each subtitle paragraph a `p` | writes with the Title Slide layout |
+//! | a slide with a title and anything else | `div class="card-content"`: `header class="card-heading"` holding the title as an `h1`, then `div class="card-columns"` of `div class="card-column"`s | one column, or one per body placeholder when two or more sit side by side, each other shape joining the column it overlaps most; writes with the Title and Content layout, Two Content for two columns or more |
+//! | a slide with no title | its shapes' blocks in reading order, no layout wrapper | writes with the Title and Content layout, a leading heading as its title |
+//! | shapes | flattened in reading order, top to bottom then left to right, a group's shapes in its place | positions and sizes are lost, a picture's size kept; an empty shape reads as nothing |
+//! | a title's paragraphs | one `h1`, a `br` between each | |
+//! | a body placeholder's paragraphs | `ul` of `li`s nested by `lvl`, `ol` for `a:buAutoNum`, `p` for `a:buNone`, a paragraph setting no bullet taking its shape's list style, its layout's or master's placeholder's, else the master's body style | a write leaves a list item to the master's bullets, a counted one `a:buAutoNum`, and a `p` `a:buNone` |
+//! | any other text frame's paragraphs | `p`, a list only where a bullet is set on it or its list styles | |
+//! | a paragraph's `algn` (`ctr`, `r`) | a direct look of its text alignment | |
+//! | `a:r` with `b`, `i`, `u`, `strike`, `baseline` | `strong`, `em`, `u`, `s`, `sup` or `sub`; a toggle turned off is the master's to decide and reads as nothing | a write reads the resolved weight, slant and decoration, as a Word run writes |
+//! | a run's solid fill, `a:highlight`, and `sz` where it differs from the size most of its frame's text is set in | a `span` with a direct look of its colour, background and size | |
 //! | `a:hlinkClick` | `a href` | |
-//! | `a:br` | `br` | |
-//! | `a:tbl` | `table`, `gridSpan` and `rowSpan` as `colspan` and `rowspan`, the cells they cover absent | |
-//! | `p:pic` | `img`, as a Word picture reads | |
+//! | `a:br`, `a:fld` | `br`, the field's text as last computed | |
+//! | `a:tbl` | `table`, its first row a `thead` of `th`s when `firstRow` says so, `gridSpan` and `rowSpan` as `colspan` and `rowspan`, the cells `hMerge` and `vMerge` cover absent, a cell's solid fill a direct look of its background | |
+//! | `p:pic` | `img`, as a Word picture reads, sized by its frame | |
 //! | SmartArt | its data part's paragraphs as `p`s | its structure is lost and a write cannot make one |
+//! | `mc:AlternateContent` | its `mc:Choice` when it reads anything, else its `mc:Fallback` | |
 //! | the notes slide's body placeholder | the article's content after its `hr` | |
 //!
 //! **Lost on a read**: masters, theme fonts, backgrounds, transitions and
-//! animations, charts, connectors, shape geometry, and every position.
+//! animations, charts, connectors, shape geometry, every position, and
+//! the empty placeholders a layout leaves.
 //!
 //! **A write**: each `article data-card` writes as a slide, or the whole
 //! document as one slide when it holds none. A card's front writes through
 //! its layout as above: the title placeholder takes the heading, each column
 //! a body placeholder of its blocks (headings below the title as bold
-//! paragraphs, lists as bulleted levels), and every picture and table its own
-//! shape, stacked below the text in flow order and fitted to what remains of
-//! the slide. The content after the article's first `hr` child writes as its
-//! speaker notes, and `hidden` as a hidden slide. A deck is 16:9, 13.333 by
-//! 7.5 inches, with the writer's own master, theme and three layouts.
+//! paragraphs, lists as bulleted levels, a `pre` a monospace line each, and
+//! the grouping of a `blockquote`, `div` or `section` lost), and every
+//! picture and table its own shape, stacked below the text in flow order:
+//! the body frame shrinks to its text's estimated height (a glyph half its
+//! size wide, a line 1.2 times its size) so each picture and table fits what
+//! remains of its column at its aspect. The content after the article's
+//! first `hr` child writes as its speaker notes, and `hidden` as a hidden
+//! slide. A deck is 16:9, 13.333 by 7.5 inches (1280 by 720 px), with the
+//! writer's own master, theme and three layouts and a notes master. A card
+//! deck writes its whole stack as one deck, a route of no card articles one
+//! slide (the card stack's module docs).
 //!
 //! # Style
 //!
@@ -277,7 +294,9 @@
 //!   background as shading, `break-after: page` (and beet's `PageBreak`
 //!   markup, whatever it resolves). Cell: background, text alignment, and
 //!   for a workbook the run properties.
-//!   Shape: a slide's text sizes and colours as runs, its picture's size.
+//!   Shape: a slide's runs as a Word run's but code, which writes in a
+//!   monospace font a read loses, a paragraph's alignment, a table cell's
+//!   background, a picture's size.
 //!
 //! # Pictures
 //!
@@ -323,21 +342,16 @@
 //! [`Element`]: beet_core::prelude::Element
 //! [`Value`]: beet_core::prelude::Value
 mod a1_reference;
-mod core_properties;
-mod deck;
-mod deck_report;
+mod deck_parser;
+mod deck_renderer;
 mod doc_meta_properties;
 mod namespace;
-mod node;
 mod office_picture;
 mod office_style;
 #[cfg(test)]
 mod office_test;
 mod ooxml_plugin;
-mod ooxml_query;
 mod opc_package;
-mod package;
-mod parser;
 mod read_element;
 mod word_parser;
 mod word_renderer;
@@ -345,16 +359,12 @@ mod workbook_parser;
 mod workbook_renderer;
 mod xml_part;
 pub use a1_reference::*;
-pub use core_properties::*;
-pub use deck::*;
-pub use deck_report::DeckReported;
+pub use deck_parser::*;
+pub use deck_renderer::*;
 pub use namespace::*;
-pub use node::*;
 pub use office_style::*;
 pub use ooxml_plugin::*;
 pub use opc_package::*;
-pub use package::*;
-pub use parser::*;
 pub use word_parser::*;
 pub use word_renderer::*;
 pub use workbook_parser::*;

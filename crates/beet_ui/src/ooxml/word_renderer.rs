@@ -241,7 +241,7 @@ impl WordRenderer {
 	const FONT: &str = "Calibri";
 	const MONOSPACE: &str = "Courier New";
 	/// The tags a block walk handles as blocks, every other as inline.
-	const BLOCKS: [&str; 33] = [
+	pub(crate) const BLOCKS: [&str; 33] = [
 		"p",
 		"h1",
 		"h2",

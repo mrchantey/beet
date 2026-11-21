@@ -252,7 +252,8 @@ fn on_ready_call(
 		.queue_async_local(|entity| CallOnReady::call(entity, request));
 }
 
-/// Streams a [`Response`] body to stdout chunk-by-chunk.
+/// Streams a [`Response`] body to stdout chunk-by-chunk, its bytes as they
+/// are, so a binary body (a slide deck, a picture) pipes to a file intact.
 ///
 /// A stdout that will not take a chunk (`| head`, a closed terminal) is the
 /// ordinary end of a piped program's output, not a fault: stop reading the
@@ -260,7 +261,7 @@ fn on_ready_call(
 /// fails to produce a chunk IS a fault and fails the load.
 pub(crate) async fn stream_body_to_stdout(mut body: Body) -> Result {
 	while let Some(chunk) = body.next().await? {
-		if cross_log_noline!("{}", String::from_utf8_lossy(&chunk)).is_err() {
+		if beet_core::CrossLog::bytes(&chunk).is_err() {
 			break;
 		}
 	}

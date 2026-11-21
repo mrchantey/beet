@@ -67,6 +67,25 @@ impl CrossLog {
 		}
 	}
 
+	/// Write `bytes` as they are, flushing after, and report whether the
+	/// stream took them, as [`inline`](Self::inline) does text: a streamed
+	/// body need not be text, ie a slide deck piped to a file. A console that
+	/// holds only text takes them lossily as UTF-8.
+	#[doc(hidden)]
+	pub fn bytes(bytes: &[u8]) -> Result {
+		crate::cfg_if! {
+			if #[cfg(all(feature = "std", not(target_arch = "wasm32")))] {
+				use std::io::Write;
+				let mut stdout = std::io::stdout();
+				stdout.write_all(bytes)?;
+				stdout.flush()?;
+				Ok(())
+			} else {
+				Self::inline(&crate::_alloc::string::String::from_utf8_lossy(bytes))
+			}
+		}
+	}
+
 	/// Log a line to the error stream, ignoring a stream that will not take
 	/// it: best effort for the same reason [`line`](Self::line) is.
 	#[doc(hidden)]

@@ -602,18 +602,38 @@ impl OpeningRoute {
 	/// url space, the one place address and page coincide, so a compiled
 	/// binary's own args open the page they name (`beet --entry=chat.bsx
 	/// docs/form`).
+	///
+	/// The start request's params, but for the server's own knobs, open with
+	/// the page, ie a card deck's `--slide=3`, so a page param given at launch
+	/// reaches the first page as it would a later request.
 	pub fn from_parts(parts: &RequestParts, mounted: bool) -> Result<Self> {
-		match ServerParams::from_parts(parts)?.path {
+		let mut opening = match ServerParams::from_parts(parts)?.path {
 			Some(path) => Self::at(path),
 			None if mounted => Self(Url::ROOT),
 			None => Self(Url::ROOT.with_path(parts.path().clone())),
+		};
+		let knobs = ParamsDeclaration::new::<
+			Self,
+			(BootParams, ServerParams, ColorSchemeParams),
+		>();
+		let is_knob = |key: &str| {
+			let key = key.replace('_', "-");
+			knobs.metas().iter().any(|meta| meta.name() == key)
+		};
+		for (key, values) in parts.params().iter_all() {
+			if is_knob(key) {
+				continue;
+			}
+			for value in values {
+				opening.0.params_mut().insert(key.clone(), value.clone());
+			}
 		}
-		.xok()
+		opening.xok()
 	}
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
@@ -662,6 +682,23 @@ mod test {
 			.0
 			.path_string()
 			.xpect_eq("/docs/form");
+	}
+
+	/// A page param given at launch opens with the page, the server's own
+	/// knobs left behind, so `--server=tui --slide=3` opens `/?slide=3`.
+	#[beet_core::test]
+	fn opening_route_keeps_page_params() {
+		use beet_net::prelude::*;
+
+		let mut parts = RequestParts::get("/");
+		parts.insert_param("server", "tui");
+		parts.insert_param("color-scheme", "dark");
+		parts.insert_param("slide", "3");
+		OpeningRoute::from_parts(&parts, false)
+			.unwrap()
+			.0
+			.to_string()
+			.xpect_eq("/?slide=3");
 	}
 
 	/// An in-world navigation records a terminal page view for the page it leaves,
@@ -793,7 +830,7 @@ mod test {
 	/// between updates so async work (the navigation task, the bridge)
 	/// progresses at top-level tick depth rather than starving inside the
 	/// test's own poll under a loaded suite.
-	async fn drive_until(app: &mut App, host: Entity, needle: &str) {
+	pub(crate) async fn drive_until(app: &mut App, host: Entity, needle: &str) {
 		use beet_ui::prelude::*;
 
 		for _ in 0..200 {

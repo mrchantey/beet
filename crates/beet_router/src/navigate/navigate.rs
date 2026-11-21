@@ -64,11 +64,17 @@ impl NavigateTo {
 
 	/// Whether this is a card-stack step (resolved against the deck's card list
 	/// and redirected) rather than a generic tree move (dispatched inline).
-	pub fn is_card(&self) -> bool {
-		matches!(
-			self,
-			Self::NextCard | Self::PrevCard | Self::FirstCard | Self::LastCard
-		)
+	pub fn is_card(&self) -> bool { self.card_nav().is_some() }
+
+	/// The card step this is, none for a tree move.
+	pub fn card_nav(&self) -> Option<CardNav> {
+		match self {
+			Self::NextCard => Some(CardNav::Next),
+			Self::PrevCard => Some(CardNav::Prev),
+			Self::FirstCard => Some(CardNav::First),
+			Self::LastCard => Some(CardNav::Last),
+			_ => None,
+		}
 	}
 }
 
@@ -110,12 +116,43 @@ pub async fn NavigateHandler(
 	};
 
 	let direction = NavigateTo::from_str_param(&value)?;
-	let current_path = request.path().clone();
 	let action_entity = caller.id();
 	let world = caller.world();
 
-	// resolve the target path against the route tree (card steps resolve against
-	// the deck's card list, tree moves against the generic sibling/parent tree).
+	// a card step redirects the browser to the resolved card so its address bar
+	// updates (the deck's keyboard JS just sets `window.location`) and the last
+	// card clamps rather than looping; the generic tree moves keep dispatching
+	// inline for programmatic / CLI callers.
+	if let Some(nav) = direction.card_nav() {
+		let deck = world
+			.with_state::<AncestorQuery<Entity, With<CardDeck>>, _>(
+				move |decks| decks.get(action_entity).ok(),
+			)
+			.await;
+		let positions = match deck {
+			// counting a deck's card articles builds its routes, std only
+			#[cfg(feature = "std")]
+			Some(deck) => CardDeck::positions(&world.entity(deck)).await?,
+			// a stack no deck declares counts a card per route
+			_ => {
+				world
+					.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
+						move |query| {
+							let routes =
+								CardDeck::routes(query.get(action_entity)?);
+							CardDeck::positions_of(&routes, |_| 1).xok()
+						},
+					)
+					.await?
+			}
+		};
+		let current = CardPosition::of_url(&positions, request.url());
+		let target = nav.resolve(&positions, &current)?;
+		return Response::temporary_redirect(target.url().to_string()).xok();
+	}
+
+	let current_path = request.path().clone();
+	// resolve the target path against the route tree
 	let target_path = world
 		.with_state::<AncestorQuery<&RouteTree>, Result<Vec<SmolStr>>>(
 			move |query| {
@@ -124,15 +161,6 @@ pub async fn NavigateHandler(
 			},
 		)
 		.await?;
-
-	// a card step redirects the browser to the resolved card so its address bar
-	// updates (the deck's keyboard JS just sets `window.location`) and the last
-	// card clamps rather than looping; the generic tree moves keep dispatching
-	// inline for programmatic / CLI callers.
-	if direction.is_card() {
-		let location = format!("/{}", target_path.join("/"));
-		return Response::temporary_redirect(location).xok();
-	}
 
 	let resolved = world
 		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(move |query| {
@@ -172,17 +200,11 @@ fn resolve_navigation(
 		NavigateTo::PrevSibling => {
 			resolve_sibling(tree, current_path, SiblingDirection::Prev)
 		}
-		NavigateTo::NextCard => {
-			CardNav::resolve(tree, current_path, CardNav::Next)
-		}
-		NavigateTo::PrevCard => {
-			CardNav::resolve(tree, current_path, CardNav::Prev)
-		}
-		NavigateTo::FirstCard => {
-			CardNav::resolve(tree, current_path, CardNav::First)
-		}
-		NavigateTo::LastCard => {
-			CardNav::resolve(tree, current_path, CardNav::Last)
+		NavigateTo::NextCard
+		| NavigateTo::PrevCard
+		| NavigateTo::FirstCard
+		| NavigateTo::LastCard => {
+			bevybail!("a card step resolves against the deck's cards")
 		}
 	}
 }
@@ -237,7 +259,7 @@ enum SiblingDirection {
 
 /// Navigate to the next or previous sibling at the same tree level, wrapping at
 /// the ends (the history-style shortcut behavior). For non-wrapping
-/// stack-of-cards navigation see [`resolve_card`](crate::prelude::resolve_card).
+/// stack-of-cards navigation see [`CardNav`](crate::prelude::CardNav).
 fn resolve_sibling(
 	tree: &RouteTree,
 	current_path: &[SmolStr],
@@ -259,8 +281,8 @@ fn resolve_sibling(
 
 /// The routable siblings at the current path's tree level, paired with the
 /// current path's index among them. Used by [`resolve_sibling`] (wrapping history
-/// shortcuts); the card-stack `resolve_card` resolves against its own
-/// page-route-only card list instead.
+/// shortcuts); a [`CardNav`](crate::prelude::CardNav) step resolves against
+/// the deck's cards instead.
 pub(crate) fn siblings_and_index<'a>(
 	tree: &'a RouteTree,
 	current_path: &[SmolStr],

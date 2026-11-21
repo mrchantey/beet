@@ -572,6 +572,10 @@ impl MarkdownRenderer {
 }
 
 impl NodeVisitor for MarkdownRenderer {
+	/// Skips what the page hides, ie a deck's other cards and its notes,
+	/// except inside a passthrough element, written whole as HTML.
+	fn skips_hidden(&self) -> bool { self.passthrough.is_none() }
+
 	/// Skips a textless tag the [`HtmlPassthrough`] does not name, and
 	/// nothing inside a passthrough element, which is written whole.
 	fn skip_node(
@@ -1292,6 +1296,18 @@ mod test {
 	fn passes_inline_html_through() {
 		render_unescaped("<p>see <svg><text>x &amp; y</text></svg> here</p>")
 			.xpect_eq("see <svg><text>x &amp; y</text></svg> here\n");
+	}
+
+	/// A `hidden` element writes nothing, as the web and the terminal show
+	/// nothing of it.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn skips_hidden_elements() {
+		render_html_with(
+			"<p>shown</p><article hidden><p>a hidden card</p></article><p>after</p>",
+			MarkdownRenderer::new(),
+		)
+		.xpect_eq("shown\n\nafter\n");
 	}
 
 	/// The words alone write nothing for an embedded element.

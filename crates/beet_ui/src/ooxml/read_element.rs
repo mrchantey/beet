@@ -26,6 +26,101 @@ pub(crate) enum ReadNode {
 	Text(String),
 }
 
+/// One piece of inline content inside the elements wrapping it, outermost
+/// first, before equal wrappers are merged: a reader pushes one per run and
+/// [`assemble`](Self::assemble)s a paragraph's.
+#[derive(Debug, Clone)]
+pub(crate) struct ReadSegment {
+	/// The elements wrapping it, outermost first.
+	pub wrappers: Vec<ReadElement>,
+	/// The content itself.
+	pub node: ReadNode,
+}
+
+/// A list item as a reader reads it, before its list is assembled: its
+/// depth from 0 and whether its list counts.
+#[derive(Debug, Clone)]
+pub(crate) struct ReadListItem {
+	/// Its depth, 0 for a top level item.
+	pub level: u8,
+	/// Whether its list counts, an `ol`, else a `ul`.
+	pub ordered: bool,
+	/// The `li`.
+	pub element: ReadElement,
+}
+
+impl ReadListItem {
+	/// One list at `depth` of `items`, a deeper item nested in the item
+	/// before it, the list's kind its first item's.
+	pub fn list(items: &[ReadListItem], depth: u8) -> ReadElement {
+		let tag = if items[0].ordered { "ol" } else { "ul" };
+		let mut list = ReadElement::new(tag);
+		let mut index = 0;
+		while index < items.len() {
+			if items[index].level <= depth {
+				list = list.with_child(items[index].element.clone());
+				index += 1;
+				continue;
+			}
+			let end = (index..items.len())
+				.find(|end| items[*end].level <= depth)
+				.unwrap_or(items.len());
+			let nested = Self::list(&items[index..end], depth + 1);
+			match list
+				.children
+				.iter_mut()
+				.rev()
+				.find_map(|child| match child {
+					ReadNode::Element(element) => Some(element),
+					ReadNode::Text(_) => None,
+				}) {
+				Some(last) => last.children.push(ReadNode::Element(nested)),
+				None => {
+					list = list
+						.with_child(ReadElement::new("li").with_child(nested))
+				}
+			}
+			index = end;
+		}
+		list
+	}
+}
+
+impl ReadSegment {
+	/// The content of `segments`, each run of equal wrappers one element.
+	pub fn assemble(segments: &[ReadSegment]) -> Vec<ReadNode> {
+		Self::assemble_from(segments, 0)
+	}
+
+	/// The content of `segments` from their wrappers at `depth` in.
+	fn assemble_from(segments: &[ReadSegment], depth: usize) -> Vec<ReadNode> {
+		let mut out = Vec::new();
+		let mut index = 0;
+		while index < segments.len() {
+			let segment = &segments[index];
+			let Some(wrapper) = segment.wrappers.get(depth) else {
+				out.push(segment.node.clone());
+				index += 1;
+				continue;
+			};
+			let end = (index..segments.len())
+				.find(|end| {
+					segments[*end]
+						.wrappers
+						.get(depth)
+						.is_none_or(|other| !wrapper.same_shell(other))
+				})
+				.unwrap_or(segments.len());
+			let mut element = wrapper.clone();
+			element.children =
+				Self::assemble_from(&segments[index..end], depth + 1);
+			out.push(ReadNode::Element(element));
+			index = end;
+		}
+		ReadNode::merge_text(out)
+	}
+}
+
 impl ReadNode {
 	/// `nodes` with each run of adjacent texts joined into one, an empty
 	/// text dropped.
@@ -98,6 +193,24 @@ impl ReadElement {
 		self.tag == other.tag
 			&& self.attributes == other.attributes
 			&& self.look == other.look
+	}
+
+	/// This cell holding `blocks`: a lone plain paragraph's content held
+	/// directly, its alignment, background and attributes the cell's, else
+	/// the blocks.
+	pub fn with_cell_content(mut self, blocks: Vec<ReadElement>) -> Self {
+		match <[ReadElement; 1]>::try_from(blocks) {
+			Ok([paragraph]) if paragraph.tag == "p" => {
+				let look = &paragraph.look;
+				self.look.text_align = look.text_align;
+				self.look.background = self.look.background.or(look.background);
+				self.attributes.extend(paragraph.attributes);
+				self.children = paragraph.children;
+				self
+			}
+			Ok(blocks) => blocks.into_iter().fold(self, Self::with_child),
+			Err(blocks) => blocks.into_iter().fold(self, Self::with_child),
+		}
 	}
 
 	/// Spawns this element and its subtree as the last child of `parent`,

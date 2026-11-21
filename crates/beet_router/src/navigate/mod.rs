@@ -1,7 +1,7 @@
 // std-only: the browser-style Navigator drives the live-render pipeline
 // (`parse_page`/`build_live_page`/`bind_surface_page`), which needs beet_ui.
 #[cfg(feature = "std")]
-mod navigator;
+pub(crate) mod navigator;
 #[cfg(feature = "std")]
 pub use navigator::*;
 // std-only: the navigation-failure error page (a beet_ui `#[template]`).

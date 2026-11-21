@@ -122,6 +122,8 @@ impl Plugin for RouterPlugin {
 			// the Office formats a route serves and writes
 			#[cfg(feature = "ooxml")]
 			app.install_type::<OoxmlPlugin>();
+			// a router a `CardDeck` marks steps as a stack of cards
+			app.install_type::<CardStackPlugin>();
 			app
 				// the scene routes' render params and the media a request resolves
 				.register_type::<RenderRoot>()

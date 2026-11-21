@@ -152,6 +152,21 @@ struct Segment {
 	leaf: Leaf,
 }
 
+impl Segment {
+	/// This segment as the shared assembly reads it, none for a page break.
+	fn read(&self) -> Option<ReadSegment> {
+		let node = match &self.leaf {
+			Leaf::Text(text) => ReadNode::Text(text.clone()),
+			Leaf::Element(element) => ReadNode::Element(element.clone()),
+			Leaf::PageBreak => return None,
+		};
+		Some(ReadSegment {
+			wrappers: self.wrappers.clone(),
+			node,
+		})
+	}
+}
+
 #[derive(Debug, Clone)]
 enum Leaf {
 	Text(String),
@@ -742,7 +757,9 @@ impl WordRead<'_> {
 			if let Some(id) = bookmarks.next() {
 				element = element.with_attribute("id", id.to_string());
 			}
-			element.children = Self::assemble(chunk, 0);
+			element.children = ReadSegment::assemble(
+				&chunk.iter().filter_map(Segment::read).collect::<Vec<_>>(),
+			);
 			items.push(BlockRead::Paragraph {
 				kind: kind.clone(),
 				element,
@@ -1495,7 +1512,7 @@ impl WordRead<'_> {
 	/// directly, its look and id the cell's, else the blocks, the empty
 	/// paragraph Word requires after a cell's last table dropped.
 	fn cell_content(
-		mut cell: ReadElement,
+		cell: ReadElement,
 		mut blocks: Vec<ReadElement>,
 	) -> ReadElement {
 		let closes_table = match blocks.as_slice() {
@@ -1511,22 +1528,7 @@ impl WordRead<'_> {
 		if closes_table {
 			blocks.pop();
 		}
-		match <[ReadElement; 1]>::try_from(blocks) {
-			Ok([paragraph]) if paragraph.tag == "p" => {
-				let look = &paragraph.look;
-				cell.look.text_align = look.text_align;
-				cell.look.background = cell.look.background.or(look.background);
-				cell.attributes.extend(paragraph.attributes);
-				cell.children = paragraph.children;
-				cell
-			}
-			Ok(blocks) => {
-				blocks.into_iter().fold(cell, ReadElement::with_child)
-			}
-			Err(blocks) => {
-				blocks.into_iter().fold(cell, ReadElement::with_child)
-			}
-		}
+		cell.with_cell_content(blocks)
 	}
 
 	/// Groups each run of list items into nested lists, of quote paragraphs
@@ -1635,49 +1637,19 @@ impl WordRead<'_> {
 			let ends = index == items.len()
 				|| (items[index].0 == top && items[index].2 != items[start].2);
 			if ends {
-				out.push(Self::list(&items[start..index], top));
+				let list = items[start..index]
+					.iter()
+					.map(|(level, ordered, _, element)| ReadListItem {
+						level: *level,
+						ordered: *ordered,
+						element: element.clone(),
+					})
+					.collect::<Vec<_>>();
+				out.push(ReadListItem::list(&list, top));
 				start = index;
 			}
 		}
 		out
-	}
-
-	/// One list at `depth` of `items`, a deeper item nested in the item
-	/// before it.
-	fn list(
-		items: &[(u8, bool, SmolStr, ReadElement)],
-		depth: u8,
-	) -> ReadElement {
-		let tag = if items[0].1 { "ol" } else { "ul" };
-		let mut list = ReadElement::new(tag);
-		let mut index = 0;
-		while index < items.len() {
-			if items[index].0 <= depth {
-				list = list.with_child(items[index].3.clone());
-				index += 1;
-				continue;
-			}
-			let end = (index..items.len())
-				.find(|end| items[*end].0 <= depth)
-				.unwrap_or(items.len());
-			let nested = Self::list(&items[index..end], depth + 1);
-			match list
-				.children
-				.iter_mut()
-				.rev()
-				.find_map(|child| match child {
-					ReadNode::Element(element) => Some(element),
-					ReadNode::Text(_) => None,
-				}) {
-				Some(last) => last.children.push(ReadNode::Element(nested)),
-				None => {
-					list = list
-						.with_child(ReadElement::new("li").with_child(nested))
-				}
-			}
-			index = end;
-		}
-		list
 	}
 
 	/// Preformatted lines as one `pre`, a line each, lines each wholly in
@@ -1723,40 +1695,6 @@ impl WordRead<'_> {
 				pre
 			}
 		}
-	}
-
-	/// The content of `segments` from their wrappers at `depth` in, each run
-	/// of equal wrappers one element.
-	fn assemble(segments: &[Segment], depth: usize) -> Vec<ReadNode> {
-		let mut out = Vec::new();
-		let mut index = 0;
-		while index < segments.len() {
-			let segment = &segments[index];
-			let Some(wrapper) = segment.wrappers.get(depth) else {
-				match &segment.leaf {
-					Leaf::Text(text) => out.push(ReadNode::Text(text.clone())),
-					Leaf::Element(element) => {
-						out.push(ReadNode::Element(element.clone()))
-					}
-					Leaf::PageBreak => {}
-				}
-				index += 1;
-				continue;
-			};
-			let end = (index..segments.len())
-				.find(|end| {
-					segments[*end]
-						.wrappers
-						.get(depth)
-						.is_none_or(|other| !wrapper.same_shell(other))
-				})
-				.unwrap_or(segments.len());
-			let mut element = wrapper.clone();
-			element.children = Self::assemble(&segments[index..end], depth + 1);
-			out.push(ReadNode::Element(element));
-			index = end;
-		}
-		ReadNode::merge_text(out)
 	}
 }
 

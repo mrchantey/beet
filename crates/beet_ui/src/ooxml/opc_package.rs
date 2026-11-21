@@ -79,6 +79,18 @@ impl OpcRelationship {
 	pub const FOOTER: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer";
 	/// A Word file's settings.
 	pub const SETTINGS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings";
+	/// A presentation's slide.
+	pub const SLIDE: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide";
+	/// A slide's layout.
+	pub const SLIDE_LAYOUT: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout";
+	/// A layout's, or a presentation's, slide master.
+	pub const SLIDE_MASTER: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster";
+	/// A slide's speaker notes.
+	pub const NOTES_SLIDE: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide";
+	/// A presentation's, or a notes slide's, notes master.
+	pub const NOTES_MASTER: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster";
+	/// A SmartArt graphic's data.
+	pub const DIAGRAM_DATA: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData";
 
 	/// Whether this relationship's type is `kind`, or one whose last segment
 	/// is `kind`'s, as the strict and transitional schemas spell the same

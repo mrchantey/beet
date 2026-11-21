@@ -364,8 +364,7 @@ fn router_plugin(app: &mut App) {
 		ServerPlugin,
 		NavigatorPlugin,
 		PageHostPlugin,
-	)>()
-	.add_plugins(CardStackPlugin);
+	)>();
 	// the scene-server meta-routes load/save scenes through world serde, so they
 	// are only available (and only useful) with `template_serde`.
 	#[cfg(feature = "template_serde")]

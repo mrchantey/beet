@@ -422,6 +422,32 @@ impl LivePage {
 		}
 	}
 
+	/// The content the scene route `node` builds for `request`, matched in
+	/// the tree `router` sits in, no middleware applied: ie a card deck
+	/// counting or gathering its routes' cards. The caller releases it with
+	/// [`despawn_content`](Self::despawn_content).
+	pub(crate) async fn build_content(
+		router: &AsyncEntity,
+		node: ActionNode,
+		request: Request,
+	) -> Result<Entity> {
+		Self::build(router, node, request)
+			.await
+			.map(|(_, page, _)| page)
+	}
+
+	/// Releases content [`build_content`](Self::build_content) built: its
+	/// ephemerals, itself among them.
+	pub(crate) fn despawn_content(world: &mut World, page: Entity) {
+		let to_despawn = world
+			.get_entity(page)
+			.ok()
+			.and_then(|entity| entity.get::<DespawnAfterRender>())
+			.map(|despawn| despawn.0.clone())
+			.unwrap_or_else(|| vec![page]);
+		Self::despawn(world, to_despawn);
+	}
+
 	/// Build the scene route `node` matched for `request`, answering the
 	/// route, the page it built and the request's parts with the matched path
 	/// params merged in.

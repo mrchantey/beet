@@ -48,6 +48,15 @@ impl NodeWalker<'_, '_> {
 		if visitor.skip_node(&cx, &node) {
 			return;
 		}
+		// a `hidden` element is no content to a reader of its text
+		if visitor.skips_hidden()
+			&& self
+				.elements
+				.get(cx.entity)
+				.is_ok_and(|view| view.attribute("hidden").is_some())
+		{
+			return;
+		}
 
 		let (doctype, comment, element, value, expression, cdata, instruction) =
 			node;
@@ -126,6 +135,11 @@ pub trait NodeVisitor {
 		element
 			.is_some_and(|element| RenderTreeQuery::is_textless(element.tag()))
 	}
+
+	/// Whether to skip an element carrying `hidden` and all its children, as
+	/// a renderer of text does where the web and the terminal hide it. `false`
+	/// by default, so markup keeps the attribute for its own reader.
+	fn skips_hidden(&self) -> bool { false }
 
 	fn visit_doctype(&mut self, _cx: &VisitContext, _doctype: &Doctype) {}
 	fn visit_comment(&mut self, _cx: &VisitContext, _comment: &Comment) {}

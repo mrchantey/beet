@@ -913,7 +913,6 @@ mod test {
 		use bevy::math::UVec2;
 
 		let mut app = tui_app();
-		app.add_plugins(CardStackPlugin);
 		let site_dir = deck_fixture();
 		// the repo store on the root backs the `RoutesDir` scan by ancestry.
 		let router = app

@@ -106,6 +106,13 @@ pub(crate) fn resolve_styles(
 	// so this fires on a real resize or first sight, not on paint's per-frame
 	// buffer writes.
 	resized: Query<Entity, Changed<MediaViewport>>,
+	// an attribute selector (`[hidden]`) reads an element's attributes, so an
+	// attribute added after the element first resolved re-resolves it, ie a
+	// card deck hiding the cards a render does not show
+	attributes: Query<
+		&AttributeOf,
+		Or<(Changed<AttributeOf>, Changed<Attribute>)>,
+	>,
 	ancestors: Query<&ChildOf>,
 	// content transcluded by reference has no `ChildOf` edge to the layout, so the
 	// traversal follows holders to re-resolve referenced content under the layout's
@@ -124,6 +131,7 @@ pub(crate) fn resolve_styles(
 ) -> Result {
 	let mut roots = query
 		.iter()
+		.chain(attributes.iter().map(|attribute| attribute.get()))
 		.map(|entity| ancestors.root_ancestor(entity))
 		.collect::<HashSet<_>>();
 	// a resized surface seeds the traversal (its whole tree, portals included,
@@ -554,5 +562,35 @@ mod test {
 			})
 			.xpect_eq(light_live.foreground);
 		live(&world, dark).xpect_eq(dark_live);
+	}
+
+	/// An attribute added after its element first resolved re-resolves it,
+	/// so an attribute selector applies, ie `[hidden]` in the terminal.
+	#[beet_core::test]
+	fn resolves_an_added_attribute() {
+		let mut world = StylePlugin.into_world();
+		world.spawn(rsx! { <div><p>"words"</p></div> });
+		let paragraph = world
+			.query::<(Entity, &Element)>()
+			.iter(&world)
+			.find(|(_, element)| element.tag() == "p")
+			.unwrap()
+			.0;
+		world.run_schedule(PostParseTree);
+		let display = |world: &World| {
+			world
+				.entity(paragraph)
+				.get::<LayoutStyle>()
+				.unwrap()
+				.display
+		};
+		(display(&world) == Display::None).xpect_false();
+		world.spawn((
+			AttributeOf::new(paragraph),
+			Attribute::new("hidden"),
+			Value::Null,
+		));
+		world.run_schedule(PostParseTree);
+		(display(&world) == Display::None).xpect_true();
 	}
 }
