@@ -1,15 +1,37 @@
 {
   "beet_core::atproto::provenance::Provenance": {
-    "created": "2026-11-21T01:07:22.330Z",
+    "created": "2026-11-21T02:41:25.367Z",
     "sources": [],
     "ttl": null
   },
   "beet_router::router::site::syndication::standard_site::standard_site_index::StandardSiteIndex": {
     "documents": [
       {
-        "cid": "bafyreieyew6bxmivo36at2j4skg5zhluyhpvhadegyscpgkxgtqxxurupy",
+        "bsky_post": {
+          "cid": "bafyreianztrecyklti7rrihe4y4p3x5bm7igx7prepxzcrjnrvntlqgzyi",
+          "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/app.bsky.feed.post/3n2s2xi7xwhqd"
+        },
+        "cid": "bafyreigcsyz72sbj23fxwjs4k766iasacj2chqgxl2qgy22ski2xwsl6qm",
+        "path": "/every-name-for-a-beet",
+        "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/site.standard.document/3n2s2xbamucqd"
+      },
+      {
+        "bsky_post": {
+          "cid": "bafyreigx452vcgtznpvcenex3kyyblpecosdwnz6ha5ndov4f4xryx2h4e",
+          "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/app.bsky.feed.post/3n2s2pafhsxis"
+        },
+        "cid": "bafyreih2o5qr2pu3fqmrbbw5wj5fmaset5ud6kjyygflfys3ee7xhjiq5q",
         "path": "/the-great-beet-harvest",
         "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/site.standard.document/3n2rvxnjmwcba"
+      },
+      {
+        "bsky_post": {
+          "cid": "bafyreiakvv24z3d6nbgkm3hfauyq435nsl4s27dalvrbhvkmjwzr6ladby",
+          "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/app.bsky.feed.post/3n2s35qhcjupr"
+        },
+        "cid": "bafyreidntfrrtrr3ggiiqt25422lgxpy2ugupnhakzvyp7uimo3eukrgbi",
+        "path": "/this-weeks-bunch",
+        "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/site.standard.document/3n2s35iwqkfpr"
       }
     ],
     "publication": {

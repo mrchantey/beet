@@ -64,3 +64,5 @@ What we would do differently:
 | Detroit Dark Red | 42 | 410 g |
 | Chioggia | 35 | 320 g |
 | Golden | 28 | 280 g |
+
+Next spring the Chioggias get a second row: they won the taste test by a stripe.

@@ -2,7 +2,7 @@
 title = "This Week's Bunch"
 description = "Fresh from the market this week: small, sweet bunches with their greens still perky, and what we are cooking with them."
 tags = ["recipes", "news"]
-created = "2026-11-19"
+created = "2026-11-21"
 authors = ["Beetmania"]
 
 [RouteMeta]
