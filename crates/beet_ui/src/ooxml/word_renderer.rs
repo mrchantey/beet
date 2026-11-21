@@ -2909,7 +2909,9 @@ mod test {
 	}
 
 	/// A markdown page written as a Word file reads back holding its
-	/// structure, and that read round trips.
+	/// structure, and that read round trips. Its `rust` fence is highlighted
+	/// under `syntax_highlighting`, so only its text is asserted, the colours
+	/// it writes held to the round trip.
 	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
 	fn writes_a_markdown_page() {
@@ -2923,7 +2925,7 @@ mod test {
 			 ## Lists\n\n- one\n  - nested\n- two\n\n1. first\n2. second\n\n\
 			 | a | b |\n|---|---|\n| x | y |\n\n\
 			 <table><thead><tr><th>h</th><th>i</th></tr></thead><tbody><tr><td colspan=\"2\">wide</td></tr></tbody></table>\n\n\
-			 ```rust\nfn main() {{}}\n```\n\n![a picture]({image})\n\n---\n\n[^1]: The note.\n"
+			 ```\nfn main() {{}}\n```\n\nThen:\n\n```rust\nlet x = 1;\n```\n\n![a picture]({image})\n\n---\n\n[^1]: The note.\n"
 		);
 		let (mut world, root) = parse_in(
 			formats(false),
@@ -2951,6 +2953,16 @@ mod test {
 			.xpect_contains("<img src=\"data:image/png;base64,")
 			.xpect_contains("<hr />")
 			.xpect_contains("<div id=\"fn-1\" class=\"footnote-definition\"><p>The note.</p></div>");
+		// the highlighted fence's text, whatever spans its colours wrote as
+		let highlighted = first
+			.split_once("<p>Then:</p><pre>")
+			.and_then(|(_, rest)| rest.split_once("</pre>"))
+			.unwrap()
+			.0
+			.split(['<', '>'])
+			.step_by(2)
+			.collect::<String>();
+		highlighted.xpect_eq("let x = 1;");
 		let rewritten = write(&mut again, again_root, default());
 		let (mut third, third_root) = read(&rewritten);
 		html(&mut third, third_root).xpect_eq(first);
@@ -2959,6 +2971,7 @@ mod test {
 	/// LibreOffice converts a written file headless to text, the proxy for
 	/// opening without a repair prompt, its headings and table intact.
 	/// Skips where `soffice` is absent.
+	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn libreoffice_reads_a_written_file() {
 		if !has_soffice() {

@@ -36,7 +36,7 @@
 //! | `w:p` | `p` | |
 //! | `w:p` styled `Title`, `Heading1` to `Heading6` | `h1` to `h6` | `Title` reads as `h1`; a heading writes with its `Heading<n>` style, defined with its built-in name and outline level so the navigation pane and a contents page find it |
 //! | consecutive `Quote` or `IntenseQuote` paragraphs | `blockquote` of `p`s | each `p` in a `blockquote` writes with `Quote` |
-//! | consecutive `HTMLPreformatted` paragraphs | one `pre`, a line each, every line wholly `HTMLCode` read as one `code` | |
+//! | consecutive `HTMLPreformatted` paragraphs | one `pre`, a line each, every line wholly `HTMLCode` read as one `code` | a `pre` writes a paragraph a line, so adjacent `pre`s read back as one |
 //! | a run styled `HTMLCode` | `code` | |
 //! | a `Caption` paragraph directly above a table | that table's `caption` | |
 //! | a paragraph numbered by `w:numPr`, its own or its style's | `li`, grouped by `w:ilvl` into nested `ul`, or `ol` when the level's `w:numFmt` counts (decimal, letter, roman), a deeper level nested in the item before it, a top level item of another `w:num` starting a new list | a write numbers each `li` at its depth with the writer's own bullet or decimal definition, each top level list, and each nested list of the other kind, its own `w:num` restarting its count |
@@ -316,10 +316,9 @@
 //!
 //! `OpcPackage` reads and writes the zip package itself, its content types,
 //! relationships and parts by path, over the `zip` crate with deflate
-//! through the workspace's pure rust `flate2`. No typed part of `ooxmlsdk`
-//! is used once the readers read parts as XML, and its generated API, its
-//! second XML parser and its exact pin are not worth the package handling it
-//! leaves, so it is dropped.
+//! through the workspace's pure rust `flate2`. A reader parses a part
+//! through the markup parser's XML dialect (`OpcPackage::xml`), and a writer
+//! builds one as an `XmlPart`, escaping as [`XmlRenderer`] does.
 //!
 //! # Document properties
 //!
@@ -343,6 +342,7 @@
 //! [`DocParser`]: crate::prelude::DocParser
 //! [`DocRenderer`]: crate::prelude::DocRenderer
 //! [`DocMeta`]: crate::prelude::DocMeta
+//! [`XmlRenderer`]: crate::prelude::XmlRenderer
 //! [`Element`]: beet_core::prelude::Element
 //! [`Value`]: beet_core::prelude::Value
 mod a1_reference;

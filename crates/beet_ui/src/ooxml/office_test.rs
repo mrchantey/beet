@@ -57,6 +57,7 @@ pub(crate) fn html(world: &mut World, root: Entity) -> String {
 
 /// Whether LibreOffice is on this machine, a test converting through it
 /// skipping where it is not.
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn has_soffice() -> bool {
 	std::process::Command::new("soffice")
 		.arg("--version")
@@ -67,6 +68,7 @@ pub(crate) fn has_soffice() -> bool {
 /// `bytes` written as `name` in a fresh directory and converted by
 /// LibreOffice headless to `format`, its own profile kept in that
 /// directory, answering the converted file's text.
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn soffice_convert(
 	bytes: &MediaBytes,
 	name: &str,

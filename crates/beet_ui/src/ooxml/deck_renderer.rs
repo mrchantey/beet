@@ -2411,6 +2411,7 @@ mod test {
 	/// LibreOffice converts a written deck headless, the proxy for opening
 	/// without a repair prompt, every slide's text and notes intact. Skips
 	/// where `soffice` is absent.
+	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn libreoffice_reads_a_written_deck() {
 		if !has_soffice() {

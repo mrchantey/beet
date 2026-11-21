@@ -1485,7 +1485,7 @@ impl WordRead<'_> {
 	}
 
 	/// The children of `parent` named `local`, a content control's or custom
-	/// markup's walked through.
+	/// markup's own children read in its place.
 	fn through_controls<'b>(
 		parent: &'b BsxElement,
 		local: &str,

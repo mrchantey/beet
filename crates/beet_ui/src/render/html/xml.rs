@@ -1,5 +1,5 @@
-//! Rendering a tree as XML: the [`XmlRenderer`] target and the
-//! [`XmlWriter`] it and an Office file's writer share.
+//! Rendering a tree as XML: the [`XmlRenderer`] target and its
+//! [`XmlWriter`], whose escaping an Office file's parts are written through.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -32,8 +32,7 @@ impl Installer for XmlRenderer {
 /// Writes a tree as XML: an element from its [`Element`] and [`Attribute`]s,
 /// text from its [`Value`], and a comment, doctype, CDATA section or
 /// processing instruction as itself. An entity with no element, ie a parse
-/// root or a node only an Office file's writer reads, is written through,
-/// its children in place, and a [`Portal`] as the tree it transcludes.
+/// root or a fragment, is written through, its children in place, and a [`Portal`] as the tree it transcludes.
 #[derive(SystemParam)]
 pub(crate) struct XmlWriter<'w, 's> {
 	nodes: Query<'w, 's, XmlNode<'static>>,

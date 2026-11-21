@@ -137,7 +137,6 @@ beet_action = { workspace = true, optional = true, features = ["std", "reflect"]
 bevy.workspace = true
 extend.workspace = true
 bytes.workspace = true
-# the Office package an `ooxml` document is read from and written to
 # the zip an Office file is, read and written by `OpcPackage`
 zip = { workspace = true, optional = true }
 # deflate for `zip`, its pure rust backend

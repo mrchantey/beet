@@ -919,6 +919,7 @@ mod test {
 	/// LibreOffice opens a written workbook headless and converts it, the
 	/// proxy for opening without a repair prompt, its values intact. Skips
 	/// where `soffice` is absent.
+	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn libreoffice_opens_a_written_workbook() {
 		if !has_soffice() {
