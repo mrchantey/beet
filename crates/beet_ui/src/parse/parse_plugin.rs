@@ -41,7 +41,9 @@ impl Plugin for ParsePlugin {
 		app.install_type::<crate::prelude::BsxDefaultsPlugin>();
 		// a document's root metadata and its route's, which frontmatter
 		// declares and writes
-		app.register_type::<DocMeta>().register_type::<RouteMeta>();
+		app.register_type::<DocMeta>()
+			.register_type::<RouteMeta>()
+			.register_type::<InlineBlob>();
 		// the limits and vocabulary `beet check` holds every page's metadata to
 		app.register_type::<DocMetaRules>()
 			.register_type::<TextLimit>();

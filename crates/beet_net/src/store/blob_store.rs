@@ -147,6 +147,28 @@ impl BlobStore {
 		self.root_key() == other.root_key() && self.subdir() == other.subdir()
 	}
 
+	/// The blob `path` names relative to this store's scope, a leading `..`
+	/// climbing above the scope within the store it was scoped from, ie
+	/// `../../demo/a.bsx` through a store scoped to `src/slides` is
+	/// `demo/a.bsx` of its [`base`](Self::base). Any other path is a key of
+	/// this store, as a [`RelPath`] has it.
+	///
+	/// # Errors
+	/// Errors when `path` climbs above the base store.
+	pub fn relative_blob(&self, path: &str) -> Result<Blob> {
+		if !path.starts_with("..") {
+			return Blob::new(self.clone(), RelPath::new(path)).xok();
+		}
+		let key = SmolPath::new(format!("{}/{path}", self.subdir()));
+		if key.as_str() == ".." || key.as_str().starts_with("../") {
+			bevybail!(
+				"`{path}` climbs above the store scoped to `{}`",
+				self.subdir()
+			);
+		}
+		Blob::new(self.base(), RelPath::new(key)).xok()
+	}
+
 	/// Get an object and infer the [`MediaType`] from its path extension.
 	pub async fn get_media(&self, path: &RelPath) -> Result<MediaBytes> {
 		let media_type = path.media_type().unwrap_or(MediaType::Bytes);
@@ -451,6 +473,35 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("not under its declared store root");
+	}
+
+	/// A `..` climbs above a scope within its base store, never above it.
+	#[beet_core::test]
+	async fn climbs_above_a_scope() {
+		let scoped = nested_store().await.with_subdir(RelPath::new("a/b"));
+		let read = async |path: &str| {
+			scoped
+				.relative_blob(path)
+				.unwrap()
+				.get_media()
+				.await
+				.unwrap()
+		};
+		read("../shared.txt")
+			.await
+			.as_utf8()
+			.unwrap()
+			.xpect_eq("shared");
+		read("main.bsx")
+			.await
+			.as_utf8()
+			.unwrap()
+			.xpect_eq("<Router/>");
+		scoped
+			.relative_blob("../../../x")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("climbs above");
 	}
 
 	#[beet_core::test]

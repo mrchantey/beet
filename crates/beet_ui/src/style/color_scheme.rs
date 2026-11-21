@@ -1,59 +1,15 @@
-//! The typed, queryable color-scheme handle for non-web targets.
-//!
-//! On the web the active scheme is driven entirely by the
-//! `.light-scheme`/`.dark-scheme` classes (seeded by `ColorSchemeScript`), and
-//! CSS re-themes for free. tui/native have no CSS engine, so [`ColorScheme`] is
-//! the runtime handle: set it on an ancestor element and [`sync_color_scheme`]
-//! mirrors it onto [`Classes`], re-running the cascade via `resolve_styles`.
+//! [`sync_color_scheme`], mirroring a [`ColorScheme`] onto its element's
+//! [`Classes`] so the cascade re-themes.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// The active color scheme on an element — the typed counterpart to the
-/// `.light-scheme`/`.dark-scheme` classes.
-///
-/// Query it to read the current scheme; mutate it to switch themes at runtime.
-/// For the app-wide session default see [`Theme::scheme`](crate::style::material::Theme).
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Component, Reflect)]
-#[reflect(Component)]
-pub enum ColorScheme {
-	Light,
-	#[default]
-	Dark,
-}
-
 impl ColorScheme {
-	/// Parse a scheme keyword (`light`/`dark`), eg a `color-scheme` URL or CLI
-	/// parameter.
-	pub fn parse(value: &str) -> Option<Self> {
-		match value {
-			"light" => Some(Self::Light),
-			"dark" => Some(Self::Dark),
-			_ => None,
-		}
-	}
-
-	/// The scheme class this maps to.
-	pub fn class(self) -> ClassName {
-		match self {
-			Self::Light => classes::LIGHT_SCHEME,
-			Self::Dark => classes::DARK_SCHEME,
-		}
-	}
-
 	/// The opposite scheme's class, removed from [`Classes`] on sync.
 	fn inactive_class(self) -> ClassName {
 		match self {
-			Self::Light => classes::DARK_SCHEME,
-			Self::Dark => classes::LIGHT_SCHEME,
+			Self::Light => Self::DARK_CLASS,
+			Self::Dark => Self::LIGHT_CLASS,
 		}
-	}
-
-	/// Flip between light and dark.
-	pub fn toggle(&mut self) {
-		*self = match self {
-			Self::Light => Self::Dark,
-			Self::Dark => Self::Light,
-		};
 	}
 }
 

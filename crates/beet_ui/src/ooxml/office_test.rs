@@ -55,18 +55,6 @@ pub(crate) fn html(world: &mut World, root: Entity) -> String {
 		.to_string()
 }
 
-/// The tree under `root` as markdown.
-pub(crate) fn markdown(world: &mut World, root: Entity) -> String {
-	MarkdownRenderer::new()
-		.render(&mut RenderContext::new(
-			world,
-			root,
-			&RequestParts::default(),
-		))
-		.unwrap()
-		.to_string()
-}
-
 /// Whether LibreOffice is on this machine, a test converting through it
 /// skipping where it is not.
 pub(crate) fn has_soffice() -> bool {

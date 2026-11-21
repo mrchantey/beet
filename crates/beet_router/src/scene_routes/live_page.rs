@@ -63,8 +63,8 @@ impl LivePage {
 	/// [`ServerIsland`] inline, resolve the `--root` cascade ([`RenderRoot`]),
 	/// carry the route's [`DocMeta`] onto the root it chose, so a scene
 	/// response reads the page's metadata where it reads the tree, and, when
-	/// the request names a [`MediaIngestPolicy`], run the media resolve step
-	/// ([`InlineBlob::resolve`]). The live page keeps `parts`, the request
+	/// the request names or implies a [`MediaIngestPolicy`], run the media
+	/// resolve step ([`MediaResolve::resolve`]). The live page keeps `parts`, the request
 	/// every render of it answers. A failure releases what was built.
 	pub async fn prepare(
 		page: Entity,
@@ -181,11 +181,14 @@ impl LivePage {
 				}
 			})
 			.await;
-		// a request naming no policy fetches nothing
-		let Some(policy) = params.media_ingest else {
+		// a request naming no policy fetches only what its format implies
+		let Some(policy) = params
+			.media_ingest
+			.or_else(|| MediaIngestPolicy::implied(&live.request))
+		else {
 			return live.xok();
 		};
-		match InlineBlob::resolve(
+		match MediaResolve::resolve(
 			&live.world,
 			router,
 			&live.request,
@@ -352,6 +355,17 @@ impl LivePage {
 
 	/// The entity a render starts from, the cascade's answer to `--root`.
 	pub fn root(&self) -> Entity { self.root }
+
+	/// The world the page lives in.
+	pub(crate) fn world(&self) -> &AsyncWorld { &self.world }
+
+	/// The route's own content, the end of the page's layout chain.
+	pub(crate) async fn content(&self) -> Result<Entity> {
+		let page = self.page;
+		self.world
+			.with(move |world: &mut World| LayoutContent::terminal(world, page))
+			.await
+	}
 
 	/// Every [`InlineBlob`] the media resolve step fetched onto this page,
 	/// the cover image's included.

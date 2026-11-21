@@ -593,6 +593,8 @@ impl DirectLook {
 impl OfficeUnits {
 	/// CSS px to the inch.
 	pub const PX_PER_INCH: f32 = 96.;
+	/// English Metric Units per inch.
+	pub const EMU_PER_INCH: f32 = 914400.;
 	/// Points to the inch.
 	pub const PT_PER_INCH: f32 = 72.;
 	/// CSS px to the rem.
@@ -615,7 +617,12 @@ impl OfficeUnits {
 
 	/// `px` in English Metric Units, DrawingML's: 1 px is 9525 EMU.
 	pub fn emu(px: f32) -> i64 {
-		(px * 914400. / Self::PX_PER_INCH).round() as i64
+		(px * Self::EMU_PER_INCH / Self::PX_PER_INCH).round() as i64
+	}
+
+	/// `emu` English Metric Units in px.
+	pub fn px_from_emu(emu: f32) -> f32 {
+		emu * Self::PX_PER_INCH / Self::EMU_PER_INCH
 	}
 
 	/// `length` in px, a percentage of `of`, ie the page's content box, and

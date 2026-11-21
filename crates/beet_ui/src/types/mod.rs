@@ -18,6 +18,8 @@ mod portal;
 pub use portal::*;
 mod document_text;
 pub use document_text::*;
+mod inline_blob;
+pub use inline_blob::*;
 mod table_grid;
 pub use state::*;
 pub use table_grid::*;

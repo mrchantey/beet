@@ -186,7 +186,7 @@ struct GatherState {
 /// The tree read for writing.
 #[derive(SystemParam)]
 struct WordGather<'w, 's> {
-	children: Query<'w, 's, &'static Children>,
+	tree: RenderTreeQuery<'w, 's>,
 	elements: ElementQuery<'w, 's>,
 	values: Query<'w, 's, &'static Value, Without<Element>>,
 	tags: Query<'w, 's, &'static Element>,
@@ -202,8 +202,8 @@ struct Resolved {
 	probes: HashMap<Chain, Vec<ComputedStyle>>,
 	/// The elements resolving `break-after: page`.
 	breaks: HashSet<Entity>,
-	/// Each `img`'s `src`, `alt`, `width` and `height` attributes.
-	images: HashMap<Entity, (String, String, Vec2)>,
+	/// Each `img`, unsized.
+	images: HashMap<Entity, OfficePicture>,
 }
 
 /// The write in progress: the package and the counters its parts share.
@@ -440,14 +440,14 @@ impl WordGather<'_, '_> {
 	}
 
 	fn children_of(&self, entity: Entity) -> Vec<Entity> {
-		self.children
-			.get(entity)
-			.map(|children| children.to_vec())
-			.unwrap_or_default()
+		self.tree.children(entity).collect()
 	}
 
 	fn descendants(&self, entity: Entity) -> Vec<Entity> {
-		self.children.iter_descendants_depth_first(entity).collect()
+		self.tree
+			.iter_descendants_inclusive_depth_first(entity)
+			.skip(1)
+			.collect()
 	}
 
 	fn tag(&self, entity: Entity) -> Option<&str> {
@@ -1283,35 +1283,8 @@ impl Resolved {
 			.zip(styles.breaks_after(world, &breaks)?)
 			.filter_map(|(entity, breaks)| breaks.then_some(entity))
 			.collect();
-		let images = world.with_state::<ElementQuery, _>(|elements| {
-			entities
-				.iter()
-				.filter_map(|entity| {
-					let view = elements.get(*entity).ok()?;
-					(view.tag() == "img").then(|| {
-						let side = |key: &str| {
-							view.attribute(key)
-								.and_then(|value| {
-									value
-										.value
-										.to_string()
-										.trim_end_matches("px")
-										.parse::<f32>()
-										.ok()
-								})
-								.unwrap_or(0.)
-						};
-						(
-							*entity,
-							(
-								view.attribute_string("src"),
-								view.attribute_string("alt"),
-								Vec2::new(side("width"), side("height")),
-							),
-						)
-					})
-				})
-				.collect()
+		let images = world.with_state::<PictureQuery, _>(|pictures| {
+			pictures.gather(&entities)
 		});
 		Self {
 			styles,
@@ -2067,12 +2040,14 @@ impl WordWrite<'_> {
 	/// The drawing of an `img`: an image part for a `data:` picture, a
 	/// linked picture for any other.
 	fn image(&mut self, part: &str, entity: Entity) -> String {
-		let (src, alt, attributes) = self
+		let gathered = self
 			.resolved
 			.images
 			.get(&entity)
 			.cloned()
-			.unwrap_or_default();
+			.unwrap_or_else(|| {
+				OfficePicture::new(PictureSource::of(""), "", Vec2::ZERO)
+			});
 		let style = self.resolved.computed(entity);
 		let resolved = Vec2::new(
 			style
@@ -2086,13 +2061,7 @@ impl WordWrite<'_> {
 				.map(|height| self.resolved.px(height))
 				.unwrap_or(0.),
 		);
-		let picture = OfficePicture::write(
-			&src,
-			&alt,
-			attributes,
-			resolved,
-			WordRenderer::CONTENT,
-		);
+		let picture = gathered.sized(resolved, WordRenderer::CONTENT);
 		let blip = match &picture.source {
 			PictureSource::Embedded(bytes) => {
 				self.images += 1;

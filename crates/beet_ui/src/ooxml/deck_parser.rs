@@ -5,6 +5,7 @@ use super::office_style::*;
 use super::read_element::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::math::Affine2;
 
 /// Reads a slide deck into one `article data-card` per listed slide in
 /// presentation order, its front laid out as the card stack lays a card
@@ -15,15 +16,6 @@ use beet_core::prelude::*;
 pub struct DeckParser {
 	/// How the deck's looks are read.
 	options: OfficeReadOptions,
-}
-
-/// A shape's offset and extent in EMU, in slide space.
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-struct Frame {
-	x: f64,
-	y: f64,
-	width: f64,
-	height: f64,
 }
 
 /// What a shape is to the card's layout, by its placeholder type.
@@ -55,7 +47,7 @@ enum Bullet {
 #[derive(Debug)]
 struct ShapeRead {
 	role: Role,
-	frame: Frame,
+	frame: Rect,
 	blocks: Vec<ReadElement>,
 }
 
@@ -65,7 +57,7 @@ struct ShapeRead {
 struct Placeholder {
 	index: Option<SmolStr>,
 	kind: Option<SmolStr>,
-	frame: Option<Frame>,
+	frame: Option<Rect>,
 	list_style: Option<BsxElement>,
 }
 
@@ -80,108 +72,81 @@ struct SlideRead<'a> {
 	body_style: Option<BsxElement>,
 }
 
-/// A group's mapping from its children's coordinates to its parent's.
-#[derive(Debug, Clone, Copy)]
-struct Transform {
-	offset: (f64, f64),
-	child_offset: (f64, f64),
-	scale: (f64, f64),
-}
+/// A group's mapping from its children's coordinates, in EMU, to its
+/// parent's: an offset and a positive scale, so it maps a [`Rect`]'s
+/// corners to the corners of the mapped rect.
+#[derive(Debug, Default, Clone, Copy)]
+struct GroupTransform(Affine2);
 
-impl Default for Transform {
-	fn default() -> Self {
-		Self {
-			offset: (0., 0.),
-			child_offset: (0., 0.),
-			scale: (1., 1.),
-		}
-	}
-}
-
-impl Transform {
+impl GroupTransform {
 	/// `frame` in the parent's coordinates.
-	fn apply(&self, frame: Frame) -> Frame {
-		Frame {
-			x: self.offset.0 + (frame.x - self.child_offset.0) * self.scale.0,
-			y: self.offset.1 + (frame.y - self.child_offset.1) * self.scale.1,
-			width: frame.width * self.scale.0,
-			height: frame.height * self.scale.1,
-		}
+	fn apply(&self, frame: Rect) -> Rect {
+		Rect::from_corners(
+			self.0.transform_point2(frame.min),
+			self.0.transform_point2(frame.max),
+		)
 	}
 
-	/// The transform a group's `a:xfrm` makes, nested in `self`.
+	/// The transform a group's `a:xfrm` makes, nested in `self`: its
+	/// `chOff`/`chExt` child space mapped onto its `off`/`ext` frame.
 	fn nest(&self, transform: &BsxElement) -> Self {
-		let pair = |local: &str, first: &str, second: &str| {
-			transform.child(local).and_then(|element| {
-				Some((
-					element.attribute(first)?.parse::<f64>().ok()?,
-					element.attribute(second)?.parse::<f64>().ok()?,
-				))
-			})
-		};
-		let (Some(offset), Some(extent)) =
-			(pair("off", "x", "y"), pair("ext", "cx", "cy"))
-		else {
+		let (Some(offset), Some(extent)) = (
+			Xfrm::point(transform, "off", "x", "y"),
+			Xfrm::point(transform, "ext", "cx", "cy"),
+		) else {
 			return *self;
 		};
-		let child_offset = pair("chOff", "x", "y").unwrap_or(offset);
-		let child_extent = pair("chExt", "cx", "cy").unwrap_or(extent);
-		let ratio = |extent: f64, child: f64| match child > 0. {
-			true => extent / child,
-			false => 1.,
-		};
-		Self {
-			offset: (
-				self.offset.0 + (offset.0 - self.child_offset.0) * self.scale.0,
-				self.offset.1 + (offset.1 - self.child_offset.1) * self.scale.1,
-			),
-			child_offset,
-			scale: (
-				self.scale.0 * ratio(extent.0, child_extent.0),
-				self.scale.1 * ratio(extent.1, child_extent.1),
-			),
-		}
+		let child_offset =
+			Xfrm::point(transform, "chOff", "x", "y").unwrap_or(offset);
+		let child_extent =
+			Xfrm::point(transform, "chExt", "cx", "cy").unwrap_or(extent);
+		// a degenerate child extent maps one to one
+		let scale = Vec2::select(
+			child_extent.cmpgt(Vec2::ZERO),
+			extent / child_extent,
+			Vec2::ONE,
+		);
+		let local = Affine2::from_translation(offset)
+			* Affine2::from_scale(scale)
+			* Affine2::from_translation(-child_offset);
+		Self(self.0 * local)
 	}
 }
 
-impl Frame {
-	/// A shape's own frame, from its `a:xfrm`.
-	fn of(transform: &BsxElement) -> Option<Self> {
-		let pair = |local: &str, first: &str, second: &str| {
-			transform.child(local).and_then(|element| {
-				Some((
-					element.attribute(first)?.parse::<f64>().ok()?,
-					element.attribute(second)?.parse::<f64>().ok()?,
-				))
-			})
-		};
-		let (x, y) = pair("off", "x", "y")?;
-		let (width, height) = pair("ext", "cx", "cy")?;
-		Some(Self {
-			x,
-			y,
-			width,
-			height,
-		})
+/// Reading an `a:xfrm`, a shape's offset and extent in EMU.
+struct Xfrm;
+
+impl Xfrm {
+	/// A shape's frame in slide space, from its `a:xfrm`.
+	fn frame(transform: &BsxElement) -> Option<Rect> {
+		let offset = Self::point(transform, "off", "x", "y")?;
+		let extent = Self::point(transform, "ext", "cx", "cy")?;
+		Rect::from_corners(offset, offset + extent).xsome()
 	}
 
-	/// How far this frame and `other` overlap across, in EMU.
-	fn overlap_x(&self, other: &Self) -> f64 {
-		((self.x + self.width).min(other.x + other.width) - self.x.max(other.x))
-			.max(0.)
+	/// The `first` and `second` attributes of `transform`'s `local` child.
+	fn point(
+		transform: &BsxElement,
+		local: &str,
+		first: &str,
+		second: &str,
+	) -> Option<Vec2> {
+		let element = transform.child(local)?;
+		Vec2::new(
+			element.attribute(first)?.parse().ok()?,
+			element.attribute(second)?.parse().ok()?,
+		)
+		.xsome()
 	}
 
-	/// How far this frame and `other` overlap down, in EMU.
-	fn overlap_y(&self, other: &Self) -> f64 {
-		((self.y + self.height).min(other.y + other.height)
-			- self.y.max(other.y))
-		.max(0.)
+	/// How far `frame` and `other` overlap, across and down, in EMU.
+	fn overlap(frame: &Rect, other: &Rect) -> Vec2 {
+		frame.intersect(*other).size()
 	}
 
-	/// Its size in EMU, for a picture's `width` and `height`.
-	fn emu(&self) -> Option<UVec2> {
-		(self.width > 0. && self.height > 0.)
-			.then(|| UVec2::new(self.width as u32, self.height as u32))
+	/// `frame`'s size in EMU, for a picture's `width` and `height`.
+	fn emu(frame: &Rect) -> Option<Vec2> {
+		(!frame.is_empty()).then(|| frame.size())
 	}
 }
 
@@ -299,7 +264,7 @@ impl<'a> SlideRead<'a> {
 		let shapes = slide
 			.child("cSld")
 			.and_then(|common| common.child("spTree"))
-			.map(|tree| self.shapes(tree, &Transform::default()))
+			.map(|tree| self.shapes(tree, &GroupTransform::default()))
 			.unwrap_or_default();
 		for block in Self::front(shapes) {
 			article = article.with_child(block);
@@ -409,12 +374,12 @@ impl<'a> SlideRead<'a> {
 			.filter(|shape| shape.role == Role::Body)
 			.map(|shape| shape.frame)
 			.collect::<Vec<_>>();
-		bodies.sort_by(|a, b| a.x.total_cmp(&b.x));
+		bodies.sort_by(|a, b| a.min.x.total_cmp(&b.min.x));
 		let side_by_side = bodies.len() >= 2
 			&& bodies.windows(2).all(|pair| {
-				pair[0].overlap_y(&pair[1]) > 0.
-					&& pair[0].overlap_x(&pair[1])
-						< pair[0].width.min(pair[1].width) / 2.
+				let overlap = Xfrm::overlap(&pair[0], &pair[1]);
+				overlap.y > 0.
+					&& overlap.x < pair[0].width().min(pair[1].width()) / 2.
 			});
 		if !side_by_side {
 			return vec![
@@ -430,10 +395,11 @@ impl<'a> SlideRead<'a> {
 					.unwrap_or(0),
 				_ => (0..bodies.len())
 					.max_by(|a, b| {
-						shape
-							.frame
-							.overlap_x(&bodies[*a])
-							.total_cmp(&shape.frame.overlap_x(&bodies[*b]))
+						Xfrm::overlap(&shape.frame, &bodies[*a])
+							.x
+							.total_cmp(
+								&Xfrm::overlap(&shape.frame, &bodies[*b]).x,
+							)
 							.then(b.cmp(a))
 					})
 					.unwrap_or(0),
@@ -448,9 +414,9 @@ impl<'a> SlideRead<'a> {
 	fn shapes(
 		&self,
 		tree: &BsxElement,
-		transform: &Transform,
+		transform: &GroupTransform,
 	) -> Vec<ShapeRead> {
-		let mut placed = Vec::<(Frame, Vec<ShapeRead>)>::new();
+		let mut placed = Vec::<(Rect, Vec<ShapeRead>)>::new();
 		for child in tree.elements() {
 			let shapes = self.shape(child, transform);
 			if shapes.is_empty() {
@@ -461,7 +427,7 @@ impl<'a> SlideRead<'a> {
 				"grpSp" => child
 					.child("grpSpPr")
 					.and_then(|properties| properties.child("xfrm"))
-					.and_then(Frame::of)
+					.and_then(Xfrm::frame)
 					.map(|frame| transform.apply(frame))
 					.unwrap_or(shapes[0].frame),
 				_ => shapes[0].frame,
@@ -469,7 +435,10 @@ impl<'a> SlideRead<'a> {
 			placed.push((frame, shapes));
 		}
 		placed.sort_by(|(a, _), (b, _)| {
-			a.y.total_cmp(&b.y).then(a.x.total_cmp(&b.x))
+			a.min
+				.y
+				.total_cmp(&b.min.y)
+				.then(a.min.x.total_cmp(&b.min.x))
 		});
 		placed.into_iter().flat_map(|(_, shapes)| shapes).collect()
 	}
@@ -478,7 +447,7 @@ impl<'a> SlideRead<'a> {
 	fn shape(
 		&self,
 		shape: &BsxElement,
-		transform: &Transform,
+		transform: &GroupTransform,
 	) -> Vec<ShapeRead> {
 		let frame = || {
 			self.frame(shape)
@@ -555,13 +524,13 @@ impl<'a> SlideRead<'a> {
 
 	/// A shape's own frame, from its shape, group or graphic frame
 	/// properties.
-	fn own_frame(shape: &BsxElement) -> Option<Frame> {
+	fn own_frame(shape: &BsxElement) -> Option<Rect> {
 		["spPr", "grpSpPr"]
 			.iter()
 			.find_map(|local| shape.child(local))
 			.and_then(|properties| properties.child("xfrm"))
 			.or_else(|| shape.child("xfrm"))
-			.and_then(Frame::of)
+			.and_then(Xfrm::frame)
 	}
 
 	/// The layout's or master's placeholder `shape` inherits from: by its
@@ -588,7 +557,7 @@ impl<'a> SlideRead<'a> {
 
 	/// A shape's frame, a placeholder without its own taking its layout's,
 	/// else its master's.
-	fn frame(&self, shape: &BsxElement) -> Option<Frame> {
+	fn frame(&self, shape: &BsxElement) -> Option<Rect> {
 		Self::own_frame(shape).or_else(|| {
 			self.inherited(shape)
 				.find_map(|placeholder| placeholder.frame)
@@ -893,7 +862,7 @@ impl<'a> SlideRead<'a> {
 	fn picture(
 		&self,
 		picture: &BsxElement,
-		frame: &Frame,
+		frame: &Rect,
 	) -> Option<ReadElement> {
 		let blip = picture.child("blipFill")?.child("blip")?;
 		let alt = picture
@@ -908,7 +877,7 @@ impl<'a> SlideRead<'a> {
 		match relationship.external {
 			true => Some(OfficePicture::read(
 				relationship.target.to_string(),
-				frame.emu(),
+				Xfrm::emu(frame),
 				alt,
 			)),
 			false => {
@@ -916,7 +885,7 @@ impl<'a> SlideRead<'a> {
 				Some(OfficePicture::read_embedded(
 					self.package.part(path)?,
 					self.package.content_type(path)?,
-					frame.emu(),
+					Xfrm::emu(frame),
 					alt,
 				))
 			}

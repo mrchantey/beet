@@ -20,10 +20,10 @@ pub struct DocumentText<'w, 's> {
 			Option<&'static Element>,
 			Option<&'static Value>,
 			Option<&'static CData>,
-			Option<&'static Children>,
 		),
 	>,
 	elements: ElementQuery<'w, 's>,
+	tree: RenderTreeQuery<'w, 's>,
 }
 
 impl DocumentText<'_, '_> {
@@ -53,7 +53,7 @@ impl DocumentText<'_, '_> {
 	/// a line break and the end of a paragraph, row or cell as a newline.
 	pub fn text(&self, entity: Entity) -> String {
 		let mut out = String::new();
-		self.push_text(entity, false, true, &mut out);
+		self.push_text(self.tree.resolve(entity), false, true, &mut out);
 		out
 	}
 
@@ -61,7 +61,7 @@ impl DocumentText<'_, '_> {
 	/// it, ie a table cell's own words.
 	pub fn own_text(&self, entity: Entity) -> String {
 		let mut out = String::new();
-		self.push_text(entity, true, true, &mut out);
+		self.push_text(self.tree.resolve(entity), true, true, &mut out);
 		out
 	}
 
@@ -82,12 +82,7 @@ impl DocumentText<'_, '_> {
 	}
 
 	fn children(&self, entity: Entity) -> Vec<Entity> {
-		self.nodes
-			.get(entity)
-			.ok()
-			.and_then(|(.., children)| children)
-			.map(|children| children.to_vec())
-			.unwrap_or_default()
+		self.tree.children(entity).collect()
 	}
 
 	fn push_blocks(&self, entity: Entity, out: &mut Vec<Entity>) {
@@ -113,7 +108,7 @@ impl DocumentText<'_, '_> {
 		is_start: bool,
 		out: &mut String,
 	) {
-		let Ok((element, value, cdata, _)) = self.nodes.get(entity) else {
+		let Ok((element, value, cdata)) = self.nodes.get(entity) else {
 			return;
 		};
 		if let Some(checked) = self.checkbox(entity) {

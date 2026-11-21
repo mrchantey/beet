@@ -53,7 +53,7 @@ pub mod syntax;
 mod values;
 pub use animate::*;
 pub use bsx_style::*;
-pub use color_scheme::*;
+pub(crate) use color_scheme::*;
 pub use css::*;
 pub(crate) use elements::*;
 pub use resolve_styles::*;

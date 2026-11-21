@@ -302,11 +302,15 @@
 //!
 //! A read embeds a picture's bytes in its `src` as a `data:` URL of its own
 //! media type, so the tree holds everything it shows and no read does IO;
-//! a linked picture's `src` is its link. A write embeds a `data:` picture as
-//! an image part, sized by its resolved width and height, else its `width`
-//! and `height` attributes, else its native size, within the page's content
-//! box; any other `src` writes as a linked picture, since a writer does no
-//! IO, which an Office reader shows when it can reach the address.
+//! a linked picture's `src` is its link. A write embeds the bytes a
+//! picture carries, a `data:` URL's or the
+//! [`InlineBlob`](crate::prelude::InlineBlob) a media resolve step left on
+//! its `src` (a served page fetches the site's own pictures for an Office
+//! request), as an image part, sized by its resolved width and height, else
+//! its `width` and `height` attributes, else its native size, within the
+//! page's content box; any other `src` writes as a linked picture, since a
+//! writer does no IO, which an Office reader shows when it can reach the
+//! address.
 //!
 //! # Package
 //!

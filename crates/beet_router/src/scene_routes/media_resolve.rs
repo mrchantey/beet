@@ -4,8 +4,9 @@
 //! The caller asks for it: the step runs in
 //! [`LivePage::prepare`](crate::prelude::LivePage::prepare) when the request
 //! names a standard site media ingest policy ([`MediaIngestPolicy`], the
-//! `--media-ingest` render param), and only then, so a plain request fetches
-//! nothing. It runs after the layouts and the `--root` cascade, over the
+//! `--media-ingest` render param), or accepts a format that carries its
+//! pictures ([`MediaIngestPolicy::implied`]), and only then, so a plain
+//! request fetches nothing. It runs after the layouts and the `--root` cascade, over the
 //! render root's subtree: each image source (an `img`'s `src`) and the page's
 //! cover image (`DocMeta::social_image_url`) resolves against the page's
 //! url, is fetched, and lands as an [`InlineBlob`] on the attribute's entity.
@@ -62,6 +63,23 @@ impl MediaIngestPolicy {
 		}
 	}
 
+	/// The policy a request naming none takes: [`Local`](Self::Local) when
+	/// it first accepts a format carrying its pictures inside it (a Word file,
+	/// a slide deck, a workbook), which a reader opens with no site to fetch
+	/// from, else none, fetching nothing.
+	pub fn implied(parts: &RequestParts) -> Option<Self> {
+		parts
+			.accept()
+			.first()
+			.filter(|media_type| {
+				matches!(
+					media_type,
+					MediaType::Docx | MediaType::Pptx | MediaType::Xlsx
+				)
+			})
+			.map(|_| Self::Local)
+	}
+
 	/// Whether a source this policy governs is fetched, `own` being whether it
 	/// is the site's.
 	fn fetches(&self, own: bool) -> bool {
@@ -73,48 +91,11 @@ impl MediaIngestPolicy {
 	}
 }
 
-/// One source's media, fetched by the media resolve step and held on the
-/// source attribute's entity (or, for the cover image, the render root) for
-/// the life of the tree, so a render writes a correct [`BlobRef`] the first
-/// time and a publish uploads straight from the tree it rendered.
-///
-/// An ordinary component, so a later step hooks in by query or observer, ie
-/// an image optimiser or a size check against a PDS's blob limit.
-///
-/// Derived state, so no saver writes it: a scene carries the source's url as
-/// the page has it, never the bytes fetched from it.
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Component, Derived)]
-pub struct InlineBlob {
-	/// The bytes' content id under the raw codec, what `uploadBlob` answers.
-	pub cid: Cid,
-	/// The resolved source, kept for errors and deduplication.
-	pub link: Url,
-	/// The fetched bytes, one shared buffer every attribute naming this source
-	/// holds.
-	pub bytes: MediaBytes,
-}
+/// The media resolve step, fetching a page's image sources onto its tree as
+/// [`InlineBlob`]s.
+pub struct MediaResolve;
 
-impl InlineBlob {
-	/// The blob `bytes` fetched from `link` are.
-	pub fn new(link: Url, bytes: MediaBytes) -> Self {
-		Self {
-			cid: Cid::raw(&bytes),
-			link,
-			bytes,
-		}
-	}
-
-	/// The reference a record embeds for these bytes, computed with no
-	/// network: the cid, the media type and the size.
-	pub fn blob_ref(&self) -> BlobRef {
-		BlobRef {
-			cid: self.cid.clone(),
-			mime_type: self.bytes.media_type().clone(),
-			size: self.bytes.len() as u64,
-		}
-	}
-
+impl MediaResolve {
 	/// The media resolve step over the tree at `root`, the page `request`
 	/// asked `router` for: fetch every image source under `policy` and insert
 	/// an [`InlineBlob`] on each source's entity, answering the entities given

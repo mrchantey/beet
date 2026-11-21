@@ -1,6 +1,7 @@
 //! [`OfficePicture`], a picture as every Office reader and writer carries it,
 //! by the [module docs](super)' Pictures section.
 use super::office_style::OfficeUnits;
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// A picture an `img` shows: its bytes when its `src` is a `data:` URL,
@@ -18,10 +19,75 @@ pub(crate) struct OfficePicture {
 /// Where a picture's bytes are.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum PictureSource {
-	/// Carried in the tree, a `data:` url's.
+	/// Carried in the tree: a `data:` url's, or fetched onto its `src` as an
+	/// [`InlineBlob`].
 	Embedded(MediaBytes),
 	/// Elsewhere, at its `src`, which a writer links.
 	Linked(String),
+}
+
+/// The pictures of a tree being written.
+#[derive(SystemParam)]
+pub(crate) struct PictureQuery<'w, 's> {
+	elements: ElementQuery<'w, 's>,
+	attributes: AttributeQuery<'w, 's>,
+	blobs: Query<'w, 's, &'static InlineBlob>,
+}
+
+impl PictureSource {
+	/// The source `src` names: its bytes when a `data:` url, else the link.
+	pub fn of(src: &str) -> Self {
+		Url::coerce(src)
+			.media_bytes()
+			.map(Self::Embedded)
+			.unwrap_or_else(|_| Self::Linked(src.to_string()))
+	}
+}
+
+impl PictureQuery<'_, '_> {
+	/// Each `img` among `entities` as an unsized [`OfficePicture`]: its
+	/// source the [`InlineBlob`] a media resolve step left on its `src`,
+	/// else what `src` names.
+	pub fn gather(
+		&self,
+		entities: &[Entity],
+	) -> HashMap<Entity, OfficePicture> {
+		entities
+			.iter()
+			.filter_map(|entity| {
+				let view = self.elements.get(*entity).ok()?;
+				if view.tag() != "img" {
+					return None;
+				}
+				let side = |key: &str| {
+					view.attribute(key)
+						.and_then(|value| {
+							value
+								.value
+								.to_string()
+								.trim_end_matches("px")
+								.parse::<f32>()
+								.ok()
+						})
+						.unwrap_or(0.)
+				};
+				let source = self
+					.attributes
+					.find(*entity, "src")
+					.and_then(|(attribute, _)| self.blobs.get(attribute).ok())
+					.map(|blob| PictureSource::Embedded(blob.bytes.clone()))
+					.unwrap_or_else(|| {
+						PictureSource::of(&view.attribute_string("src"))
+					});
+				let picture = OfficePicture::new(
+					source,
+					&view.attribute_string("alt"),
+					Vec2::new(side("width"), side("height")),
+				);
+				Some((*entity, picture))
+			})
+			.collect()
+	}
 }
 
 impl OfficePicture {
@@ -33,7 +99,7 @@ impl OfficePicture {
 	pub fn read_embedded(
 		bytes: &[u8],
 		content_type: &str,
-		emu: Option<UVec2>,
+		emu: Option<Vec2>,
 		alt: &str,
 	) -> super::read_element::ReadElement {
 		let bytes = MediaBytes::new(
@@ -47,16 +113,15 @@ impl OfficePicture {
 	/// `emu`.
 	pub fn read(
 		src: String,
-		emu: Option<UVec2>,
+		emu: Option<Vec2>,
 		alt: &str,
 	) -> super::read_element::ReadElement {
 		let mut img = super::read_element::ReadElement::new("img")
 			.with_attribute("src", src)
 			.with_attribute("alt", alt.to_string());
-		if let Some(emu) = emu.filter(|emu| emu.x > 0 && emu.y > 0) {
-			let px = |emu: u32| {
-				((emu as f64 * OfficeUnits::PX_PER_INCH as f64 / 914400.)
-					.round() as u32)
+		if let Some(emu) = emu.filter(|emu| emu.cmpgt(Vec2::ZERO).all()) {
+			let px = |emu: f32| {
+				(OfficeUnits::px_from_emu(emu).round() as u32)
 					.max(1)
 					.to_string()
 			};
@@ -67,28 +132,27 @@ impl OfficePicture {
 		img
 	}
 
-	/// The picture an `img` writes as: its `src` decoded when a `data:` URL,
-	/// sized by `resolved` (its resolved width and height in px), else its
-	/// `width` and `height` attributes, else its native size, the other side
-	/// kept at its aspect, and scaled down to fit `bounds`.
-	pub fn write(
-		src: &str,
-		alt: &str,
-		attributes: Vec2,
-		resolved: Vec2,
-		bounds: Vec2,
-	) -> Self {
-		let source = Url::coerce(src)
-			.media_bytes()
-			.map(PictureSource::Embedded)
-			.unwrap_or_else(|_| PictureSource::Linked(src.to_string()));
-		let native = match &source {
+	/// A picture of `source`, sized by its `img`'s `width` and `height`
+	/// attributes in px, a side of 0 unsaid, until [`sized`](Self::sized).
+	pub fn new(source: PictureSource, alt: &str, attributes: Vec2) -> Self {
+		Self {
+			source,
+			size: attributes,
+			alt: alt.to_string(),
+		}
+	}
+
+	/// This picture sized by `resolved` (its resolved width and height in
+	/// px), else its attributes, else its native size, the other side kept
+	/// at its aspect, and scaled down to fit `bounds`.
+	pub fn sized(&self, resolved: Vec2, bounds: Vec2) -> Self {
+		let native = match &self.source {
 			PictureSource::Embedded(bytes) => Self::native_size(bytes.bytes()),
 			PictureSource::Linked(_) => None,
 		};
 		// each side from the first that says it, the other by aspect
 		let pick = |index: usize| {
-			[resolved, attributes]
+			[resolved, self.size]
 				.iter()
 				.map(|size| size[index])
 				.find(|side| *side > 0.)
@@ -107,9 +171,8 @@ impl OfficePicture {
 			(None, None) => native.unwrap_or(Self::FALLBACK_SIZE),
 		};
 		Self {
-			source,
 			size: Self::fit(size, bounds),
-			alt: alt.to_string(),
+			..self.clone()
 		}
 	}
 
@@ -227,7 +290,9 @@ pub(crate) mod test {
 			Url::from_media_bytes(&MediaBytes::new(MediaType::Png, png()))
 				.to_string();
 		let size = |attributes: Vec2, resolved: Vec2, bounds: Vec2| {
-			OfficePicture::write(&src, "", attributes, resolved, bounds).size
+			OfficePicture::new(PictureSource::of(&src), "", attributes)
+				.sized(resolved, bounds)
+				.size
 		};
 		size(Vec2::ZERO, Vec2::ZERO, Vec2::ZERO).xpect_eq(Vec2::new(4., 2.));
 		size(Vec2::new(40., 0.), Vec2::ZERO, Vec2::ZERO)
@@ -236,14 +301,8 @@ pub(crate) mod test {
 			.xpect_eq(Vec2::new(40., 10.));
 		size(Vec2::new(1000., 0.), Vec2::ZERO, Vec2::new(500., 0.))
 			.xpect_eq(Vec2::new(500., 250.));
-		OfficePicture::write(
-			"https://example.com/a.png",
-			"",
-			Vec2::ZERO,
-			Vec2::ZERO,
-			Vec2::ZERO,
-		)
-		.source
-		.xpect_eq(PictureSource::Linked("https://example.com/a.png".into()));
+		PictureSource::of("https://example.com/a.png").xpect_eq(
+			PictureSource::Linked("https://example.com/a.png".into()),
+		);
 	}
 }

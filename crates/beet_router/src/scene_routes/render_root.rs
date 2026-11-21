@@ -68,7 +68,8 @@ pub struct RenderParams {
 	pub root: Option<RenderRoot>,
 	/// The standard site media ingest policy: when set, the page's images are
 	/// fetched onto the tree before it renders, `upload` every source,
-	/// `local` the site's own, `link` none; unset fetches nothing.
+	/// `local` the site's own, `link` none; unset fetches what the accepted
+	/// format implies ([`MediaIngestPolicy::implied`]).
 	pub media_ingest: Option<MediaIngestPolicy>,
 	/// The markdown target's own params, flattened: `--frontmatter=toml` or
 	/// `=yaml` leads a markdown render with its root's frontmatter.

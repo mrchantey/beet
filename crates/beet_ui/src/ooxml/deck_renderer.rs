@@ -130,7 +130,7 @@ struct CellWrite {
 /// The tree read for writing.
 #[derive(SystemParam)]
 struct DeckGather<'w, 's> {
-	children: Query<'w, 's, &'static Children>,
+	tree: RenderTreeQuery<'w, 's>,
 	elements: ElementQuery<'w, 's>,
 	values: Query<'w, 's, &'static Value, Without<Element>>,
 	tags: Query<'w, 's, &'static Element>,
@@ -142,8 +142,8 @@ struct Resolved {
 	styles: OfficeStyleSheet,
 	computed: HashMap<Entity, ComputedStyle>,
 	probes: HashMap<Chain, Vec<ComputedStyle>>,
-	/// Each `img`'s `src`, `alt`, `width` and `height` attributes.
-	images: HashMap<Entity, (String, String, Vec2)>,
+	/// Each `img`, unsized.
+	images: HashMap<Entity, OfficePicture>,
 }
 
 /// The write in progress: the package, and the counters its parts share.
@@ -151,13 +151,6 @@ struct DeckWrite<'a> {
 	resolved: &'a Resolved,
 	package: OpcPackage,
 	images: u32,
-}
-
-/// A box on the slide in px.
-#[derive(Debug, Clone, Copy)]
-struct Area {
-	origin: Vec2,
-	size: Vec2,
 }
 
 impl DeckRenderer {
@@ -290,10 +283,7 @@ impl DeckGather<'_, '_> {
 	}
 
 	fn children_of(&self, entity: Entity) -> Vec<Entity> {
-		self.children
-			.get(entity)
-			.map(|children| children.to_vec())
-			.unwrap_or_default()
+		self.tree.children(entity).collect()
 	}
 
 	fn tag(&self, entity: Entity) -> Option<&str> {
@@ -800,7 +790,7 @@ impl DeckGather<'_, '_> {
 	/// The text of `entity`'s subtree.
 	fn text_of(&self, entity: Entity) -> String {
 		let mut out = String::new();
-		for node in self.children.iter_descendants_depth_first(entity) {
+		for node in self.tree.iter_descendants_inclusive_depth_first(entity) {
 			if let Ok(value) = self.values.get(node) {
 				out.push_str(&value.to_string());
 			}
@@ -966,35 +956,8 @@ impl Resolved {
 			.collect::<HashMap<_, _>>();
 		let probes = styles.probe(world, &chains)?;
 		let probes = chains.into_iter().zip(probes).collect::<HashMap<_, _>>();
-		let images = world.with_state::<ElementQuery, _>(|elements| {
-			entities
-				.iter()
-				.filter_map(|entity| {
-					let view = elements.get(*entity).ok()?;
-					(view.tag() == "img").then(|| {
-						let side = |key: &str| {
-							view.attribute(key)
-								.and_then(|value| {
-									value
-										.value
-										.to_string()
-										.trim_end_matches("px")
-										.parse::<f32>()
-										.ok()
-								})
-								.unwrap_or(0.)
-						};
-						(
-							*entity,
-							(
-								view.attribute_string("src"),
-								view.attribute_string("alt"),
-								Vec2::new(side("width"), side("height")),
-							),
-						)
-					})
-				})
-				.collect()
+		let images = world.with_state::<PictureQuery, _>(|pictures| {
+			pictures.gather(&entities)
 		});
 		Self {
 			styles,
@@ -1124,20 +1087,22 @@ impl ParagraphWrite {
 	}
 }
 
+/// A box on the slide in px, a [`Rect`] from its origin and size.
+struct Area;
+
 impl Area {
-	fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
-		Self {
-			origin: Vec2::new(x, y),
-			size: Vec2::new(width, height),
-		}
+	fn new(x: f32, y: f32, width: f32, height: f32) -> Rect {
+		let origin = Vec2::new(x, y);
+		Rect::from_corners(origin, origin + Vec2::new(width, height))
 	}
 
-	/// `xfrm`'s offset and extent in EMU.
-	fn emu(&self) -> [(String, String); 2] {
+	/// `area`'s `xfrm` offset and extent in EMU.
+	fn emu(area: &Rect) -> [(String, String); 2] {
 		let emu = |px: f32| OfficeUnits::emu(px).to_string();
+		let size = area.size();
 		[
-			(emu(self.origin.x), emu(self.origin.y)),
-			(emu(self.size.x), emu(self.size.y)),
+			(emu(area.min.x), emu(area.min.y)),
+			(emu(size.x), emu(size.y)),
 		]
 	}
 }
@@ -1344,7 +1309,7 @@ impl DeckWrite<'_> {
 
 	/// The areas each placeholder of `layout` sits in: its title, then its
 	/// bodies, `columns` of them side by side.
-	fn areas(layout: Layout, columns: usize) -> (Area, Vec<Area>) {
+	fn areas(layout: Layout, columns: usize) -> (Rect, Vec<Rect>) {
 		let (margin, gap, slide) =
 			(DeckRenderer::MARGIN, DeckRenderer::GAP, DeckRenderer::SLIDE);
 		let width = slide.x - margin * 2.;
@@ -1401,7 +1366,7 @@ impl DeckWrite<'_> {
 		id: u32,
 		name: &str,
 		placeholder: Option<(Option<&str>, Option<u32>)>,
-		area: &Area,
+		area: &Rect,
 	) {
 		let id = id.to_string();
 		xml.open("p:nvSpPr", &[])
@@ -1422,7 +1387,7 @@ impl DeckWrite<'_> {
 			}
 			xml.empty("p:ph", &attributes);
 		}
-		let [(x, y), (cx, cy)] = area.emu();
+		let [(x, y), (cx, cy)] = Area::emu(area);
 		xml.close("p:nvPr")
 			.close("p:nvSpPr")
 			.open("p:spPr", &[])
@@ -1458,7 +1423,7 @@ impl DeckWrite<'_> {
 		name: &str,
 		kind: Option<&str>,
 		index: Option<u32>,
-		area: &Area,
+		area: &Rect,
 		list_style: &str,
 	) {
 		xml.open("p:sp", &[]);
@@ -1717,7 +1682,7 @@ impl DeckWrite<'_> {
 		// a title slide's pictures and tables sit below its subtitle
 		let column_areas = match slide.layout {
 			Layout::Title => {
-				let below = body_areas[0].origin.y + body_areas[0].size.y;
+				let below = body_areas[0].max.y;
 				vec![Area::new(
 					DeckRenderer::MARGIN,
 					below,
@@ -1731,26 +1696,26 @@ impl DeckWrite<'_> {
 		for (index, (column, area)) in
 			slide.columns.iter().zip(&column_areas).enumerate()
 		{
-			let mut top = area.origin.y;
+			let mut top = area.min.y;
 			if !column.paragraphs.is_empty() {
 				let text_height = match column.objects.is_empty() {
-					true => area.size.y,
+					true => area.height(),
 					false => {
 						column
 							.paragraphs
 							.iter()
 							.map(|paragraph| {
 								paragraph.height(
-									area.size.x,
+									area.width(),
 									self.resolved.font_px(paragraph),
 								)
 							})
 							.sum::<f32>()
-							.min(area.size.y) + DeckRenderer::GAP
+							.min(area.height()) + DeckRenderer::GAP
 					}
 				};
 				let text_area =
-					Area::new(area.origin.x, top, area.size.x, text_height);
+					Area::new(area.min.x, top, area.width(), text_height);
 				let placeholder = match slide.layout {
 					Layout::Title => None,
 					_ => Some((None, Some(index as u32 + 1))),
@@ -1769,13 +1734,13 @@ impl DeckWrite<'_> {
 				top += text_height + DeckRenderer::GAP;
 			}
 			// each picture and table its share of what remains
-			let remaining = (area.origin.y + area.size.y - top).max(0.);
+			let remaining = (area.max.y - top).max(0.);
 			let count = column.objects.len().max(1) as f32;
 			let share = ((remaining - DeckRenderer::GAP * (count - 1.))
 				/ count)
 				.max(0.);
 			for object in &column.objects {
-				let bounds = Area::new(area.origin.x, top, area.size.x, share);
+				let bounds = Area::new(area.min.x, top, area.width(), share);
 				let height = match object {
 					ObjectWrite::Picture(entity) => {
 						self.picture(part, &mut xml, id, *entity, &bounds)
@@ -1806,7 +1771,7 @@ impl DeckWrite<'_> {
 		id: u32,
 		name: &str,
 		placeholder: Option<(Option<&str>, Option<u32>)>,
-		area: &Area,
+		area: &Rect,
 		paragraphs: &[ParagraphWrite],
 		body: bool,
 	) {
@@ -1983,29 +1948,30 @@ impl DeckWrite<'_> {
 		xml: &mut XmlPart,
 		id: u32,
 		entity: Entity,
-		bounds: &Area,
+		bounds: &Rect,
 	) -> f32 {
-		let (src, alt, attributes) = self
+		let gathered = self
 			.resolved
 			.images
 			.get(&entity)
 			.cloned()
-			.unwrap_or_default();
+			.unwrap_or_else(|| {
+				OfficePicture::new(PictureSource::of(""), "", Vec2::ZERO)
+			});
 		let style = self.resolved.computed(entity);
 		let resolved = Vec2::new(
 			style
 				.box_style
 				.width
-				.map(|width| self.resolved.px(width, bounds.size.x))
+				.map(|width| self.resolved.px(width, bounds.width()))
 				.unwrap_or(0.),
 			style
 				.box_style
 				.height
-				.map(|height| self.resolved.px(height, bounds.size.y))
+				.map(|height| self.resolved.px(height, bounds.height()))
 				.unwrap_or(0.),
 		);
-		let picture =
-			OfficePicture::write(&src, &alt, attributes, resolved, bounds.size);
+		let picture = gathered.sized(resolved, bounds.size());
 		let blip = match &picture.source {
 			PictureSource::Embedded(bytes) => {
 				self.images += 1;
@@ -2037,13 +2003,8 @@ impl DeckWrite<'_> {
 				),
 			),
 		};
-		let area = Area::new(
-			bounds.origin.x,
-			bounds.origin.y,
-			picture.size.x,
-			picture.size.y,
-		);
-		let [(x, y), (cx, cy)] = area.emu();
+		let area = Rect::from_corners(bounds.min, bounds.min + picture.size);
+		let [(x, y), (cx, cy)] = Area::emu(&area);
 		let id = id.to_string();
 		let name = format!("Picture {id}");
 		xml.open("p:pic", &[])
@@ -2085,9 +2046,9 @@ impl DeckWrite<'_> {
 		xml: &mut XmlPart,
 		id: u32,
 		table: &TableWrite,
-		bounds: &Area,
+		bounds: &Rect,
 	) -> f32 {
-		let column = bounds.size.x / table.columns as f32;
+		let column = bounds.width() / table.columns as f32;
 		let heights = table
 			.rows
 			.iter()
@@ -2104,8 +2065,8 @@ impl DeckWrite<'_> {
 			.collect::<Vec<_>>();
 		let height = heights.iter().sum::<f32>();
 		let area =
-			Area::new(bounds.origin.x, bounds.origin.y, bounds.size.x, height);
-		let [(x, y), (cx, cy)] = area.emu();
+			Area::new(bounds.min.x, bounds.min.y, bounds.width(), height);
+		let [(x, y), (cx, cy)] = Area::emu(&area);
 		let id = id.to_string();
 		let name = format!("Table {id}");
 		xml.open("p:graphicFrame", &[])
@@ -2410,6 +2371,28 @@ mod test {
 		let (mut third, third_root) =
 			parse_in(formats(false), &rewritten).unwrap();
 		html(&mut third, third_root).xpect_eq(read);
+	}
+
+	/// Cards a layout transcludes through a [`Portal`] write as the render
+	/// tree has them, a slide each.
+	#[beet_core::test]
+	fn writes_cards_through_a_portal() {
+		let mut world = formats(false);
+		let content = world
+			.spawn(rsx! {
+				<article data-card><h1>"One"</h1></article>
+				<article data-card><h1>"Two"</h1></article>
+			})
+			.id();
+		let root = world
+			.spawn((Element::new("main"), children![Portal::new(content)]))
+			.id();
+		let written = write(&mut world, root, default());
+		let (mut again, again_root) =
+			parse_in(formats(false), &written).unwrap();
+		let read = html(&mut again, again_root);
+		read.matches("<article data-card>").count().xpect_eq(2);
+		read.xpect_contains("One").xpect_contains("Two");
 	}
 
 	/// A document holding no card articles writes as one slide.

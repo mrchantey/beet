@@ -1,4 +1,5 @@
 pub use class::*;
+pub use color_scheme::*;
 pub use rule::*;
 pub use rule_set::*;
 pub use token::*;
@@ -6,6 +7,7 @@ pub use token_key::*;
 pub use token_plugin::*;
 pub use token_value::*;
 mod class;
+mod color_scheme;
 #[cfg(feature = "serde")]
 mod from_tokens;
 mod rule;

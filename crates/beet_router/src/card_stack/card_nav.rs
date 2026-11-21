@@ -10,6 +10,7 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 
 /// Marker opting a router into a stack of cards: its page routes, and the card
 /// articles within them, stepped through like a HyperCard stack. A render of a
@@ -27,24 +28,24 @@ use beet_core::prelude::*;
 pub struct CardDeck;
 
 /// The params a [`CardDeck`] reads, declared on it at subtree scope so every
-/// route of the deck takes them.
+/// route of the deck takes them. Both count from zero, as every index does.
 #[derive(Debug, Default, Clone, Reflect)]
 pub struct CardParams {
-	/// The card of the route to show, from 1, its first when unset.
-	pub card: Option<u32>,
-	/// The card of the whole stack to show, from 1, counting every route's
-	/// cards in order.
-	pub slide: Option<u32>,
+	/// The index of the route's card to show, its first when unset.
+	pub card: Option<usize>,
+	/// The index of the stack's card to show, counting every route's cards
+	/// in order.
+	pub slide: Option<usize>,
 }
 
-/// One card of a deck: its route's path and its place among the route's
-/// cards, from 1.
+/// One card of a deck: its route's path and its index among the route's
+/// cards.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CardPosition {
 	/// The route's path segments, empty for the home card.
 	pub path: Vec<SmolStr>,
-	/// The card within the route, from 1.
-	pub card: u32,
+	/// The card's index within the route.
+	pub card: usize,
 }
 
 /// A single step through a [`CardDeck`], resolved against its cards in order.
@@ -63,51 +64,60 @@ pub enum CardNav {
 }
 
 impl CardPosition {
+	/// The first card of the route at `path`.
+	pub fn first(path: &PathPattern) -> Self {
+		Self {
+			path: path
+				.iter()
+				.map(|segment| SmolStr::from(segment.name()))
+				.collect(),
+			card: 0,
+		}
+	}
+
 	/// The url showing this card: its route's path, with `card` past the
 	/// route's first.
 	pub fn url(&self) -> Url {
 		let url = Url::coerce(format!("/{}", self.path.join("/")));
-		match self.card > 1 {
+		match self.card > 0 {
 			true => url.with_param("card", self.card.to_string()),
 			false => url,
 		}
 	}
 
-	/// The card `url` shows in a deck of `positions`: the stack's `slide`th
-	/// when it names one, else its path's `card`th, its first when unset.
+	/// The card `url` shows in a deck of `positions`: the stack's card at
+	/// `slide` when it names one, else its path's at `card`, its first when
+	/// unset.
 	pub fn of_url(positions: &[CardPosition], url: &Url) -> Self {
 		let param = |key: &str| {
 			url.params()
 				.get(key)
-				.and_then(|value| value.parse::<u32>().ok())
+				.and_then(|value| value.parse::<usize>().ok())
 		};
 		if let Some(slide) = param("slide")
-			&& let Ok(position) =
-				CardNav::resolve_nth(positions, slide as usize)
+			&& let Ok(position) = CardNav::resolve_nth(positions, slide)
 		{
 			return position;
 		}
 		Self {
 			path: url.path().clone(),
-			card: param("card").unwrap_or(1).max(1),
+			card: param("card").unwrap_or_default(),
 		}
 	}
 }
 
 impl CardNav {
-	/// The `n`th (1-based) card of `positions`, clamped to the stack (`n < 1`
-	/// lands on the first, `n > len` on the last), so `--slide=N` counts
-	/// cards across routes.
+	/// The card of `positions` at `index`, clamped to the last, so
+	/// `--slide=N` counts cards across routes.
 	pub fn resolve_nth(
 		positions: &[CardPosition],
-		n: usize,
+		index: usize,
 	) -> Result<CardPosition> {
-		if positions.is_empty() {
-			bevybail!("card stack has no cards");
-		}
-		positions[n.saturating_sub(1).min(positions.len() - 1)]
-			.clone()
-			.xok()
+		positions
+			.get(index)
+			.or_else(|| positions.last())
+			.cloned()
+			.ok_or_else(|| bevyhow!("card stack has no cards"))
 	}
 
 	/// Resolve this step from `current` against `positions`, clamping at the
@@ -171,19 +181,15 @@ impl CardDeck {
 	/// hidden none.
 	pub fn positions_of(
 		routes: &[&ActionNode],
-		count: impl Fn(&ActionNode) -> u32,
+		count: impl Fn(&ActionNode) -> usize,
 	) -> Vec<CardPosition> {
 		routes
 			.iter()
 			.flat_map(|node| {
-				let path = node
-					.path
-					.iter()
-					.map(|segment| SmolStr::from(segment.name()))
-					.collect::<Vec<_>>();
-				(1..=count(node)).map(move |card| CardPosition {
-					path: path.clone(),
+				let first = CardPosition::first(&node.path);
+				(0..count(node)).map(move |card| CardPosition {
 					card,
+					..first.clone()
 				})
 			})
 			.collect()
@@ -204,7 +210,7 @@ impl CardDeck {
 				})
 			})
 			.await?;
-		let mut counts = HashMap::<Entity, u32>::default();
+		let mut counts = HashMap::<Entity, usize>::default();
 		for node in &routes {
 			let entity = node.entity;
 			let known = deck
@@ -302,7 +308,7 @@ mod test {
 	use beet_net::prelude::*;
 
 	/// A position on the route at `path`, `/` separated.
-	fn at(path: &str, card: u32) -> CardPosition {
+	fn at(path: &str, card: usize) -> CardPosition {
 		CardPosition {
 			path: path
 				.split('/')
@@ -314,10 +320,10 @@ mod test {
 	}
 
 	/// A stack of `routes`, each its path and card count.
-	fn stack(routes: &[(&str, u32)]) -> Vec<CardPosition> {
+	fn stack(routes: &[(&str, usize)]) -> Vec<CardPosition> {
 		routes
 			.iter()
-			.flat_map(|(path, count)| (1..=*count).map(|card| at(path, card)))
+			.flat_map(|(path, count)| (0..*count).map(|card| at(path, card)))
 			.collect()
 	}
 
@@ -334,35 +340,34 @@ mod test {
 	#[beet_core::test]
 	fn steps_cards_within_and_across_routes() {
 		let deck = stack(&[("", 1), ("talk", 3), ("outro", 1)]);
-		step(&deck, at("", 1), CardNav::Next).xpect_eq("/talk");
-		step(&deck, at("talk", 1), CardNav::Next).xpect_eq("/talk?card=2");
-		step(&deck, at("talk", 3), CardNav::Next).xpect_eq("/outro");
-		step(&deck, at("outro", 1), CardNav::Prev).xpect_eq("/talk?card=3");
-		step(&deck, at("talk", 1), CardNav::Prev).xpect_eq("/");
+		step(&deck, at("", 0), CardNav::Next).xpect_eq("/talk");
+		step(&deck, at("talk", 0), CardNav::Next).xpect_eq("/talk?card=1");
+		step(&deck, at("talk", 2), CardNav::Next).xpect_eq("/outro");
+		step(&deck, at("outro", 0), CardNav::Prev).xpect_eq("/talk?card=2");
+		step(&deck, at("talk", 0), CardNav::Prev).xpect_eq("/");
 		// the ends clamp, a stack does not loop
-		step(&deck, at("", 1), CardNav::Prev).xpect_eq("/");
-		step(&deck, at("outro", 1), CardNav::Next).xpect_eq("/outro");
-		step(&deck, at("talk", 2), CardNav::First).xpect_eq("/");
-		step(&deck, at("talk", 2), CardNav::Last).xpect_eq("/outro");
+		step(&deck, at("", 0), CardNav::Prev).xpect_eq("/");
+		step(&deck, at("outro", 0), CardNav::Next).xpect_eq("/outro");
+		step(&deck, at("talk", 1), CardNav::First).xpect_eq("/");
+		step(&deck, at("talk", 1), CardNav::Last).xpect_eq("/outro");
 		// a card past its route's last steps from the route's last
 		step(&deck, at("talk", 9), CardNav::Next).xpect_eq("/outro");
 	}
 
-	/// `--slide=N` counts cards across routes, 1-based and clamped.
+	/// `--slide=N` counts cards across routes, clamped to the last.
 	#[beet_core::test]
 	fn nth_card_counts_across_routes() {
 		let deck = stack(&[("intro", 1), ("talk", 2), ("outro", 1)]);
 		let nth = |n| CardNav::resolve_nth(&deck, n).unwrap().url().to_string();
-		nth(1).xpect_eq("/intro");
-		nth(3).xpect_eq("/talk?card=2");
-		nth(4).xpect_eq("/outro");
 		nth(0).xpect_eq("/intro");
+		nth(2).xpect_eq("/talk?card=1");
+		nth(3).xpect_eq("/outro");
 		nth(99).xpect_eq("/outro");
 		// a url naming a slide is that card
-		CardPosition::of_url(&deck, &Url::coerce("/?slide=3"))
-			.xpect_eq(at("talk", 2));
-		CardPosition::of_url(&deck, &Url::coerce("/talk?card=2"))
-			.xpect_eq(at("talk", 2));
+		CardPosition::of_url(&deck, &Url::coerce("/?slide=2"))
+			.xpect_eq(at("talk", 1));
+		CardPosition::of_url(&deck, &Url::coerce("/talk?card=1"))
+			.xpect_eq(at("talk", 1));
 	}
 
 	/// The stack's routes are its page routes in reading order, the home

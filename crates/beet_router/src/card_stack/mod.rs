@@ -39,9 +39,10 @@
 //! ```
 //!
 //! The position is a route and a card within it ([`CardPosition`]), the card
-//! addressed by the `card` request param, from 1 (`talk?card=2`), the stack's
-//! `slide` param counting cards across routes (`--slide=5`), both declared
-//! as [`CardParams`].
+//! addressed by the `card` request param and the stack's by `slide`, which
+//! counts cards across routes. Both are indices from zero, as every index
+//! is: `talk?card=1` is the route's second card, `--slide=4` the stack's
+//! fifth. Both are declared as [`CardParams`].
 //!
 //! Everything the stack needs rides in on one plugin:
 //! - [`CardStackPlugin`]: registers the marker and its params, the layout rules

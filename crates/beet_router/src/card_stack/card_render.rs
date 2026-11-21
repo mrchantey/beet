@@ -25,7 +25,7 @@ use beet_ui::prelude::*;
 /// route of no card articles one, so stepping the stack builds a route only
 /// once.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deref, Component)]
-pub struct CardCount(pub u32);
+pub struct CardCount(pub usize);
 
 /// The traversal of a document's cards.
 #[derive(SystemParam)]
@@ -106,24 +106,14 @@ impl CardCount {
 	pub(crate) async fn build(
 		deck: &AsyncEntity,
 		node: ActionNode,
-	) -> Result<u32> {
+	) -> Result<usize> {
 		let route = node.entity;
-		let request = Request::get(
-			CardPosition {
-				path: node
-					.path
-					.iter()
-					.map(|segment| SmolStr::from(segment.name()))
-					.collect(),
-				card: 1,
-			}
-			.url(),
-		);
+		let request = Request::get(CardPosition::first(&node.path).url());
 		let page = LivePage::build_content(deck, node, request).await?;
 		deck.world()
 			.with(move |world: &mut World| {
 				let count = world.with_state::<CardQuery, _>(|cards| {
-					cards.shown(page).len() as u32
+					cards.shown(page).len()
 				});
 				LivePage::despawn_content(world, page);
 				if let Ok(mut route) = world.get_entity_mut(route) {
@@ -164,8 +154,7 @@ impl CardDeck {
 									let positions =
 										CardDeck::positions(&deck).await?;
 									let position = CardNav::resolve_nth(
-										&positions,
-										slide as usize,
+										&positions, slide,
 									)?;
 									let node = LivePage::find_route(
 										&deck,
@@ -192,7 +181,9 @@ impl CardDeck {
 										.await?;
 									(substitute, position.card)
 								}
-								None => (route, params.card.unwrap_or(1)),
+								None => {
+									(route, params.card.unwrap_or_default())
+								}
 							};
 							world
 								.with(move |world: &mut World| {
@@ -209,13 +200,7 @@ impl CardDeck {
 						      next: Next<Request, Response>| async move {
 							let deck = next.world().entity(deck);
 							match CardDeck::exports(&deck, &request).await? {
-								true => {
-									CardDeck::export(
-										&deck,
-										request.parts().clone(),
-									)
-									.await
-								}
+								true => CardDeck::export(&deck, request).await,
 								false => next.call(request).await,
 							}
 						},
@@ -256,12 +241,12 @@ impl CardDeck {
 		world: &mut World,
 		route: Entity,
 		page: Entity,
-		card: u32,
+		card: usize,
 	) -> Result {
 		let content = LayoutContent::terminal(world, page)?;
 		let (shown, hide) = world.with_state::<CardQuery, _>(|cards| {
 			let shown = cards.shown(content);
-			let selected = (card.max(1) as usize).min(shown.len().max(1)) - 1;
+			let selected = card.min(shown.len().saturating_sub(1));
 			let mut hide = shown
 				.iter()
 				.enumerate()
@@ -275,7 +260,7 @@ impl CardDeck {
 			for root in roots {
 				hide.extend(cards.notes(root));
 			}
-			(shown.len() as u32, hide)
+			(shown.len(), hide)
 		});
 		for entity in hide {
 			Self::hide(world, entity);
@@ -326,12 +311,14 @@ impl CardDeck {
 			.await
 	}
 
-	/// The whole stack as one slide deck: every card route's content built
-	/// into an `article data-card` of one document in card order, a route's
-	/// own card articles as they are, then written as the request accepts.
+	/// The whole stack as one slide deck: the home card's page, its layouts
+	/// around it so every card resolves the looks the deck shows it in, its
+	/// content replaced by every card route's in card order, each route's
+	/// media fetched against its own url, then written as the request
+	/// accepts.
 	pub(crate) async fn export(
 		deck: &AsyncEntity,
-		parts: RequestParts,
+		request: Request,
 	) -> Result<Response> {
 		let id = deck.id();
 		let routes = deck
@@ -342,58 +329,61 @@ impl CardDeck {
 				})
 			})
 			.await?;
-		let world = deck.world().clone();
-		let root = world
-			.with(|world: &mut World| world.spawn_empty().id())
-			.await;
-		for (index, node) in routes.into_iter().enumerate() {
-			let url = CardPosition {
-				path: node
-					.path
-					.iter()
-					.map(|segment| SmolStr::from(segment.name()))
-					.collect(),
-				card: 1,
-			}
-			.url();
-			let page =
-				match LivePage::build_content(deck, node, Request::get(url))
-					.await
-				{
-					Ok(page) => page,
-					Err(err) => {
-						world
-							.with(move |world: &mut World| {
-								world.entity_mut(root).despawn()
-							})
-							.await;
-						return Err(err);
-					}
-				};
+		let home = routes
+			.first()
+			.cloned()
+			.ok_or_else(|| bevyhow!("card stack has no cards"))?;
+		let named = RenderParams::of(request.parts())?.media_ingest;
+		let policy = named
+			.or_else(|| MediaIngestPolicy::implied(request.parts()))
+			.unwrap_or(MediaIngestPolicy::Link);
+		// the home content is replaced, so its own media is never fetched
+		let layout_request = match named {
+			Some(_) => request,
+			None => request
+				.with_param("media-ingest", MediaIngestPolicy::Link.as_str()),
+		};
+		let live = LivePage::prepare_route(deck, home, layout_request).await?;
+		live.release_after(async |live: LivePage| {
+			let world = live.world().clone();
+			let content = live.content().await?;
 			world
 				.with(move |world: &mut World| {
-					Self::adopt(world, root, page, index == 0)
+					let children = world
+						.get::<Children>(content)
+						.map(|children| children.to_vec())
+						.unwrap_or_default();
+					for child in children {
+						world.entity_mut(child).despawn();
+					}
 				})
 				.await;
-		}
-		let bytes = world
-			.with(move |world: &mut World| {
-				let bytes = DocRenderers::render(
-					world,
-					root,
-					&parts.with_accept(MediaType::Pptx),
-				);
-				world.entity_mut(root).despawn();
-				bytes
-			})
-			.await?;
-		Response::ok().with_media(bytes).xok()
+			for node in routes {
+				let url = CardPosition::first(&node.path).url();
+				let parts = Request::get(url.clone()).parts().clone();
+				let page =
+					LivePage::build_content(deck, node, Request::get(url))
+						.await?;
+				let fetched =
+					MediaResolve::resolve(&world, id, &parts, page, policy)
+						.await;
+				world
+					.with(move |world: &mut World| {
+						Self::adopt(world, content, page)
+					})
+					.await;
+				fetched?;
+			}
+			live.render(&MediaType::Pptx).await
+		})
+		.await?
+		.xmap(|bytes| Response::ok().with_media(bytes))
+		.xok()
 	}
 
-	/// Moves `page`'s cards under `root`, a page of no card articles one
-	/// card of its content, the home page's metadata the deck's, then
-	/// releases `page`.
-	fn adopt(world: &mut World, root: Entity, page: Entity, home: bool) {
+	/// Moves `page`'s cards under `content`, a page of no card articles one
+	/// card of its content, then releases `page`.
+	fn adopt(world: &mut World, content: Entity, page: Entity) {
 		let cards = world.with_state::<CardQuery, _>(|cards| cards.cards(page));
 		let cards = match cards.is_empty() {
 			false => cards,
@@ -413,10 +403,7 @@ impl CardDeck {
 				vec![card]
 			}
 		};
-		world.entity_mut(root).add_children(&cards);
-		if home && let Some(meta) = world.get::<DocMeta>(page).cloned() {
-			world.entity_mut(root).insert(meta);
-		}
+		world.entity_mut(content).add_children(&cards);
 		LivePage::despawn_content(world, page);
 	}
 }
@@ -453,12 +440,18 @@ mod test {
 		.to_vec()
 	}
 
-	/// A store of a markdown route of one card, a markdown route of two card
-	/// articles and a deck.
+	/// A store of a markdown route of one card showing the deck's own
+	/// picture, a markdown route of two card articles, a deck and the picture.
 	async fn store() -> BlobStore {
 		let store = BlobStore::temp();
 		for (path, body) in [
-			("01-intro.md", "# Intro\n\nWelcome.\n\n---\n\nIntro notes.\n".as_bytes().to_vec()),
+			(
+				"01-intro.md",
+				"# Intro\n\nWelcome.\n\n![A picture](/media/pic.png)\n\n---\n\nIntro notes.\n"
+					.as_bytes()
+					.to_vec(),
+			),
+			("pic.png", crate::scene_routes::png(4, 2)),
 			(
 				"02-pair.md",
 				"<article data-card>\n\n# First\n\nOne.\n\n---\n\nFirst notes.\n\n</article>\n\n\
@@ -473,16 +466,26 @@ mod test {
 		store
 	}
 
-	/// A router over [`store`], a stack of cards when `deck`.
+	/// A router over [`store`] serving its pictures under `media`, a stack of
+	/// cards when `deck`.
 	async fn router(world: &mut World, deck: bool) -> Entity {
 		let store = store().await;
+		let serve = || {
+			ServeBlobs {
+				prefix: "media".into(),
+				cache: default(),
+			}
+			.into_snippet_bundle()
+		};
 		let root = match deck {
 			true => world.spawn((store, Router, CardDeck, children![
-				RoutesDir::default()
+				RoutesDir::default(),
+				serve()
 			])),
-			false => {
-				world.spawn((store, Router, children![RoutesDir::default()]))
-			}
+			false => world.spawn((store, Router, children![
+				RoutesDir::default(),
+				serve()
+			])),
 		}
 		.flush();
 		AsyncRunner::settle_async_tasks(world).await;
@@ -523,19 +526,19 @@ mod test {
 			.xpect_eq(vec![
 				"/01-intro",
 				"/02-pair",
-				"/02-pair?card=2",
+				"/02-pair?card=1",
 				"/talk",
-				"/talk?card=2",
+				"/talk?card=1",
 			]);
 	}
 
-	/// Over http `talk?card=2` answers the second slide alone, every other
+	/// Over http `talk?card=1` answers the second slide alone, every other
 	/// card and every card's notes hidden, which markdown leaves out.
 	#[beet_core::test]
 	async fn answers_one_card() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = router(&mut world, true).await;
-		get(&mut world, root, "talk?card=2", MediaType::Markdown)
+		get(&mut world, root, "talk?card=1", MediaType::Markdown)
 			.await
 			.unwrap_str()
 			.await
@@ -545,7 +548,7 @@ mod test {
 			.xpect_contains("Talk one")
 			.xnot()
 			.xpect_contains("notes");
-		let html = get(&mut world, root, "talk?card=2", MediaType::Html)
+		let html = get(&mut world, root, "talk?card=1", MediaType::Html)
 			.await
 			.unwrap_str()
 			.await;
@@ -560,7 +563,7 @@ mod test {
 			.xnot()
 			.xpect_contains("Two.");
 		// and `slide` counts across routes
-		get(&mut world, root, "01-intro?slide=3", MediaType::Markdown)
+		get(&mut world, root, "01-intro?slide=2", MediaType::Markdown)
 			.await
 			.unwrap_str()
 			.await
@@ -584,7 +587,8 @@ mod test {
 	}
 
 	/// A request for the home card accepting a slide deck answers the whole
-	/// stack, a slide per card in order, each card's notes its own.
+	/// stack, a slide per card in order, each card's notes its own and the
+	/// deck's own pictures inside it.
 	#[beet_core::test]
 	async fn exports_the_stack() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
@@ -613,8 +617,11 @@ mod test {
 		let order = ["Intro", "First", "Second", "Talk one", "Talk two"]
 			.map(|title| html.find(title).unwrap());
 		order.windows(2).all(|pair| pair[0] < pair[1]).xpect_true();
-		html.xpect_contains("<hr /><p>First notes.</p>")
+		html.clone()
+			.xpect_contains("<hr /><p>First notes.</p>")
 			.xpect_contains("<hr /><p>More notes.</p>");
+		// the deck's own picture is fetched into the file
+		html.xpect_contains("src=\"data:image/png;base64,");
 	}
 
 	/// In the terminal the arrows step every card in order across the three
@@ -642,8 +649,8 @@ mod test {
 			.world_mut()
 			.spawn((
 				PageHost::bundle(UVec2::new(60, 12)),
-				// the opening route a launch's `--slide=4` makes
-				Navigator::in_world(root, "/?slide=4"),
+				// the opening route a launch's `--slide=3` makes
+				Navigator::in_world(root, "/?slide=3"),
 			))
 			.id();
 		drive_until(&mut app, host, "Talk one").await;
@@ -662,9 +669,9 @@ mod test {
 		for (code, needle, url) in [
 			(KeyCode::Home, "Welcome.", "/01-intro"),
 			(KeyCode::ArrowRight, "One.", "/02-pair"),
-			(KeyCode::ArrowRight, "Two.", "/02-pair?card=2"),
+			(KeyCode::ArrowRight, "Two.", "/02-pair?card=1"),
 			(KeyCode::ArrowRight, "First slide.", "/talk"),
-			(KeyCode::ArrowRight, "Second slide.", "/talk?card=2"),
+			(KeyCode::ArrowRight, "Second slide.", "/talk?card=1"),
 			(KeyCode::ArrowLeft, "First slide.", "/talk"),
 		] {
 			app.world_mut().write_message(KeyboardInput {

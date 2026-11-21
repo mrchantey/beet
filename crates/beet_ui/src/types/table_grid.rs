@@ -21,8 +21,7 @@ use beet_core::prelude::*;
 pub struct TableGrid<'w, 's> {
 	elements: Query<'w, 's, &'static Element>,
 	views: ElementQuery<'w, 's>,
-	children: Query<'w, 's, &'static Children>,
-	parents: Query<'w, 's, &'static ChildOf>,
+	tree: RenderTreeQuery<'w, 's>,
 }
 
 /// A cell as its table's grid places it.
@@ -124,8 +123,9 @@ impl TableGrid<'_, '_> {
 	/// an entity that is no cell of a table.
 	pub fn locate(&self, cell: Entity) -> Option<(Entity, GridCell)> {
 		let table = self
-			.parents
-			.iter_ancestors(cell)
+			.tree
+			.iter_ancestors_inclusive(cell)
+			.skip(1)
 			.find(|ancestor| self.tag(*ancestor) == Some("table"))?;
 		self.cells(table)
 			.into_iter()
@@ -150,8 +150,8 @@ impl TableGrid<'_, '_> {
 	/// says `false`, so a `<tr contenteditable="false">` locks its cells and
 	/// a `<td contenteditable="true">` inside it unlocks itself.
 	pub fn is_locked(&self, cell: Entity) -> bool {
-		core::iter::once(cell)
-			.chain(self.parents.iter_ancestors(cell))
+		self.tree
+			.iter_ancestors_inclusive(cell)
 			.find_map(|entity| {
 				self.views
 					.get(entity)
@@ -175,20 +175,11 @@ impl TableGrid<'_, '_> {
 		parent: Entity,
 	) -> impl Iterator<Item = Entity> + '_ {
 		let mut out = Vec::new();
-		let mut pending = self
-			.children
-			.get(parent)
-			.map(|children| children.iter().rev().collect::<Vec<_>>())
-			.unwrap_or_default();
+		let mut pending = self.tree.children(parent).rev().collect::<Vec<_>>();
 		while let Some(child) = pending.pop() {
 			match self.elements.contains(child) {
 				true => out.push(child),
-				false => pending.extend(
-					self.children
-						.get(child)
-						.into_iter()
-						.flat_map(|children| children.iter().rev()),
-				),
+				false => pending.extend(self.tree.children(child).rev()),
 			}
 		}
 		out.into_iter()

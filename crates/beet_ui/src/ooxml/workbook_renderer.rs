@@ -201,107 +201,118 @@ impl WorkbookRenderer {
 	/// The sheets of `root`: every table not nested in another, in document
 	/// order, refusing a document holding none.
 	fn gather(world: &mut World, root: Entity) -> Result<Vec<SheetWrite>> {
-		let tables = world
-			.with_state::<(Query<&Children>, Query<&Element>, Query<&ChildOf>), _>(
-				|(children, elements, parents)| {
-					let is_table = |entity: Entity| {
-						elements
-							.get(entity)
-							.is_ok_and(|element| element.tag() == "table")
-					};
-					children
-						.iter_descendants_depth_first(root)
-						.filter(|entity| is_table(*entity))
-						.filter(|table| {
-							!parents
-								.iter_ancestors(*table)
-								.take_while(|ancestor| *ancestor != root)
-								.any(is_table)
-						})
-						.collect::<Vec<_>>()
-				},
-			);
+		let tables = world.with_state::<(RenderTreeQuery, Query<&Element>), _>(
+			|(tree, elements)| {
+				let is_table = |entity: Entity| {
+					elements
+						.get(entity)
+						.is_ok_and(|element| element.tag() == "table")
+				};
+				tree.iter_descendants_inclusive_depth_first(root)
+					.skip(1)
+					.filter(|entity| is_table(*entity))
+					.filter(|table| {
+						!tree
+							.iter_ancestors_inclusive(*table)
+							.skip(1)
+							.take_while(|ancestor| *ancestor != root)
+							.any(is_table)
+					})
+					.collect::<Vec<_>>()
+			},
+		);
 		if tables.is_empty() {
 			bevybail!("the document holds no table, so it writes no workbook");
 		}
 		let mut sheets = Vec::<SheetWrite>::new();
 		for (index, table) in tables.into_iter().enumerate() {
 			let sheet =
-				world.with_state::<(
-					TableGrid,
-					DocumentText,
-					ElementQuery,
-					Query<&ChildOf>,
-					Query<&Children>,
-				), _>(|(grid, text, elements, parents, children)| {
-					// the enclosing worksheet article, its name and whether it is hidden
-					let article =
-						parents.iter_ancestors(table).find_map(|ancestor| {
-							let view = elements.get(ancestor).ok()?;
-							let name = view.attribute("data-worksheet")?;
-							Some((
-								name.value.to_string(),
-								view.attribute("hidden").is_some(),
-							))
-						});
-					let caption = children
-						.get(table)
-						.into_iter()
-						.flatten()
-						.find(|child| {
-							elements
-								.get(**child)
-								.is_ok_and(|view| view.tag() == "caption")
-						})
-						.map(|caption| text.text(*caption).trim().to_string())
-						.filter(|caption| !caption.is_empty());
-					let cells = grid
-						.cells(table)
-						.into_iter()
-						.map(|place| {
-							let cell = place.entity;
-							let view = elements.get(cell).ok();
-							let formula = view
-								.as_ref()
-								.and_then(|view| view.attribute("data-formula"))
-								.map(|formula| {
-									let formula = formula.value.to_string();
-									formula
-										.strip_prefix('=')
-										.unwrap_or(&formula)
-										.to_string()
-								})
-								.filter(|formula| !formula.trim().is_empty());
-							let href = children
-								.iter_descendants(cell)
-								.find_map(|child| {
-									let view = elements.get(child).ok()?;
-									(view.tag() == "a")
-										.then(|| {
-											view.attribute("href").map(|href| {
-												href.value.to_string()
-											})
-										})
-										.flatten()
+				world
+					.with_state::<(TableGrid, DocumentText, ElementQuery, RenderTreeQuery), _>(
+						|(grid, text, elements, tree)| {
+							// the enclosing worksheet article, its name and whether it is hidden
+							let article = tree
+								.iter_ancestors_inclusive(table)
+								.skip(1)
+								.find_map(|ancestor| {
+									let view = elements.get(ancestor).ok()?;
+									let name =
+										view.attribute("data-worksheet")?;
+									Some((
+										name.value.to_string(),
+										view.attribute("hidden").is_some(),
+									))
 								});
-							CellWrite {
-								place,
-								text: text
-									.text(cell)
-									.trim_end_matches('\n')
-									.to_string(),
-								formula,
-								locked: grid.is_locked(cell),
-								href,
-							}
-						})
-						.collect::<Vec<_>>();
-					let (name, hidden) = match article {
-						Some((name, hidden)) => (Some(name), hidden),
-						None => (caption, false),
-					};
-					(name, hidden, cells)
-				});
+							let caption = tree
+								.children(table)
+								.find(|child| {
+									elements.get(*child).is_ok_and(|view| {
+										view.tag() == "caption"
+									})
+								})
+								.map(|caption| {
+									text.text(caption).trim().to_string()
+								})
+								.filter(|caption| !caption.is_empty());
+							let cells =
+								grid.cells(table)
+									.into_iter()
+									.map(|place| {
+										let cell = place.entity;
+										let view = elements.get(cell).ok();
+										let formula = view
+											.as_ref()
+											.and_then(|view| {
+												view.attribute("data-formula")
+											})
+											.map(|formula| {
+												let formula =
+													formula.value.to_string();
+												formula
+													.strip_prefix('=')
+													.unwrap_or(&formula)
+													.to_string()
+											})
+											.filter(|formula| {
+												!formula.trim().is_empty()
+											});
+										let href = tree
+											.iter_descendants_inclusive_depth_first(
+												cell,
+											)
+											.skip(1)
+											.find_map(|child| {
+												let view =
+													elements.get(child).ok()?;
+												(view.tag() == "a")
+													.then(|| {
+														view.attribute("href")
+															.map(|href| {
+																href.value
+																	.to_string()
+															})
+													})
+													.flatten()
+											});
+										CellWrite {
+											place,
+											text: text
+												.text(cell)
+												.trim_end_matches('\n')
+												.to_string(),
+											formula,
+											locked: grid.is_locked(cell),
+											href,
+										}
+									})
+									.collect::<Vec<_>>();
+							let (name, hidden) = match article {
+								Some((name, hidden)) => (Some(name), hidden),
+								None => (caption, false),
+							};
+							(name, hidden, cells)
+						},
+					);
 			let (name, hidden, cells) = sheet;
 			let name = Self::sheet_name(
 				name.as_deref(),
@@ -722,7 +733,6 @@ mod test {
 	use super::super::workbook_parser::test::*;
 	use crate::prelude::*;
 	use crate::style::material::*;
-	use crate::style::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 

@@ -1311,12 +1311,10 @@ impl WordRead<'_> {
 				})
 			};
 			let size =
-				side("width").zip(side("height")).map(|(width, height)| {
-					UVec2::new(
-						(width * 12700.) as u32,
-						(height * 12700.) as u32,
-					)
-				});
+				// a VML side in pt, 12700 EMU each
+				side("width")
+					.zip(side("height"))
+					.map(|(width, height)| Vec2::new(width, height) * 12700.);
 			let alt = shape.attribute("alt").unwrap_or_default();
 			if let Some(img) =
 				self.blip(part, image.prefixed_attribute("id"), None, size, alt)
@@ -1333,7 +1331,7 @@ impl WordRead<'_> {
 		part: &str,
 		embed: Option<&str>,
 		link: Option<&str>,
-		size: Option<UVec2>,
+		size: Option<Vec2>,
 		alt: &str,
 	) -> Option<ReadElement> {
 		if let Some(relationship) =
@@ -1366,8 +1364,8 @@ impl WordRead<'_> {
 	}
 
 	/// A DrawingML extent's `cx` and `cy` in EMU.
-	fn extent(extent: &BsxElement) -> Option<UVec2> {
-		Some(UVec2::new(
+	fn extent(extent: &BsxElement) -> Option<Vec2> {
+		Some(Vec2::new(
 			extent.attribute("cx")?.parse().ok()?,
 			extent.attribute("cy")?.parse().ok()?,
 		))
