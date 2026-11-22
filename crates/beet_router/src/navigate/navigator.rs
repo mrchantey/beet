@@ -56,6 +56,9 @@ pub struct Navigator {
 	/// The analytics session id: one session per surface (a terminal
 	/// connection), stamped on every page view this navigator records.
 	session: Uuid,
+	/// The session's client country, resolved once when the surface opens and
+	/// stamped on every page view this navigator records.
+	country: Option<SmolStr>,
 	/// The current in-world page's land time and url, used to emit a page-view
 	/// analytics event with its dwell duration when navigating away or on
 	/// despawn. `None` until the first in-world page, and for network browsing.
@@ -145,6 +148,7 @@ impl Default for Navigator {
 			history: default(),
 			history_cursor: 0,
 			session: uuid_ext::now_v7(),
+			country: None,
 			current_page: None,
 		}
 	}
@@ -187,6 +191,13 @@ impl Navigator {
 	/// surface negotiates html where the terminal's default asks for text.
 	pub fn with_accepts(mut self, accepts: Vec<MediaType>) -> Self {
 		self.accepts = accepts;
+		self
+	}
+
+	/// The country of the client this navigator's surface serves, stamped on
+	/// every page view it records, ie an ssh peer's.
+	pub fn with_country(mut self, country: Option<SmolStr>) -> Self {
+		self.country = country;
 		self
 	}
 
@@ -522,6 +533,11 @@ impl Navigator {
 
 	/// This navigator's analytics session id (one session per surface).
 	pub(crate) fn analytics_session(&self) -> Uuid { self.session }
+
+	/// This navigator's client country, stamped on its page views.
+	pub(crate) fn analytics_country(&self) -> Option<SmolStr> {
+		self.country.clone()
+	}
 
 	/// Take the currently-tracked in-world page (its land time and url), leaving
 	/// none. Used by the page-view recorder when navigating away.

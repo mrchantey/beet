@@ -195,8 +195,8 @@ pub struct AnalyticsEvent {
 	pub session: Option<Uuid>,
 	/// The requested or viewed path, eg `/docs/intro`.
 	pub path: SmolStr,
-	/// ISO 3166-1 alpha-2 country code, derived from the client ip then
-	/// discarded. Applies to any event whose client address is known.
+	/// ISO 3166-1 alpha-2 country code, a [`ClientOrigin`]'s: named by a
+	/// fronting proxy, or looked up from the client ip which is then discarded.
 	pub country: Option<SmolStr>,
 	/// Raw client ip, only populated when [`AnalyticsConfig::store_ip`] is set;
 	/// off by default so the default posture collects no personal data.
@@ -252,12 +252,18 @@ impl AnalyticsEvent {
 		self
 	}
 
+	/// Builder-style setter for the country.
+	pub fn with_country(mut self, country: Option<SmolStr>) -> Self {
+		self.country = country;
+		self
+	}
+
 	/// Parses a web client beacon body into an event.
 	///
 	/// The client sends `{kind, page_view_id, session, path, ...}` where the
 	/// remaining fields depend on the kind; they build the typed
 	/// [`AnalyticsEventData`]. `session_cookie` (from the request cookie) and the
-	/// geoip `country` are supplied by the server; the body's `session` wins when
+	/// `country` (its [`ClientOrigin`]'s) are supplied by the server; the body's `session` wins when
 	/// present. A page view keeps the client `page_view_id` as its row id (so
 	/// heartbeats dedupe to the newest); other kinds get a fresh id.
 	pub fn from_beacon(

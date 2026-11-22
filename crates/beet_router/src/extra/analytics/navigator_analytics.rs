@@ -18,14 +18,14 @@ pub(crate) async fn record_page_view(
 	let url = url.clone();
 	// atomically roll the tracked page to the new one, taking the previous;
 	// skipped for the network transport (not our own routes).
-	let Some((session, previous)) = entity
+	let Some((session, country, previous)) = entity
 		.get_mut(move |mut nav: Mut<Navigator>| {
 			if !matches!(nav.transport(), NavigatorTransport::InWorld { .. }) {
 				return None;
 			}
 			let previous = nav.take_current_page();
 			nav.set_current_page(Some((now, url)));
-			Some((nav.analytics_session(), previous))
+			Some((nav.analytics_session(), nav.analytics_country(), previous))
 		})
 		.await?
 	else {
@@ -34,6 +34,7 @@ pub(crate) async fn record_page_view(
 	if let Some((landed, previous_url)) = previous {
 		let event = router_analytics_ext::page_view_event(
 			session,
+			country,
 			&previous_url,
 			now.duration_since(landed),
 		);
@@ -59,6 +60,7 @@ pub(crate) fn finalize_page_view_on_remove(
 		if let Some((landed, url)) = nav.current_page() {
 			commands.trigger(router_analytics_ext::page_view_event(
 				nav.analytics_session(),
+				nav.analytics_country(),
 				url,
 				landed.elapsed(),
 			));

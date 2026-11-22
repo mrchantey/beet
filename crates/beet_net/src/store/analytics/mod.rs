@@ -11,7 +11,7 @@
 //! Emitters just `trigger` an [`AnalyticsEvent`]; the single persistence observer
 //! stores it. The server-side request middleware and the in-world navigator
 //! emitters live in beet_router; this module owns the wire types, the store, the
-//! geoip country lookup, and the [`analytics_ext`] helpers.
+//! client origin and its country, and the [`analytics_ext`] helpers.
 
 // the types + emission need only serde (via `std`); `Value`, `Uuid`, the event
 // enum and the geoip lookup are not json.

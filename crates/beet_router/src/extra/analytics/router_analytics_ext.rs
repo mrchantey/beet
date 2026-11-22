@@ -3,9 +3,10 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// Build a terminal-session page-view [`AnalyticsEvent`] for `url` with the given
-/// dwell duration.
+/// dwell duration, stamped with the session's country.
 pub fn page_view_event(
 	session: Uuid,
+	country: Option<SmolStr>,
 	url: &Url,
 	dwell: Duration,
 ) -> AnalyticsEvent {
@@ -17,6 +18,26 @@ pub fn page_view_event(
 	})
 	.with_client_kind(ClientKind::Terminal)
 	.with_session(Some(session))
+	.with_country(country)
+}
+
+/// The country of `origin`, as seen from `entity`: the proxy's verdict, else a
+/// lookup in the [`GeoIp`] on `entity`'s ancestry, resolved only when the origin
+/// needs one. Without a `<GeoIpDb/>` on the ancestry every looked up country is
+/// `None`.
+pub async fn origin_country(
+	world: &AsyncWorld,
+	entity: Entity,
+	origin: ClientOrigin,
+) -> Option<SmolStr> {
+	if !origin.needs_lookup() {
+		return origin.country(|| None);
+	}
+	world
+		.with_state::<AncestorQuery<&GeoIp>, _>(move |geoips| {
+			origin.country(|| geoips.get(entity).ok())
+		})
+		.await
 }
 
 /// The client kind for a routed request: a web client when it carries a user

@@ -169,19 +169,20 @@ impl Plugin for SshTuiPlugin {
 /// [`SshServer`] elsewhere is untouched.
 fn on_ssh_recv(
 	ev: On<SshRecv>,
-	peers: Query<&ChildOf, With<SshPeerInfo>>,
+	peers: Query<(&ChildOf, &SshPeerInfo)>,
 	tui_servers: Query<&OpeningRoute, With<SshTuiServer>>,
 	routes: RouteQuery,
+	geoips: AncestorQuery<&GeoIp>,
 	mut terminals: Query<&mut ChannelTerminal>,
 	mut buffers: Query<&mut DoubleBuffer>,
 	mut commands: Commands,
 ) -> Result {
 	let connection = ev.target();
 	// only handle connections (carry SshPeerInfo) whose host is an SshTuiServer.
-	let Ok(host) = peers.get(connection).map(|child_of| child_of.parent())
-	else {
+	let Ok((child_of, peer)) = peers.get(connection) else {
 		return Ok(());
 	};
+	let host = child_of.parent();
 	let Ok(opening) = tui_servers.get(host) else {
 		return Ok(());
 	};
@@ -193,6 +194,12 @@ fn on_ssh_recv(
 		.resolve_tree(host)
 		.map(|(router, _)| router)
 		.unwrap_or(host);
+	// no proxy fronts ssh, so a session's country is its peer's lookup in the
+	// `<GeoIpDb/>` on the router's ancestry, resolved once when it starts.
+	let session_country = || {
+		ClientOrigin::from_ip(peer.peer_addr.map(|addr| addr.ip()))
+			.country(|| geoips.get(router).ok())
+	};
 	match ev.event().inner() {
 		// a session is a pty then a shell or exec request: the pty sizes the
 		// surface, the request that follows opens its first page.
@@ -244,10 +251,26 @@ fn on_ssh_recv(
 		}
 		// a shell is an exec naming no page
 		SshEvent::RequestShell => {
-			start_session(&mut commands, connection, router, opening, "");
+			let country = session_country();
+			start_session(
+				&mut commands,
+				connection,
+				router,
+				opening,
+				"",
+				country,
+			);
 		}
 		SshEvent::RequestExec(command) => {
-			start_session(&mut commands, connection, router, opening, command);
+			let country = session_country();
+			start_session(
+				&mut commands,
+				connection,
+				router,
+				opening,
+				command,
+				country,
+			);
 		}
 		SshEvent::Data(bytes) => {
 			if let Ok(mut terminal) = terminals.get_mut(connection) {
@@ -281,13 +304,14 @@ fn on_ssh_recv(
 /// rather than building a page nothing shows and holding the client silent
 /// until the pty timeout. Decided in a queued command, behind the pty's own
 /// insert: a trigger does not flush, so the surface may not have landed when
-/// the request arrives.
+/// the request arrives. `country` is the peer's, stamped on every page view.
 fn start_session(
 	commands: &mut Commands,
 	connection: Entity,
 	router: Entity,
 	opening: &OpeningRoute,
 	command: &str,
+	country: Option<SmolStr>,
 ) {
 	let path = command.trim().to_owned();
 	let url = match path.as_str() {
@@ -297,7 +321,9 @@ fn start_session(
 	commands.entity(connection).queue_silenced(
 		move |mut entity: EntityWorldMut| {
 			if entity.contains::<ChannelTerminal>() {
-				entity.insert(Navigator::in_world(router, url));
+				entity.insert(
+					Navigator::in_world(router, url).with_country(country),
+				);
 				return;
 			}
 			let usage = format!("ssh -t <host> {path}");
@@ -490,9 +516,7 @@ mod test {
 		open_session(app, server, size, terminal, SshEvent::RequestShell)
 	}
 
-	/// Spawn a simulated SSH connection, then request a pty of `size` on
-	/// `terminal` followed by `start` (a shell or exec request), in the order a
-	/// real client sends them.
+	/// Spawn a simulated SSH connection, then [`request_session`] on it.
 	fn open_session(
 		app: &mut App,
 		server: Entity,
@@ -504,6 +528,19 @@ mod test {
 			.world_mut()
 			.spawn((SshPeerInfo::default(), ChildOf(server)))
 			.id();
+		request_session(app, connection, size, terminal, start);
+		connection
+	}
+
+	/// Request a pty of `size` on `terminal` followed by `start` (a shell or
+	/// exec request) on `connection`, in the order a real client sends them.
+	fn request_session(
+		app: &mut App,
+		connection: Entity,
+		size: UVec2,
+		terminal: &str,
+		start: SshEvent,
+	) {
 		let pty = SshEvent::RequestPty(RequestPty {
 			terminal: terminal.into(),
 			window: SshWindowSize {
@@ -518,7 +555,6 @@ mod test {
 				.trigger_target(SshRecv(ev));
 		}
 		app.update();
-		connection
 	}
 
 	/// Record, in order, every event the session on `connection` sends its client.
@@ -934,6 +970,59 @@ mod test {
 			.xpect_contains("Alpha page")
 			.xnot()
 			.xpect_contains("Beta page");
+	}
+
+	/// An ssh session's page views carry its peer's country, looked up in the
+	/// `<GeoIpDb/>` on the router's ancestry: the view recorded on navigating
+	/// away, and the one finalized when the session closes.
+	#[beet_core::test]
+	async fn page_views_carry_the_peer_country() {
+		let mut app = ssh_tui_app();
+		let server = spawn_server(&mut app);
+		// the server's router, where a `<GeoIpDb/>` lands its `GeoIp`
+		let router = app.world().entity(server).get::<Children>().unwrap()[0];
+		let peer: std::net::SocketAddr = "203.0.113.7:50022".parse().unwrap();
+		app.world_mut()
+			.entity_mut(router)
+			.insert(GeoIp::from_table([(peer.ip(), "NZ")]));
+		let views = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+		let recorder = views.clone();
+		app.world_mut().add_observer(move |ev: On<AnalyticsEvent>| {
+			recorder.lock().unwrap().push(ev.event().clone());
+		});
+
+		let connection = app
+			.world_mut()
+			.spawn((
+				SshPeerInfo {
+					username: None,
+					peer_addr: Some(peer),
+				},
+				ChildOf(server),
+			))
+			.id();
+		let size = UVec2::new(40, 8);
+		request_session(
+			&mut app,
+			connection,
+			size,
+			"xterm",
+			SshEvent::RequestShell,
+		);
+		drive_until(&mut app, connection, "Alpha page").await;
+		let url = Url::coerce("beta");
+		app.world_mut()
+			.entity_mut(connection)
+			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
+		drive_until(&mut app, connection, "Beta page").await;
+		close_connection(&mut app, connection);
+
+		let views = views.lock().unwrap().clone();
+		views
+			.iter()
+			.map(|view| (view.path.as_str(), view.country.as_deref()))
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![("/alpha", Some("NZ")), ("/beta", Some("NZ"))]);
 	}
 
 	/// Regression: the real beet-site path — a [`Layout`]-wrapped [`BlobPage`]

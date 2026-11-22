@@ -1,10 +1,18 @@
-//! Offline geoip country lookup for analytics.
+//! The country a client connected from, for analytics.
 //!
-//! Derives an ISO country code from a client ip using a MaxMind-format `.mmdb`,
-//! so analytics can bucket by country without collecting or storing a raw ip.
-//! Best-effort: with the `geoip` feature off, or no database declared, or an
-//! unresolvable ip, [`GeoIp::country`] returns `None` and callers omit the
-//! country.
+//! A [`ClientOrigin`] is read off a request's headers before its body is
+//! consumed: the client ip ([`analytics_ext::client_ip`]) and the country a
+//! fronting proxy named in `cf-ipcountry`. The proxy's header is authoritative
+//! when sent, and is trusted exactly as `client_ip` trusts `cf-connecting-ip`:
+//! only an origin reachable solely through the proxy can rely on it, since any
+//! client reaching the origin directly can set either header. Two ascii letters
+//! are its country; `XX` (unknown), `T1` (Tor) or anything else is no country,
+//! never a fall through to the database, which would find a Tor exit's country.
+//!
+//! Without the header the country is [`GeoIp`]'s lookup of the ip, an offline
+//! MaxMind-format `.mmdb`, so analytics buckets by country without collecting or
+//! storing a raw ip. Best-effort: with the `geoip` feature off, no database
+//! declared, or an unresolvable ip, the country is `None` and callers omit it.
 //!
 //! The database is *content*: it ships with the document as a static asset, so
 //! `<GeoIpDb/>` resolves it out of the nearest ancestor [`BlobStore`] (the
@@ -16,6 +24,70 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::net::IpAddr;
+
+/// The header a fronting Cloudflare proxy names the client's country in.
+const PROXY_COUNTRY_HEADER: &str = "cf-ipcountry";
+
+/// Where a client connected from: its ip, and the country a fronting proxy
+/// named, see the [module docs](self) for the trust model.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ClientOrigin {
+	/// The client ip, `None` when the transport exposed none.
+	pub ip: Option<IpAddr>,
+	/// The proxy's `cf-ipcountry` verdict: `None` without the header,
+	/// `Some(None)` when it named no country (`XX`, `T1`, malformed).
+	proxy_country: Option<Option<SmolStr>>,
+}
+
+impl ClientOrigin {
+	/// Reads the client ip and the proxy's country from request headers.
+	pub fn from_headers(headers: &HeaderMap) -> Self {
+		Self {
+			ip: analytics_ext::client_ip(headers),
+			proxy_country: headers
+				.first_raw(PROXY_COUNTRY_HEADER)
+				.map(Self::parse_proxy_country),
+		}
+	}
+
+	/// An origin known only by its ip, ie an ssh peer, which no proxy fronts.
+	pub fn from_ip(ip: Option<IpAddr>) -> Self {
+		Self {
+			ip,
+			proxy_country: None,
+		}
+	}
+
+	/// Whether resolving the country needs a database: no proxy verdict, and an
+	/// ip to look up.
+	pub fn needs_lookup(&self) -> bool {
+		self.proxy_country.is_none() && self.ip.is_some()
+	}
+
+	/// The client's ISO 3166-1 alpha-2 country: the proxy's verdict when it sent
+	/// one, else `geoip`'s lookup of the ip. `geoip` is called only when
+	/// [`Self::needs_lookup`], so a caller resolves its database lazily.
+	pub fn country<'a>(
+		&self,
+		geoip: impl FnOnce() -> Option<&'a GeoIp>,
+	) -> Option<SmolStr> {
+		match (&self.proxy_country, self.ip) {
+			(Some(verdict), _) => verdict.clone(),
+			(None, Some(ip)) => geoip()?.country(ip),
+			(None, None) => None,
+		}
+	}
+
+	/// Two ascii letters uppercased, excluding `XX`; anything else is no country.
+	fn parse_proxy_country(value: &str) -> Option<SmolStr> {
+		let value = value.trim();
+		(value.len() == 2
+			&& value.bytes().all(|byte| byte.is_ascii_alphabetic()))
+		.then(|| value.to_ascii_uppercase())
+		.filter(|code| code != "XX")
+		.map(SmolStr::from)
+	}
+}
 
 /// The default path of the country database, relative to the repo store root.
 const COUNTRY_DB_PATH: &str = "assets/databases/country.mmdb";
@@ -82,8 +154,16 @@ impl GeoIpDb {
 /// ancestry.
 #[derive(Default, Clone, Component)]
 pub struct GeoIp {
+	source: Option<std::sync::Arc<CountrySource>>,
+}
+
+/// What a loaded [`GeoIp`] answers from.
+enum CountrySource {
+	/// A parsed `.mmdb`.
 	#[cfg(feature = "geoip")]
-	db: Option<std::sync::Arc<CountryDb>>,
+	Mmdb(CountryDb),
+	/// A fixed ip to country table.
+	Table(HashMap<IpAddr, SmolStr>),
 }
 
 impl GeoIp {
@@ -103,7 +183,7 @@ impl GeoIp {
 				};
 				let db = CountryDb::from_bytes(bytes.to_vec())?;
 				debug!("geoip: country database loaded from {path}");
-				Self { db: Some(std::sync::Arc::new(db)) }.xok()
+				Self::from_source(CountrySource::Mmdb(db)).xok()
 			} else {
 				let _ = (assets, path);
 				Self::default().xok()
@@ -111,16 +191,32 @@ impl GeoIp {
 		}
 	}
 
+	/// A database answering from a fixed ip to country table, ie a stand-in
+	/// for the `.mmdb` in tests. Available without the `geoip` feature.
+	pub fn from_table(
+		table: impl IntoIterator<Item = (IpAddr, impl Into<SmolStr>)>,
+	) -> Self {
+		table
+			.into_iter()
+			.map(|(ip, country)| (ip, country.into()))
+			.collect::<HashMap<_, _>>()
+			.xmap(CountrySource::Table)
+			.xmap(Self::from_source)
+	}
+
+	fn from_source(source: CountrySource) -> Self {
+		Self {
+			source: Some(std::sync::Arc::new(source)),
+		}
+	}
+
 	/// The ISO 3166-1 alpha-2 country code for `ip`, or `None` when the database
 	/// is unavailable or the ip is unresolvable.
 	pub fn country(&self, ip: IpAddr) -> Option<SmolStr> {
-		cfg_if! {
-			if #[cfg(feature = "geoip")] {
-				self.db.as_ref()?.country(ip)
-			} else {
-				let _ = ip;
-				None
-			}
+		match self.source.as_deref()? {
+			#[cfg(feature = "geoip")]
+			CountrySource::Mmdb(db) => db.country(ip),
+			CountrySource::Table(table) => table.get(&ip).cloned(),
 		}
 	}
 
@@ -131,11 +227,7 @@ impl GeoIp {
 	}
 
 	/// Whether a database is loaded; `false` yields `None` for every lookup.
-	pub fn is_loaded(&self) -> bool {
-		cfg_if! {
-			if #[cfg(feature = "geoip")] { self.db.is_some() } else { false }
-		}
-	}
+	pub fn is_loaded(&self) -> bool { self.source.is_some() }
 }
 
 /// The reader itself is an opaque 8 MB buffer, so this reports only whether one
@@ -179,6 +271,66 @@ impl CountryDb {
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	/// Headers carrying `ip` as the client address and, when given, the proxy's
+	/// country.
+	fn headers(ip: &str, country: Option<&str>) -> HeaderMap {
+		let mut headers = HeaderMap::default();
+		headers.set_raw("cf-connecting-ip", ip);
+		if let Some(country) = country {
+			headers.set_raw(PROXY_COUNTRY_HEADER, country);
+		}
+		headers
+	}
+
+	/// A stand-in database resolving the test ip to `NZ`.
+	fn nz_geoip() -> GeoIp {
+		GeoIp::from_table([("203.0.113.7".parse::<IpAddr>().unwrap(), "NZ")])
+	}
+
+	/// The proxy's header wins over the database, uppercased; without one the
+	/// database answers.
+	#[beet_core::test]
+	fn proxy_country_precedes_the_database() {
+		let geoip = nz_geoip();
+		ClientOrigin::from_headers(&headers("203.0.113.7", Some(" us ")))
+			.country(|| Some(&geoip))
+			.xpect_eq(Some("US".into()));
+		ClientOrigin::from_headers(&headers("203.0.113.7", None))
+			.country(|| Some(&geoip))
+			.xpect_eq(Some("NZ".into()));
+	}
+
+	/// A proxy that names no country is still authoritative: its unknowns never
+	/// fall through to the database, which would find a Tor exit's country.
+	#[beet_core::test]
+	fn proxy_unknowns_are_no_country() {
+		for unknown in ["XX", "T1", "", "USA", "1A"] {
+			let origin = ClientOrigin::from_headers(&headers(
+				"203.0.113.7",
+				Some(unknown),
+			));
+			origin.needs_lookup().xpect_false();
+			origin
+				.country(|| panic!("looked up despite the proxy's {unknown:?}"))
+				.xpect_none();
+		}
+	}
+
+	/// No ip and no header means nothing to look up, so the database is never
+	/// resolved.
+	#[beet_core::test]
+	fn no_lookup_without_an_ip() {
+		let origin = ClientOrigin::from_headers(&HeaderMap::default());
+		origin.needs_lookup().xpect_false();
+		origin
+			.country(|| panic!("looked up without an ip"))
+			.xpect_none();
+		let geoip = nz_geoip();
+		ClientOrigin::from_ip(Some("203.0.113.7".parse().unwrap()))
+			.country(|| Some(&geoip))
+			.xpect_eq(Some("NZ".into()));
+	}
 
 	/// Without a loaded database, lookups return `None` rather than erroring, so
 	/// analytics degrades gracefully when none is declared.

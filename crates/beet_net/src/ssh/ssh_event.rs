@@ -37,7 +37,11 @@ pub enum SshEvent {
 
 impl SshEvent {
 	/// The SSH extended data type a [`Stderr`](Self::Stderr) payload travels
-	/// as (RFC 4254 §5.2).
+	/// as (RFC 4254 §5.2). Only the native russh transports frame it.
+	#[cfg(all(
+		any(feature = "russh_client", feature = "russh_server"),
+		not(target_arch = "wasm32")
+	))]
 	pub(crate) const STDERR_EXTENDED_DATA: u32 = 1;
 
 	/// Create a [`SshEvent::Data`] payload from a UTF-8 string.
@@ -161,6 +165,6 @@ pub struct SshPeerInfo {
 	/// The username supplied during authentication, if any.
 	pub username: Option<SmolStr>,
 	/// The client's network address, if the transport exposed it. Read by
-	/// analytics for a country lookup; not all connections carry one.
+	/// a terminal session for its country lookup; not all connections carry one.
 	pub peer_addr: Option<std::net::SocketAddr>,
 }

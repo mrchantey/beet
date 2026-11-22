@@ -23,8 +23,8 @@ const SKIP_SEGMENTS: [&str; 2] = ["analytics", "health"];
 /// Middleware that records a [`AnalyticsKind::Request`] event per routed request.
 ///
 /// Spread on a router alongside an [`AnalyticsConfig`] to enable it. Reads the
-/// client address, session cookie, and user agent from the request, the status
-/// from the response, and a geoip country from the address, then triggers an
+/// client origin, session cookie, and user agent from the request, the status
+/// from the response, and the origin's country, then triggers an
 /// [`AnalyticsEvent`] the analytics observer persists.
 #[action]
 #[derive(Default, Component, Reflect)]
@@ -60,7 +60,7 @@ pub async fn AnalyticsMiddleware(
 	// read everything needed before the body-consuming `next.call`.
 	let path = request.path_string();
 	let method = request.method().to_string();
-	let ip = analytics_ext::client_ip(request.headers());
+	let origin = ClientOrigin::from_headers(request.headers());
 	let session = analytics_ext::session_from_cookies(request.headers());
 	let user_agent = request
 		.headers()
@@ -81,25 +81,17 @@ pub async fn AnalyticsMiddleware(
 	// outnumber every real event several times over, so recording them costs a
 	// store write each to bury the signal. A *referred* 404 is the opposite, a
 	// link that should have worked, so it is kept (see
-	// `AnalyticsSummary::broken_links`). Dropping here also skips the geoip and
+	// `AnalyticsSummary::broken_links`). Dropping here also skips the country and
 	// store work below for the bulk of hostile traffic.
 	if status == 404 && referrer.is_none() {
 		return Ok(response);
 	}
 
-	// a geoip country from the address, always derived; the raw ip is stored only
-	// when explicitly opted in, keeping the default posture free of personal data.
-	// A country needs a `<GeoIpDb/>` on this route's ancestry; without one every
-	// country is `None`.
-	let country = ip
-		.zip(
-			world
-				.with_state::<AncestorQuery<&GeoIp>, Option<GeoIp>>(
-					move |query| query.get(caller_id).ok().cloned(),
-				)
-				.await,
-		)
-		.and_then(|(ip, geoip)| geoip.country(ip));
+	// the raw ip is stored only when explicitly opted in, keeping the default
+	// posture free of personal data; the country is always derived.
+	let ip = config.store_ip.then_some(origin.ip).flatten();
+	let country =
+		router_analytics_ext::origin_country(&world, caller_id, origin).await;
 
 	let mut event = AnalyticsEvent::new(path, AnalyticsEventData::Request {
 		status,
@@ -110,13 +102,9 @@ pub async fn AnalyticsMiddleware(
 	.with_client_kind(router_analytics_ext::request_client_kind(
 		user_agent.is_some(),
 	))
-	.with_session(session);
-	event.country = country;
-	if config.store_ip {
-		if let Some(ip) = ip {
-			event.ip = Some(ip.to_string().into());
-		}
-	}
+	.with_session(session)
+	.with_country(country);
+	event.ip = ip.map(|ip| ip.to_string().into());
 
 	// fire-and-forget: the analytics observer persists it off the request path.
 	world
@@ -344,8 +332,11 @@ mod test {
 	#[derive(Resource, Default, Deref)]
 	struct Captured(std::sync::Arc<std::sync::Mutex<Vec<AnalyticsEvent>>>);
 
-	/// A router carrying the config + middleware, a capturing observer, and one
-	/// route. Returns the root entity.
+	/// The client ip the [`GeoIp`] stand-in resolves to `NZ`.
+	const NZ_IP: &str = "203.0.113.7";
+
+	/// A router carrying the config + middleware, a [`GeoIp`] stand-in, a
+	/// capturing observer, and one route. Returns the root entity.
 	fn analytics_router(world: &mut World) -> Entity {
 		world.init_resource::<Captured>();
 		let captured = world.resource::<Captured>().0.clone();
@@ -357,6 +348,7 @@ mod test {
 			.spawn((
 				Router,
 				AnalyticsConfig::default(),
+				GeoIp::from_table([(NZ_IP.parse().unwrap(), "NZ")]),
 				StoreRef(store),
 				AnalyticsMiddleware::default(),
 				children![render_action::fixed_func_route("about", || rsx! {
@@ -455,6 +447,28 @@ mod test {
 			let (status, events) = exchange(request).await;
 			status.xpect_eq(StatusCode::OK);
 			events.len().xpect_eq(1);
+		}
+	}
+
+	/// The country a fronting proxy names wins over the database, a proxy's
+	/// unknown is no country, and without the header the database answers.
+	#[beet_core::test]
+	async fn records_the_origin_country() {
+		for (proxy_country, expected) in [
+			(Some("us"), Some("US")),
+			(Some("T1"), None),
+			(None, Some("NZ")),
+		] {
+			let mut request = Request::get("about")
+				.with_header_raw("cf-connecting-ip", NZ_IP);
+			if let Some(proxy_country) = proxy_country {
+				request =
+					request.with_header_raw("cf-ipcountry", proxy_country);
+			}
+			let (_, events) = exchange(request).await;
+			events[0].country.as_deref().xpect_eq(expected);
+			// the raw ip stays out by default
+			events[0].ip.xpect_none();
 		}
 	}
 
