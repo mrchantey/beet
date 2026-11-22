@@ -1,10 +1,8 @@
 //! A seed post read from a route's answer.
-use super::request_post::fill;
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_router::prelude::*;
 
 /// A seed post whose text is a route's answer: a `GET` of `path` exchanged
 /// with the url space the thread is attached in, asking for
@@ -19,32 +17,21 @@ use beet_router::prelude::*;
 /// </CreateActor>
 /// ```
 ///
-/// Each `{param}` of `path` is filled from the request the thread is built
-/// for, as [`RequestPost`] fills its text, read while the template builds;
-/// the exchange is a [`SeedSource`], read once the thread is attached.
+/// A [`SeedSource`], so the route is called by the entry creating the
+/// thread and by nothing else, each `{param}` of `path` filled from the
+/// request entering ([`ThreadEntry::fill`]).
 ///
 /// ## Errors
 ///
-/// Errors when `path` names a param outside a request build, or one the
-/// request lacks. A non-OK answer is a [`TemplateError`] naming the path, so
-/// the thread never reduces.
-#[template(system)]
+/// The entry creating the thread fails when `path` names a param the
+/// request lacks, or the route answers anything but OK, naming the path.
+#[template]
 pub fn RoutePost(
 	/// The path of the route, each `{param}` the request's value for it.
 	#[prop(required)]
-	path: String,
-	stack: Res<RequestContextStack>,
-) -> Result<impl Bundle> {
-	let path = match stack.try_current() {
-		Some(cx) => fill(&path, cx.parts())?,
-		None if path.contains('{') => bevybail!(
-			"`<RoutePost path=\"{path}\"/>` fills its path from a request, \
-			 but is built outside one: it seeds a thread a route builds per \
-			 request, ie a `ThreadRoute`"
-		),
-		None => path,
-	};
-	SeedSource::route(path).xok()
+	path: SmolStr,
+) -> impl Bundle {
+	SeedSource::route(path)
 }
 
 impl SeedSource {
@@ -56,7 +43,8 @@ impl SeedSource {
 		Self::new(
 			label,
 			Action::new_async(
-				async move |cx: ActionContext| -> Result<String> {
+				async move |cx: ActionContext<ThreadEntry>| -> Result<String> {
+					let path = cx.input.fill(&path)?;
 					let space = cx
 						.caller
 						.with_state::<(Query<&ChildOf>, Query<&PathPartial>), _>(
@@ -166,9 +154,9 @@ mod test {
 			.xpect_eq("notes on product");
 	}
 
-	/// A route answering anything but OK fails the build, naming the path.
+	/// A route answering anything but OK fails the entry, naming the path.
 	#[beet_core::test]
-	async fn a_refusal_fails_the_build() {
+	async fn a_refusal_fails_the_entry() {
 		let (mut app, router, _) = host("nowhere");
 		let (status, text) = review(&mut app, router).await;
 		status.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);

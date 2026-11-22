@@ -21,9 +21,6 @@ pub struct ThreadRecords {
 	posts: Vec<Post>,
 	/// Per-post response metadata, used for `previous_response_id` chaining.
 	metas: HashMap<PostId, ResponseMeta>,
-	/// The messages of the request this session serves, by their authors,
-	/// posted as its session opens ([`RequestMessage`]).
-	pub(super) requested: Vec<(ActorId, SeedPost)>,
 }
 
 impl ThreadRecords {
@@ -97,10 +94,6 @@ impl ThreadRecords {
 			.collect()
 	}
 
-	/// Drop every post, ie a continued thread's freshly resolved seed, which
-	/// its stored seed stands for.
-	pub fn clear_posts(&mut self) { self.posts.clear(); }
-
 	/// Merge stored records under these: the stored posts and metadata,
 	/// then every actor of these records over the stored ones, so
 	/// the authored definitions win while the stored authors still resolve.
@@ -109,7 +102,6 @@ impl ThreadRecords {
 			actors,
 			posts,
 			metas,
-			requested: _,
 		} = stored;
 		for (id, actor) in actors {
 			self.actors.entry(id).or_insert(actor);
@@ -280,91 +272,74 @@ impl SeedPost {
 
 impl ThreadRecords {
 	/// Reduce every freshly-spawned authored [`Thread`] into a [`ThreadRecords`] plus
-	/// a lean behavior scene.
+	/// a lean behavior scene, keeping its seed posts.
 	///
 	/// For each thread lacking records, walk its descendant actors in author order
 	/// and: hoist each [`Actor`] into `records.actors`, hoist each [`SeedPost`] into
 	/// `records.posts`, then rewrite the actor entity. An actor that carries behavior
 	/// (an [`Action`]) becomes an [`ActorRef`] keeping its behavior and tools; a
 	/// seed-only actor (eg the system prompt) is despawned, leaving no turn behind.
-	/// A thread still holding a [`SeedSource`] waits: its seed is read while
-	/// the thread builds, and the records reduce once every seed is a
-	/// [`SeedPost`]. The seed posts are kept by a fresh thread and dropped by
-	/// an entry continuing a stored one; a [`RequestMessage`] is set aside
-	/// until its session opens.
+	///
+	/// A thread mounting a store ([`MountThreadStore`]) or holding a
+	/// [`SeedSource`] waits for its entry, the one place that knows whether
+	/// its seed is kept ([`Self::reduce_entered`]).
 	///
 	/// Idempotent: gated on `Without<ThreadRecords>`, so it runs once per thread.
 	pub fn reduce(
 		mut commands: Commands,
-		threads: Query<(Entity, &Thread), Without<ThreadRecords>>,
-		children: Query<&Children>,
-		actors: Query<&Actor>,
-		seeds: Query<(&SeedPost, Has<RequestMessage>)>,
-		#[cfg(feature = "action")] pending: Query<(), With<SeedSource>>,
-		#[cfg(feature = "action")] behaviors: Query<(), With<ActionMeta>>,
+		threads: Query<
+			(Entity, &Thread),
+			(Without<ThreadRecords>, Without<MountThreadStore>),
+		>,
+		reduction: Reduction,
+		#[cfg(feature = "action")] sources: Query<(), With<SeedSource>>,
 	) -> Result {
-		for (thread_entity, thread) in threads.iter() {
-			// a seed still being read: reduce once it lands
+		for (entity, thread) in threads.iter() {
 			#[cfg(feature = "action")]
-			if children
-				.iter_descendants(thread_entity)
-				.any(|entity| pending.contains(entity))
+			if reduction
+				.children
+				.iter_descendants(entity)
+				.any(|child| sources.contains(child))
 			{
 				continue;
 			}
-			let thread_id = thread.id();
-			let mut records = ThreadRecords::new();
-
-			// descendant actor entities, in author (DFS) order
-			let actor_entities = children
-				.iter_descendants(thread_entity)
-				.filter(|entity| actors.contains(*entity))
-				.collect::<Vec<_>>();
-
-			for actor_entity in actor_entities {
-				let actor = actors.get(actor_entity)?.clone();
-				let actor_id = records.insert_actor(actor);
-
-				// hoist this actor's seed posts, despawning their entities. Scan all
-				// descendants (not just direct children) so seeds authored through a
-				// markup `<Slot/>` are still found; actors never nest, so every
-				// `SeedPost` under an actor entity is unambiguously its own.
-				for child in children.iter_descendants(actor_entity) {
-					if let Ok((seed_post, requested)) = seeds.get(child) {
-						if requested {
-							records
-								.requested
-								.push((actor_id, seed_post.clone()));
-						} else {
-							records.upsert_post(
-								seed_post
-									.clone()
-									.into_post(actor_id, thread_id),
-							);
-						}
-						commands.entity(child).despawn();
-					}
-				}
-
-				// rewrite the actor: behavior -> ActorRef, seed-only -> despawn
-				#[cfg(feature = "action")]
-				let has_behavior = behaviors.contains(actor_entity);
-				#[cfg(not(feature = "action"))]
-				let has_behavior = true;
-				if has_behavior {
-					commands
-						.entity(actor_entity)
-						.remove::<Actor>()
-						.insert(ActorRef(actor_id));
-				} else {
-					commands.entity(actor_entity).despawn();
-				}
-			}
-
-			records.posts.sort_by_key(|post| post.id());
-			commands.entity(thread_entity).insert(records);
+			reduction.reduce(&mut commands, entity, thread.id(), true)?;
 		}
 		Ok(())
+	}
+
+	/// Reduce the thread at `entity` as its entry decides, consuming its
+	/// [`MountThreadStore`]: keeping its seed posts when the entry creates
+	/// its thread, else despawning them and every [`SeedSource`] unread. A
+	/// thread already reduced, which mounts no store, is left as it is.
+	#[cfg(feature = "action")]
+	pub(crate) fn reduce_entered(
+		world: &mut World,
+		entity: Entity,
+		keep_seeds: bool,
+	) -> Result {
+		world.entity_mut(entity).remove::<MountThreadStore>();
+		if world.get::<ThreadRecords>(entity).is_some() {
+			return Ok(());
+		}
+		world.run_system_cached_with::<_, Result, _, _>(
+			Self::reduce_one,
+			(entity, keep_seeds),
+		)??;
+		world.flush();
+		Ok(())
+	}
+
+	/// Reduce the one thread at `entity`, keeping or dropping its seeds.
+	#[cfg(feature = "action")]
+	fn reduce_one(
+		In((entity, keep_seeds)): In<(Entity, bool)>,
+		mut commands: Commands,
+		threads: Query<&Thread>,
+		reduction: Reduction,
+	) -> Result {
+		let thread = threads.get(entity)?.id();
+		reduction.reduce(&mut commands, entity, thread, keep_seeds)
 	}
 
 	/// Run [`ThreadRecords::reduce`] immediately and flush, for manual consumers that
@@ -390,6 +365,87 @@ impl ThreadRecords {
 			})
 			.await
 			.xok()
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Reduction: the walk over one authored thread
+// ═══════════════════════════════════════════════════════════════════════
+
+/// The queries reducing one authored thread ([`ThreadRecords::reduce`]).
+#[derive(SystemParam)]
+pub struct Reduction<'w, 's> {
+	children: Query<'w, 's, &'static Children>,
+	actors: Query<'w, 's, &'static Actor>,
+	seeds: Query<'w, 's, &'static SeedPost>,
+	#[cfg(feature = "action")]
+	sources: Query<'w, 's, (), With<SeedSource>>,
+	#[cfg(feature = "action")]
+	behaviors: Query<'w, 's, (), With<ActionMeta>>,
+}
+
+impl Reduction<'_, '_> {
+	/// Reduce the thread at `entity`, its posts belonging to `thread`,
+	/// keeping or dropping its seed posts.
+	fn reduce(
+		&self,
+		commands: &mut Commands,
+		entity: Entity,
+		thread: ThreadId,
+		keep_seeds: bool,
+	) -> Result {
+		let mut records = ThreadRecords::new();
+
+		// descendant actor entities, in author order
+		let actor_entities = self
+			.children
+			.iter_descendants_depth_first(entity)
+			.filter(|child| self.actors.contains(*child))
+			.collect::<Vec<_>>();
+
+		for actor_entity in actor_entities {
+			let actor = self.actors.get(actor_entity)?.clone();
+			let actor_id = records.insert_actor(actor);
+
+			// hoist or drop this actor's seed posts, despawning their entities.
+			// Scan all descendants (not just direct children) so seeds authored
+			// through a markup `<Slot/>` are still found; actors never nest, so
+			// every seed under an actor entity is unambiguously its own.
+			for child in
+				self.children.iter_descendants_depth_first(actor_entity)
+			{
+				if let Ok(seed_post) = self.seeds.get(child) {
+					if keep_seeds {
+						records.upsert_post(
+							seed_post.clone().into_post(actor_id, thread),
+						);
+					}
+					commands.entity(child).despawn();
+				}
+				#[cfg(feature = "action")]
+				if !keep_seeds && self.sources.contains(child) {
+					commands.entity(child).despawn();
+				}
+			}
+
+			// rewrite the actor: behavior -> ActorRef, seed-only -> despawn
+			#[cfg(feature = "action")]
+			let has_behavior = self.behaviors.contains(actor_entity);
+			#[cfg(not(feature = "action"))]
+			let has_behavior = true;
+			if has_behavior {
+				commands
+					.entity(actor_entity)
+					.remove::<Actor>()
+					.insert(ActorRef(actor_id));
+			} else {
+				commands.entity(actor_entity).despawn();
+			}
+		}
+
+		records.posts.sort_by_key(|post| post.id());
+		commands.entity(entity).insert(records);
+		Ok(())
 	}
 }
 

@@ -140,12 +140,37 @@ fn assert_served_shape(app: &mut App) {
 	views.xpect_eq(vec![thread]);
 }
 
-/// The reduced thread's `(actor count, seed-post count)`.
+/// The reduced thread's `(actor count, seed-post count)`, its joins aside.
 fn record_counts(app: &mut App) -> (usize, usize) {
 	let mut threads = app.world_mut().query_filtered::<Entity, With<Thread>>();
 	let thread = threads.iter(app.world()).next().unwrap();
 	let records = app.world().get::<ThreadRecords>(thread).unwrap();
-	(records.actors().len(), records.posts().len())
+	(records.actors().len(), records.model_posts(None).len())
+}
+
+/// Enter every thread mounting a store, over a temp store, as its start
+/// would: a mounted thread reduces once its entry knows whether it creates
+/// its thread.
+async fn enter_mounted(app: &mut App) {
+	let threads = app
+		.world_mut()
+		.query_filtered::<Entity, With<MountThreadStore>>()
+		.iter(app.world())
+		.collect::<Vec<_>>();
+	for thread in &threads {
+		app.world_mut()
+			.entity_mut(*thread)
+			.insert(BlobStore::temp());
+	}
+	app.world_mut()
+		.run_async_local_then(async move |world: AsyncWorld| -> Result {
+			for thread in threads {
+				Thread::enter(world.clone(), thread, default()).await?;
+			}
+			Ok(())
+		})
+		.await
+		.unwrap();
 }
 
 /// The kinds of every actor in the reduced records, so a scene's `kind="..."`
@@ -247,6 +272,7 @@ async fn coding_agent_scene_reduces() {
 async fn persistent_chat_scene_reduces() {
 	let mut app =
 		reduce(include_str!("../examples/thread/persistent_chat.bsx")).await;
+	enter_mounted(&mut app).await;
 	assert_crate_check_passed(&mut app);
 	assert_served_shape(&mut app);
 	record_counts(&mut app).xpect_eq((3, 1));

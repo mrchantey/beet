@@ -229,22 +229,7 @@ impl NavigatorRowData {
 		live: Option<bool>,
 		selected: bool,
 	) -> Self {
-		let entries = thread
-			.metadata()
-			.iter()
-			.filter(|(key, _)| key.as_str() != "template")
-			.map(|(key, value)| format!("{key}={}", value_text(value)))
-			.collect::<Vec<_>>();
-		let name = thread
-			.metadata()
-			.get("template")
-			.ok()
-			.map(value_text)
-			.unwrap_or_else(|| thread.name().to_string());
-		let label = std::iter::once(name)
-			.chain(entries)
-			.collect::<Vec<_>>()
-			.join(" ");
+		let label = thread.name();
 		let text = format!(
 			"{}{guides}{}{label}{}",
 			if selected { "> " } else { "  " },
@@ -272,14 +257,6 @@ impl NavigatorRowData {
 			("text", Value::new(self.text.clone())),
 		]))
 	}
-}
-
-/// A metadata value as a label shows it, a string without its quotes.
-fn value_text(value: &Value) -> String {
-	value
-		.as_str()
-		.map(str::to_string)
-		.unwrap_or_else(|_| value.to_string())
 }
 
 impl NavigatorRow {
@@ -559,13 +536,8 @@ mod test {
 	use beet_net::prelude::*;
 	use bevy::math::UVec2;
 
-	/// A thread stamped `template` with `entries`.
-	fn thread(template: &str, entries: &[(&str, &str)]) -> Thread {
-		entries.iter().fold(
-			Thread::default().with_metadata("template", template),
-			|thread, (key, value)| thread.with_metadata(*key, *value),
-		)
-	}
+	/// A thread named as its row reads.
+	fn thread(name: &str) -> Thread { Thread::new(name) }
 
 	/// A completed text post on `thread`.
 	fn post(thread: &Thread, actor: &Actor, text: &str) -> Post {
@@ -588,15 +560,15 @@ mod test {
 				store.with_subdir(RelPath::new("threads").join(role)),
 			))
 		};
-		let loop_thread = thread("LoopThread", &[("journal", "loop")]);
+		let loop_thread = thread("LoopThread journal=loop");
 		let grade = post(&loop_thread, &actor, "grade product: unmet evals");
 		let write = post(&loop_thread, &actor, "write market: missing");
-		let grader = thread("GraderThread", &[])
+		let grader = thread("GraderThread")
 			.with_spawned_by(PostRef::new(loop_thread.id(), grade.id()));
-		let clerk = thread("ClerkThread", &[("document", "market")])
+		let clerk = thread("ClerkThread document=market")
 			.with_spawned_by(PostRef::new(loop_thread.id(), write.id()));
 		let answer = post(&clerk, &actor, "wrote the market");
-		let branch = thread("ClerkThread", &[("document", "pricing")])
+		let branch = thread("ClerkThread document=pricing")
 			.with_branch_of(PostRef::new(clerk.id(), answer.id()));
 		for (role, record, posts) in [
 			("loop", &loop_thread, vec![grade, write]),

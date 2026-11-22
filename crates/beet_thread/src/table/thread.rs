@@ -40,9 +40,6 @@ pub struct Thread {
 	/// The post this thread branches from, continuing its history.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	branch_of: Option<PostRef>,
-	/// Extensible key-value metadata, the entries a request continues a
-	/// stored thread by ([`ThreadEntry`]).
-	metadata: Map,
 }
 
 impl Default for Thread {
@@ -62,18 +59,11 @@ impl Thread {
 			name: name.into(),
 			spawned_by: None,
 			branch_of: None,
-			metadata: default(),
 		}
 	}
 
 	pub fn created(&self) -> Timestamp { self.created }
 	pub fn name(&self) -> &str { &self.name }
-
-	/// Adopt a stored [`ThreadId`] when an entry continues a stored thread, so
-	/// posts created this session share its identity. The id is minted fresh
-	/// on build and adopted on entry (actor ids, by contrast, are authored and
-	/// stable).
-	pub fn set_id(&mut self, id: ThreadId) { self.id = id; }
 
 	/// The post whose action started this thread.
 	pub fn spawned_by(&self) -> Option<&PostRef> { self.spawned_by.as_ref() }
@@ -93,23 +83,5 @@ impl Thread {
 	pub fn with_branch_of(mut self, branch_of: PostRef) -> Self {
 		self.branch_of = Some(branch_of);
 		self
-	}
-
-	pub fn metadata(&self) -> &Map { &self.metadata }
-	pub fn metadata_mut(&mut self) -> &mut Map { &mut self.metadata }
-	pub fn with_metadata(
-		mut self,
-		key: impl Into<SmolStr>,
-		value: impl Into<Value>,
-	) -> Self {
-		self.metadata.insert(key, value);
-		self
-	}
-
-	/// Whether this record's metadata holds every entry of `entries`.
-	pub fn matches(&self, entries: &Map) -> bool {
-		entries
-			.iter()
-			.all(|(key, value)| self.metadata.get(key).ok() == Some(value))
 	}
 }

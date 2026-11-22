@@ -98,6 +98,27 @@ impl<M> Uuid7<M> {
 	}
 	pub fn uuid(&self) -> Uuid { self.uuid_v7 }
 
+	/// Teach every authoring seam, a flag, a query param, a markup attribute,
+	/// to read this id from its text, or from an integer as a pinned id
+	/// ([`Self::from_u128`]), as `<CreateActor id=2>` pins one.
+	pub(crate) fn register_literal()
+	where
+		Self: PartialReflect,
+	{
+		LiteralParser::register::<Self>(LiteralParser::new(|value: &Value| {
+			match value {
+				Value::Str(text) => Self::parse(text).map(Some),
+				Value::Uint(value) => {
+					Self::from_u128(*value as u128).xsome().xok()
+				}
+				Value::Int(value) if *value >= 0 => {
+					Self::from_u128(*value as u128).xsome().xok()
+				}
+				_ => Ok(None),
+			}
+		}));
+	}
+
 	/// Parse a typed id from its hyphenated text, as [`Display`](std::fmt::Display)
 	/// writes it.
 	///

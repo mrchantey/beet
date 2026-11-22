@@ -12,8 +12,8 @@ use beet_net::prelude::*;
 /// ```rsx
 /// <TuiServer {(CallOnReady, SweepDescendants)}>
 ///     <Router>
-///         <Repeat {RunThread{metadata:{chat:"main"}}}>
-///             <Thread {(Sequence, MountThreadStore{path:"threads"})}> ..actors.. </Thread>
+///         <Repeat {RunThread}>
+///             <Thread {(Sequence, MountThreadStore{path:"threads/chat"})}> ..actors.. </Thread>
 ///         </Repeat>
 ///     </Router>
 /// </TuiServer>
@@ -41,18 +41,14 @@ use beet_net::prelude::*;
 /// is the behavior and runs its actors in order.
 ///
 /// A thread under it declaring a [`MountThreadStore`] continues the newest
-/// stored thread whose metadata holds every entry of `metadata`, so a restart
+/// thread in the mount's path, filled from the start request, so a restart
 /// resumes; declaring none, it starts a thread every run. A thread built per
 /// request rather than per entry is a [`ThreadRoute`].
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(CallOnStart)]
 #[require(ActionOverload<Request, Outcome> = RunThread::entry())]
-pub struct RunThread {
-	/// The entries a thread this verb creates is stamped with, and that an
-	/// entry continues a stored thread by. Empty starts a thread every run.
-	pub metadata: Map,
-}
+pub struct RunThread;
 
 impl RunThread {
 	/// The thread's entry point: enter every thread at or under the entity
@@ -68,11 +64,8 @@ impl RunThread {
 		ActionOverload::new(Action::new_async(
 			async |cx: ActionContext<Request>| -> Result<Outcome> {
 				let entity = cx.caller.clone();
-				let metadata = entity.get_cloned::<RunThread>().await?.metadata;
 				// the params ride the start request, never a global env read
-				let params =
-					cx.input.parts().parse_params::<ThreadEntryParams>()?;
-				let entry = ThreadEntry::new(metadata, params);
+				let entry = ThreadEntry::parse(cx.input.parts().clone())?;
 				let threads = Self::enter_all(&entity, &entry).await?;
 				// the canonical action, resolved by its own signature: an endless
 				// `Repeat` never returns, a finite loop completes while the servers
@@ -139,19 +132,16 @@ mod test {
 	/// The directory every scene keeps its thread records under.
 	const RECORDS: &str = "threads";
 
-	/// A persistent thread scene continuing by its metadata: pinned actor
-	/// ids, one system seed and one mock agent. One agent turn, no loop, so
-	/// the run finishes.
+	/// A persistent thread scene: pinned actor ids, one system seed and one
+	/// mock agent. One agent turn, no loop, so the run finishes.
 	fn scene(system: ActorId, agent: ActorId) -> impl Bundle {
 		(
 			Thread::default(),
 			Sequence::new(),
-			RunThread {
-				metadata: Map::new([("chat", "main")]),
-			},
+			RunThread,
 			MountThreadStore {
 				path: RelPath::new(RECORDS),
-				..default()
+				new: false,
 			},
 			children![
 				(
@@ -219,7 +209,7 @@ mod test {
 	}
 
 	/// A `{MountThreadStore}` thread, run twice against the same store,
-	/// continues the stored thread its metadata names rather than creating a
+	/// continues the stored thread its path names rather than creating a
 	/// duplicate. Regression for the deferred mount: the sync used to flush the
 	/// fresh, un-adopted thread before adoption ran, growing the store to two
 	/// threads on the second run.
@@ -234,7 +224,7 @@ mod test {
 		run_once(&store, system, agent);
 		stored_threads(&store).await.xpect_eq(1);
 
-		// reload: the same metadata continues the stored thread, no duplicate
+		// reload: the same path continues the stored thread, no duplicate
 		run_once(&store, system, agent);
 		stored_threads(&store).await.xpect_eq(1);
 	}
@@ -279,15 +269,10 @@ mod test {
 	async fn kicks_only_its_own_entry() {
 		let mut app = app();
 		let ephemeral = || {
-			(
-				Thread::default(),
-				Sequence::new(),
-				RunThread::default(),
-				children![
-					(Actor::user(), children![Post::spawn("hello")]),
-					(Actor::agent(), MockPostStreamer::default()),
-				],
-			)
+			(Thread::default(), Sequence::new(), RunThread, children![
+				(Actor::user(), children![Post::spawn("hello")]),
+				(Actor::agent(), MockPostStreamer::default()),
+			])
 		};
 		let booted = app
 			.world_mut()
@@ -313,24 +298,5 @@ mod test {
 		(replies(&mut app, booted) > 1).xpect_true();
 		// ... while the untouched entry never ran its own
 		replies(&mut app, idle).xpect_eq(1);
-	}
-
-	/// Markup declares the metadata a `RunThread` continues by as a struct
-	/// literal, as `examples/thread/persistent_chat.bsx` does.
-	#[beet_core::test]
-	fn declares_its_metadata_in_markup() {
-		let mut app = app();
-		let entity = BsxTemplate::parse_entry(
-			app.world(),
-			r#"<Repeat {RunThread{metadata:{chat:"persistent"}}}/>"#,
-		)
-		.unwrap()
-		.spawn(app.world_mut())
-		.unwrap();
-		app.world()
-			.get::<RunThread>(entity)
-			.unwrap()
-			.metadata
-			.xpect_eq(Map::new([("chat", "persistent")]));
 	}
 }

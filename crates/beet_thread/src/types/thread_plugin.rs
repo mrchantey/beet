@@ -15,8 +15,11 @@ pub struct ThreadPlugin {}
 impl Plugin for ThreadPlugin {
 	fn build(&self, app: &mut App) {
 		app.install_type::<(AsyncPlugin, RouterPlugin, NetPlugin)>();
-		// a `PostRef` and a `ThreadId` read from a flag, a param or markup
-		PostRef::register_literals();
+		// a `PostRef` and each id read from a flag, a param or markup
+		PostRef::register_literal();
+		ThreadId::register_literal();
+		ActorId::register_literal();
+		PostId::register_literal();
 
 		#[cfg(feature = "action")]
 		app.install_type::<ActionPlugin>()
@@ -86,11 +89,7 @@ impl Plugin for ThreadPlugin {
 			.register_type::<ToolChoice>()
 			.register_type::<StringEnumOptions>()
 			// ── Markup templates ──────────────────────────────────────────
-			.install_type::<(
-				CreatePost,
-				CreateActor,
-				RequestPost,
-			)>()
+			.install_type::<(CreatePost, CreateActor)>()
 			.add_observer(reapply_string_enum_options)
 			// _
 			;

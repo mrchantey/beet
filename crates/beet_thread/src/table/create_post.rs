@@ -8,8 +8,8 @@ use beet_core::prelude::*;
 /// and despawns the entity, leaving only the record.
 ///
 /// With `src` rather than `text` it expands to a [`SeedSource`] reading the
-/// file at that path in the store at or above the thread while the thread
-/// builds, so a long procedure has one source, ie
+/// file at that path in the store at or above the thread, read by the entry
+/// creating the thread, so a long procedure has one source, ie
 /// `<CreatePost src="seeds/system.md"/>`.
 ///
 /// Set `intent` / `status` to author refusals ([`PostIntent::Refusal`]),
@@ -20,7 +20,7 @@ pub fn CreatePost(
 	/// The post's text.
 	text: String,
 	/// A file in the store above the thread holding the post's text, read
-	/// while the thread builds, in place of `text`.
+	/// by the entry creating the thread, in place of `text`.
 	src: Option<RelPath>,
 	#[prop(default = PostIntent::Message)] intent: PostIntent,
 	#[prop(default = PostStatus::Completed)] status: PostStatus,

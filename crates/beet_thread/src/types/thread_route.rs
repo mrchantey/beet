@@ -5,38 +5,40 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-/// A route answering each request with a session of a thread built for it
-/// from the named template, each thread entity one session of one thread:
+/// A thread run as a function: built for one request from the named
+/// template, run to its outcome, answered and despawned, nobody typing.
 ///
 /// ```bsx
-/// <Route path="review/:document" {ThreadRoute{template:"ReviewThread", metadata:{document:"{document}"}}}/>
+/// <Route path="review/:document" {ThreadRoute{template:"ReviewThread", message:"review {document}"}}/>
+/// <!-- ReviewThread.bsx -->
+/// <Thread {(Sequence, MountThreadStore{path:"threads/review/{document}"})}> ..actors.. </Thread>
 /// ```
 ///
-/// On every request it:
+/// The words are the model's, defined once in the [`table`](crate::table)
+/// module docs. On every request it:
 ///
 /// 1. builds a fresh thread from `template`, a name resolved as a [`Layout`]
 ///    resolves its own ([`BsxTemplate::named`]), with the request on the
-///    [`RequestContextStack`] for the build, so a seed reads a path param,
-///    ie `<RequestPost text="review {document}"/>`;
-/// 2. settles the build, every [`SeedSource`] read, and attaches the thread
-///    beneath the route, where it resolves the ancestor [`BlobStore`] and the
-///    host url space as if authored there. It is built detached first, so the
-///    host [`RouteTree`] never rebuilds for it;
-/// 3. enters it ([`Thread::enter`]), continuing the newest stored thread
-///    whose metadata holds every entry of `metadata`, each `{param}` filled
-///    from the request, plus `template`; a route declaring no metadata starts
-///    a thread every request. `--thread` continues a stored thread by id,
-///    `--new` starts one stamped the same, and `--spawned-by` names the post
-///    whose action asked for the session ([`ThreadEntryParams`]);
-/// 4. runs the template's behavior to its [`Outcome`], then closes the
+///    [`RequestContextStack`] for the build, then attaches it beneath the
+///    route, where it resolves the ancestor [`BlobStore`] and the host url
+///    space as if authored there. It is built detached first, so the host
+///    [`RouteTree`] never rebuilds for it;
+/// 2. enters it ([`Thread::enter`]), the template's [`MountThreadStore`]
+///    path, filled from the request, naming the thread it continues, and
+///    the request's [`ThreadEntryParams`] overriding it; then posts
+///    `message`, each `{param}` filled from the request, by `actor`, else
+///    the thread's first User actor by id;
+/// 3. runs the template's behavior to its [`Outcome`], then closes the
 ///    session ([`SessionClosed`]), an error closing it as a fail;
-/// 5. waits for every completed post to reach its [`ThreadStore`]
+/// 4. waits for every completed post to reach its [`ThreadStore`]
 ///    ([`ThreadStore::flush`]), then despawns the thread;
-/// 6. answers the last completed text of the thread's acting actors as the
+/// 5. answers the last completed text of the thread's acting actors as the
 ///    body on a pass, and a `500` naming the failure on a fail.
 ///
-/// A failed build, a seed that could not be read or a behavior that errors
-/// fail the request the same way, the thread despawned all the same.
+/// A failed build, a refused entry or a behavior that errors fail the
+/// request the same way, the thread despawned all the same. A template
+/// holding a `UserInput` is refused, naming it: a thread a person sits in is
+/// held by a [`RunThread`].
 #[action]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -45,22 +47,26 @@ pub async fn ThreadRoute(
 	/// [`BsxTemplateRegistry`] or a rust `#[template]`, by name.
 	#[field]
 	template: SmolStr,
-	/// The entries a thread this route creates is stamped with, each string's
-	/// `{param}` filled from the request, and that a request continues a
-	/// stored thread by. Empty starts a thread every request.
+	/// The message each request posts once the thread is entered, each
+	/// `{param}` filled from the request. None posts nothing.
 	#[field]
-	metadata: Map,
+	message: Option<SmolStr>,
+	/// The message's author, by id, else the thread's first User actor by
+	/// id.
+	#[field]
+	actor: Option<ActorId>,
 	entry: Params<ThreadEntryParams>,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let route = cx.caller.clone();
 	let world = route.world().clone();
-	let entry = ThreadRoute::entry(
-		&template,
-		&metadata,
-		cx.input.parts(),
+	let mut entry = ThreadEntry::new(
+		cx.input.parts().clone(),
 		ThreadEntryParams::clone(&entry),
-	)?;
+	);
+	if let Some(message) = &message {
+		entry = entry.with_message(message, actor)?;
+	}
 	let root =
 		ThreadRoute::build(&route, template.clone(), cx.input.parts().clone())
 			.await?;
@@ -73,33 +79,6 @@ pub async fn ThreadRoute(
 }
 
 impl ThreadRoute {
-	/// The entry a request makes: `metadata` filled from `parts` and stamped
-	/// with the template, continuing by it when the route declares any.
-	fn entry(
-		template: &SmolStr,
-		metadata: &Map,
-		parts: &RequestParts,
-		params: ThreadEntryParams,
-	) -> Result<ThreadEntry> {
-		let mut stamp = Map::default();
-		for (key, value) in metadata.iter() {
-			let value = match value {
-				Value::Str(text) => {
-					Value::new(crate::table::request_post::fill(text, parts)?)
-				}
-				other => other.clone(),
-			};
-			stamp.insert(key.clone(), value);
-		}
-		stamp.insert("template", template.as_str());
-		ThreadEntry {
-			continues: !metadata.is_empty(),
-			metadata: stamp,
-			params,
-		}
-		.xok()
-	}
-
 	/// Build `template` for the request `parts`, settle it and attach it
 	/// beneath `route`, answering the build root, the container holding the
 	/// template's own root.
@@ -166,6 +145,8 @@ impl ThreadRoute {
 		template: &str,
 		entry: ThreadEntry,
 	) -> Result<Response> {
+		#[cfg(feature = "ui")]
+		Self::assert_unattended(root, template).await?;
 		let threads = RunThread::enter_all(root, &entry).await?;
 		let behavior = root
 			.with_state::<Query<&Children>, _>(|root, children| {
@@ -206,6 +187,35 @@ impl ThreadRoute {
 			),
 		}
 		.xok()
+	}
+
+	/// Refuse a template holding a [`UserInput`], naming its actor: nobody
+	/// types into a thread run as a function.
+	#[cfg(feature = "ui")]
+	async fn assert_unattended(root: &AsyncEntity, template: &str) -> Result {
+		let typing = root
+			.with_state::<(Query<&Children>, Query<Option<&Actor>, With<UserInput>>), _>(
+				|root, (children, inputs)| {
+					children
+						.iter_descendants(root)
+						.filter_map(|entity| inputs.get(entity).ok())
+						.map(|actor| {
+							actor
+								.map(|actor| actor.name().to_string())
+								.unwrap_or_default()
+						})
+						.next()
+				},
+			)
+			.await?;
+		match typing {
+			Some(actor) => bevybail!(
+				"the template `{template}` holds a `UserInput` on the actor `{actor}`, \
+				 but a `ThreadRoute` runs with nobody typing: a thread a person sits \
+				 in is held by a `RunThread`"
+			),
+			None => Ok(()),
+		}
 	}
 
 	/// Tear down the build `root`: detached from the route first, then every
@@ -267,13 +277,14 @@ mod test {
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
 
-	/// The thread a review builds per request: pinned actors, the reviewed
-	/// document in its seed, a reading agent with tools of its own that reads once then
-	/// answers, its records kept under `threads`.
+	/// The thread a review builds per request, one per document: two people
+	/// with pinned ids, and a reading agent with tools of its own that reads
+	/// once then answers.
 	const REVIEW_THREAD: &str = r#"
 <RepeatWhileFunctionCallOutput>
-	<Thread {(Sequence, MountThreadStore{path:"threads"})}>
-		<CreateActor name="User" kind="User" id=1><RequestPost text="review {document}"/></CreateActor>
+	<Thread {(Sequence, MountThreadStore{path:"threads/{document}"})}>
+		<CreateActor name="Author" kind="User" id=1/>
+		<CreateActor name="Editor" kind="User" id=3/>
 		<CreateActor name="Agent" kind="Agent" id=2 {MockPostStreamer{script:[Call{tool:"read-blob", arguments:{path:"notes.md"}}]}}>
 			<Router><StoreToolset read_only=true/></Router>
 		</CreateActor>
@@ -301,10 +312,19 @@ mod test {
 		PostRef::new(ThreadId::from_u128(1), PostId::from_u128(2))
 	}
 
-	/// A thread whose behavior errors once its session opens.
+	/// A thread with no person in it, whose behavior errors once entered.
 	const FAILING_THREAD: &str = r#"
-<Thread {(Sequence, MountThreadStore{path:"threads"})}>
+<Thread {(Sequence, MountThreadStore{path:"failures"})}>
 	<CreateActor name="Agent" kind="Agent" id=2 {Bail}/>
+</Thread>
+"#;
+
+	/// A thread a person types into.
+	#[cfg(feature = "ui")]
+	const SITTING_THREAD: &str = r#"
+<Thread {Sequence}>
+	<CreateActor name="Owner" kind="User" {UserInput}/>
+	<CreateActor name="Agent" kind="Agent" {MockPostStreamer}/>
 </Thread>
 "#;
 
@@ -315,13 +335,15 @@ mod test {
 	#[require(Action<(), Outcome> = Action::new_async(bail))]
 	struct Bail;
 
-	/// A host url space holding the review route, spread with `review`, over
-	/// an in-memory store.
-	fn host(review: &str) -> (App, Entity, BlobStore) {
+	/// A host url space over an in-memory store, its routes running each
+	/// template.
+	fn host() -> (App, Entity, BlobStore) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.install_type::<ThreadPlugin>()
 			.register_type::<Bail>();
+		#[cfg(feature = "ui")]
+		app.register_type::<UserInput>();
 		let mut registry = app
 			.world_mut()
 			.get_resource_or_init::<BsxTemplateRegistry>();
@@ -329,19 +351,22 @@ mod test {
 			("ReviewThread", REVIEW_THREAD),
 			("DelegateThread", DELEGATE_THREAD),
 			("FailingThread", FAILING_THREAD),
+			#[cfg(feature = "ui")]
+			("SittingThread", SITTING_THREAD),
 		] {
 			registry.insert_source(name, source).unwrap();
 		}
 		let store = BlobStore::temp();
 		let router = BsxTemplate::parse_entry(
 			app.world(),
-			&format!(
-				r#"<Router>
-	<Route path="review/:document" {{{review}}}/>
-	<Route path="delegate" {{ThreadRoute{{template:"DelegateThread"}}}}/>
-	<Route path="fail" {{ThreadRoute{{template:"FailingThread"}}}}/>
-</Router>"#
-			),
+			r#"<Router>
+	<Route path="review/:document" {ThreadRoute{template:"ReviewThread", message:"review {document}"}}/>
+	<Route path="edit/:document" {ThreadRoute{template:"ReviewThread", message:"edit {document}", actor:3}}/>
+	<Route path="delegate" {ThreadRoute{template:"DelegateThread"}}/>
+	<Route path="fail" {ThreadRoute{template:"FailingThread"}}/>
+	<Route path="lonely" {ThreadRoute{template:"FailingThread", message:"anyone?"}}/>
+	<Route path="sit" {ThreadRoute{template:"SittingThread"}}/>
+</Router>"#,
 		)
 		.unwrap()
 		.spawn(app.world_mut())
@@ -349,9 +374,6 @@ mod test {
 		app.world_mut().entity_mut(router).insert(store.clone());
 		(app, router, store)
 	}
-
-	/// The review route continuing by its document.
-	const BY_DOCUMENT: &str = r#"ThreadRoute{template:"ReviewThread", metadata:{document:"{document}"}}"#;
 
 	/// Request `request` of the host, answering its status and body.
 	async fn review(
@@ -364,23 +386,9 @@ mod test {
 		(response.status(), response.text().await.unwrap())
 	}
 
-	/// The records under `threads` in `store`.
-	fn thread_store(store: &BlobStore) -> BlobThreadStore {
-		BlobThreadStore::new(store.with_subdir(RelPath::new("threads")))
-	}
-
-	/// Every stored thread's text posts, the tool calls and sessions aside,
-	/// sorted.
-	async fn stored(store: &BlobStore) -> Vec<Vec<String>> {
-		let records = thread_store(store);
-		let mut threads = Vec::new();
-		for thread in records.threads().await.unwrap() {
-			threads.push(texts(
-				&records.thread_posts(thread.id(), None).await.unwrap(),
-			));
-		}
-		threads.sort();
-		threads
+	/// The records under `path` in `store`.
+	fn thread_store(store: &BlobStore, path: &str) -> BlobThreadStore {
+		BlobThreadStore::new(store.with_subdir(RelPath::new(path)))
 	}
 
 	/// The text posts of `posts`, the tool calls and sessions aside.
@@ -394,9 +402,9 @@ mod test {
 			.collect()
 	}
 
-	/// The one stored thread.
-	async fn only_thread(store: &BlobStore) -> (Thread, Vec<Post>) {
-		let records = thread_store(store);
+	/// The one thread stored under `path`.
+	async fn only_thread(store: &BlobStore, path: &str) -> (Thread, Vec<Post>) {
+		let records = thread_store(store, path);
 		let threads = records.threads().await.unwrap();
 		threads.len().xpect_eq(1);
 		let posts = records.thread_posts(threads[0].id(), None).await.unwrap();
@@ -407,7 +415,7 @@ mod test {
 	/// its posts in the store and the host's route tree untouched.
 	#[beet_core::test]
 	async fn answers_then_despawns_its_thread() {
-		let (mut app, router, store) = host(BY_DOCUMENT);
+		let (mut app, router, store) = host();
 		let tree = app
 			.world()
 			.entity(router)
@@ -422,10 +430,10 @@ mod test {
 			.iter(app.world())
 			.count()
 			.xpect_eq(0);
-		stored(&store).await.xpect_eq(vec![vec![
+		texts(&only_thread(&store, "threads/product").await.1).xpect_eq(vec![
 			"review product".to_string(),
 			"you said: review product".to_string(),
-		]]);
+		]);
 		app.world()
 			.entity(router)
 			.get_ref::<RouteTree>()
@@ -434,65 +442,86 @@ mod test {
 			.xpect_eq(tree);
 	}
 
-	/// Two requests with the same filled metadata continue one thread, each
-	/// posting its own message, and another value starts its own, stamped
-	/// with its entries and the template.
+	/// Two requests naming the same document continue one thread, each
+	/// posting its own message, and another document keeps its own.
 	#[beet_core::test]
-	async fn continues_by_its_metadata() {
-		let (mut app, router, store) = host(BY_DOCUMENT);
+	async fn continues_by_its_path() {
+		let (mut app, router, store) = host();
 		for path in ["review/product", "review/product", "review/market"] {
 			review(&mut app, router, Request::get(path))
 				.await
 				.0
 				.xpect_eq(StatusCode::OK);
 		}
-		stored(&store).await.xpect_eq(vec![
-			vec![
-				"review market".to_string(),
-				"you said: review market".to_string(),
-			],
-			vec![
-				"review product".to_string(),
-				"you said: review product".to_string(),
-				"review product".to_string(),
-				"you said: review product".to_string(),
-			],
+		texts(&only_thread(&store, "threads/product").await.1).xpect_eq(
+			["review product", "you said: review product"]
+				.repeat(2)
+				.into_iter()
+				.map(str::to_string)
+				.collect::<Vec<_>>(),
+		);
+		texts(&only_thread(&store, "threads/market").await.1).xpect_eq(vec![
+			"review market".to_string(),
+			"you said: review market".to_string(),
 		]);
-		thread_store(&store)
-			.threads()
-			.await
-			.unwrap()
-			.iter()
-			.any(|thread| {
-				thread.metadata().get("document").ok()
-					== Some(&Value::new("market"))
-					&& thread.metadata().get("template").ok()
-						== Some(&Value::new("ReviewThread"))
-			})
-			.xpect_true();
 	}
 
-	/// A route declaring no metadata starts a thread every request.
+	/// A request's message lands once per request, after its session opens,
+	/// by the named actor, else the thread's first User actor by id.
 	#[beet_core::test]
-	async fn no_metadata_is_fresh_every_time() {
-		let (mut app, router, store) =
-			host(r#"ThreadRoute{template:"ReviewThread"}"#);
-		for _ in 0..2 {
-			review(&mut app, router, Request::get("review/product")).await;
+	async fn posts_the_message_by_its_actor() {
+		let (mut app, router, store) = host();
+		for path in ["review/product", "edit/product"] {
+			review(&mut app, router, Request::get(path))
+				.await
+				.0
+				.xpect_eq(StatusCode::OK);
 		}
-		stored(&store).await.len().xpect_eq(2);
+		let (_, posts) = only_thread(&store, "threads/product").await;
+		let messages = posts
+			.iter()
+			.filter(|post| {
+				post.to_string() == "review product"
+					|| post.to_string() == "edit product"
+			})
+			.map(|post| (post.to_string(), post.author()))
+			.collect::<Vec<_>>();
+		messages.xpect_eq(vec![
+			("review product".to_string(), ActorId::from_u128(1)),
+			("edit product".to_string(), ActorId::from_u128(3)),
+		]);
+		// each message directly follows its own session's opened post
+		for (index, post) in posts.iter().enumerate() {
+			if SessionOpened::opens(post) {
+				matches!(
+					posts[index + 1].to_string().as_str(),
+					"review product" | "edit product"
+				)
+				.xpect_true();
+			}
+		}
 	}
 
-	/// `--new` starts a thread stamped the same, which the next request
-	/// continues, and `--thread` continues a stored thread by id.
+	/// A message with no actor named fails the request when the thread holds
+	/// no User actor.
 	#[beet_core::test]
-	async fn new_and_thread_pick_the_thread() {
-		let (mut app, router, store) = host(BY_DOCUMENT);
+	async fn a_message_needs_an_author() {
+		let (mut app, router, _) = host();
+		let (status, text) =
+			review(&mut app, router, Request::get("lonely")).await;
+		status.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
+		text.xpect_contains("holds no User actor");
+	}
+
+	/// The request's params pick the thread: `--new` creates one and
+	/// `--thread` continues a stored one by id, a malformed id refused.
+	#[beet_core::test]
+	async fn its_params_pick_the_thread() {
+		let (mut app, router, store) = host();
 		review(&mut app, router, Request::get("review/product")).await;
-		let (first, _) = only_thread(&store).await;
+		let (first, _) = only_thread(&store, "threads/product").await;
 		for request in [
 			Request::get("review/product").with_param("new", "true"),
-			Request::get("review/product"),
 			Request::get("review/product")
 				.with_param("thread", &first.id().to_string()),
 		] {
@@ -501,14 +530,11 @@ mod test {
 				.0
 				.xpect_eq(StatusCode::OK);
 		}
-		// two sessions of each thread, each request asking and answered
-		let session = ["review product", "you said: review product"];
-		let twice = session
-			.repeat(2)
-			.into_iter()
-			.map(str::to_string)
-			.collect::<Vec<_>>();
-		stored(&store).await.xpect_eq(vec![twice.clone(), twice]);
+		let records = thread_store(&store, "threads/product");
+		records.threads().await.unwrap().len().xpect_eq(2);
+		texts(&records.thread_posts(first.id(), None).await.unwrap())
+			.len()
+			.xpect_eq(4);
 		review(
 			&mut app,
 			router,
@@ -524,7 +550,7 @@ mod test {
 	/// carries neither.
 	#[beet_core::test]
 	async fn sessions_are_bracketed_by_posts() {
-		let (mut app, router, store) = host(BY_DOCUMENT);
+		let (mut app, router, store) = host();
 		let creator = delegating_post();
 		let second = PostRef::new(ThreadId::from_u128(1), PostId::from_u128(3));
 		for spawned_by in [&creator, &second] {
@@ -538,7 +564,7 @@ mod test {
 			.0
 			.xpect_eq(StatusCode::OK);
 		}
-		let (thread, posts) = only_thread(&store).await;
+		let (thread, posts) = only_thread(&store, "threads/product").await;
 		thread.spawned_by().xpect_eq(Some(&creator));
 		posts
 			.iter()
@@ -561,7 +587,11 @@ mod test {
 		}
 		// the scripted agent answered the review both times, never a session
 		let mut records = ThreadRecords::new();
-		for actor in thread_store(&store).actors().await.unwrap() {
+		for actor in thread_store(&store, "threads/product")
+			.actors()
+			.await
+			.unwrap()
+		{
 			records.insert_actor(actor);
 		}
 		for post in posts {
@@ -579,16 +609,20 @@ mod test {
 	/// field of the call.
 	#[beet_core::test]
 	async fn spawned_by_travels_as_a_body_field() {
-		let (mut app, router, store) = host(BY_DOCUMENT);
+		let (mut app, router, store) = host();
 		review(&mut app, router, Request::get("review/product")).await;
-		only_thread(&store).await.0.spawned_by().xpect_none();
+		only_thread(&store, "threads/product")
+			.await
+			.0
+			.spawned_by()
+			.xpect_none();
 
-		let (mut app, router, store) = host(BY_DOCUMENT);
+		let (mut app, router, store) = host();
 		review(&mut app, router, Request::get("delegate"))
 			.await
 			.0
 			.xpect_eq(StatusCode::OK);
-		only_thread(&store)
+		only_thread(&store, "threads/product")
 			.await
 			.0
 			.spawned_by()
@@ -599,12 +633,12 @@ mod test {
 	/// records reach the store.
 	#[beet_core::test]
 	async fn an_erroring_session_still_closes() {
-		let (mut app, router, store) = host(BY_DOCUMENT);
+		let (mut app, router, store) = host();
 		review(&mut app, router, Request::get("fail"))
 			.await
 			.1
 			.xpect_contains("boom");
-		only_thread(&store)
+		only_thread(&store, "failures")
 			.await
 			.1
 			.iter()
@@ -612,5 +646,16 @@ mod test {
 			.map(|closed| closed.outcome)
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![Outcome::FAIL]);
+	}
+
+	/// A template a person types into is refused, naming the actor.
+	#[cfg(feature = "ui")]
+	#[beet_core::test]
+	async fn refuses_a_person_typing() {
+		let (mut app, router, _) = host();
+		let (status, text) =
+			review(&mut app, router, Request::get("sit")).await;
+		status.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
+		text.xpect_contains("holds a `UserInput` on the actor `Owner`");
 	}
 }

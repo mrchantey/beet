@@ -37,17 +37,11 @@ impl PostRef {
 	}
 
 	/// Teach every authoring seam, a flag, a query param, a markup attribute,
-	/// to read a [`PostRef`] and a [`ThreadId`] from their text.
-	pub(crate) fn register_literals() {
+	/// to read a [`PostRef`] from its text.
+	pub(crate) fn register_literal() {
 		LiteralParser::register::<PostRef>(LiteralParser::new(
 			|value: &Value| match value {
 				Value::Str(text) => PostRef::parse(text).map(Some),
-				_ => Ok(None),
-			},
-		));
-		LiteralParser::register::<ThreadId>(LiteralParser::new(
-			|value: &Value| match value {
-				Value::Str(text) => ThreadId::parse(text).map(Some),
 				_ => Ok(None),
 			},
 		));

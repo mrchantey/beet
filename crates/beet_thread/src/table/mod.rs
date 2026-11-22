@@ -176,7 +176,8 @@
 //!   a post, then going its own way, referencing its ancestors' posts rather
 //!   than copying them. A branch lives in its parent's store, so
 //!   `--branch-of` naming a post the mount's store lacks is refused, as is
-//!   `--branch-of` beside `--thread`.
+//!   `--branch-of` beside `--thread`. Its seed is its parent's, in the
+//!   history it continues, so creating a branch reads no seed source.
 //!
 //! # Limits
 //!
@@ -196,10 +197,8 @@ pub use create_actor::*;
 mod create_post;
 mod document;
 mod load_thread;
-pub(crate) mod request_post;
 pub use create_post::*;
 pub use load_thread::*;
-pub use request_post::*;
 #[cfg(feature = "action")]
 mod route_post;
 #[cfg(feature = "action")]
