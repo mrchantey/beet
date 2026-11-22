@@ -49,7 +49,9 @@ pub fn RequestPost(
 #[derive(Debug, Default, Clone, Copy, Component)]
 pub struct RequestMessage;
 
-/// `text` with each `{param}` replaced by its value in `parts`.
+/// `text` with each `{param}` replaced by its value in `parts`, the values
+/// of a param holding several, ie a greedy path param's segments, joined by
+/// `/`.
 pub(crate) fn fill(text: &str, parts: &RequestParts) -> Result<String> {
 	let mut out = String::with_capacity(text.len());
 	let mut chars = text.chars().peekable();
@@ -70,13 +72,19 @@ pub(crate) fn fill(text: &str, parts: &RequestParts) -> Result<String> {
 						}
 					}
 				}
-				let value = parts.get_param(name.trim()).ok_or_else(|| {
-					bevyhow!(
-						"`{text}` names the param `{name}`, which the request `{}` lacks",
-						parts.path_string()
-					)
-				})?;
-				out.push_str(value);
+				// a greedy path param holds a value per segment, ie
+				// `build/*rubric`'s `acme/01-plan`, so they join as the path
+				// they were
+				let values = parts
+					.get_params(name.trim())
+					.filter(|values| !values.is_empty())
+					.ok_or_else(|| {
+						bevyhow!(
+							"`{text}` names the param `{name}`, which the request `{}` lacks",
+							parts.path_string()
+						)
+					})?;
+				out.push_str(&values.join("/"));
 			}
 			(other, _) => out.push(other),
 		}
@@ -102,6 +110,18 @@ mod test {
 		)
 		.unwrap()
 		.xpect_eq("review product as a reader, {literally}");
+	}
+
+	/// A greedy path param fills as the path it captured, every segment.
+	#[beet_core::test]
+	fn fills_a_greedy_param_whole() {
+		let mut request = Request::get("build/acme/01-plan");
+		request
+			.params_mut()
+			.insert_vec("rubric".into(), vec!["acme".into(), "01-plan".into()]);
+		fill("build {rubric}", &parts(request))
+			.unwrap()
+			.xpect_eq("build acme/01-plan");
 	}
 
 	#[beet_core::test]

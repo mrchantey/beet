@@ -9,6 +9,10 @@ pub struct MarkdownParams {
 	/// declares, its author and dates among it, in the format named,
 	/// `--frontmatter=toml` or `--frontmatter=yaml`.
 	pub frontmatter: Option<MediaType>,
+	/// Write what the page hides rather than skip it, `--hidden`, so a
+	/// document dumps whole, ie a deck's hidden slides as card articles
+	/// carrying `hidden`.
+	pub hidden: bool,
 }
 
 /// Renders an entity tree back to a markdown string via [`NodeVisitor`].
@@ -23,6 +27,18 @@ pub struct MarkdownParams {
 /// ([`MarkdownParams`]), a render leads with the block declaring its root's
 /// frontmatter components ([`Frontmatter::write`]), so a parsed markdown file
 /// renders its metadata back and a Word file its core properties.
+///
+/// An `article` carrying a `data-` attribute, ie a deck's `article
+/// data-card` or a workbook's `article data-worksheet`, writes as markdown
+/// authors one, an HTML block of its open tag with every attribute, its
+/// markdown and its close tag, each a block of its own, since those
+/// attributes say what it is and markdown has no syntax for them. Any other
+/// `article` writes as its content.
+///
+/// A `hidden` element writes nothing, as the web and the terminal show
+/// nothing of it, unless asked for with `--hidden` ([`MarkdownParams`]) or
+/// [`with_hidden`](Self::with_hidden), when it writes as any other does, an
+/// article keeping its `hidden` among its attributes.
 ///
 /// A [`Comment`] is an authoring note, never a page's content, so it is
 /// skipped unless [`with_comments`](Self::with_comments) keeps it, as a writer
@@ -70,6 +86,10 @@ pub struct MarkdownRenderer {
 	/// The passthrough element open in the walk, written by its own
 	/// [`HtmlRenderer`] until it closes.
 	passthrough: Option<Passthrough>,
+	/// The articles open in the walk written as HTML blocks, innermost last.
+	html_blocks: Vec<Entity>,
+	/// Write hidden elements rather than skip them.
+	write_hidden: bool,
 	/// A checkbox was just written, so the words after it are spaced from
 	/// it unless they bring their own space.
 	after_box: bool,
@@ -310,6 +330,8 @@ impl MarkdownRenderer {
 			blocks: Vec::new(),
 			tables: Vec::new(),
 			passthrough: None,
+			html_blocks: Vec::new(),
+			write_hidden: false,
 			after_box: false,
 			after_element: None,
 			at_block_start: false,
@@ -326,6 +348,13 @@ impl MarkdownRenderer {
 	/// a writer round-tripping a source rather than rendering a page.
 	pub fn with_comments(mut self) -> Self {
 		self.strip_comments = false;
+		self
+	}
+
+	/// Write hidden elements rather than skip them, for a dump of a whole
+	/// document rather than a render of its page.
+	pub fn with_hidden(mut self) -> Self {
+		self.write_hidden = true;
 		self
 	}
 
@@ -528,6 +557,57 @@ impl MarkdownRenderer {
 		}
 	}
 
+	/// Opens an `article` carrying a `data-` attribute as an HTML block, its
+	/// open tag a block of its own, answering whether it did.
+	fn open_html_block(
+		&mut self,
+		cx: &VisitContext,
+		view: &ElementView,
+	) -> bool {
+		if view.tag() != "article"
+			|| !view
+				.attributes
+				.iter()
+				.any(|attr| attr.key().starts_with("data-"))
+		{
+			return false;
+		}
+		let mut open = String::from("<article");
+		for attr in &view.attributes {
+			open.push(' ');
+			open.push_str(attr.key());
+			// a null is a boolean attribute, present with no value
+			if !attr.value.is_null() {
+				open.push_str(&format!(
+					"=\"{}\"",
+					escape_html_attribute(&attr.value.to_string())
+				));
+			}
+		}
+		open.push('>');
+		self.state.ensure_block_separator();
+		self.push_str(&open);
+		self.state.ensure_newline();
+		self.state.needs_block_separator = true;
+		self.html_blocks.push(cx.entity);
+		true
+	}
+
+	/// Closes the HTML block `entity` opened, if it opened one, answering
+	/// whether it did.
+	fn close_html_block(&mut self, entity: Entity) -> bool {
+		if self.html_blocks.last() != Some(&entity) {
+			return false;
+		}
+		self.html_blocks.pop();
+		self.flush_inline();
+		self.state.ensure_block_separator();
+		self.push_str("</article>");
+		self.state.ensure_newline();
+		self.state.needs_block_separator = true;
+		true
+	}
+
 	/// Records a suppressible block's start before its separator.
 	fn start_block(&mut self) -> BlockStart {
 		BlockStart {
@@ -573,8 +653,11 @@ impl MarkdownRenderer {
 
 impl NodeVisitor for MarkdownRenderer {
 	/// Skips what the page hides, ie a deck's other cards and its notes,
-	/// except inside a passthrough element, written whole as HTML.
-	fn skips_hidden(&self) -> bool { self.passthrough.is_none() }
+	/// unless asked to write it, and except inside a passthrough element,
+	/// written whole as HTML.
+	fn skips_hidden(&self) -> bool {
+		self.passthrough.is_none() && !self.write_hidden
+	}
 
 	/// Skips a textless tag the [`HtmlPassthrough`] does not name, and
 	/// nothing inside a passthrough element, which is written whole.
@@ -625,6 +708,9 @@ impl NodeVisitor for MarkdownRenderer {
 		}
 		if self.html_passthrough.passes(name) {
 			self.open_passthrough(cx, view);
+			return;
+		}
+		if self.open_html_block(cx, &view) {
 			return;
 		}
 		let block = Self::SUPPRESSIBLE
@@ -826,7 +912,7 @@ impl NodeVisitor for MarkdownRenderer {
 		};
 		self.after_element = Self::spaces_from_sibling(&self.state, name)
 			.then(|| Self::is_item(name));
-		if passthrough_closed {
+		if passthrough_closed || self.close_html_block(cx.entity) {
 			return;
 		}
 		if let Some(wrapper) = InlineWrapper::of(name) {
@@ -1035,12 +1121,12 @@ impl DocRenderer for MarkdownRenderer {
 		cx: &mut RenderContext,
 	) -> Result<MediaBytes, RenderError> {
 		cx.check_accepts(&[MediaType::Markdown])?;
+		let params = cx.request.parse_params::<MarkdownParams>()?;
+		self.write_hidden |= params.hidden;
 		// asked for, a document's metadata leads it as the frontmatter that
 		// declares it
 		#[cfg(feature = "bsx")]
-		if let Some(media_type) =
-			cx.request.parse_params::<MarkdownParams>()?.frontmatter
-		{
+		if let Some(media_type) = params.frontmatter {
 			let entity = cx.entity;
 			let component = cx
 				.world
@@ -1308,6 +1394,34 @@ mod test {
 			MarkdownRenderer::new(),
 		)
 		.xpect_eq("shown\n\nafter\n");
+	}
+
+	/// A card article writes as markdown authors one, so a deck dumps card by
+	/// card and reads back as the same cards; asked for, a hidden one writes
+	/// too, keeping its `hidden`.
+	#[beet_core::test]
+	fn writes_card_articles_as_authored() {
+		let deck = "<article data-card><h1>One</h1><hr/><p>Notes.</p></article>\
+			<article data-card hidden><h1>Two</h1></article><article class=\"wide\"><p>Plain.</p></article>";
+		render_html_with(deck, MarkdownRenderer::new()).xpect_eq(
+			"<article data-card>\n\n# One\n\n---\n\nNotes.\n\n</article>\n\nPlain.\n",
+		);
+		let whole =
+			render_html_with(deck, MarkdownRenderer::new().with_hidden());
+		whole.clone().xpect_eq(
+			"<article data-card>\n\n# One\n\n---\n\nNotes.\n\n</article>\n\n\
+			 <article data-card hidden>\n\n# Two\n\n</article>\n\nPlain.\n",
+		);
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		MarkdownParser::new()
+			.parse(ParseContext::new(
+				&mut world.entity_mut(entity),
+				&MediaBytes::new_markdown(&whole),
+			))
+			.unwrap();
+		render_with(&mut world, entity, MarkdownRenderer::new().with_hidden())
+			.xpect_eq(whole);
 	}
 
 	/// The words alone write nothing for an embedded element.
