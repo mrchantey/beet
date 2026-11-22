@@ -25,7 +25,7 @@ action = ["dep:beet_action"]
 # action and the completions mapper drives one.
 agent = ["action", "dep:async-openai"]
 # Reactive chat UI on top of beet_ui: the `ThreadView` charcell widget and the
-# `ThreadWindow` -> `Document` projection. Pulls beet_ui's template + charcell
+# `ThreadRecords` -> `Document` projection. Pulls beet_ui's template + charcell
 # (`tui`) stack plus the reactive document chain.
 ui = ["dep:beet_ui", "action"]
 

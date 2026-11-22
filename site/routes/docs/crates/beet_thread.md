@@ -7,29 +7,23 @@ visibility = "unlisted"
 
 # beet_thread
 
-`beet_thread` orchestrates conversations between many actors. A `Thread` is a sequence of `Actor`s, each owning their `Post`s, and an actor might be a person, a system prompt or an LLM agent. They all participate on equal footing, so the same machinery drives a plain group chat, a human-in-the-loop workflow or a fleet of cooperating agents.
+`beet_thread` keeps conversations between actors. A `Thread` is posts by `Actor`s, people, agents or the system on equal footing, kept as records in a store, so a room of people needs nothing an agent brings and an agent is one more participant whose turn is an action.
 
-Running a thread advances the conversation: an agent actor sends the transcript to its provider and appends the reply. Because actors are entities and tools are just child [`Action`] routes, giving an agent a capability means spawning another route on it, and a multi-agent system is simply more actors in the tree, not a different architecture.
+Because a turn is an action, a thread's behavior is ordinary [beet_action](/docs/crates/beet_action) control flow: a `Sequence` takes turns one at a time, a `Parallel` lets actors speak at once. An agent's tools are the routes of its own `Router`, so giving it a capability means mounting another route, and a multi-agent system is more actors in the tree rather than a different architecture.
 
-```rust,ignore
-use beet::prelude::*;
+Every word of the model, from seed and session to window, turn and lineage, is defined once in the crate's `table` module docs.
 
-#[beet::main]
-async fn main() {
-	env_ext::load_dotenv();
-
-	let posts = ThreadMut::spawn()
-		.insert_actor(Actor::system())
-		.insert_post("make like a duck and quack")
-		.thread_view()
-		.insert_actor(Actor::agent())
-		.with_bundle(OpenAiProvider::gpt_5_mini().unwrap())
-		.send_and_collect()
-		.await
-		.unwrap();
-
-	println!("{posts:#?}");
-}
+```rust
+# use beet_core::prelude::*;
+# use beet_thread::prelude::*;
+# async fn run() -> Result {
+let replies = Post::run_oneshot(children![
+	(Actor::user(), children![Post::spawn("hi")]),
+	(Actor::agent(), MockPostStreamer::default()),
+])
+.await?;
+# Ok(())
+# }
 ```
 
-Providers include OpenAI, Gemini, Bedrock and Ollama, plus a mock provider for tests, and replies can be streamed or collected in one go. Add `ThreadStdoutPlugin` to stream a conversation to the terminal.
+Providers include OpenAI, Gemini, Bedrock and Ollama, plus a mock provider for tests, and replies can be streamed or collected in one go.

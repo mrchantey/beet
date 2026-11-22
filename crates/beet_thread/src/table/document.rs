@@ -8,7 +8,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use uuid::Uuid;
 
-/// A record in a thread store ([`Thread`], [`Actor`], [`Post`], ..), keyed by
+/// A record in a thread store ([`Thread`](crate::prelude::Thread), [`Actor`](crate::prelude::Actor), [`Post`](crate::prelude::Post), ..), keyed by
 /// its typed [`TableId`].
 pub trait ThreadRecord: 'static + Send + Sync + Sized {
 	type Id: TableId;

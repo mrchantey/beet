@@ -5,7 +5,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
 /// The durable, syncable log of a thread's records: [`Thread`], [`Actor`],
-/// [`Post`] and [`ResponseMeta`]. Parallels [`BlobStore`] as the source of
+/// [`Post`] and [`ResponseMeta`]. Parallels [`BlobStore`](beet_net::prelude::BlobStore) as the source of
 /// truth the ephemeral scene is a view onto.
 ///
 /// A thread's records flush into it as they change, each flush a task of its own;

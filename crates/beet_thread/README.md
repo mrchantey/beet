@@ -1,34 +1,32 @@
 # beet_thread
 
-Multi-actor conversation orchestration.
+Conversations between actors, kept as records.
 
-A [`Thread`] is a sequence of [`Actor`]s, each owning their [`Post`]s. An actor may be a person, a system prompt or an LLM agent, and they all participate on equal footing, so the same machinery drives a plain group chat, a human-in-the-loop workflow or a fleet of cooperating agents.
+A [`Thread`] is a conversation: [`Post`]s by [`Actor`]s, people, agents or the system on equal footing, kept in a store. People post to each other with no agent around, and an agent is one more actor whose turn is an action, so the same machinery is a room, a person working with an agent or a fleet of agents working together. Every word of the model, from thread and seed to window, session, turn, the three shapes and lineage, is defined once in the [`table`] module docs.
 
-Running a thread advances the conversation: an agent actor sends the transcript to its provider and appends the reply. Because actors are entities, an agent's tools are just the routes of the [`Router`] beneath it, its own url space: a tool's name is its route path, and a call of anything else is that router's not-found. A tool is a route taking a typed input, its arguments that input sent as a JSON body. A verb of the url space hosting the agent becomes one of its tools as a [`HostTool`], `<HostTool path="eval/grade"/>`, a route at the same path whose definition is read off the host's route, its declared params the arguments, and whose call is forwarded there with the arguments as those params, so the host validates them as it does flags, its pinned params (`params="table=claims"`) out of the agent's reach. A multi-agent setup is just more actors in the tree.
-
-A thread is one conversation for its whole life, a record in a [`ThreadStore`], and a thread entity is one session of it. Its seed is its initial posts, a [`SeedSource`] (`<CreatePost src="..">`, or `<RoutePost path="..">`, the answer of a route of the url space the thread is attached in) read as part of the build, and [`Thread::enter`] continues the stored thread whose metadata holds the entries its route declares, which keeps its stored seed, so a changed seed reaches a new thread (`--new`). A [`ThreadRoute`] builds one session per request, `<Route path="review/:document" {ThreadRoute{template:"ReviewThread", metadata:{document:"{document}"}}}/>`, continuing the thread about that document. Threads relate by records, never entities: a thread is spawned by a post in another, or branched from one, continuing its history (the `table` module docs).
+A thread entity is a window onto one stored thread, named by its store path: `<Thread {(Sequence, MountThreadStore{path:"threads/chat"})}>`. A [`RunThread`] holds one for a runtime's life, and a [`ThreadRoute`] runs one as a function, a request in and an answer out. An agent's tools are the routes of its own [`Router`], each named by its route path.
 
 Providers: OpenAI, Gemini, Bedrock, Ollama, plus a mock provider for tests. Replies can be streamed or collected.
 
-```rust,ignore
-use beet::prelude::*;
+```rust
+use beet_core::prelude::*;
+use beet_thread::prelude::*;
 
-#[beet::main]
-async fn main() {
-	env_ext::load_dotenv();
-
-	let posts = ThreadMut::spawn()
-		.insert_actor(Actor::system())
-		.insert_post("make like a duck and quack")
-		.thread_view()
-		.insert_actor(Actor::agent())
-		.with_bundle(OpenAiProvider::gpt_5_4_mini().unwrap())
-		.send_and_collect()
-		.await
-		.unwrap();
-
-	println!("{posts:#?}");
-}
+# async_ext::block_on(async {
+let replies = Post::run_oneshot(children![
+	(Actor::user(), children![Post::spawn("hi")]),
+	(Actor::agent(), MockPostStreamer::default()),
+])
+.await
+.unwrap();
+replies[0].to_string().xpect_eq("you said: hi");
+# });
 ```
 
-Add [`ThreadStdoutPlugin`] to stream messages to the terminal, and spawn a [`Router`] of `route::exchange`s beneath an agent actor to give it tools.
+[`Thread`]: crate::prelude::Thread
+[`Post`]: crate::prelude::Post
+[`Actor`]: crate::prelude::Actor
+[`RunThread`]: crate::prelude::RunThread
+[`ThreadRoute`]: crate::prelude::ThreadRoute
+[`Router`]: beet_router::prelude::Router
+[`table`]: crate::table
