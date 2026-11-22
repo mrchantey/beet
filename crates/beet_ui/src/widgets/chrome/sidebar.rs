@@ -388,7 +388,7 @@ mod test {
 		world.init_resource::<PackageConfig>();
 		let root = world.spawn_template(template).unwrap().id();
 		world.entity_mut(root).insert(FlexBuffer::new(width));
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 		world
 			.entity_mut(root)
 			.take::<FlexBuffer>()
@@ -423,7 +423,7 @@ mod test {
 			Value::str("false"),
 		));
 		world.entity_mut(root).insert(FlexBuffer::new(width));
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 		world.entity_mut(root).take::<FlexBuffer>().unwrap()
 	}
 
@@ -615,7 +615,7 @@ mod test {
 			.unwrap()
 			.id();
 		world.entity_mut(root).insert(FlexBuffer::new(width));
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 
 		let rect_of = |world: &mut World, tag: &str| {
 			world
@@ -796,7 +796,7 @@ mod test {
 				.entity_mut(link)
 				.insert(ElementStateMap::with(ElementState::Hovered));
 		}
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 		world
 			.get::<crate::style::VisualStyle>(link)
 			.unwrap()
@@ -853,7 +853,7 @@ mod test {
 				.entity_mut(button)
 				.insert(ElementStateMap::with(ElementState::Hovered));
 		}
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 		let buffer = world.entity_mut(root).take::<FlexBuffer>().unwrap();
 		buffer
 			.cells()

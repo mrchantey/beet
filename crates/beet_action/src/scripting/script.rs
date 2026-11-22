@@ -18,30 +18,24 @@ use serde_json::Value as JsonValue;
 /// JavaScript's own workaround: an object literal is parenthesised, exactly as
 /// an arrow returns one, `({ name: "ada" })`.
 ///
-/// `Script` is the program; its sibling [`ScriptConfig`] is what the host grants
-/// it: world access, console access, the components the world bridge will
-/// address on its behalf, and its resource ceilings. An absent config is
-/// [`ScriptConfig::default`], so a script is world-capable and unrestricted in
-/// reach until a scene says otherwise, and `world: false` makes it provably
-/// pure.
+/// `Script` is the program as a value, what [`run`](Self::run) evaluates. A
+/// scene never holds one: a script there is an entity whose source is its own
+/// [`Value`] and its descendants' ([`RunScript`]), which [`ScriptAction`]
+/// reads into a `Script` per call. Its sibling [`ScriptConfig`] is what the
+/// host grants it: world access, console access, the components the world
+/// bridge will address on its behalf, and its resource ceilings. An absent
+/// config is [`ScriptConfig::default`], so a script is world-capable and
+/// unrestricted in reach until a scene says otherwise, and `world: false`
+/// makes it provably pure.
 ///
-/// `Script` is pure data: it holds the program but installs no [`Action`]. To
-/// run it as a behaviour-tree leaf add [`OutcomeScript`] (which requires a
-/// [`ScriptAction`]); to dispatch it from a route add `ExchangeScript`. Keeping
-/// the data and the action separate lets a domain action gather its own input
-/// and apply its own output around the shared [`Script::run`] backend without a
-/// second, dormant action fighting over the entity's [`ActionMeta`].
+/// A domain action gathers its own input and applies its own output around
+/// the shared [`Script::run`] backend, so it never fights a second, dormant
+/// action over the entity's [`ActionMeta`].
 ///
 /// The backend is chosen at compile time from the target and the `quickjs`
 /// feature, never configured at runtime: a `Script` names a program, not an
 /// engine. A build with no usable backend errors when run rather than silently
 /// degrading, since a backend that cannot isolate the script is not a backend.
-#[derive(Component, Reflect)]
-#[reflect(Component)]
-// `Input` and `Output` only appear in the ignored phantom marker, so an
-// empty `#[reflect(where)]` drops the default `Reflect`/`TypePath` bound
-// and lets us reflect [`Script`] for any compatible input/output pair.
-#[reflect(where)]
 pub struct Script<Input = (), Output = ()>
 where
 	Input: 'static + Send + Sync + Serialize,
@@ -49,12 +43,11 @@ where
 {
 	/// The JavaScript source to evaluate, as an async function body.
 	pub content: String,
-	#[reflect(ignore)]
 	_marker: PhantomData<fn() -> (Input, Output)>,
 }
 
 // Manual impls avoid spurious `Input: Clone/Debug/Default` bounds the
-// derives would add — the phantom marker does not require them.
+// derives would add, the phantom marker does not require them.
 impl<Input, Output> Default for Script<Input, Output>
 where
 	Input: 'static + Send + Sync + Serialize,

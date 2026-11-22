@@ -3,8 +3,12 @@ use beet_core::prelude::*;
 
 /// Description of a target used by steering behaviors.
 /// This can either be a fixed position or an entity with a [`Transform`] component.
+///
+/// [`Entity`](Self::Entity) is an entity reference, so a clone or a scene load
+/// remaps it to the entity it lands as.
 #[derive(Debug, Copy, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, MapEntities, Default)]
+#[component(map_entities)]
 pub enum SteerTarget {
 	/// The target is a fixed position
 	Position(Vec3),
@@ -49,9 +53,8 @@ impl SteerTarget {
 
 impl MapEntities for SteerTarget {
 	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
-		match self {
-			Self::Entity(entity) => *entity = entity_mapper.get_mapped(*entity),
-			_ => {}
+		if let Self::Entity(entity) = self {
+			*entity = entity_mapper.get_mapped(*entity);
 		}
 	}
 }

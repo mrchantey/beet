@@ -1,28 +1,45 @@
 use crate::prelude::*;
+use bevy::ecs::query::Allow;
 use bevy::platform::sync::Arc;
 
-/// Reactive structure: spawns one child per item of a list-typed document field,
-/// re-spawning them whenever that field's [`Value`] changes.
+/// Reactive structure: one child per item of a list-typed document field,
+/// reconciled whenever that field's [`Value`] changes. `bx:for` in markup.
 ///
 /// The companion to [`FieldRef`], which reactively syncs a single [`Value`].
-/// Where a [`FieldRef`] tracks one field's value, a [`ReactiveChildren`] tracks
-/// a *list* field and materializes a child entity per item via `build_item`.
+/// Spawn it beside the ref backing it, `(FieldRef::new("items"),
+/// ReactiveChildren::default())`: the ref links to the document and inserts
+/// the synced [`Value`], so a `Changed<Value>` on this entity drives the
+/// rebuild.
 ///
-/// It rides the existing [`FieldRef`] machinery rather than duplicating it: the
-/// author spawns it via [`new`](Self::new), which pairs it with a [`FieldRef`].
-/// That ref links to the document and inserts the synced [`Value`], so a
-/// `Changed<Value>` on this entity drives the rebuild. Each spawned child is
-/// tagged [`ReactiveChild`] so a rebuild despawns exactly the previous
-/// generation and leaves static siblings alone.
-#[derive(Component)]
+/// Each row is a clone of the item template, an inline [`Prefab`] child of
+/// this entity ([`Prefab::clone_under`]), in a terminating
+/// [`DocumentScope`] at its item, so a binding in the template reads its own
+/// item. Rows are [`Derived`], so a save writes the generator and its
+/// template and never the rows, which the next load regenerates. With a
+/// [`key`](Self::key) a change reconciles by key rather than rebuilding:
+/// matching rows are reused, removed keys despawned and new keys spawned, so
+/// per-row state and bindings survive an append.
+///
+/// A view built in rust whose rows are computed per item, rather than bound,
+/// gives a builder instead of a prefab ([`from_fn`](Self::from_fn)). A builder
+/// is code, which a scene cannot hold, so such a view is derived ui and never
+/// saved.
+#[derive(Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
 pub struct ReactiveChildren {
-	/// Builds the spawn effect for an item, given its index and [`Value`].
-	build_item: Arc<dyn Fn(usize, &Value) -> OnSpawn + Send + Sync>,
-	/// Optional stable key per item. When set, a change reconciles by key
-	/// (reuse-matching / despawn-removed / spawn-new) instead of rebuilding
-	/// every child, so per-row entity state and bindings survive an append.
-	key_of: Option<Arc<dyn Fn(&Value) -> String + Send + Sync>>,
+	/// The field of each item a row reconciles by, ie `id` or `user.id`
+	/// (`bx:key`); a non-string key compares by its debug form. Unkeyed, a
+	/// change rebuilds every row.
+	pub key: Option<FieldPath>,
+	/// Builds a row's content from its index and item, in place of the
+	/// prefab.
+	#[reflect(ignore)]
+	build: Option<ItemBuilder>,
 }
+
+/// A row builder, see [`ReactiveChildren::from_fn`].
+#[derive(Clone)]
+struct ItemBuilder(Arc<dyn Fn(usize, &Value) -> OnSpawn + Send + Sync>);
 
 /// Marker on each child spawned by a [`ReactiveChildren`], so a rebuild can
 /// despawn exactly the previous generation and leave static siblings alone.
@@ -37,34 +54,59 @@ pub(crate) struct ReactiveChildKey {
 }
 
 impl ReactiveChildren {
-	/// Build a [`ReactiveChildren`] that spawns a child per list item via
-	/// `build_item`, rebuilding the whole generation on every change.
-	///
-	/// Spawn it beside the field that backs it, ie `(FieldRef::new("items"),
-	/// ReactiveChildren::new(..))` or `(items.field(), ReactiveChildren::new(..))`.
-	/// The ref's `on_add` inserts the synced [`Value`] and `sync_document_to_local`
-	/// keeps it current, so the rebuild rides `Changed<Value>`.
-	pub fn new(
+	/// Rows built per item by `build_item` rather than cloned from a prefab,
+	/// for a view built in rust.
+	pub fn from_fn(
 		build_item: impl 'static + Send + Sync + Fn(usize, &Value) -> OnSpawn,
 	) -> Self {
-		ReactiveChildren {
-			build_item: Arc::new(build_item),
-			key_of: None,
+		Self {
+			key: None,
+			build: Some(ItemBuilder(Arc::new(build_item))),
 		}
 	}
 
-	/// As [`new`](Self::new), but reconciles by the stable key `key_of` returns
-	/// for each item: children whose key persists are reused (their entity,
-	/// state, and field bindings survive), removed keys are despawned, and new
-	/// keys are spawned. Appending an item therefore neither rebuilds existing
-	/// rows nor drops their in-progress streaming bindings.
-	pub fn keyed(
-		key_of: impl 'static + Send + Sync + Fn(&Value) -> String,
-		build_item: impl 'static + Send + Sync + Fn(usize, &Value) -> OnSpawn,
-	) -> Self {
-		ReactiveChildren {
-			build_item: Arc::new(build_item),
-			key_of: Some(Arc::new(key_of)),
+	/// Reconcile rows by the item field at `key`.
+	pub fn with_key(mut self, key: impl Into<FieldPath>) -> Self {
+		self.key = Some(key.into());
+		self
+	}
+
+	/// The reconciliation key of `item`: the string at [`key`](Self::key),
+	/// else its debug form, empty where the item lacks it.
+	fn item_key(key: &FieldPath, item: &Value) -> String {
+		match item.get_path(key) {
+			Some(Value::Str(key)) => key.to_string(),
+			Some(other) => format!("{other:?}"),
+			None => String::new(),
+		}
+	}
+
+	/// Queue the spawn of one row under `parent`, carrying `row`: built by
+	/// the builder, else cloned from `prefab`.
+	fn spawn_row(
+		&self,
+		commands: &mut Commands,
+		parent: Entity,
+		prefab: Option<Entity>,
+		index: usize,
+		item: &Value,
+		row: impl Bundle,
+	) {
+		let row = (ChildOf(parent), ReactiveChild, Derived, row);
+		match (&self.build, prefab) {
+			(Some(build), _) => {
+				commands.spawn((row, (build.0)(index, item)));
+			}
+			(None, Some(prefab)) => {
+				commands.queue(move |world: &mut World| {
+					if let Err(err) =
+						Prefab::clone_under(world, prefab, parent, row)
+					{
+						world.handle_command_error::<ReactiveChildren>(err);
+					}
+				});
+			}
+			(None, None) => {}
 		}
 	}
 }
@@ -89,6 +131,7 @@ pub(super) fn update_reactive_children(
 		Changed<Value>,
 	>,
 	reactive_children: Query<(), With<ReactiveChild>>,
+	prefabs: Query<(), (With<Prefab>, Allow<Disabled>)>,
 	child_keys: Query<&ReactiveChildKey>,
 ) -> Result {
 	for (entity, value, resolved, reactive, children) in changed.iter() {
@@ -98,75 +141,80 @@ pub(super) fn update_reactive_children(
 			path: resolved.field_path.with_pushed(index),
 			terminate: true,
 		};
-		match &reactive.key_of {
+		let prefab = children
+			.into_iter()
+			.flatten()
+			.copied()
+			.find(|child| prefabs.contains(*child));
+		let items = value.as_list().map(Vec::as_slice).unwrap_or_default();
+		match &reactive.key {
 			// unkeyed: despawn the previous generation and respawn it whole
 			None => {
-				if let Some(children) = children {
-					children
-						.iter()
-						.filter(|child| reactive_children.contains(*child))
-						.for_each(|child| commands.entity(child).despawn());
+				for child in children
+					.into_iter()
+					.flatten()
+					.filter(|child| reactive_children.contains(**child))
+				{
+					commands.entity(*child).despawn();
 				}
-				if let Ok(items) = value.as_list() {
-					for (index, item) in items.iter().enumerate() {
-						commands.spawn((
-							ChildOf(entity),
-							ReactiveChild,
-							scope_at(index),
-							(reactive.build_item)(index, item),
-						));
-					}
+				for (index, item) in items.iter().enumerate() {
+					reactive.spawn_row(
+						&mut commands,
+						entity,
+						prefab,
+						index,
+						item,
+						scope_at(index),
+					);
 				}
 			}
 			// keyed: reconcile by key, reusing matching children
-			Some(key_of) => {
+			Some(key_path) => {
 				let existing: HashMap<String, Entity> = children
 					.into_iter()
-					.flat_map(|children| children.iter())
+					.flatten()
 					.filter_map(|child| {
 						child_keys
-							.get(child)
+							.get(*child)
 							.ok()
-							.map(|keyed| (keyed.key.clone(), child))
+							.map(|keyed| (keyed.key.clone(), *child))
 					})
 					.collect();
 				let mut kept: HashSet<String> = HashSet::default();
-				if let Ok(items) = value.as_list() {
-					for (index, item) in items.iter().enumerate() {
-						let key = key_of(item);
-						kept.insert(key.clone());
-						match existing.get(&key) {
-							// reuse: only touch the child if its index shifted, so
-							// an append never re-resolves a settled row's bindings
-							Some(&child) => {
-								let unchanged = child_keys
-									.get(child)
-									.map(|keyed| keyed.index)
-									.unwrap_or(usize::MAX) == index;
-								if !unchanged {
-									commands.entity(child).insert((
-										scope_at(index),
-										ReactiveChildKey { key, index },
-									));
-								}
-							}
-							None => {
-								commands.spawn((
-									ChildOf(entity),
-									ReactiveChild,
-									ReactiveChildKey { key, index },
+				for (index, item) in items.iter().enumerate() {
+					let key = ReactiveChildren::item_key(key_path, item);
+					kept.insert(key.clone());
+					match existing.get(&key) {
+						// reuse: only touch the child if its index shifted, so
+						// an append never re-resolves a settled row's bindings
+						Some(&child) => {
+							let unchanged = child_keys
+								.get(child)
+								.map(|keyed| keyed.index)
+								.unwrap_or(usize::MAX) == index;
+							if !unchanged {
+								commands.entity(child).insert((
 									scope_at(index),
-									(reactive.build_item)(index, item),
+									ReactiveChildKey { key, index },
 								));
 							}
 						}
+						None => reactive.spawn_row(
+							&mut commands,
+							entity,
+							prefab,
+							index,
+							item,
+							(ReactiveChildKey { key, index }, scope_at(index)),
+						),
 					}
 				}
 				// despawn children whose key vanished
-				existing
-					.iter()
-					.filter(|(key, _)| !kept.contains(*key))
-					.for_each(|(_, child)| commands.entity(*child).despawn());
+				for (_, child) in
+					existing.iter().filter(|(key, _)| !kept.contains(*key))
+				{
+					commands.entity(*child).despawn();
+				}
 			}
 		}
 	}
@@ -208,10 +256,10 @@ mod test {
 				ChildOf(doc),
 				(
 					FieldRef::new("items"),
-					ReactiveChildren::keyed(
-						|item| item.as_str().unwrap_or_default().to_string(),
-						|_, value| OnSpawn::insert(value.clone()),
-					),
+					ReactiveChildren::from_fn(|_, value| {
+						OnSpawn::insert(value.clone())
+					})
+					.with_key(FieldPath::default()),
 				),
 			))
 			.id();
@@ -250,7 +298,7 @@ mod test {
 				ChildOf(doc),
 				(
 					FieldRef::new("items"),
-					ReactiveChildren::new(|_, value| {
+					ReactiveChildren::from_fn(|_, value| {
 						OnSpawn::insert(value.clone())
 					}),
 				),
@@ -283,7 +331,7 @@ mod test {
 				ChildOf(doc),
 				(
 					FieldRef::new("items"),
-					ReactiveChildren::new(|_, value| {
+					ReactiveChildren::from_fn(|_, value| {
 						OnSpawn::insert(value.clone())
 					}),
 				),
@@ -314,7 +362,7 @@ mod test {
 				ChildOf(doc),
 				(
 					FieldRef::new("items"),
-					ReactiveChildren::new(|_, value| {
+					ReactiveChildren::from_fn(|_, value| {
 						OnSpawn::insert(value.clone())
 					}),
 				),
@@ -371,7 +419,7 @@ mod test {
 				ChildOf(doc),
 				(
 					items.field(),
-					ReactiveChildren::new(|_, value| {
+					ReactiveChildren::from_fn(|_, value| {
 						OnSpawn::insert(value.clone())
 					}),
 				),
@@ -411,7 +459,7 @@ mod test {
 			ChildOf(doc),
 			(
 				FieldRef::new("items"),
-				ReactiveChildren::new(|_, _| {
+				ReactiveChildren::from_fn(|_, _| {
 					// each child reads its own item's "name", scoped to items[N]
 					OnSpawn::insert((Value::default(), FieldRef::new("name")))
 				}),
@@ -445,10 +493,10 @@ mod test {
 			ChildOf(doc),
 			(
 				FieldRef::new("groups"),
-				ReactiveChildren::new(|_, _| {
+				ReactiveChildren::from_fn(|_, _| {
 					OnSpawn::insert((
 						FieldRef::new("items"),
-						ReactiveChildren::new(|_, _| {
+						ReactiveChildren::from_fn(|_, _| {
 							OnSpawn::insert((
 								Value::default(),
 								FieldRef::new("name"),

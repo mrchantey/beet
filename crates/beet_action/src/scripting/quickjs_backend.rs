@@ -465,7 +465,7 @@ mod test {
 	async fn increments_a_number() {
 		AsyncPlugin::world()
 			.spawn((
-				Script::<i64, i64>::new("input + 1"),
+				Value::from("input + 1"),
 				ScriptAction::<i64, i64>::default(),
 			))
 			.call::<i64, i64>(41)
@@ -478,7 +478,7 @@ mod test {
 	async fn concatenates_strings() {
 		AsyncPlugin::world()
 			.spawn((
-				Script::<String, String>::new(r#""hello " + input"#),
+				Value::from(r#""hello " + input"#),
 				ScriptAction::<String, String>::default(),
 			))
 			.call::<String, String>("world".to_string())
@@ -497,9 +497,7 @@ mod test {
 	async fn mutates_a_struct_field() {
 		AsyncPlugin::world()
 			.spawn((
-				Script::<Player, Player>::new(
-					"{ input.score += 10; return input }",
-				),
+				Value::from("{ input.score += 10; return input }"),
 				ScriptAction::<Player, Player>::default(),
 			))
 			.call::<Player, Player>(Player {
@@ -589,7 +587,7 @@ mod test {
 	async fn parse_errors_propagate() {
 		AsyncPlugin::world()
 			.spawn((
-				Script::<i64, i64>::new("this is not valid js ((("),
+				Value::from("this is not valid js ((("),
 				ScriptAction::<i64, i64>::default(),
 			))
 			.call::<i64, i64>(0)

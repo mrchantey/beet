@@ -1,7 +1,9 @@
+mod dynamic_components;
 #[cfg(target_arch = "wasm32")]
 mod js;
 #[cfg(feature = "json")]
 mod json;
+pub use dynamic_components::*;
 pub mod map;
 pub use map::*;
 #[cfg(feature = "serde")]

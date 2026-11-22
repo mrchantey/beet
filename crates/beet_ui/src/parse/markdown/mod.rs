@@ -168,7 +168,11 @@ impl DocParser for MarkdownParser {
 		Frontmatter::root_declarations(bytes, frontmatter_type)
 	}
 
-	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
+	fn parse(&mut self, bytes: &MediaBytes) -> Result<SceneBody, ParseError> {
+		Err(ParseError::WorldOnly(bytes.media_type().clone()))
+	}
+
+	fn parse_into(&mut self, cx: ParseContext) -> Result<(), ParseError> {
 		let media_type = cx.bytes.media_type();
 		if *media_type != MediaType::Markdown {
 			return Err(ParseError::UnsupportedType {
@@ -201,7 +205,7 @@ mod test {
 	fn parse_md(entity: &mut EntityWorldMut, md: &str) {
 		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::new()
-			.parse(ParseContext::new(entity, &bytes))
+			.parse_into(ParseContext::new(entity, &bytes))
 			.unwrap();
 	}
 
@@ -209,7 +213,7 @@ mod test {
 	fn parse_md_with_path(entity: &mut EntityWorldMut, md: &str, path: &str) {
 		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::new()
-			.parse(
+			.parse_into(
 				ParseContext::new(entity, &bytes).with_path(WsPath::new(path)),
 			)
 			.unwrap();
@@ -391,8 +395,12 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				let mut parser = MarkdownParser::new();
-				parser.parse(ParseContext::new(entity, &bytes)).unwrap();
-				parser.parse(ParseContext::new(entity, &bytes)).unwrap();
+				parser
+					.parse_into(ParseContext::new(entity, &bytes))
+					.unwrap();
+				parser
+					.parse_into(ParseContext::new(entity, &bytes))
+					.unwrap();
 			})
 			.children()
 			.len()

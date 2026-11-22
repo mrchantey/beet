@@ -692,7 +692,7 @@ fn main() { println!("hello"); }
 		let mut source = world();
 		let post = source.spawn_empty().id();
 		MarkdownParser::new()
-			.parse(ParseContext::new(
+			.parse_into(ParseContext::new(
 				&mut source.entity_mut(post),
 				&MediaBytes::new_markdown(POST),
 			))

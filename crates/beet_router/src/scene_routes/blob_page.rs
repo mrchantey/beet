@@ -83,7 +83,7 @@ impl BlobPage {
 						types.get(route).cloned().unwrap_or_default()
 					})
 					.component;
-				let declarations = DocParsers::of(world)?
+				let declarations = DocParsers::of(world)
 					.declarations(&bytes, &frontmatter_type)?;
 				let content = world.spawn(render_store).id();
 				declarations.insert(&mut world.entity_mut(content))?;

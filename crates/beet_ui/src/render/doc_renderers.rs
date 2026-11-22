@@ -254,7 +254,10 @@ mod test {
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<div><p>hi</p></div>");
 		BsxParser
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.parse_into(ParseContext::new(
+				&mut world.entity_mut(entity),
+				&bytes,
+			))
 			.unwrap();
 		(world, entity)
 	}
@@ -456,7 +459,10 @@ mod test {
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_markdown("# Title");
 		MarkdownParser::new()
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.parse_into(ParseContext::new(
+				&mut world.entity_mut(entity),
+				&bytes,
+			))
 			.unwrap();
 		DocRenderers::render(
 			&mut world,

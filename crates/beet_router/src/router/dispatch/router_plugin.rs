@@ -693,7 +693,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-	use beet_ui::prelude::*;
 
 	/// REGRESSION: the beet.org box's binary, built without `vault`, warned
 	/// `<Secrets>` unregistered on every load of the site entry, which

@@ -236,18 +236,14 @@ fn resolved<'a>(
 	}
 }
 
-/// A list of non-struct items: one value line per item, each line's own
-/// [`FieldRef`] empty so it reads the item itself within the row's scope.
+/// A list of non-struct items: one value line per item, cloned from the
+/// line's [`Prefab`], its own [`FieldRef`] empty so it reads the item itself
+/// within the row's scope.
 fn value_list(field: FieldRef) -> Snippet {
 	rsx! {
-		<div {(
-			field,
-			ReactiveChildren::new(|_index, item| {
-				OnSpawn::insert(rsx! {
-					<div>{(item.clone(), FieldRef::default())}</div>
-				})
-			}),
-		)}/>
+		<div {(field, ReactiveChildren::default())}>
+			<div {Prefab}>{(Value::default(), FieldRef::default())}</div>
+		</div>
 	}
 }
 
@@ -290,10 +286,9 @@ fn item_table(cx: ViewCx<'_>, item: &StructSchema, field: FieldRef) -> Snippet {
 		<div {Classes::new([classes::TABLE_SCROLL])}>
 			<table {class_set}>
 				<thead><tr>{headers}</tr></thead>
-				<tbody {(
-					field.clone(),
-					ReactiveChildren::new(move |_index, item| row(&columns, item)),
-				)}/>
+				<tbody {(field.clone(), ReactiveChildren::default())}>
+					{row(&columns)}
+				</tbody>
 			</table>
 		</div>
 		<div {(field, empty)}/>
@@ -316,22 +311,20 @@ struct Column {
 	label: SmolStr,
 }
 
-/// One table row: a `<tr>` of cells, each seeded with the item's current value
-/// so a fresh row paints on its first frame, and bound so a later edit re-syncs
-/// it.
+/// The row template, a [`Prefab`] `<tr>` of cells each bound to one item
+/// field.
 ///
-/// The [`ReactiveChildren`] scopes the row to `items[index]`, so a cell's path
-/// is relative to its own item.
-fn row(columns: &[Column], item: &Value) -> OnSpawn {
+/// The [`ReactiveChildren`] scopes each row it clones to `items[index]`, so a
+/// cell's path is relative to its own item.
+fn row(columns: &[Column]) -> Snippet {
 	let cells = columns
 		.iter()
 		.map(|column| {
-			let seed = item.get(&column.key).cloned().unwrap_or_default();
 			let field = FieldRef::new(FieldPath::new([column.key.clone()]));
-			rsx! { <td>{(seed, field)}</td> }.any_snippet()
+			rsx! { <td>{(Value::default(), field)}</td> }.any_snippet()
 		})
 		.collect::<Vec<_>>();
-	OnSpawn::insert(rsx! { <tr>{cells}</tr> })
+	rsx! { <tr {Prefab}>{cells}</tr> }
 }
 
 /// Head `content` with the name of the field it reads, or pass it through

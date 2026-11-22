@@ -50,6 +50,9 @@ impl Plugin for DocumentPlugin {
 			.register_type::<BindingTarget>()
 			.register_type::<FieldSegment>()
 			.register_type::<DocumentScope>()
+			// a list's generator and the item template it clones
+			.register_type::<ReactiveChildren>()
+			.register_type::<Prefab>()
 			.register_type::<ResolvedFieldPath>()
 			.register_type::<Value>()
 			.register_type::<Map>()
@@ -104,6 +107,7 @@ impl Plugin for DocumentPlugin {
 			(
 				DocumentSyncSet::Read,
 				DocumentSyncSet::Rebuild,
+				DocumentSyncSet::Seed,
 				DocumentSyncSet::Write,
 			)
 				.chain(),
@@ -128,6 +132,10 @@ impl Plugin for DocumentPlugin {
 					.chain()
 					.in_set(DocumentSyncSet::Read),
 				update_reactive_children.in_set(DocumentSyncSet::Rebuild),
+				(update_field_bindings, sync_document_to_local)
+					.chain()
+					.run_if(rows_spawned)
+					.in_set(DocumentSyncSet::Seed),
 				(sync_local_to_document, scene_sync)
 					.chain()
 					.in_set(DocumentSyncSet::Write),
@@ -144,6 +152,11 @@ impl Plugin for DocumentPlugin {
 		#[cfg(not(feature = "bevy_async"))]
 		app.add_systems(PreUpdate, run_document_sync);
 	}
+}
+
+/// Whether a [`ReactiveChildren`] spawned rows since the last check.
+fn rows_spawned(rows: Query<(), Added<ReactiveChild>>) -> bool {
+	!rows.is_empty()
 }
 
 /// Per-frame driver: one [`DocumentSync`] pass.
@@ -211,6 +224,9 @@ pub enum DocumentSyncSet {
 	Read,
 	/// Generations reconciled against what was just read.
 	Rebuild,
+	/// The read path again for the rows a rebuild just cloned, so a fresh
+	/// row paints its item on the pass that spawned it.
+	Seed,
 	/// Local → document: the write-back and the scene sync behind it.
 	Write,
 }

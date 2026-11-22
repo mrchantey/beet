@@ -11,6 +11,7 @@ use crate::prelude::*;
 #[reflect(opaque)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub enum ValueSchema {
 	/// Matches any value. An escape hatch that disables validation and
 	/// type-checking for this field.

@@ -57,7 +57,7 @@ pub(crate) fn widget_plugin(app: &mut App) {
 	// a sheet existing, as a sheet only bakes where the style resources are
 	// (a world without them, ie a bare markdown parse, has no `StyleQuery`)
 	app.add_systems(
-		crate::parse::PostParseTree,
+		beet_core::prelude::PostParseTree,
 		super::refresh_stylesheets
 			.run_if(any_with_component::<super::BakedStylesheet>)
 			.after(crate::style::ResolveStylesSet),

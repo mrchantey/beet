@@ -19,7 +19,7 @@ fn main() {
 	// `PostParseTree` automatically once the tree is built.
 	let bytes = MediaBytes::new_markdown(MARKDOWN);
 	MarkdownParser::new()
-		.parse(ParseContext::new(
+		.parse_into(ParseContext::new(
 			&mut app.world_mut().entity_mut(entity),
 			&bytes,
 		))

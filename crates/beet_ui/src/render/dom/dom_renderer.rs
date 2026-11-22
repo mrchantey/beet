@@ -1046,7 +1046,7 @@ mod test {
 			"# Routing\n\n`<RoutesDir/>` scans:\n\n| file | route |\n| --- | --- |\n| `a.md` | `/a` |\n| `b/c.md` | `/b/c` |\n\nFrontmatter:\n\n```toml\n+++\ntitle = \"Routing\"\n+++\n```\n\n- one\n- two\n",
 		);
 		MarkdownParser::new()
-			.parse(ParseContext::new(
+			.parse_into(ParseContext::new(
 				&mut app.world_mut().entity_mut(host),
 				&markdown,
 			))

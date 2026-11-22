@@ -79,8 +79,9 @@
 
 #[cfg(feature = "bevy_asset")]
 mod asset;
+#[cfg(all(test, feature = "json"))]
+mod conformance;
 mod dynamic_template;
-mod entity_map;
 mod loader;
 mod saver;
 mod scene_document;
@@ -91,7 +92,6 @@ mod template_filter;
 #[cfg(feature = "bevy_asset")]
 pub use asset::*;
 pub use dynamic_template::*;
-pub use entity_map::*;
 pub use loader::EntryTemplate;
 pub use loader::LoadTemplateSerde;
 pub(self) use loader::Placement;

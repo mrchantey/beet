@@ -81,8 +81,9 @@ pub(super) const VOID_ELEMENTS: &[&str] = &[
 	"param", "source", "track", "wbr",
 ];
 
-/// Elements whose content is raw text up to their closing tag.
-const RAW_TEXT_ELEMENTS: &[&str] = &["script", "style"];
+/// Elements whose content is raw text up to their closing tag: HTML's, and a
+/// [`RunScript`](crate::prelude::RunScript), whose body is its source.
+const RAW_TEXT_ELEMENTS: &[&str] = &["script", "style", "RunScript"];
 
 impl BsxNode {
 	/// Parse a full document into a flat list of root nodes.

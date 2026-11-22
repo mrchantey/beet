@@ -457,7 +457,7 @@ fn spawn_bsx_under(world: &mut World, parent: Entity, source: &str) -> Entity {
 	let bytes = MediaBytes::new_bsx(source);
 	let mut entity = world.spawn(ChildOf(parent));
 	BsxParser
-		.parse(ParseContext::new(&mut entity, &bytes))
+		.parse_into(ParseContext::new(&mut entity, &bytes))
 		.unwrap();
 	let container = entity.id();
 	world.entity(container).get::<Children>().unwrap()[0]

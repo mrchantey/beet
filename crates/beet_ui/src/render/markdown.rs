@@ -1184,7 +1184,10 @@ mod test {
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::new()
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.parse_into(ParseContext::new(
+				&mut world.entity_mut(entity),
+				&bytes,
+			))
 			.unwrap();
 		render_with(&mut world, entity, MarkdownRenderer::new().with_comments())
 	}
@@ -1196,7 +1199,10 @@ mod test {
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::with_expressions()
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.parse_into(ParseContext::new(
+				&mut world.entity_mut(entity),
+				&bytes,
+			))
 			.unwrap();
 		render_with(
 			&mut world,
@@ -1300,7 +1306,7 @@ mod test {
 			})
 			.id();
 		MarkdownParser::new()
-			.parse(ParseContext::new(
+			.parse_into(ParseContext::new(
 				&mut world.entity_mut(entity),
 				&MediaBytes::new_markdown("# Plan"),
 			))
@@ -1339,7 +1345,10 @@ mod test {
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_markdown("<!-- note -->\n\n# Title\n");
 		MarkdownParser::new()
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.parse_into(ParseContext::new(
+				&mut world.entity_mut(entity),
+				&bytes,
+			))
 			.unwrap();
 		render_with(&mut world, entity, MarkdownRenderer::new())
 			.xpect_eq("# Title\n");
@@ -1358,7 +1367,10 @@ mod test {
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
 		BsxParser
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.parse_into(ParseContext::new(
+				&mut world.entity_mut(entity),
+				&bytes,
+			))
 			.unwrap();
 		render_with(&mut world, entity, renderer)
 	}

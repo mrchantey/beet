@@ -14,8 +14,8 @@ pub use script_action::*;
 #[cfg(feature = "scripting")]
 pub use script_config::*;
 
-// The behaviour-tree front-end: the `OutcomeScript` marker and its `<RunScript>`
-// template, which is all it takes to make a `Script` a leaf.
+// The behaviour-tree front-end: the `OutcomeScript` marker every `RunScript`
+// requires, which is all it takes to make a script a leaf.
 #[cfg(feature = "scripting")]
 mod outcome_script;
 #[cfg(feature = "scripting")]
@@ -33,7 +33,7 @@ pub use dynamic::*;
 
 // The wire format, compiled with the host-realm backends that speak it and no
 // wider: the embedded engine calls the engine directly and needs none of it.
-// It is also not part of beet's surface — a consumer names `Script`, never a
+// It is also not part of beet's surface: a consumer names `Script`, never a
 // `ScriptRequest` — so the re-export is crate-internal.
 #[cfg(all(feature = "scripting", feature = "std", not(feature = "quickjs")))]
 pub(crate) mod protocol;
@@ -55,7 +55,7 @@ pub(crate) use quickjs_backend::run_quickjs;
 // Each borrows its isolation from the surrounding runtime, so which ones exist
 // is a property of the target: a sandboxed child process on native, a child
 // isolate on wasm (picked between at runtime, since the wasm host is not known
-// until the module boots). `std` throughout — a bare-metal target has no host
+// until the module boots). `std` throughout: a bare-metal target has no host
 // realm to borrow from, which leaves the embedded engine as its only option.
 beet_core::cfg_if! {
 	if #[cfg(all(

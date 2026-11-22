@@ -56,18 +56,15 @@ impl Plugin for ActionPlugin {
 		// long-running action lifecycle
 		.add_systems(Update, tick_run_timers)
 		.add_plugins(running_plugin::<(), Outcome>);
-		// the one registered `Script` instantiation, so a `<Script>` tag resolves
-		// by base name unambiguously; the derived `ScriptAction` is inserted by
-		// `#[require]` via ComponentId and needs no reflect of its own.
+		// the world bridge: the vocabulary a scene mints and the envelope it
+		// grants a script, then the behaviour-tree leaf every `RunScript` is
+		// where scripting is built in, `RunScript` itself being core data
 		#[cfg(feature = "scripting")]
-		app.register_type::<Script<Value, Value>>()
-			// the world bridge: the vocabulary a scene mints and the envelope it
-			// grants a script
-			.register_type::<DynamicComponent>()
+		app.register_type::<DynamicComponent>()
 			.register_type::<ScriptConfig>()
-			// the behaviour-tree leaf marker and its markup front-end
 			.register_type::<OutcomeScript<Value, Value>>()
-			.install_type::<RunScript>();
+			.register_type::<RunScript>()
+			.register_required_components::<RunScript, OutcomeScript>();
 		// the external-process leaf needs the native `ChildProcess` to spawn, so it
 		// (and its action marker) only exist on a native std build. `Command` is
 		// crate-qualified to disambiguate it from bevy's `Command` trait, both in

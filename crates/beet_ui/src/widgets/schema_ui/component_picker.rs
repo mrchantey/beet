@@ -164,7 +164,7 @@ mod test {
 		html.clone()
 			.xpect_contains("<option value=\"beet_ui::widgets::schema_ui::component_picker::test::Health\">Health</option>")
 			.xpect_contains(">ChildOf</option>");
-		html.clone().xnot().xpect_contains("Children</option>");
+		html.clone().xnot().xpect_contains(">Children</option>");
 		html.xnot().xpect_contains(">Name</option>");
 	}
 

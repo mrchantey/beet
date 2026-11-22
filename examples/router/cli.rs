@@ -51,9 +51,7 @@ fn setup(mut commands: Commands) {
 			// a `Script` is pure data, so pair it with an `ExchangeScript` to
 			// make the entity a dispatchable route.
 			(
-				Script::<Params<GreetRequest>, String>::new(
-					r#""hello " + input.name"#,
-				),
+				Value::from(r#""hello " + input.name"#,),
 				ExchangeScript::<Params<GreetRequest>, String, _, _>::default(),
 				PathPartial::new("greet"),
 			),
@@ -61,9 +59,7 @@ fn setup(mut commands: Commands) {
 			// script input shape (`{ path, params, body }`, what `<ScriptRoute>`
 			// authors) and digs out the `name` query parameter itself.
 			(
-				Script::<Value, Value>::new(
-					r#""hello " + input.params.name[0]"#,
-				),
+				Value::from(r#""hello " + input.params.name[0]"#,),
 				ExchangeScript::<
 					Value,
 					Value,

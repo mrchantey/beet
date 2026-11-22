@@ -52,7 +52,7 @@ pub fn render_charcell(
 		.entity_mut(root)
 		.insert((root_bundle, FlexBuffer::new(width)));
 	world.update_local();
-	world.run_schedule(crate::parse::PostParseTree);
+	world.run_schedule(beet_core::prelude::PostParseTree);
 	world
 		.entity_mut(root)
 		.take::<FlexBuffer>()

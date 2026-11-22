@@ -1,11 +1,10 @@
 //! The BSX custom-tag seam: an uppercase tag resolved by a registered handler
 //! rather than the type registry or the [`BsxTemplateRegistry`].
 //!
-//! Core knows no concrete tag: like the
-//! [`EventRegistry`](crate::prelude::EventRegistry), this registry is empty by
-//! default and populated by a downstream layer (eg `beet_ui` registers `Rule`).
+//! Core knows no concrete tag: this registry is empty by default and populated
+//! by a downstream layer (eg `beet_ui` registers `Rule`).
 //! A handler reads the parsed element's raw attributes and mutates the world,
-//! producing no entity content — the markup analogue of a build-time effect like
+//! producing no entity content, the markup analogue of a build-time effect like
 //! a resource patch.
 //!
 //! The seam exists because some tags declare data whose home (eg a `RuleSet`)

@@ -1,5 +1,5 @@
-//! The concrete `bx:<event>` installer: a trigger that runs the directive's
-//! script against the live world.
+//! The concrete `bx:<event>` handler: a `click` reaching an element runs each
+//! of its `OnEvent { event: "click" }` children against the live world.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -21,7 +21,7 @@ use beet_core::prelude::*;
 /// write is awaited and its errors reported rather than left floating.
 ///
 /// A script is a script: this is the same [`Script::statements`] rule an
-/// `<Ecmascript>` route or a `<RunScript>` leaf gets, applied through the one
+/// `ExchangeScript` route or a `<RunScript>` leaf gets, applied through the one
 /// implementation so the two cannot drift.
 fn event_script_body(script: &str) -> String {
 	format!(
@@ -30,51 +30,56 @@ fn event_script_body(script: &str) -> String {
 	)
 }
 
-/// Register the `click` event installer: a [`PointerDown`] observer that, on
-/// fire, evaluates the directive's script.
+/// Runs the `click` handlers of the entity a [`PointerDown`] reaches, once
+/// per entity it propagates through, so a click on a button's label runs the
+/// button's handler.
 ///
-/// What the script may reach is the host's own [`ScriptConfig`] when it carries
-/// one, so narrowing a button's grant is an ordinary spread
-/// (`<button bx:click=".." {ScriptConfig{write:["Document"]}}>`); absent one it
-/// is [`ScriptConfig::default`], world-capable and unrestricted, which is where
-/// the phase leaves it.
-pub(super) fn register_event_scripts(world: &mut World) {
-	world.resource_mut::<EventRegistry>().insert(
-		"click",
-		|entity: &mut EntityWorldMut, script: &str| {
-			let script = Script::<Value, Value>::new(event_script_body(script));
-			entity.observe(
-				move |ev: On<PointerDown>, mut commands: Commands| {
-					let (script, target) = (script.clone(), ev.target);
-					// queued rather than run inline: the evaluation needs the world,
-					// and every `world` call it makes is served at a sync point.
-					commands.queue(move |world: &mut World| {
-						let Ok(host) = world.get_entity(target) else {
-							return;
-						};
-						let config = host
-							.get::<ScriptConfig>()
-							.cloned()
-							.unwrap_or_default();
-						// the event as a value: its target now, room for a payload
-						// (a key, a form value) as more triggers are registered.
-						let mut input = Map::default();
-						input.insert("target", entity_id::encode(target));
-						let input = Value::Map(input);
-						world.run_async_local(move |world| async move {
-							script.run(input, world, &config).await.map(|_| ())
-						});
-					});
-				},
-			);
-		},
-	);
+/// Each handler is an [`OnEvent`] child, its source read through
+/// [`ElementTextQuery::script_source`] when it fires, so a handler loaded from
+/// a saved scene runs as one authored in markup. What it may reach is the
+/// host's own [`ScriptConfig`] when it carries one, so narrowing a button's
+/// grant is an ordinary spread
+/// (`<button bx:click=".." {ScriptConfig{write:["Document"]}}>`); absent one
+/// it is [`ScriptConfig::default`], world-capable and unrestricted.
+pub(super) fn run_click_scripts(
+	ev: On<PointerDown>,
+	children: Query<&Children>,
+	events: Query<&OnEvent>,
+	text: ElementTextQuery,
+	configs: Query<&ScriptConfig>,
+	mut commands: Commands,
+) {
+	let host = ev.target;
+	let config = configs.get(host).cloned().unwrap_or_default();
+	for handler in children.get(host).into_iter().flatten().filter(|child| {
+		events
+			.get(**child)
+			.is_ok_and(|on_event| on_event.event == "click")
+	}) {
+		let script = Script::<Value, Value>::new(event_script_body(
+			&text.script_source(*handler),
+		));
+		let config = config.clone();
+		// queued rather than run inline: the evaluation needs the world, and
+		// every `world` call it makes is served at a sync point.
+		commands.queue(move |world: &mut World| {
+			// the event as a value: its target now, room for a payload (a
+			// key, a form value) as more triggers are registered.
+			let mut input = Map::default();
+			input.insert("target", entity_id::encode(host));
+			let input = Value::Map(input);
+			world.run_async_local(move |world| async move {
+				script.run(input, world, &config).await.map(|_| ())
+			});
+		});
+	}
 }
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	/// Spawn `markup` under `doc` and return the element the observer is wired
 	/// onto (the container's one content child).
@@ -201,5 +206,60 @@ mod test {
 			.get_field::<String>(&FieldPath::parse("status"))
 			.unwrap()
 			.xpect_eq("pending");
+	}
+
+	/// A handler is behaviour, never content: the button renders its label
+	/// alone.
+	#[beet_core::test]
+	fn a_handler_renders_as_nothing() {
+		let mut world = world_ext::ui_world();
+		let doc = world.spawn(Document::default()).id();
+		let button = click_target(
+			&mut world,
+			doc,
+			r#"<button bx:click="target.set_field('count', 7)">+</button>"#,
+		);
+		HtmlRenderer::new()
+			.render(&mut RenderContext::new(
+				&mut world,
+				button,
+				&RequestParts::default(),
+			))
+			.unwrap()
+			.to_string()
+			.xpect_contains("+")
+			.xnot()
+			.xpect_contains("set_field");
+	}
+
+	/// A handler is data, so it survives a save and a reload and still runs.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn a_handler_survives_a_save_and_a_reload() {
+		let mut world = world_ext::ui_world();
+		let doc = world.spawn(Document::new(value!({ "count": 0 }))).id();
+		let button = click_target(
+			&mut world,
+			doc,
+			r#"<button bx:click="target.with_field('count', count => count + 1)">+</button>"#,
+		);
+		let bytes = TemplateSaver::new()
+			.save_roots(&mut world, MediaType::Json, [button])
+			.unwrap();
+		bytes
+			.as_utf8()
+			.unwrap()
+			.xref()
+			.xpect_contains("OnEvent")
+			.xpect_contains("with_field");
+
+		let mut world = world_ext::ui_world();
+		let doc = world.spawn(Document::new(value!({ "count": 0 }))).id();
+		let button = TemplateLoader::new(&mut world)
+			.with_entity(doc)
+			.load(&bytes)
+			.unwrap()[0];
+		click(&mut world, button).await;
+		count(&world, doc, "count").xpect_eq(1);
 	}
 }

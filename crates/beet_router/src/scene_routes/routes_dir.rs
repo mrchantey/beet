@@ -176,7 +176,7 @@ impl RoutesDir {
 						)
 						.await??;
 					let parsers =
-						dir.world().with(|world| DocParsers::of(world)).await?;
+						dir.world().with(|world| DocParsers::of(world)).await;
 					let specs = Self::discover_routes(
 						&parsers,
 						&store,
@@ -311,7 +311,7 @@ impl RoutesDir {
 				)
 				.await?;
 			let parsers =
-				route.world().with(|world| DocParsers::of(world)).await?;
+				route.world().with(|world| DocParsers::of(world)).await;
 			let spec = RouteSpec {
 				declarations: Self::scan_declarations(
 					&parsers,

@@ -15,16 +15,20 @@
 //! This is the no_std core; async helpers sit behind the `bevy_async` feature,
 //! never on the core path.
 
+mod entity_map;
 // templates held unbuilt, built on demand by their holder
 mod held;
 mod lifecycle;
+mod prefab;
 mod registry;
 mod slot;
 mod spawn_template;
 mod template_plugin;
 
+pub use entity_map::*;
 pub use held::*;
 pub use lifecycle::*;
+pub use prefab::*;
 pub use registry::*;
 pub use slot::*;
 pub use spawn_template::*;

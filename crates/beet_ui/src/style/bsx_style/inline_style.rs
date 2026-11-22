@@ -160,7 +160,7 @@ mod test {
 			"<div bx:style=\"display=Flex max-width=Rem(40.0)\">inner</div>",
 		);
 		MarkdownParser::new()
-			.parse(ParseContext::new(&mut world.entity_mut(root), &bytes))
+			.parse_into(ParseContext::new(&mut world.entity_mut(root), &bytes))
 			.unwrap();
 		world.flush();
 		// the embedded div gained a source-derived inline class.
@@ -197,7 +197,7 @@ mod test {
 			 <div bx:style=\"max-width=Rem(20.0)\">b</div>",
 		);
 		MarkdownParser::new()
-			.parse(ParseContext::new(&mut world.entity_mut(root), &bytes))
+			.parse_into(ParseContext::new(&mut world.entity_mut(root), &bytes))
 			.unwrap();
 		world.flush();
 		// each div carries its own distinct inline class.

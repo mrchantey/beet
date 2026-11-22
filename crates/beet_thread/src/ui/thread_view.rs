@@ -57,13 +57,15 @@ fn thread_view_on_add(mut world: DeferredWorld, cx: HookContext) {
 	// *is* the scrolling transcript container. All styling goes through the cascade
 	// (`inline_class!`): `resolve_styles` rebuilds `LayoutStyle`/`BoxStyle` from the
 	// cascade for every node of a styled tree, so a set component would be clobbered.
-	// Rows are a keyed `ReactiveChildren` over the document's `posts`.
+	// Rows are a `ReactiveChildren` over the document's `posts`, keyed by each
+	// post's `id` (a uuid string), so reconciliation reuses a row across
+	// appends and in-progress body growth.
 	world.commands().entity(cx.entity).insert(rsx! {
 		<div {(
 			ThreadScroll::default(),
 			ScrollPosition::default(),
 			FieldRef::new("posts"),
-			ReactiveChildren::keyed(post_key, post_row),
+			ReactiveChildren::from_fn(post_row).with_key(FieldPath::parse("id")),
 			transcript_style(),
 		)}/>
 	});
@@ -112,15 +114,6 @@ impl Default for ThreadScroll {
 			last_max: 0,
 		}
 	}
-}
-
-/// Stable reconciliation key for a post item: its `id` field (a uuid string), so
-/// reconciliation reuses a row across appends and in-progress body growth.
-fn post_key(item: &Value) -> String {
-	item.get("id")
-		.and_then(|id| id.as_str().ok())
-		.unwrap_or_default()
-		.to_string()
 }
 
 /// Build one post row: a role-accented block holding the author label and the

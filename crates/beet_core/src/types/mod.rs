@@ -30,6 +30,8 @@ mod document;
 pub use document::*;
 mod entity_body;
 pub use entity_body::*;
+mod run_script;
+pub use run_script::*;
 mod entity_key;
 pub use entity_key::*;
 #[cfg(feature = "serde")]

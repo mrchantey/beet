@@ -116,8 +116,7 @@ impl RouteCollection {
 		// through and the one type it reads out of those declarations (a `slug`
 		// renaming the emitted route) are built here; the rest resolve against
 		// the app registry when the emitted route spawns.
-		let mut parsers = DocParsers::default();
-		parsers.register_builtins();
+		let parsers = ParsePlugin::parsers();
 		let mut registry = TypeRegistry::default();
 		registry.register::<RouteMeta>();
 		let frontmatter_type = FrontmatterType::default();

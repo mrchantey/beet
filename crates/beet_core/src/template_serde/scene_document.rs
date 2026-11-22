@@ -111,7 +111,8 @@ impl SceneDocument {
 				bytes.media_type()
 			);
 		}
-		Self::load(world, host, &SceneBody::from_bytes(bytes)?)
+		let body = DocParsers::of(world).body(bytes)?;
+		Self::load(world, host, &body)
 	}
 
 	/// Fork: serialize `host`'s children as one scene, land its document on
@@ -139,7 +140,7 @@ impl SceneDocument {
 			&roots,
 			default(),
 		)?;
-		let value = SceneBody::from_bytes(&bytes)?.to_value()?;
+		let value = bytes.deserialize::<SceneBody>()?.to_value()?;
 		Self::land(world, host, value, entity_map);
 		Ok(bytes)
 	}
@@ -974,9 +975,10 @@ mod test {
 		const SPARKLE: &str = "some_plugin::Sparkle";
 		let mut world = new_world();
 		let host = world.spawn_empty().id();
-		let body = SceneBody::from_bytes(&MediaBytes::new_json(format!(
+		let body = MediaBytes::new_json(format!(
 			r#"{{"entities":{{"0":{{"{NAME}":"root","{SPARKLE}":{{"amount":3}}}}}}}}"#
-		)))
+		))
+		.deserialize::<SceneBody>()
 		.unwrap();
 		SceneDocument::load(&mut world, host, &body).unwrap();
 		let root = entity(&world, host, 0);

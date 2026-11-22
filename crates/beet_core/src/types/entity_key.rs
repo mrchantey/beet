@@ -26,6 +26,9 @@ use crate::prelude::*;
 pub struct EntityKey(SmolStr);
 
 impl EntityKey {
+	/// A document's root, `"0"`.
+	pub const ROOT: Self = Self(SmolStr::new_inline("0"));
+
 	/// Parse a key, refusing only the empty string.
 	pub fn parse(text: &str) -> Result<Self> {
 		match text.is_empty() {

@@ -58,12 +58,8 @@ impl WorldRead {
 			bevyhow!("{entity} was despawned before the script read it")
 		})?;
 		match ident.type_id {
-			// SAFETY: `DynamicComponents::register` is the only source of a
-			// dynamic `ComponentId`, and it always declares a `Value` layout.
-			None => entity
-				.get_by_id(ident.id)
-				.ok()
-				.map(|ptr| unsafe { ptr.deref::<Value>() }.clone())
+			None => DynamicComponents::value(world, entity, ident.id)
+				.cloned()
 				.xok(),
 			Some(type_id) => {
 				let registry = world.resource::<AppTypeRegistry>().read();

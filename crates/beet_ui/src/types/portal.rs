@@ -67,7 +67,10 @@ impl PortalOf {
 /// Neither [`ChildOf`] nor [`Portal`] admits a self-referential edge, so the
 /// upward walk always terminates.
 ///
-/// The tags a text walk skips are owned here too:
+/// A [`RunScript`] child is behaviour rather than content, and a
+/// [`Disabled`] one is held, ie a [`Prefab`] template, so the downward walk
+/// never yields either or its subtree: a `bx:click` handler under a button
+/// renders as nothing, and so does a list's item template. The tags a text walk skips are owned here too:
 /// [`is_textless`](Self::is_textless).
 #[derive(SystemParam)]
 pub struct RenderTreeQuery<'w, 's> {
@@ -75,6 +78,7 @@ pub struct RenderTreeQuery<'w, 's> {
 	parents: Query<'w, 's, &'static ChildOf>,
 	portals: Query<'w, 's, &'static Portal>,
 	holders: Query<'w, 's, &'static PortalOf>,
+	hidden: Query<'w, 's, (), Or<(With<RunScript>, With<Disabled>)>>,
 }
 
 impl RenderTreeQuery<'_, '_> {
@@ -110,7 +114,7 @@ impl RenderTreeQuery<'_, '_> {
 	}
 
 	/// The children of the entity `entity` renders as, in order, each holder
-	/// replaced by the entity it renders as.
+	/// replaced by the entity it renders as, every script left out.
 	pub fn children(
 		&self,
 		entity: Entity,
@@ -119,6 +123,7 @@ impl RenderTreeQuery<'_, '_> {
 			.get(self.resolve(entity))
 			.into_iter()
 			.flat_map(|children| children.iter())
+			.filter(|child| !self.hidden.contains(*child))
 			.map(|child| self.resolve(child))
 	}
 

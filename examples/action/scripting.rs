@@ -35,7 +35,7 @@ fn setup(async_commands: AsyncCommands) {
 			.with(|world: &mut World| {
 				world
 					.spawn((
-						Script::<i64, i64>::new("input + 1"),
+						Value::from("input + 1"),
 						ScriptAction::<i64, i64>::default(),
 					))
 					.id()
@@ -49,7 +49,7 @@ fn setup(async_commands: AsyncCommands) {
 			.with(|world: &mut World| {
 				world
 					.spawn((
-						Script::<String, String>::new(r#""hello " + input"#),
+						Value::from(r#""hello " + input"#),
 						ScriptAction::<String, String>::default(),
 					))
 					.id()
@@ -66,9 +66,7 @@ fn setup(async_commands: AsyncCommands) {
 			.with(|world: &mut World| {
 				world
 					.spawn((
-						Script::<Player, Player>::new(
-							"{ input.score += 100; return input }",
-						),
+						Value::from("{ input.score += 100; return input }"),
 						ScriptAction::<Player, Player>::default(),
 					))
 					.id()

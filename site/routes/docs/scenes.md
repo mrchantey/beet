@@ -16,6 +16,7 @@ A scene is a set of entities, each holding components keyed by identifier, plus 
 
 ```json
 {
+	"$type": "org.beet.scene#body",
 	"resources": {
 		"bevy_ecs::Time": 393933892
 	},

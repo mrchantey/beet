@@ -147,7 +147,7 @@ mod test {
 			world.entity_mut(root).insert(store);
 		}
 		BsxParser
-			.parse(ParseContext::new(
+			.parse_into(ParseContext::new(
 				&mut world.entity_mut(root),
 				&MediaBytes::new_bsx(bsx),
 			))
@@ -325,7 +325,7 @@ mod test {
 		app.add_plugins(StylePlugin);
 		let root = app.world_mut().spawn_empty().id();
 		MarkdownParser::new()
-			.parse(ParseContext::new(
+			.parse_into(ParseContext::new(
 				&mut app.world_mut().entity_mut(root),
 				&MediaBytes::new_markdown(
 					"# Flow\n\n<Mermaid render=\"Text\">graph LR; A --> B</Mermaid>\n",

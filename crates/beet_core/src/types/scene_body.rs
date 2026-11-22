@@ -9,6 +9,7 @@
 //!
 //! ```json
 //! {
+//!   "$type": "org.beet.scene#body",
 //!   "resources": { "bevy_time::time::Time": 393933892 },
 //!   "entities": {
 //!     "0": { "bevy_ecs::name::Name": "Bob" },
@@ -17,28 +18,143 @@
 //! }
 //! ```
 //!
+//! A body is always written with its `$type`, which is how a structured
+//! document says it is a scene body rather than a plain value: the structured
+//! parsers in `template_serde` read one whose root names it as a body and any
+//! other as one entity holding the value. Read back, the `$type` may be absent,
+//! as it is in an atproto union member's fields, but never names another def.
+//!
 //! Every value is a plain [`Value`], so a body is read and written with no
 //! type registry: reflection happens on the way to and from a world, in
 //! `template_serde` (`SceneBody::reflect` and `TemplateBuilder`).
 use crate::prelude::*;
 use indexmap::IndexMap;
+use serde::ser::SerializeMap;
+use serde::ser::SerializeStruct;
 
 /// A scene as data: its resources and its entities, each an [`EntityBody`] of
 /// type path to [`Value`]. See the [module docs](self) for the wire shape.
 ///
-/// The serde form of every scene format (json, ron, postcard), and
+/// The serde form of every scene format (json, ron, postcard, toml), and
 /// `org.beet.scene#body` as an atproto lexicon object ([`NSID`](Self::NSID)).
 /// Two bodies are equal when they write the same document, so entity order
 /// counts.
-#[derive(Debug, Default, Clone, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Eq)]
 pub struct SceneBody {
 	/// The scene's resources, keyed by type path.
-	#[serde(default)]
 	pub resources: EntityBody,
 	/// The scene's entities in file order, which is child order and is never
 	/// sorted.
-	#[serde(default)]
 	pub entities: IndexMap<EntityKey, EntityBody, FixedHasher>,
+}
+
+/// The body as written, `$type` first, so a reader probing a structured
+/// document's root finds it before anything else. A map in a human readable
+/// format, since `$type` is no identifier ron allows, and a struct in a
+/// binary one, whose fields are positional.
+impl Serialize for SceneBody {
+	fn serialize<S: serde::Serializer>(
+		&self,
+		serializer: S,
+	) -> Result<S::Ok, S::Error> {
+		if serializer.is_human_readable() {
+			let mut body = serializer.serialize_map(Some(3))?;
+			body.serialize_entry(OpenUnion::TYPE_KEY, Self::NSID.as_str())?;
+			body.serialize_entry("resources", &self.resources)?;
+			body.serialize_entry("entities", &self.entities)?;
+			body.end()
+		} else {
+			let mut body = serializer.serialize_struct("SceneBody", 3)?;
+			body.serialize_field(OpenUnion::TYPE_KEY, Self::NSID.as_str())?;
+			body.serialize_field("resources", &self.resources)?;
+			body.serialize_field("entities", &self.entities)?;
+			body.end()
+		}
+	}
+}
+
+/// The body as read: its `$type` checked, and absent in a union member's
+/// fields or a hand written document.
+impl<'de> Deserialize<'de> for SceneBody {
+	fn deserialize<D: serde::Deserializer<'de>>(
+		deserializer: D,
+	) -> Result<Self, D::Error> {
+		const FIELDS: &[&str] = &[OpenUnion::TYPE_KEY, "resources", "entities"];
+		match deserializer.is_human_readable() {
+			true => deserializer.deserialize_map(SceneBodyVisitor),
+			false => deserializer.deserialize_struct(
+				"SceneBody",
+				FIELDS,
+				SceneBodyVisitor,
+			),
+		}
+	}
+}
+
+struct SceneBodyVisitor;
+
+impl<'de> serde::de::Visitor<'de> for SceneBodyVisitor {
+	type Value = SceneBody;
+
+	fn expecting(
+		&self,
+		formatter: &mut core::fmt::Formatter,
+	) -> core::fmt::Result {
+		formatter.write_str("a scene body, `{ resources, entities }`")
+	}
+
+	fn visit_map<A: serde::de::MapAccess<'de>>(
+		self,
+		mut map: A,
+	) -> Result<SceneBody, A::Error> {
+		let mut body = SceneBody::default();
+		while let Some(key) = map.next_key::<SmolStr>()? {
+			match key.as_str() {
+				OpenUnion::TYPE_KEY => {
+					map.next_value::<SceneBodyType>()?;
+				}
+				"resources" => body.resources = map.next_value()?,
+				"entities" => body.entities = map.next_value()?,
+				_ => {
+					map.next_value::<serde::de::IgnoredAny>()?;
+				}
+			}
+		}
+		Ok(body)
+	}
+
+	fn visit_seq<A: serde::de::SeqAccess<'de>>(
+		self,
+		mut seq: A,
+	) -> Result<SceneBody, A::Error> {
+		let missing = |index| serde::de::Error::invalid_length(index, &self);
+		seq.next_element::<SceneBodyType>()?
+			.ok_or_else(|| missing(0))?;
+		Ok(SceneBody {
+			resources: seq.next_element()?.ok_or_else(|| missing(1))?,
+			entities: seq.next_element()?.ok_or_else(|| missing(2))?,
+		})
+	}
+}
+
+/// A `$type` that must name [`SceneBody::NSID`], read as a plain string in
+/// every format so postcard's positional fields agree with the writer.
+struct SceneBodyType;
+
+impl<'de> Deserialize<'de> for SceneBodyType {
+	fn deserialize<D: serde::Deserializer<'de>>(
+		deserializer: D,
+	) -> Result<Self, D::Error> {
+		let named = SmolStr::deserialize(deserializer)?;
+		if named.as_str() == SceneBody::NSID.as_str() {
+			Ok(Self)
+		} else {
+			Err(serde::de::Error::custom(format!(
+				"a scene body's `$type` is `{}`, not `{named}`",
+				SceneBody::NSID
+			)))
+		}
+	}
 }
 
 impl PartialEq for SceneBody {
@@ -53,19 +169,23 @@ impl SceneBody {
 	/// structured document carries to say it is one.
 	pub const NSID: Nsid = Nsid::new_static("org.beet.scene#body");
 
-	/// Read a body from a serde format's bytes: ron, json or postcard.
-	pub fn from_bytes(bytes: &MediaBytes) -> Result<Self> {
-		match bytes.media_type() {
-			MediaType::Ron | MediaType::Json | MediaType::Postcard => {
-				bytes.deserialize()
-			}
-			// untyped bytes are the binary format
-			MediaType::Bytes => MediaType::Postcard.deserialize(bytes.bytes()),
-			other => {
-				bevybail!(
-					"a scene body is ron, json or postcard, not `{other}`"
-				)
-			}
+	/// Whether `value` is a body: an object whose `$type` names one.
+	pub fn is_body(value: &Value) -> bool {
+		value
+			.as_map()
+			.ok()
+			.and_then(|map| map.get(OpenUnion::TYPE_KEY).ok())
+			.and_then(|r#type| r#type.as_str().ok())
+			.is_some_and(|r#type| r#type == Self::NSID.as_str())
+	}
+
+	/// A body of one entity, the root, holding `components`.
+	pub fn root(components: EntityBody) -> Self {
+		let mut entities = IndexMap::default();
+		entities.insert(EntityKey::ROOT, components);
+		Self {
+			resources: default(),
+			entities,
 		}
 	}
 

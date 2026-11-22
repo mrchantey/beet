@@ -67,6 +67,13 @@ impl TemplateSaver {
 		self
 	}
 
+	/// Allows a resource type to be serialized, narrowing an unset filter to
+	/// the types allowed.
+	pub fn allow_resource<T: Resource>(mut self) -> Self {
+		self.resource_filter = self.resource_filter.allow::<T>();
+		self
+	}
+
 	/// Denies a resource type from being serialized.
 	pub fn deny_resource<T: Resource>(mut self) -> Self {
 		self.resource_filter = self.resource_filter.deny::<T>();

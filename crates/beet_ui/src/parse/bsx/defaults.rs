@@ -1,20 +1,20 @@
-//! The default BSX event registration.
+//! The default BSX event handlers.
 //!
-//! Core keeps the [`EventRegistry`] empty: it knows no concrete event, and no
-//! way to evaluate a script, so neither bevy picking nor a JS engine enters it.
-//! This plugin supplies the concrete `click` installer, so every
-//! `bx:click="await target.set_field('count', 1)"` works. An app that wants a
-//! different trigger set registers its own instead of (or alongside) this one.
+//! Core lowers `bx:<event>` to an [`OnEvent`] child and knows no concrete
+//! event, and no way to evaluate a script, so neither bevy picking nor a JS
+//! engine enters it. This plugin runs the `click` handlers, so every
+//! `bx:click="await target.set_field('count', 1)"` works. An app that wants
+//! another trigger adds its own observer beside this one.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Registers the default BSX event vocabulary into the core seam, plus the
-/// widget set by name so a `<Head/>`/`<Sidebar/>` tag resolves.
+/// Runs the default BSX event handlers, and registers the widget set by name
+/// so a `<Head/>`/`<Sidebar/>` tag resolves.
 ///
-/// Builds on [`BsxPlugin`] (which seeds the empty registry). With the
-/// `scripting` feature it also installs the `click` installer and the
-/// [`AsyncPlugin`] its evaluations resolve against; without it a `bx:<event>`
-/// directive still builds, it just carries no behavior.
+/// Builds on [`BsxPlugin`]. With the `scripting` feature it also runs `click`
+/// handlers and installs the [`AsyncPlugin`] their evaluations resolve
+/// against; without it a `bx:<event>` directive still builds, its handler
+/// inert.
 #[derive(Default)]
 pub struct BsxDefaultsPlugin;
 
@@ -25,8 +25,8 @@ impl Plugin for BsxDefaultsPlugin {
 		{
 			// every `world` call an event script makes is served at the async
 			// sync point, so the seat has to exist before one can fire.
-			app.install_type::<AsyncPlugin>();
-			super::event_script::register_event_scripts(app.world_mut());
+			app.install_type::<AsyncPlugin>()
+				.add_observer(super::event_script::run_click_scripts);
 		}
 	}
 }

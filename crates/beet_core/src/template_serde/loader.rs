@@ -52,9 +52,10 @@ impl<'a> TemplateLoader<'a> {
 	}
 
 	/// Loads an entry from [`MediaBytes`] into the world, dispatching by media
-	/// type: `.bsx`/`.html` parse to the BSX IR, every serde format
-	/// (RON/JSON/postcard) to the [`DynamicTemplate`] IR. Both build through the
-	/// one [`spawn_template`](WorldTemplateExt::spawn_template) path.
+	/// type: `.bsx`/`.html` parse to the BSX IR, every other format through
+	/// the world's [`DocParsers`] to a [`SceneBody`] and its
+	/// [`DynamicTemplate`]. Both build through the one
+	/// [`spawn_template`](WorldTemplateExt::spawn_template) path.
 	pub fn load(self, bytes: &MediaBytes) -> Result<Vec<Entity>> {
 		let entry = EntryTemplate::from_bytes(self.world, bytes)?;
 		self.load_entry(entry)
@@ -203,7 +204,7 @@ pub enum EntryTemplate {
 impl EntryTemplate {
 	/// Parse entry bytes into the matching IR, dispatching by [`MediaType`]: the
 	/// parse half of [`TemplateLoader::load`]. For a caller that builds the result
-	/// into an existing entity rather than spawning a root — an include
+	/// into an existing entity rather than spawning a root, ie an include
 	/// (`<Template src>`) builds the parsed entry at its own site.
 	pub fn from_bytes(world: &World, bytes: &MediaBytes) -> Result<Self> {
 		match bytes.media_type() {
@@ -213,8 +214,9 @@ impl EntryTemplate {
 			MediaType::Bsx | MediaType::Html => {
 				BsxTemplate::parse_entry(world, bytes.as_utf8()?).map(Self::Bsx)
 			}
-			// every other type is a serde scene format.
-			_ => SceneBody::from_bytes(bytes)?
+			// every other format is a scene body through the registry
+			_ => DocParsers::of(world)
+				.body(bytes)?
 				.reflect(world)
 				.map(Self::Serde),
 		}

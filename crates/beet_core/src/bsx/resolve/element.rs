@@ -142,8 +142,8 @@ pub(super) fn apply_common_directives(
 			handler(cx.entity, source, span)?;
 		}
 	}
-	// `bx:<event>="script"` events. The event name is the directive suffix after
-	// `bx:`; the script resolves through the core seam.
+	// `bx:<event>="script"` events, each lowered to an `OnEvent` child. The
+	// event name is the directive suffix after `bx:`.
 	for attr in &el.attributes {
 		if !is_event_directive(&attr.key) {
 			continue;
@@ -156,7 +156,7 @@ pub(super) fn apply_common_directives(
 			);
 		};
 		let event = attr.key.strip_prefix("bx:").unwrap_or(&attr.key);
-		install_event(cx.entity, &EventBinding::new(event, script.as_str()));
+		install_event(cx.entity, event, script.as_str());
 	}
 	Ok(())
 }
@@ -180,9 +180,10 @@ pub(super) fn build_children(
 }
 
 /// `bx:for="items"` + optional `bx:key`: a [`ReactiveChildren`] over the `items`
-/// array, spawning the element's child template per item, each in a terminating
-/// index scope. With `bx:key="field"` it reconciles by that per-item key so an
-/// append reuses existing rows instead of rebuilding them.
+/// array, the element's children built once into its inline [`Prefab`], which
+/// each row clones in a terminating index scope. With `bx:key="field"` it
+/// reconciles by that per-item key so an append reuses existing rows instead
+/// of rebuilding them.
 fn build_reactive_children(
 	el: &BsxElement,
 	field: &str,
@@ -190,53 +191,23 @@ fn build_reactive_children(
 	_refs: &RefBindings,
 	cx: &mut TemplateContext,
 ) -> Result<()> {
-	let template = el.children.clone();
-	let registry = registry.clone();
-	// each item child builds the element's body as its own template; the
-	// terminating index scope `ReactiveChildren` adds resolves its fields.
-	let build = move |_index: usize, _item: &Value| {
-		let template = template.clone();
-		let registry = registry.clone();
-		OnSpawn::new(move |entity| {
-			let nested =
-				BsxTemplate::container(template.clone(), registry.clone());
-			if let Err(error) = entity.build_template(&nested) {
-				entity.insert(TemplateError::new(error));
-			}
-		})
-	};
+	let parent = cx.entity.id();
+	// SAFETY: only used to spawn and build the item prefab under the element.
+	let world = unsafe { cx.entity.world_mut() };
+	let prefab = world.spawn((Prefab, ChildOf(parent))).id();
+	let template =
+		BsxTemplate::container(el.children.clone(), registry.clone());
+	if let Err(error) = world.entity_mut(prefab).build_template(&template) {
+		world.entity_mut(prefab).insert(TemplateError::new(error));
+	}
+	Prefab::hold(world, prefab);
+	// the element gained its prefab child, so its cached location moved
+	cx.entity.update_location();
 	// the field backing the list: its synced `Value` drives the rebuild.
-	cx.entity.insert(FieldRef::new(field));
-	match string_attr(el, "bx:key") {
-		Some(key_path) => {
-			let key_path = key_path.to_string();
-			cx.entity.insert(ReactiveChildren::keyed(
-				move |item| reactive_item_key(item, &key_path),
-				build,
-			));
-		}
-		None => {
-			cx.entity.insert(ReactiveChildren::new(build));
-		}
-	}
+	let mut reactive = ReactiveChildren::default();
+	reactive.key = string_attr(el, "bx:key").map(|key| FieldPath::parse(&key));
+	cx.entity.insert((FieldRef::new(field), reactive));
 	Ok(())
-}
-
-/// Extract a reconciliation key from a `bx:for` item by a dotted `bx:key` path,
-/// eg `bx:key="id"` or `bx:key="user.id"`. Falls back to a debug repr for
-/// non-string keys (eg numeric ids), which is stable within a session.
-fn reactive_item_key(item: &Value, key_path: &str) -> String {
-	let mut current = item;
-	for segment in key_path.split('.') {
-		match current.get(segment) {
-			Some(next) => current = next,
-			None => return String::new(),
-		}
-	}
-	current
-		.as_str()
-		.map(str::to_string)
-		.unwrap_or_else(|_| format!("{current:?}"))
 }
 
 /// Build the caller content of an uppercase tag as slot children: each child its

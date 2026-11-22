@@ -9,10 +9,11 @@
 //! tree through the template substrate by [`BsxTemplate`], so a `.bsx` file
 //! produces trees identical to what `rsx!` lowers to.
 //!
-//! Author + parse + build live here in `beet_core`; rendering the built tree to
-//! HTML or charcell lives in `beet_ui`, as do the `DocParsers` dispatch, which
-//! delegates BSX parsing to [`BsxNode::parse_document`] + [`BsxTemplate`], and
-//! the `DocRenderers` registry.
+//! Author + parse + build live here in `beet_core`, beside the format registry
+//! [`DocParsers`]; rendering the built tree to HTML or charcell lives in
+//! `beet_ui`, as do its BSX parser, which delegates to
+//! [`BsxNode::parse_document`] + [`BsxTemplate`], and the `DocRenderers`
+//! registry.
 //!
 //! Internal split, one directory per stage: source text to syntax tree in
 //! `parse` (the cursor, the markup parser, the value grammar, the
@@ -28,8 +29,11 @@
 //! entities; text becomes a [`Value`]. A braced `{..}` block is the value
 //! grammar: a `{literal}` lowers to a [`Value`], an `{@source:path}` binding to
 //! its reactive sync components. The `bx:` directives (`bx:scope`, `bx:ref`,
-//! `bx:click`, ...) attach their document-system and slot-marker components.
-//! An uppercase tag or a spread nothing is registered under is not an error:
+//! `bx:click`, ...) attach their document-system and slot-marker components:
+//! `bx:for` a [`ReactiveChildren`] whose item template is the element's
+//! children held as an inline [`Prefab`], `bx:<event>` an [`OnEvent`] child.
+//! `<script>`, `<style>` and `<RunScript>` read their body as raw text, a
+//! [`RunScript`]'s body being its source. An uppercase tag or a spread nothing is registered under is not an error:
 //! it warns, is held with its value in the entity's [`Unregistered`] and, for
 //! a tag, builds its children anyway, so a lean binary loads the same document
 //! shape a full one does and only its behavior is missing.
@@ -75,9 +79,9 @@
 //! position (`{@doc:name}`), and as spread-tuple items
 //! (`{(Slider{value:3}, @comp:Slider.value)}`), pairing a component insert with
 //! a binding on the same entity. An event directive is a script:
-//! `bx:click="target.with_field('count', count => count + 1)"` runs its source
-//! through the registered installer (see [`EventRegistry`]), with the event
-//! target entity bound to `target`. No mirror is lowered onto the host: the script writes the
+//! `bx:click="target.with_field('count', count => count + 1)"` lowers to an
+//! [`OnEvent`] child carrying [`RunScript`] and its source, which the plugin
+//! owning the event runs with the event target entity bound to `target`. No mirror is lowered onto the host: the script writes the
 //! real document through the same ancestor-document walk a display binding
 //! reads through, and document-sync fans the change out.
 //!

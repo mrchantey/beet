@@ -37,8 +37,8 @@ pub struct ReflectTemplate {
 }
 
 impl ReflectTemplate {
-	/// The registration under short type path `name`, resolving an ambiguous
-	/// short path in favour of a sole template candidate.
+	/// The registration under type path `name`, full or short, resolving an
+	/// ambiguous short path in favour of a sole template candidate.
 	///
 	/// A `#[template]` type's short path is its *only* name: it exists to be
 	/// authored as `<Button>` and is reachable no other way, while a component
@@ -51,7 +51,10 @@ impl ReflectTemplate {
 		registry: &'a TypeRegistry,
 		name: &str,
 	) -> Option<&'a TypeRegistration> {
-		if let Some(registration) = registry.get_with_short_type_path(name) {
+		if let Some(registration) = registry
+			.get_with_type_path(name)
+			.or_else(|| registry.get_with_short_type_path(name))
+		{
 			return Some(registration);
 		}
 		if !registry.is_ambiguous(name) {

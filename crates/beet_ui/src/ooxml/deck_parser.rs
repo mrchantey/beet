@@ -1049,7 +1049,11 @@ impl DocParser for DeckParser {
 			.xok()
 	}
 
-	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
+	fn parse(&mut self, bytes: &MediaBytes) -> Result<SceneBody, ParseError> {
+		Err(ParseError::WorldOnly(bytes.media_type().clone()))
+	}
+
+	fn parse_into(&mut self, cx: ParseContext) -> Result<(), ParseError> {
 		if cx.bytes.media_type() != &MediaType::Pptx {
 			return Err(ParseError::UnsupportedType {
 				unsupported: cx.bytes.media_type().clone(),

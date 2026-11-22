@@ -3,14 +3,16 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::resource::IS_RESOURCE;
 
-/// A world with the async bridge installed and a type registry holding
-/// [`Name`], the one component every bridge test writes through, and
-/// [`Document`], which the field helpers check their reach against.
+/// A world with the async bridge installed, every [`RunScript`] a leaf as
+/// the action plugin makes it, and a type registry holding [`Name`], the one
+/// component every bridge test writes through, and [`Document`], which the
+/// field helpers check their reach against.
 ///
 /// Async because every operation is served through a [`WorldBridge`], which
 /// resolves at a sync point.
 pub(crate) fn test_world() -> World {
-	let world = AsyncPlugin::world();
+	let mut world = AsyncPlugin::world();
+	world.register_required_components::<RunScript, OutcomeScript>();
 	{
 		let registry = world.resource::<AppTypeRegistry>();
 		let mut registry = registry.write();

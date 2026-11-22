@@ -125,7 +125,7 @@ mod test {
 		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::new()
-			.parse(ParseContext::new(
+			.parse_into(ParseContext::new(
 				&mut app.world_mut().entity_mut(entity),
 				&bytes,
 			))
@@ -292,7 +292,7 @@ mod test {
 		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_html("<p>a &amp; b</p>");
 		BsxParser
-			.parse(ParseContext::new(
+			.parse_into(ParseContext::new(
 				&mut app.world_mut().entity_mut(entity),
 				&bytes,
 			))

@@ -31,7 +31,7 @@ impl BlobStoreList {
 		build_item: impl 'static + Send + Sync + Fn(usize, &Value) -> OnSpawn,
 	) -> impl Bundle {
 		let field = TypedFieldRef::<Vec<RelPath>>::inline();
-		(field.field(), ReactiveChildren::new(build_item))
+		(field.field(), ReactiveChildren::from_fn(build_item))
 	}
 }
 

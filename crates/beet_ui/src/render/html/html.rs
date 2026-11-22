@@ -431,7 +431,10 @@ mod test {
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
 		BsxParser
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.parse_into(ParseContext::new(
+				&mut world.entity_mut(entity),
+				&bytes,
+			))
 			.unwrap();
 		(world, entity)
 	}

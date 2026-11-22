@@ -22,11 +22,15 @@ use beet_core::prelude::*;
 /// world.spawn(RunNext::new(next));
 /// ```
 ///
+/// `target` is an entity reference, so a clone or a scene load remaps it to
+/// the entity it lands as.
+///
 /// ## Errors
 /// Errors if `target` was never set.
 #[action]
 #[derive(Debug, Component, Reflect)]
-#[reflect(Component, Default)]
+#[reflect(Component, Default, MapEntities)]
+#[component(map_entities)]
 pub async fn RunNext<T = Outcome>(
 	/// The next action entity to call.
 	#[field(required)]
@@ -92,6 +96,24 @@ where
 			target: Some(target),
 			if_input_matches: Some(value),
 			_marker: PhantomData,
+		}
+	}
+}
+
+impl<T> MapEntities for RunNext<T>
+where
+	T: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ PartialEq
+		+ Reflect
+		+ FromReflect
+		+ bevy::reflect::Typed,
+{
+	fn map_entities<M: EntityMapper>(&mut self, mapper: &mut M) {
+		if let Some(target) = &mut self.target {
+			*target = mapper.get_mapped(*target);
 		}
 	}
 }

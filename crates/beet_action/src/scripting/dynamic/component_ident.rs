@@ -1,6 +1,5 @@
 //! Resolving a component identifier, as written in a scene or a script, to a
 //! live component.
-use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::component::ComponentId;
 use bevy::reflect::TypeRegistry;

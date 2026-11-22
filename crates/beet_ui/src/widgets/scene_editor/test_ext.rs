@@ -60,7 +60,7 @@ pub(super) fn render_charcell(world: &mut World) -> String {
 		.next()
 		.expect("no root");
 	world.entity_mut(root).insert(FlexBuffer::new(100));
-	world.run_schedule(crate::parse::PostParseTree);
+	world.run_schedule(beet_core::prelude::PostParseTree);
 	world
 		.entity_mut(root)
 		.take::<FlexBuffer>()

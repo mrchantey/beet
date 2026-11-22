@@ -27,8 +27,8 @@ pub(in crate::bsx) fn is_directive(key: &str) -> bool {
 }
 
 /// The `bx:` directives with dedicated structural meaning, as opposed to a
-/// `bx:<event>` verb trigger. Anything else under `bx:` is treated as an event
-/// (resolved through the [`EventRegistry`], a graceful no-op when unregistered).
+/// `bx:<event>` verb trigger. Anything else under `bx:` is treated as an event,
+/// lowered to an [`OnEvent`] child, inert where no plugin owns the event.
 const STRUCTURAL_DIRECTIVES: &[&str] = &[
 	"bx:cfg",
 	"bx:scope",

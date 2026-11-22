@@ -699,7 +699,7 @@ mod test {
 		TemplateLoader::new(&mut world)
 			.with_entity(router)
 			.load(&MediaBytes::new_json(
-				r#"{"entities":{"0":{"some_plugin::Sparkle":{"amount":3}}}}"#,
+				r#"{"$type":"org.beet.scene#body","entities":{"0":{"some_plugin::Sparkle":{"amount":3}}}}"#,
 			))
 			.unwrap();
 		let report = check(&mut world, router).await;

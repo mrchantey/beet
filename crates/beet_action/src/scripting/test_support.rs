@@ -55,11 +55,7 @@ pub(crate) async fn run_leaf_with(
 	config: ScriptConfig,
 ) -> Result<Outcome> {
 	world
-		.spawn((
-			Script::<Value, Value>::new(script),
-			OutcomeScript::<Value, Value>::default(),
-			config,
-		))
+		.spawn((RunScript, Value::Str(script.into()), config))
 		.call::<(), Outcome>(())
 		.await
 }

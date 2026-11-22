@@ -830,7 +830,7 @@ mod tests {
 		world
 			.entity_mut(root)
 			.insert(Buffer::new(size).into_double_buffer());
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 		let rects = world
 			.run_system_once(|q: Query<(&Element, &LayoutRect)>| {
 				q.iter()
@@ -884,7 +884,7 @@ mod tests {
 		world
 			.entity_mut(root)
 			.insert(Buffer::new(UVec2::new(100, 24)).into_double_buffer());
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 		// keyed by tag, the table wrapper by its class to tell it from the
 		// container `div`
 		let rects = world
@@ -969,7 +969,7 @@ mod tests {
 		world
 			.entity_mut(root)
 			.insert(Buffer::new(UVec2::new(100, 24)).into_double_buffer());
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 		display(&mut world, "nav").xpect_not_eq(Display::None);
 		display(&mut world, "button").xpect_eq(Display::None);
 		// one column above the breakpoint: still wide
@@ -978,7 +978,7 @@ mod tests {
 			.get_mut::<DoubleBuffer>()
 			.unwrap()
 			.resize(UVec2::new(91, 24));
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 		display(&mut world, "nav").xpect_not_eq(Display::None);
 		display(&mut world, "button").xpect_eq(Display::None);
 		// exactly the breakpoint: collapsed (inclusive, like CSS `max-width`)
@@ -987,7 +987,7 @@ mod tests {
 			.get_mut::<DoubleBuffer>()
 			.unwrap()
 			.resize(UVec2::new(90, 24));
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 		display(&mut world, "nav").xpect_eq(Display::None);
 		display(&mut world, "button").xpect_eq(Display::Flex);
 		// and the collapsed rail holds NO rect. Below the breakpoint the drawer is
@@ -1012,7 +1012,7 @@ mod tests {
 			.get_mut::<DoubleBuffer>()
 			.unwrap()
 			.resize(UVec2::new(40, 24));
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 		display(&mut world, "nav").xpect_eq(Display::None);
 		display(&mut world, "button").xpect_eq(Display::Flex);
 		// and back up: the rail returns, the toggle hides again
@@ -1021,7 +1021,7 @@ mod tests {
 			.get_mut::<DoubleBuffer>()
 			.unwrap()
 			.resize(UVec2::new(100, 24));
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 		display(&mut world, "nav").xpect_not_eq(Display::None);
 		display(&mut world, "button").xpect_eq(Display::None);
 	}

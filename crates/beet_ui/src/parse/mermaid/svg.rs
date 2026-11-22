@@ -161,7 +161,8 @@ fn spawn_inline_svg(
 	svg: &str,
 	width: f32,
 ) -> Result {
-	BsxParser.parse(ParseContext::new(figure, &MediaBytes::new_html(svg)))?;
+	BsxParser
+		.parse_into(ParseContext::new(figure, &MediaBytes::new_html(svg)))?;
 	let figure_id = figure.id();
 	figure.world_scope(|world| {
 		let root = world

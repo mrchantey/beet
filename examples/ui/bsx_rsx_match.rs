@@ -19,7 +19,7 @@ fn main() {
 		let bytes = MediaBytes::new_bsx(CARD_BSX);
 		let mut entity = bsx_world.spawn_empty();
 		BsxParser
-			.parse(ParseContext::new(&mut entity, &bytes))
+			.parse_into(ParseContext::new(&mut entity, &bytes))
 			.unwrap();
 		entity.id()
 	};

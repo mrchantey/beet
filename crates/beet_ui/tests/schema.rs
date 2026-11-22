@@ -19,7 +19,7 @@ fn parse_bsx(world: &mut World, source: &str) -> Entity {
 	let bytes = MediaBytes::new_bsx(source);
 	let mut entity = world.spawn_empty();
 	BsxParser
-		.parse(ParseContext::new(&mut entity, &bytes))
+		.parse_into(ParseContext::new(&mut entity, &bytes))
 		.unwrap();
 	entity.id()
 }
@@ -284,7 +284,7 @@ fn component_field_binds_document() {
 	let root = {
 		let mut entity = world.spawn(ChildOf(doc));
 		BsxParser
-			.parse(ParseContext::new(&mut entity, &bytes))
+			.parse_into(ParseContext::new(&mut entity, &bytes))
 			.unwrap();
 		entity.id()
 	};
@@ -341,7 +341,7 @@ async fn async_remote_schema_defers_load() {
 		let world = app.world_mut();
 		let mut entity = world.spawn_empty();
 		BsxParser
-			.parse(ParseContext::new(&mut entity, &bytes))
+			.parse_into(ParseContext::new(&mut entity, &bytes))
 			.unwrap();
 		entity.id()
 	};
@@ -390,7 +390,7 @@ async fn remote_template_stub_defers_load() {
 		let world = app.world_mut();
 		let mut entity = world.spawn_empty();
 		BsxParser
-			.parse(ParseContext::new(&mut entity, &bytes))
+			.parse_into(ParseContext::new(&mut entity, &bytes))
 			.unwrap();
 		entity.id()
 	};

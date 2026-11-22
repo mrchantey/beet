@@ -1,5 +1,5 @@
 use super::*;
-use crate::parse::PostParseTree;
+use beet_core::prelude::PostParseTree;
 use beet_core::prelude::*;
 use bevy::math::UVec2;
 

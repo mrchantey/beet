@@ -52,7 +52,7 @@ fn parse_bsx(
 		None => world.spawn_empty(),
 	};
 	BsxParser
-		.parse(ParseContext::new(&mut entity, &bytes))
+		.parse_into(ParseContext::new(&mut entity, &bytes))
 		.unwrap();
 	entity.id()
 }
@@ -544,13 +544,69 @@ fn reactive_children_per_item() {
 	);
 	world.update_local();
 	world.update_local();
-	// one <li> child per item.
-	world
+	// one row per item, each a clone of the held item template, whose body
+	// is the element's children
+	let rows = world
 		.entity(list)
 		.get::<Children>()
-		.map(|children| children.len())
 		.unwrap()
-		.xpect_eq(3);
+		.iter()
+		.filter(|child| world.entity(*child).contains::<ReactiveChild>())
+		.collect::<Vec<_>>();
+	rows.len().xpect_eq(3);
+	for row in rows {
+		let item = world.entity(row).get::<Children>().unwrap()[0];
+		world.get::<Element>(item).unwrap().tag().xpect_eq("li");
+	}
+}
+
+/// A list saves as its generator and held item template, never its rows, so a
+/// reload regenerates the rows rather than freezing them.
+#[cfg(feature = "json")]
+#[beet_core::test]
+fn reactive_children_survive_a_save_and_a_reload() {
+	let rows = |world: &World, list: Entity| {
+		world
+			.entity(list)
+			.get::<Children>()
+			.unwrap()
+			.iter()
+			.filter(|child| world.entity(*child).contains::<ReactiveChild>())
+			.count()
+	};
+	let mut world = world();
+	let doc = world
+		.spawn(Document::new(value!({ "items": ["a", "b"] })))
+		.id();
+	let list = spawn_bsx_under(
+		&mut world,
+		Some(doc),
+		"<ul bx:for=\"items\"><li>x</li></ul>",
+	);
+	world.update_local();
+	rows(&world, list).xpect_eq(2);
+	let bytes = TemplateSaver::new()
+		.save_roots(&mut world, MediaType::Json, [list])
+		.unwrap();
+	bytes
+		.as_utf8()
+		.unwrap()
+		.xref()
+		.xpect_contains("ReactiveChildren")
+		.xpect_contains("Prefab")
+		.xnot()
+		.xpect_contains("Disabled");
+
+	let mut world = self::world();
+	let doc = world
+		.spawn(Document::new(value!({ "items": ["a", "b", "c"] })))
+		.id();
+	let list = TemplateLoader::new(&mut world)
+		.with_entity(doc)
+		.load(&bytes)
+		.unwrap()[0];
+	world.update_local();
+	rows(&world, list).xpect_eq(3);
 }
 
 // ---- props store ------------------------------------------------------------
@@ -909,7 +965,7 @@ async fn counter_bsx_repaints_in_live_tui() {
 	// parse the counter markup as the host's content tree.
 	let bytes = MediaBytes::new_bsx(COUNTER_BSX);
 	BsxParser
-		.parse(ParseContext::new(
+		.parse_into(ParseContext::new(
 			&mut app.world_mut().entity_mut(host),
 			&bytes,
 		))
@@ -1533,7 +1589,7 @@ fn mdx_resolves_embedded_template() {
 	let bytes = MediaBytes::new_markdown("# Title\n\n<Greeting/>\n");
 	let mut entity = world.spawn_empty();
 	MarkdownParser::new()
-		.parse(ParseContext::new(&mut entity, &bytes))
+		.parse_into(ParseContext::new(&mut entity, &bytes))
 		.unwrap();
 	let root = entity.id();
 	// the embedded <Greeting/> resolved to its <strong>Hi</strong> subtree.
@@ -1546,7 +1602,7 @@ fn render_markdown(world: &mut World, md: &str) -> String {
 	let bytes = MediaBytes::new_markdown(md);
 	let mut entity = world.spawn_empty();
 	MarkdownParser::new()
-		.parse(ParseContext::new(&mut entity, &bytes))
+		.parse_into(ParseContext::new(&mut entity, &bytes))
 		.unwrap();
 	let root = entity.id();
 	render_html(world, root)
@@ -1603,7 +1659,7 @@ fn html_mode_is_plain_html() {
 fn parse_bsx_html(world: &mut World, bytes: &MediaBytes) -> Entity {
 	let mut entity = world.spawn_empty();
 	BsxParser
-		.parse(ParseContext::new(&mut entity, bytes))
+		.parse_into(ParseContext::new(&mut entity, bytes))
 		.unwrap();
 	entity.id()
 }

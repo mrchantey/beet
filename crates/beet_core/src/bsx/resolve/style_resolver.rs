@@ -1,8 +1,7 @@
 //! The BSX inline-style seam: the `bx:style` directive.
 //!
-//! Like the [`BsxTagResolvers`](crate::prelude::BsxTagResolvers) and
-//! [`EventRegistry`](crate::prelude::EventRegistry) seams, core knows nothing
-//! concrete here: it parses `bx:style`'s raw declaration text and source span,
+//! Like the [`BsxTagResolvers`](crate::prelude::BsxTagResolvers) seam, core
+//! knows nothing concrete here: it parses `bx:style`'s raw declaration text and source span,
 //! then hands them to a downstream handler. The handler (registered by `beet_ui`,
 //! where the style types live) parses the declarations into a one-off `Rule` and
 //! attaches a unique, span-derived class to the element, the markup twin of the

@@ -28,6 +28,7 @@
 
 use crate::prelude::*;
 use bevy::ecs::component::ComponentCloneBehavior;
+use bevy::ecs::component::ComponentId;
 use bevy::ecs::entity::EntityMapper;
 use bevy::ecs::reflect::AppTypeRegistry;
 use bevy::ecs::reflect::ReflectComponent;
@@ -105,14 +106,44 @@ pub enum ComponentSlot {
 	Template(DeferredTemplate),
 }
 
-/// A deferred template slot: a registered template's short type path and the
-/// reflected patch (a `DynamicStruct` over its default) to build it from.
+/// A deferred template slot: a template invocation, the registered
+/// template's type path and the reflected patch to build it from, expanded
+/// when the slot builds and never before (design: a scene is never target
+/// specific through a baked expansion).
+///
+/// Its build is retained on the entity as a [`TemplateInvocation`], so a save
+/// writes the invocation back in place of what it expanded to.
 pub struct DeferredTemplate {
-	/// The registered template's short type path, the registry lookup key.
+	/// The registered template's type path, full or short, the registry
+	/// lookup key.
 	pub name: SmolStr,
 	/// The reflected patch over the template's default, typically a
 	/// `DynamicStruct` carrying only the provided fields.
 	pub patch: Box<dyn PartialReflect>,
+	/// The patch as its body wrote it, which a save writes back.
+	pub value: Value,
+}
+
+/// The template invocations a scene body expanded on this entity, each
+/// written back by a saver as one of the entity's own keys in place of what
+/// it expanded to: the components it inserted are left out, and the entities
+/// it spawned are [`Derived`]. So a scene holding an invocation re-saves byte
+/// identical, and re-expands on the next load.
+///
+/// Never saved as itself, and read directly, so it needs no registration.
+#[derive(Debug, Default, Clone, Component, Deref)]
+pub struct TemplateInvocations(Vec<TemplateInvocation>);
+
+/// One template invocation a body expanded, see [`TemplateInvocations`].
+#[derive(Debug, Clone)]
+pub struct TemplateInvocation {
+	/// The template's type path, the key a save writes it under.
+	pub name: SmolStr,
+	/// The patch as its body wrote it.
+	pub value: Value,
+	/// The type paths of the components its expansion inserted on the entity,
+	/// which a save leaves out.
+	pub expanded: Vec<SmolStr>,
 }
 
 impl Template for DynamicTemplate {
@@ -212,12 +243,16 @@ fn build_entity(
 				// SAFETY: only used to apply a component onto the mapped entity.
 				let world = unsafe { cx.entity.world_mut() };
 				// what a body's reflection held is inserted as it stands, so
-				// holding needs no registration of the marker itself
+				// holding needs no registration of the marker itself, a name
+				// this world minted as a runtime component inserted as one
 				if let Some(unregistered) = value
 					.try_as_reflect()
 					.and_then(|value| value.downcast_ref::<Unregistered>())
 				{
-					world.entity_mut(entity_id).insert(unregistered.clone());
+					DynamicComponents::insert_held(
+						&mut world.entity_mut(entity_id),
+						unregistered.clone(),
+					);
 					continue;
 				}
 				let (world, mut mapper) =
@@ -231,10 +266,12 @@ fn build_entity(
 				)?;
 			}
 			ComponentSlot::Template(deferred) => {
+				// SAFETY: only used to acquire the mapped entity for a scoped
+				// build and to retain what that build expanded.
+				let world = unsafe { cx.entity.world_mut() };
+				let before = ExpansionSnapshot::new(world, entity_id);
 				// build the deferred template into a context scoped to this
 				// entity, sharing the reference map so cross-entity refs resolve.
-				// SAFETY: only used to acquire the mapped entity for a scoped build.
-				let world = unsafe { cx.entity.world_mut() };
 				let mut entity = world.entity_mut(entity_id);
 				let mut scoped =
 					TemplateContext::new(&mut entity, cx.entity_references);
@@ -244,10 +281,76 @@ fn build_entity(
 					deferred.patch.as_ref(),
 					&mut scoped,
 				)?;
+				before.retain(world, entity_id, registry, deferred);
 			}
 		}
 	}
 	Ok(())
+}
+
+/// An entity's components and children before a template expands on it, so
+/// what the expansion added is retained as its [`TemplateInvocation`].
+struct ExpansionSnapshot {
+	components: Vec<ComponentId>,
+	children: Vec<Entity>,
+}
+
+impl ExpansionSnapshot {
+	fn new(world: &World, entity: Entity) -> Self {
+		let entity = world.entity(entity);
+		Self {
+			components: entity.archetype().components().to_vec(),
+			children: entity
+				.get::<Children>()
+				.map(|children| children.to_vec())
+				.unwrap_or_default(),
+		}
+	}
+
+	/// Retain `deferred`'s expansion on `entity`: the components it added, by
+	/// type path, and every child it spawned marked [`Derived`].
+	fn retain(
+		self,
+		world: &mut World,
+		entity: Entity,
+		registry: &TypeRegistry,
+		deferred: &DeferredTemplate,
+	) {
+		let target = world.entity(entity);
+		let expanded = target
+			.archetype()
+			.components()
+			.iter()
+			.filter(|id| !self.components.contains(id))
+			.filter_map(|id| world.components().get_info(*id)?.type_id())
+			.filter_map(|type_id| registry.get(type_id))
+			.map(|registration| {
+				SmolStr::new(registration.type_info().type_path())
+			})
+			.collect::<Vec<_>>();
+		let spawned = target
+			.get::<Children>()
+			.into_iter()
+			.flatten()
+			.filter(|child| !self.children.contains(child))
+			.copied()
+			.collect::<Vec<_>>();
+		for child in spawned {
+			world.entity_mut(child).insert(Derived);
+		}
+		let invocation = TemplateInvocation {
+			name: deferred.name.clone(),
+			value: deferred.value.clone(),
+			expanded,
+		};
+		let mut target = world.entity_mut(entity);
+		match target.get_mut::<TemplateInvocations>() {
+			Some(mut invocations) => invocations.0.push(invocation),
+			None => {
+				target.insert(TemplateInvocations(vec![invocation]));
+			}
+		}
+	}
 }
 
 /// The deterministic [`SceneEntityReference`] for an in-template entity, keyed on
@@ -582,6 +685,7 @@ mod test {
 				DeferredTemplate {
 					name: "Label".into(),
 					patch: Box::new(patch),
+					value: value!({ "text": "deferred" }),
 				},
 			)])],
 		};

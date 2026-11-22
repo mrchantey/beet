@@ -171,7 +171,7 @@ where
 impl<T> TypedFieldRef<T> {
 	/// The [`FieldRef`] paired with its co-located [`ValueSchema`], for places
 	/// that need an owned bundle rather than a deref borrow, ie
-	/// `ReactiveChildren::new(items.field(), ..)` or a `children![items.field()]`
+	/// `(items.field(), ReactiveChildren::default())` or a `children![items.field()]`
 	/// markup slot. The schema lets a typed write type-check locally.
 	pub fn field(&self) -> (FieldRef, ValueSchema) {
 		(self.field.clone(), self.schema.clone())

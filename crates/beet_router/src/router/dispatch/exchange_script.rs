@@ -1,6 +1,8 @@
-//! The [`Script`] route surfaces: the [`ExchangeScript`] marker (a route served
-//! from a sibling `Script`'s output) and the [`ExchangeScriptElement`] entry
-//! action (a `<script>` body run for its console output).
+//! The script route surfaces: the [`ExchangeScript`] marker (a route served
+//! from its script's output) and the [`ExchangeScriptElement`] entry action (a
+//! `<script>` body run for its console output). Both read their program the
+//! one way a script is read, its own [`Value`] and its descendants'
+//! ([`ElementTextQuery::script_source`]).
 //!
 //! Both are thin Request/Response wrappers; the eval machinery (the world
 //! bridge, the console capture, and the compile-time backend selection behind
@@ -25,7 +27,8 @@ use std::marker::PhantomData;
 /// slot once the entry loads, streaming the captured output. (A script element
 /// installs a plain `Action<Request, Response>`, which the load verb calls
 /// directly.) The script source is the marked element's
-/// raw-text body, with the [`Request`] shaped into its `input`:
+/// raw-text body, its descendant [`Value`], with the [`Request`] shaped into
+/// its `input`:
 ///
 /// ```bsx
 /// <script {(ExchangeScriptElement, CallOnReady)}>console.log("hello world")</script>
@@ -52,7 +55,7 @@ pub async fn ExchangeScriptElement(
 		.with_state::<(ElementTextQuery, Query<&ScriptConfig>), _>(
 			move |(elements, configs)| {
 				(
-					elements.text_content(entity),
+					elements.script_source(entity),
 					configs.get(entity).ok().cloned(),
 				)
 			},
@@ -72,7 +75,8 @@ pub async fn ExchangeScriptElement(
 
 /// Reflect-able marker that installs the typed [`ScriptAction`], its
 /// [`ScriptConfig`], and the [`ExchangeOverload`] adapting them to
-/// request/response dispatch, declaring the params its conversions read.
+/// request/response dispatch, declaring the params its conversions read. The
+/// program is the entity's own [`Value`] and its descendants'.
 ///
 /// Serves what the script returned (eg a `String`), not its console output (that
 /// is [`ExchangeScriptElement`]). `M1`/`M2` are
@@ -160,8 +164,9 @@ where
 /// A markup-friendly scripted route: a `path` plus a `script` served the whole
 /// request and answering with what it returns.
 ///
-/// The non-generic front-end for a `(PathPartial, Script, ExchangeScript)`
-/// route, so a no-code entry declares one without spelling the generic types:
+/// The non-generic front-end for a `(PathPartial, RunScript, ExchangeScript)`
+/// route, its source the route's own [`Value`], so a no-code entry declares
+/// one without spelling the generic types:
 ///
 /// ```bsx
 /// <ScriptRoute path="sign"
@@ -191,15 +196,15 @@ pub fn ScriptRoute(
 ) -> impl Bundle {
 	(
 		PathPartial::new(path),
-		Script::<Value, Value>::new(script),
+		Value::from(script),
 		ExchangeScript::<Value, Value, ScriptInputMarker, ScriptAnswerMarker>::default(),
 	)
 }
 
 /// A `ExchangeScript` route installs the typed `ScriptAction` (hence an
 /// `ActionMeta`) and the `ExchangeOverload` adapter, so what the script returns is
-/// served as the route response. Regression: requiring only `Script` left the route
-/// without an `ActionMeta`, so it never joined the `RouteTree`.
+/// served as the route response. Regression: a route holding only its source
+/// had no `ActionMeta`, so it never joined the `RouteTree`.
 #[cfg(test)]
 #[cfg(feature = "quickjs")]
 mod route_test {
@@ -240,7 +245,7 @@ mod route_test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((Router::with_defaults(), children![(
-				Script::<(), String>::new(r#""hello world""#),
+				Value::from(r#""hello world""#),
 				ExchangeScript::<(), String>::default(),
 				PathPartial::new("greet"),
 			)]))
@@ -257,9 +262,7 @@ mod route_test {
 	async fn a_strict_router_admits_any_script_param() {
 		world()
 			.spawn((Router::with_defaults(), RejectUnknownParams, children![(
-				Script::<Value, Value>::new(
-					r#""hello " + input.params.name[0]"#
-				),
+				Value::from(r#""hello " + input.params.name[0]"#),
 				ExchangeScript::<
 					Value,
 					Value,
@@ -420,7 +423,7 @@ mod route_test {
 				(
 					route::new(
 						"sign",
-						Script::<Value, Value>::new(
+						Value::from(
 							r#"{
 							await world.spawn({ Name: input.params.name[0] });
 							return "signed";
@@ -438,7 +441,7 @@ mod route_test {
 				(
 					route::new(
 						"book",
-						Script::<Value, Value>::new(
+						Value::from(
 							r#"{
 							const found = [];
 							for (const id of await world.entities("Name")) {

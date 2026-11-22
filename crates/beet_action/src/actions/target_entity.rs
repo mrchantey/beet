@@ -17,8 +17,12 @@ use beet_core::prelude::*;
 /// let target = TargetEntity::Agent;
 /// # let _ = target;
 /// ```
+///
+/// [`Other`](Self::Other) is an entity reference, so a clone or a scene load
+/// remaps it to the entity it lands as.
 #[derive(Debug, Default, Clone, Component, Reflect, PartialEq, Eq, Hash)]
-#[reflect(Default, Component)]
+#[reflect(Default, Component, MapEntities)]
+#[component(map_entities)]
 pub enum TargetEntity {
 	/// Use the action entity itself (the caller).
 	#[default]
@@ -27,6 +31,14 @@ pub enum TargetEntity {
 	Agent,
 	/// Specify an explicit entity to target.
 	Other(Entity),
+}
+
+impl MapEntities for TargetEntity {
+	fn map_entities<M: EntityMapper>(&mut self, mapper: &mut M) {
+		if let Self::Other(entity) = self {
+			*entity = mapper.get_mapped(*entity);
+		}
+	}
 }
 
 impl TargetEntity {
@@ -55,6 +67,47 @@ impl TargetEntity {
 				AgentQuery::entity_async(world, action).await
 			}
 			TargetEntity::Other(entity) => *entity,
+		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// A prefab whose actions name its own entities: every clone's references
+	/// land on that clone's entities, never the prefab's or another clone's.
+	#[beet_core::test]
+	fn a_prefab_clone_remaps_its_targets() {
+		let mut world = AsyncPlugin::world();
+		let prefab = world.spawn(Prefab).id();
+		let next = world.spawn(ChildOf(prefab)).id();
+		world.spawn((
+			TargetEntity::Other(next),
+			RunNext::new(next),
+			ChildOf(prefab),
+		));
+		let clones = [world.spawn_empty().id(), world.spawn_empty().id()].map(
+			|target| {
+				Prefab::clone_under(&mut world, prefab, target, ())
+					.unwrap()
+					.root
+			},
+		);
+		for root in clones {
+			let children =
+				world.entity(root).get::<Children>().unwrap().to_vec();
+			world
+				.get::<TargetEntity>(children[1])
+				.unwrap()
+				.clone()
+				.xpect_eq(TargetEntity::Other(children[0]));
+			world
+				.get::<RunNext>(children[1])
+				.unwrap()
+				.target
+				.xpect_eq(Some(children[0]));
 		}
 	}
 }

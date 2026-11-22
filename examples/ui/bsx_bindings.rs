@@ -27,7 +27,7 @@ fn main() {
 		let bytes = MediaBytes::new_bsx(GREETING_BSX);
 		let mut entity = world.spawn(ChildOf(doc));
 		BsxParser
-			.parse(ParseContext::new(&mut entity, &bytes))
+			.parse_into(ParseContext::new(&mut entity, &bytes))
 			.unwrap();
 		entity.id()
 	};

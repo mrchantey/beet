@@ -27,9 +27,9 @@ use serde::Serialize;
 /// components and an exclude carves one out of an otherwise open grant:
 ///
 /// ```ignore
-/// <RunScript
-///   {ScriptConfig{read:["guestbook.*","Text"], write:["guestbook.*"]}}
-///   script=".."/>
+/// <RunScript {ScriptConfig{read:["guestbook.*","Text"], write:["guestbook.*"]}}>
+///   ..
+/// </RunScript>
 /// ```
 ///
 /// A component passes a filter if *any* of its names (full type path, short
@@ -69,19 +69,27 @@ impl ScriptConfig {
 	/// The components no script may ever write, whatever a config says.
 	///
 	/// A script's grant is carried on the entity beside it, so a script that
-	/// could write these could widen its own reach or replace its own body: the
-	/// sandbox would hold only until the first script asked it not to. This is a
-	/// rule rather than a flag, so there is nothing to forget to set.
+	/// could write these could widen its own reach or turn itself into another
+	/// kind of script: the sandbox would hold only until the first script asked
+	/// it not to. This is a rule rather than a flag, so there is nothing to
+	/// forget to set. A script's source, the [`Value`] of a script entity and
+	/// its descendants, is guarded by entity rather than name, in
+	/// [`WorldWrite`].
 	///
-	/// Matched by base name rather than by type: the carriers are generic (so
-	/// their short path reads `Script<Value, Value>`) and one of them
+	/// Matched by base name rather than by type: some carriers are generic (so
+	/// their short path reads `OutcomeScript<Value, Value>`) and one of them
 	/// ([`ExchangeScript`], the route marker) lives in `beet_router`, which
 	/// depends on this crate. A runtime component that picks one of these names
 	/// is refused too, which is the conservative direction.
 	///
 	/// [`ExchangeScript`]: https://docs.rs/beet_router
-	pub const PROTECTED: [&str; 4] =
-		["ScriptConfig", "Script", "OutcomeScript", "ExchangeScript"];
+	pub const PROTECTED: [&str; 5] = [
+		"ScriptConfig",
+		"RunScript",
+		"OnEvent",
+		"OutcomeScript",
+		"ExchangeScript",
+	];
 
 	/// A config reaching the named components, readable and writable.
 	///
@@ -357,27 +365,59 @@ mod test {
 			.xpect_contains("no script may write");
 	}
 
-	/// The same rule guards the script's own body under every instantiation: the
-	/// carrier is generic, so the refusal matches its base name and a script
-	/// cannot replace what runs next time.
+	/// The same rule guards what makes an entity a script, so a script
+	/// cannot turn itself into another kind.
 	#[beet_core::test]
-	fn no_config_can_grant_a_write_to_the_script_itself() {
+	fn no_config_can_grant_a_write_to_a_script_carrier() {
 		let mut world = test_world();
 		world
 			.resource::<AppTypeRegistry>()
 			.write()
-			.register::<Script<Value, Value>>();
+			.register::<RunScript>();
 		ScriptConfig::default()
 			.assert_writable(
 				&ComponentIdent::resolve(
 					&mut world,
-					<Script<Value, Value>>::short_type_path(),
+					RunScript::short_type_path(),
 				)
 				.unwrap(),
 			)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("no script may write");
+	}
+
+	/// A script's source is its entity's `Value` and its descendants', so no
+	/// grant reaches them: a script cannot rewrite what runs next time.
+	#[beet_core::test]
+	fn no_config_can_grant_a_write_to_a_script_source() {
+		let mut world = test_world();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<Value>();
+		let script = world.spawn((RunScript, children![Value::from("1")])).id();
+		let source = world.entity(script).get::<Children>().unwrap()[0];
+		WorldWrite::insert(
+			&mut world,
+			source,
+			Value::type_path(),
+			Value::from("2"),
+			&ScriptConfig::default(),
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("a script's source");
+		// a text node outside any script stays writable
+		let text = world.spawn(Value::from("a")).id();
+		WorldWrite::insert(
+			&mut world,
+			text,
+			Value::type_path(),
+			Value::from("b"),
+			&ScriptConfig::default(),
+		)
+		.unwrap();
 	}
 
 	/// A runtime component that picks a protected name is refused too, which is

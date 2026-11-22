@@ -273,7 +273,7 @@ mod test {
 		world
 			.entity_mut(root)
 			.insert(Buffer::new(UVec2::new(80, 24)).into_double_buffer());
-		world.run_schedule(crate::parse::PostParseTree);
+		world.run_schedule(beet_core::prelude::PostParseTree);
 		world
 			.entity(root)
 			.get::<Children>()

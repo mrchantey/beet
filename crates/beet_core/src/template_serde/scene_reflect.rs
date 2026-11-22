@@ -3,12 +3,14 @@
 //! entity references both ways.
 
 use super::ComponentSlot;
+use super::DeferredTemplate;
 use super::DynamicTemplate;
 use super::DynamicTemplateEntity;
 use crate::prelude::*;
 use bevy::ecs::entity::EntityGeneration;
 use bevy::ecs::entity::EntityIndex;
 use bevy::ecs::entity::EntityMapper;
+use bevy::ecs::reflect::ReflectComponent;
 use bevy_reflect::PartialReflect;
 use bevy_reflect::ReflectFromReflect;
 use bevy_reflect::TypeRegistration;
@@ -22,11 +24,13 @@ impl SceneBody {
 	/// Reflect this body against `world`'s type registry into the
 	/// [`DynamicTemplate`] that spawns it.
 	///
-	/// A key resolves as a full type path, else a short one. A component key
-	/// that resolves as neither is left off its entity with a warning and held,
-	/// value and all, in the entity's [`Unregistered`], unless its short name
-	/// is [allowed](AllowedUnregistered), which skips it silently. A resource
-	/// has no entity to hold it, so an unresolved one is an error, as is any
+	/// A key resolves as a full type path, else a short one. A key naming a
+	/// template is its invocation, a deferred slot expanded when the entity
+	/// builds. A component key that resolves as neither is left off its entity
+	/// with a warning and held, value and all, in the entity's
+	/// [`Unregistered`], unless its short name is
+	/// [allowed](AllowedUnregistered), which skips it silently. A resource has
+	/// no entity to hold it, so an unresolved one is an error, as is any
 	/// registered type whose value does not read.
 	pub fn reflect(&self, world: &World) -> Result<DynamicTemplate> {
 		let app_registry = world
@@ -81,6 +85,20 @@ impl SceneBody {
 		let mut unregistered = Unregistered::default();
 		for (name, value) in body.iter() {
 			match Self::registration(registry, name) {
+				Some(registration)
+					if registration.data::<ReflectComponent>().is_none()
+						&& registration.data::<ReflectTemplate>().is_some() =>
+				{
+					components.push(ComponentSlot::Template(DeferredTemplate {
+						name: registration.type_info().type_path().into(),
+						patch: keys.deserialize(
+							registration,
+							registry,
+							value,
+						)?,
+						value: value.clone(),
+					}))
+				}
 				Some(registration) => components.push(ComponentSlot::Value(
 					keys.deserialize(registration, registry, value)?,
 				)),
@@ -349,19 +367,54 @@ mod test {
 		weight: u64,
 	}
 
+	/// A resource a body carries.
+	#[derive(Debug, Default, Clone, PartialEq, Resource, Reflect)]
+	#[reflect(Resource, Default)]
+	struct Score(u32);
+
+	/// A template a body invokes: its expansion inserts [`Health`] on the
+	/// entity and spawns a named child, neither of which a save writes.
+	#[derive(Debug, Default, Clone, Reflect)]
+	#[reflect(Default)]
+	struct Badge {
+		text: String,
+	}
+	subtree_template!(Badge);
+	impl GetTemplateSchema for Badge {}
+	impl bevy::ecs::template::Template for Badge {
+		type Output = ();
+		fn build_template(
+			&self,
+			cx: &mut bevy::ecs::template::TemplateContext,
+		) -> Result<()> {
+			let root = cx.entity.id();
+			cx.entity.insert(Health(9));
+			// SAFETY: only used to spawn an unrelated child entity.
+			let world = unsafe { cx.entity.world_mut() };
+			world.spawn((Name::new(self.text.clone()), ChildOf(root)));
+			OK
+		}
+		fn clone_template(&self) -> Self { self.clone() }
+	}
+
 	const HEALTH: &str =
 		"beet_core::template_serde::scene_reflect::test::Health";
 	const SHIELD: &str =
 		"beet_core::template_serde::scene_reflect::test::Shield";
 	const LINKS: &str = "beet_core::template_serde::scene_reflect::test::Links";
 
-	/// A world registering `Health` and `Links`, and `Shield` when `full`.
+	/// A world registering `Health`, `Links`, `Score` and the `Badge`
+	/// template, and `Shield` when `full`.
 	fn world(full: bool) -> World {
-		let world = <(TemplatePlugin, MinimalTypesPlugin)>::world();
+		let mut app = App::new();
+		app.add_plugins((TemplatePlugin, MinimalTypesPlugin))
+			.install_type::<Badge>();
+		let world = core::mem::take(app.world_mut());
 		{
 			let mut registry = world.resource::<AppTypeRegistry>().write();
 			registry.register::<Health>();
 			registry.register::<Links>();
+			registry.register::<Score>();
 			if full {
 				registry.register::<Shield>();
 			}
@@ -426,6 +479,60 @@ mod test {
 				.xpect_eq(Shield { strength: 1.3 });
 			// and the reload re-saves the bytes it read
 			save(&mut loaded, root, media_type).xpect_eq(bytes);
+		}
+	}
+
+	/// A body holding a `Value`, an entity reference, a resource and a template
+	/// invocation round trips through json and postcard: the invocation
+	/// expands on load, and a re-save writes it back in place of what it
+	/// expanded to, byte identical.
+	#[cfg(feature = "postcard")]
+	#[crate::test]
+	fn an_invocation_round_trips_byte_identical() {
+		let badge = "beet_core::template_serde::scene_reflect::test::Badge";
+		let value = "beet_core::types::value::value::Value";
+		let score = "beet_core::template_serde::scene_reflect::test::Score";
+		let authored = MediaBytes::new_json(format!(
+			r#"{{"$type":"org.beet.scene#body","resources":{{"{score}":4}},"entities":{{"0":{{"{badge}":{{"text":"hi"}},"{LINKS}":{{"first":"1","rest":[],"weight":2}}}},"1":{{"{value}":"text","bevy_ecs::hierarchy::ChildOf":"0"}}}}}}"#
+		));
+		// the body's resource is saved beside its entities
+		let save = |world: &mut World, root: Entity, media_type: MediaType| {
+			TemplateSaver::new()
+				.extract_resources()
+				.allow_resource::<Score>()
+				.save_roots(world, media_type, [root])
+				.unwrap()
+		};
+		let mut loaded = world(true);
+		let root = load(&mut loaded, &authored);
+		// the invocation expanded: its component and its child
+		loaded.get::<Health>(root).unwrap().xpect_eq(Health(9));
+		loaded.resource::<Score>().clone().xpect_eq(Score(4));
+		let json = save(&mut loaded, root, MediaType::Json);
+		json.as_utf8()
+			.unwrap()
+			.xref()
+			.xpect_contains(badge)
+			.xpect_contains(r#""first":"1""#)
+			.xpect_contains(score)
+			.xnot()
+			.xpect_contains(HEALTH)
+			.xnot()
+			.xpect_contains("bevy_ecs::name::Name");
+
+		for media_type in [MediaType::Json, MediaType::Postcard] {
+			let bytes = json
+				.deserialize::<SceneBody>()
+				.unwrap()
+				.to_bytes(media_type.clone())
+				.unwrap();
+			let mut reloaded = world(true);
+			let root = load(&mut reloaded, &bytes);
+			reloaded.get::<Health>(root).unwrap().xpect_eq(Health(9));
+			let child =
+				reloaded.entity(root).get::<Children>().unwrap().to_vec();
+			child.len().xpect_eq(2);
+			save(&mut reloaded, root, media_type).xpect_eq(bytes);
 		}
 	}
 
@@ -531,7 +638,7 @@ mod test {
 	fn a_short_name_resolves_and_an_allowed_one_is_skipped() {
 		let body = |name: &str| {
 			MediaBytes::new_json(format!(
-				r#"{{"entities":{{"0":{{"{name}":4}}}}}}"#
+				r#"{{"$type":"org.beet.scene#body","entities":{{"0":{{"{name}":4}}}}}}"#
 			))
 		};
 		let mut world = world(false);
@@ -552,7 +659,7 @@ mod test {
 		let mut world = world(false);
 		TemplateLoader::new(&mut world)
 			.load(&MediaBytes::new_json(format!(
-				r#"{{"entities":{{"main":{{"{HEALTH}":"full"}}}}}}"#
+				r#"{{"$type":"org.beet.scene#body","entities":{{"main":{{"{HEALTH}":"full"}}}}}}"#
 			)))
 			.unwrap_err()
 			.to_string()

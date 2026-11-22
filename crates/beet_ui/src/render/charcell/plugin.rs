@@ -1,5 +1,4 @@
 use super::*;
-use crate::parse::PostParseTree;
 #[cfg(feature = "tui")]
 use crate::parse::RealtimeParsePlugin;
 use crate::prelude::MediaViewport;
@@ -7,6 +6,7 @@ use crate::prelude::Medium;
 use crate::style::DiagramSet;
 use crate::style::ResolveStylesSet;
 use crate::style::StylePlugin;
+use beet_core::prelude::PostParseTree;
 use beet_core::prelude::*;
 use bevy::ecs::component::Mutable;
 #[allow(unused)]

@@ -133,19 +133,17 @@ fn route_bundle() -> impl Bundle {
 		ForkFlag,
 		children![
 			(
-				Script::<(), String>::new(r#""hello world""#),
+				Value::from(r#""hello world""#),
 				ExchangeScript::<(), String>::default(),
 				PathPartial::new(""),
 			),
 			(
-				Script::<(), String>::new(r#""hello foo""#),
+				Value::from(r#""hello foo""#),
 				ExchangeScript::<(), String>::default(),
 				PathPartial::new("foo"),
 			),
 			(
-				Script::<Params<GreetRequest>, String>::new(
-					r#""hello " + input.name"#,
-				),
+				Value::from(r#""hello " + input.name"#,),
 				ExchangeScript::<Params<GreetRequest>, String, _, _>::default(),
 				PathPartial::new("greet"),
 			),
@@ -153,9 +151,7 @@ fn route_bundle() -> impl Bundle {
 			// script input shape (`{ path, params, body }`, what `<ScriptRoute>`
 			// authors) and digs out the `name` query parameter itself.
 			(
-				Script::<Value, Value>::new(
-					r#""hello " + input.params.name[0]"#,
-				),
+				Value::from(r#""hello " + input.params.name[0]"#,),
 				ExchangeScript::<
 					Value,
 					Value,

@@ -6,7 +6,6 @@
 //! despawned entity is an error naming it, never a panic.
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::ptr::OwningPtr;
 use bevy::reflect::serde::TypedReflectDeserializer;
 use serde::de::DeserializeSeed;
 
@@ -61,19 +60,14 @@ impl WorldWrite {
 	) -> Result {
 		let ident = ComponentIdent::resolve(world, ident)?;
 		config.assert_writable(&ident)?;
+		Self::assert_not_source(world, entity, &ident)?;
 		match ident.type_id {
 			None => {
-				Self::entity_mut(world, entity)?.xmap(|mut entity| {
-					// SAFETY: a dynamic `ComponentId` only ever comes from
-					// `DynamicComponents::register`, which declares a `Value` layout
-					// and a matching drop fn, and `value` is a `Value` given away
-					// here rather than dropped.
-					unsafe {
-						OwningPtr::make(value, |ptr| {
-							entity.insert_by_id(ident.id, ptr);
-						})
-					};
-				});
+				DynamicComponents::insert_value(
+					&mut Self::entity_mut(world, entity)?,
+					ident.id,
+					value,
+				);
 				Ok(())
 			}
 			Some(type_id) => {
@@ -126,6 +120,7 @@ impl WorldWrite {
 	) -> Result {
 		let ident = ComponentIdent::resolve(world, ident)?;
 		config.assert_writable(&ident)?;
+		Self::assert_not_source(world, entity, &ident)?;
 		Self::entity_mut(world, entity)?.remove_by_id(ident.id);
 		Ok(())
 	}
@@ -228,6 +223,35 @@ impl WorldWrite {
 
 	/// The entity, as an error rather than a panic when the world despawned it
 	/// between the script obtaining its id and asking for this write.
+	/// Refuse a write to a script's source: the [`Value`] of an entity that
+	/// is a script ([`RunScript`], or a typed one carrying its
+	/// [`ScriptConfig`]) or lies under a [`RunScript`], so no script rewrites
+	/// what runs next time, its own or another's.
+	fn assert_not_source(
+		world: &World,
+		entity: Entity,
+		ident: &ComponentIdent,
+	) -> Result {
+		if ident.type_id != Some(core::any::TypeId::of::<Value>()) {
+			return Ok(());
+		}
+		let Ok(target) = world.get_entity(entity) else {
+			return Ok(());
+		};
+		let is_source = target.contains::<ScriptConfig>()
+			|| core::iter::successors(Some(entity), |entity| {
+				world.get::<ChildOf>(*entity).map(ChildOf::parent)
+			})
+			.any(|entity| world.get::<RunScript>(entity).is_some());
+		match is_source {
+			true => bevybail!(
+				"no script may write the `Value` of {entity}: it is a script's \
+source, so writing it would rewrite what runs"
+			),
+			false => Ok(()),
+		}
+	}
+
 	fn entity_mut<'w>(
 		world: &'w mut World,
 		entity: Entity,
