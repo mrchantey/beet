@@ -18,9 +18,10 @@ repository.workspace = true
 default = ["bindings_aws_common", "bindings_aws_dynamo"]
 bindings_generator = ["tokens","prettyplease","beet_core/tokens"]
 tokens = ["proc-macro2", "quote", "syn"]
-# The S3/Dynamo runtime backends. Pulls the bucket declaration: a `<DirSync>`
-# spells its S3 end through `S3BucketBlock::store_uri`.
-aws_sdk = ["beet_net/aws_sdk", "bindings_aws_common"]
+# The S3 bucket declaration's runtime half: a `<DirSync>` spells its S3 end
+# through `S3BucketBlock::store_uri`, an S3 state backend and an R2 bucket are
+# reached through `S3Store`. The client itself is always on.
+aws = ["bindings_aws_common"]
 # A deployer renders every always-compiled declaration, so it carries the
 # binding `<SecretBlock/>`'s parameter renders through.
 deploy = ["beet_router", "dep:base64", "vault", "bindings_aws_ssm", "dep:ssh-key", "dep:rand"]
@@ -39,7 +40,7 @@ lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_acm","
 # block that renders the target arn must be compiled beside it.
 scheduled_job_block = ["bindings_aws_scheduler","bindings_aws_common","lambda_block"]
 lightsail_block = ["bindings_aws_common","bindings_aws_lightsail","bindings_aws_dns"]
-fargate_block = ["bindings_aws_common","bindings_aws_dynamo","bindings_aws_fargate","bindings_aws_acm","bindings_aws_dns","vpc_block"]
+fargate_block = ["dep:base64", "bindings_aws_common","bindings_aws_dynamo","bindings_aws_fargate","bindings_aws_acm","bindings_aws_dns","vpc_block"]
 # The network every AWS compute block sits in: vpc, public + private subnets,
 # internet gateway and the security-group handles a consumer names.
 vpc_block = ["bindings_aws_vpc"]
@@ -54,7 +55,7 @@ sns_topic_block = ["bindings_aws_sns", "bindings_aws_common"]
 # whose always-present `Route53` variant needs the Route53 binding.
 cloudflare_dns = ["bindings_cloudflare_common", "bindings_aws_dns"]
 # The Cloudflare Containers + Workers blocks/actions. Wrangler-provisioned, so no
-# terraform bindings; needs `deploy` (the actions) and `aws_sdk` (the container's
+# terraform bindings; needs `deploy` (the actions) and `aws` (the container's
 # `S3Store::r2` path) at the consumer.
 cloudflare_block = []
 # `<AtprotoHandleBlock/>`, the TXT records that make a domain's names atproto
@@ -128,7 +129,7 @@ required-features = ["bindings_generator"]
 
 [dependencies]
 beet_core = { workspace = true, features = ["std", "json", "rand", "fs"] }
-beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "aws_rest_api"] }
+beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "aws"] }
 bytes.workspace = true
 beet_action = { workspace = true, features = ["std", "reflect", "json"] }
 beet_router = { workspace = true, optional = true, features = ["json"] }
@@ -165,7 +166,7 @@ beet_core = { workspace = true, features = ["testing"] }
 pretty_env_logger.workspace = true
 beet_infra = { path = ".", features = [
 	"deploy",
-	"aws_sdk",
+	"aws",
 	"bindings_generator",
 	"bindings_aws_dns",
 	"lambda_block",
@@ -179,17 +180,17 @@ beet_infra = { path = ".", features = [
 [[example]]
 name = "lambda_test"
 path = "examples/lambda_test.rs"
-required-features = ["deploy", "aws_sdk", "lambda_block"]
+required-features = ["deploy", "aws", "lambda_block"]
 
 [[example]]
 name = "lightsail_test"
 path = "examples/lightsail_test.rs"
-required-features = ["deploy", "aws_sdk", "lightsail_block"]
+required-features = ["deploy", "aws", "lightsail_block"]
 
 [[example]]
 name = "fargate_test"
 path = "examples/fargate_test.rs"
-required-features = ["deploy", "aws_sdk", "fargate_block"]
+required-features = ["deploy", "aws", "fargate_block"]
 
 [lib]
 harness = false

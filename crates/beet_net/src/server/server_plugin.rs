@@ -174,7 +174,7 @@ mod test {
 	#[beet_core::test]
 	// #[ignore = "flaky with all features?"]
 	async fn http_server() {
-		let server = HttpServer::new_test(HttpServer::start_mini_with_tcp);
+		let server = HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			let mut app = App::new();

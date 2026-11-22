@@ -56,7 +56,7 @@ thread = ["beet/thread", "beet/ui"]
 # tags from the same build rather than needing a feature of its own.
 # `beet/site_images` derives an `<IconSet/>`'s files and a `<SocialCards/>`
 # set, which the deploy's and the `assets` verb's `<Derive/>` regenerate.
-infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/scheduled_job_block", "beet/lightsail_block", "beet/fargate_block", "beet/aws_sdk", "beet/mail", "beet/site_images"]
+infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/scheduled_job_block", "beet/lightsail_block", "beet/fargate_block", "aws", "beet/mail", "beet/site_images"]
 # The atproto network half: an `<AtprotoAccount/>` lands its repo, reads and
 # writes reach a real PDS, handles resolve. Lean, so a serving binary can link
 # it without the deploy machinery; with `infra` too it brings the handle block
@@ -109,8 +109,9 @@ secure = ["beet/secure"]
 # a deploy entry's credentials from its secrets document; the browser builds
 # (`--no-default-features`) name it through `web_full` only. A feature of its
 # own rather than a dep-table entry so the registration reports it and
-# `bx:cfg="feature:vault"` resolves.
-vault = ["beet/vault"]
+# `bx:cfg="feature:vault"` resolves. `aws` signs the `aws` and `admin` verbs'
+# calls as this machine's identity.
+vault = ["beet/vault", "aws"]
 # The live terminal target for `beet present`: the navigable charcell host and
 # the markup-declarable `TuiServer` (`beet/tui_server` pulls `beet_router/tui`,
 # which registers it). On by default so a bare `beet present` boots the deck.
@@ -119,15 +120,16 @@ tui = ["beet/tui_server"]
 # --server=http,ssh` serves http and an ssh terminal from one process. Registers
 # the markup-declarable `SshTuiServer` via `SshTuiPlugin`.
 ssh = ["tui", "beet/ssh_tui"]
-# S3-backed stores, so a deployed `beet` task loads its entry (`main.bsx`,
-# `routes/`, `templates/`) from an S3 bucket instead of the local filesystem,
-# selected at runtime by `--repo=s3://<bucket>`. Adds no deploy/terraform
-# machinery, keeping the container binary lean.
-aws_sdk = ["beet/aws_sdk"]
+# AWS over signed requests and the S3 and DynamoDB stores, so a deployed `beet`
+# task loads its entry (`main.bsx`, `routes/`, `templates/`) from an S3 bucket
+# instead of the local filesystem, selected at runtime by `--repo=s3://<bucket>`.
+# Adds no deploy/terraform machinery, keeping the container binary lean. `net`
+# is its native transport; a wasm build signs through fetch.
+aws = ["beet/aws", "net"]
 # The AWS Lambda backend: builds the generic `beet` binary as a `provided.al2023`
-# function (the lambda http backend wins server selection over the mini server).
-# Pulls `aws_sdk` so the deployed function loads its site from S3 at request time.
-lambda = ["beet/lambda", "beet/aws_sdk"]
+# function (the lambda runtime loop wins server selection over the mini server).
+# Pulls `aws` so the deployed function loads its site from S3 at request time.
+lambda = ["beet/lambda", "aws"]
 # The Cloudflare Worker target (wasm32-only): builds the `beet-cli` lib as a
 # `cdylib` Worker that loads its site from an R2 bucket and serves it through the
 # render router. Pulls `beet/cloudflare` (the portable render router + the R2
@@ -135,8 +137,10 @@ lambda = ["beet/lambda", "beet/aws_sdk"]
 # Build with: `cargo build --target wasm32-unknown-unknown -p beet-cli --lib \
 # --no-default-features --features cloudflare`.
 # `console_error_panic_hook` is an unconditional wasm dep (the standalone binary
-# uses it too), so it is not a `dep:` activation here.
-cloudflare = ["beet/cloudflare", "dep:worker"]
+# uses it too), so it is not a `dep:` activation here. `aws` signs AWS calls
+# through fetch, so a Worker reaches S3, DynamoDB and the rest as its secret
+# bindings' credential.
+cloudflare = ["beet/cloudflare", "dep:worker", "aws"]
 # The browser-wasm target (wasm32-only): builds the standalone `beet` binary for
 # the browser, which boots the launch its page's `<Wasm repo entry server>`
 # describes (an http repo forked into IndexedDB, resolved through the one
@@ -194,7 +198,7 @@ web_render = ["web", "winit", "beet/webgpu"]
 # Two exclusion groups, each for its own reason:
 # - `cloudflare`: a different artifact entirely (the Worker `cdylib`), not a browser
 #   binary.
-# - `net`/`sockets`/`secure`/`ssh`/`aws_sdk`/`lambda` (the native transports, gated
+# - `net`/`sockets`/`secure`/`ssh`/`lambda` (the native transports, gated
 #   away in beet_net on wasm) and `qrcode`/`pdf` (whose deps sit in this manifest's
 #   own `not(wasm32)` table): all compile, and all add exactly zero packages to the
 #   wasm graph, so naming them would claim a capability the runtime does not have.

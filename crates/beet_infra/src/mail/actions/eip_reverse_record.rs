@@ -1,14 +1,10 @@
 //! The reverse-dns half of the box's identity: the record, and both halves of
 //! its lifecycle.
-use crate::actions::aws_cli_ext;
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
-
-
-
 
 /// `<EipReverseRecord up={$attach_up} down={$attach_down}/>` — the box's reverse
 /// record, declared as a thing the stack HAS rather than as a step some verb
@@ -43,13 +39,143 @@ impl EipReverseDns {
 	/// rather than from whatever the deploying machine caches.
 	pub const RESOLVER: &'static str = "https://cloudflare-dns.com/dns-query";
 
-	/// Whether an `aws ec2` failure is "that address does not exist".
+	/// Whether an EC2 failure is "that address does not exist".
 	///
 	/// The one failure a teardown reads as success: a destroy walks the
 	/// declaration rather than a ledger, so it routinely addresses a resource
 	/// that was never created or has already gone.
 	fn is_missing(err: &BevyError) -> bool {
-		err.to_string().contains("InvalidAllocationID.NotFound")
+		AwsError::is(err, &["InvalidAllocationID.NotFound"])
+	}
+}
+
+/// The address attribute calls on one elastic IP, over an EC2 client.
+struct ElasticAddress {
+	client: AwsClient,
+	allocation: String,
+}
+
+/// The reverse record of an address as `DescribeAddressesAttribute` reports
+/// it.
+///
+/// The two fields differ by one letter of meaning: `ptr_record` is what
+/// resolves today, `ptr_record_update` is what AWS is still working on, in
+/// either direction. Reading the wrong one reports success the moment a
+/// request is accepted.
+#[derive(Debug, Default, Clone, PartialEq)]
+struct PtrRecord {
+	/// Fully qualified, ie with the root label, empty when none is published.
+	ptr_record: String,
+	/// The value of a pending update, empty when none is pending.
+	ptr_record_update: String,
+}
+
+/// What a dry-run `ReleaseAddress` says of an address.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReleaseProbe {
+	/// `DryRunOperation`: the release would go through.
+	Allowed,
+	/// `InvalidAddress.PtrSet`: the release path still holds a record.
+	PtrSet,
+	/// `UnauthorizedOperation`: the caller may not release it at all.
+	Unauthorized,
+	/// The address is already gone.
+	Missing,
+}
+
+impl ElasticAddress {
+	fn new(region: &str, allocation: impl Into<String>) -> Self {
+		Self {
+			client: AwsClient::new(AwsService::EC2, region),
+			allocation: allocation.into(),
+		}
+	}
+
+	/// `ModifyAddressAttribute`: request `hostname` as the reverse record.
+	async fn request_ptr(&self, hostname: &str) -> Result {
+		self.client
+			.call_query("ModifyAddressAttribute", [
+				("AllocationId", self.allocation.as_str()),
+				("DomainName", hostname),
+			])
+			.await?;
+		Ok(())
+	}
+
+	/// `DescribeAddressesAttribute` of the `domain-name` attribute.
+	async fn ptr(&self) -> Result<PtrRecord> {
+		self.client
+			.call_query("DescribeAddressesAttribute", [
+				("AllocationId.1", self.allocation.as_str()),
+				("Attribute", "domain-name"),
+			])
+			.await?
+			.xmap(|response| PtrRecord::parse(&response))
+			.xok()
+	}
+
+	/// `ResetAddressAttribute` of the `domain-name` attribute.
+	async fn reset_ptr(&self) -> Result {
+		self.client
+			.call_query("ResetAddressAttribute", [
+				("AllocationId", self.allocation.as_str()),
+				("Attribute", "domain-name"),
+			])
+			.await?;
+		Ok(())
+	}
+
+	/// A dry-run `ReleaseAddress`, which always answers an error: its code
+	/// is the reading. Any other error is returned as it is.
+	async fn probe_release(&self) -> Result<ReleaseProbe> {
+		let Err(err) = self
+			.client
+			.call_query("ReleaseAddress", [
+				("AllocationId", self.allocation.as_str()),
+				("DryRun", "true"),
+			])
+			.await
+		else {
+			bevybail!(
+				"a dry-run ReleaseAddress of {} released it",
+				self.allocation
+			);
+		};
+		match AwsError::code(&err) {
+			Some("DryRunOperation") => ReleaseProbe::Allowed.xok(),
+			Some("InvalidAddress.PtrSet") => ReleaseProbe::PtrSet.xok(),
+			Some("UnauthorizedOperation") => ReleaseProbe::Unauthorized.xok(),
+			_ if EipReverseDns::is_missing(&err) => ReleaseProbe::Missing.xok(),
+			_ => Err(err),
+		}
+	}
+}
+
+impl PtrRecord {
+	/// The first address of a `DescribeAddressesAttribute` response.
+	fn parse(response: &XmlElement) -> Self {
+		let text = |path: &str| {
+			response
+				.text_at(&format!("addressSet/item/{path}"))
+				.unwrap_or_default()
+				.to_string()
+		};
+		Self {
+			ptr_record: text("ptrRecord"),
+			ptr_record_update: text("ptrRecordUpdate/value"),
+		}
+	}
+
+	/// Whether `hostname` is the published record rather than a pending
+	/// update. AWS answers the name fully qualified, the block declares it
+	/// without the root label.
+	fn is_published(&self, hostname: &str) -> bool {
+		self.ptr_record.trim_end_matches('.') == hostname
+	}
+
+	/// Whether any record remains, published or on its way in or out.
+	fn is_pending(&self) -> bool {
+		!self.ptr_record.is_empty() || !self.ptr_record_update.is_empty()
 	}
 }
 
@@ -93,20 +219,13 @@ pub async fn EipReverseDns(
 	wait_for_forward(&hostname, &address, timeout, poll).await?;
 
 	info!("requesting PTR {address} -> {hostname}");
-	aws_cli_ext::ec2(&region, [
-		"modify-address-attribute",
-		"--allocation-id",
-		&allocation,
-		"--domain-name",
-		&hostname,
-	])
-	.run_async()
-	.await?;
+	let elastic = ElasticAddress::new(&region, allocation);
+	elastic.request_ptr(&hostname).await?;
 
 	// publication is asynchronous and AWS gives itself hours, so a PTR still
 	// pending is reported rather than failing the deploy: nothing downstream
 	// waits on it, and the request is already lodged.
-	match wait_for_ptr(&region, &allocation, &hostname, timeout, poll).await? {
+	match wait_for_ptr(&elastic, &hostname, timeout, poll).await? {
 		true => info!("{address} resolves back to {hostname}"),
 		false => info!(
 			"the PTR for {address} is still pending at AWS; it publishes \
@@ -173,50 +292,20 @@ async fn resolve_a(hostname: &str) -> Result<Vec<String>> {
 /// Poll the address attribute until the PTR reads back as `hostname`. `false`
 /// when it is still pending, which is a normal outcome rather than a failure.
 async fn wait_for_ptr(
-	region: &str,
-	allocation: &str,
+	elastic: &ElasticAddress,
 	hostname: &str,
 	timeout: Duration,
 	poll: Duration,
 ) -> Result<bool> {
 	let attempts = (timeout.as_secs() / poll.as_secs().max(1)).max(1);
 	for _ in 1..=attempts {
-		let output = aws_cli_ext::ec2(region, [
-			"describe-addresses-attribute",
-			"--allocation-ids",
-			allocation,
-			"--attribute",
-			"domain-name",
-			"--output",
-			"json",
-		])
-		.run_async_stdout()
-		.await?;
-		if ptr_is_published(&output, hostname)? {
+		if elastic.ptr().await?.is_published(hostname) {
 			return Ok(true);
 		}
 		time_ext::sleep(poll).await;
 	}
 	Ok(false)
 }
-
-/// Whether a `describe-addresses-attribute` body reports `hostname` as the
-/// published record rather than a pending update.
-///
-/// The two fields differ by one letter of meaning: `PtrRecord` is what resolves
-/// today, `PtrRecordUpdate` is what AWS is still working on. Reading the wrong
-/// one reports success the moment the request is accepted.
-fn ptr_is_published(body: &str, hostname: &str) -> Result<bool> {
-	let value: Value = serde_json::from_str(body)?;
-	// AWS returns the name fully qualified, ie with the root label
-	let published = value["Addresses"][0]["PtrRecord"]
-		.as_str()
-		.unwrap_or_default()
-		.trim_end_matches('.')
-		.to_string();
-	Ok(published == hostname)
-}
-
 
 /// Clears the box's reverse record, then waits until AWS will actually let go
 /// of the address.
@@ -274,16 +363,8 @@ pub async fn EipReverseDnsReset(
 	};
 
 	info!("resetting the PTR on {allocation}");
-	if let Err(err) = aws_cli_ext::ec2(&region, [
-		"reset-address-attribute",
-		"--allocation-id",
-		&allocation,
-		"--attribute",
-		"domain-name",
-	])
-	.run_async()
-	.await
-	{
+	let elastic = ElasticAddress::new(&region, allocation.clone());
+	if let Err(err) = elastic.reset_ptr().await {
 		// an address that is already gone is a clean outcome, anything else is not
 		if !EipReverseDns::is_missing(&err) {
 			return Err(err);
@@ -292,23 +373,23 @@ pub async fn EipReverseDnsReset(
 		return Pass(cx.input).xok();
 	}
 
-	wait_until_releasable(&region, &allocation, timeout, poll, settle).await?;
+	wait_until_releasable(&elastic, timeout, poll, settle).await?;
 	Pass(cx.input).xok()
 }
 
 /// Poll until `allocation` has read releasable for `settle`, ie until the
 /// release path itself stops refusing and keeps not refusing.
 async fn wait_until_releasable(
-	region: &str,
-	allocation: &str,
+	elastic: &ElasticAddress,
 	timeout: Duration,
 	poll: Duration,
 	settle: Duration,
 ) -> Result {
+	let allocation = &elastic.allocation;
 	let started = Instant::now();
 	let mut clear_since: Option<Instant> = None;
 	while started.elapsed() < timeout {
-		match refusal(region, allocation).await? {
+		match refusal(elastic).await? {
 			Some(reason) => {
 				// a reading that refuses restarts the settle: the state went
 				// backwards, so anything counted before it means nothing.
@@ -343,116 +424,256 @@ async fn wait_until_releasable(
 	)
 }
 
-/// Why `allocation` cannot be released right now, or [`None`] if nothing
+/// Why the address cannot be released right now, or [`None`] if nothing
 /// refuses it.
 ///
 /// Two readings, because neither alone is the answer: the attribute says what
 /// the record service holds, and a dry-run release says what the release path
 /// thinks, which is the one that actually blocks terraform.
-async fn refusal(region: &str, allocation: &str) -> Result<Option<String>> {
-	let attribute = aws_cli_ext::ec2(region, [
-		"describe-addresses-attribute",
-		"--allocation-ids",
-		allocation,
-		"--attribute",
-		"domain-name",
-		"--output",
-		"json",
-	])
-	.run_async_stdout()
-	.await;
-	match attribute {
+async fn refusal(elastic: &ElasticAddress) -> Result<Option<String>> {
+	match elastic.ptr().await {
 		// the address itself is gone, so nothing is holding it
 		Err(err) if EipReverseDns::is_missing(&err) => return Ok(None),
 		Err(err) => return Err(err),
-		Ok(body) if ptr_is_pending(&body)? => {
+		Ok(ptr) if ptr.is_pending() => {
 			return Ok(Some("the record is still published".to_string()));
 		}
 		Ok(_) => {}
 	}
-	match aws_cli_ext::ec2(region, [
-		"release-address",
-		"--allocation-id",
-		allocation,
-		"--dry-run",
-	])
-	.run_async()
-	.await
-	{
-		// a dry run always "fails"; this is the success answer
-		Err(err) if err.to_string().contains("DryRunOperation") => Ok(None),
-		Err(err) if EipReverseDns::is_missing(&err) => Ok(None),
-		Err(err) if err.to_string().contains("InvalidAddress.PtrSet") => {
+	match elastic.probe_release().await? {
+		ReleaseProbe::PtrSet => {
 			Ok(Some("the release path still reports a PTR".to_string()))
 		}
-		// any other refusal (a permission the deploy role lacks, say) is not
-		// this action's business: the attribute already read clear.
-		Err(_) | Ok(_) => Ok(None),
+		ReleaseProbe::Allowed | ReleaseProbe::Missing => Ok(None),
+		// a permission the deploy role lacks is not this action's business:
+		// the attribute already read clear
+		ReleaseProbe::Unauthorized => {
+			debug!(
+				"the dry-run release of {} is unauthorized, the attribute reads clear",
+				elastic.allocation
+			);
+			Ok(None)
+		}
 	}
-}
-
-/// Whether a `describe-addresses-attribute` body still reports a record, either
-/// published or on its way to being one.
-fn ptr_is_pending(body: &str) -> Result<bool> {
-	let value: Value = serde_json::from_str(body)?;
-	let address = &value["Addresses"][0];
-	let published = address["PtrRecord"].as_str().unwrap_or_default();
-	let updating = address["PtrRecordUpdate"]["Value"]
-		.as_str()
-		.unwrap_or_default();
-	Ok(!published.is_empty() || !updating.is_empty())
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use std::sync::Arc;
+	use std::sync::Mutex;
+
+	/// One call's form params.
+	type Params = MultiMap<SmolStr, SmolStr>;
+
+	/// Every call an [`ElasticAddress`] made.
+	type Calls = Arc<Mutex<Vec<Params>>>;
+
+	/// The address `eipalloc-1` in `ap-southeast-2`, its EC2 answering
+	/// `answer` given each call's form params, every call recorded.
+	fn recording(
+		answer: impl 'static + Send + Sync + Fn(&Params) -> Response,
+	) -> (ElasticAddress, Calls) {
+		let calls = Calls::default();
+		let recorded = calls.clone();
+		let answer = Arc::new(answer);
+		let client = AwsClient::new(AwsService::EC2, "ap-southeast-2")
+			.with_credentials(AwsCredentials::new("AKID", "secret"))
+			.with_transport(move |request| {
+				let (recorded, answer) = (recorded.clone(), answer.clone());
+				Box::pin(async move {
+					request
+						.headers
+						.first_raw("authorization")
+						.unwrap()
+						.xpect_contains("/ap-southeast-2/ec2/aws4_request");
+					let body = request.body.into_bytes().await?;
+					let params =
+						Url::parse_query_string(str::from_utf8(&body)?);
+					let response = answer(&params);
+					recorded.lock().unwrap().push(params);
+					response.xok()
+				})
+			});
+		let elastic = ElasticAddress {
+			client,
+			allocation: "eipalloc-1".into(),
+		};
+		(elastic, calls)
+	}
+
+	/// The value of `key` in `params`.
+	fn param<'a>(params: &'a Params, key: &str) -> Option<&'a str> {
+		params.get(key).map(SmolStr::as_str)
+	}
+
+	/// An EC2 error answer carrying `code`.
+	fn error(status: StatusCode, code: &str) -> Response {
+		Response::from_status(status).with_body(format!(
+			"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+			<Response><Errors><Error><Code>{code}</Code>\
+			<Message>no</Message></Error></Errors>\
+			<RequestID>req-1</RequestID></Response>"
+		))
+	}
+
+	/// A `DescribeAddressesAttribute` answer with `inner` as its one address.
+	fn attribute(inner: &str) -> Response {
+		Response::ok().with_body(format!(
+			"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+			<DescribeAddressesAttributeResponse xmlns=\"http://ec2.amazonaws.com/doc/2016-11-15/\">\
+			<requestId>req-1</requestId><addressSet><item>\
+			<publicIp>1.2.3.4</publicIp><allocationId>eipalloc-1</allocationId>\
+			{inner}</item></addressSet></DescribeAddressesAttributeResponse>"
+		))
+	}
+
+	const PENDING: &str = "<ptrRecordUpdate><value>mail.beetmash.com</value>\
+		<status>PENDING</status></ptrRecordUpdate>";
+	const PUBLISHED: &str = "<ptrRecord>mail.beetmash.com.</ptrRecord>";
+
+	/// The request names the address and the hostname, and the read back
+	/// asks for the `domain-name` attribute of that one address.
+	#[beet_core::test]
+	async fn requests_and_reads_the_record() {
+		let (elastic, calls) =
+			recording(|params| match param(params, "Action") {
+				Some("ModifyAddressAttribute") => Response::ok().with_body(
+					"<ModifyAddressAttributeResponse><address>\
+					<allocationId>eipalloc-1</allocationId></address>\
+					</ModifyAddressAttributeResponse>",
+				),
+				_ => attribute(PUBLISHED),
+			});
+		elastic.request_ptr("mail.beetmash.com").await.unwrap();
+		elastic
+			.ptr()
+			.await
+			.unwrap()
+			.is_published("mail.beetmash.com")
+			.xpect_true();
+		let calls = calls.lock().unwrap().clone();
+		param(&calls[0], "Version").xpect_eq(Some("2016-11-15"));
+		param(&calls[0], "AllocationId").xpect_eq(Some("eipalloc-1"));
+		param(&calls[0], "DomainName").xpect_eq(Some("mail.beetmash.com"));
+		param(&calls[1], "Action").xpect_eq(Some("DescribeAddressesAttribute"));
+		param(&calls[1], "AllocationId.1").xpect_eq(Some("eipalloc-1"));
+		param(&calls[1], "Attribute").xpect_eq(Some("domain-name"));
+	}
 
 	/// A request that has been accepted but not published reads as pending, not
-	/// as done: `PtrRecordUpdate` is the work in progress and `PtrRecord` is
+	/// as done: `ptrRecordUpdate` is the work in progress and `ptrRecord` is
 	/// what the internet sees.
 	#[beet_core::test]
-	fn a_pending_update_is_not_a_published_record() {
-		let pending = r#"{"Addresses":[{"PublicIp":"1.2.3.4","PtrRecord":"","PtrRecordUpdate":{"Value":"mail.beetmash.com","Status":"PENDING"}}]}"#;
-		ptr_is_published(pending, "mail.beetmash.com")
-			.unwrap()
-			.xpect_false();
+	async fn a_pending_update_is_not_a_published_record() {
+		let (elastic, _) = recording(|_| attribute(PENDING));
+		let ptr = elastic.ptr().await.unwrap();
+		ptr.is_published("mail.beetmash.com").xpect_false();
+		ptr.ptr_record_update.as_str().xpect_eq("mail.beetmash.com");
 	}
 
 	/// The teardown reads a record that is still on its way OUT as still there:
-	/// `PtrRecordUpdate` is the work in progress either direction, and treating
+	/// `ptrRecordUpdate` is the work in progress either direction, and treating
 	/// a pending withdrawal as done is how a destroy reaches
 	/// `ReleaseAddress` before AWS has let go.
 	#[beet_core::test]
-	fn a_pending_withdrawal_still_counts_as_a_record() {
-		let withdrawing = r#"{"Addresses":[{"PublicIp":"1.2.3.4","PtrRecord":"","PtrRecordUpdate":{"Value":"mail.beetmash.com","Status":"PENDING"}}]}"#;
-		super::ptr_is_pending(withdrawing).unwrap().xpect_true();
-		let done = r#"{"Addresses":[{"PublicIp":"1.2.3.4","PtrRecord":"","PtrRecordUpdate":{}}]}"#;
-		super::ptr_is_pending(done).unwrap().xpect_false();
-		let published = r#"{"Addresses":[{"PublicIp":"1.2.3.4","PtrRecord":"mail.beetmash.com."}]}"#;
-		super::ptr_is_pending(published).unwrap().xpect_true();
-	}
-
-	/// An address that was never allocated is a clean teardown, not a failure:
-	/// a destroy walks the declaration rather than a ledger of what was made.
-	#[beet_core::test]
-	fn a_missing_address_is_not_a_failure() {
-		EipReverseDns::is_missing(&bevyhow!(
-			"An error occurred (InvalidAllocationID.NotFound) when calling the ReleaseAddress operation"
-		))
-		.xpect_true();
-		EipReverseDns::is_missing(&bevyhow!("AccessDenied")).xpect_false();
+	async fn a_pending_withdrawal_still_counts_as_a_record() {
+		for (inner, pending) in [
+			(PENDING, true),
+			("<ptrRecordUpdate/>", false),
+			(PUBLISHED, true),
+		] {
+			let (elastic, _) = recording(move |_| attribute(inner));
+			elastic.ptr().await.unwrap().is_pending().xpect_eq(pending);
+		}
 	}
 
 	/// AWS returns the name fully qualified; the block declares it without the
 	/// root label, and comparing the two raw would never match.
 	#[beet_core::test]
 	fn the_published_record_matches_the_declared_hostname() {
-		let done = r#"{"Addresses":[{"PublicIp":"1.2.3.4","PtrRecord":"mail.beetmash.com."}]}"#;
-		ptr_is_published(done, "mail.beetmash.com")
-			.unwrap()
-			.xpect_true();
-		ptr_is_published(done, "mail.example.com")
-			.unwrap()
+		let ptr = PtrRecord {
+			ptr_record: "mail.beetmash.com.".into(),
+			..default()
+		};
+		ptr.is_published("mail.beetmash.com").xpect_true();
+		ptr.is_published("mail.example.com").xpect_false();
+	}
+
+	/// The dry-run release is read by its code: `DryRunOperation` would
+	/// release, `UnauthorizedOperation` may not, a set PTR still blocks, a
+	/// gone address is nothing to wait for, and anything else is an error.
+	#[beet_core::test]
+	async fn the_dry_run_release_is_read_by_its_code() {
+		for (status, code, probe) in [
+			(
+				StatusCode::PRECONDITION_FAILED,
+				"DryRunOperation",
+				ReleaseProbe::Allowed,
+			),
+			(
+				StatusCode::FORBIDDEN,
+				"UnauthorizedOperation",
+				ReleaseProbe::Unauthorized,
+			),
+			(
+				StatusCode::BAD_REQUEST,
+				"InvalidAddress.PtrSet",
+				ReleaseProbe::PtrSet,
+			),
+			(
+				StatusCode::BAD_REQUEST,
+				"InvalidAllocationID.NotFound",
+				ReleaseProbe::Missing,
+			),
+		] {
+			let (elastic, calls) = recording(move |_| error(status, code));
+			elastic.probe_release().await.unwrap().xpect_eq(probe);
+			let calls = calls.lock().unwrap().clone();
+			param(&calls[0], "Action").xpect_eq(Some("ReleaseAddress"));
+			param(&calls[0], "AllocationId").xpect_eq(Some("eipalloc-1"));
+			param(&calls[0], "DryRun").xpect_eq(Some("true"));
+		}
+		let (elastic, _) = recording(|_| {
+			error(StatusCode::BAD_REQUEST, "InvalidParameterValue")
+		});
+		AwsError::code(&elastic.probe_release().await.unwrap_err())
+			.xpect_eq(Some("InvalidParameterValue"));
+	}
+
+	/// The teardown waits on a record still published, and once it reads
+	/// clear only the release path's own `PtrSet` holds it.
+	#[beet_core::test]
+	async fn a_refusal_is_a_record_or_a_ptr_set_release() {
+		let (elastic, _) = recording(|_| attribute(PUBLISHED));
+		refusal(&elastic).await.unwrap().xpect_some();
+		let (elastic, _) = recording(|params| match param(params, "Action") {
+			Some("ReleaseAddress") => {
+				error(StatusCode::BAD_REQUEST, "InvalidAddress.PtrSet")
+			}
+			_ => attribute(""),
+		});
+		refusal(&elastic).await.unwrap().xpect_some();
+		let (elastic, _) = recording(|params| match param(params, "Action") {
+			Some("ReleaseAddress") => {
+				error(StatusCode::PRECONDITION_FAILED, "DryRunOperation")
+			}
+			_ => attribute(""),
+		});
+		refusal(&elastic).await.unwrap().xpect_none();
+	}
+
+	/// An address that was never allocated is a clean teardown, not a failure:
+	/// a destroy walks the declaration rather than a ledger of what was made.
+	#[beet_core::test]
+	async fn a_missing_address_is_not_a_failure() {
+		let (elastic, _) = recording(|_| {
+			error(StatusCode::BAD_REQUEST, "InvalidAllocationID.NotFound")
+		});
+		let err = elastic.reset_ptr().await.unwrap_err();
+		EipReverseDns::is_missing(&err).xpect_true();
+		refusal(&elastic).await.unwrap().xpect_none();
+		EipReverseDns::is_missing(&bevyhow!("InvalidAllocationID.NotFound"))
 			.xpect_false();
 	}
 }

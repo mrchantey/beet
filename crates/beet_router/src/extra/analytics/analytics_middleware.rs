@@ -251,7 +251,7 @@ mod stalled_store_test {
 	async fn stalled_store_never_delays_a_request() {
 		let started = Arc::new(AtomicUsize::new(0));
 		let (server, on_spawn) =
-			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+			HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		let port = server.port.unwrap();
 
 		let store_started = started.clone();

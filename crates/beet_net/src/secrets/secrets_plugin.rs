@@ -25,11 +25,16 @@ impl Plugin for SecretsPlugin {
 			.register_type::<SecretsRm>()
 			.register_type::<SecretsRekey>();
 		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-		app.register_type::<SecretsExec>()
-			// mounted at an entry's TOP level rather than under `secrets`, so
-			// the everyday credential command is `beet aws` and the rare one
-			// is `beet admin`
-			.register_type::<AwsExec>()
+		app.register_type::<SecretsExec>();
+		// mounted at an entry's TOP level rather than under `secrets`, so the
+		// everyday credential command is `beet aws` and the rare one is
+		// `beet admin`
+		#[cfg(all(
+			feature = "fs",
+			feature = "aws",
+			not(target_arch = "wasm32")
+		))]
+		app.register_type::<AwsExec>()
 			.register_type::<AdminElevate>();
 	}
 }

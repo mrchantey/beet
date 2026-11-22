@@ -3,7 +3,7 @@
 //! api.
 //!
 //! Every call is a SigV4-signed request through beet's own http client
-//! ([`AwsJsonClient`]) as the launch's credentials: a deployed box's pair,
+//! ([`AwsClient`]) as the launch's credentials: a deployed box's pair,
 //! or the deployer's on a deploy. No SDK client and no `aws` cli, so the
 //! provider builds on every target and a box needs nothing installed to
 //! read its secrets.
@@ -85,7 +85,7 @@ pub(crate) fn attach_ssm_secrets(
 #[derive(Debug, Clone)]
 pub struct SsmSecretStore {
 	scope: SecretScope,
-	client: AwsJsonClient,
+	client: AwsClient,
 }
 
 impl SsmSecretStore {
@@ -96,13 +96,13 @@ impl SsmSecretStore {
 	pub fn new(scope: SecretScope, region: impl Into<SmolStr>) -> Self {
 		Self {
 			scope,
-			client: AwsJsonClient::new("ssm", "AmazonSSM", region),
+			client: AwsClient::new(AwsService::SSM, region),
 		}
 	}
 
 	/// The same store calling through `client`: explicit credentials, or a
 	/// test's stand-in for AWS.
-	pub fn with_client(mut self, client: AwsJsonClient) -> Self {
+	pub fn with_client(mut self, client: AwsClient) -> Self {
 		self.client = client;
 		self
 	}
@@ -113,7 +113,7 @@ impl SsmSecretStore {
 	async fn get_parameter(&self, name: &str) -> Result<Option<String>> {
 		match self
 			.client
-			.call(
+			.call_json(
 				"GetParameter",
 				&json!({"Name": name, "WithDecryption": true}),
 			)
@@ -155,7 +155,11 @@ impl SsmSecretStore {
 			body["Description"] = description.into();
 		}
 		// the one call that carries a secret, so its errors are redacted
-		match self.client.call_secret("PutParameter", &body, value).await {
+		match self
+			.client
+			.call_json_secret("PutParameter", &body, value)
+			.await
+		{
 			Ok(_) => Ok(()),
 			Err(err)
 				if AwsError::code(&err) == Some("ParameterAlreadyExists") =>
@@ -213,7 +217,7 @@ impl SsmSecretStore {
 	) -> Result<Vec<Value>> {
 		let mut items = Vec::new();
 		loop {
-			let mut page = self.client.call(action, &body).await?;
+			let mut page = self.client.call_json(action, &body).await?;
 			if let Value::Array(parameters) = page["Parameters"].take() {
 				items.extend(parameters);
 			}
@@ -232,7 +236,7 @@ impl SsmSecretStore {
 		for batch in names.chunks(10) {
 			let body = self
 				.client
-				.call("DeleteParameters", &json!({"Names": batch}))
+				.call_json("DeleteParameters", &json!({"Names": batch}))
 				.await?;
 			deleted.extend(
 				body["DeletedParameters"]
@@ -440,7 +444,7 @@ mod test {
 		let calls = Calls::default();
 		let recorded = calls.clone();
 		let answer = Arc::new(answer);
-		let client = AwsJsonClient::new("ssm", "AmazonSSM", "ap-southeast-2")
+		let client = AwsClient::new(AwsService::SSM, "ap-southeast-2")
 			.with_credentials(AwsCredentials::new("AKID", "secret"))
 			.with_transport(move |request| {
 				let (recorded, answer) = (recorded.clone(), answer.clone());

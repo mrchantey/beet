@@ -1382,7 +1382,7 @@ mod test {
 		use std::sync::atomic::Ordering;
 		let fetches = std::sync::Arc::new(AtomicUsize::new(0));
 		let (mut server, on_spawn) =
-			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+			HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		// leave the process-global loopback port to whoever owns it
 		server.canonical = false;
 		let poster = format!("{}/poster.png", server.local_url());

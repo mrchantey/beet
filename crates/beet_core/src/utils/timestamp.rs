@@ -165,6 +165,30 @@ impl Timestamp {
 		)
 	}
 
+	/// Parse an http date, the inverse of
+	/// [`format_rfc2822`](Self::format_rfc2822): the IMF-fixdate form every
+	/// server sends in its `Date` header, `Sun, 06 Nov 1994 08:49:37 GMT`.
+	/// `None` on any other shape.
+	pub fn parse_http_date(text: &str) -> Option<Self> {
+		let (_weekday, rest) = text.trim().split_once(", ")?;
+		let mut parts = rest.split(' ');
+		let day = parts.next()?.parse::<u32>().ok()?;
+		let month = parts.next()?;
+		let month = (1..=12).find(|month_number| {
+			Date::month_name(*month_number)
+				.is_some_and(|name| name[..3].eq_ignore_ascii_case(month))
+		})?;
+		let year = parts.next()?.parse::<i64>().ok()?;
+		let time = parts.next()?;
+		if parts.next()? != "GMT" || parts.next().is_some() {
+			return None;
+		}
+		Self::parse_iso8601(&format!(
+			"{}T{time}Z",
+			Date::from_civil(year, month, day).ok()?
+		))
+	}
+
 	/// This instant's UTC `(hour, minute, second, millisecond)`.
 	fn civil_time(&self) -> (i64, i64, i64, i64) {
 		let millis_of_day = self.0.rem_euclid(Date::MILLIS_PER_DAY);
@@ -348,5 +372,20 @@ mod test {
 			.timestamp()
 			.format_rfc2822()
 			.xpect_eq("Sun, 20 Jul 1969 00:00:00 GMT");
+	}
+
+	/// An http `Date` reads back to the instant it formats, at whole seconds.
+	#[crate::test]
+	fn parses_http_dates() {
+		Timestamp::parse_http_date("Mon, 09 Sep 2024 19:46:02 GMT")
+			.xpect_eq(Some(Timestamp::from_millis(1_725_911_162_000)));
+		Timestamp::parse_http_date("Sun, 06 Nov 1994 08:49:37 GMT")
+			.unwrap()
+			.format_rfc2822()
+			.xpect_eq("Sun, 06 Nov 1994 08:49:37 GMT");
+		Timestamp::parse_http_date("Sunday, 06-Nov-94 08:49:37 GMT")
+			.xpect_none();
+		Timestamp::parse_http_date("Sun, 06 Nov 1994 08:49:37 +0000")
+			.xpect_none();
 	}
 }

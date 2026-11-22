@@ -1,0 +1,5 @@
+no AWS credentials, tried
+  1. the shared credentials file (`/nonexistent/credentials`, profile `default`): none
+  2. the ECS container endpoint (no `AWS_CONTAINER_CREDENTIALS_*_URI`): none
+  3. the ECS container endpoint (`http://evil.example.com/creds`): refusing to send a container credential request to `http://evil.example.com/creds`: plain http only reaches loopback or the container agent
+  4. EC2 instance metadata (`AWS_EC2_METADATA_DISABLED`): none

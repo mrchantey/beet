@@ -242,13 +242,8 @@ impl R2BucketBlock {
 	/// ([`parked_pair`](Self::parked_pair)): the store a deploy-machine
 	/// process reads and writes the bucket through. The runtime attach lands
 	/// a store under the process's ambient credentials, which are AWS's, so
-	/// a verb targeting this bucket resolves this instead. Native, as the
-	/// S3 client is.
-	#[cfg(all(
-		feature = "vault",
-		feature = "aws_sdk",
-		not(target_arch = "wasm32")
-	))]
+	/// a verb targeting this bucket resolves this instead.
+	#[cfg(all(feature = "vault", feature = "aws"))]
 	pub async fn parked_store(
 		&self,
 		stack: &ResolvedStack,
@@ -256,7 +251,7 @@ impl R2BucketBlock {
 	) -> Result<BlobStore> {
 		let (access_key, secret_key) = self.parked_pair(stack, secrets).await?;
 		S3Store::from_uri(&self.store_uri(stack)?)?
-			.with_credentials(S3Credentials::new(access_key, secret_key))
+			.with_credentials(AwsCredentials::new(access_key, secret_key))
 			.xmap(BlobStore::new)
 			.xok()
 	}

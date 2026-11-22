@@ -2,15 +2,16 @@
 
 beet_core::test_main!();
 
-// the deploy verbs: every one of them shells out (tofu, docker, ssh, wrangler,
-// the aws cli) or drives the S3 SDK, so they are native-only. A wasm consumer
-// gets the definitions without the execution.
+// the deploy verbs: most shell out (tofu, cargo, docker, ssh, wrangler), so
+// they are native-only. A wasm consumer gets the definitions without the
+// execution.
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 mod actions;
 pub mod bindings;
 mod blocks;
 // a repo's deploy credentials, one per provider, and the gate a stack's deploy
-// and elevated deploy pass through: native, since every converge shells out.
+// and elevated deploy pass through: native, since a converge reads and seals
+// the repo's secrets document and hands its session to child processes.
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 mod credentials;
 // the mail stack's blocks and their declarative identity inputs. Definitions

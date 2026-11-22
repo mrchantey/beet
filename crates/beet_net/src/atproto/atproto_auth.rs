@@ -1,42 +1,9 @@
-//! The one credential seam a write to a PDS goes through.
-//!
-//! [`AtprotoAuth`] is shaped for all three providers the protocol allows and
-//! implemented for one:
-//!
-//! - [`AppPassword`]: `createSession` on first use, a bearer token on every
-//!   request, `refreshSession` when the server answers `ExpiredToken`.
-//! - `OAuthPublic`, designed and unimplemented: PAR, PKCE and DPoP (ES256)
-//!   through the browser flow, with a custom url scheme or a same-origin https
-//!   redirect. The spec caps a public client's sessions and refresh tokens at
-//!   two weeks, so a human re-consents fortnightly.
-//! - `OAuthConfidential`, designed and unimplemented, the intended end state:
-//!   the same flow with a client key the account's stack holds in its secret
-//!   store, sessions unlimited, so an agent or a schedule can write where the
-//!   session lives.
-//!
-//! Both OAuth providers need a client metadata document served at
-//! `https://<site>/oauth/client-metadata.json` (a static route), a `p256`
-//! dependency for DPoP, and a session store for the refresh token and the DPoP
-//! key, which is the stack's secret store. `authorize` then signs a DPoP proof
-//! for the exact method and url, and `recover` retries with the server's
-//! `dpop_nonce`, so either is a drop-in behind this trait.
+//! An atproto account's app password, one [`RequestAuth`] a write to a PDS
+//! goes through; the OAuth credentials designed beside it are on that seam's
+//! own docs.
 use crate::prelude::*;
 use alloc::sync::Arc;
 use beet_core::prelude::*;
-
-/// How a request to a PDS proves it may write.
-pub trait AtprotoAuth: 'static + Send + Sync {
-	/// The account this credential writes as.
-	fn did(&self) -> &Did;
-
-	/// Attach what this request needs: a bearer token, or under OAuth a DPoP
-	/// proof signed for this exact method and url plus the bound token.
-	fn authorize(&self, request: Request) -> SendBoxedFuture<Result<Request>>;
-
-	/// The server refused the request: refresh the session (or under OAuth
-	/// take the server's DPoP nonce) and say whether it may be retried.
-	fn recover(&self, error: &XrpcError) -> SendBoxedFuture<Result<bool>>;
-}
 
 /// An app password: a per-application password minted in the account's
 /// settings, which cannot change the account itself and can be revoked
@@ -84,6 +51,9 @@ impl AppPassword {
 			session: default(),
 		}
 	}
+
+	/// The account this credential writes as.
+	pub fn did(&self) -> &Did { &self.did }
 
 	fn current(&self) -> Option<Session> {
 		self.session
@@ -159,9 +129,7 @@ impl AppPassword {
 	}
 }
 
-impl AtprotoAuth for AppPassword {
-	fn did(&self) -> &Did { &self.did }
-
+impl RequestAuth for AppPassword {
 	fn authorize(&self, request: Request) -> SendBoxedFuture<Result<Request>> {
 		let this = self.clone();
 		Box::pin(async move {
@@ -183,9 +151,9 @@ impl AtprotoAuth for AppPassword {
 		})
 	}
 
-	fn recover(&self, error: &XrpcError) -> SendBoxedFuture<Result<bool>> {
+	fn recover(&self, failure: &AuthFailure) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
-		let error = error.error.clone();
+		let error = failure.code.clone();
 		Box::pin(async move {
 			match (error.as_str(), this.current()) {
 				("ExpiredToken", Some(session)) => {

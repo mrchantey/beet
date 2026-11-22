@@ -6,7 +6,7 @@ use bytes::Bytes;
 
 /// A [`PdsProvider`] over a real PDS: the five xrpc calls that write
 /// (`putRecord`, `deleteRecord`, `uploadBlob`, and the session pair behind
-/// [`AtprotoAuth`]) and the two that read unauthenticated (`getRecord`,
+/// [`AppPassword`]) and the two that read unauthenticated (`getRecord`,
 /// `listRecords`).
 ///
 /// The PDS is resolved from the did's document on first use and remembered,
@@ -19,7 +19,7 @@ pub struct XrpcPds {
 	did: Did,
 	endpoint: Arc<RwLock<Option<SmolStr>>>,
 	resolver: DidResolver,
-	auth: Option<Arc<dyn AtprotoAuth>>,
+	auth: Option<Arc<dyn RequestAuth>>,
 }
 
 impl core::fmt::Debug for XrpcPds {
@@ -92,8 +92,8 @@ impl XrpcPds {
 	}
 
 	/// Write with `auth`; `None` keeps the repo read only.
-	pub fn with_auth(mut self, auth: Option<impl AtprotoAuth>) -> Self {
-		self.auth = auth.map(|auth| Arc::new(auth) as Arc<dyn AtprotoAuth>);
+	pub fn with_auth(mut self, auth: Option<impl RequestAuth>) -> Self {
+		self.auth = auth.map(|auth| Arc::new(auth) as Arc<dyn RequestAuth>);
 		self
 	}
 
@@ -119,7 +119,7 @@ impl XrpcPds {
 		endpoint.xok()
 	}
 
-	fn auth(&self) -> Result<&Arc<dyn AtprotoAuth>> {
+	fn auth(&self) -> Result<&Arc<dyn RequestAuth>> {
 		self.auth.as_ref().ok_or_else(|| {
 			bevyhow!(
 				"the repo of {} is read only: its `<AtprotoAccount/>` names no \
@@ -148,8 +148,19 @@ impl XrpcPds {
 			if response.status().is_ok() {
 				return Ok(response);
 			}
+			let headers = response.headers().clone();
 			let error = XrpcError::read(method, response).await;
-			if authorized && !retried && self.auth()?.recover(&error).await? {
+			if authorized
+				&& !retried && self
+				.auth()?
+				.recover(&AuthFailure {
+					status: error.status,
+					code: error.error.clone(),
+					message: error.message.clone(),
+					headers,
+				})
+				.await?
+			{
 				retried = true;
 				continue;
 			}
@@ -327,8 +338,6 @@ pub struct XrpcError {
 	pub error: SmolStr,
 	/// The server's explanation.
 	pub message: String,
-	/// The server's `DPoP-Nonce`, which an OAuth credential retries with.
-	pub dpop_nonce: Option<SmolStr>,
 }
 
 impl XrpcError {
@@ -336,11 +345,6 @@ impl XrpcError {
 	/// protocol's error shape keeps its text as the message.
 	pub async fn read(method: &str, response: Response) -> Self {
 		let status = response.status();
-		let dpop_nonce = response
-			.headers()
-			.get_raw("dpop-nonce")
-			.and_then(|values| values.first())
-			.map(SmolStr::new);
 		let text = response.text().await.unwrap_or_default();
 		let body = serde_json::from_str::<XrpcErrorBody>(&text).ok();
 		Self {
@@ -351,7 +355,6 @@ impl XrpcError {
 				.map(|body| body.error.clone())
 				.unwrap_or_default(),
 			message: body.and_then(|body| body.message).unwrap_or(text),
-			dpop_nonce,
 		}
 	}
 

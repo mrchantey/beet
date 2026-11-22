@@ -67,7 +67,7 @@ pub async fn BuildDockerImage(
 				let parent = child_of_q
 					.get(entity)
 					.ok()
-					.and_then(|child_of| Some(child_of.parent()))
+					.map(|child_of| child_of.parent())
 					.ok_or_else(|| bevyhow!("no parent found"))?;
 
 				// find siblings
@@ -111,14 +111,14 @@ pub async fn BuildDockerImage(
 	let dockerfile_dir = workspace_root
 		.join("target")
 		.join(format!("{}-docker", artifact.label()));
-	std::fs::create_dir_all(&dockerfile_dir)?;
+	fs_ext::create_dir_all(&dockerfile_dir)?;
 
 	// copy binary to dockerfile directory
 	let binary_filename = binary_path
 		.file_name()
 		.ok_or_else(|| bevyhow!("invalid binary path"))?;
 	let binary_dest = dockerfile_dir.join(binary_filename);
-	std::fs::copy(&binary_path, &binary_dest)?;
+	fs_ext::copy(&binary_path, &binary_dest)?;
 
 	// create Dockerfile
 	let base_image = block.container_image().base_image();
@@ -150,33 +150,24 @@ pub async fn BuildDockerImage(
 		"FROM {}\n{}COPY {} /app\nRUN chmod +x /app\n{}CMD {}\n",
 		base_image, setup_commands, binary_filename, expose, cmd_json,
 	);
-	std::fs::write(dockerfile_dir.join("Dockerfile"), dockerfile_content)?;
+	fs_ext::write(dockerfile_dir.join("Dockerfile"), dockerfile_content)?;
 
-	// get ECR repository details - must match terraform's naming convention
-	// terraform uses stack.resource_ident(block.build_label("ecr")).primary_identifier()
-	let ecr_ident = stack.resource_ident(block.build_label("ecr"));
-	let ecr_repo_name = ecr_ident.primary_identifier();
-	let region = stack.aws_region()?;
-	let account_id = get_aws_account_id().await?;
-	let ecr_url =
-		format!("{account_id}.dkr.ecr.{region}.amazonaws.com/{ecr_repo_name}");
-
-	// ensure ECR repository exists
-	ensure_ecr_repository(region, ecr_repo_name).await?;
-
-	// authenticate to ECR
+	// the ECR repository terraform names, and a login to its registry
+	let ecr_repo_name = stack
+		.resource_ident(block.build_label("ecr"))
+		.primary_identifier()
+		.to_string();
+	let ecr = EcrRegistry::new(AwsClient::new(
+		AwsService::ECR,
+		stack.aws_region()?.clone(),
+	));
+	let ecr_url = ecr.repository_uri(&ecr_repo_name).await?;
 	let engine_cmd = engine.command();
-	info!("authenticating {} to ECR", engine_cmd);
-	let auth_cmd = ChildProcess::new("sh").with_args([
-		"-c",
-		&format!(
-			"aws ecr get-login-password --region {region} | {engine_cmd} \
-				 login --username AWS --password-stdin \
-				 {account_id}.dkr.ecr.{region}.amazonaws.com"
-		),
-	]);
-	auth_cmd
-		.run_async()
+	info!("authenticating {engine_cmd} to ECR");
+	let login = ecr.login().await?;
+	login
+		.command(engine)
+		.run_async_stdin(&login.password)
 		.await
 		.map_err(|err| bevyhow!("ECR authentication failed: {err}"))?;
 
@@ -209,42 +200,107 @@ pub async fn BuildDockerImage(
 	Pass(cx.input).xok()
 }
 
-/// Get AWS account ID.
-async fn get_aws_account_id() -> Result<String> {
-	aws_cli_ext::sts([
-		"get-caller-identity",
-		"--query",
-		"Account",
-		"--output",
-		"text",
-	])
-	.run_async_stdout()
-	.await?
-	.trim()
-	.to_string()
-	.xok()
+/// The ECR registry of the client's account and region.
+struct EcrRegistry {
+	client: AwsClient,
 }
 
-/// Verify ECR repository exists (should be created by Terraform).
-async fn ensure_ecr_repository(region: &str, repo_name: &str) -> Result {
-	let result = aws_cli_ext::service("ecr", region, [
-		"describe-repositories",
-		"--repository-names",
-		repo_name,
-	])
-	.run_async()
-	.await;
-	match result {
-		Ok(_) => {
-			info!("ECR repository {repo_name} exists");
-			Ok(())
-		}
-		_ => {
-			bevybail!(
-				"ECR repository {repo_name} does not exist. Run Terraform apply \
-				 first to create infrastructure."
+/// A registry login: the host and the password `<engine> login` takes on
+/// stdin, never in argv.
+struct EcrLogin {
+	registry: String,
+	password: String,
+}
+
+impl EcrRegistry {
+	fn new(client: AwsClient) -> Self { Self { client } }
+
+	/// The push uri of the repository `name`, ie
+	/// `<account>.dkr.ecr.<region>.amazonaws.com/<name>`.
+	///
+	/// The repository is terraform's, created by the `storage` layer: an
+	/// absent one is refused rather than created, since a repository made here
+	/// collides with the one the next apply creates.
+	async fn repository_uri(&self, name: &str) -> Result<String> {
+		let answer = self
+			.client
+			.call_json(
+				"DescribeRepositories",
+				&serde_json::json!({ "repositoryNames": [name] }),
 			)
+			.await;
+		match answer {
+			Ok(answer) => answer["repositories"][0]["repositoryUri"]
+				.as_str()
+				.map(ToString::to_string)
+				.ok_or_else(|| {
+					bevyhow!("ECR answered no uri for repository {name}")
+				}),
+			Err(err)
+				if AwsError::is(&err, &["RepositoryNotFoundException"]) =>
+			{
+				bevybail!(
+					"ECR repository {name} does not exist. Run Terraform apply \
+					 first to create infrastructure."
+				)
+			}
+			Err(err) => Err(err),
 		}
+	}
+
+	/// `ecr:GetAuthorizationToken`, its `AWS:<password>` token decoded.
+	async fn login(&self) -> Result<EcrLogin> {
+		let answer = self
+			.client
+			.call_json("GetAuthorizationToken", &serde_json::json!({}))
+			.await?;
+		let data = &answer["authorizationData"][0];
+		let registry = data["proxyEndpoint"]
+			.as_str()
+			.ok_or_else(|| bevyhow!("ECR answered no registry endpoint"))?
+			.trim_start_matches("https://")
+			.to_string();
+		let token = data["authorizationToken"]
+			.as_str()
+			.ok_or_else(|| bevyhow!("ECR answered no authorization token"))?;
+		let password = Self::decode_token(token)?
+			.strip_prefix("AWS:")
+			.ok_or_else(|| {
+				bevyhow!("ECR's authorization token names another user")
+			})?
+			.to_string();
+		EcrLogin { registry, password }.xok()
+	}
+
+	fn decode_token(token: &str) -> Result<String> {
+		cfg_if! {
+			if #[cfg(feature = "deploy")] {
+				use base64::Engine;
+				base64::engine::general_purpose::STANDARD
+					.decode(token)?
+					.xmap(String::from_utf8)?
+					.xok()
+			} else {
+				let _ = token;
+				bevybail!("decoding an ECR login requires the `deploy` feature")
+			}
+		}
+	}
+}
+
+impl EcrLogin {
+	/// `<engine> login` to the registry, reading the password from stdin and
+	/// redacting it from every rendering of the command.
+	fn command(&self, engine: ContainerEngine) -> ChildProcess {
+		ChildProcess::new(engine.command())
+			.with_secret(self.password.as_str())
+			.with_args([
+				"login",
+				"--username",
+				"AWS",
+				"--password-stdin",
+				self.registry.as_str(),
+			])
 	}
 }
 
@@ -261,5 +317,123 @@ impl BuildDockerImage {
 		Self {
 			engine: ContainerEngine::Podman,
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use serde_json::Value;
+	use serde_json::json;
+	use std::sync::Arc;
+	use std::sync::Mutex;
+
+	/// The registry whose ECR answers each call with `answer`, given its
+	/// target and body, recording every call.
+	fn registry(
+		answer: impl 'static + Send + Sync + Fn(&str, &Value) -> Response,
+	) -> (EcrRegistry, Arc<Mutex<Vec<(String, Value)>>>) {
+		let calls = Arc::new(Mutex::new(Vec::new()));
+		let recorded = calls.clone();
+		let answer = Arc::new(answer);
+		let client = AwsClient::new(AwsService::ECR, "ap-southeast-2")
+			.with_credentials(AwsCredentials::new("AKID", "secret"))
+			.with_transport(move |request| {
+				let (recorded, answer) = (recorded.clone(), answer.clone());
+				Box::pin(async move {
+					request.url().to_string().xpect_eq(
+						"https://api.ecr.ap-southeast-2.amazonaws.com/",
+					);
+					let target = request
+						.headers
+						.first_raw("x-amz-target")
+						.unwrap_or_default()
+						.to_string();
+					let body = serde_json::from_slice::<Value>(
+						&request.body.into_bytes().await?,
+					)?;
+					let response = answer(&target, &body);
+					recorded.lock().unwrap().push((target, body));
+					response.xok()
+				})
+			});
+		(EcrRegistry::new(client), calls)
+	}
+
+	const REGISTRY: &str = "123456789012.dkr.ecr.ap-southeast-2.amazonaws.com";
+
+	/// The repository's uri is ECR's own, and an absent repository is refused
+	/// as terraform's to create.
+	#[beet_core::test]
+	async fn finds_the_repository() {
+		let (ecr, calls) =
+			registry(|_, body| match body["repositoryNames"][0].as_str() {
+				Some("beetmash-prod--ecr") => Response::ok().with_body(
+					json!({ "repositories": [{
+						"repositoryName": "beetmash-prod--ecr",
+						"repositoryUri": format!("{REGISTRY}/beetmash-prod--ecr"),
+						"registryId": "123456789012",
+					}]})
+					.to_string(),
+				),
+				_ => Response::from_status(StatusCode::BAD_REQUEST).with_body(
+					json!({
+						"__type": "RepositoryNotFoundException",
+						"message": "The repository does not exist",
+					})
+					.to_string(),
+				),
+			});
+		ecr.repository_uri("beetmash-prod--ecr")
+			.await
+			.unwrap()
+			.xpect_eq(format!("{REGISTRY}/beetmash-prod--ecr"));
+		ecr.repository_uri("beetmash-drill--ecr")
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("Run Terraform apply");
+		calls.lock().unwrap()[0].clone().xpect_eq((
+			"AmazonEC2ContainerRegistry_V20150921.DescribeRepositories"
+				.to_string(),
+			json!({ "repositoryNames": ["beetmash-prod--ecr"] }),
+		));
+	}
+
+	/// The token decodes to the password the engine reads from stdin: the
+	/// command is exactly the login with no password in its argv, and the
+	/// password is redacted wherever it would print.
+	#[beet_core::test]
+	async fn logs_in_over_stdin() {
+		// base64 of `AWS:hunter2`
+		let (ecr, calls) = registry(|_, _| {
+			Response::ok().with_body(
+				json!({ "authorizationData": [{
+					"authorizationToken": "QVdTOmh1bnRlcjI=",
+					"expiresAt": 1_800_000_000.0,
+					"proxyEndpoint": format!("https://{REGISTRY}"),
+				}]})
+				.to_string(),
+			)
+		});
+		let login = ecr.login().await.unwrap();
+		login.password.as_str().xpect_eq("hunter2");
+		login
+			.command(ContainerEngine::Podman)
+			.to_string()
+			.xpect_eq(format!(
+				"podman login --username AWS --password-stdin {REGISTRY}"
+			));
+		login
+			.command(ContainerEngine::Podman)
+			.with_args(["echo", "hunter2"])
+			.to_string()
+			.xnot()
+			.xpect_contains("hunter2");
+		calls.lock().unwrap()[0].clone().xpect_eq((
+			"AmazonEC2ContainerRegistry_V20150921.GetAuthorizationToken"
+				.to_string(),
+			json!({}),
+		));
 	}
 }

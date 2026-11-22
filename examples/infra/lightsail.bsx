@@ -29,7 +29,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 	<Stack app_name="lightsail" {AwsRegion("us-west-2")}>
 		<Group bx:ref="deploy_up">
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
-			<LightsailSiteBlock features="aws_sdk" exec_route="serve"/>
+			<LightsailSiteBlock features="aws" exec_route="serve"/>
 			<S3BucketBlock label="repo" {RepoStoreBlock}/>
 			<!-- the ssh authority the box trusts, before the apply that boots it -->
 			<EnsureSshAuthority/>

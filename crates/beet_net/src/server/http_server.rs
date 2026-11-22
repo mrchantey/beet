@@ -25,8 +25,8 @@ use core::net::SocketAddr;
 /// its destructor; tasks spawned on the entity are cancelled with it.
 ///
 /// The future is a [`LocalBoxedFuture`] (never `Send`): the facet always drives it
-/// as a local task, so it stays on the thread it was created on. This lets a backend hold a thread-bound resource across an await, eg the
-/// lambda backend's tokio runtime [`EnterGuard`](tokio::runtime::EnterGuard).
+/// as a local task, so it stays on the thread it was created on, and a backend
+/// may hold a thread-bound resource across an await.
 pub type HttpServerFn =
 	fn(AsyncEntity, OnceValueRx<()>) -> LocalBoxedFuture<'static, Result>;
 
@@ -312,7 +312,7 @@ mod std_impl {
 		/// `<HttpServer port=..>` rebinds on a live-reload rebuild, where a
 		/// `port=0` would move the origin out from under the browser. Racy in
 		/// principle (another process may take it before the bind), fine for a
-		/// runner that owns the machine's test run; prefer [`Self::new_test`]'s
+		/// runner that owns the machine's test run; prefer [`Self::bind_loopback`]'s
 		/// pre-bound listener where the caller can hand one over, and a plain
 		/// `port: 0` read back through [`Listening`] where the port never
 		/// rebinds.
@@ -323,16 +323,42 @@ mod std_impl {
 				.xok()
 		}
 
-		/// Creates a test server bound to an OS-assigned port.
+		/// Serve `handler` from a mini server on a thread of its own, answering
+		/// its url once it accepts connections: a test's stand-in for a
+		/// remote service, ie a metadata endpoint, an AWS api, an OAuth
+		/// provider. The server runs until the process exits.
+		pub async fn spawn_test(handler: Action<Request, Response>) -> String {
+			let (server, on_spawn) =
+				Self::bind_loopback(Self::start_mini_with_tcp);
+			let url = server.local_url();
+			let port = server.port.unwrap_or_default();
+			std::thread::spawn(move || {
+				App::new()
+					.add_plugins((MinimalPlugins, ServerPlugin))
+					.spawn((server, on_spawn, children![handler]))
+					.run();
+			});
+			// listening once a connect is accepted
+			for _ in 0..200 {
+				if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+					break;
+				}
+				time_ext::sleep_millis(10).await;
+			}
+			url
+		}
+
+		/// A server bound to an OS-assigned port on `127.0.0.1`, reachable
+		/// from this machine alone: a local helper (a browser harness, an
+		/// OAuth redirect receiver) or a test.
 		///
-		/// Binds to port `0` so the OS picks a free port, avoiding
-		/// collisions in parallel tests. The listener is kept alive and
-		/// passed directly to the server function, eliminating port race conditions.
-		///
-		/// The returned [`OnSpawn`] runs the real listener; include it in the
-		/// spawn bundle. The `HttpServer` unit tests do not boot through the
-		/// fan-out, so the listener comes from this `OnSpawn`.
-		pub fn new_test<Func, Fut>(run_server: Func) -> (HttpServer, OnSpawn)
+		/// The port is bound here and the listener handed straight to
+		/// `run_server`, so there is no race for it. The returned
+		/// [`OnSpawn`] runs the listener; include it in the spawn bundle. The
+		/// server runs until its entity despawns.
+		pub fn bind_loopback<Func, Fut>(
+			run_server: Func,
+		) -> (HttpServer, OnSpawn)
 		where
 			Func: 'static
 				+ Send
@@ -623,7 +649,7 @@ pub(crate) mod tests {
 	}
 }
 
-// needs `new_test` + `async_io` (server, native) and the ureq client.
+// needs `bind_loopback` + `async_io` (server, native) and the ureq client.
 #[cfg(test)]
 #[cfg(all(feature = "ureq", feature = "server", not(target_arch = "wasm32")))]
 pub(crate) mod test {
@@ -647,7 +673,7 @@ pub(crate) mod test {
 			) -> Fut,
 		Fut: 'static + Send + Sync + Future<Output = Result>,
 	{
-		let server = HttpServer::new_test(run_server);
+		let server = HttpServer::bind_loopback(run_server);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			let mut app = App::new();

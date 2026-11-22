@@ -206,10 +206,6 @@ impl GlobFilter {
 	/// Returns `true` if there are no rules, ie everything passes.
 	pub fn is_empty(&self) -> bool { self.rules.is_empty() }
 
-	/// The rules in order, for a consumer translating this filter into another
-	/// matcher's dialect, ie the aws cli's `--include`/`--exclude`.
-	pub fn rules(&self) -> &[GlobRule] { &self.rules }
-
 	/// Whether the filter holds any include rule, which is what turns it from a
 	/// denylist into an allowlist.
 	pub fn has_include(&self) -> bool {
@@ -612,11 +608,11 @@ mod test {
 		let json = serde_json::to_string(&filter).unwrap();
 		let deserialized: GlobFilter = serde_json::from_str(&json).unwrap();
 
-		filter.xpect_eq(deserialized);
-		filter.rules().to_vec().xpect_eq(vec![
+		filter.rules.clone().xpect_eq(vec![
 			GlobRule::Include(GlobPattern::new("**/*.rs")),
 			GlobRule::Exclude(GlobPattern::new("*target*")),
 		]);
+		filter.xpect_eq(deserialized);
 	}
 
 	#[crate::test]

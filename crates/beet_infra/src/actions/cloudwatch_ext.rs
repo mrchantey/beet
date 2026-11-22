@@ -1,10 +1,6 @@
-//! Publishing custom metrics, over the `aws` cli.
-//!
-//! The cli because every deploy verb already shells out to `aws`
-//! ([`aws_cli_ext`]), so an SDK client here would be a dependency bought for
-//! one verb.
-use super::aws_cli_ext;
+//! Publishing custom metrics, as CloudWatch `PutMetricData`.
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use serde_json::json;
 
 /// One metric value, in a namespace's units.
@@ -43,7 +39,7 @@ impl MetricDatum {
 		}
 	}
 
-	/// The wire form, as `put-metric-data --metric-data` takes it.
+	/// The wire form, one entry of `PutMetricData`'s `MetricData`.
 	pub fn to_json(
 		&self,
 		dimension: &str,
@@ -58,14 +54,33 @@ impl MetricDatum {
 	}
 }
 
-/// Publish `data` into `namespace`, every datum carrying the one
-/// `(dimension, dimension_value)` pair.
+/// Publish `data` into `namespace` in `region`, as the launch's own
+/// credential, every datum carrying the one `(dimension, dimension_value)`
+/// pair.
 ///
 /// One call for the whole batch rather than one per datum: they describe one
 /// observation of one subject, so publishing them together is what keeps a
 /// dashboard's rows aligned in time.
 pub async fn put_metric_data(
 	region: &str,
+	namespace: &str,
+	dimension: &str,
+	dimension_value: &str,
+	data: &[MetricDatum],
+) -> Result {
+	put_metric_data_with(
+		&AwsClient::new(AwsService::MONITORING, region),
+		namespace,
+		dimension,
+		dimension_value,
+		data,
+	)
+	.await
+}
+
+/// [`put_metric_data`] through `client`.
+async fn put_metric_data_with(
+	client: &AwsClient,
 	namespace: &str,
 	dimension: &str,
 	dimension_value: &str,
@@ -78,22 +93,21 @@ pub async fn put_metric_data(
 		.iter()
 		.map(|datum| datum.to_json(dimension, dimension_value))
 		.collect::<Vec<_>>();
-	let data = serde_json::to_string(&metrics)?;
-	aws_cli_ext::service("cloudwatch", region, [
-		"put-metric-data",
-		"--namespace",
-		namespace,
-		"--metric-data",
-		&data,
-	])
-	.run_async()
-	.await?;
+	client
+		.call_json(
+			"PutMetricData",
+			&json!({ "Namespace": namespace, "MetricData": metrics }),
+		)
+		.await?;
 	Ok(())
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use serde_json::Value;
+	use std::sync::Arc;
+	use std::sync::Mutex;
 
 	/// The datum's wire shape is what an alarm's `dimensions` must match
 	/// exactly: a metric published under a different dimension name is a
@@ -108,5 +122,76 @@ mod tests {
 			.xpect_eq(
 				r#"{"Dimensions":[{"Name":"Domain","Value":"news.example.com"}],"MetricName":"BounceRate","Unit":"None","Value":0.012}"#,
 			);
+	}
+
+	/// The batch is one json `PutMetricData` naming the namespace, every datum
+	/// under the one dimension; an empty batch calls nothing.
+	#[beet_core::test]
+	async fn publishes_the_batch_as_one_call() {
+		let calls = Arc::new(Mutex::new(Vec::<(String, Value)>::new()));
+		let recorded = calls.clone();
+		let client = AwsClient::new(AwsService::MONITORING, "ap-southeast-2")
+			.with_credentials(AwsCredentials::new("AKID", "secret"))
+			.with_transport(move |request| {
+				let recorded = recorded.clone();
+				Box::pin(async move {
+					request.url().to_string().xpect_eq(
+						"https://monitoring.ap-southeast-2.amazonaws.com/",
+					);
+					let target = request
+						.headers
+						.first_raw("x-amz-target")
+						.unwrap_or_default()
+						.to_string();
+					let body = serde_json::from_slice::<Value>(
+						&request.body.into_bytes().await?,
+					)?;
+					recorded.lock().unwrap().push((target, body));
+					// a successful PutMetricData answers an empty body
+					Response::ok().xok()
+				})
+			});
+		put_metric_data_with(
+			&client,
+			"Beet/Mail",
+			"Domain",
+			"news.example.com",
+			&[],
+		)
+		.await
+		.unwrap();
+		calls.lock().unwrap().len().xpect_eq(0);
+		put_metric_data_with(
+			&client,
+			"Beet/Mail",
+			"Domain",
+			"news.example.com",
+			&[
+				MetricDatum::rate("BounceRate", 0.012),
+				MetricDatum::count("Sent", 40.),
+			],
+		)
+		.await
+		.unwrap();
+		calls.lock().unwrap().clone().xpect_eq(vec![(
+			"GraniteServiceVersion20100801.PutMetricData".to_string(),
+			json!({
+				"Namespace": "Beet/Mail",
+				"MetricData": [
+					{
+						"MetricName": "BounceRate",
+						"Value": 0.012,
+						"Unit": "None",
+						"Dimensions": [{ "Name": "Domain", "Value": "news.example.com" }],
+					},
+					{
+						"MetricName": "Sent",
+						"Value": 40.0,
+						"Unit": "Count",
+						"Dimensions": [{ "Name": "Domain", "Value": "news.example.com" }],
+					},
+				],
+			}),
+		)]);
 	}
 }

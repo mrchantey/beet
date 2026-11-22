@@ -41,7 +41,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu`,
 	<Stack app_name="lambda" {AwsRegion("us-west-2")}>
 		<Group bx:ref="deploy_up">
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
-			<LambdaSiteBlock features="lambda,aws_sdk" exec_route="serve"/>
+			<LambdaSiteBlock features="lambda" exec_route="serve"/>
 			<!-- deploy-versioned by default: each deploy publishes the site under
 			     its own id and ships a binary baked to read that prefix -->
 			<S3BucketBlock label="repo" {RepoStoreBlock}/>

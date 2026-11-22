@@ -29,18 +29,16 @@ pub async fn VaultBackup(
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let identities = AgeIdentityFile::require()?;
-	// a launch with no terminal refuses rather than prompts
-	if BootstrapConfig::get().headless {
-		bevybail!(
-			"a backup passphrase is typed on a terminal: run this \
-			interactively, without `--headless`"
-		);
-	}
-	let passphrase = terminal_ext::read_secret_line("passphrase: ")?;
+	let passphrase =
+		OperatorPrompt::ask(VaultBackup::passphrase_ask("passphrase: "))
+			.await?;
 	if passphrase.is_empty() {
 		bevybail!("an empty passphrase protects nothing");
 	}
-	if terminal_ext::read_secret_line("passphrase (again): ")? != passphrase {
+	if OperatorPrompt::ask(VaultBackup::passphrase_ask("passphrase (again): "))
+		.await?
+		!= passphrase
+	{
 		bevybail!("the passphrases differ");
 	}
 	let ciphertext = AgePassphrase::new(passphrase)
@@ -77,4 +75,31 @@ fn qr_text(_armored: &str) -> Result<String> {
 	feature)\n"
 		.to_string()
 		.xok()
+}
+
+impl VaultBackup {
+	/// The ask a backup passphrase is, `prompt` shown on the terminal:
+	/// shared with the restore, which reads the same passphrase back.
+	pub(crate) fn passphrase_ask(prompt: &str) -> OperatorAsk {
+		OperatorAsk::secret_line("a backup passphrase", prompt)
+			.with_instead("run this interactively, without `--headless`")
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// A headless launch is refused with the instruction it always had.
+	#[beet_core::test]
+	fn a_headless_backup_says_so() {
+		RefusalPrompt::new("this launch is headless")
+			.refusal(&VaultBackup::passphrase_ask("passphrase: "))
+			.to_string()
+			.xpect_starts_with(
+				"a backup passphrase is typed by the operator, and this launch \
+				is headless: run this interactively, without `--headless`",
+			);
+	}
 }

@@ -30,6 +30,7 @@ impl Plugin for InfraPlugin {
 		// ..and where its resources land at each provider, spreads on the
 		// stack or an ancestor resolved by ancestry (never the environment).
 		app.register_type::<crate::prelude::AwsRegion>()
+			.register_type::<crate::prelude::IdentityCenter>()
 			.register_type::<crate::prelude::CloudflareAccount>()
 			.register_type::<crate::prelude::CloudflareZone>();
 
@@ -102,10 +103,16 @@ impl Plugin for InfraPlugin {
 
 		// the serverless function, so a stack authors `<LambdaBlock
 		// label="rollup"/>` from markup rather than only from Rust.
+		// a sync's restart, retiring the warm environments a boot built: an
+		// action, so `deploy`-gated like the rest of them
+		#[cfg(all(
+			feature = "lambda_block",
+			feature = "deploy",
+			not(target_arch = "wasm32")
+		))]
+		app.register_type::<crate::prelude::LambdaRestart>();
 		#[cfg(feature = "lambda_block")]
 		app.register_type::<crate::prelude::LambdaBlock>()
-			// a sync's restart, retiring the warm environments a boot built
-			.register_type::<crate::prelude::LambdaRestart>()
 			.add_systems(
 				DeployRender,
 				(
@@ -381,6 +388,12 @@ impl Plugin for InfraPlugin {
 					crate::prelude::AwsDeployCredential,
 				>,
 			)
+			// a person's Identity Center sign in, and the invite adding one
+			.install_type::<crate::prelude::SsoRoutes>()
+			.register_type::<crate::prelude::SsoLogin>()
+			.register_type::<crate::prelude::SsoLogout>()
+			.register_type::<crate::prelude::SsoStatus>()
+			.register_type::<crate::prelude::SsoInvite>()
 			// the account it deploys into, converged before it
 			.register_type::<crate::prelude::AwsAccount>()
 			.add_observer(
@@ -468,11 +481,11 @@ impl Plugin for InfraPlugin {
 		// that binds a local dir to a bucket by label.
 		#[cfg(all(
 			feature = "deploy",
-			feature = "aws_sdk",
+			feature = "aws",
 			not(target_arch = "wasm32")
 		))]
 		app.register_type::<crate::prelude::SyncS3Bucket>()
-			.register_type::<beet_net::prelude::SyncDirection>()
+			.register_type::<crate::prelude::SyncDirection>()
 			.register_type::<crate::prelude::DirSync>()
 			.add_observer(crate::actions::attach_dir_sync_store);
 
@@ -499,11 +512,11 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::WatchTarget>();
 
 		// the full-lifecycle smoke-test action: reads a bucket's `BlobStore` (so
-		// `aws_sdk`-gated like the store) and lives in the `actions` module (so
+		// `aws`-gated like the store) and lives in the `actions` module (so
 		// `deploy`-gated and native-only). Register it only when all three compile it.
 		#[cfg(all(
 			feature = "deploy",
-			feature = "aws_sdk",
+			feature = "aws",
 			not(target_arch = "wasm32")
 		))]
 		app.register_type::<crate::prelude::LifecycleProbe>();

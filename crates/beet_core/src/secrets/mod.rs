@@ -27,7 +27,7 @@
 //!
 //! The rules every consumer of this subsystem relies on; the tutorial at
 //! `site/routes/docs/secrets.md` walks them, `beet_net::secrets` holds the
-//! document I/O and the verbs, `beet_net`'s `AwsJsonClient` the signed
+//! document I/O and the verbs, `beet_net`'s `AwsClient` the signed
 //! requests parameter store is reached by, and `beet_infra`'s README
 //! "Secrets" the stack side (its store providers and declarations,
 //! `<SecretBlock/>`, exports, restore, revoke).

@@ -9,7 +9,7 @@
 //!   PDS's duties on write, for tests and for a repo that never leaves the
 //!   machine, its records stored in canonical DAG-CBOR by default. Compiled
 //!   under `dag_cbor` alone: the data model needs no network.
-//! - `XrpcPds`, a real PDS over xrpc through the `AtprotoAuth` credential
+//! - `XrpcPds`, a real PDS over xrpc through a `RequestAuth` credential
 //!   seam, with did and handle resolution, behind the `atproto` feature,
 //!   which adds `json` for the wire.
 //! - [`DryRunPds`], laid over either, keeping every write in memory: a dry

@@ -538,7 +538,7 @@ fn worker_wrangler_json(
 
 // ───────────────────────────── R2 site sync ────────────────────────────────
 
-/// Publishes a local site directory to an R2 bucket with one `aws s3 sync`
+/// Publishes a local site directory to an R2 bucket with one [`BlobSync`]
 /// over R2's S3 endpoint, as the S3 pair the deploy token derives
 /// ([`CloudflareAccess::r2_credentials`]), timing the publish (the headline
 /// the `bench` verb measures against a full redeploy). Uploads what changed
@@ -601,9 +601,9 @@ impl CloudflareR2Sync {
 	}
 }
 
-/// Sync `local_dir` into `bucket` as the deploy token's derived S3 pair: one
-/// process for the whole directory, uploading what changed and deleting
-/// nothing, so a deploy only ever adds and replaces. Shared by
+/// Sync `local_dir` into `bucket` as the deploy token's derived S3 pair,
+/// uploading what changed and deleting nothing, so a deploy only ever adds
+/// and replaces. Shared by
 /// [`CloudflareR2Sync`] and [`CloudflareBench`].
 ///
 /// `local_dir` is resolved relative to the cwd (like `--entry`), not the
@@ -621,21 +621,21 @@ async fn sync_dir_to_r2(
 	prefix: Option<&str>,
 ) -> Result {
 	let root = AbsPath::new(local_dir)?;
-	let target = match prefix {
-		Some(prefix) => format!("s3://{bucket}/{prefix}"),
-		None => format!("s3://{bucket}"),
-	};
-	info!("syncing {root} to {target}");
 	let (access_key, secret_key) = access.r2_credentials(account.id()).await?;
-	aws_cli_ext::r2(&account.r2_endpoint(), &access_key, &secret_key, [
-		"s3",
-		"sync",
-		&root.to_string(),
-		&target,
-		"--only-show-errors",
-	])
-	.run_async()
+	let store = S3Store::r2(account.id(), bucket)
+		.with_credentials(AwsCredentials::new(access_key, secret_key));
+	let store = match prefix {
+		Some(prefix) => store.with_subdir(prefix),
+		None => store,
+	};
+	info!("syncing {root} to {}", store.s3_uri());
+	let report = BlobSync::new(
+		BlobStore::new(FsStore::new(root)),
+		BlobStore::new(store),
+	)
+	.run()
 	.await?;
+	info!("{report}");
 	Ok(())
 }
 
@@ -960,7 +960,7 @@ async fn delete_container_images(access: &CloudflareAccess, worker_name: &str) {
 /// Empty `bucket` completely — delete *every* object regardless of prefix — through
 /// the R2 S3-compatible endpoint of `account`. `wrangler r2 object` cannot list
 /// objects, so it cannot find keys synced under a prefix (eg the `assets/*`
-/// mount); `aws s3 rm --recursive` lists + deletes them all, which `wrangler r2
+/// mount); [`S3Store::clear`] lists and deletes them all, which `wrangler r2
 /// bucket delete` then requires (it refuses a non-empty bucket). The S3 pair is
 /// derived from the api token the teardown already runs with; with no token the
 /// empty is skipped with a warning so a no-creds teardown still deletes the
@@ -978,29 +978,15 @@ async fn empty_bucket(
 		return Ok(());
 	}
 	let (access_key, secret_key) = access.r2_credentials(account.id()).await?;
-	let endpoint = account.r2_endpoint();
-	info!("emptying all objects from r2://{bucket} via {endpoint}");
-	match aws_cli_ext::r2(&endpoint, &access_key, &secret_key, [
-		"s3",
-		"rm",
-		&format!("s3://{bucket}"),
-		"--recursive",
-	])
-	.run_async()
-	.await
-	{
-		Ok(_) => Ok(()),
-		// an already-deleted bucket has nothing to empty; treat as done so a repeat
-		// teardown is idempotent (mirrors `wrangler_r2_create`'s "already exists").
-		Err(err)
-			if err.to_string().contains("NoSuchBucket")
-				|| err.to_string().contains("does not exist") =>
-		{
-			info!("r2://{bucket} already gone, nothing to empty");
-			Ok(())
-		}
-		Err(err) => Err(err),
-	}
+	info!("emptying all objects from r2://{bucket}");
+	// an already-deleted bucket has nothing to empty, so a repeat teardown is
+	// idempotent (mirrors `wrangler_r2_create`'s "already exists")
+	let removed = S3Store::r2(account.id(), bucket)
+		.with_credentials(AwsCredentials::new(access_key, secret_key))
+		.clear()
+		.await?;
+	info!("removed {removed} object(s) from r2://{bucket}");
+	Ok(())
 }
 
 #[cfg(test)]

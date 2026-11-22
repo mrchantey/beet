@@ -14,10 +14,13 @@ use beet_core::prelude::*;
 /// ```
 ///
 /// With `--account=<name>` the call runs inside that member account of the
-/// Organization: the administrator session chained into it
-/// ([`MemberAccount::ADMIN_ROLE`]) when one is live, else `beet-agent`
-/// assuming its read role ([`MemberAccount::READ_ROLE`]), so the same split of
-/// read by default and write behind a code holds in every account.
+/// Organization. A live Identity Center session ([`IdentityCenterSession`],
+/// `beet sso login`) reaches it first, as `beet-admin` inside the hour after
+/// its interactive sign in and `beet-read` after. Without one, the
+/// administrator session chains into it ([`MemberAccount::ADMIN_ROLE`]) when
+/// one is live, else `beet-agent` assumes its read role
+/// ([`MemberAccount::READ_ROLE`]), so the same split of read by default and
+/// write behind a human act holds in every account.
 ///
 /// **A regional service needs its region naming**, as the third line does.
 /// There is no `~/.aws/config` on a beet machine to supply one ambiently --
@@ -64,12 +67,20 @@ pub async fn AwsExec(
 			get-caller-identity`"
 		);
 	}
+	// a person's own sign in reaches a named account before any machine
+	// identity does
+	if let Some(name) = account.as_deref()
+		&& let Some((credentials, who)) = AwsExec::through_sso(name).await?
+	{
+		info!("aws as {who}");
+		return AwsExec::run(&credentials, &nested_args, true).await;
+	}
 	// a live session wins: the operator typed a code to get it, and silently
 	// running as the weaker identity would waste that and confuse the failure
 	let state = AdminSession::read()?;
-	let (vars, who) = match &state {
+	let (credentials, who) = match &state {
 		SessionState::Live(session) => (
-			session.sdk_vars(),
+			session.credentials().clone(),
 			format!(
 				"the `{}` role, {} left on the session",
 				AgentIdentity::ADMIN_ROLE,
@@ -85,63 +96,115 @@ pub async fn AwsExec(
 				AgentIdentity::USER
 			);
 			(
-				AgentIdentity::sdk_pair().await?,
+				AgentIdentity::credentials().await?,
 				format!("`{}`, the session having lapsed", AgentIdentity::USER),
 			)
 		}
 		SessionState::None => (
-			AgentIdentity::sdk_pair().await?,
+			AgentIdentity::credentials().await?,
 			format!("`{}`, which can read and not write", AgentIdentity::USER),
 		),
 	};
 	// inside a member, by the role this identity holds there
-	let (vars, who) = match account.as_deref() {
+	let (credentials, who) = match account.as_deref() {
 		Some(name) => {
 			let role = match &state {
 				SessionState::Live(_) => MemberAccount::ADMIN_ROLE,
 				_ => MemberAccount::READ_ROLE,
 			};
-			let member = MemberAccount::find(&vars, name).await?;
-			let inside = member.assume(&vars, role).await?;
+			let member = MemberAccount::find(credentials.clone(), name).await?;
+			let inside = member.assume(credentials, role).await?;
 			(
-				inside.sdk_vars(),
+				inside,
 				format!(
 					"{who}, as `{role}` in `{}` ({})",
 					member.name, member.id
 				),
 			)
 		}
-		None => (vars, who),
+		None => (credentials, who),
 	};
 	info!("aws as {who}");
-	let status =
-		AgentIdentity::aws(&vars, nested_args.iter().map(String::as_str))
-			.spawn()?
-			.status()
-			.await?;
-	match status.success() {
-		true => Response::ok().xok(),
-		// the cli already printed its own error, so this adds only the thing
-		// the cli cannot know: that a stronger identity is one command away
-		false => match matches!(state, SessionState::Live(_)) {
-			true => {
-				bevybail!("`aws` exited with {}", status.code().unwrap_or(-1))
-			}
-			false => bevybail!(
-				"`aws` exited with {}. If that was an `AccessDenied`, this ran \
-				as `{}`, which is read-only by design: `beet admin` mints an \
-				administrator session with one code from your phone, and this \
-				verb then uses it automatically",
-				status.code().unwrap_or(-1),
-				AgentIdentity::USER
-			),
-		},
-	}
+	AwsExec::run(
+		&credentials,
+		&nested_args,
+		matches!(state, SessionState::Live(_)),
+	)
+	.await
 }
 
 impl AwsExec {
+	/// The child as `credentials`, its failure naming the stronger identity
+	/// one command away unless `elevated` already is.
+	async fn run(
+		credentials: &AwsCredentials,
+		nested_args: &[String],
+		elevated: bool,
+	) -> Result<Response> {
+		let status = AgentIdentity::aws(
+			&credentials.env_vars(),
+			nested_args.iter().map(String::as_str),
+		)
+		.spawn()?
+		.status()
+		.await?;
+		match (status.success(), elevated) {
+			(true, _) => Response::ok().xok(),
+			(false, true) => {
+				bevybail!("`aws` exited with {}", status.code().unwrap_or(-1))
+			}
+			// the cli already printed its own error, so this adds only the
+			// thing the cli cannot know: that a stronger identity is one
+			// command away
+			(false, false) => bevybail!(
+				"`aws` exited with {}. If that was an `AccessDenied`, this ran \
+				as `{}`, which is read-only by design: `beet admin` mints an \
+				administrator session with one code from your phone, or `beet \
+				sso login` opens an hour of `beet-admin` in a member account, \
+				and this verb then uses it automatically",
+				status.code().unwrap_or(-1),
+				AgentIdentity::USER
+			),
+		}
+	}
+
+	/// The account `name` through a live Identity Center session: its role
+	/// credential and who that is, the refreshed session written back, `None`
+	/// when there is no session.
+	async fn through_sso(
+		name: &str,
+	) -> Result<Option<(AwsCredentials, String)>> {
+		let dir = IdentityCenterSession::dir()?;
+		let session = match IdentityCenterSession::read_in(&dir)? {
+			SsoState::Live(session) => session,
+			SsoState::Lapsed => {
+				warn!(
+					"the Identity Center session has lapsed, so this falls back \
+					to this machine's identity: `beet sso login` opens another"
+				);
+				return None.xok();
+			}
+			SsoState::None => return None.xok(),
+		};
+		let center = session.identity_center();
+		let session = center.fresh(session).await?;
+		session.write_in(&dir)?;
+		let account = center.account(&session, name).await?;
+		let role = session.role_at(Timestamp::now());
+		let credentials =
+			center.role_credentials(&session, &account, role).await?;
+		Some((
+			credentials,
+			format!(
+				"your Identity Center sign in, as `{role}` in `{}` ({})",
+				account.name, account.id
+			),
+		))
+		.xok()
+	}
+
 	/// A remaining duration a human reads at a glance, ie `48m` or `2h11m`.
-	pub(crate) fn describe_remaining(secs: i64) -> String {
+	pub fn describe_remaining(secs: i64) -> String {
 		match (secs / 3600, (secs % 3600) / 60) {
 			(0, mins) => format!("{mins}m"),
 			(hours, 0) => format!("{hours}h"),

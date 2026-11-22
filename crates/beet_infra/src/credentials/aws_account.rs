@@ -2,7 +2,6 @@
 //! operator's Organization, and its converge.
 
 use super::aws_deploy_credential::AwsAdmin;
-use crate::actions::aws_cli_ext;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -44,6 +43,18 @@ use serde_json::json;
 ///    changed once an unlock's delay has passed; the read role
 ///    ([`MemberAccount::READ_ROLE`], `ViewOnlyAccess`) trusting `beet-agent`;
 ///    and the state bucket, versioned.
+///
+/// With `{IdentityCenter{..}}` declared beside it, the converge also
+/// provisions the human path in, as the management account (after step 3,
+/// and each member's part right after step 4): the operator group, the two
+/// permission sets (`beet-admin`, `AdministratorAccess` for an hour;
+/// `beet-read`, `ViewOnlyAccess` for eight), provisioned when one changed,
+/// and the group's assignment to both in the member. Per the `sso-admin` and
+/// `identitystore` models every one of those has an api, and two steps have
+/// none: enabling the Organization's instance and its MFA policy are the
+/// console's, so an instance `ListInstances` does not answer fails the
+/// converge naming the clicks. The management account itself is never
+/// assigned, and a close removes the member's assignments first.
 ///
 /// A rule that exists is left as it is, whatever its retention: a locked rule
 /// changes only after an unlock and its delay, which is an operator's act at
@@ -209,6 +220,7 @@ impl AwsAccount {
 		&self,
 		calls: &C,
 		region: &str,
+		identity_center: Option<&IdentityCenter>,
 	) -> Result<(MemberAccount, C::Member, Vec<String>)> {
 		self.check()?;
 		let name = self.resolved_name()?;
@@ -254,6 +266,15 @@ impl AwsAccount {
 				)
 				.await?,
 		);
+		// 3b. the Identity Center instance's operator group and permission
+		// sets, before any member is assigned them
+		let sso = match identity_center {
+			Some(center) => Some(
+				Self::converge_identity_center(calls, center, &mut report)
+					.await?,
+			),
+			None => None,
+		};
 		// 4. the member, found or created
 		let id = match calls.find_account(&name).await? {
 			Some(id) => {
@@ -273,6 +294,24 @@ impl AwsAccount {
 			}
 		};
 		let member = MemberAccount { name, id };
+		// 4b. the operator group assigned both sets in the member
+		if let Some((instance, group, sets)) = &sso {
+			for (spec, set) in sets {
+				if !calls.is_assigned(instance, &member.id, set, group).await? {
+					calls
+						.assign(instance, &member.id, set, group, false)
+						.await?;
+					report.push(format!(
+						"{} assigned `{}` in {}",
+						identity_center
+							.map(|center| center.group.as_str())
+							.unwrap_or_default(),
+						spec.name,
+						member.name
+					));
+				}
+			}
+		}
 		// 5. inside it
 		let inside = calls.enter(&member).await?;
 		for resource_type in Self::RULES {
@@ -327,6 +366,74 @@ impl AwsAccount {
 		(member, inside, report).xok()
 	}
 
+	/// The Identity Center steps in the management account: the instance,
+	/// which is the console's to enable, the operator group and the two
+	/// permission sets, each found or created, a set provisioned when it
+	/// changed. Answers what the member step assigns.
+	async fn converge_identity_center<C: ManagementCalls>(
+		calls: &C,
+		center: &IdentityCenter,
+		report: &mut Vec<String>,
+	) -> Result<(
+		IdentityCenterInstance,
+		SmolStr,
+		Vec<(PermissionSetSpec, SmolStr)>,
+	)> {
+		let Some(instance) = calls.sso_instance().await? else {
+			bevybail!(
+				"the Organization has no IAM Identity Center instance, and \
+				enabling one has no api: in the management account's console, \
+				IAM Identity Center > Enable (an organization instance, in the \
+				`IdentityCenter`'s region), then Settings > Authentication > \
+				Multi-factor authentication > Configure: every time they sign \
+				in, and let users register their own device. Then rerun the \
+				elevated deploy"
+			);
+		};
+		let group = match calls.sso_group(&instance, &center.group).await? {
+			Some(group) => group,
+			None => {
+				let group =
+					calls.create_sso_group(&instance, &center.group).await?;
+				report.push(format!(
+					"identity center group {} created",
+					center.group
+				));
+				group
+			}
+		};
+		let mut sets = Vec::new();
+		for spec in IdentityCenter::PERMISSION_SETS {
+			let (set, created) = match calls
+				.permission_set(&instance, spec.name)
+				.await?
+			{
+				Some(set) => (set, false),
+				None => {
+					report
+						.push(format!("permission set {} created", spec.name));
+					(calls.create_permission_set(&instance, &spec).await?, true)
+				}
+			};
+			let attached = calls
+				.ensure_set_policy(&instance, &set, spec.policy_arn)
+				.await?;
+			if attached {
+				report.push(format!(
+					"permission set {} holds {}",
+					spec.name, spec.policy_arn
+				));
+			}
+			if created || attached {
+				calls.provision_set(&instance, &set).await?;
+				report
+					.push(format!("permission set {} provisioned", spec.name));
+			}
+			sets.push((spec, set));
+		}
+		(instance, group, sets).xok()
+	}
+
 	/// Poll a creation request until it settles.
 	async fn await_created<C: ManagementCalls>(
 		calls: &C,
@@ -359,8 +466,9 @@ impl AwsAccount {
 		})
 	}
 
-	/// `beet-agent`'s path to a member: finding it by name, and assuming its
-	/// read role. Granted here rather than left to `ViewOnlyAccess`'s
+	/// `beet-agent`'s path to a member: finding it by name, assuming its
+	/// read role, and finding the Identity Center instance a sign in starts
+	/// at. Granted here rather than left to `ViewOnlyAccess`'s
 	/// contents, so the read path never depends on what AWS puts in it.
 	fn agent_read() -> Value {
 		json!({
@@ -370,6 +478,12 @@ impl AwsAccount {
 					"Sid": "FindMembers",
 					"Effect": "Allow",
 					"Action": "organizations:ListAccounts",
+					"Resource": "*",
+				},
+				{
+					"Sid": "FindIdentityCenter",
+					"Effect": "Allow",
+					"Action": "sso:ListInstances",
 					"Resource": "*",
 				},
 				{
@@ -399,31 +513,54 @@ impl AwsAccount {
 
 	/// Close the declared account: the administrator session, the member
 	/// found, its state bucket read for any stack's state, then
-	/// `organizations close-account` as the management account.
+	/// `organizations:CloseAccount` as the management account.
 	async fn close_declared(caller: &AsyncEntity) -> Result<String> {
 		let Some((account, region)) = Self::declared(caller).await? else {
 			bevybail!("this launch declares no `<AwsAccount/>` to close");
 		};
 		let name = account.resolved_name()?;
 		let session = AdminSession::acquire(AdminSession::DEFAULT_SECS).await?;
-		let management = AwsAdmin::new(session.sdk_vars());
-		let member = MemberAccount::find(management.vars(), &name).await?;
-		let inside = AwsAdmin::new(
+		let management = AwsAdmin::new(session.credentials().clone());
+		let member =
+			MemberAccount::find_in(&management.organizations(), &name).await?;
+		let inside = management.acting_as(
 			member
-				.assume(management.vars(), MemberAccount::ADMIN_ROLE)
-				.await?
-				.sdk_vars(),
+				.assume_with(&management.sts(), MemberAccount::ADMIN_ROLE)
+				.await?,
 		);
 		let keys = inside
 			.state_keys(&S3Backend::default_bucket(&member.id), &region)
 			.await?;
 		Self::refuse_live_state(&member, &keys)?;
+		// the operator group's assignments go first, so the closed account
+		// leaves nothing behind in the access portal
+		if let Some((center, sso_region)) =
+			IdentityCenter::declared(caller).await?
+		{
+			let sso = IdentityCenterAdmin::from_clients(
+				management.client(AwsService::SSO_ADMIN, &sso_region),
+				management.client(AwsService::IDENTITY_STORE, &sso_region),
+			);
+			if let Some(instance) = sso.instance().await?
+				&& let Some(group) =
+					sso.find_group(&instance, &center.group).await?
+			{
+				for spec in IdentityCenter::PERMISSION_SETS {
+					if let Some(set) =
+						sso.find_permission_set(&instance, spec.name).await?
+						&& sso
+							.is_assigned(&instance, &member.id, &set, &group)
+							.await?
+					{
+						sso.assign(&instance, &member.id, &set, &group, true)
+							.await?;
+					}
+				}
+			}
+		}
 		management
-			.run(aws_cli_ext::organizations([
-				"close-account",
-				"--account-id",
-				member.id.as_str(),
-			]))
+			.organizations()
+			.call_json("CloseAccount", &json!({"AccountId": member.id}))
 			.await?;
 		format!(
 			"closed `{}` ({}): suspended and reopenable for 90 days with its \
@@ -459,7 +596,7 @@ impl AwsAccount {
 
 /// What an account converge asks of the management account, as its
 /// administrator. A trait so the converge's order is testable against a fake;
-/// [`AwsManagement`] is the cli.
+/// [`AwsManagement`] is AWS's.
 pub(crate) trait ManagementCalls {
 	/// The calls inside a member, once entered.
 	type Member: MemberCalls;
@@ -500,6 +637,59 @@ pub(crate) trait ManagementCalls {
 	async fn wait(&self);
 	/// Act inside `member` as its administrator role from here on.
 	async fn enter(&self, member: &MemberAccount) -> Result<Self::Member>;
+	/// The Organization's Identity Center instance, `None` until enabled.
+	async fn sso_instance(&self) -> Result<Option<IdentityCenterInstance>>;
+	/// The identity store group named `name`.
+	async fn sso_group(
+		&self,
+		instance: &IdentityCenterInstance,
+		name: &str,
+	) -> Result<Option<SmolStr>>;
+	async fn create_sso_group(
+		&self,
+		instance: &IdentityCenterInstance,
+		name: &str,
+	) -> Result<SmolStr>;
+	/// The permission set named `name`, by arn.
+	async fn permission_set(
+		&self,
+		instance: &IdentityCenterInstance,
+		name: &str,
+	) -> Result<Option<SmolStr>>;
+	async fn create_permission_set(
+		&self,
+		instance: &IdentityCenterInstance,
+		spec: &PermissionSetSpec,
+	) -> Result<SmolStr>;
+	/// Attach `policy` to `set` unless it holds it, answering whether it did.
+	async fn ensure_set_policy(
+		&self,
+		instance: &IdentityCenterInstance,
+		set: &str,
+		policy: &str,
+	) -> Result<bool>;
+	async fn provision_set(
+		&self,
+		instance: &IdentityCenterInstance,
+		set: &str,
+	) -> Result;
+	/// Whether `group` holds `set` in `account`.
+	async fn is_assigned(
+		&self,
+		instance: &IdentityCenterInstance,
+		account: &str,
+		set: &str,
+		group: &str,
+	) -> Result<bool>;
+	/// Assign `group` `set` in `account`, or with `remove` take it away.
+	async fn assign(
+		&self,
+		instance: &IdentityCenterInstance,
+		account: &str,
+		set: &str,
+		group: &str,
+		remove: bool,
+	) -> Result;
 }
 
 /// What an account converge asks inside the member, see [`ManagementCalls`].
@@ -527,27 +717,75 @@ pub(crate) trait MemberCalls {
 	async fn create_state_bucket(&self, bucket: &str, region: &str) -> Result;
 }
 
-/// The management account's administrator session making the calls through
-/// the aws cli, see [`ManagementCalls`].
+/// The management account's administrator session making the calls at AWS,
+/// see [`ManagementCalls`].
 pub(crate) struct AwsManagement {
 	admin: AwsAdmin,
 	region: SmolStr,
+	/// The Identity Center instance's region, where one is declared.
+	sso_region: Option<SmolStr>,
 }
 
 impl AwsManagement {
+	/// The service control policy type, the one kind of policy the guard is.
+	const SCP: &'static str = "SERVICE_CONTROL_POLICY";
+
 	pub(crate) fn new(admin: AwsAdmin, region: impl Into<SmolStr>) -> Self {
 		Self {
 			admin,
 			region: region.into(),
+			sso_region: None,
 		}
 	}
 
-	/// An `aws organizations` call answering text.
-	async fn organizations<'a>(
+	/// Reach the Identity Center instance in `region`.
+	pub(crate) fn with_sso_region(
+		mut self,
+		region: impl Into<SmolStr>,
+	) -> Self {
+		self.sso_region = Some(region.into());
+		self
+	}
+
+	/// The Identity Center administration api, as this administrator.
+	fn identity_center(&self) -> Result<IdentityCenterAdmin> {
+		let region = self.sso_region.as_deref().ok_or_else(|| {
+			bevyhow!("no `IdentityCenter` is declared to reach")
+		})?;
+		IdentityCenterAdmin::from_clients(
+			self.admin.client(AwsService::SSO_ADMIN, region),
+			self.admin.client(AwsService::IDENTITY_STORE, region),
+		)
+		.xok()
+	}
+
+	/// An Organizations `action` with `body`.
+	async fn organizations(&self, action: &str, body: Value) -> Result<Value> {
+		self.admin.organizations().call_json(action, &body).await
+	}
+
+	/// Every entry of the `list` an Organizations `action` answers, across
+	/// its pages.
+	async fn organizations_list(
 		&self,
-		args: impl IntoIterator<Item = &'a str>,
-	) -> Result<String> {
-		self.admin.run(aws_cli_ext::organizations(args)).await
+		action: &str,
+		body: Value,
+		list: &str,
+	) -> Result<Vec<Value>> {
+		let organizations = self.admin.organizations();
+		let mut entries = Vec::new();
+		let mut body = body;
+		loop {
+			let mut page = organizations.call_json(action, &body).await?;
+			if let Some(held) = page[list].as_array_mut() {
+				entries.append(held);
+			}
+			match page["NextToken"].as_str() {
+				Some(token) => body["NextToken"] = token.into(),
+				None => break,
+			}
+		}
+		entries.xok()
 	}
 }
 
@@ -555,10 +793,12 @@ impl ManagementCalls for AwsManagement {
 	type Member = AwsMember;
 
 	async fn organization_exists(&self) -> Result<bool> {
-		match self.organizations(["describe-organization"]).await {
+		match self.organizations("DescribeOrganization", json!({})).await {
 			Ok(_) => true.xok(),
 			Err(err)
-				if err.to_string().contains("AWSOrganizationsNotInUse") =>
+				if AwsError::is(&err, &[
+					"AWSOrganizationsNotInUseException",
+				]) =>
 			{
 				false.xok()
 			}
@@ -567,53 +807,47 @@ impl ManagementCalls for AwsManagement {
 	}
 
 	async fn create_organization(&self) -> Result {
-		self.organizations(["create-organization", "--feature-set", "ALL"])
-			.await
-			.map(|_| ())
+		self.organizations("CreateOrganization", json!({"FeatureSet": "ALL"}))
+			.await?;
+		OK
 	}
 
 	async fn root(&self) -> Result<(SmolStr, bool)> {
-		let out = self
-			.organizations([
-				"list-roots",
-				"--query",
-				"Roots[0].[Id, PolicyTypes[?Type=='SERVICE_CONTROL_POLICY'].Status | [0]]",
-				"--output",
-				"text",
-			])
-			.await?;
-		let mut fields = out.split_whitespace();
-		let root = fields
-			.next()
+		let roots = self.organizations("ListRoots", json!({})).await?;
+		let root = &roots["Roots"][0];
+		let id = root["Id"]
+			.as_str()
 			.ok_or_else(|| bevyhow!("the Organization answered no root"))?;
-		(root.into(), fields.next() == Some("ENABLED")).xok()
+		let enabled = root["PolicyTypes"].as_array().into_iter().flatten().any(
+			|policy_type| {
+				policy_type["Type"] == Self::SCP
+					&& policy_type["Status"] == "ENABLED"
+			},
+		);
+		(SmolStr::new(id), enabled).xok()
 	}
 
 	async fn enable_policies(&self, root: &str) -> Result {
-		self.organizations([
-			"enable-policy-type",
-			"--root-id",
-			root,
-			"--policy-type",
-			"SERVICE_CONTROL_POLICY",
-		])
-		.await
-		.map(|_| ())
+		self.organizations(
+			"EnablePolicyType",
+			json!({"RootId": root, "PolicyType": Self::SCP}),
+		)
+		.await?;
+		OK
 	}
 
 	async fn find_policy(&self, name: &str) -> Result<Option<SmolStr>> {
-		let query = format!("Policies[?Name=='{name}'].Id | [0]");
-		self.organizations([
-			"list-policies",
-			"--filter",
-			"SERVICE_CONTROL_POLICY",
-			"--query",
-			query.as_str(),
-			"--output",
-			"text",
-		])
-		.await
-		.map(AwsAdmin::text_option)
+		self.organizations_list(
+			"ListPolicies",
+			json!({"Filter": Self::SCP}),
+			"Policies",
+		)
+		.await?
+		.iter()
+		.find(|policy| policy["Name"] == name)
+		.and_then(|policy| policy["Id"].as_str())
+		.map(SmolStr::new)
+		.xok()
 	}
 
 	async fn create_policy(
@@ -621,39 +855,37 @@ impl ManagementCalls for AwsManagement {
 		name: &str,
 		document: &str,
 	) -> Result<SmolStr> {
-		self.organizations([
-			"create-policy",
-			"--name",
-			name,
-			"--type",
-			"SERVICE_CONTROL_POLICY",
-			"--description",
-			"members stay in the Organization; closing is the management account's act",
-			"--content",
-			document,
-			"--query",
-			"Policy.PolicySummary.Id",
-			"--output",
-			"text",
-		])
-		.await
-		.map(|out| out.trim().into())
+		let created = self
+			.organizations(
+				"CreatePolicy",
+				json!({
+					"Name": name,
+					"Type": Self::SCP,
+					"Description": "members stay in the Organization; closing is the management account's act",
+					"Content": document,
+				}),
+			)
+			.await?;
+		created["Policy"]["PolicySummary"]["Id"]
+			.as_str()
+			.map(SmolStr::new)
+			.ok_or_else(|| {
+				bevyhow!("`organizations:CreatePolicy` answered no id")
+			})
 	}
 
 	async fn attached_policies(&self, target: &str) -> Result<Vec<SmolStr>> {
-		self.organizations([
-			"list-policies-for-target",
-			"--target-id",
-			target,
-			"--filter",
-			"SERVICE_CONTROL_POLICY",
-			"--query",
-			"Policies[].Id",
-			"--output",
-			"text",
-		])
-		.await
-		.map(|out| out.split_whitespace().map(SmolStr::from).collect())
+		self.organizations_list(
+			"ListPoliciesForTarget",
+			json!({"TargetId": target, "Filter": Self::SCP}),
+			"Policies",
+		)
+		.await?
+		.iter()
+		.filter_map(|policy| policy["Id"].as_str())
+		.map(SmolStr::new)
+		.collect::<Vec<_>>()
+		.xok()
 	}
 
 	async fn attach_policy(&self, policy: &str, target: &str) -> Result {
@@ -662,21 +894,20 @@ impl ManagementCalls for AwsManagement {
 		let mut last = None;
 		for _ in 0..10 {
 			match self
-				.organizations([
-					"attach-policy",
-					"--policy-id",
-					policy,
-					"--target-id",
-					target,
-				])
+				.organizations(
+					"AttachPolicy",
+					json!({"PolicyId": policy, "TargetId": target}),
+				)
 				.await
 			{
 				Ok(_) => return OK,
 				Err(err)
-					if err.to_string().contains("PolicyTypeNotEnabled") =>
+					if AwsError::is(&err, &[
+						"PolicyTypeNotEnabledException",
+					]) =>
 				{
 					last = Some(err);
-					time_ext::sleep_secs(3).await;
+					self.admin.pause(3).await;
 				}
 				Err(err) => return Err(err),
 			}
@@ -712,7 +943,7 @@ impl ManagementCalls for AwsManagement {
 	}
 
 	async fn find_account(&self, name: &str) -> Result<Option<SmolStr>> {
-		MemberAccount::lookup(self.admin.vars(), name)
+		MemberAccount::lookup_in(&self.admin.organizations(), name)
 			.await
 			.map(|found| found.map(|member| member.id))
 	}
@@ -735,66 +966,150 @@ impl ManagementCalls for AwsManagement {
 	fn now_millis(&self) -> u128 { Timestamp::now().millis() as u128 }
 
 	async fn create_account(&self, name: &str, email: &str) -> Result<SmolStr> {
-		self.organizations([
-			"create-account",
-			"--email",
-			email,
-			"--account-name",
-			name,
-			"--role-name",
-			MemberAccount::ADMIN_ROLE,
-			"--query",
-			"CreateAccountStatus.Id",
-			"--output",
-			"text",
-		])
-		.await
-		.map(|out| out.trim().into())
+		let created = self
+			.organizations(
+				"CreateAccount",
+				json!({
+					"Email": email,
+					"AccountName": name,
+					"RoleName": MemberAccount::ADMIN_ROLE,
+				}),
+			)
+			.await?;
+		created["CreateAccountStatus"]["Id"]
+			.as_str()
+			.map(SmolStr::new)
+			.ok_or_else(|| {
+				bevyhow!("`organizations:CreateAccount` answered no request id")
+			})
 	}
 
 	async fn account_created(&self, request: &str) -> Result<Option<SmolStr>> {
-		let out = self
-			.organizations([
-				"describe-create-account-status",
-				"--create-account-request-id",
-				request,
-				"--query",
-				"CreateAccountStatus.[State, AccountId, FailureReason]",
-				"--output",
-				"text",
-			])
+		let answer = self
+			.organizations(
+				"DescribeCreateAccountStatus",
+				json!({"CreateAccountRequestId": request}),
+			)
 			.await?;
-		let fields = out.split_whitespace().collect::<Vec<_>>();
-		match fields.as_slice() {
-			["SUCCEEDED", id, ..] => Some(SmolStr::from(*id)).xok(),
-			["IN_PROGRESS", ..] => None.xok(),
-			[_, _, reason, ..] => {
-				bevybail!("creating the account failed: {reason}")
-			}
-			_ => bevybail!("creating the account answered `{}`", out.trim()),
+		let status = &answer["CreateAccountStatus"];
+		match (status["State"].as_str(), status["AccountId"].as_str()) {
+			(Some("SUCCEEDED"), Some(id)) => Some(SmolStr::new(id)).xok(),
+			(Some("IN_PROGRESS"), _) => None.xok(),
+			(Some("FAILED"), _) => bevybail!(
+				"creating the account failed: {}",
+				status["FailureReason"]
+					.as_str()
+					.unwrap_or("no reason given")
+			),
+			(state, _) => bevybail!(
+				"creating the account answered the state `{}`",
+				state.unwrap_or_default()
+			),
 		}
 	}
 
-	async fn wait(&self) { time_ext::sleep_secs(5).await; }
+	async fn wait(&self) { self.admin.pause(5).await; }
+
+	async fn sso_instance(&self) -> Result<Option<IdentityCenterInstance>> {
+		self.identity_center()?.instance().await
+	}
+
+	async fn sso_group(
+		&self,
+		instance: &IdentityCenterInstance,
+		name: &str,
+	) -> Result<Option<SmolStr>> {
+		self.identity_center()?.find_group(instance, name).await
+	}
+
+	async fn create_sso_group(
+		&self,
+		instance: &IdentityCenterInstance,
+		name: &str,
+	) -> Result<SmolStr> {
+		self.identity_center()?.create_group(instance, name).await
+	}
+
+	async fn permission_set(
+		&self,
+		instance: &IdentityCenterInstance,
+		name: &str,
+	) -> Result<Option<SmolStr>> {
+		self.identity_center()?
+			.find_permission_set(instance, name)
+			.await
+	}
+
+	async fn create_permission_set(
+		&self,
+		instance: &IdentityCenterInstance,
+		spec: &PermissionSetSpec,
+	) -> Result<SmolStr> {
+		self.identity_center()?
+			.create_permission_set(instance, spec)
+			.await
+	}
+
+	async fn ensure_set_policy(
+		&self,
+		instance: &IdentityCenterInstance,
+		set: &str,
+		policy: &str,
+	) -> Result<bool> {
+		self.identity_center()?
+			.ensure_policy(instance, set, policy)
+			.await
+	}
+
+	async fn provision_set(
+		&self,
+		instance: &IdentityCenterInstance,
+		set: &str,
+	) -> Result {
+		self.identity_center()?.provision(instance, set).await
+	}
+
+	async fn is_assigned(
+		&self,
+		instance: &IdentityCenterInstance,
+		account: &str,
+		set: &str,
+		group: &str,
+	) -> Result<bool> {
+		self.identity_center()?
+			.is_assigned(instance, account, set, group)
+			.await
+	}
+
+	async fn assign(
+		&self,
+		instance: &IdentityCenterInstance,
+		account: &str,
+		set: &str,
+		group: &str,
+		remove: bool,
+	) -> Result {
+		self.identity_center()?
+			.assign(instance, account, set, group, remove)
+			.await
+	}
 
 	async fn enter(&self, member: &MemberAccount) -> Result<AwsMember> {
 		// a new account's role is assumable a few seconds after it exists
+		let sts = self.admin.sts();
 		let mut last = None;
 		for _ in 0..12 {
-			match member
-				.assume(self.admin.vars(), MemberAccount::ADMIN_ROLE)
-				.await
-			{
-				Ok(session) => {
+			match member.assume_with(&sts, MemberAccount::ADMIN_ROLE).await {
+				Ok(credentials) => {
 					return AwsMember {
-						admin: AwsAdmin::new(session.sdk_vars()),
+						admin: self.admin.acting_as(credentials),
 						region: self.region.clone(),
 					}
 					.xok();
 				}
 				Err(err) => {
 					last = Some(err);
-					time_ext::sleep_secs(5).await;
+					self.admin.pause(5).await;
 				}
 			}
 		}
@@ -802,8 +1117,8 @@ impl ManagementCalls for AwsManagement {
 	}
 }
 
-/// The administrator role inside a member making the calls through the aws
-/// cli, see [`MemberCalls`].
+/// The administrator role inside a member making the calls at AWS, see
+/// [`MemberCalls`].
 pub(crate) struct AwsMember {
 	admin: AwsAdmin,
 	region: SmolStr,
@@ -812,6 +1127,11 @@ pub(crate) struct AwsMember {
 impl AwsMember {
 	/// The session inside the member, for the deploy credential's converge.
 	pub(crate) fn into_admin(self) -> AwsAdmin { self.admin }
+
+	/// The Recycle Bin in the member's region.
+	fn recycle_bin(&self) -> AwsClient {
+		self.admin.client(AwsService::RBIN, &self.region)
+	}
 }
 
 impl MemberCalls for AwsMember {
@@ -820,25 +1140,32 @@ impl MemberCalls for AwsMember {
 		resource_type: &str,
 		description: &str,
 	) -> Result<Option<u16>> {
-		let query = format!(
-			"Rules[?Description=='{description}'].RetentionPeriod.RetentionPeriodValue | [0]"
-		);
-		let out = self
-			.admin
-			.run(aws_cli_ext::service("rbin", &self.region, [
-				"list-rules",
-				"--resource-type",
-				resource_type,
-				"--query",
-				query.as_str(),
-				"--output",
-				"text",
-			]))
-			.await?;
-		AwsAdmin::text_option(out)
-			.map(|days| days.parse::<u16>())
-			.transpose()?
-			.xok()
+		let recycle_bin = self.recycle_bin();
+		let mut body = json!({"ResourceType": resource_type});
+		loop {
+			let page = recycle_bin
+				.send_json(
+					AwsRequest::post("ListRules", "/list-rules")
+						.with_json(&body)?,
+				)
+				.await?;
+			if let Some(rule) = page["Rules"]
+				.as_array()
+				.into_iter()
+				.flatten()
+				.find(|rule| rule["Description"] == description)
+			{
+				return rule["RetentionPeriod"]["RetentionPeriodValue"]
+					.as_u64()
+					.map(u16::try_from)
+					.transpose()?
+					.xok();
+			}
+			match page["NextToken"].as_str() {
+				Some(token) => body["NextToken"] = token.into(),
+				None => return None.xok(),
+			}
+		}
 	}
 
 	async fn create_rule(
@@ -848,37 +1175,30 @@ impl MemberCalls for AwsMember {
 		days: u16,
 		unlock_delay_days: u16,
 	) -> Result {
-		let retention = json!({
-			"RetentionPeriodValue": days,
-			"RetentionPeriodUnit": "DAYS",
-		})
-		.to_string();
-		let lock = json!({
-			"UnlockDelay": {
-				"UnlockDelayValue": unlock_delay_days,
-				"UnlockDelayUnit": "DAYS",
-			},
-		})
-		.to_string();
-		self.admin
-			.run(aws_cli_ext::service("rbin", &self.region, [
-				"create-rule",
-				"--resource-type",
-				resource_type,
-				"--description",
-				description,
-				"--retention-period",
-				retention.as_str(),
-				"--lock-configuration",
-				lock.as_str(),
-			]))
-			.await
-			.map(|_| ())
+		self.recycle_bin()
+			.send(AwsRequest::post("CreateRule", "/rules").with_json(
+				&json!({
+					"ResourceType": resource_type,
+					"Description": description,
+					"RetentionPeriod": {
+						"RetentionPeriodValue": days,
+						"RetentionPeriodUnit": "DAYS",
+					},
+					"LockConfiguration": {
+						"UnlockDelay": {
+							"UnlockDelayValue": unlock_delay_days,
+							"UnlockDelayUnit": "DAYS",
+						},
+					},
+				}),
+			)?)
+			.await?;
+		OK
 	}
 
 	async fn role_exists(&self, name: &str) -> Result<bool> {
 		self.admin
-			.iam_json(["get-role", "--role-name", name])
+			.iam_option("GetRole", &[("RoleName", name)])
 			.await
 			.map(|found| found.is_some())
 	}
@@ -894,86 +1214,41 @@ impl MemberCalls for AwsMember {
 		})
 		.to_string();
 		self.admin
-			.iam([
-				"create-role",
-				"--role-name",
-				name,
-				"--assume-role-policy-document",
-				trust.as_str(),
-				"--tags",
-				"Key=beet,Value=agent-read",
+			.iam_call("CreateRole", &[
+				("RoleName", name),
+				("AssumeRolePolicyDocument", trust.as_str()),
+				("Tags.member.1.Key", "beet"),
+				("Tags.member.1.Value", "agent-read"),
 			])
 			.await?;
 		self.admin
-			.iam([
-				"attach-role-policy",
-				"--role-name",
-				name,
-				"--policy-arn",
-				"arn:aws:iam::aws:policy/job-function/ViewOnlyAccess",
+			.iam_call("AttachRolePolicy", &[
+				("RoleName", name),
+				(
+					"PolicyArn",
+					"arn:aws:iam::aws:policy/job-function/ViewOnlyAccess",
+				),
 			])
 			.await
-			.map(|_| ())
 	}
 
 	async fn bucket_exists(&self, bucket: &str) -> Result<bool> {
-		match self
-			.admin
-			.run(aws_cli_ext::service("s3api", &self.region, [
-				"head-bucket",
-				"--bucket",
-				bucket,
-			]))
-			.await
-		{
-			Ok(_) => true.xok(),
-			Err(err)
-				if ["404", "Not Found", "NoSuchBucket"]
-					.iter()
-					.any(|marker| err.to_string().contains(marker)) =>
-			{
-				false.xok()
-			}
-			Err(err) => Err(err),
-		}
+		self.admin.bucket(bucket, &self.region).store_exists().await
 	}
 
 	async fn create_state_bucket(&self, bucket: &str, region: &str) -> Result {
-		let location = format!("LocationConstraint={region}");
-		let mut args = vec!["create-bucket", "--bucket", bucket];
-		// us-east-1 is the one region that refuses to be named as a constraint
-		if region != crate::bindings::aws::region::US_EAST_1 {
-			args.extend(["--create-bucket-configuration", location.as_str()]);
-		}
-		self.admin
-			.run(aws_cli_ext::service("s3api", region, args))
-			.await?;
+		let store = self.admin.bucket(bucket, region);
+		store.store_create().await?;
 		// every apply overwrites the state in place, so a version is its only
 		// undo, as for a bucket a first deploy creates
-		self.admin
-			.run(aws_cli_ext::service("s3api", region, [
-				"put-bucket-versioning",
-				"--bucket",
-				bucket,
-				"--versioning-configuration",
-				"Status=Enabled",
-			]))
-			.await?;
-		self.admin
-			.run(aws_cli_ext::service("s3api", region, [
-				"put-public-access-block",
-				"--bucket",
-				bucket,
-				"--public-access-block-configuration",
-				"BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true",
-			]))
-			.await
-			.map(|_| ())
+		store.set_object_versioning().await?;
+		store.block_public_access().await
 	}
 }
 
 #[cfg(test)]
 mod test {
+	use super::super::aws_deploy_credential::aws_seam;
 	use super::*;
 
 	/// The calls a converge made, in order, against an account where nothing
@@ -981,15 +1256,35 @@ mod test {
 	#[derive(Clone, Copy)]
 	struct Fake {
 		fresh: bool,
+		/// What the Organization's Identity Center holds.
+		sso: SsoFake,
 		log: Store<Vec<String>>,
+	}
+
+	/// The Identity Center states a converge meets.
+	#[derive(Clone, Copy, PartialEq, Eq)]
+	enum SsoFake {
+		/// Never enabled at the console.
+		NoInstance,
+		/// Enabled, nothing provisioned.
+		Empty,
+		/// The group and both sets in place, assigned in an account that
+		/// existed.
+		Provisioned,
 	}
 
 	impl Fake {
 		fn new(fresh: bool) -> Self {
 			Self {
 				fresh,
+				sso: SsoFake::Provisioned,
 				log: Store::default(),
 			}
+		}
+
+		fn with_sso(mut self, sso: SsoFake) -> Self {
+			self.sso = sso;
+			self
 		}
 
 		fn call(&self, line: impl Into<String>) {
@@ -1081,6 +1376,91 @@ mod test {
 			self.call(format!("enter {}", member.id));
 			(*self).xok()
 		}
+		async fn sso_instance(&self) -> Result<Option<IdentityCenterInstance>> {
+			(self.sso != SsoFake::NoInstance)
+				.then(|| IdentityCenterInstance {
+					arn: "arn:ssoins".into(),
+					identity_store_id: "d-123".into(),
+				})
+				.xok()
+		}
+		async fn sso_group(
+			&self,
+			_instance: &IdentityCenterInstance,
+			_name: &str,
+		) -> Result<Option<SmolStr>> {
+			(self.sso == SsoFake::Provisioned)
+				.then(|| SmolStr::new("g-ops"))
+				.xok()
+		}
+		async fn create_sso_group(
+			&self,
+			_instance: &IdentityCenterInstance,
+			name: &str,
+		) -> Result<SmolStr> {
+			self.call(format!("create-group {name}"));
+			SmolStr::new("g-ops").xok()
+		}
+		async fn permission_set(
+			&self,
+			_instance: &IdentityCenterInstance,
+			name: &str,
+		) -> Result<Option<SmolStr>> {
+			(self.sso == SsoFake::Provisioned)
+				.then(|| SmolStr::new(format!("ps-{name}")))
+				.xok()
+		}
+		async fn create_permission_set(
+			&self,
+			_instance: &IdentityCenterInstance,
+			spec: &PermissionSetSpec,
+		) -> Result<SmolStr> {
+			self.call(format!(
+				"create-permission-set {} {}",
+				spec.name, spec.session
+			));
+			SmolStr::new(format!("ps-{}", spec.name)).xok()
+		}
+		async fn ensure_set_policy(
+			&self,
+			_instance: &IdentityCenterInstance,
+			set: &str,
+			policy: &str,
+		) -> Result<bool> {
+			if self.sso == SsoFake::Provisioned {
+				return false.xok();
+			}
+			self.call(format!("attach-set-policy {set} {policy}"));
+			true.xok()
+		}
+		async fn provision_set(
+			&self,
+			_instance: &IdentityCenterInstance,
+			set: &str,
+		) -> Result {
+			self.call(format!("provision {set}"));
+			OK
+		}
+		async fn is_assigned(
+			&self,
+			_instance: &IdentityCenterInstance,
+			_account: &str,
+			_set: &str,
+			_group: &str,
+		) -> Result<bool> {
+			(self.sso == SsoFake::Provisioned && !self.fresh).xok()
+		}
+		async fn assign(
+			&self,
+			_instance: &IdentityCenterInstance,
+			account: &str,
+			set: &str,
+			group: &str,
+			remove: bool,
+		) -> Result {
+			self.call(format!("assign {account} {set} {group} {remove}"));
+			OK
+		}
 	}
 
 	impl MemberCalls for Fake {
@@ -1140,8 +1520,10 @@ mod test {
 	#[beet_core::test]
 	async fn converges_in_order() {
 		let fake = Fake::new(true);
-		let (member, _, report) =
-			beetmash().converge(&fake, "ap-southeast-2").await.unwrap();
+		let (member, _, report) = beetmash()
+			.converge(&fake, "ap-southeast-2", None)
+			.await
+			.unwrap();
 		member.id.as_str().xpect_eq("222");
 		fake.log.get().xpect_eq(vec![
 			"create-organization".to_string(),
@@ -1165,8 +1547,10 @@ mod test {
 	#[beet_core::test]
 	async fn a_converged_account_changes_nothing() {
 		let fake = Fake::new(false);
-		let (_, _, report) =
-			beetmash().converge(&fake, "ap-southeast-2").await.unwrap();
+		let (_, _, report) = beetmash()
+			.converge(&fake, "ap-southeast-2", None)
+			.await
+			.unwrap();
 		fake.log.get().xpect_eq(vec![
 			"agent-read beet-agent--member-read".to_string(),
 			"enter 222".into(),
@@ -1234,5 +1618,321 @@ mod test {
 		.to_string()
 		.xpect_contains("beetmash-mail--prod--tofu-tfstate");
 		AwsAccount::refuse_live_state(&member, &[]).unwrap();
+	}
+
+	/// The management calls at a stand-in AWS answering `answer`.
+	fn management(
+		answer: impl 'static + Send + Sync + Fn(&aws_seam::Asked) -> Response,
+	) -> (AwsManagement, aws_seam::Log) {
+		let (admin, log) = aws_seam::admin(answer);
+		(AwsManagement::new(admin, "ap-southeast-2"), log)
+	}
+
+	/// The member calls at a stand-in AWS answering `answer`.
+	fn member(
+		answer: impl 'static + Send + Sync + Fn(&aws_seam::Asked) -> Response,
+	) -> (AwsMember, aws_seam::Log) {
+		let (admin, log) = aws_seam::admin(answer);
+		(
+			AwsMember {
+				admin,
+				region: "ap-southeast-2".into(),
+			},
+			log,
+		)
+	}
+
+	/// The root is the first, and its guard's policy type counts as enabled
+	/// only once its status says so.
+	#[beet_core::test]
+	async fn reads_the_root_and_its_policy_status() {
+		let roots = |status: &'static str| {
+			move |_: &aws_seam::Asked| {
+				aws_seam::ok(format!(
+					r#"{{"Roots":[{{"Id":"r-ab12","Name":"Root","PolicyTypes":[
+					{{"Type":"TAG_POLICY","Status":"ENABLED"}},
+					{{"Type":"SERVICE_CONTROL_POLICY","Status":"{status}"}}]}}]}}"#
+				))
+			}
+		};
+		let (calls, log) = management(roots("ENABLED"));
+		calls
+			.root()
+			.await
+			.unwrap()
+			.xpect_eq((SmolStr::new("r-ab12"), true));
+		let asked = log.lock().unwrap()[0].clone();
+		asked.target.xpect_eq("AWSOrganizationsV20161128.ListRoots");
+		asked
+			.line
+			.xpect_eq("POST https://organizations.us-east-1.amazonaws.com/");
+		let (calls, _) = management(roots("PENDING_ENABLE"));
+		calls.root().await.unwrap().1.xpect_false();
+	}
+
+	/// A creation is in progress, then succeeded with its account, and a
+	/// failure says why.
+	#[beet_core::test]
+	async fn reads_the_create_account_status() {
+		let status = |body: &'static str| {
+			move |_: &aws_seam::Asked| {
+				aws_seam::ok(format!(r#"{{"CreateAccountStatus":{body}}}"#))
+			}
+		};
+		let (calls, log) =
+			management(status(r#"{"Id":"car-1","State":"IN_PROGRESS"}"#));
+		calls.account_created("car-1").await.unwrap().xpect_none();
+		log.lock().unwrap()[0]
+			.json()
+			.xpect_eq(serde_json::json!({"CreateAccountRequestId": "car-1"}));
+		let (calls, _) = management(status(
+			r#"{"Id":"car-1","State":"SUCCEEDED","AccountId":"222"}"#,
+		));
+		calls
+			.account_created("car-1")
+			.await
+			.unwrap()
+			.xpect_eq(Some(SmolStr::new("222")));
+		let (calls, _) = management(status(
+			r#"{"Id":"car-1","State":"FAILED","FailureReason":"EMAIL_ALREADY_EXISTS"}"#,
+		));
+		calls
+			.account_created("car-1")
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("EMAIL_ALREADY_EXISTS");
+	}
+
+	/// An attach right after enabling the policy type is refused for a
+	/// moment, and retried until the type is enabled.
+	#[beet_core::test]
+	async fn retries_an_attach_while_the_policy_type_enables() {
+		// refused twice, then attached
+		let refusals = std::sync::Mutex::new(2);
+		let (calls, log) = management(move |_| {
+			let mut left = refusals.lock().unwrap();
+			match *left {
+				0 => aws_seam::ok(""),
+				_ => {
+					*left -= 1;
+					aws_seam::json_error("PolicyTypeNotEnabledException")
+				}
+			}
+		});
+		calls.attach_policy("p-guard", "r-ab12").await.unwrap();
+		let log = log.lock().unwrap().clone();
+		log.len().xpect_eq(3);
+		log[2].json().xpect_eq(
+			serde_json::json!({"PolicyId": "p-guard", "TargetId": "r-ab12"}),
+		);
+		// any other refusal is answered at once
+		let (calls, log) =
+			management(|_| aws_seam::json_error("PolicyNotFoundException"));
+		calls.attach_policy("p-guard", "r-ab12").await.unwrap_err();
+		log.lock().unwrap().len().xpect_eq(1);
+	}
+
+	/// The guard is found by name across pages of the account's policies.
+	#[beet_core::test]
+	async fn finds_the_guard_across_pages() {
+		let (calls, log) = management(|asked| match asked.json()["NextToken"]
+			.as_str()
+		{
+			None => aws_seam::ok(
+				r#"{"Policies":[{"Id":"p-full","Name":"FullAWSAccess"}],"NextToken":"t1"}"#,
+			),
+			Some(_) => aws_seam::ok(
+				r#"{"Policies":[{"Id":"p-guard","Name":"beet-member-guard"}]}"#,
+			),
+		});
+		calls
+			.find_policy(AwsAccount::MEMBER_GUARD)
+			.await
+			.unwrap()
+			.xpect_eq(Some(SmolStr::new("p-guard")));
+		let log = log.lock().unwrap().clone();
+		log[0]
+			.json()
+			.xpect_eq(serde_json::json!({"Filter": "SERVICE_CONTROL_POLICY"}));
+		log[1].json().xpect_eq(serde_json::json!({
+			"Filter": "SERVICE_CONTROL_POLICY",
+			"NextToken": "t1",
+		}));
+	}
+
+	/// A rule is the one carrying the converge's description, across pages,
+	/// and its retention is read; a rule is created locked.
+	#[beet_core::test]
+	async fn finds_and_creates_recycle_bin_rules() {
+		let (inside, log) = member(|asked| {
+			match asked.json()["NextToken"].as_str() {
+				None => aws_seam::ok(
+					r#"{"Rules":[{"Identifier":"a","Description":"someone else's","RetentionPeriod":{"RetentionPeriodValue":3,"RetentionPeriodUnit":"DAYS"}}],"NextToken":"t1"}"#,
+				),
+				Some(_) => aws_seam::ok(format!(
+					r#"{{"Rules":[{{"Identifier":"b","Description":"{}","RetentionPeriod":{{"RetentionPeriodValue":14,"RetentionPeriodUnit":"DAYS"}},"LockState":"locked"}}]}}"#,
+					AwsAccount::RULE_DESCRIPTION
+				)),
+			}
+		});
+		inside
+			.find_rule("EBS_SNAPSHOT", AwsAccount::RULE_DESCRIPTION)
+			.await
+			.unwrap()
+			.xpect_eq(Some(14));
+		let log = log.lock().unwrap().clone();
+		log[0].line.xpect_eq(
+			"POST https://rbin.ap-southeast-2.amazonaws.com/list-rules",
+		);
+		log[1].json().xpect_eq(serde_json::json!({
+			"ResourceType": "EBS_SNAPSHOT",
+			"NextToken": "t1",
+		}));
+
+		let (inside, log) = member(|_| aws_seam::ok(r#"{"Identifier":"c"}"#));
+		inside
+			.create_rule("EBS_VOLUME", AwsAccount::RULE_DESCRIPTION, 7, 10)
+			.await
+			.unwrap();
+		let asked = log.lock().unwrap()[0].clone();
+		asked
+			.line
+			.xpect_eq("POST https://rbin.ap-southeast-2.amazonaws.com/rules");
+		asked.json().xpect_eq(serde_json::json!({
+			"ResourceType": "EBS_VOLUME",
+			"Description": AwsAccount::RULE_DESCRIPTION,
+			"RetentionPeriod": {"RetentionPeriodValue": 7, "RetentionPeriodUnit": "DAYS"},
+			"LockConfiguration": {
+				"UnlockDelay": {"UnlockDelayValue": 10, "UnlockDelayUnit": "DAYS"},
+			},
+		}));
+	}
+
+	/// The state bucket is created in its region, then versioned, then closed
+	/// to the public, in that order.
+	#[beet_core::test]
+	async fn creates_the_state_bucket() {
+		let (endpoint, requests) = aws_seam::s3_server();
+		let (inside, _) = member(|_| aws_seam::ok(""));
+		let inside = AwsMember {
+			admin: aws_seam::with_s3_endpoint(inside.admin, &endpoint),
+			..inside
+		};
+		inside
+			.create_state_bucket("beet-state-222", "ap-southeast-2")
+			.await
+			.unwrap();
+		let requests = requests.lock().unwrap().clone();
+		requests
+			.iter()
+			.map(|(line, _)| line.clone())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![
+				"PUT /beet-state-222/".to_string(),
+				"PUT /beet-state-222/?versioning".into(),
+				"PUT /beet-state-222/?publicAccessBlock".into(),
+			]);
+		requests[0].1.as_str().xpect_contains(
+			"<LocationConstraint>ap-southeast-2</LocationConstraint>",
+		);
+		requests[1]
+			.1
+			.as_str()
+			.xpect_contains("<Status>Enabled</Status>");
+		requests[2].1.as_str().xpect_contains(
+			"<RestrictPublicBuckets>true</RestrictPublicBuckets>",
+		);
+	}
+
+	/// The Identity Center lines a converge with an instance declared logs,
+	/// the account's own lines left out.
+	async fn sso_log(fake: Fake) -> Vec<String> {
+		beetmash()
+			.converge(&fake, "ap-southeast-2", Some(&IdentityCenter::default()))
+			.await
+			.unwrap();
+		fake.log
+			.get()
+			.into_iter()
+			.filter(|line| {
+				[
+					"create-group",
+					"create-permission-set",
+					"attach-set-policy",
+					"provision",
+					"assign",
+				]
+				.iter()
+				.any(|prefix| line.starts_with(prefix))
+			})
+			.collect()
+	}
+
+	/// The whole provisioning, in order, for a fresh Organization: the group,
+	/// each set created, given its policy and provisioned, then the new
+	/// account assigned both.
+	#[beet_core::test]
+	async fn provisions_identity_center_from_nothing() {
+		sso_log(Fake::new(true).with_sso(SsoFake::Empty)).await.xpect_eq(vec![
+			"create-group beet-operators".to_string(),
+			"create-permission-set beet-admin PT1H".into(),
+			"attach-set-policy ps-beet-admin arn:aws:iam::aws:policy/AdministratorAccess".into(),
+			"provision ps-beet-admin".into(),
+			"create-permission-set beet-read PT8H".into(),
+			"attach-set-policy ps-beet-read arn:aws:iam::aws:policy/job-function/ViewOnlyAccess".into(),
+			"provision ps-beet-read".into(),
+			"assign 222 ps-beet-admin g-ops false".into(),
+			"assign 222 ps-beet-read g-ops false".into(),
+		]);
+	}
+
+	/// An instance enabled but empty, beside an existing account, gains the
+	/// same, the account's assignments included.
+	#[beet_core::test]
+	async fn provisions_an_empty_instance() {
+		let log = sso_log(Fake::new(false).with_sso(SsoFake::Empty)).await;
+		log.len().xpect_eq(9);
+		log[0].as_str().xpect_eq("create-group beet-operators");
+	}
+
+	/// A provisioned instance and an assigned account change nothing.
+	#[beet_core::test]
+	async fn a_provisioned_instance_changes_nothing() {
+		sso_log(Fake::new(false).with_sso(SsoFake::Provisioned))
+			.await
+			.xpect_eq(Vec::<String>::new());
+	}
+
+	/// A new member account gains its two assignments and nothing else.
+	#[beet_core::test]
+	async fn a_new_account_gains_its_assignments() {
+		sso_log(Fake::new(true).with_sso(SsoFake::Provisioned))
+			.await
+			.xpect_eq(vec![
+				"assign 222 ps-beet-admin g-ops false".to_string(),
+				"assign 222 ps-beet-read g-ops false".into(),
+			]);
+	}
+
+	/// An instance nobody enabled fails naming the console clicks, before
+	/// any member is touched.
+	#[beet_core::test]
+	async fn an_unenabled_instance_names_the_console() {
+		let fake = Fake::new(true).with_sso(SsoFake::NoInstance);
+		let Err(err) = beetmash()
+			.converge(&fake, "ap-southeast-2", Some(&IdentityCenter::default()))
+			.await
+		else {
+			panic!("an unenabled instance converged");
+		};
+		err.to_string()
+			.xpect_contains("IAM Identity Center > Enable")
+			.xpect_contains("Multi-factor authentication");
+		fake.log
+			.get()
+			.iter()
+			.any(|line| line.starts_with("create-account"))
+			.xpect_false();
 	}
 }

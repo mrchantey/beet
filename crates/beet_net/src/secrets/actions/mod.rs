@@ -7,9 +7,9 @@
 //! value deliberately as its response, everything else answers with names,
 //! counts and paths. Age files by path are the `vault` verbs' business.
 
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "fs", feature = "aws", not(target_arch = "wasm32")))]
 mod admin;
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "fs", feature = "aws", not(target_arch = "wasm32")))]
 mod aws;
 mod check;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
@@ -21,9 +21,9 @@ mod rm;
 mod secrets_routes;
 mod set;
 
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "fs", feature = "aws", not(target_arch = "wasm32")))]
 pub use admin::*;
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "fs", feature = "aws", not(target_arch = "wasm32")))]
 pub use aws::*;
 pub use check::*;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]

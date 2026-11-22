@@ -255,11 +255,7 @@ pub(crate) async fn export_target(
 	}
 	let entity = caller.world().entity(declaration);
 	let handle = SecretsHandle::of_declaration(&entity).await?;
-	#[cfg(all(
-		feature = "cloudflare_dns",
-		feature = "aws_sdk",
-		not(target_arch = "wasm32")
-	))]
+	#[cfg(all(feature = "cloudflare_dns", feature = "aws"))]
 	if let Some(block) = entity
 		.world()
 		.with(move |world: &mut World| -> Option<R2BucketBlock> {
@@ -278,11 +274,7 @@ pub(crate) async fn export_target(
 			.with_label(handle.label.clone().unwrap_or_default())
 			.xok();
 	}
-	#[cfg(not(all(
-		feature = "cloudflare_dns",
-		feature = "aws_sdk",
-		not(target_arch = "wasm32")
-	)))]
+	#[cfg(not(all(feature = "cloudflare_dns", feature = "aws")))]
 	let _ = store;
 	handle.xok()
 }

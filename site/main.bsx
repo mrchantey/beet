@@ -104,7 +104,7 @@ and a stale one as a warning, since a stale one still serves.
 ## The deploy
 
 This same file loads in the deployed binary (built `--no-default-features
---features aws_sdk,ssh,geoip`), which never compiled the deploy stack: the
+--features aws,ssh,geoip`), which never compiled the deploy stack: the
 `<Fragment bx:cfg="feature:infra && feature:extra">` inside the `<Stack>`
 excludes the deploy machinery before the build walk, so none of its tags resolve
 and none of it is linked or touched. What is left in its place is a tombstone
@@ -483,11 +483,11 @@ binary serves the records and the comments (`atproto`).
 			<Fragment bx:cfg="feature:infra && feature:extra">
 			<!-- the block + its build artifact share one entity (the deploy pairs them);
 			     the box alone is granted read on the host key -->
-			<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip,atproto" {ReadsSecrets([$ssh_host_key])}/>
+			<LightsailBeetSiteBlock features="aws,ssh,geoip,atproto" {ReadsSecrets([$ssh_host_key])}/>
 			<!-- the box is replaceable, so it owns no durable timer: the rollup runs
 			     as an invoke-only lambda the schedule calls at 03:00 UTC, booting the
 			     `jobs` verb of this same document. -->
-			<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda,atproto"/>
+			<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="ssh,geoip,lambda,atproto"/>
 			<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 			<!-- 💡 what a deploy DOES, as an ordered group rather than a route: the
 			     `deploy` verb `<DeployRoutes/>` spawns runs this list forward. -->

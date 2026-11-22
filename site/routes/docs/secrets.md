@@ -383,7 +383,7 @@ The first is a committed file, overwritten only when a secret changed, so git ho
 <Route path="serve" {(HttpServer, SshTuiServer, SshHostKeyRef($ssh_host_key))}>..</Route>
 <Stack>
 	<SecretBlock bx:ref="ssh_host_key" label="ssh-host-key" env="BEET_SSH_HOST_KEY"/>
-	<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip" {ReadsSecrets([$ssh_host_key])}/>
+	<LightsailBeetSiteBlock features="aws,ssh,geoip" {ReadsSecrets([$ssh_host_key])}/>
 </Stack>
 ```
 
@@ -464,6 +464,7 @@ flowchart TB
 | --- | --- | --- | --- | --- |
 | 0a admin | the operator, and any agent on the machine for the session after | when a deploy needs `--elevated` | an AWS session a code buys (1h default, up to 12h), by an elevated deploy or `beet admin`, chained into a repo's account as `OrganizationAccountAccessRole` for an hour at a time | unrecoverable, hence the phone |
 | 0a mint | the operator, and the one elevated deploy the value is pasted into | when a deploy needs `--elevated` at Cloudflare | `beet-mint`, holding `Account API Tokens Write` alone: rolled on the dashboard for each elevated deploy | mints any token the account can hold, hence the login |
+| 0b person | the operator and anyone invited, from the terminal and the AWS access portal | each working day | an IAM Identity Center sign in (`beet sso login`, behind the instance's own MFA), kept on tmpfs: `beet-read` in every assigned account freely, `beet-admin` only in the hour after the interactive sign in | read everywhere it is assigned; admin for the hour a human just opened |
 | 0c read | agents, constantly | constantly | `beet-agent`, sealed in the global document, and `beet-agent-read` inside each repo's account, which it assumes | metadata disclosure |
 | 1 deploy | the operator and CI | every deploy | `<app_name>-deploy` at AWS, inside the repo's own account, and at Cloudflare, both named for the entry and sealed in that entry's own document with what they were converged to grant | its own entry's apps, recoverably |
 | 2 runtime | the servers | continuous | minted by an apply, or by an elevated deploy for an R2 bucket, or written from the entry's document by an apply as a write-only parameter (a `<SecretBlock/>`); parked in the stack's store, and in its sealed export where it has one | its own app's data; for a bucket's token, nothing younger than the bucket's lock |
@@ -479,12 +480,13 @@ Cloudflare offers two more terms for a deploy token, a lifetime and an address f
 
 This is also why the sealed documents may live in public repositories. age's security rests entirely on the private key, so the question is never "is ciphertext safe" but "what does that one key unlock", and the answer is bounded by construction.
 
-Six flows, day to day:
+Seven flows, day to day:
 
 - **`just cli all/deploy`** opens the entry's document for the AWS deploy pair and the Cloudflare deploy token, checks both against the declarations of every stack the package lists, and deploys each, `tofu` minting the runtime identities wearing their boundary; `just cli mail/deploy` does the same for one stack. You, or CI holding the age key. `--dry-run` says, asking for nothing, whether it would need `--elevated`.
 - **`just cli all/deploy --elevated`** when the plain deploy refuses: a stack gained a service, a bucket was declared or its retention changed, the credential lives outside the declared account, or `--roll` is replacing a credential. It asks for the code, the dashboard login, or both, only as the credentials need them, converges the account and the credentials, and runs the same deploy. Rare, one code or one login.
 - **`beet aws -- s3 ls`** opens the global document for `beet-agent`. Lists names, reads nothing. What an agent gets by default, and it says so on stderr. `--account=<repo>` runs it inside that repo's account, as its read role.
 - **`beet admin --duration=30m`** asks for a code and buys a session for account work that is no stack's deploy, ie rolling `beet-agent`'s own key; for that half hour `beet aws` runs as `beet-admin` and says so (inside a repo's account with `--account`), and an elevated deploy or `beet admin -- <verb>` reuses the session rather than asking again.
+- **`beet sso login`** signs a person in through the browser (`--no-browser` for a url and a code from an ssh session). For the next hour `beet aws --account=<repo>` runs as `beet-admin` in that account, and as `beet-read` after, for as long as Identity Center keeps the session; the access portal at the instance's start url opens each account's console. `beet sso invite <email>` adds a person to the operator group, as `beet admin`.
 - **`just cli close-account --elevated`** closes the package's accounts once every stack is destroyed: the most final act there is, so a package verb of its own rather than a side effect of a teardown.
 - **the console, as `pete`** with a password and a code, for the day `beet admin` is itself what is broken. Behind that, the account root user.
 

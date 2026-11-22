@@ -1,25 +1,22 @@
 use crate::prelude::*;
-use aws_config::Region;
-use aws_sdk_s3::Client;
-use aws_sdk_s3::error::SdkError;
-use aws_sdk_s3::operation::get_object::GetObjectError;
-use aws_sdk_s3::operation::head_bucket::HeadBucketError;
-use aws_sdk_s3::operation::head_object::HeadObjectError;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
 /// AWS S3-backed store, holding its configuration as serializable fields.
-/// The S3 client is lazily constructed and cached by region using a [`LazyPool`].
+/// Each call is an [`AwsClient`] request (`restXml`), signed as this store's
+/// credential else the launch's own, in its region else the launch's else
+/// `us-east-1` (S3 names a bucket's own region on a miss, and the client
+/// follows it).
 #[derive(Debug, Clone, Component, Reflect, Get)]
 #[reflect(Component)]
 #[component(on_insert = BlobStore::on_insert::<Self>)]
 pub struct S3Store {
 	/// The S3 bucket name.
 	bucket_name: SmolStr,
-	/// The region this store's client is pinned to, else the SDK's own default
-	/// provider chain (`AWS_REGION`, the profile, the instance metadata). A
-	/// store built at the process boundary leaves it unset; one built from a
-	/// declaration carries the region that declaration resolved.
+	/// The region this store's client is pinned to, else the launch's
+	/// (`AWS_REGION`). A store built at the process boundary leaves it unset;
+	/// one built from a declaration carries the region that declaration
+	/// resolved.
 	region: Option<SmolStr>,
 	/// Optional subdirectory prefix for all keys.
 	subdir: Option<RelPath>,
@@ -33,54 +30,18 @@ pub struct S3Store {
 	/// so this is `false` by default: claiming a url the bucket will not serve
 	/// turns every static file into a redirect to a 403.
 	public: bool,
-	/// An explicit key pair, else the SDK's own default chain (the
-	/// environment, the profile, the instance metadata). Set for a bucket at
+	/// The storage class every write lands in (`STANDARD_IA`, `GLACIER_IR`),
+	/// else the bucket's default.
+	storage_class: Option<SmolStr>,
+	/// Send every request unsigned, a read of a public bucket from a launch
+	/// that holds no credential for it.
+	anonymous: bool,
+	/// An explicit credential, else the launch's own. Set for a bucket at
 	/// another vendor (an R2 bucket under the token pair an apply parked)
 	/// reached from a process whose ambient credentials are AWS's. Never
-	/// reflected or printed.
+	/// reflected, and printed as its key id alone.
 	#[reflect(ignore)]
-	credentials: Option<S3Credentials>,
-}
-
-/// A static access key pair for an [`S3Store`]. [`Debug`] prints the key id
-/// and redacts the secret.
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct S3Credentials {
-	access_key_id: SmolStr,
-	secret_access_key: SmolStr,
-}
-
-impl S3Credentials {
-	/// A pair as the S3 api takes it.
-	pub fn new(
-		access_key_id: impl Into<SmolStr>,
-		secret_access_key: impl Into<SmolStr>,
-	) -> Self {
-		Self {
-			access_key_id: access_key_id.into(),
-			secret_access_key: secret_access_key.into(),
-		}
-	}
-
-	/// The SDK's form of the pair.
-	fn to_sdk(&self) -> aws_sdk_s3::config::Credentials {
-		aws_sdk_s3::config::Credentials::new(
-			self.access_key_id.to_string(),
-			self.secret_access_key.to_string(),
-			None,
-			None,
-			"beet",
-		)
-	}
-}
-
-impl core::fmt::Debug for S3Credentials {
-	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		f.debug_struct("S3Credentials")
-			.field("access_key_id", &self.access_key_id)
-			.field("secret_access_key", &"<redacted>")
-			.finish()
-	}
+	credentials: Option<AwsCredentials>,
 }
 
 impl S3Store {
@@ -92,9 +53,8 @@ impl S3Store {
 		Self::new_default_region(bucket_name).with_region(region)
 	}
 
-	/// Create a store whose region the SDK's default provider chain resolves,
-	/// the process-boundary convention: a `--repo=s3://<bucket>` names a
-	/// bucket, not a region.
+	/// Create a store whose region the launch names, the process-boundary
+	/// convention: a `--repo=s3://<bucket>` names a bucket, not a region.
 	///
 	/// `pub(crate)` deliberately. A store is below [`Stack`] in the crate graph
 	/// (`beet_infra` depends on `beet_net`, never the reverse), so it cannot
@@ -114,6 +74,8 @@ impl S3Store {
 			subdir: None,
 			endpoint: None,
 			public: false,
+			storage_class: None,
+			anonymous: false,
 			credentials: None,
 		}
 	}
@@ -141,9 +103,8 @@ impl S3Store {
 	/// The store an `s3://` [`StoreUri`] names, erroring on any other kind. An
 	/// `endpoint` (eg `https://<account>.r2.cloudflarestorage.com`) switches
 	/// onto an S3-compatible service with region `auto`, so one binary serves
-	/// identically on AWS S3 and R2; otherwise an unnamed region is left to the
-	/// SDK's own default provider chain, the process boundary's region
-	/// convention (the deploy writes `Environment=AWS_REGION=..` into the
+	/// identically on AWS S3 and R2; otherwise an unnamed region is the
+	/// launch's, the process boundary's region convention (the deploy writes `Environment=AWS_REGION=..` into the
 	/// unit). A `path_prefix` roots the store inside the bucket, so a binary
 	/// baked with `s3://<bucket>/<deploy-id>` reads only the document version
 	/// it shipped with.
@@ -185,10 +146,27 @@ impl S3Store {
 		self
 	}
 
-	/// Sign every request with `credentials` rather than the SDK's default
-	/// chain, see [`S3Store::credentials`].
-	pub fn with_credentials(mut self, credentials: S3Credentials) -> Self {
+	/// Sign every request as `credentials` rather than the launch's own,
+	/// see [`S3Store::credentials`].
+	pub fn with_credentials(mut self, credentials: AwsCredentials) -> Self {
 		self.credentials = Some(credentials);
+		self
+	}
+
+	/// Write every object in `storage_class` rather than the bucket's
+	/// default, ie `STANDARD_IA` for a cold copy.
+	pub fn with_storage_class(
+		mut self,
+		storage_class: impl Into<SmolStr>,
+	) -> Self {
+		self.storage_class = Some(storage_class.into());
+		self
+	}
+
+	/// Send every request unsigned: a public bucket read by a launch holding
+	/// no credential for it.
+	pub fn with_anonymous(mut self, anonymous: bool) -> Self {
+		self.anonymous = anonymous;
 		self
 	}
 
@@ -210,49 +188,104 @@ impl S3Store {
 			.map(SmolStr::new)
 	}
 
-	/// Every object under this store's prefix with its size and etag, paged
-	/// through `ListObjectsV2`.
-	async fn list_objects(&self) -> Result<Vec<(RelPath, BlobStat)>> {
-		let client = self.client().await;
-		let bucket_name = self.bucket_name.as_str();
-		let prefix = self.subdir.as_ref().map(|subdir| format!("{subdir}/"));
-		let mut objects = Vec::new();
-		let mut continuation_token = None;
+	/// The region requests go to: this store's, else the launch's, else
+	/// `us-east-1`, where S3 answers a miss with the bucket's own.
+	fn resolved_region(&self) -> SmolStr {
+		self.region
+			.clone()
+			.or_else(AwsClient::launch_region)
+			.unwrap_or_else(|| "us-east-1".into())
+	}
 
+	/// The client this store calls through: its endpoint, region and
+	/// credential.
+	fn client(&self) -> AwsClient {
+		let client = AwsClient::new(AwsService::S3, self.resolved_region());
+		let client = match &self.endpoint {
+			Some(endpoint) => client.with_endpoint(endpoint),
+			None => client,
+		};
+		match (self.anonymous, &self.credentials) {
+			(true, _) => client.anonymous(),
+			(false, Some(credentials)) => {
+				client.with_credentials(credentials.clone())
+			}
+			(false, None) => client,
+		}
+	}
+
+	/// `request` against this store's bucket.
+	async fn send(&self, request: AwsRequest) -> Result<Response> {
+		self.client()
+			.send(request.with_bucket(self.bucket_name.clone()))
+			.await
+	}
+
+	/// `request` against this store's bucket, answering its xml.
+	async fn send_xml(&self, request: AwsRequest) -> Result<XmlElement> {
+		XmlElement::parse(&self.send(request).await?.text().await?)
+	}
+
+
+	/// Every page of `ListObjectsV2` under `prefix`, split at `delimiter`
+	/// where one is given.
+	async fn list_pages(
+		&self,
+		prefix: Option<&str>,
+		delimiter: Option<&str>,
+	) -> Result<Vec<XmlElement>> {
+		let mut pages = Vec::new();
+		let mut continuation_token: Option<String> = None;
 		loop {
-			let mut req = client.list_objects_v2().bucket(bucket_name);
-			if let Some(ref prefix) = prefix {
-				req = req.prefix(prefix);
+			let mut request = AwsRequest::get("ListObjectsV2", "/")
+				.with_query("list-type", "2");
+			if let Some(prefix) = prefix {
+				request = request.with_query("prefix", prefix);
 			}
-			if let Some(token) = &continuation_token {
-				req = req.continuation_token(token);
+			if let Some(delimiter) = delimiter {
+				request = request.with_query("delimiter", delimiter);
 			}
-			let list_result = req.send().await?;
-			let contents = list_result.contents.unwrap_or_default();
-			objects.extend(contents.into_iter().filter_map(|obj| {
-				let key = obj.key?;
-				let rel = match &prefix {
-					Some(prefix) => key.strip_prefix(prefix.as_str())?,
-					None => &key,
-				};
-				let stat = BlobStat {
-					size: obj.size.unwrap_or_default() as u64,
-					md5: Self::etag_md5(obj.e_tag.as_deref()),
-				};
-				Some((RelPath::new(rel), stat))
-			}));
-
-			if list_result.is_truncated == Some(true) {
-				continuation_token = list_result.next_continuation_token;
-				if continuation_token.is_none() {
-					break;
-				}
-			} else {
+			if let Some(token) = continuation_token.take() {
+				request = request.with_query("continuation-token", token);
+			}
+			let page = self.send_xml(request).await?;
+			let truncated = page.text_at("IsTruncated") == Some("true");
+			continuation_token = page
+				.text_at("NextContinuationToken")
+				.map(ToString::to_string);
+			pages.push(page);
+			if !truncated || continuation_token.is_none() {
 				break;
 			}
 		}
+		pages.xok()
+	}
 
-		objects.xok()
+	/// Every object under this store's prefix with its size and etag, paged
+	/// through `ListObjectsV2`.
+	async fn list_objects(&self) -> Result<Vec<(RelPath, BlobStat)>> {
+		let prefix = self.subdir.as_ref().map(|subdir| format!("{subdir}/"));
+		self.list_pages(prefix.as_deref(), None)
+			.await?
+			.iter()
+			.flat_map(|page| page.children_named("Contents"))
+			.filter_map(|object| {
+				let key = object.text_at("Key")?;
+				let rel = match &prefix {
+					Some(prefix) => key.strip_prefix(prefix.as_str())?,
+					None => key,
+				};
+				let stat = BlobStat {
+					size: object
+						.text_at("Size")
+						.and_then(|size| size.parse().ok())
+						.unwrap_or_default(),
+					md5: Self::etag_md5(object.text_at("ETag")),
+				};
+				Some((RelPath::new(rel), stat))
+			})
+			.collect::<Vec<_>>()
+			.xok()
 	}
 
 	/// Construct the full S3 URI including optional subdir.
@@ -274,24 +307,88 @@ impl S3Store {
 	/// Versions are kept, with no expiry rule: how long an old version is
 	/// worth keeping is the bucket's own declaration to make, not this call's.
 	pub async fn set_object_versioning(&self) -> Result {
-		let this = self.clone();
-		async_ext::pin_tokio(async move {
-			use aws_sdk_s3::types::BucketVersioningStatus;
-			use aws_sdk_s3::types::VersioningConfiguration;
-			this.client()
-				.await
-				.put_bucket_versioning()
-				.bucket(this.bucket_name.as_str())
-				.versioning_configuration(
-					VersioningConfiguration::builder()
-						.status(BucketVersioningStatus::Enabled)
-						.build(),
+		self.send(
+			AwsRequest::put("PutBucketVersioning", "/")
+				.with_flag("versioning")
+				.with_xml(
+					"<VersioningConfiguration \
+					xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+					<Status>Enabled</Status></VersioningConfiguration>",
 				)
-				.send()
+				.xmap(Self::with_content_md5),
+		)
+		.await?;
+		Ok(())
+	}
+
+	/// Block every form of public access to this store's bucket, the
+	/// account-level guard a bucket that must never serve anonymously sets
+	/// when it is created.
+	pub async fn block_public_access(&self) -> Result {
+		self.send(
+			AwsRequest::put("PutPublicAccessBlock", "/")
+				.with_flag("publicAccessBlock")
+				.with_xml(
+					"<PublicAccessBlockConfiguration \
+					xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+					<BlockPublicAcls>true</BlockPublicAcls>\
+					<IgnorePublicAcls>true</IgnorePublicAcls>\
+					<BlockPublicPolicy>true</BlockPublicPolicy>\
+					<RestrictPublicBuckets>true</RestrictPublicBuckets>\
+					</PublicAccessBlockConfiguration>",
+				)
+				.xmap(Self::with_content_md5),
+		)
+		.await?;
+		Ok(())
+	}
+
+	/// Delete every object under this store's prefix, a thousand per
+	/// `DeleteObjects` (the most one takes), answering how many went. A bucket
+	/// that does not exist holds nothing, so it answers zero.
+	pub async fn clear(&self) -> Result<usize> {
+		let prefix = self.subdir.as_ref().map(|subdir| format!("{subdir}/"));
+		let pages = match self.list_pages(prefix.as_deref(), None).await {
+			Ok(pages) => pages,
+			Err(err) if AwsError::is(&err, &["NoSuchBucket"]) => return Ok(0),
+			Err(err) => return Err(err),
+		};
+		let keys = pages
+			.iter()
+			.flat_map(|page| page.children_named("Contents"))
+			.filter_map(|object| object.text_at("Key").map(ToString::to_string))
+			.collect::<Vec<_>>();
+		for batch in keys.chunks(1000) {
+			let objects = batch
+				.iter()
+				.map(|key| {
+					format!(
+						"<Object><Key>{}</Key></Object>",
+						XmlElement::escape(key)
+					)
+				})
+				.collect::<String>();
+			let deleted = self
+				.send_xml(
+					AwsRequest::post("DeleteObjects", "/")
+						.with_flag("delete")
+						.with_xml(format!(
+							"<Delete xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+							<Quiet>true</Quiet>{objects}</Delete>"
+						))
+						.xmap(Self::with_content_md5),
+				)
 				.await?;
-			Ok(())
-		})
-		.await
+			if let Some(error) = deleted.child("Error") {
+				bevybail!(
+					"DeleteObjects could not delete `{}`: {} {}",
+					error.text_at("Key").unwrap_or_default(),
+					error.text_at("Code").unwrap_or_default(),
+					error.text_at("Message").unwrap_or_default()
+				);
+			}
+		}
+		keys.len().xok()
 	}
 
 	/// The region this store's bucket actually lives in, or `None` when there
@@ -299,76 +396,31 @@ impl S3Store {
 	/// endpoint, so this is the one call that says where a bucket is without
 	/// being told first; S3 reports `us-east-1` as an empty constraint.
 	pub async fn bucket_region(&self) -> Result<Option<SmolStr>> {
-		use aws_sdk_s3::error::ProvideErrorMetadata;
-		let this = self.clone();
-		async_ext::pin_tokio(async move {
-			match this
-				.client()
-				.await
-				.get_bucket_location()
-				.bucket(this.bucket_name.as_str())
-				.send()
-				.await
-			{
-				Ok(output) => output
-					.location_constraint
-					.map(|region| SmolStr::new(region.as_str()))
-					.filter(|region| !region.is_empty())
-					.unwrap_or_else(|| SmolStr::new("us-east-1"))
-					.xsome()
-					.xok(),
-				// S3 models this one as an unmodelled error, so the code is
-				// the only thing that says "no such bucket"
-				Err(err) if err.code() == Some("NoSuchBucket") => Ok(None),
-				Err(err) => bevybail!("Failed to locate bucket: {err:?}"),
+		match self
+			.send_xml(
+				AwsRequest::get("GetBucketLocation", "/").with_flag("location"),
+			)
+			.await
+		{
+			Ok(location) => match location.text.as_str() {
+				"" => SmolStr::new("us-east-1"),
+				region => SmolStr::new(region),
 			}
-		})
-		.await
+			.xsome()
+			.xok(),
+			Err(err) if AwsError::is(&err, &["NoSuchBucket"]) => Ok(None),
+			Err(err) => Err(err),
+		}
 	}
 
-	/// Get or create an S3 client for this store's region, endpoint and
-	/// credentials. Cached by the three so an R2 store and an AWS store in
-	/// the same region get distinct clients, as do two stores at one endpoint
-	/// under different key pairs.
-	async fn client(&self) -> Client {
-		static POOL: LazyPool<
-			(Option<SmolStr>, Option<SmolStr>, Option<S3Credentials>),
-			Client,
-			Client,
-		> = LazyPool::new(|key| {
-			let (region, endpoint, credentials) =
-				(key.0.clone(), key.1.clone(), key.2.clone());
-			Box::pin(async move {
-				// a configured region wins; an unset one leaves the SDK's own
-				// default chain in place, and so does an unset key pair.
-				let mut loader = aws_ext::loader();
-				if let Some(region) = region {
-					loader = loader.region(Region::new(region.to_string()));
-				}
-				if let Some(credentials) = credentials {
-					loader = loader.credentials_provider(credentials.to_sdk());
-				}
-				let config = loader.load().await;
-				match endpoint {
-					// R2 / S3-compatible: override the endpoint and use
-					// path-style addressing, which those services require.
-					Some(endpoint) => Client::from_conf(
-						aws_sdk_s3::config::Builder::from(&config)
-							.endpoint_url(endpoint.to_string())
-							.force_path_style(true)
-							.build(),
-					),
-					// the unchanged default AWS path.
-					None => Client::new(&config),
-				}
-			})
-		});
-		POOL.get(&(
-			self.region.clone(),
-			self.endpoint.clone(),
-			self.credentials.clone(),
-		))
-		.await
+	/// `request` carrying its body's `Content-MD5`, which S3 requires of a
+	/// configuration write and a batch delete.
+	fn with_content_md5(request: AwsRequest) -> AwsRequest {
+		use base64::Engine;
+		use md5::Digest;
+		let digest = md5::Md5::digest(request.body());
+		let encoded = base64::engine::general_purpose::STANDARD.encode(digest);
+		request.with_header("content-md5", encoded)
 	}
 
 	/// Resolve the S3 object key from a [`RelPath`].
@@ -378,6 +430,9 @@ impl S3Store {
 			None => path.to_string(),
 		}
 	}
+
+	/// The request path of `key`.
+	fn key_path(key: &str) -> String { format!("/{key}") }
 }
 
 impl BlobStoreProvider for S3Store {
@@ -385,15 +440,11 @@ impl BlobStoreProvider for S3Store {
 
 	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(S3Store {
-			bucket_name: self.bucket_name.clone(),
-			region: self.region.clone(),
 			subdir: Some(match &self.subdir {
 				Some(existing) => existing.join(&path),
 				None => path,
 			}),
-			endpoint: self.endpoint.clone(),
-			public: self.public,
-			credentials: self.credentials.clone(),
+			..self.clone()
 		})
 	}
 
@@ -414,126 +465,80 @@ impl BlobStoreProvider for S3Store {
 
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
-		async_ext::pin_tokio(async move {
-			let client = this.client().await;
-			match client
-				.head_bucket()
-				.bucket(this.bucket_name.as_str())
-				.send()
-				.await
-			{
+		Box::pin(async move {
+			match this.send(AwsRequest::head("HeadBucket", "/")).await {
 				Ok(_) => true.xok(),
-				Err(SdkError::ServiceError(service_err))
-					if let HeadBucketError::NotFound(_) = service_err.err() =>
+				Err(err)
+					if AwsError::is(&err, &["NotFound", "NoSuchBucket"]) =>
 				{
 					false.xok()
 				}
-				Err(other) => {
-					bevybail!("Failed to check bucket: {:?}", other)
-				}
+				Err(err) => Err(err),
 			}
 		})
 	}
 
 	fn store_create(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		async_ext::pin_tokio(async move {
-			let client = this.client().await;
-			let mut req =
-				client.create_bucket().bucket(this.bucket_name.as_str());
-
-			// the client's RESOLVED region, so an unpinned store creates the
-			// bucket where its own requests will land. us-east-1 is S3's default
+		Box::pin(async move {
+			// the RESOLVED region, so an unpinned store creates the bucket
+			// where its own requests will land. us-east-1 is S3's default
 			// region and rejects an explicit LocationConstraint; all other
-			// regions require it.
-			let region = client.config().region().map(ToString::to_string);
-			if let Some(region) = region.filter(|region| region != "us-east-1")
-			{
-				use aws_sdk_s3::types::CreateBucketConfiguration;
-				let bucket_config = CreateBucketConfiguration::builder()
-					.location_constraint(region.as_str().into())
-					.build();
-				req = req.create_bucket_configuration(bucket_config);
-			}
-			req.send().await?;
+			// regions (and R2's `auto`) take it or ignore it.
+			let region = this.resolved_region();
+			let request = AwsRequest::put("CreateBucket", "/");
+			let request = match region.as_str() {
+				"us-east-1" => request,
+				region => request.with_xml(format!(
+					"<CreateBucketConfiguration \
+					xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+					<LocationConstraint>{}</LocationConstraint>\
+					</CreateBucketConfiguration>",
+					XmlElement::escape(region)
+				)),
+			};
+			this.send(request).await?;
 			().xok()
 		})
 	}
 
 	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		async_ext::pin_tokio(async move {
-			let client = this.client().await;
-			let bucket_name = this.bucket_name.as_str();
-
-			// Only empty buckets can be deleted, so remove all objects first
-			let mut continuation_token = None;
-			loop {
-				let mut req = client.list_objects_v2().bucket(bucket_name);
-				if let Some(token) = &continuation_token {
-					req = req.continuation_token(token);
-				}
-				let list_result = req.send().await?;
-				let contents = list_result.contents.unwrap_or_default();
-
-				if !contents.is_empty() {
-					let delete_objects = aws_sdk_s3::types::Delete::builder()
-						.set_objects(Some(
-							contents
-								.into_iter()
-								.filter_map(|obj| {
-									obj.key.map(|key| {
-										aws_sdk_s3::types::ObjectIdentifier::builder()
-												.key(key)
-												.build()
-									})
-								})
-								.collect::<Result<_, _>>()?,
-						))
-						.build()?;
-
-					client
-						.delete_objects()
-						.bucket(bucket_name)
-						.delete(delete_objects)
-						.send()
-						.await?;
-				}
-
-				if list_result.is_truncated == Some(true) {
-					continuation_token = list_result.next_continuation_token;
-					if continuation_token.is_none() {
-						break;
-					}
-				} else {
-					break;
-				}
+		Box::pin(async move {
+			// only empty buckets can be deleted, so remove all objects first
+			S3Store {
+				subdir: None,
+				..this.clone()
 			}
-
-			client.delete_bucket().bucket(bucket_name).send().await?;
+			.clear()
+			.await?;
+			this.send(AwsRequest::delete("DeleteBucket", "/")).await?;
 			().xok()
 		})
 	}
 
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		let key = self.resolve_key(path);
-		async_ext::pin_tokio(async move {
-			let client = this.client().await;
-			client
-				.put_object()
-				.bucket(this.bucket_name.as_str())
-				.key(&key)
-				.body(body.to_vec().into())
-				.send()
-				.await?;
+		let request = AwsRequest::put(
+			"PutObject",
+			Self::key_path(&self.resolve_key(path)),
+		)
+		.with_body(body);
+		let request = match &self.storage_class {
+			Some(class) => {
+				request.with_header("x-amz-storage-class", class.as_str())
+			}
+			None => request,
+		};
+		Box::pin(async move {
+			this.send(request).await?;
 			().xok()
 		})
 	}
 
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let this = self.clone();
-		async_ext::pin_tokio(async move {
+		Box::pin(async move {
 			this.list_objects()
 				.await?
 				.into_iter()
@@ -548,7 +553,7 @@ impl BlobStoreProvider for S3Store {
 	/// page rather than one `HeadObject` per key.
 	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
 		let this = self.clone();
-		async_ext::pin_tokio(async move { this.list_objects().await })
+		Box::pin(async move { this.list_objects().await })
 	}
 
 	/// `ListObjectsV2` with a `/` delimiter: the common prefixes are the
@@ -559,10 +564,7 @@ impl BlobStoreProvider for S3Store {
 			true => this.subdir.as_ref().map(|subdir| format!("{subdir}/")),
 			false => Some(format!("{}/", this.resolve_key(path))),
 		};
-		async_ext::pin_tokio(async move {
-			let client = this.client().await;
-			let mut listing = BlobDir::default();
-			let mut continuation_token = None;
+		Box::pin(async move {
 			let strip = |key: &str| {
 				let rest = match &prefix {
 					Some(prefix) => key.strip_prefix(prefix.as_str())?,
@@ -570,40 +572,17 @@ impl BlobStoreProvider for S3Store {
 				};
 				rest.trim_end_matches('/').xmap(SmolStr::new).xsome()
 			};
-			loop {
-				let mut req = client
-					.list_objects_v2()
-					.bucket(this.bucket_name.as_str())
-					.delimiter("/");
-				if let Some(ref prefix) = prefix {
-					req = req.prefix(prefix);
-				}
-				if let Some(token) = &continuation_token {
-					req = req.continuation_token(token);
-				}
-				let page = req.send().await?;
+			let mut listing = BlobDir::default();
+			for page in this.list_pages(prefix.as_deref(), Some("/")).await? {
 				listing.dirs.extend(
-					page.common_prefixes
-						.unwrap_or_default()
-						.into_iter()
-						.filter_map(|common| strip(&common.prefix?)),
+					page.children_named("CommonPrefixes")
+						.filter_map(|common| strip(common.text_at("Prefix")?)),
 				);
 				listing.files.extend(
-					page.contents
-						.unwrap_or_default()
-						.into_iter()
-						.filter_map(|obj| strip(&obj.key?))
+					page.children_named("Contents")
+						.filter_map(|object| strip(object.text_at("Key")?))
 						.filter(|name| !name.is_empty()),
 				);
-				match page.is_truncated {
-					Some(true) => {
-						continuation_token = page.next_continuation_token;
-						if continuation_token.is_none() {
-							break;
-						}
-					}
-					_ => break,
-				}
 			}
 			listing.dedup().xok()
 		})
@@ -616,26 +595,24 @@ impl BlobStoreProvider for S3Store {
 	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
-		async_ext::pin_tokio(async move {
-			let client = this.client().await;
-			match client
-				.head_object()
-				.bucket(this.bucket_name.as_str())
-				.key(&key)
-				.send()
+		Box::pin(async move {
+			match this
+				.send(AwsRequest::head("HeadObject", Self::key_path(&key)))
 				.await
 			{
 				Ok(head) => Some(BlobStat {
-					size: head.content_length.unwrap_or_default() as u64,
-					md5: Self::etag_md5(head.e_tag.as_deref()),
+					size: head
+						.headers()
+						.first_raw("content-length")
+						.and_then(|length| length.parse().ok())
+						.unwrap_or_default(),
+					md5: Self::etag_md5(head.headers().first_raw("etag")),
 				})
 				.xok(),
-				Err(SdkError::ServiceError(service_err))
-					if let HeadObjectError::NotFound(_) = service_err.err() =>
-				{
+				Err(err) if AwsError::is(&err, &["NotFound", "NoSuchKey"]) => {
 					None.xok()
 				}
-				Err(err) => Err(err.into()),
+				Err(err) => Err(err),
 			}
 		})
 	}
@@ -643,70 +620,43 @@ impl BlobStoreProvider for S3Store {
 	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
-		async_ext::pin_tokio(async move {
-			let client = this.client().await;
+		Box::pin(async move {
 			// a missing key is a miss, not a failure: the served 404 is the whole
 			// difference between a static host and a broken one.
-			let get_result = match client
-				.get_object()
-				.bucket(this.bucket_name.as_str())
-				.key(&key)
-				.send()
+			match this
+				.send(AwsRequest::get("GetObject", Self::key_path(&key)))
 				.await
 			{
-				Ok(get_result) => get_result,
-				Err(SdkError::ServiceError(service_err))
-					if let GetObjectError::NoSuchKey(_) = service_err.err() =>
-				{
-					return Err(HttpError::new(
+				Ok(response) => response.body.into_bytes().await,
+				Err(err) if AwsError::is(&err, &["NoSuchKey", "NotFound"]) => {
+					Err(HttpError::new(
 						StatusCode::NOT_FOUND,
 						format!("object not found: {key}"),
 					)
-					.into());
+					.into())
 				}
-				Err(err) => return Err(err.into()),
-			};
-			get_result.body.collect().await?.into_bytes().xok()
+				Err(err) => Err(err),
+			}
 		})
 	}
 
 	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
-		let this = self.clone();
-		let key = self.resolve_key(path);
-		async_ext::pin_tokio(async move {
-			let client = this.client().await;
-			match client
-				.head_object()
-				.bucket(this.bucket_name.as_str())
-				.key(&key)
-				.send()
-				.await
-			{
-				Ok(_) => true.xok(),
-				Err(SdkError::ServiceError(service_err))
-					if let HeadObjectError::NotFound(_) = service_err.err() =>
-				{
-					false.xok()
-				}
-				Err(err) => Err(err.into()),
-			}
-		})
+		let stat = self.stat(path);
+		Box::pin(async move { stat.await.map(|stat| stat.is_some()) })
 	}
 
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		let path = path.clone();
-		async_ext::pin_tokio(async move {
+		Box::pin(async move {
 			match this.exists(&path).await? {
 				true => {
-					let client = this.client().await;
-					client
-						.delete_object()
-						.bucket(this.bucket_name.as_str())
-						.key(&key)
-						.send()
-						.await?;
+					this.send(AwsRequest::delete(
+						"DeleteObject",
+						Self::key_path(&key),
+					))
+					.await?;
 					().xok()
 				}
 				false => {
@@ -759,10 +709,9 @@ mod test {
 	#[beet_core::test]
 	fn credentials_debug_redacts() {
 		let store = S3Store::r2("acct", "bucket")
-			.with_credentials(S3Credentials::new("AKIA", "hunter2"));
+			.with_credentials(AwsCredentials::new("AKIA", "hunter2"));
 		format!("{store:?}")
 			.xpect_contains("AKIA")
-			.xpect_contains("<redacted>")
 			.xnot()
 			.xpect_contains("hunter2");
 	}
@@ -772,6 +721,22 @@ mod test {
 	async fn works() {
 		let provider = S3Store::new("beet-test-bucket", "us-west-2");
 		store_test::run(provider).await;
+	}
+
+	/// The store suite against a local S3 server (SeaweedFS's gateway on
+	/// 8333, its identity `beetlocal`), path style as any endpoint is.
+	#[beet_core::test]
+	#[ignore = "needs a local S3 server on 127.0.0.1:8333"]
+	async fn local_s3() {
+		store_test::run(
+			S3Store::new("beet-local-bucket", "us-east-1")
+				.with_endpoint("http://127.0.0.1:8333")
+				.with_credentials(AwsCredentials::new(
+					"beetlocal",
+					"beetlocalsecret",
+				)),
+		)
+		.await;
 	}
 
 	#[beet_core::test]

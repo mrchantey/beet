@@ -108,8 +108,8 @@ stays, an inert tag in a lean build.
 	     the read-only `beet-agent`, or under a live admin session, and says
 	     which on stderr every time. `beet admin` buys that session with one
 	     code from a phone, the one thing an automated process cannot supply -->
-	<AwsExec bx:cfg="feature:vault"/>
-	<AdminElevate bx:cfg="feature:vault"/>
+	<AwsExec bx:cfg="feature:vault && feature:aws"/>
+	<AdminElevate bx:cfg="feature:vault && feature:aws"/>
 	<!-- the aws identity this entry deploys as: one iam user, `beet-deploy`,
 	     sealed in this entry's document, and one managed policy per app the
 	     entry declares, here the `beet` app of the stack below. A deploy checks
@@ -120,7 +120,10 @@ stays, an inert tag in a lean build.
 	<!-- the repo's own AWS account, a member of the Organization the AWS deploy
 	     credential lives and deploys in. The root carries no region, so it is
 	     spread here: the state bucket and the Recycle Bin rules land there -->
-	<AwsAccount name="beet" bx:cfg="feature:infra && feature:extra" {AwsRegion("us-west-2")}/>
+	<AwsAccount name="beet" bx:cfg="feature:infra && feature:extra" {(AwsRegion("us-west-2"), IdentityCenter{group:"beet-operators"})}/>
+	<!-- a person's Identity Center sign in, the human path into every member
+	     account: `beet sso login`, then `beet aws --account=beet -- ..` -->
+	<Route path="sso" bx:cfg="feature:infra && feature:extra"><SsoRoutes/></Route>
 	<!-- `close-account --elevated`: the package's most final act, stated where
 	     the account is -->
 	<CloseDeployAccounts bx:cfg="feature:infra && feature:extra"/>

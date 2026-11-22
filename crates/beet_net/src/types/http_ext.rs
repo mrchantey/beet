@@ -340,8 +340,8 @@ pub fn sec_websocket_key(headers: &HeaderMap) -> Option<&str> {
 /// Compute the `Sec-WebSocket-Accept` value for a client's `Sec-WebSocket-Key`,
 /// `base64(SHA1(key + GUID))` per [RFC 6455 §4.2.2].
 ///
-/// Reuses the workspace `sha1` (the RustCrypto sibling of `sha2`, used for the
-/// `aws_sdk` signing) and `base64` crates, so no new crypto dependency is added.
+/// Reuses the workspace `sha1` (the RustCrypto sibling of `sha2`) and
+/// `base64` crates, so no new crypto dependency is added.
 ///
 /// Rides the no_std `sockets` feature (not `tungstenite`): the bare-metal client
 /// (`ws_ext`) computes it to validate the server's `101` handshake response.

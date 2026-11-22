@@ -202,7 +202,7 @@ mod test {
 		// race; spawn it on a bare router (no `HttpServer`, so the `Server`
 		// orchestrator does not also try to bind the same port).
 		let (server, on_spawn) =
-			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+			HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		let port = server.port.unwrap();
 
 		std::thread::spawn(move || {

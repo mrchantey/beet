@@ -19,9 +19,9 @@ pub enum StackBackend {
 impl Default for StackBackend {
 	fn default() -> Self {
 		cfg_if! {
-			// the S3 backend needs the native SDK (`S3Store` is native-only), so a
-			// wasm build defaults to local state exactly as an sdk-free one does.
-			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
+			// the S3 backend needs `S3Store`, so a build without `aws` defaults
+			// to local state
+			if #[cfg(feature = "aws")] {
 				StackBackend::S3(S3Backend::default())
 			} else {
 				StackBackend::Local(LocalBackend::default())
@@ -99,7 +99,7 @@ impl ResolvedBackend {
 	}
 
 	/// The state store, see [`uri`](Self::uri). Errors without a compiled
-	/// backend for it, ie an S3 state backend in an `aws_sdk`-free build.
+	/// backend for it, ie an S3 state backend in a build without `aws`.
 	pub fn store(&self) -> Result<BlobStore> {
 		BlobStore::from_uri(&self.uri())
 	}
@@ -117,7 +117,7 @@ impl ResolvedBackend {
 		// only undo: a bucket born here is born versioned, which is what makes a
 		// fresh account's first deploy as recoverable as an established one's.
 		// Only at creation, so an existing bucket's settings stay its owner's.
-		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+		#[cfg(feature = "aws")]
 		if let Self::S3(s3) = self {
 			S3Store::from_uri(&s3.uri())?
 				.set_object_versioning()
@@ -199,8 +199,8 @@ impl LocalBackend {
 /// Where a state bucket is created when nothing says otherwise, and the
 /// endpoint a discovery asks: `sts:GetCallerIdentity` and `GetBucketLocation`
 /// both answer here for an account and a bucket anywhere.
-// only [`S3Backend::resolve`]'s `aws_sdk` branch reads it, and the other
-// branch bails, so a build without the sdk does not. Kept out of the
+// only [`S3Backend::resolve`]'s `aws` branch reads it, and the other
+// branch bails, so a build without `aws` does not. Kept out of the
 // `cfg_if!` so the field docs below can still link it in every build.
 #[allow(dead_code)]
 const DEFAULT_STATE_REGION: &str = aws::region::US_EAST_1;
@@ -280,11 +280,11 @@ impl S3Backend {
 	/// in, which fails every verb.
 	pub async fn resolve(&self) -> Result<ResolvedS3Backend> {
 		cfg_if! {
-			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
+			if #[cfg(feature = "aws")] {
 				let bucket = match &self.bucket {
 					Some(bucket) => bucket.clone(),
 					None => Self::default_bucket(
-						&beet_net::prelude::aws_ext::account_id().await?,
+						&AwsSts::account_id().await?,
 					),
 				};
 				let located = S3Store::from_uri(&StoreUri::S3 {
@@ -315,7 +315,7 @@ impl S3Backend {
 			} else {
 				bevybail!(
 					"cannot resolve the S3 state backend: this build has no aws \
-					sdk. Declare a local backend, or build with `aws_sdk`."
+					client. Declare a local backend, or build with `aws`."
 				)
 			}
 		}

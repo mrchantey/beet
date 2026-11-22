@@ -90,7 +90,7 @@ impl DirSync {
 /// declaration: `deploy` mints a version and fills it, while `sync` republishes
 /// into the version already being served (`<AdoptCurrentDeploy/>` is what points
 /// the launch at it). One declaration, read by both.
-#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+#[cfg(feature = "aws")]
 pub(crate) fn declared_store<'a>(
 	entity: Entity,
 	sync: &DirSync,
@@ -129,7 +129,7 @@ pub(crate) fn declared_store<'a>(
 /// end alone: the declaration is resolved when the sync runs, and an
 /// `S3FsStore` built over a stand-in path would be a store pointing
 /// somewhere nothing asked for.
-#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+#[cfg(feature = "aws")]
 pub(crate) fn attach_dir_sync_store(
 	ev: On<Add<DirSync>>,
 	mut commands: Commands,
@@ -157,7 +157,7 @@ pub(crate) fn attach_dir_sync_store(
 		});
 }
 
-#[cfg(all(test, feature = "aws_sdk", not(target_arch = "wasm32")))]
+#[cfg(all(test, feature = "aws"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

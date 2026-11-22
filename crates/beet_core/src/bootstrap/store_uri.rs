@@ -29,8 +29,7 @@ use core::str::FromStr;
 /// 3. `s3://<bucket>[/<path_prefix>][?endpoint=<url>][&region=<region>]`: an
 ///    S3-compatible bucket, optionally rooted at a key prefix. With an
 ///    `endpoint` (eg a Cloudflare R2 account endpoint) the region defaults to
-///    `auto`; without one an unnamed region is left to the AWS SDK's own default
-///    provider chain.
+///    `auto`; without one an unnamed region is the launch's (`AWS_REGION`).
 ///
 ///    The path prefix is what lets a deploy give each version of a document
 ///    its own root: a binary baked with `s3://<bucket>/<deploy-id>` reads only the

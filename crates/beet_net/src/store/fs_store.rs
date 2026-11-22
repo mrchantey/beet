@@ -18,6 +18,10 @@ pub struct FsStore {
 	path: AbsPath,
 	/// Optional subdirectory from which all paths are resolved.
 	subdir: Option<RelPath>,
+	/// Whether a listing reads through symbolic links, materializing a linked
+	/// directory's files as the store's own. On by default, as a path read
+	/// is; off, a link is invisible to [`list`](BlobStoreProvider::list).
+	follow_symlinks: bool,
 }
 
 impl Default for FsStore {
@@ -25,6 +29,7 @@ impl Default for FsStore {
 		Self {
 			path: WsPath::default().into(),
 			subdir: None,
+			follow_symlinks: true,
 		}
 	}
 }
@@ -34,8 +39,15 @@ impl FsStore {
 	pub fn new(path: impl Into<AbsPath>) -> Self {
 		Self {
 			path: path.into(),
-			subdir: None,
+			..default()
 		}
+	}
+
+	/// List through symbolic links or skip them, see
+	/// [`FsStore::follow_symlinks`].
+	pub fn with_follow_symlinks(mut self, follow_symlinks: bool) -> Self {
+		self.follow_symlinks = follow_symlinks;
+		self
 	}
 	/// Set the subdirectory from which all paths are resolved.
 	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
@@ -60,16 +72,19 @@ impl BlobStoreProvider for FsStore {
 
 	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(FsStore {
-			path: self.path.clone(),
 			subdir: Some(match &self.subdir {
 				Some(existing) => existing.join(&path),
 				None => path,
 			}),
+			..self.clone()
 		})
 	}
 
 	fn base(&self) -> Box<dyn BlobStoreProvider> {
-		Box::new(FsStore::new(self.path.clone()))
+		Box::new(FsStore {
+			subdir: None,
+			..self.clone()
+		})
 	}
 
 	/// The filesystem has a parent universe above the store's root, so a
@@ -93,7 +108,11 @@ impl BlobStoreProvider for FsStore {
 				)
 			})?;
 		(
-			(Box::new(FsStore::new(abs_root)) as Box<dyn BlobStoreProvider>),
+			(Box::new(FsStore {
+				path: abs_root,
+				subdir: None,
+				..self.clone()
+			}) as Box<dyn BlobStoreProvider>),
 			entry_name,
 		)
 			.xok()
@@ -164,13 +183,19 @@ impl BlobStoreProvider for FsStore {
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let root = self.effective_root();
 		let scoped = self.subdir.is_some();
+		let read = ReadDir {
+			files: true,
+			recursive: true,
+			follow_symlinks: self.follow_symlinks,
+			..default()
+		};
 		Box::pin(async move {
 			// a subdir never written to holds no files, as a missing prefix in
 			// an object store does; only a missing root is an error
 			if scoped && !fs_ext::exists_async(&root).await? {
 				return Vec::new().xok();
 			}
-			ReadDir::files_recursive_async(&root)
+			read.read_async(&root)
 				.await?
 				.into_iter()
 				.map(|path| {

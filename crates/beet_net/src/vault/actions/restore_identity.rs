@@ -26,14 +26,9 @@ pub async fn VaultRestoreIdentity(
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let ciphertext = fs_ext::read(&file)?;
-	// a launch with no terminal refuses rather than prompts
-	if BootstrapConfig::get().headless {
-		bevybail!(
-			"a backup passphrase is typed on a terminal: run this \
-			interactively, without `--headless`"
-		);
-	}
-	let passphrase = terminal_ext::read_secret_line("passphrase: ")?;
+	let passphrase =
+		OperatorPrompt::ask(VaultBackup::passphrase_ask("passphrase: "))
+			.await?;
 	let plaintext = AgePassphrase::new(passphrase).decrypt(&ciphertext)?;
 	let restored = String::from_utf8(plaintext)
 		.map_err(|_| bevyhow!("the backup is not an identity file"))?

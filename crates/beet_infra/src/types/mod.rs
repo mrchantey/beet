@@ -21,6 +21,7 @@ mod infra_plugin;
 // a bucket's per-prefix retention, shared by every provider's bucket block.
 mod prefix_expiry;
 // where a stack's resources land at each provider, resolved by ancestry.
+mod identity_center;
 mod provider_address;
 mod resource_scope;
 // the ceiling on what a deploy may create, lowered from the IAM documents the
@@ -50,6 +51,7 @@ pub use cloudflare_access::*;
 pub use cloudflare_deploy_token::*;
 pub use deploy_source::*;
 pub use deployment::*;
+pub use identity_center::*;
 pub use infra_plugin::*;
 pub use prefix_expiry::*;
 pub use provider_address::*;

@@ -333,8 +333,11 @@ async fn send_inbound(
 	info!("asking {} to send {from} -> {address}", relay.label());
 	match relay {
 		RelayMode::Ses(_) => {
-			send_inbound_ses(region, sender_domain, from, address, token)
-				.await?;
+			let ses = AwsClient::new(AwsService::SES, region);
+			let message_id =
+				send_inbound_ses(&ses, sender_domain, from, address, token)
+					.await?;
+			info!("SES accepted the inbound probe as {message_id}");
 			Ok(true)
 		}
 		RelayMode::Comail(comail) => {
@@ -367,40 +370,41 @@ async fn send_inbound(
 	}
 }
 
-/// The SES arm: the api that already holds the sending identity.
+/// The SES arm: the api that already holds the sending identity. SES v2
+/// `SendEmail`, answering the message id SES assigned.
 async fn send_inbound_ses(
-	region: &str,
+	ses: &AwsClient,
 	sender_domain: &MailDomainBlock,
 	from: &str,
 	address: &str,
 	token: &str,
-) -> Result {
-	let destination = format!("ToAddresses={address}");
+) -> Result<String> {
 	// through the domain's own configuration set, so a bounce or a complaint
 	// on the probe lands in the same event stream as real mail rather than
 	// silently nowhere.
-	let configuration_set = sender_domain.configuration_set_name();
-	let content = json!({
-		"Simple": {
-			"Subject": { "Data": MailProbe::subject(token) },
-			"Body": { "Text": { "Data": "Inbound leg of the beet mail probe." } },
+	let body = json!({
+		"FromEmailAddress": from,
+		"Destination": { "ToAddresses": [address] },
+		"ConfigurationSetName": sender_domain.configuration_set_name(),
+		"Content": {
+			"Simple": {
+				"Subject": { "Data": MailProbe::subject(token) },
+				"Body": { "Text": { "Data": "Inbound leg of the beet mail probe." } },
+			}
+		},
+	});
+	let response = ses
+		.send_json(
+			AwsRequest::post("SendEmail", "/v2/email/outbound-emails")
+				.with_json(&body)?,
+		)
+		.await?;
+	match response["MessageId"].as_str() {
+		Some(id) => id.to_string().xok(),
+		None => {
+			bevybail!("SES accepted the inbound probe but named no message id")
 		}
-	})
-	.to_string();
-	aws_cli_ext::service("sesv2", region, [
-		"send-email",
-		"--from-email-address",
-		from,
-		"--destination",
-		&destination,
-		"--configuration-set-name",
-		&configuration_set,
-		"--content",
-		&content,
-	])
-	.run_async()
-	.await?;
-	Ok(())
+	}
 }
 
 /// The comail arm: the HTTP send api, authenticated with the enrolled pair.
@@ -753,5 +757,61 @@ mod tests {
 		)
 		.is_empty()
 		.xpect_true();
+	}
+
+	/// The SES arm is one `SendEmail` from the sender to the probe mailbox
+	/// through the domain's configuration set, its subject carrying the
+	/// run's token. Never sent for real here: the transport is the stand-in.
+	#[beet_core::test]
+	async fn the_ses_leg_sends_one_simple_message() {
+		let sent = std::sync::Arc::new(std::sync::Mutex::new(None));
+		let seen = sent.clone();
+		let ses = AwsClient::new(AwsService::SES, "ap-southeast-2")
+			.with_credentials(AwsCredentials::new("AKID", "secret"))
+			.with_transport(move |request| {
+				let seen = seen.clone();
+				Box::pin(async move {
+					(*request.method()).xpect_eq(HttpMethod::Post);
+					request.uri().xpect_eq(
+						"https://email.ap-southeast-2.amazonaws.com/v2/email/outbound-emails",
+					);
+					request
+						.headers
+						.first_raw("authorization")
+						.unwrap()
+						.xpect_contains("/ap-southeast-2/ses/aws4_request");
+					let body = serde_json::from_slice::<Value>(
+						&request.body.into_bytes().await?,
+					)?;
+					*seen.lock().unwrap() = Some(body);
+					Response::ok()
+						.with_body(r#"{"MessageId":"0100018f-probe"}"#)
+						.xok()
+				})
+			});
+		let domain =
+			MailDomainBlock::new("news.beetmash.com", "mail.beetmash.com");
+		send_inbound_ses(
+			&ses,
+			&domain,
+			"news@news.beetmash.com",
+			"probe@beetmash.com",
+			"abc123",
+		)
+		.await
+		.unwrap()
+		.as_str()
+		.xpect_eq("0100018f-probe");
+		sent.lock().unwrap().clone().unwrap().xpect_eq(json!({
+			"FromEmailAddress": "news@news.beetmash.com",
+			"Destination": { "ToAddresses": ["probe@beetmash.com"] },
+			"ConfigurationSetName": domain.configuration_set_name(),
+			"Content": {
+				"Simple": {
+					"Subject": { "Data": "beet mail probe abc123" },
+					"Body": { "Text": { "Data": "Inbound leg of the beet mail probe." } },
+				}
+			},
+		}));
 	}
 }

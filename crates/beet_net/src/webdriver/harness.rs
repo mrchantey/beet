@@ -71,7 +71,7 @@ impl PageHarness {
 		host: impl Bundle,
 	) -> Result<Self> {
 		let (mut server, on_spawn) =
-			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+			HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		// leave the process-global loopback port to the app under test: several
 		// harnesses may serve concurrently in one test binary.
 		server.canonical = false;

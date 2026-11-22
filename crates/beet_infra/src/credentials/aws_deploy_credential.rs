@@ -1,7 +1,6 @@
 //! `<AwsDeployCredential/>`: an entry's own AWS deploy user, its policies and
 //! the pair its secrets document holds.
 
-use crate::actions::aws_cli_ext;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -455,13 +454,22 @@ impl AwsDeployCredential {
 		})?;
 		let mut report = Vec::new();
 		// the account first, since the credential lives inside it
-		let management = AwsAdmin::new(session.sdk_vars());
+		let management = AwsAdmin::new(session.credentials().clone());
 		let (admin, home) = match AwsAccount::declared(caller).await? {
 			Some((declared, region)) => {
+				let identity_center = IdentityCenter::declared(caller).await?;
+				let calls = AwsManagement::new(management, region.clone());
+				let calls = match &identity_center {
+					Some((_, sso_region)) => {
+						calls.with_sso_region(sso_region.clone())
+					}
+					None => calls,
+				};
 				let (home, inside, lines) = declared
 					.converge(
-						&AwsManagement::new(management, region.clone()),
+						&calls,
 						&region,
+						identity_center.as_ref().map(|(center, _)| center),
 					)
 					.await?;
 				report.extend(lines);
@@ -535,7 +543,7 @@ impl AwsDeployCredential {
 		);
 		CredentialElevation {
 			report,
-			env: admin.vars().to_vec(),
+			env: admin.sdk_vars(),
 			cleanup: None,
 		}
 		.xok()
@@ -770,20 +778,21 @@ impl AwsDeployCredential {
 			admin.delete_key(user, stale).await?;
 			info!("deleted unreferenced key {stale} of {user}");
 		}
-		let (id, secret) = admin.create_key(user).await?;
-		Self::prove_key(&id, &secret).await?;
+		let key = admin.create_key(user).await?;
+		Self::prove_key(&key).await?;
+		let id = key.access_key_id();
 		document.set(
 			&identity,
 			&group,
 			Self::KEY_ID,
-			&id,
+			id,
 			Self::id_record(entry, &home, &sealed, unconditioned),
 		)?;
 		document.set(
 			&identity,
 			&group,
 			Self::KEY_SECRET,
-			&secret,
+			key.secret_access_key(),
 			Self::secret_record(entry),
 		)?;
 		handle.write(&document).await?;
@@ -825,8 +834,8 @@ impl AwsDeployCredential {
 			note: Some(
 				format!(
 					"aws deploy credential `{}`: the access key id of the \
-					`{entry}` entry's own iam user; its deploy verbs and every \
-					`aws s3 sync` read the pair from here, never from ~/.aws",
+					`{entry}` entry's own iam user; its deploy verbs read the \
+					pair from here, never from ~/.aws",
 					DeployCredential::name(entry)
 				)
 				.into(),
@@ -880,19 +889,12 @@ impl AwsDeployCredential {
 	/// eventually consistent, so a new key answers `InvalidClientTokenId` for
 	/// a few seconds. Retried rather than slept through, and a failure here
 	/// leaves the old key in place.
-	async fn prove_key(id: &str, secret: &str) -> Result {
+	async fn prove_key(key: &AwsCredentials) -> Result {
 		const ATTEMPTS: usize = 10;
+		let sts = AwsSts::new(key.clone());
 		let mut last = None;
 		for attempt in 0..ATTEMPTS {
-			let result = aws_cli_ext::sts(["get-caller-identity"])
-				.without_env("AWS_PROFILE")
-				.without_env("AWS_SESSION_TOKEN")
-				.with_env(Self::KEY_ID, id)
-				.with_env(Self::KEY_SECRET, secret)
-				.with_secret(secret)
-				.run_async_stdout()
-				.await;
-			match result {
+			match sts.caller_identity().await {
 				Ok(_) => return OK,
 				Err(err) => {
 					last = Some(err);
@@ -908,28 +910,105 @@ impl AwsDeployCredential {
 	}
 }
 
-/// The administrator session one elevated deploy acts as at IAM, handed to
-/// every `aws` call explicitly: the launch's own environment holds the sealed
+/// The administrator session one elevated deploy acts as at IAM, every call
+/// signed as it explicitly: the launch's own environment holds the sealed
 /// deploy pair, which is exactly the credential that cannot do this.
-pub(crate) struct AwsAdmin(Vec<(SmolStr, SmolStr)>);
+#[derive(Clone)]
+pub(crate) struct AwsAdmin {
+	credentials: AwsCredentials,
+	seam: AwsSeam,
+}
+
+/// What a test puts in AWS's place: the transport every client sends
+/// through, the endpoint every bucket is reached at, and no pause between
+/// polls. Empty outside a test.
+#[derive(Clone, Default)]
+struct AwsSeam {
+	transport: Option<AwsTransport>,
+	s3_endpoint: Option<SmolStr>,
+	instant: bool,
+}
 
 impl AwsAdmin {
-	/// The session `vars` acts as.
-	pub(crate) fn new(vars: Vec<(SmolStr, SmolStr)>) -> Self { Self(vars) }
+	/// The tag the deploy user carries, saying what made it.
+	const USER_TAG_KEY: &'static str = "beet";
+	/// Its value, what a retirement checks before deleting a user.
+	const USER_TAG_VALUE: &'static str = "deploy-credential";
+	/// The region the global services, IAM and Organizations, are signed for.
+	const GLOBAL_REGION: &'static str = "us-east-1";
 
-	/// The session's three variables.
-	pub(crate) fn vars(&self) -> &[(SmolStr, SmolStr)] { &self.0 }
-
-	/// `process` as this session, answering its stdout.
-	pub(crate) async fn run(&self, process: ChildProcess) -> Result<String> {
-		self.wrap(process).run_async_stdout().await
+	/// The session `credentials` is.
+	pub(crate) fn new(credentials: AwsCredentials) -> Self {
+		Self {
+			credentials,
+			seam: default(),
+		}
 	}
 
-	/// A `--output text` answer, `None` when empty or the cli's `None`.
-	pub(crate) fn text_option(out: String) -> Option<SmolStr> {
-		Some(out.trim())
-			.filter(|out| !out.is_empty() && *out != "None")
-			.map(SmolStr::from)
+	/// The same AWS as `credentials`, ie a member's role assumed from this
+	/// session.
+	pub(crate) fn acting_as(&self, credentials: AwsCredentials) -> Self {
+		Self {
+			credentials,
+			seam: self.seam.clone(),
+		}
+	}
+
+	/// The session's three variables, for a child signing its own requests
+	/// (`tofu`).
+	pub(crate) fn sdk_vars(&self) -> Vec<(SmolStr, SmolStr)> {
+		self.credentials.env_vars()
+	}
+
+	/// `service` in `region` as this session.
+	pub(crate) fn client(
+		&self,
+		service: AwsService,
+		region: &str,
+	) -> AwsClient {
+		let client = AwsClient::new(service, region)
+			.with_credentials(self.credentials.clone());
+		match self.seam.transport.clone() {
+			Some(transport) => {
+				client.with_transport(move |request| transport(request))
+			}
+			None => client,
+		}
+	}
+
+	/// IAM as this session.
+	pub(crate) fn iam(&self) -> AwsClient {
+		self.client(AwsService::IAM, Self::GLOBAL_REGION)
+	}
+
+	/// Organizations as this session, which only the management account's
+	/// answers.
+	pub(crate) fn organizations(&self) -> AwsClient {
+		self.client(AwsService::ORGANIZATIONS, Self::GLOBAL_REGION)
+	}
+
+	/// STS as this session.
+	pub(crate) fn sts(&self) -> AwsSts {
+		AwsSts::from_client(
+			self.client(AwsService::STS, AwsSts::DEFAULT_REGION),
+		)
+	}
+
+	/// The bucket `bucket` in `region` as this session.
+	pub(crate) fn bucket(&self, bucket: &str, region: &str) -> S3Store {
+		let store = S3Store::new(bucket, region)
+			.with_credentials(self.credentials.clone());
+		match &self.seam.s3_endpoint {
+			Some(endpoint) => store.with_endpoint(endpoint.clone()),
+			None => store,
+		}
+	}
+
+	/// Wait `secs` before polling AWS again.
+	pub(crate) async fn pause(&self, secs: u64) {
+		if !self.seam.instant {
+			time_ext::sleep_secs(secs).await;
+		}
 	}
 
 	/// Every object key in `bucket`, none when the bucket does not exist.
@@ -938,104 +1017,124 @@ impl AwsAdmin {
 		bucket: &str,
 		region: &str,
 	) -> Result<Vec<SmolStr>> {
-		match self
-			.run(aws_cli_ext::service("s3api", region, [
-				"list-objects-v2",
-				"--bucket",
-				bucket,
-				"--query",
-				"Contents[].Key",
-				"--output",
-				"text",
-			]))
-			.await
-		{
-			Ok(out) => out
-				.split_whitespace()
-				.filter(|key| *key != "None")
-				.map(SmolStr::from)
+		match self.bucket(bucket, region).list().await {
+			Ok(keys) => keys
+				.iter()
+				.map(|key| SmolStr::new(key.to_string()))
 				.collect::<Vec<_>>()
 				.xok(),
-			Err(err) if err.to_string().contains("NoSuchBucket") => {
+			Err(err) if AwsError::is(&err, &["NoSuchBucket"]) => {
 				Vec::new().xok()
 			}
 			Err(err) => Err(err),
 		}
 	}
 
-	/// The tag the deploy user carries, saying what made it.
-	const USER_TAG: &'static str = "Key=beet,Value=deploy-credential";
-	/// Its value, what a retirement checks before deleting a user.
-	const USER_TAG_VALUE: &'static str = "deploy-credential";
-
-	/// `process` as this session: its three variables set, an inherited
-	/// profile dropped, every value redacted from any rendering of the command.
-	fn wrap(&self, process: ChildProcess) -> ChildProcess {
-		self.0
-			.iter()
-			.fold(process.without_env("AWS_PROFILE"), |process, (_, value)| {
-				process.with_secret(value.clone())
-			})
-			.with_envs(self.0.clone())
-	}
-
 	/// This session's own account, which every policy arn composes with.
 	pub(crate) async fn account_id(&self) -> Result<String> {
-		self.wrap(aws_cli_ext::sts([
-			"get-caller-identity",
-			"--query",
-			"Account",
-			"--output",
-			"text",
-		]))
-		.run_async_stdout()
-		.await
-		.map(|out| out.trim().to_string())
-		.map_err(|err| {
-			bevyhow!(
-				"the administrator session does not answer \
-				`sts:GetCallerIdentity`: {err}"
-			)
-		})
+		self.sts()
+			.caller_identity()
+			.await
+			.map(|identity| identity.account.to_string())
+			.map_err(|err| {
+				bevyhow!(
+					"the administrator session does not answer \
+					`sts:GetCallerIdentity`: {err}"
+				)
+			})
 	}
 
-	/// An `aws iam` call as this session.
-	pub(crate) async fn iam<'a>(
+	/// An IAM `action`, answering nothing worth reading.
+	pub(crate) async fn iam_call(
 		&self,
-		args: impl IntoIterator<Item = &'a str>,
-	) -> Result<String> {
-		self.run(aws_cli_ext::iam(args)).await
+		action: &str,
+		params: &[(&str, &str)],
+	) -> Result {
+		self.iam()
+			.call_query(action, params.iter().copied())
+			.await?;
+		OK
 	}
 
-	/// [`iam`](Self::iam) answering json, `None` when the entity does not
+	/// An IAM `action`'s result, `None` when the entity it names does not
 	/// exist: every converge step is get-or-create, and absence is the one
 	/// failure that is not one.
-	pub(crate) async fn iam_json<'a>(
+	pub(crate) async fn iam_option(
 		&self,
-		args: impl IntoIterator<Item = &'a str>,
-	) -> Result<Option<Value>> {
-		match self.iam(args).await {
-			Ok(body) => serde_json::from_str::<Value>(&body).map(Some)?.xok(),
-			Err(err) if err.to_string().contains("NoSuchEntity") => None.xok(),
+		action: &str,
+		params: &[(&str, &str)],
+	) -> Result<Option<XmlElement>> {
+		match self.iam().call_query(action, params.iter().copied()).await {
+			Ok(result) => Some(result).xok(),
+			Err(err) if AwsError::is(&err, &["NoSuchEntity"]) => None.xok(),
 			Err(err) => Err(err),
 		}
+	}
+
+	/// Every member of the `list` an IAM `action` answers, across its pages.
+	async fn iam_list(
+		&self,
+		action: &str,
+		params: &[(&str, &str)],
+		list: &str,
+	) -> Result<Vec<XmlElement>> {
+		let iam = self.iam();
+		let mut members = Vec::new();
+		let mut marker: Option<String> = None;
+		loop {
+			let page = iam
+				.call_query(
+					action,
+					params.iter().copied().chain(
+						marker.as_deref().map(|marker| ("Marker", marker)),
+					),
+				)
+				.await?;
+			members.extend(Self::members(&page, list).cloned());
+			marker = match page.text_at("IsTruncated") {
+				Some("true") => page.text_at("Marker").map(ToString::to_string),
+				_ => None,
+			};
+			if marker.is_none() {
+				break;
+			}
+		}
+		members.xok()
+	}
+
+	/// The `<member>`s of the query list `list` in `result`.
+	fn members<'a>(
+		result: &'a XmlElement,
+		list: &str,
+	) -> impl Iterator<Item = &'a XmlElement> {
+		result
+			.child(list)
+			.into_iter()
+			.flat_map(|held| held.children_named("member"))
+	}
+
+	/// The `field` of each of `members` that has one.
+	fn fields(members: &[XmlElement], field: &str) -> Vec<SmolStr> {
+		members
+			.iter()
+			.filter_map(|member| member.text_at(field))
+			.map(SmolStr::new)
+			.collect()
 	}
 
 	/// The user, created when absent.
 	async fn ensure_user(&self, user: &str) -> Result<String> {
 		if self
-			.iam_json(["get-user", "--user-name", user])
+			.iam_option("GetUser", &[("UserName", user)])
 			.await?
 			.is_some()
 		{
 			return format!("user {user} exists").xok();
 		}
-		self.iam([
-			"create-user",
-			"--user-name",
-			user,
-			"--tags",
-			Self::USER_TAG,
+		self.iam_call("CreateUser", &[
+			("UserName", user),
+			("Tags.member.1.Key", Self::USER_TAG_KEY),
+			("Tags.member.1.Value", Self::USER_TAG_VALUE),
 		])
 		.await?;
 		format!("user {user} created").xok()
@@ -1050,103 +1149,81 @@ impl AwsAdmin {
 	) -> Result<String> {
 		let path = format!("/aws-service-role/{service}/");
 		let held = self
-			.iam([
-				"list-roles",
-				"--path-prefix",
-				&path,
-				"--query",
-				"Roles[0].RoleName",
-				"--output",
-				"text",
-			])
+			.iam()
+			.call_query("ListRoles", [("PathPrefix", path.as_str())])
 			.await?;
-		if let Some(name) = Self::text_option(held) {
+		if let Some(name) = Self::members(&held, "Roles")
+			.find_map(|role| role.text_at("RoleName"))
+		{
 			return format!("service-linked role {name} exists").xok();
 		}
-		let name = self
-			.iam([
-				"create-service-linked-role",
-				"--aws-service-name",
+		let created = self
+			.iam()
+			.call_query("CreateServiceLinkedRole", [(
+				"AWSServiceName",
 				service,
-				"--query",
-				"Role.RoleName",
-				"--output",
-				"text",
-			])
+			)])
 			.await?;
-		format!("service-linked role {} created for {service}", name.trim())
-			.xok()
+		format!(
+			"service-linked role {} created for {service}",
+			created.text_at("Role/RoleName").unwrap_or_default()
+		)
+		.xok()
 	}
 
 	/// Every access key id of `user`, active or not: an inactive one still
 	/// counts against the limit of two.
 	async fn access_keys(&self, user: &str) -> Result<Vec<SmolStr>> {
-		let body = self
-			.iam([
-				"list-access-keys",
-				"--user-name",
-				user,
-				"--query",
-				"AccessKeyMetadata[].AccessKeyId",
-				"--output",
-				"json",
-			])
-			.await?;
-		serde_json::from_str::<Vec<SmolStr>>(&body)?.xok()
+		self.iam_list(
+			"ListAccessKeys",
+			&[("UserName", user)],
+			"AccessKeyMetadata",
+		)
+		.await?
+		.xmap(|keys| Self::fields(&keys, "AccessKeyId"))
+		.xok()
 	}
 
-	/// Mint a pair. Its stdout carries the only copy of the secret half, so
-	/// nothing here logs the output.
-	async fn create_key(&self, user: &str) -> Result<(SmolStr, SmolStr)> {
-		let body = self
-			.iam([
-				"create-access-key",
-				"--user-name",
-				user,
-				"--query",
-				"AccessKey.[AccessKeyId,SecretAccessKey]",
-				"--output",
-				"json",
-			])
+	/// Mint a pair. The answer carries the only copy of the secret half, so
+	/// nothing here logs it, and the credential it becomes prints its key id
+	/// alone.
+	async fn create_key(&self, user: &str) -> Result<AwsCredentials> {
+		let result = self
+			.iam()
+			.call_query("CreateAccessKey", [("UserName", user)])
 			.await?;
-		let pair = serde_json::from_str::<Vec<SmolStr>>(&body)?;
-		match pair.as_slice() {
-			[id, secret] => (id.clone(), secret.clone()).xok(),
-			_ => bevybail!("`iam create-access-key` answered no pair"),
+		match (
+			result.text_at("AccessKey/AccessKeyId"),
+			result.text_at("AccessKey/SecretAccessKey"),
+		) {
+			(Some(id), Some(secret)) => AwsCredentials::new(id, secret).xok(),
+			_ => bevybail!("`iam:CreateAccessKey` answered no pair"),
 		}
 	}
 
 	async fn delete_key(&self, user: &str, id: &str) -> Result {
-		self.iam([
-			"delete-access-key",
-			"--user-name",
-			user,
-			"--access-key-id",
-			id,
+		self.iam_call("DeleteAccessKey", &[
+			("UserName", user),
+			("AccessKeyId", id),
 		])
 		.await
-		.map(|_| ())
 	}
 
 	/// The user holding the access key `id`, `None` when the account holds
 	/// no such key.
 	async fn key_owner(&self, id: &str) -> Result<Option<SmolStr>> {
 		match self
-			.iam([
-				"get-access-key-last-used",
-				"--access-key-id",
-				id,
-				"--query",
-				"UserName",
-				"--output",
-				"text",
-			])
+			.iam()
+			.call_query("GetAccessKeyLastUsed", [("AccessKeyId", id)])
 			.await
 		{
-			Ok(out) => Self::text_option(out).xok(),
+			Ok(result) => result
+				.text_at("UserName")
+				.filter(|user| !user.is_empty())
+				.map(SmolStr::new)
+				.xok(),
 			Err(err)
-				if err.to_string().contains("NoSuchEntity")
-					|| err.to_string().contains("AccessDenied") =>
+				if AwsError::is(&err, &["NoSuchEntity", "AccessDenied"]) =>
 			{
 				None.xok()
 			}
@@ -1156,18 +1233,28 @@ impl AwsAdmin {
 
 	/// Every managed policy attached to `user`, by arn.
 	async fn attached_policies(&self, user: &str) -> Result<Vec<SmolStr>> {
-		self.iam([
-			"list-attached-user-policies",
-			"--user-name",
-			user,
-			"--query",
-			"AttachedPolicies[].PolicyArn",
-			"--output",
-			"json",
-		])
+		self.iam_list(
+			"ListAttachedUserPolicies",
+			&[("UserName", user)],
+			"AttachedPolicies",
+		)
 		.await?
-		.xmap(|body| serde_json::from_str::<Vec<SmolStr>>(&body))?
+		.xmap(|policies| Self::fields(&policies, "PolicyArn"))
 		.xok()
+	}
+
+	/// The ids of the managed policy `arn`'s versions other than its default,
+	/// newest first.
+	async fn non_default_versions(&self, arn: &str) -> Result<Vec<SmolStr>> {
+		self.iam_list("ListPolicyVersions", &[("PolicyArn", arn)], "Versions")
+			.await?
+			.into_iter()
+			.filter(|version| {
+				version.text_at("IsDefaultVersion") != Some("true")
+			})
+			.collect::<Vec<_>>()
+			.xmap(|versions| Self::fields(&versions, "VersionId"))
+			.xok()
 	}
 
 	/// Detach the managed policy `arn` from `user`, deleting it when nothing
@@ -1175,25 +1262,15 @@ impl AwsAdmin {
 	/// line.
 	async fn release_policy(&self, user: &str, arn: &str) -> Result<String> {
 		let attachments = self
-			.iam([
-				"get-policy",
-				"--policy-arn",
-				arn,
-				"--query",
-				"Policy.AttachmentCount",
-				"--output",
-				"text",
-			])
+			.iam()
+			.call_query("GetPolicy", [("PolicyArn", arn)])
 			.await?
-			.trim()
-			.parse::<u32>()
+			.text_at("Policy/AttachmentCount")
+			.and_then(|count| count.parse::<u32>().ok())
 			.unwrap_or(u32::MAX);
-		self.iam([
-			"detach-user-policy",
-			"--user-name",
-			user,
-			"--policy-arn",
-			arn,
+		self.iam_call("DetachUserPolicy", &[
+			("UserName", user),
+			("PolicyArn", arn),
 		])
 		.await?;
 		let name = arn.rsplit('/').next().unwrap_or(arn);
@@ -1201,29 +1278,14 @@ impl AwsAdmin {
 			return format!("policy {name} detached from {user}").xok();
 		}
 		// a managed policy is deleted only once its other versions are
-		let versions = self
-			.iam([
-				"list-policy-versions",
-				"--policy-arn",
-				arn,
-				"--query",
-				"Versions[?IsDefaultVersion==`false`].VersionId",
-				"--output",
-				"json",
-			])
-			.await?
-			.xmap(|body| serde_json::from_str::<Vec<SmolStr>>(&body))?;
-		for version in versions {
-			self.iam([
-				"delete-policy-version",
-				"--policy-arn",
-				arn,
-				"--version-id",
-				version.as_str(),
+		for version in self.non_default_versions(arn).await? {
+			self.iam_call("DeletePolicyVersion", &[
+				("PolicyArn", arn),
+				("VersionId", version.as_str()),
 			])
 			.await?;
 		}
-		self.iam(["delete-policy", "--policy-arn", arn]).await?;
+		self.iam_call("DeletePolicy", &[("PolicyArn", arn)]).await?;
 		format!(
 			"policy {name} detached from {user} and deleted, nothing else holding it"
 		)
@@ -1236,18 +1298,15 @@ impl AwsAdmin {
 	/// (untagged) is left, and said so.
 	async fn retire_user(&self, user: &str) -> Result<Vec<String>> {
 		let tag = self
-			.iam([
-				"list-user-tags",
-				"--user-name",
-				user,
-				"--query",
-				"Tags[?Key==`beet`].Value",
-				"--output",
-				"text",
-			])
+			.iam_list("ListUserTags", &[("UserName", user)], "Tags")
 			.await
 			.ok()
-			.and_then(Self::text_option);
+			.and_then(|tags| {
+				tags.iter()
+					.find(|tag| tag.text_at("Key") == Some(Self::USER_TAG_KEY))
+					.and_then(|tag| tag.text_at("Value"))
+					.map(SmolStr::new)
+			});
 		if tag.as_deref() != Some(Self::USER_TAG_VALUE) {
 			return vec![format!(
 				"user {user} held the replaced key but is no deploy user this \
@@ -1264,10 +1323,190 @@ impl AwsAdmin {
 			self.delete_key(user, &key).await?;
 			report.push(format!("key {key} of {user} deleted"));
 		}
-		self.iam(["delete-user", "--user-name", user]).await?;
+		self.iam_call("DeleteUser", &[("UserName", user)]).await?;
 		report
 			.push(format!("user {user} retired, replaced by this entry's own"));
 		report.xok()
+	}
+}
+
+/// A recording stand-in for AWS, for the tests of the calls an [`AwsAdmin`]
+/// makes: every client it builds sends through it, and nothing pauses.
+#[cfg(test)]
+pub(crate) mod aws_seam {
+	use super::AwsAdmin;
+	use super::AwsSeam;
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use beet_net::prelude::*;
+	use serde_json::Value;
+	use std::sync::Arc;
+	use std::sync::Mutex;
+
+	/// Every request the stand-in was asked, in order.
+	pub(crate) type Log = Arc<Mutex<Vec<Asked>>>;
+
+	/// One request the stand-in was asked.
+	#[derive(Debug, Clone)]
+	pub(crate) struct Asked {
+		/// The method and url, ie `POST https://iam.amazonaws.com/`.
+		pub(crate) line: String,
+		/// The `x-amz-target` header, empty for a query or rest call.
+		pub(crate) target: String,
+		/// The body as sent.
+		pub(crate) body: String,
+	}
+
+	impl Asked {
+		/// The decoded value of the form parameter `key` a query call carried.
+		pub(crate) fn param(&self, key: &str) -> Option<String> {
+			self.body.split('&').find_map(|pair| {
+				let (name, value) = pair.split_once('=')?;
+				(name == key).then(|| AwsDeployPolicy::decode_document(value))
+			})
+		}
+
+		/// The query call's action, empty for any other.
+		pub(crate) fn action(&self) -> String {
+			self.param("Action").unwrap_or_default()
+		}
+
+		/// The body as json.
+		pub(crate) fn json(&self) -> Value {
+			serde_json::from_str(&self.body).unwrap()
+		}
+	}
+
+	/// A session whose AWS is `answer`, given each request, and the log of
+	/// every one it was asked.
+	pub(crate) fn admin(
+		answer: impl 'static + Send + Sync + Fn(&Asked) -> Response,
+	) -> (AwsAdmin, Log) {
+		let log = Log::default();
+		let recorded = log.clone();
+		let answer = Arc::new(answer);
+		let transport: AwsTransport = Arc::new(move |request: Request| {
+			let (recorded, answer) = (recorded.clone(), answer.clone());
+			Box::pin(async move {
+				let line = format!(
+					"{} {}",
+					request.method().to_string().to_uppercase(),
+					request.url()
+				);
+				let target = request
+					.headers
+					.first_raw("x-amz-target")
+					.unwrap_or_default()
+					.to_string();
+				let body = String::from_utf8(
+					request.body.into_bytes().await?.to_vec(),
+				)?;
+				let asked = Asked { line, target, body };
+				let response = answer(&asked);
+				recorded.lock().unwrap().push(asked);
+				response.xok()
+			})
+		});
+		let admin = AwsAdmin {
+			credentials: AwsCredentials::new("AKID", "secret"),
+			seam: AwsSeam {
+				transport: Some(transport),
+				s3_endpoint: None,
+				instant: true,
+			},
+		};
+		(admin, log)
+	}
+
+	/// The same session reaching every bucket at `endpoint`.
+	pub(crate) fn with_s3_endpoint(
+		mut admin: AwsAdmin,
+		endpoint: &str,
+	) -> AwsAdmin {
+		admin.seam.s3_endpoint = Some(endpoint.into());
+		admin
+	}
+
+	/// A successful answer carrying `body`.
+	pub(crate) fn ok(body: impl Into<String>) -> Response {
+		Response::ok().with_body(body.into())
+	}
+
+	/// A query protocol refusal carrying `code`, as IAM answers one.
+	pub(crate) fn query_error(code: &str) -> Response {
+		Response::from_status(StatusCode::NOT_FOUND).with_body(format!(
+			"<ErrorResponse><Error><Type>Sender</Type><Code>{code}</Code>\
+			<Message>refused</Message></Error></ErrorResponse>"
+		))
+	}
+
+	/// A json protocol refusal carrying `code`, as Organizations answers one.
+	pub(crate) fn json_error(code: &str) -> Response {
+		Response::from_status(StatusCode::BAD_REQUEST)
+			.with_body(format!(r#"{{"__type":"{code}","Message":"refused"}}"#))
+	}
+
+	/// A local S3 answering every request with an empty success, and the
+	/// method, path and body of each: [`S3Store`] builds its own client, so
+	/// a bucket's requests are asked of a real listener at its endpoint.
+	pub(crate) fn s3_server() -> (String, Arc<Mutex<Vec<(String, String)>>>) {
+		use std::io::BufRead;
+		use std::io::Read;
+		use std::io::Write;
+		let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+		let endpoint = format!("http://{}", listener.local_addr().unwrap());
+		let log = Arc::new(Mutex::new(Vec::new()));
+		let recorded = log.clone();
+		std::thread::spawn(move || {
+			for stream in listener.incoming().flatten() {
+				let recorded = recorded.clone();
+				// one thread per connection, each serving its keep-alive
+				std::thread::spawn(move || {
+					let mut reader =
+						std::io::BufReader::new(stream.try_clone().unwrap());
+					let mut stream = stream;
+					loop {
+						let mut request_line = String::new();
+						if reader.read_line(&mut request_line).unwrap_or(0) == 0
+						{
+							return;
+						}
+						let mut length = 0;
+						loop {
+							let mut header = String::new();
+							reader.read_line(&mut header).unwrap();
+							let header = header.trim();
+							if header.is_empty() {
+								break;
+							}
+							if let Some((name, value)) = header.split_once(':')
+								&& name.eq_ignore_ascii_case("content-length")
+							{
+								length = value.trim().parse().unwrap();
+							}
+						}
+						let mut body = vec![0; length];
+						reader.read_exact(&mut body).unwrap();
+						let mut words = request_line.split_whitespace();
+						let line = format!(
+							"{} {}",
+							words.next().unwrap_or_default(),
+							words.next().unwrap_or_default()
+						);
+						recorded
+							.lock()
+							.unwrap()
+							.push((line, String::from_utf8(body).unwrap()));
+						stream
+							.write_all(
+								b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n",
+							)
+							.unwrap();
+					}
+				});
+			}
+		});
+		(endpoint, log)
 	}
 }
 
@@ -1302,26 +1541,20 @@ impl AppPolicies {
 		};
 		let mut uncapped = Vec::new();
 		for (kind, name) in &self.principals {
-			let Some(principal) = admin
-				.iam_json([
-					&format!("get-{kind}"),
-					&format!("--{kind}-name"),
-					name.as_str(),
-				])
-				.await?
+			let (action, field, element) = match *kind {
+				"role" => ("GetRole", "RoleName", "Role"),
+				_ => ("GetUser", "UserName", "User"),
+			};
+			let Some(principal) =
+				admin.iam_option(action, &[(field, name.as_str())]).await?
 			else {
 				// not at the account yet, so its `CreateRole` will carry the
 				// boundary and there is nothing to wait for
 				continue;
 			};
-			let held = principal
-				.get(match *kind {
-					"role" => "Role",
-					_ => "User",
-				})
-				.and_then(|principal| principal.get("PermissionsBoundary"))
-				.and_then(|boundary| boundary.get("PermissionsBoundaryArn"))
-				.and_then(Value::as_str);
+			let held = principal.text_at(&format!(
+				"{element}/PermissionsBoundary/PermissionsBoundaryArn"
+			));
 			if !held.is_some_and(of_this_app) {
 				uncapped.push(format!("{kind} {name}"));
 			}
@@ -1416,37 +1649,28 @@ impl AwsDeployPolicy {
 			);
 		}
 		let arn = format!("arn:aws:iam::{account}:policy/{name}");
-		let existing = admin
-			.iam_json([
-				"get-policy",
-				"--policy-arn",
-				arn.as_str(),
-				"--query",
-				"Policy.DefaultVersionId",
-				"--output",
-				"json",
-			])
-			.await?;
-		match existing {
+		match admin
+			.iam_option("GetPolicy", &[("PolicyArn", arn.as_str())])
+			.await?
+		{
 			None => {
 				admin
-					.iam([
-						"create-policy",
-						"--policy-name",
-						name,
-						"--policy-document",
-						rendered.as_str(),
+					.iam_call("CreatePolicy", &[
+						("PolicyName", name),
+						("PolicyDocument", rendered.as_str()),
 					])
 					.await?;
 				format!("policy {name} created").xok()
 			}
-			Some(version) => {
+			Some(policy) => {
 				Self::converge_version(
 					admin,
 					name,
 					&arn,
 					document,
-					version.as_str().unwrap_or_default(),
+					policy
+						.text_at("Policy/DefaultVersionId")
+						.unwrap_or_default(),
 				)
 				.await
 			}
@@ -1463,60 +1687,64 @@ impl AwsDeployPolicy {
 		default_version: &str,
 	) -> Result<String> {
 		let live = admin
-			.iam([
-				"get-policy-version",
-				"--policy-arn",
-				arn,
-				"--version-id",
-				default_version,
-				"--query",
-				"PolicyVersion.Document",
-				"--output",
-				"json",
+			.iam()
+			.call_query("GetPolicyVersion", [
+				("PolicyArn", arn),
+				("VersionId", default_version),
 			])
 			.await?;
-		// the cli decodes the url-encoded document, so this compares values
+		// IAM answers the document url-encoded, and this compares values
 		// rather than text: a key order or a whitespace change is not a change
-		if serde_json::from_str::<Value>(&live).ok().as_ref() == Some(document)
-		{
+		let live = live
+			.text_at("PolicyVersion/Document")
+			.map(Self::decode_document)
+			.and_then(|live| serde_json::from_str::<Value>(&live).ok());
+		if live.as_ref() == Some(document) {
 			return format!("policy {name} unchanged").xok();
 		}
-		let versions = admin
-			.iam([
-				"list-policy-versions",
-				"--policy-arn",
-				arn,
-				"--query",
-				"Versions[?IsDefaultVersion==`false`].VersionId",
-				"--output",
-				"json",
-			])
-			.await?
-			.xmap(|body| serde_json::from_str::<Vec<SmolStr>>(&body))?;
+		let versions = admin.non_default_versions(arn).await?;
 		if versions.len() >= 4 {
 			let oldest = versions.last().cloned().unwrap_or_default();
 			admin
-				.iam([
-					"delete-policy-version",
-					"--policy-arn",
-					arn,
-					"--version-id",
-					oldest.as_str(),
+				.iam_call("DeletePolicyVersion", &[
+					("PolicyArn", arn),
+					("VersionId", oldest.as_str()),
 				])
 				.await?;
 			info!("pruned version {oldest} of {name}, which holds five");
 		}
+		let rendered = document.to_string();
 		admin
-			.iam([
-				"create-policy-version",
-				"--policy-arn",
-				arn,
-				"--policy-document",
-				document.to_string().as_str(),
-				"--set-as-default",
+			.iam_call("CreatePolicyVersion", &[
+				("PolicyArn", arn),
+				("PolicyDocument", rendered.as_str()),
+				("SetAsDefault", "true"),
 			])
 			.await?;
 		format!("policy {name} updated").xok()
+	}
+
+	/// A policy document as IAM answers it, its `%XX` escapes decoded.
+	fn decode_document(encoded: &str) -> String {
+		let bytes = encoded.as_bytes();
+		let hex = |at: usize| {
+			bytes.get(at).and_then(|byte| (*byte as char).to_digit(16))
+		};
+		let mut decoded = Vec::with_capacity(bytes.len());
+		let mut index = 0;
+		while index < bytes.len() {
+			match (bytes[index], hex(index + 1), hex(index + 2)) {
+				(b'%', Some(high), Some(low)) => {
+					decoded.push((high * 16 + low) as u8);
+					index += 3;
+				}
+				(byte, _, _) => {
+					decoded.push(byte);
+					index += 1;
+				}
+			}
+		}
+		String::from_utf8_lossy(&decoded).into_owned()
 	}
 
 	/// Attach the policy to `user` unless it already is.
@@ -1534,21 +1762,18 @@ impl AwsDeployPolicy {
 			return OK;
 		}
 		admin
-			.iam([
-				"attach-user-policy",
-				"--user-name",
-				user,
-				"--policy-arn",
-				arn,
+			.iam_call("AttachUserPolicy", &[
+				("UserName", user),
+				("PolicyArn", arn),
 			])
 			.await
-			.map(|_| ())
 	}
 }
 
 #[cfg(test)]
 mod test {
 	use super::AppPolicies;
+	use super::aws_seam;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
@@ -1835,5 +2060,147 @@ mod test {
 				.protects(&change(kind, "update"), &dev)
 				.xpect_none();
 		}
+	}
+
+	/// An absent user is `NoSuchEntity`, which is no failure: the user is
+	/// created, tagged as the deploy user a retirement may delete.
+	#[beet_core::test]
+	async fn creates_an_absent_user() {
+		let (admin, log) =
+			aws_seam::admin(|asked| match asked.action().as_str() {
+				"GetUser" => aws_seam::query_error("NoSuchEntity"),
+				_ => aws_seam::ok(
+					"<CreateUserResponse><CreateUserResult><User>\
+				<UserName>beet-site-deploy</UserName></User>\
+				</CreateUserResult></CreateUserResponse>",
+				),
+			});
+		admin
+			.ensure_user("beet-site-deploy")
+			.await
+			.unwrap()
+			.xpect_eq("user beet-site-deploy created");
+		let log = log.lock().unwrap().clone();
+		log[0]
+			.line
+			.as_str()
+			.xpect_eq("POST https://iam.amazonaws.com/");
+		log[0]
+			.param("UserName")
+			.xpect_eq(Some("beet-site-deploy".into()));
+		log[1].action().xpect_eq("CreateUser");
+		log[1]
+			.param("Tags.member.1.Key")
+			.xpect_eq(Some("beet".into()));
+		log[1]
+			.param("Tags.member.1.Value")
+			.xpect_eq(Some("deploy-credential".into()));
+	}
+
+	/// A minted pair is read from the answer, and the credential it becomes
+	/// never prints its secret half.
+	#[beet_core::test]
+	async fn mints_a_pair_without_printing_it() {
+		let (admin, _) = aws_seam::admin(|_| {
+			aws_seam::ok(
+				"<CreateAccessKeyResponse><CreateAccessKeyResult><AccessKey>\
+				<UserName>beet-site-deploy</UserName>\
+				<AccessKeyId>AKIANEW</AccessKeyId><Status>Active</Status>\
+				<SecretAccessKey>hunter2secret</SecretAccessKey>\
+				</AccessKey></CreateAccessKeyResult></CreateAccessKeyResponse>",
+			)
+		});
+		let key = admin.create_key("beet-site-deploy").await.unwrap();
+		key.access_key_id().xpect_eq("AKIANEW");
+		key.secret_access_key().xpect_eq("hunter2secret");
+		format!("{key:?}")
+			.xpect_contains("AKIANEW")
+			.xnot()
+			.xpect_contains("hunter2secret");
+	}
+
+	/// IAM answers a policy document url-encoded, so a live document equal
+	/// to the declared one in value is unchanged whatever its spelling; a
+	/// changed one prunes the oldest of a full set of versions first.
+	#[beet_core::test]
+	async fn compares_the_live_document_decoded() {
+		let document = serde_json::json!({
+			"Version": "2012-10-17",
+			"Statement": [{"Effect": "Allow", "Action": "s3:GetObject", "Resource": "*"}],
+		});
+		let live = "%7B%22Statement%22%3A%20%5B%7B%22Resource%22%3A%22%2A%22%2C\
+			%22Action%22%3A%22s3%3AGetObject%22%2C%22Effect%22%3A%22Allow%22%7D%5D%2C\
+			%22Version%22%3A%222012-10-17%22%7D";
+		let answer =
+			move |asked: &aws_seam::Asked| match asked.action().as_str() {
+				"GetPolicy" => aws_seam::ok(
+					"<GetPolicyResponse><GetPolicyResult><Policy>\
+				<DefaultVersionId>v5</DefaultVersionId>\
+				</Policy></GetPolicyResult></GetPolicyResponse>",
+				),
+				"GetPolicyVersion" => aws_seam::ok(format!(
+					"<GetPolicyVersionResponse><GetPolicyVersionResult>\
+				<PolicyVersion><Document>{live}</Document>\
+				<VersionId>v5</VersionId><IsDefaultVersion>true</IsDefaultVersion>\
+				</PolicyVersion></GetPolicyVersionResult></GetPolicyVersionResponse>"
+				)),
+				"ListPolicyVersions" => aws_seam::ok(format!(
+					"<ListPolicyVersionsResponse><ListPolicyVersionsResult>\
+				<Versions>{}</Versions><IsTruncated>false</IsTruncated>\
+				</ListPolicyVersionsResult></ListPolicyVersionsResponse>",
+					(1..=5)
+						.rev()
+						.map(|version| format!(
+							"<member><VersionId>v{version}</VersionId>\
+						<IsDefaultVersion>{}</IsDefaultVersion></member>",
+							version == 5
+						))
+						.collect::<String>()
+				)),
+				_ => aws_seam::ok("<R/>"),
+			};
+		let (admin, log) = aws_seam::admin(answer);
+		AwsDeployPolicy::converge_document(
+			&admin,
+			"111",
+			"app--deploy",
+			&document,
+		)
+		.await
+		.unwrap()
+		.xpect_eq("policy app--deploy unchanged");
+		log.lock()
+			.unwrap()
+			.iter()
+			.map(|asked| asked.action())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["GetPolicy".to_string(), "GetPolicyVersion".into()]);
+		log.lock().unwrap()[1]
+			.param("PolicyArn")
+			.xpect_eq(Some("arn:aws:iam::111:policy/app--deploy".into()));
+
+		let (admin, log) = aws_seam::admin(answer);
+		let changed =
+			serde_json::json!({"Version": "2012-10-17", "Statement": []});
+		AwsDeployPolicy::converge_document(
+			&admin,
+			"111",
+			"app--deploy",
+			&changed,
+		)
+		.await
+		.unwrap()
+		.xpect_eq("policy app--deploy updated");
+		let log = log.lock().unwrap().clone();
+		log[3].action().xpect_eq("DeletePolicyVersion");
+		log[3].param("VersionId").xpect_eq(Some("v1".into()));
+		log[4].action().xpect_eq("CreatePolicyVersion");
+		log[4].param("SetAsDefault").xpect_eq(Some("true".into()));
+		log[4]
+			.param("PolicyDocument")
+			.map(|document| {
+				serde_json::from_str::<serde_json::Value>(&document).unwrap()
+			})
+			.xpect_eq(Some(changed));
 	}
 }

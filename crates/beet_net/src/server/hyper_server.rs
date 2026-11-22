@@ -496,7 +496,8 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		let server = HttpServer::new_test(HttpServer::start_hyper_with_tcp);
+		let server =
+			HttpServer::bind_loopback(HttpServer::start_hyper_with_tcp);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
@@ -519,7 +520,8 @@ mod test {
 	}
 	#[beet_core::test]
 	async fn stream_roundtrip() {
-		let server = HttpServer::new_test(HttpServer::start_hyper_with_tcp);
+		let server =
+			HttpServer::bind_loopback(HttpServer::start_hyper_with_tcp);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
@@ -549,7 +551,8 @@ mod test {
 	// asserts stream behavior with timestamps and delays
 	#[beet_core::test]
 	async fn stream_timestamp() {
-		let server = HttpServer::new_test(HttpServer::start_hyper_with_tcp);
+		let server =
+			HttpServer::bind_loopback(HttpServer::start_hyper_with_tcp);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
@@ -647,7 +650,8 @@ mod upgrade_test {
 	/// `mini_http_server` upgrade test.
 	#[beet_core::test]
 	async fn upgrades_to_socket() {
-		let server = HttpServer::new_test(HttpServer::start_hyper_with_tcp);
+		let server =
+			HttpServer::bind_loopback(HttpServer::start_hyper_with_tcp);
 		let port = server.0.port.unwrap();
 		let landed = Store::<Vec<Entity>>::default();
 		let captor = landed.clone();

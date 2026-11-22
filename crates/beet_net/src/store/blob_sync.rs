@@ -16,6 +16,12 @@ use beet_core::prelude::*;
 /// mirror, where objects absent from the source are removed so the destination
 /// exactly reflects it. A deploy wants that (a renamed or removed source file
 /// otherwise lingers across deploys), a source of record does not.
+///
+/// What each end is, beyond its contents, is the end's own declaration: a
+/// local end that skips symbolic links is an
+/// [`FsStore::with_follow_symlinks`], a storage class or an unsigned read of
+/// a public bucket an [`S3Store`](crate::prelude::S3Store) option, a prefix a
+/// subdir.
 #[derive(Debug, Clone, Get, SetWith)]
 pub struct BlobSync {
 	/// The end read from.
@@ -24,6 +30,19 @@ pub struct BlobSync {
 	dest: BlobStore,
 	/// Remove objects in the destination that the source lacks.
 	delete: bool,
+	/// Report what would move without moving it.
+	dry_run: bool,
+	/// Compare the two ends by size alone, rather than size and digest.
+	///
+	/// Right for a store whose content is immutable per path (a segment log,
+	/// a content-addressed blob), where size is already a complete
+	/// comparison. Wrong for a mutable mirror, where an edit that happened to
+	/// keep the byte count would be skipped.
+	size_only: bool,
+	/// The paths below both ends this sync covers, the whole store when
+	/// empty: a path the filter refuses is neither copied nor removed, so a
+	/// pattern reads the same in either direction.
+	filter: GlobFilter,
 	/// Transfers in flight at once.
 	concurrency: usize,
 }
@@ -35,24 +54,54 @@ impl BlobSync {
 			source,
 			dest,
 			delete: false,
+			dry_run: false,
+			size_only: false,
+			filter: default(),
 			concurrency: 16,
 		}
 	}
 
-	/// Run the mirror, reporting what moved.
-	pub async fn run(&self) -> Result<BlobSyncReport> {
-		let source = self.source.list_stats().await?;
-		let dest = self
-			.dest
+	/// The stats of `store` this sync covers.
+	async fn covered(
+		&self,
+		store: &BlobStore,
+	) -> Result<Vec<(RelPath, BlobStat)>> {
+		store
 			.list_stats()
+			.await?
+			.into_iter()
+			.filter(|(path, _)| {
+				self.filter.is_empty() || self.filter.passes(path.as_str())
+			})
+			.collect::<Vec<_>>()
+			.xok()
+	}
+
+	/// Whether `dest` already holds what `source` describes.
+	fn same(&self, dest: &BlobStat, source: &BlobStat) -> bool {
+		match self.size_only {
+			true => dest.size == source.size,
+			false => dest.matches(source),
+		}
+	}
+
+	/// Run the mirror, reporting what moved, or under
+	/// [`dry_run`](Self::dry_run) what would.
+	pub async fn run(&self) -> Result<BlobSyncReport> {
+		let source = self.covered(&self.source).await?;
+		let dest = self
+			.covered(&self.dest)
 			.await?
 			.into_iter()
 			.collect::<HashMap<_, _>>();
 		// what to copy: absent from the destination, or present but different
-		let mut report = BlobSyncReport::default();
+		let mut report = BlobSyncReport {
+			dry_run: self.dry_run,
+			..default()
+		};
 		for (path, stat) in &source {
 			match dest.get(path) {
-				Some(existing) if existing.matches(stat) => {
+				Some(existing) if self.same(existing, stat) => {
 					report.unchanged.push(path.clone());
 					report.unchanged_bytes += stat.size;
 				}
@@ -62,14 +111,16 @@ impl BlobSync {
 				}
 			}
 		}
-		async_ext::try_join_all_bounded(
-			self.concurrency,
-			report.copied.iter().map(|path| async move {
-				let bytes = self.source.get(path).await?;
-				self.dest.insert(path, bytes).await
-			}),
-		)
-		.await?;
+		if !self.dry_run {
+			async_ext::try_join_all_bounded(
+				self.concurrency,
+				report.copied.iter().map(|path| async move {
+					let bytes = self.source.get(path).await?;
+					self.dest.insert(path, bytes).await
+				}),
+			)
+			.await?;
+		}
 		// what to prune: in the destination and nowhere in the source
 		if self.delete {
 			let kept =
@@ -79,14 +130,15 @@ impl BlobSync {
 				.filter(|path| !kept.contains(path))
 				.cloned()
 				.collect();
-			async_ext::try_join_all_bounded(
-				self.concurrency,
-				report
-					.removed
-					.iter()
-					.map(|path| async move { self.dest.remove(path).await }),
-			)
-			.await?;
+			if !self.dry_run {
+				async_ext::try_join_all_bounded(
+					self.concurrency,
+					report.removed.iter().map(|path| async move {
+						self.dest.remove(path).await
+					}),
+				)
+				.await?;
+			}
 		}
 		report.sort();
 		report.xok()
@@ -107,6 +159,8 @@ pub struct BlobSyncReport {
 	pub copied_bytes: u64,
 	/// Total size of the unchanged objects.
 	pub unchanged_bytes: u64,
+	/// Whether this was a dry run, so nothing listed above moved.
+	pub dry_run: bool,
 }
 
 impl BlobSyncReport {
@@ -124,9 +178,13 @@ impl BlobSyncReport {
 
 impl core::fmt::Display for BlobSyncReport {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		let would = match self.dry_run {
+			true => "would have ",
+			false => "",
+		};
 		write!(
 			f,
-			"copied {} ({}), unchanged {} ({}), removed {}",
+			"{would}copied {} ({}), unchanged {} ({}), removed {}",
 			self.copied.len(),
 			Self::mib(self.copied_bytes),
 			self.unchanged.len(),
@@ -217,6 +275,90 @@ mod test {
 		report.removed.xpect_eq(paths(&["stale.txt"]));
 		report.unchanged.xpect_eq(paths(&["keep.txt"]));
 		dest.list().await.unwrap().xpect_eq(paths(&["keep.txt"]));
+	}
+
+	/// A dry run reports what a mirror would do and touches nothing.
+	#[beet_core::test]
+	async fn a_dry_run_moves_nothing() {
+		let source = seeded(&[("new.txt", "n")]).await;
+		let dest = seeded(&[("stale.txt", "s")]).await;
+		let report = BlobSync::new(source, dest.clone())
+			.with_delete(true)
+			.with_dry_run(true)
+			.run()
+			.await
+			.unwrap();
+		report.copied.xpect_eq(paths(&["new.txt"]));
+		report.removed.xpect_eq(paths(&["stale.txt"]));
+		report.to_string().xpect_starts_with("would have copied 1");
+		dest.list().await.unwrap().xpect_eq(paths(&["stale.txt"]));
+	}
+
+	/// By size alone, a same-length change is not re-sent.
+	#[beet_core::test]
+	async fn size_only_skips_a_same_size_change() {
+		let source = seeded(&[("a.txt", "one")]).await;
+		let dest = seeded(&[("a.txt", "ONE")]).await;
+		BlobSync::new(source, dest)
+			.with_size_only(true)
+			.run()
+			.await
+			.unwrap()
+			.unchanged
+			.xpect_eq(paths(&["a.txt"]));
+	}
+
+	/// A filter narrows both ends, so what it refuses is neither copied nor
+	/// pruned.
+	#[beet_core::test]
+	async fn a_filter_covers_both_ends() {
+		let source =
+			seeded(&[("records/a.json", "a"), ("blobs/b.png", "b")]).await;
+		let dest = seeded(&[("blobs/kept.png", "k")]).await;
+		let report = BlobSync::new(source, dest.clone())
+			.with_delete(true)
+			.with_filter(GlobFilter::default().with_exclude("blobs/*"))
+			.run()
+			.await
+			.unwrap();
+		report.copied.xpect_eq(paths(&["records/a.json"]));
+		report.removed.xpect_eq(Vec::<RelPath>::new());
+		dest.exists(&RelPath::new("blobs/kept.png"))
+			.await
+			.unwrap()
+			.xpect_true();
+	}
+
+	/// A local end that skips links leaves a linked directory out.
+	#[cfg(all(unix, not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	async fn a_local_end_may_skip_links() {
+		let root = TempDir::new_ws().unwrap();
+		let target = TempDir::new_ws().unwrap();
+		fs_ext::write(root.join("main.bsx"), "<div/>").unwrap();
+		fs_ext::write(target.join("logo.png"), "png").unwrap();
+		std::os::unix::fs::symlink(target.path(), root.join("assets")).unwrap();
+		let sync = |follow: bool| {
+			BlobSync::new(
+				BlobStore::new(
+					FsStore::new(root.path().clone())
+						.with_follow_symlinks(follow),
+				),
+				BlobStore::temp(),
+			)
+		};
+		sync(true)
+			.run()
+			.await
+			.unwrap()
+			.copied
+			.xpect_eq(paths(&["assets/logo.png", "main.bsx"]));
+		sync(false)
+			.run()
+			.await
+			.unwrap()
+			.copied
+			.xpect_eq(paths(&["main.bsx"]));
 	}
 
 	/// The deploy's shape: a directory on disk mirrored into a store, and the

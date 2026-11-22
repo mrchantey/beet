@@ -31,6 +31,8 @@ mod store;
 #[cfg(feature = "action")]
 mod actions;
 mod net_plugin;
+#[cfg(feature = "oauth")]
+mod oauth;
 #[cfg(feature = "vault")]
 mod secrets;
 #[cfg(feature = "std")]
@@ -104,6 +106,8 @@ pub mod prelude {
 	#[cfg(feature = "mdns")]
 	pub use crate::mdns::*;
 	pub use crate::net_plugin::*;
+	#[cfg(feature = "oauth")]
+	pub use crate::oauth::*;
 	#[cfg(feature = "vault")]
 	pub use crate::secrets::*;
 	pub use crate::server::*;

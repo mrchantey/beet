@@ -22,7 +22,7 @@
 //!
 //! - **Mini HTTP**: Lightweight async-io TCP server (default for `server` feature)
 //! - **Hyper**: Full-featured HTTP server (requires `hyper` feature)
-//! - **Lambda**: AWS Lambda runtime adapter (requires `lambda` feature)
+//! - **Lambda**: the Runtime API loop, [`LambdaRuntime`] (requires `lambda`)
 //! - **Installed**: a backend supplied at runtime via [`HttpServer::set_backend`], used
 //!   on `no_std` targets with no compiled-in backend.
 //!
@@ -119,6 +119,8 @@ mod echo_http_server;
 mod hyper_server;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_server;
+#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
+pub use lambda_server::*;
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 mod mini_http_server;
 #[cfg(feature = "std")]

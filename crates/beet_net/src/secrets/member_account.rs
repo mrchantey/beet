@@ -32,10 +32,30 @@ impl MemberAccount {
 	/// from another role's session at an hour.
 	pub const SESSION_SECS: i64 = 3600;
 
-	/// The active member account named `name`, asked as `vars`: the
+	/// The Organizations api as `credentials`, answered by the management
+	/// account from `us-east-1`.
+	pub fn organizations(
+		credentials: impl Into<AwsCredentialSource>,
+	) -> AwsClient {
+		AwsClient::new(AwsService::ORGANIZATIONS, "us-east-1")
+			.with_credentials(credentials)
+	}
+
+	/// The active member account named `name`, asked as `credentials`: the
 	/// administrator session, or `beet-agent` through its read policy.
-	pub async fn find(vars: &[(SmolStr, SmolStr)], name: &str) -> Result<Self> {
-		Self::lookup(vars, name).await?.ok_or_else(|| {
+	pub async fn find(
+		credentials: impl Into<AwsCredentialSource>,
+		name: &str,
+	) -> Result<Self> {
+		Self::find_in(&Self::organizations(credentials), name).await
+	}
+
+	/// [`find`](Self::find) through `organizations`.
+	pub async fn find_in(
+		organizations: &AwsClient,
+		name: &str,
+	) -> Result<Self> {
+		Self::lookup_in(organizations, name).await?.ok_or_else(|| {
 			bevyhow!(
 				"the Organization holds no active account named `{name}`: an \
 				elevated deploy of the package declaring `<AwsAccount \
@@ -46,26 +66,50 @@ impl MemberAccount {
 
 	/// [`find`](Self::find), `None` when there is no such account.
 	pub async fn lookup(
-		vars: &[(SmolStr, SmolStr)],
+		credentials: impl Into<AwsCredentialSource>,
+		name: &str,
+	) -> Result<Option<Self>> {
+		Self::lookup_in(&Self::organizations(credentials), name).await
+	}
+
+	/// [`lookup`](Self::lookup) through `organizations`: every page of
+	/// `ListAccounts`, the active ones named `name`.
+	pub async fn lookup_in(
+		organizations: &AwsClient,
 		name: &str,
 	) -> Result<Option<Self>> {
 		Self::check_name(name)?;
-		let query = format!("Accounts[?Name=='{name}' && Status=='ACTIVE'].Id");
-		let out = AgentIdentity::aws(vars, [
-			"organizations",
-			"list-accounts",
-			"--query",
-			query.as_str(),
-			"--output",
-			"text",
-		])
-		.run_async_stdout()
-		.await?;
-		match out.split_whitespace().collect::<Vec<_>>().as_slice() {
+		let mut ids = Vec::new();
+		let mut next_token: Option<String> = None;
+		loop {
+			let body = match next_token.take() {
+				Some(token) => serde_json::json!({"NextToken": token}),
+				None => serde_json::json!({}),
+			};
+			let page = organizations.call_json("ListAccounts", &body).await?;
+			ids.extend(
+				page["Accounts"]
+					.as_array()
+					.into_iter()
+					.flatten()
+					.filter(|account| {
+						account["Name"] == name
+							&& (account["State"] == "ACTIVE"
+								|| account["Status"] == "ACTIVE")
+					})
+					.filter_map(|account| account["Id"].as_str())
+					.map(SmolStr::new),
+			);
+			match page["NextToken"].as_str() {
+				Some(token) => next_token = Some(token.to_string()),
+				None => break,
+			}
+		}
+		match ids.as_slice() {
 			[] => None.xok(),
 			[id] => Some(Self {
 				name: name.into(),
-				id: (*id).into(),
+				id: id.clone(),
 			})
 			.xok(),
 			ids => bevybail!(
@@ -91,30 +135,28 @@ impl MemberAccount {
 		}
 	}
 
-	/// Assume `role` in this account as `vars`, for the hour a member session
-	/// lasts.
+	/// Assume `role` in this account as `credentials`, for the hour a member
+	/// session lasts.
 	pub async fn assume(
 		&self,
-		vars: &[(SmolStr, SmolStr)],
+		credentials: impl Into<AwsCredentialSource>,
 		role: &str,
-	) -> Result<AdminSession> {
-		let arn = format!("arn:aws:iam::{}:role/{role}", self.id);
-		let seconds = Self::SESSION_SECS.to_string();
-		let body = AgentIdentity::aws(vars, [
-			"sts",
-			"assume-role",
-			"--role-arn",
-			arn.as_str(),
-			"--role-session-name",
-			AgentIdentity::USER,
-			"--duration-seconds",
-			seconds.as_str(),
-			"--query",
-			"Credentials.[AccessKeyId,SecretAccessKey,SessionToken,Expiration]",
-			"--output",
-			"text",
-		])
-		.run_async_stdout()
+	) -> Result<AwsCredentials> {
+		self.assume_with(&AwsSts::new(credentials), role).await
+	}
+
+	/// [`assume`](Self::assume) through `sts`.
+	pub async fn assume_with(
+		&self,
+		sts: &AwsSts,
+		role: &str,
+	) -> Result<AwsCredentials> {
+		sts.assume_role(&AssumeRole {
+			role_arn: format!("arn:aws:iam::{}:role/{role}", self.id).into(),
+			session_name: AgentIdentity::USER.into(),
+			duration_secs: Self::SESSION_SECS,
+			mfa: None,
+		})
 		.await
 		.map_err(|err| {
 			bevyhow!(
@@ -122,8 +164,7 @@ impl MemberAccount {
 				self.name,
 				self.id
 			)
-		})?;
-		AdminSession::parse(&body, Self::SESSION_SECS)
+		})
 	}
 }
 
@@ -139,5 +180,49 @@ mod test {
 		MemberAccount::check_name("beet_egress").unwrap();
 		MemberAccount::check_name("a' || b").unwrap_err();
 		MemberAccount::check_name("").unwrap_err();
+	}
+
+	/// The account is found across pages by name and state, and the closed
+	/// one of the same name is not it.
+	#[beet_core::test]
+	async fn finds_across_pages() {
+		let pages = std::sync::Arc::new(std::sync::Mutex::new(
+			vec![
+				r#"{"Accounts":[{"Id":"111","Name":"beetmash","State":"SUSPENDED"}],"NextToken":"t1"}"#,
+				r#"{"Accounts":[{"Id":"222","Name":"beetmash","State":"ACTIVE"},{"Id":"333","Name":"other","State":"ACTIVE"}]}"#,
+			]
+			.into_iter(),
+		));
+		let tokens = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+		let seen = tokens.clone();
+		let organizations =
+			AwsClient::new(AwsService::ORGANIZATIONS, "us-east-1")
+				.with_credentials(AwsCredentials::new("AKID", "secret"))
+				.with_transport(move |request| {
+					let pages = pages.clone();
+					let seen = seen.clone();
+					Box::pin(async move {
+						request.headers.first_raw("x-amz-target").xpect_eq(
+							Some("AWSOrganizationsV20161128.ListAccounts"),
+						);
+						let body = request.body.into_bytes().await?;
+						seen.lock()
+							.unwrap()
+							.push(String::from_utf8(body.to_vec())?);
+						Response::ok()
+							.with_body(pages.lock().unwrap().next().unwrap())
+							.xok()
+					})
+				});
+		MemberAccount::find_in(&organizations, "beetmash")
+			.await
+			.unwrap()
+			.id
+			.as_str()
+			.xpect_eq("222");
+		tokens.lock().unwrap().clone().xpect_eq(vec![
+			"{}".to_string(),
+			r#"{"NextToken":"t1"}"#.to_string(),
+		]);
 	}
 }

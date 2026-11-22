@@ -18,7 +18,8 @@ Situational cheatsheets, read before touching the subsystem:
 - Actions: one-per-entity, overloads, providers, `#[field]`, facets: `crates/beet_action/README.md`
 - Servers and the lifecycle verbs: `crates/beet_net/README.md`
 - Cloud resources: stacks, grants, buckets, jobs, a box's ssh authority: `crates/beet_infra/README.md` + `.agents/skills/infra-deploy`
-- Deploy credentials, `<stack>/deploy`, a package's `all/deploy` and `--elevated` (no mint verb; an agent relays a refusal to the operator as it is): `crates/beet_infra/README.md`, "Deploy, and deploy elevated"; a repo's own AWS account (`<AwsAccount/>`, `beet aws --account`): "The AWS account"
+- Deploy credentials, `<stack>/deploy`, a package's `all/deploy` and `--elevated` (no mint verb; an agent relays a refusal to the operator as it is): `crates/beet_infra/README.md`, "Deploy, and deploy elevated"; a repo's own AWS account (`<AwsAccount/>`, `beet aws --account`) and a person's way in (`<IdentityCenter/>`, `beet sso login`): "The AWS account"
+- AWS calls (`AwsClient`, signed, every target, no SDK or cli): `crates/beet_net/src/client/aws/mod.rs`; asking the operator: `OperatorPrompt`
 - The beet CLI, entries, wasm binaries, making any binary a beet runtime: `crates/beet-cli/README.md` + `crates/beet_router/src/launch/mod.rs`
 - Styling: `crates/beet_ui/src/style/mod.rs`
 - Scene editing (tree, inspector, entity and component pickers): `crates/beet_ui/src/widgets/scene_editor/mod.rs`

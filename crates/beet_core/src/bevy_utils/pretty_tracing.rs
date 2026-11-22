@@ -63,7 +63,7 @@ impl Plugin for LogPlugin {
 /// ## Levels
 ///
 /// Beet's own crates log at [`default_level`](Self::default_level), every
-/// other crate (rustls, hyper, the AWS SDK, bevy itself) warnings and errors
+/// other crate (rustls, hyper, russh, bevy itself) warnings and errors
 /// only: a dependency's `debug` is its authors' diagnostics, not the app's.
 /// Which targets are beet's own is a prefix rule,
 /// [`own_targets`](Self::own_targets), so a downstream crate opts in by name.
@@ -72,7 +72,7 @@ impl Plugin for LogPlugin {
 /// [`filter`](Self::filter), override the defaults, each a comma separated
 /// directive list: a bare level sets the own targets' level
 /// (`RUST_LOG=info`), a `target=level` directive any target's, a dependency's
-/// included (`RUST_LOG=info,aws_smithy_runtime=debug`).
+/// included (`RUST_LOG=info,russh=debug`).
 #[derive(Clone)]
 pub struct PrettyTracing {
 	/// The level the [`own_targets`](Self::own_targets) log at, unless a bare
@@ -114,8 +114,8 @@ impl PrettyTracing {
 	/// if already initialized, this will do nothing
 	///
 	/// ## AWS Lambda
-	/// This also considers the AWS Lambda tracing environment variables,
-	/// as defined in [`lambda_http::tracing::init_default_subscriber_with_writer`]
+	/// A function's `AWS_LAMBDA_LOG_LEVEL`, set from its logging config, wins
+	/// over `RUST_LOG`, so the level is the function's own setting.
 	///
 	/// ## Format
 	/// See [`PrettyTracing::interactive`]: a terminal gets the colored
@@ -453,8 +453,8 @@ mod test {
 		tracing::info!(target: "beet_cli", "cli info");
 		tracing::debug!(target: "my_app::main", "app debug");
 		tracing::debug!(target: "rustls::client::hs", "rustls debug");
-		tracing::info!(target: "aws_smithy_runtime::client", "sdk info");
-		tracing::debug!(target: "aws_smithy_runtime::client", "sdk debug");
+		tracing::info!(target: "russh::client", "dependency info");
+		tracing::debug!(target: "russh::client", "dependency debug");
 		tracing::warn!(target: "hyper_util::client", "hyper warn");
 	}
 
@@ -482,16 +482,16 @@ mod test {
 			.xnot()
 			.xpect_contains("rustls debug")
 			.xnot()
-			.xpect_contains("sdk info");
+			.xpect_contains("dependency info");
 	}
 
 	/// `RUST_LOG` overrides: a bare level is beet's own, a target directive
 	/// raises a dependency, and [`PrettyTracing::filter`] wins over both.
 	#[crate::test]
 	fn the_environment_overrides() {
-		captured(my_app(), Some("info,aws_smithy_runtime=debug"), emit_levels)
+		captured(my_app(), Some("info,russh=debug"), emit_levels)
 			.xpect_contains("cli info")
-			.xpect_contains("sdk debug")
+			.xpect_contains("dependency debug")
 			.xnot()
 			.xpect_contains("beet debug")
 			.xnot()

@@ -21,7 +21,7 @@
 //! `beet-site--dev--main-fargate-cluster` / `main-fargate--service`.
 //!
 //! Run it (after the site is deployed) with:
-//!     cargo test -p beet_infra --features deploy,aws_sdk,fargate_block \
+//!     cargo test -p beet_infra --features deploy,aws,fargate_block \
 //!         --test site_load_test -- --ignored
 
 beet_core::test_main!();

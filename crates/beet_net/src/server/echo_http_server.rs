@@ -48,7 +48,7 @@ impl EchoHttpServer {
 	///
 	/// Use [`url()`](Self::url) to make requests against the running server.
 	pub async fn new() -> Self {
-		let server = HttpServer::new_test(HttpServer::start_mini_with_tcp);
+		let server = HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		let url = Url::coerce(&server.0.local_url());
 		std::thread::spawn(|| {
 			App::new()

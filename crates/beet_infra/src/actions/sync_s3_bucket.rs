@@ -3,7 +3,9 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Syncs a local directory and a declared bucket, in either direction.
+/// Syncs a local directory and a declared bucket, in either direction, as a
+/// [`BlobSync`] between a local [`FsStore`] and the bucket's [`S3Store`],
+/// copying only what differs by size and digest.
 ///
 /// Both ends come from the nearest ancestor [`DirSync`] (or, where a store was
 /// spawned directly, from its [`S3FsStore`]): the bucket end is the identity
@@ -27,15 +29,13 @@ pub async fn SyncS3Bucket(
 	/// additive sync). Guarded on push by [`SyncS3Bucket::assert_mirrorable`].
 	#[field]
 	delete: bool,
-	/// Compare the two ends by SIZE alone, rather than by size and modified
-	/// time.
+	/// Compare the two ends by SIZE alone, rather than by size and digest.
 	///
 	/// Right for a store whose content is immutable per path (a segment log, a
 	/// content-addressed blob), where size is already a complete comparison and
-	/// the default makes a hydrate permanent: a downloaded file is always newer
-	/// than the object it came from, so the next push re-uploads the whole
-	/// store. Wrong for a mutable mirror, where an edit that happened to keep
-	/// the byte count would be skipped.
+	/// spares reading every local file to digest it. Wrong for a mutable
+	/// mirror, where an edit that happened to keep the byte count would be
+	/// skipped.
 	#[field]
 	size_only: bool,
 	/// Upload the targets of symbolic links rather than skipping them, so a
@@ -50,27 +50,38 @@ pub async fn SyncS3Bucket(
 	bucket_dir: Option<RelPath>,
 	/// Narrow the sync to part of the directory, ie
 	/// `{filter:{exclude:["*/blobs/*"]}}` to hydrate a store's records without
-	/// its media. Empty by default, the whole directory. Translated into the
-	/// cli's own rules by [`S3Sync::filter_args`], and matched against each
+	/// its media. Empty by default, the whole directory. Matched against each
 	/// entry's path below the two ends, so a pattern reads the same in either
 	/// direction. A filtered PUSH leaves what it skipped out of the bucket,
 	/// which only a store that is not the source of record should want.
 	#[field]
 	filter: GlobFilter,
+	/// Report what would move without moving it.
+	#[field]
+	dry_run: bool,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	trace!("SyncS3Bucket: starting");
 	let ends = SyncEnds::declared(&cx.caller).await?;
 	let local_dir = ends.local_dir(cx.caller.world()).await?;
-	let storage_class = ends.storage_class;
-	let s3_store = match ends.deploy_subdir {
-		Some(subdir) => ends.s3_store.with_subdir(subdir),
-		None => ends.s3_store,
+	let s3_store = ends.s3_store.clone();
+	// the deploy's prefix, then the sync's own dir below it
+	let subdir = match (ends.deploy_subdir.clone(), bucket_dir) {
+		(Some(deploy), Some(dir)) => Some(deploy.join(&dir)),
+		(deploy, dir) => deploy.or(dir),
 	};
-	// `s3_uri` already ends in a separator
-	let s3_uri = match &bucket_dir {
-		Some(dir) => format!("{}{dir}", s3_store.s3_uri()),
-		None => s3_store.s3_uri(),
+	let s3_store = match subdir {
+		Some(subdir) => s3_store.with_subdir(subdir),
+		None => s3_store,
+	}
+	.with_anonymous(no_sign_request);
+	// a class declared on the bucket lands new objects there directly,
+	// sparing each a day at Standard and a transition request
+	let s3_store = match (direction, ends.storage_class) {
+		(SyncDirection::Push, Some(class)) => {
+			s3_store.with_storage_class(class.as_str())
+		}
+		_ => s3_store,
 	};
 	// only a mirroring push can destroy remote state, so only it is guarded
 	if delete && direction == SyncDirection::Push {
@@ -81,36 +92,41 @@ pub async fn SyncS3Bucket(
 		// surprise worth a line of output
 		info!("SyncS3Bucket: filtered sync: {filter}");
 	}
-	trace!(
-		"SyncS3Bucket: syncing {} {} {s3_uri}",
-		local_dir,
-		match direction {
-			SyncDirection::Push => "->",
-			SyncDirection::Pull => "<-",
-		}
+	let uri = s3_store.s3_uri();
+	let local = BlobStore::new(
+		FsStore::new(local_dir.clone()).with_follow_symlinks(follow_symlinks),
 	);
-	match direction {
-		SyncDirection::Push => {
-			let sync = S3Sync::push(local_dir.clone(), &s3_uri);
-			// a class declared on the bucket lands new objects there directly,
-			// sparing each a day at Standard and a transition request
-			match storage_class {
-				Some(class) => sync.storage_class(class.as_str()),
-				None => sync,
-			}
-		}
-		SyncDirection::Pull => S3Sync::pull(&s3_uri, local_dir.clone()),
-	}
-	.filter(filter)
-	.delete(delete)
-	.size_only(size_only)
-	.follow_symlinks(follow_symlinks)
-	.no_sign_request(no_sign_request)
-	.send()
-	.await?;
-	trace!("synced {s3_uri} (region: {:?})", s3_store.region());
-	trace!("SyncS3Bucket: complete");
+	let bucket = BlobStore::new(s3_store);
+	let (source, dest) = match direction {
+		SyncDirection::Push => (local, bucket),
+		SyncDirection::Pull => (bucket, local),
+	};
+	let report = BlobSync::new(source, dest)
+		.with_delete(delete)
+		.with_size_only(size_only)
+		.with_dry_run(dry_run)
+		.with_filter(filter)
+		.run()
+		.await?;
+	info!("synced {local_dir} {} {uri}: {report}", match direction {
+		SyncDirection::Push => "->",
+		SyncDirection::Pull => "<-",
+	});
 	Pass(cx.input).xok()
+}
+
+/// Which way a sync runs between a local directory and a bucket.
+///
+/// The direction flips which end is the source, so the two ends are named by
+/// *where* they are (local, bucket) rather than by their role in one direction.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
+#[reflect(Default)]
+pub enum SyncDirection {
+	/// Local directory to bucket, the publishing direction.
+	#[default]
+	Push,
+	/// Bucket to local directory, the hydrating direction.
+	Pull,
 }
 
 /// What one sync resolves when it RUNS rather than when it is declared,

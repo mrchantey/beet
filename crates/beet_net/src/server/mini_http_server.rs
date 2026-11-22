@@ -383,7 +383,7 @@ mod secure_test {
 
 	#[beet_core::test]
 	async fn serves_https_and_plaintext_loopback() {
-		let server = HttpServer::new_test(HttpServer::start_mini_with_tcp);
+		let server = HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		let port = server.0.port.unwrap();
 		std::thread::spawn(move || {
 			App::new()
@@ -476,7 +476,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ServerPlugin));
 		let (server, on_spawn) =
-			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+			HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		let addr: SocketAddr = ([127, 0, 0, 1], server.port.unwrap()).into();
 		let entity = app
 			.world_mut()
@@ -518,7 +518,7 @@ mod test {
 		handler: Action<Request, Response>,
 	) -> u16 {
 		let (server, on_spawn) =
-			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+			HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		let port = server.port.unwrap();
 		std::thread::spawn(move || {
 			let mut app = App::new();
@@ -723,7 +723,7 @@ mod test {
 	async fn upgrades_to_socket() {
 		use crate::sockets::*;
 
-		let server = HttpServer::new_test(HttpServer::start_mini_with_tcp);
+		let server = HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		let port = server.0.port.unwrap();
 		// records each landed socket entity so the test can assert the upgrade
 		let landed = Store::<Vec<Entity>>::default();

@@ -9,7 +9,7 @@ use bevy::prelude::BevyError;
 /// log: its message, then whatever cause the message leaves out.
 ///
 /// A [`BevyError`] keeps the error it erased private, exposing only its
-/// `Display`, which is the outermost message alone (the AWS SDK's `dispatch
+/// `Display`, which is the outermost message alone (a transport's `dispatch
 /// failure`), and its `Debug`, which for a derived error type nests every
 /// `source` field down the chain. So the cause of an erased error is its
 /// `Debug`, reported when it says more than the message does; a beet message
@@ -56,8 +56,7 @@ impl core::fmt::Display for ErrorReport {
 mod test {
 	use crate::prelude::*;
 
-	/// A transport failure hiding its cause behind a terse message, the shape
-	/// of the AWS SDK's `SdkError::DispatchFailure`.
+	/// A transport failure hiding its cause behind a terse message.
 	#[derive(Debug)]
 	struct DispatchFailure {
 		source: ConnectorError,

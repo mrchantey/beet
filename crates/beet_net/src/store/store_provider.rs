@@ -28,10 +28,10 @@ pub enum StoreProvider {
 	/// `memory://<name>`.
 	Memory(InMemoryStore),
 	/// `s3://<bucket>`.
-	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+	#[cfg(feature = "aws")]
 	S3(S3Store),
 	/// `dynamo://<table>`.
-	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+	#[cfg(feature = "aws")]
 	Dynamo(DynamoStore),
 	/// `local-storage://<store>`.
 	#[cfg(target_arch = "wasm32")]
@@ -57,9 +57,9 @@ macro_rules! each_store {
 		match $this {
 			StoreProvider::Fs($store) => $body,
 			StoreProvider::Memory($store) => $body,
-			#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+			#[cfg(feature = "aws")]
 			StoreProvider::S3($store) => $body,
-			#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+			#[cfg(feature = "aws")]
 			StoreProvider::Dynamo($store) => $body,
 			#[cfg(target_arch = "wasm32")]
 			StoreProvider::LocalStorage($store) => $body,
@@ -96,14 +96,14 @@ impl StoreProvider {
 					})
 					.xmap(Self::Memory)
 			}
-			#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+			#[cfg(feature = "aws")]
 			StoreUri::S3 { .. } => Self::S3(S3Store::from_uri(uri)?),
-			#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+			#[cfg(feature = "aws")]
 			StoreUri::Dynamo { .. } => Self::Dynamo(DynamoStore::from_uri(uri)?),
-			#[cfg(not(all(feature = "aws_sdk", not(target_arch = "wasm32"))))]
+			#[cfg(not(feature = "aws"))]
 			StoreUri::S3 { .. } | StoreUri::Dynamo { .. } => bevybail!(
 				"store `{uri}` requires a compiled AWS backend (enable the \
-				 `aws_sdk` feature, native only)"
+				 `aws` feature)"
 			),
 			#[cfg(target_arch = "wasm32")]
 			StoreUri::LocalStorage { name, path_prefix } => {

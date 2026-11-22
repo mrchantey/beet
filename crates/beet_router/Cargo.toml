@@ -51,9 +51,9 @@ native = ["std", "beet_net/fs", "beet_net/http"]
 # The Cloudflare Worker target (wasm32-only): the R2-backed store an entry loads
 # from, and the world-owning `entry_build` driver the Worker's fetch handler runs.
 cloudflare = ["std", "beet_net/cloudflare"]
-# The S3-backed store, native-only: lets a deployed binary serve its routes from
-# a bucket-backed `BlobStore`.
-aws_sdk = ["std", "beet_net/aws_sdk"]
+# The S3-backed store: lets a deployed binary serve its routes from a
+# bucket-backed `BlobStore`.
+aws = ["std", "beet_net/aws"]
 interface = ["serde"]
 # The BSX markup parser, forwarded to `beet_ui` (which delegates to the core
 # parser). Routes `MediaType::Html` parsing through BSX for media negotiation.

@@ -11,16 +11,17 @@ use std::path::PathBuf;
 /// It lives at `~/.config/beet/secrets.toml`, stowed there by arch-config, so a
 /// fresh machine gets it from one `stow` and one restored age key. It is
 /// declared by no entry and nothing auto-loads it: [`AwsExec`] and
-/// [`AdminSession`] open it on demand and map the pair onto the sdk's own
-/// variable names for one child.
+/// [`AdminSession`] open it on demand, signing in-process with the pair, or
+/// mapping it onto the standard variable names for one child.
 ///
-/// ## Why the records are not named for the sdk
+/// ## Why the records are not named for the standard variables
 ///
 /// A name may live in only one document a launch loads, and every repo's own
 /// document already holds `AWS_ACCESS_KEY_ID`. Naming these the same would mean
 /// a launch in any repo either shadowing its AWS deploy credential with this
 /// read-only pair or refusing to load. So they are named for whose they are,
-/// and the mapping onto the sdk's names happens per child, where it is visible.
+/// and the mapping onto the standard names happens per child, where it is
+/// visible.
 pub struct AgentIdentity;
 
 impl AgentIdentity {
@@ -59,7 +60,8 @@ impl AgentIdentity {
 		SecretsHandle::from_uri(&path.to_string_lossy())
 	}
 
-	/// The aws cli as `vars` and nothing else: each value redacted from any
+	/// The aws cli as `vars` and nothing else, the one child [`AwsExec`]
+	/// spawns: each value redacted from any
 	/// rendering of the command, the launch's own variables dropped, and an
 	/// inherited profile and session token with them, since a long-lived pair
 	/// beside a foreign token authenticates as nobody. Removals apply before
@@ -93,14 +95,12 @@ impl AgentIdentity {
 			.xok()
 	}
 
-	/// `beet-agent`'s pair under the SDK's own names, ready for a child.
+	/// `beet-agent`'s pair, read from the global document.
 	///
 	/// Reads the two records by name through the same narrowing
 	/// [`SecretsExec`] uses, so a document missing one half says which rather
-	/// than handing a child half a credential. Native with `fs`, like every
-	/// verb that spawns the child.
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-	pub async fn sdk_pair() -> Result<Vec<(SmolStr, SmolStr)>> {
+	/// than handing out half a credential.
+	pub async fn credentials() -> Result<AwsCredentials> {
 		let handle = Self::handle().await?;
 		let pairs = SecretsExec::narrow(
 			handle
@@ -111,13 +111,16 @@ impl AgentIdentity {
 			Some(&format!("{},{}", Self::KEY_ID, Self::KEY_SECRET)),
 			&handle.describe(),
 		)?;
-		pairs
-			.into_iter()
-			.map(|(name, value)| match name.as_str() {
-				Self::KEY_ID => ("AWS_ACCESS_KEY_ID".into(), value),
-				_ => ("AWS_SECRET_ACCESS_KEY".into(), value),
-			})
-			.collect::<Vec<_>>()
+		let value = |name: &str| {
+			pairs
+				.iter()
+				.find(|(key, _)| key == name)
+				.map(|(_, value)| value.clone())
+				.ok_or_else(|| {
+					bevyhow!("the global document holds no `{name}`")
+				})
+		};
+		AwsCredentials::new(value(Self::KEY_ID)?, value(Self::KEY_SECRET)?)
 			.xok()
 	}
 }
@@ -135,7 +138,7 @@ pub enum SessionState {
 	None,
 }
 
-/// A live administrator session: the temporary credentials
+/// A live administrator session: the temporary credential
 /// `sts:AssumeRole` minted, on tmpfs and nowhere else.
 ///
 /// Stored under `$XDG_RUNTIME_DIR/beet/admin-session`, which is tmpfs on every
@@ -145,17 +148,37 @@ pub enum SessionState {
 /// administrator credential, which is the thing this whole model removes.
 #[derive(Debug, Clone)]
 pub struct AdminSession {
-	/// The temporary access key id.
-	pub key_id: SmolStr,
-	/// Its secret half.
-	pub secret: SmolStr,
-	/// The session token, which the sdk requires beside the pair.
-	pub token: SmolStr,
+	/// The role's temporary credential, its expiry always set.
+	credentials: AwsCredentials,
 	/// When the grant lapses, as a unix second.
-	pub expires: i64,
+	expires: i64,
 }
 
 impl AdminSession {
+	/// The session `credentials` is, refused when it carries no expiry or
+	/// session token: an assumed role's credential always has both.
+	pub fn new(credentials: AwsCredentials) -> Result<Self> {
+		let (Some(expiry), Some(_)) =
+			(credentials.expiry(), credentials.session_token())
+		else {
+			bevybail!(
+				"an administrator session is a role's temporary credential, \
+				with a session token and an expiry"
+			);
+		};
+		Self {
+			expires: expiry.secs(),
+			credentials,
+		}
+		.xok()
+	}
+
+	/// The role's credential, to sign in-process with.
+	pub fn credentials(&self) -> &AwsCredentials { &self.credentials }
+
+	/// When the grant lapses, as a unix second.
+	pub fn expires(&self) -> i64 { self.expires }
+
 	/// Where the session is written. `$XDG_RUNTIME_DIR` when set, else a
 	/// per-uid path under `/run/user`, which is what the variable would have
 	/// named anyway.
@@ -210,11 +233,12 @@ impl AdminSession {
 			fs_ext::remove(&path)?;
 			return SessionState::None.xok();
 		};
+		let expires = expires.parse::<i64>().unwrap_or_default();
 		let session = Self {
-			key_id: key_id.into(),
-			secret: secret.into(),
-			token: token.into(),
-			expires: expires.parse::<i64>().unwrap_or_default(),
+			credentials: AwsCredentials::new(key_id, secret)
+				.with_session_token(token)
+				.with_expiry(Timestamp::from_secs(expires)),
+			expires,
 		};
 		// a session file anyone else can read is not one, and the age identity
 		// path already refuses on the same rule
@@ -273,19 +297,19 @@ impl AdminSession {
 			format!(
 				"AWS_ACCESS_KEY_ID={}\nAWS_SECRET_ACCESS_KEY={}\n\
 				 AWS_SESSION_TOKEN={}\nBEET_ADMIN_EXPIRES={}\n",
-				self.key_id, self.secret, self.token, self.expires
+				self.credentials.access_key_id(),
+				self.credentials.secret_access_key(),
+				self.credentials.session_token().unwrap_or_default(),
+				self.expires
 			),
 		)?;
 		OK
 	}
 
-	/// The three variables a child needs to act as the role.
+	/// The three variables a child signing its own requests needs to act as
+	/// the role (`tofu`, `docker`, `beet aws`).
 	pub fn sdk_vars(&self) -> Vec<(SmolStr, SmolStr)> {
-		vec![
-			("AWS_ACCESS_KEY_ID".into(), self.key_id.clone()),
-			("AWS_SECRET_ACCESS_KEY".into(), self.secret.clone()),
-			("AWS_SESSION_TOKEN".into(), self.token.clone()),
-		]
+		self.credentials.env_vars()
 	}
 }
 
@@ -293,10 +317,22 @@ impl AdminSession {
 mod test {
 	use super::*;
 
-	/// The record names are not the sdk's, because a name lives in one
+	/// A session `secs` from now, for the round trips below.
+	fn session(secs: i64) -> AdminSession {
+		AdminSession::new(
+			AwsCredentials::new("ASIAEXAMPLE", "secrethalf")
+				.with_session_token("sessiontoken")
+				.with_expiry(Timestamp::from_secs(
+					Timestamp::now().secs() + secs,
+				)),
+		)
+		.unwrap()
+	}
+
+	/// The record names are not the standard ones, because a name lives in one
 	/// document and every repo's own already holds those.
 	#[beet_core::test]
-	fn the_records_are_not_named_for_the_sdk() {
+	fn the_records_are_not_the_standard_names() {
 		AgentIdentity::KEY_ID.xpect_contains("BEET_AGENT");
 		AgentIdentity::KEY_SECRET.xpect_contains("BEET_AGENT");
 		// the collision this naming exists to avoid
@@ -333,31 +369,23 @@ mod test {
 		// operator's live grant
 		let dir = TempDir::new().unwrap();
 		let path = dir.join("beet").join("admin-session");
-		let live = AdminSession {
-			key_id: "ASIAEXAMPLE".into(),
-			secret: "secrethalf".into(),
-			token: "sessiontoken".into(),
-			expires: Timestamp::now().secs() + 600,
-		};
+		let live = session(600);
 		live.write_to(&path).unwrap();
 		// owner-only, with no window in which it was not
 		fs_ext::is_private(&path).unwrap().xpect_true();
 		match AdminSession::read_at(&path).unwrap() {
 			SessionState::Live(read) => {
-				read.key_id.as_str().xpect_eq("ASIAEXAMPLE");
-				read.token.as_str().xpect_eq("sessiontoken");
+				read.credentials().access_key_id().xpect_eq("ASIAEXAMPLE");
+				read.credentials()
+					.session_token()
+					.xpect_eq(Some("sessiontoken"));
 				(read.remaining_secs() > 590).xpect_true();
 			}
 			_ => panic!("a session with ten minutes left read as not live"),
 		}
 		// a lapsed one is Expired, and its file is GONE rather than left for
 		// the next reader
-		AdminSession {
-			expires: Timestamp::now().secs() - 1,
-			..live.clone()
-		}
-		.write_to(&path)
-		.unwrap();
+		session(-1).write_to(&path).unwrap();
 		matches!(AdminSession::read_at(&path).unwrap(), SessionState::Expired)
 			.xpect_true();
 		fs_ext::exists(&path).unwrap().xpect_false();
@@ -365,12 +393,7 @@ mod test {
 		matches!(AdminSession::read_at(&path).unwrap(), SessionState::None)
 			.xpect_true();
 		// a file claiming more than the role can grant is a moved clock
-		AdminSession {
-			expires: Timestamp::now().secs() + 43200 * 3,
-			..live.clone()
-		}
-		.write_to(&path)
-		.unwrap();
+		session(43200 * 3).write_to(&path).unwrap();
 		AdminSession::read_at(&path)
 			.unwrap_err()
 			.to_string()
@@ -382,24 +405,19 @@ mod test {
 			.xpect_true();
 	}
 
-	/// The three the sdk needs, token included: a role's credentials without it
+	/// The three a child needs, token included: a role's credentials without it
 	/// authenticate as nobody.
 	#[beet_core::test]
 	fn a_session_hands_over_all_three_variables() {
-		AdminSession {
-			key_id: "ASIAEXAMPLE".into(),
-			secret: "x".into(),
-			token: "y".into(),
-			expires: Timestamp::now().secs() + 600,
-		}
-		.sdk_vars()
-		.iter()
-		.map(|(name, _)| name.to_string())
-		.collect::<Vec<_>>()
-		.xpect_eq(vec![
-			"AWS_ACCESS_KEY_ID",
-			"AWS_SECRET_ACCESS_KEY",
-			"AWS_SESSION_TOKEN",
-		]);
+		session(600)
+			.sdk_vars()
+			.iter()
+			.map(|(name, _)| name.to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![
+				"AWS_ACCESS_KEY_ID",
+				"AWS_SECRET_ACCESS_KEY",
+				"AWS_SESSION_TOKEN",
+			]);
 	}
 }

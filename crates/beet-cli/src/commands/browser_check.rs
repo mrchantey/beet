@@ -39,7 +39,7 @@ pub(crate) fn wasm_page(body: impl Bundle) -> Result<String> {
 pub(crate) async fn serve_wasm_page(page: String) -> Result<u16> {
 	let workspace = FsStore::new(AbsPath::new_workspace_rel("")?);
 	let (mut server, on_spawn) =
-		HttpServer::new_test(HttpServer::start_mini_with_tcp);
+		HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 	server.canonical = false;
 	let port = server.port.expect("a test server is pre-bound");
 	std::thread::spawn(move || {

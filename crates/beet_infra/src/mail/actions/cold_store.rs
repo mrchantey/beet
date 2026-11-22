@@ -1,10 +1,9 @@
 //! The deploy machine's view of the buckets a cold copy spans: the live
 //! archive over the instance's own cloud, and the cold store over the S3 api
 //! at the other vendor's endpoint under the parked token.
-use crate::actions::aws_cli_ext;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::Value;
+use beet_net::prelude::*;
 
 /// One object of a bucket listing, as much of it as a verb here reads.
 #[derive(Debug, Clone, PartialEq)]
@@ -21,28 +20,23 @@ pub struct ListedObject {
 pub struct Listing(pub Vec<ListedObject>);
 
 impl Listing {
-	/// Parse an `aws s3api list-objects-v2 --output json` body. An empty
-	/// bucket prints nothing at all rather than an empty document, so that
-	/// is a listing of nothing rather than a parse error.
-	pub fn parse(body: &str) -> Result<Self> {
-		if body.trim().is_empty() {
-			return Ok(Self::default());
-		}
-		let listing: Value = serde_json::from_str(body)?;
-		listing["Contents"]
-			.as_array()
+	/// The objects of every `ListObjectsV2` page, in page order.
+	fn from_pages<'a>(pages: impl IntoIterator<Item = &'a XmlElement>) -> Self {
+		pages
 			.into_iter()
-			.flatten()
+			.flat_map(|page| page.children_named("Contents"))
 			.filter_map(|object| {
 				Some(ListedObject {
-					key: object["Key"].as_str()?.to_string(),
-					last_modified: object["LastModified"].as_str()?.to_string(),
-					size: object["Size"].as_u64().unwrap_or_default(),
+					key: object.text_at("Key")?.to_string(),
+					last_modified: object.text_at("LastModified")?.to_string(),
+					size: object
+						.text_at("Size")
+						.and_then(|size| size.parse().ok())
+						.unwrap_or_default(),
 				})
 			})
 			.collect::<Vec<_>>()
 			.xmap(Self)
-			.xok()
 	}
 
 	/// The newest object whose key ends in `suffix`, by last-modified rather
@@ -67,43 +61,28 @@ pub struct LiveStore {
 }
 
 impl LiveStore {
+	fn remote(&self) -> RemoteBucket {
+		RemoteBucket::new(
+			S3Store::new(self.bucket.clone(), self.region.clone()),
+			AwsClient::new(AwsService::S3, self.region.clone()),
+		)
+	}
+
 	pub async fn list(&self, prefix: &str) -> Result<Listing> {
-		aws_cli_ext::service("s3api", &self.region, [
-			"list-objects-v2",
-			"--bucket",
-			&self.bucket,
-			"--prefix",
-			prefix,
-			"--output",
-			"json",
-		])
-		.run_async_stdout()
-		.await?
-		.xmap(|body| Listing::parse(&body))
+		self.remote().list(prefix).await
 	}
 
 	pub async fn download(&self, key: &str, local: &AbsPath) -> Result {
-		aws_cli_ext::service("s3", &self.region, [
-			"cp",
-			&format!("s3://{}/{key}", self.bucket),
-			local.as_str(),
-			"--only-show-errors",
-		])
-		.run_async()
-		.await?;
-		Ok(())
+		self.remote().download(key, local).await
 	}
 }
 
 /// The cold side: the [`R2BucketBlock`] a mail box copies into, reached over
-/// the S3 api at the account's endpoint under the token a human parked. The
-/// pair rides the child's environment rather than its argv, and the secret
-/// half is declared so a failure cannot print it.
+/// the S3 api at the account's endpoint under the token a human parked, whose
+/// pair signs every request in place of the process's own credential.
 pub struct ColdStore {
 	pub bucket: String,
-	endpoint: String,
-	access_key: String,
-	secret_key: String,
+	remote: RemoteBucket,
 }
 
 impl ColdStore {
@@ -121,66 +100,82 @@ impl ColdStore {
 	) -> Result<Self> {
 		let (access_key, secret_key) =
 			block.parked_pair(stack, secrets).await?;
+		let credentials = AwsCredentials::new(access_key, secret_key);
+		let bucket = block.bucket_name(stack);
+		let endpoint = block.endpoint(stack)?;
+		let region = CloudflareAccount::R2_REGION;
 		Self {
-			bucket: block.bucket_name(stack),
-			endpoint: block.endpoint(stack)?,
-			access_key,
-			secret_key,
+			remote: RemoteBucket::new(
+				S3Store::new(bucket.clone(), region)
+					.with_endpoint(endpoint.clone())
+					.with_credentials(credentials.clone()),
+				AwsClient::new(AwsService::S3, region)
+					.with_endpoint(endpoint)
+					.with_credentials(credentials),
+			),
+			bucket,
 		}
 		.xok()
 	}
 
-	/// An `aws <service>` invocation against the cold endpoint, as the
-	/// bucket's own pair.
-	fn aws<'a>(
-		&self,
-		service: &'a str,
-		args: impl IntoIterator<Item = &'a str>,
-	) -> ChildProcess {
-		aws_cli_ext::r2(
-			&self.endpoint,
-			&self.access_key,
-			&self.secret_key,
-			[service].into_iter().chain(args),
-		)
-	}
-
 	pub async fn list(&self, prefix: &str) -> Result<Listing> {
-		self.aws("s3api", [
-			"list-objects-v2",
-			"--bucket",
-			&self.bucket,
-			"--prefix",
-			prefix,
-			"--output",
-			"json",
-		])
-		.run_async_stdout()
-		.await?
-		.xmap(|body| Listing::parse(&body))
+		self.remote.list(prefix).await
 	}
 
 	pub async fn download(&self, key: &str, local: &AbsPath) -> Result {
-		self.aws("s3", [
-			"cp",
-			&format!("s3://{}/{key}", self.bucket),
-			local.as_str(),
-			"--only-show-errors",
-		])
-		.run_async()
-		.await?;
-		Ok(())
+		self.remote.download(key, local).await
+	}
+}
+
+/// One bucket over the S3 api, its objects read through its [`S3Store`] and
+/// its listing through a client of the same endpoint, region and credential:
+/// a listing here orders by last-modified, which a [`BlobStat`] does not
+/// carry.
+struct RemoteBucket {
+	bucket: SmolStr,
+	store: BlobStore,
+	client: AwsClient,
+}
+
+impl RemoteBucket {
+	fn new(store: S3Store, client: AwsClient) -> Self {
+		Self {
+			bucket: store.bucket_name().clone(),
+			store: BlobStore::new(store),
+			client,
+		}
 	}
 
-	pub async fn upload(&self, local: &AbsPath, key: &str) -> Result {
-		self.aws("s3", [
-			"cp",
-			local.as_str(),
-			&format!("s3://{}/{key}", self.bucket),
-			"--only-show-errors",
-		])
-		.run_async()
-		.await?;
+	/// Every object under `prefix`, paged through `ListObjectsV2`.
+	async fn list(&self, prefix: &str) -> Result<Listing> {
+		let mut pages = Vec::new();
+		let mut continuation_token: Option<String> = None;
+		loop {
+			let request = AwsRequest::get("ListObjectsV2", "/")
+				.with_bucket(self.bucket.clone())
+				.with_query("list-type", "2")
+				.with_query("prefix", prefix);
+			let request = match continuation_token.take() {
+				Some(token) => request.with_query("continuation-token", token),
+				None => request,
+			};
+			let page = self.client.send_xml(request).await?;
+			continuation_token = (page.text_at("IsTruncated") == Some("true"))
+				.then(|| page.text_at("NextContinuationToken"))
+				.flatten()
+				.map(ToString::to_string);
+			pages.push(page);
+			if continuation_token.is_none() {
+				break;
+			}
+		}
+		Listing::from_pages(&pages).xok()
+	}
+
+	/// The object at `key`, written to `local`.
+	async fn download(&self, key: &str, local: &AbsPath) -> Result {
+		let bytes = self.store.get(&RelPath::new(key)).await?;
+		fs_ext::write_async(local, bytes).await?;
 		Ok(())
 	}
 }
@@ -197,20 +192,108 @@ impl ListedObject {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use std::sync::Arc;
+	use std::sync::Mutex;
 
-	/// Newest by last-modified, filtered by suffix first: a marker under the
-	/// prefix and a newer object under another prefix both lose, and an empty
-	/// bucket's empty stdout is a listing of nothing rather than an error.
-	#[beet_core::test]
-	fn newest_selects_by_time_within_the_suffix() {
-		let listing = Listing::parse(
-			r#"{"Contents":[
-				{"Key":"sqlite/2026/09/05/old.db","LastModified":"2026-09-05T14:30:00Z","Size":1},
-				{"Key":"sqlite/notes.txt","LastModified":"2026-09-07T14:30:00Z","Size":1},
-				{"Key":"sqlite/2026/09/06/new.db","LastModified":"2026-09-06T14:30:00Z","Size":2}
-			]}"#,
+	/// A `ListObjectsV2` page holding `objects`, continued by `next`.
+	fn page(objects: &[(&str, &str, u64)], next: Option<&str>) -> String {
+		let contents = objects
+			.iter()
+			.map(|(key, modified, size)| {
+				format!(
+					"<Contents><Key>{key}</Key><LastModified>{modified}</LastModified>\
+					<ETag>&quot;abc&quot;</ETag><Size>{size}</Size>\
+					<StorageClass>STANDARD</StorageClass></Contents>"
+				)
+			})
+			.collect::<String>();
+		let truncation = match next {
+			Some(next) => format!(
+				"<IsTruncated>true</IsTruncated>\
+				<NextContinuationToken>{next}</NextContinuationToken>"
+			),
+			None => "<IsTruncated>false</IsTruncated>".to_string(),
+		};
+		format!(
+			"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+			<ListBucketResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+			<Name>cold</Name><Prefix>sqlite/</Prefix><KeyCount>{}</KeyCount>\
+			<MaxKeys>1000</MaxKeys>{truncation}{contents}</ListBucketResult>",
+			objects.len()
 		)
-		.unwrap();
+	}
+
+	/// A listing is every page of `ListObjectsV2` under the prefix, at the
+	/// R2 endpoint path style and signed for `auto` as the parked pair, the
+	/// continuation token carried from one page to the next.
+	#[beet_core::test]
+	async fn lists_every_page_under_the_prefix() {
+		let pages = Arc::new(Mutex::new(
+			vec![
+				page(
+					&[(
+						"sqlite/2026/09/05/old.db",
+						"2026-09-05T14:30:00.000Z",
+						1,
+					)],
+					Some("token-1"),
+				),
+				page(
+					&[
+						("sqlite/notes.txt", "2026-09-07T14:30:00.000Z", 1),
+						(
+							"sqlite/2026/09/06/new.db",
+							"2026-09-06T14:30:00.000Z",
+							2,
+						),
+					],
+					None,
+				),
+			]
+			.into_iter(),
+		));
+		let urls = Arc::new(Mutex::new(Vec::new()));
+		let seen = urls.clone();
+		let client =
+			AwsClient::new(AwsService::S3, CloudflareAccount::R2_REGION)
+				.with_endpoint("https://acct.r2.cloudflarestorage.com")
+				.with_credentials(AwsCredentials::new("AKID", "secret"))
+				.with_transport(move |request| {
+					let (pages, seen) = (pages.clone(), seen.clone());
+					Box::pin(async move {
+						(*request.method()).xpect_eq(HttpMethod::Get);
+						request
+							.headers
+							.first_raw("authorization")
+							.unwrap()
+							.xpect_contains("Credential=AKID/")
+							.xpect_contains("/auto/s3/aws4_request");
+						seen.lock().unwrap().push(request.uri());
+						Response::ok()
+							.with_body(pages.lock().unwrap().next().unwrap())
+							.xok()
+					})
+				});
+		let bucket = RemoteBucket::new(S3Store::new("cold", "auto"), client);
+		let listing = bucket.list("sqlite/").await.unwrap();
+
+		let urls = urls.lock().unwrap().clone();
+		urls.len().xpect_eq(2);
+		urls[0]
+			.as_str()
+			.xpect_starts_with("https://acct.r2.cloudflarestorage.com/cold/?")
+			.xpect_contains("list-type=2")
+			.xpect_contains("prefix=sqlite/")
+			.xnot()
+			.xpect_contains("continuation-token");
+		urls[1]
+			.as_str()
+			.xpect_contains("continuation-token=token-1");
+
+		listing.0.len().xpect_eq(3);
+		listing.0[2].size.xpect_eq(2);
+		// newest by last-modified, filtered by suffix first: a marker under
+		// the prefix that is newer still loses
 		listing
 			.newest(".db")
 			.unwrap()
@@ -218,7 +301,15 @@ mod tests {
 			.as_str()
 			.xpect_eq("sqlite/2026/09/06/new.db");
 		listing.newest(".age").xpect_none();
-		Listing::parse("").unwrap().0.len().xpect_eq(0);
-		Listing::parse("{}").unwrap().0.len().xpect_eq(0);
+	}
+
+	/// An empty bucket answers a page with no `Contents`, a listing of
+	/// nothing rather than an error.
+	#[beet_core::test]
+	fn an_empty_page_is_an_empty_listing() {
+		Listing::from_pages(&[XmlElement::parse(&page(&[], None)).unwrap()])
+			.0
+			.len()
+			.xpect_eq(0);
 	}
 }

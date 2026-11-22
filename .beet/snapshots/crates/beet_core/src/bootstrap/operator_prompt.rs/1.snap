@@ -1,0 +1,3 @@
+a backup passphrase is typed by the operator, and this launch is headless: run this interactively, without `--headless`
+an mfa code is typed by a person, never passed or piped, and this launch is headless
+a sign in needs a person to act on it, and this launch is headless

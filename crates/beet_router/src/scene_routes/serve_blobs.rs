@@ -425,7 +425,7 @@ mod test {
 			store.insert(&RelPath::from(path), body).await.unwrap();
 		}
 		let (mut server, on_spawn) =
-			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+			HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		// leave the process-global loopback port to whoever owns it
 		server.canonical = false;
 		let url = server.local_url();

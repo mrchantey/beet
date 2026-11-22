@@ -244,6 +244,8 @@ serde_plain = "1"
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 # no_std by default, since `beet_core` computes every content id with it.
 sha2 = { version = "0.11", default-features = false }
+# the keyed digest AWS Signature Version 4 derives its signing key with
+hmac = { version = "0.13", default-features = false }
 # SQLite for the `SqliteStore` backend: `bundled` compiles the engine in rather
 # than linking a system library, so it cross-compiles like the rest of the tree.
 # `ffi-sqlite-wasm-rs` is how it reaches the browser: rusqlite swaps
@@ -342,14 +344,9 @@ qrcode = { version = "0.14", default-features = false }
 #💡 http
 http = "1"
 http-body-util = "0.1"
-# AWS Signature Version 4, so an AWS JSON api (parameter store) is a signed
-# request through beet's own http client rather than an SDK client or the
-# `aws` cli. Already in the tree through the S3 SDK; target agnostic, no
-# runtime. `sign-http` + `http1` sign an `http` 1.x request, and the two
-# crates beside it name the identity it signs as.
-aws-sigv4 = { version = "1", default-features = false, features = ["sign-http", "http1"] }
-aws-credential-types = { version = "1", default-features = false }
-aws-smithy-runtime-api = { version = "1", default-features = false, features = ["client"] }
+# the xml AWS answers S3 and the query protocols in (`AwsClient`), read into a
+# small element tree rather than through serde
+quick-xml = { version = "0.41", default-features = false }
 
 #💡 tui
 vte = "0.15.0"
@@ -557,8 +554,12 @@ rustls-tls = [
 # TLS serving: the `Tls` component (self-signed dev certs for a LAN secure
 # context, or provided PEM files). See beet_net's docs.
 secure = ["rustls-tls", "beet_net/secure"]
-lambda = ["rustls-tls", "beet_net?/lambda"]
-aws_sdk = ["net", "beet_net?/aws_sdk","beet_infra?/aws_sdk","beet_router?/aws_sdk"]
+# The Lambda runtime loop (`LambdaRuntime`), plain http to the task's local
+# Runtime API.
+lambda = ["net", "beet_net?/lambda"]
+# AWS over signed requests (`AwsClient`) and the S3 and DynamoDB stores, on
+# every target.
+aws = ["net", "beet_net?/aws","beet_infra?/aws","beet_router?/aws"]
 deploy = ["infra", "beet_infra?/deploy"]
 # Office Open XML: Word files, workbooks and slide decks as media, each read
 # into the one document tree and written back by re-projection
@@ -637,20 +638,20 @@ mermaid_svg = ["mermaid", "beet_ui?/mermaid_svg"]
 # example wiring (`beet_extra/infra`, the `InfraExamplesPlugin` templates) so
 # `BeetExtraPlugin` adds it; the `?` keeps it inert when `beet_extra` is not a dep.
 infra = ["dep:beet_infra", "beet_extra?/infra"]
-lambda_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]
+lambda_block = ["deploy", "aws", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]
 # The recurring timer (`<ScheduledJobBlock/>`) and the lambda it invokes: the
 # schedule composes its target's function ident through a `LambdaRef`, so it
 # forwards `lambda_block` rather than standing alone.
 scheduled_job_block = ["lambda_block", "beet_infra?/scheduled_job_block"]
-lightsail_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lightsail_block", "fs", "rand"]
-fargate_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/fargate_block", "fs", "rand"]
+lightsail_block = ["deploy", "aws", "bindings_aws_common", "beet_infra?/lightsail_block", "fs", "rand"]
+fargate_block = ["deploy", "aws", "bindings_aws_common", "beet_infra?/fargate_block", "fs", "rand"]
 # The Cloudflare Containers + Workers deploy blocks/actions (wrangler-provisioned,
 # so no terraform bindings). The deployed container binary is built as a separate
-# `cargo` invocation, so the orchestrator needs no `aws_sdk` itself.
+# `cargo` invocation, so the orchestrator needs no `aws` itself.
 cloudflare_block = ["deploy", "beet_infra?/cloudflare_block", "fs", "rand"]
 # The network the AWS compute blocks sit in, and the company Postgres instance
 # inside it. Neither is mail-specific, so both forward on their own.
-vpc_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/vpc_block", "fs", "rand"]
+vpc_block = ["deploy", "aws", "bindings_aws_common", "beet_infra?/vpc_block", "fs", "rand"]
 rds_postgres_block = ["vpc_block", "beet_infra?/rds_postgres_block"]
 # The self-hosted mail stack: the per-domain DNS + SES declaration and the
 # member/mailbox/alias inputs it is authored from, on the vpc.

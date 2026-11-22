@@ -80,7 +80,8 @@ pub async fn SecretsSet(
 	let mut document = handle.read_or_new().await?;
 	let identity = AgeIdentityFile::require()?;
 	let value = ValueSource::new(value, from_env, copy, generate, length)?
-		.resolve(&name, &document, &identity)?;
+		.resolve(&name, &document, &identity)
+		.await?;
 	// no flag for the record's metadata or its `modified`: both describe the
 	// value, so a re-set of the same value keeps them and a new value drops
 	// them, and a new note never reads as a roll (`modified` versions what a
@@ -166,7 +167,7 @@ impl ValueSource {
 	}
 
 	/// The value for the record `name`.
-	fn resolve(
+	async fn resolve(
 		self,
 		name: &str,
 		document: &SecretsDocument,
@@ -195,14 +196,14 @@ impl ValueSource {
 			Self::Generate(length) => {
 				Secret::generate(name, length).map(|value| value.to_string())
 			}
-			Self::Stdin => read_stdin_value(),
+			Self::Stdin => read_stdin_value().await,
 		}
 	}
 }
 
-/// The value typed or piped in: one line without echo on a terminal, else
-/// all of stdin with one trailing newline dropped.
-fn read_stdin_value() -> Result<String> {
+/// The value typed or piped in: one line asked of the operator when stdin
+/// is a terminal, else all of stdin with one trailing newline dropped.
+async fn read_stdin_value() -> Result<String> {
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {
 			bevybail!("pass the value with `--value`, `--from-env` or `--generate`: this host has no stdin to read it from")
@@ -210,7 +211,7 @@ fn read_stdin_value() -> Result<String> {
 			use std::io::IsTerminal;
 			use std::io::Read;
 			if std::io::stdin().is_terminal() {
-				return terminal_ext::read_secret_line("value: ");
+				return OperatorPrompt::ask(SecretsSet::value_ask()).await;
 			}
 			let mut value = String::new();
 			std::io::stdin().read_to_string(&mut value)?;
@@ -221,6 +222,16 @@ fn read_stdin_value() -> Result<String> {
 				.to_string()
 				.xok()
 		}
+	}
+}
+
+impl SecretsSet {
+	/// The ask a typed value is, and what to pass where nobody can type it.
+	fn value_ask() -> OperatorAsk {
+		OperatorAsk::secret_line("the value", "value: ").with_instead(
+			"pass it with `--value`, `--from-env`, `--copy` or \
+			`--generate`, or pipe it on stdin",
+		)
 	}
 }
 
@@ -541,5 +552,16 @@ mod test {
 		unsafe {
 			env_ext::remove_var("BEET_TEST_SET_FROM_ENV").unwrap();
 		}
+	}
+
+	/// Where nobody can type the value, the refusal says what to pass.
+	#[beet_core::test]
+	fn a_headless_set_says_what_to_pass() {
+		RefusalPrompt::new("this launch is headless")
+			.refusal(&SecretsSet::value_ask())
+			.to_string()
+			.xpect_contains(
+				"`--value`, `--from-env`, `--copy` or `--generate`",
+			);
 	}
 }

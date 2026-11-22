@@ -20,10 +20,12 @@ use super::*;
 use alloc::borrow::Cow;
 use beet_core::prelude::*;
 
-/// A multimap of HTTP-style headers with kebab-case key normalization.
+/// A multimap of HTTP-style headers with lowercase key normalization.
 ///
-/// All keys are normalized to lowercase with underscores replaced by hyphens
-/// on insertion and lookup, ensuring case-insensitive, canonical access.
+/// All keys are lowercased on insertion and lookup, so access is
+/// case-insensitive as http names are. Nothing else is rewritten: `_` is a
+/// legal name character distinct from `-`, and some apis name headers with
+/// it (the AWS access portal's `x-amz-sso_bearer_token`).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(
 	feature = "serde",
@@ -32,29 +34,12 @@ use beet_core::prelude::*;
 )]
 pub struct HeaderMap(MultiMap<String, String>);
 
-/// Normalize a header key to lowercase kebab-case.
-///
-/// Converts uppercase to lowercase and replaces `_` with `-`.
-/// Returns [`Cow::Borrowed`] if no transformation is needed.
-pub(crate) fn to_kebab_case(val: &str) -> Cow<'_, str> {
-	let needs_transform = val
-		.bytes()
-		.any(|byte| byte.is_ascii_uppercase() || byte == b'_');
-	if needs_transform {
-		let transformed: String = val
-			.bytes()
-			.map(|byte| {
-				if byte == b'_' {
-					b'-'
-				} else {
-					byte.to_ascii_lowercase()
-				}
-			})
-			.map(|byte| byte as char)
-			.collect();
-		Cow::Owned(transformed)
-	} else {
-		Cow::Borrowed(val)
+/// Normalize a header key to lowercase, [`Cow::Borrowed`] when it already
+/// is.
+pub(crate) fn normalize_name(val: &str) -> Cow<'_, str> {
+	match val.bytes().any(|byte| byte.is_ascii_uppercase()) {
+		true => Cow::Owned(val.to_ascii_lowercase()),
+		false => Cow::Borrowed(val),
 	}
 }
 
@@ -64,13 +49,13 @@ impl HeaderMap {
 
 	/// Insert a raw header value. The key is normalized to kebab-case.
 	pub fn set_raw(&mut self, key: impl AsRef<str>, value: impl Into<String>) {
-		let key = to_kebab_case(key.as_ref()).into_owned();
+		let key = normalize_name(key.as_ref()).into_owned();
 		self.0.insert(key, value.into());
 	}
 
 	/// Get the first raw string value for a header key.
 	pub fn first_raw(&self, key: &str) -> Option<&str> {
-		let key = to_kebab_case(key);
+		let key = normalize_name(key);
 		self.0
 			.get_vec(key.as_ref())
 			.and_then(|vals| vals.first().map(|val| val.as_str()))
@@ -78,7 +63,7 @@ impl HeaderMap {
 
 	/// Get all raw string values for a header key.
 	pub fn get_raw(&self, key: &str) -> Option<&Vec<String>> {
-		let key = to_kebab_case(key);
+		let key = normalize_name(key);
 		self.0.get_vec(key.as_ref())
 	}
 
@@ -101,7 +86,7 @@ impl HeaderMap {
 
 	/// Set a typed header, replacing any existing values for that key.
 	pub fn set<H: Header>(&mut self, value: impl Into<H::Value>) {
-		let key = to_kebab_case(H::KEY).into_owned();
+		let key = normalize_name(H::KEY).into_owned();
 		self.0.remove(&key);
 		for val in H::serialize(value.into()) {
 			self.0.insert(key.clone(), val);
@@ -118,7 +103,7 @@ impl HeaderMap {
 
 	/// Check if a header key exists.
 	pub fn contains_raw(&self, key: &str) -> bool {
-		let key = to_kebab_case(key);
+		let key = normalize_name(key);
 		self.0.contains_key(key.as_ref())
 	}
 
@@ -141,7 +126,7 @@ impl HeaderMap {
 
 	/// Remove a header key and all its values.
 	pub fn remove_raw(&mut self, key: &str) -> Option<Vec<String>> {
-		let key = to_kebab_case(key);
+		let key = normalize_name(key);
 		self.0.remove(key.as_ref())
 	}
 
@@ -162,7 +147,7 @@ impl From<MultiMap<String, String>> for HeaderMap {
 	fn from(raw: MultiMap<String, String>) -> Self {
 		let mut map = HeaderMap::new();
 		for (key, values) in raw.iter_all() {
-			let normalized = to_kebab_case(key).into_owned();
+			let normalized = normalize_name(key).into_owned();
 			for value in values {
 				map.0.insert(normalized.clone(), value.clone());
 			}
@@ -196,28 +181,18 @@ mod test {
 	use super::*;
 
 	#[beet_core::test]
-	fn to_kebab_case_lowercase() {
-		to_kebab_case("content-type").xpect_eq("content-type");
+	fn normalizes_case_only() {
+		normalize_name("content-type").xpect_eq("content-type");
+		normalize_name("Content-Type").xpect_eq("content-type");
+		// an underscore is its own character, as the access portal's bearer
+		// header needs it to be
+		normalize_name("X-Amz-SSO_Bearer_Token")
+			.xpect_eq("x-amz-sso_bearer_token");
 	}
 
 	#[beet_core::test]
-	fn to_kebab_case_uppercase() {
-		to_kebab_case("Content-Type").xpect_eq("content-type");
-	}
-
-	#[beet_core::test]
-	fn to_kebab_case_underscores() {
-		to_kebab_case("content_type").xpect_eq("content-type");
-	}
-
-	#[beet_core::test]
-	fn to_kebab_case_mixed() {
-		to_kebab_case("X_Custom_Header").xpect_eq("x-custom-header");
-	}
-
-	#[beet_core::test]
-	fn to_kebab_case_borrows_when_already_normalized() {
-		let result = to_kebab_case("content-type");
+	fn normalize_name_borrows_when_already_normalized() {
+		let result = normalize_name("content-type");
 		matches!(result, Cow::Borrowed(_)).xpect_true();
 	}
 
@@ -250,10 +225,7 @@ mod test {
 			.first_raw("CONTENT-TYPE")
 			.unwrap()
 			.xpect_eq("text/html");
-		headers
-			.first_raw("content_type")
-			.unwrap()
-			.xpect_eq("text/html");
+		headers.first_raw("content_type").xpect_none();
 	}
 
 	#[beet_core::test]
@@ -272,7 +244,7 @@ mod test {
 		let mut headers = HeaderMap::new();
 		headers.set_raw("x-custom", "value");
 		headers.contains_raw("x-custom").xpect_true();
-		headers.contains_raw("X_Custom").xpect_true();
+		headers.contains_raw("X-Custom").xpect_true();
 		headers.contains_raw("x-missing").xpect_false();
 	}
 
@@ -298,7 +270,7 @@ mod test {
 	#[beet_core::test]
 	fn from_multimap() {
 		let mut raw = MultiMap::new();
-		raw.insert("Content_Type".to_string(), "text/html".to_string());
+		raw.insert("Content-Type".to_string(), "text/html".to_string());
 		let headers = HeaderMap::from(raw);
 		headers
 			.get::<headers::ContentType>()

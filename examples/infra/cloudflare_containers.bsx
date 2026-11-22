@@ -44,7 +44,7 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 	<Route path="deploy" {ExchangeSequence}>
 		<CloudflareContainerBlock name="beet-hello-container" bucket="beet-hello-site" exec_route="serve"/>
 		<!-- build the native binary, then the deploy bakes it into the image -->
-		<BeetBinaryBuild features="aws_sdk"/>
+		<BeetBinaryBuild features="aws"/>
 		<CloudflareContainerDeployAction/>
 		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->

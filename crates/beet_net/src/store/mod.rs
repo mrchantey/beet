@@ -7,8 +7,9 @@
 //! - [`FsStore`]: Local filesystem storage, cross-platform via `fs_ext` (the deno
 //!   runner's fs globals back it on wasm)
 //! - [`LocalStorageStore`]: Browser localStorage (WASM only)
-//! - [`S3Store`]: AWS S3 storage (requires `aws_sdk` feature)
-//! - [`DynamoStore`]: AWS DynamoDB storage (requires `aws_sdk` feature)
+//! - [`S3Store`]: AWS S3 storage, and any S3-compatible service ie R2
+//!   (requires `aws`)
+//! - [`DynamoStore`]: AWS DynamoDB storage (requires `aws`)
 //! - [`SqliteStore`]: a SQLite database file, blobs and real SQL tables with an
 //!   SQL escape hatch (requires `sqlite`)
 //! - [`HttpStore`]: a store served over http (a `<ServeBlobs>` mount), read-only
@@ -80,8 +81,6 @@ pub use store_path::*;
 // persistence inside needs `json` (the TableStore surface) and gates itself.
 #[cfg(feature = "std")]
 mod analytics;
-#[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
-mod aws_cli;
 #[cfg(feature = "json")]
 mod document_blob;
 #[cfg(feature = "json")]
@@ -110,8 +109,6 @@ mod table_store;
 mod scene_blob;
 #[cfg(feature = "std")]
 pub use analytics::*;
-#[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
-pub use aws_cli::*;
 #[cfg(feature = "std")]
 pub use derivation::*;
 #[cfg(feature = "json")]
@@ -157,20 +154,17 @@ pub use indexed_db_store::*;
 pub use local_storage_store::*;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub use r2_workers_store::*;
-// who the launch is at AWS, which is how a name is derived rather than declared.
-#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-pub mod aws_ext;
-#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+#[cfg(feature = "aws")]
 pub use s3_store::*;
-#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+#[cfg(feature = "aws")]
 mod s3_fs_store;
-#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+#[cfg(feature = "aws")]
 mod s3_store;
-#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+#[cfg(feature = "aws")]
 pub use dynamo_store::*;
-#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+#[cfg(feature = "aws")]
 pub use s3_fs_store::*;
-#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+#[cfg(feature = "aws")]
 mod dynamo_store;
 #[cfg(feature = "sqlite")]
 mod sqlite_store;
@@ -266,7 +260,7 @@ impl Plugin for StorePlugin {
 		#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 		app.register_type::<R2WorkersStore>();
 
-		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+		#[cfg(feature = "aws")]
 		app.register_type::<S3Store>()
 			.register_type::<DynamoStore>();
 

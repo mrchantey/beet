@@ -70,8 +70,8 @@ json = ["serde", "dep:serde_json", "dep:zstd", "dep:ruzstd", "beet_core/json", "
 # converge and the `<AtprotoAccount/>` declaration, every record crossing
 # through `MediaType::DagCbor`. No network.
 dag_cbor = ["serde", "beet_core/dag_cbor"]
-# The network half of the `atproto` module: `XrpcPds`, the `AtprotoAuth`
-# credential seam, did and handle resolution, the account attach that lands an
+# The network half of the `atproto` module: `XrpcPds` writing through
+# `AppPassword` (a `RequestAuth`), did and handle resolution, the account attach that lands an
 # account's repo, and the Bluesky record shapes beet writes. The `Pds` family
 # itself (`EmulatorPds`, the converge, the account declaration) rides
 # `dag_cbor`, since the data model needs no network; `json` is the wire. `rand`
@@ -129,41 +129,39 @@ hyper = [
 "dep:async-executor",
 "dep:pin-project"
 ]
-# `json` deserializes the `ScheduledInvoke` payload a schedule delivers, which
-# arrives as an opaque event `lambda_http` hands over through `pass_through`.
-lambda = ["std", "json", "rustls-tls", "dep:lambda_http", "beet_core/tokio"]
+# The Lambda runtime: this crate's own loop over the Runtime API, plain http
+# to the local endpoint Lambda names (see `lambda_server.rs`), so no runtime
+# crate and no tokio. `json` reads the invocation events, a function url's
+# request and a schedule's `ScheduledInvoke` alike.
+lambda = ["std", "json", "http"]
 fs = ["std", "beet_core/fs","dep:async-process"]
 tokens = ["beet_core/tokens"]
-aws_sdk = [
-	"std",
-	"serde",
-	"dep:aws-sdk-s3",
-	"dep:serde_dynamo",
-	"dep:aws-sdk-dynamodb",
-	# who the credentials belong to, which is what a derived name is derived
-	# from (`aws_ext::account_id`); already in the tree, since the credential
-	# chain resolves roles through it.
-	"dep:aws-sdk-sts",
-	"dep:aws-config",
-	"beet_core/tokio",
-]
 # The Cloudflare R2 store backend (`R2WorkersStore`), reading the site through the
 # Worker's R2 binding instead of the S3 API. wasm32-only: the `worker` crate is
 # referenced under the wasm target table, so `dep:worker` activates only there.
-# Mirrors `aws_sdk`'s shape (a store backend behind `std`), but target-gated.
+# A store backend behind `std` like `aws`, but target-gated.
 cloudflare = ["std", "dep:worker"]
-# An AWS JSON api (`AwsJsonClient`, ie parameter store) as SigV4-signed
-# requests through this crate's own http client, as the launch's credentials:
-# no SDK client, no runtime, no `aws` cli, so every target, wasm included.
-aws_rest_api = [
+# AWS as Signature Version 4 requests through this crate's own http client
+# (`AwsClient`, `AwsCredentialSource`, `SigV4`) and the stores over it
+# (`S3Store`, `DynamoStore`): no SDK, no async runtime and no `aws` cli, so
+# every target, a Cloudflare Worker included. `rand` jitters the retry
+# backoff; `serde_dynamo` maps a row onto DynamoDB's attribute json.
+aws = [
 	"std",
 	"http",
 	"serde",
 	"dep:serde_json",
-	"dep:aws-sigv4",
-	"dep:aws-credential-types",
-	"dep:aws-smithy-runtime-api",
+	"dep:sha2",
+	"dep:hmac",
+	"dep:quick-xml",
+	"dep:serde_dynamo",
+	"beet_core/rand",
+	# Identity Center's login is an OAuth flow over the same client
+	"oauth",
 ]
+# The reusable pieces of an OAuth client (`Pkce`, `OAuthState`,
+# `LoopbackRedirect`, `DeviceGrant`, `OAuthTokens`), see `src/oauth/mod.rs`.
+oauth = ["std", "http", "serde", "dep:sha2", "beet_core/rand"]
 serde = [
 	"dep:serde",
 	"dep:base64",
@@ -195,10 +193,6 @@ native-tls = [
 rustls-tls = [
 	"reqwest?/rustls-tls",
 	"ureq?/rustls",
-	"aws-config?/rustls",
-	"aws-sdk-dynamodb?/rustls",
-	"aws-sdk-s3?/rustls",
-	"aws-sdk-sts?/rustls",
 	"dep:futures-rustls",
 	"dep:webpki-roots",
 	# ring, not aws-lc-rs: the rest of the rustls stack here is ring-backed and
@@ -281,10 +275,13 @@ qrcode = { workspace = true, optional = true }
 # http
 http = { workspace = true, optional = true }
 eventsource-stream = { version = "0.2.3", optional = true }
-#💡 aws_rest_api
-aws-sigv4 = { workspace = true, optional = true }
-aws-credential-types = { workspace = true, optional = true }
-aws-smithy-runtime-api = { workspace = true, optional = true }
+#💡 aws
+# a row as DynamoDB's attribute json, through the crate's own `AttributeValue`
+# (no SDK feature)
+serde_dynamo = { version = "4", optional = true }
+sha2 = { workspace = true, optional = true }
+hmac = { workspace = true, optional = true }
+quick-xml = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-process = { workspace = true, optional = true }
@@ -329,35 +326,7 @@ pin-project = { workspace = true, optional = true }
 
 
 #💡 lambda
-# `pass_through`: a scheduled invoke is not an http event, so without it the
-# runtime rejects the payload before the adapter ever sees it.
-lambda_http = { version = "1.3", optional = true, features = ["pass_through"] }
-
-#💡 aws
-serde_dynamo = { version = "4",optional = true, features = ["aws-sdk-dynamodb+1"]}
-aws-sdk-dynamodb = { version = "1", optional = true, default-features = false, features = [
-	# defaults without rustls
-	"default-https-client",
-	"rt-tokio",
-] }
-aws-sdk-s3 = { version = "1", optional = true, default-features = false, features = [
-	# defaults without rustls
-	"sigv4a",
-	"default-https-client",
-	"rt-tokio",
-] }
-aws-sdk-sts = { version = "1", optional = true, default-features = false, features = [
-	# defaults without rustls
-	"default-https-client",
-	"rt-tokio",
-] }
-aws-config = { version = "1", optional = true, default-features = false, features = [
-	"default-https-client",
-	"rt-tokio",
-	"behavior-version-latest",
-] }
-
-
+# (the runtime loop is this crate's own client, see `lambda_server.rs`)
 
 # the zstd C library, the native `JsonlCodec::Zstd` backend. Hosted targets only:
 # a bare-metal build (`target_os = "none"`, eg esp32 firmware) has no libc for it

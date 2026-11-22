@@ -37,6 +37,21 @@ A derived file is a document computed from declared sources and stored beside th
 
 `SqliteStore` runs on every target, browsers included: `rusqlite` builds its ffi from `sqlite-wasm-rs` rather than `libsqlite3-sys` on `wasm32-unknown-unknown`, so the SQL dialect, the generated columns and the query planner are the same engine everywhere. Two things differ there and both are the default VFS holding the database in memory rather than in a file: the store exists while a connection to it does (there is nothing to stat), and there is no WAL. Nor is there a thread to hand a query to, so a call runs where it is made — which is why a browser build that cares about jank, or wants a durable OPFS VFS, belongs in a dedicated worker.
 
+## AWS
+
+The `aws` feature is AWS as Signature Version 4 requests through this crate's own client (`src/client/aws/mod.rs`): `AwsClient` over every protocol beet speaks, the credential chain, STS, the S3 and DynamoDB stores, the Lambda runtime loop (`lambda`), and IAM Identity Center's sign in (`IdentityCenterClient`). No SDK, no async runtime and no `aws` cli, so the same code signs from a native binary, a Lambda and a Cloudflare Worker. Where each piece runs:
+
+| | native | Cloudflare Worker | browser |
+|---|---|---|---|
+| credentials | explicit, environment, shared file, ECS container, EC2 instance metadata | explicit, environment (the entry seeds it from the Worker's secret bindings) | explicit, environment |
+| `AwsClient`, every store and api call | yes | yes, within a request's subrequest and memory caps | compiles; nothing is built for it (no presigned urls, no CORS) |
+| `beet admin`, `beet aws`, Identity Center sign in | yes | no person to ask | no |
+| `logs tail --follow` (`<AwsWatch/>`) | yes | unsuited: a request ends | no |
+| the Lambda runtime (`lambda`) | in a Lambda task | no | no |
+| `<stack>/deploy` | yes | no: it runs `tofu` and `cargo` | no |
+
+The operator's own `aws` cli is reachable through `beet aws -- <args>` (`AwsExec`), the one place beet spawns it.
+
 ## Example
 
 ```rust,ignore
@@ -65,8 +80,9 @@ App::new()
 |---------|-------------|
 | `server` | Lightweight mini HTTP server using `async-io` TCP |
 | `hyper` | Full-featured Hyper HTTP server (implies `server`) |
-| `lambda` | AWS Lambda server support |
-| `aws_sdk` | AWS S3 and DynamoDB providers |
+| `lambda` | The Lambda runtime: beet's own loop over the Runtime API (`LambdaRuntime`) |
+| `aws` | AWS over signed requests (`AwsClient`), the S3 and DynamoDB stores, STS and Identity Center, see AWS above |
+| `oauth` | The reusable pieces of an OAuth client: PKCE, state, the loopback redirect, the device grant, the token set |
 | `reqwest` | Use reqwest as the HTTP client backend |
 | `ureq` | Use ureq as the HTTP client backend |
 | `tungstenite` | Native WebSocket support |
@@ -76,4 +92,4 @@ App::new()
 | `rustls-tls` | Use rustls for TLS |
 | `native-tls` | Use native TLS implementation |
 | `secure` | TLS serving: the `Tls` component (self-signed dev cert or provided PEM files) |
-| `atproto` | An account's repo on a real PDS: `XrpcPds`, the `AtprotoAuth` seam with `AppPassword`, did and handle resolution, and the `app.bsky.*` lexicons beet writes (`FeedPost`, `RichText`). The `Pds` family itself (`EmulatorPds`, the converge, `<AtprotoAccount/>`) rides `json`; see `src/atproto/mod.rs` |
+| `atproto` | An account's repo on a real PDS: `XrpcPds` writing through `AppPassword` (a `RequestAuth`), did and handle resolution, and the `app.bsky.*` lexicons beet writes (`FeedPost`, `RichText`). The `Pds` family itself (`EmulatorPds`, the converge, `<AtprotoAccount/>`) rides `json`; see `src/atproto/mod.rs` |

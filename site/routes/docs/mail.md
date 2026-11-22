@@ -112,7 +112,7 @@ The deploy token reads the cold bucket's configuration rather than writing it, b
 ```sh
 curl -s https://api.cloudflare.com/client/v4/accounts/<account id>/tokens/verify \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"
-aws sts get-caller-identity
+beet aws -- sts get-caller-identity
 ```
 
 Then one cheap read per AWS service you will touch (`ec2`, `sesv2`, `ssm`, `iam`, `s3`, `logs`) in your chosen region, and a throwaway TXT record create and delete against the zone to prove DNS write rather than assume it. A missing permission discovered here costs seconds; the same permission discovered during an apply leaves a partly-created stack.

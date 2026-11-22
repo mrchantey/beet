@@ -21,29 +21,19 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 	// parts, since a server never follows anything
 	let max_redirects = req.redirects.max();
 	let (parts, body) = req.into_parts();
-
-	// 4xx/5xx are answers, not io failures: the caller wants the response
-	// whatever its status, so only a connection error fails the request.
-	let config = ureq::config::Config::builder()
-		.http_status_as_error(false)
-		// `0` answers the `3xx` to the caller rather than erroring:
-		// `max_redirects_do_error` is `max_redirects > 0 && ..`
-		.max_redirects(max_redirects)
-		// the socket and the tls handshake, never the response: a stalled
-		// connect otherwise waits out the operating system's SYN retries
-		.timeout_connect(Some(CONNECT_TIMEOUT))
-		.xmap(with_tls)
-		.build();
-	let agent = ureq::Agent::with_parts(
-		config,
-		DefaultConnector::new(),
-		ReachableFirst::default(),
-	);
+	let agent = agent();
 
 	// Convert to http::Request
 	let http_parts: http::request::Parts = parts.try_into()?;
 	let body = Vec::from(body.into_bytes().await?);
-	let http_req = http::Request::from_parts(http_parts, body);
+	// the redirect budget is the one setting a request overrides, so every
+	// policy shares the agent's connection pool
+	let http_req = agent
+		.configure_request(http::Request::from_parts(http_parts, body))
+		// `0` answers the `3xx` to the caller rather than erroring:
+		// `max_redirects_do_error` is `max_redirects > 0 && ..`
+		.max_redirects(max_redirects)
+		.build();
 
 	// Run the whole blocking exchange on a thread pool, the body read included:
 	// `agent.run` resolves only the status and headers, handing back a reader that
@@ -66,6 +56,31 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 /// The longest a request may take to connect, tls included.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// The one agent every request runs on, so connections are pooled across
+/// requests rather than each paying a fresh TCP and TLS handshake.
+fn agent() -> &'static ureq::Agent {
+	static AGENT: std::sync::LazyLock<ureq::Agent> =
+		std::sync::LazyLock::new(|| {
+			// 4xx/5xx are answers, not io failures: the caller wants the
+			// response whatever its status, so only a connection error fails
+			// the request.
+			let config = ureq::config::Config::builder()
+				.http_status_as_error(false)
+				// the socket and the tls handshake, never the response: a
+				// stalled connect otherwise waits out the operating system's
+				// SYN retries
+				.timeout_connect(Some(CONNECT_TIMEOUT))
+				.xmap(with_tls)
+				.build();
+			ureq::Agent::with_parts(
+				config,
+				DefaultConnector::new(),
+				ReachableFirst::default(),
+			)
+		});
+	&AGENT
+}
+
 /// ureq's [`DefaultResolver`] with the reachable address first.
 ///
 /// ureq tries resolved addresses one at a time in the order the system gives
@@ -76,15 +91,46 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 /// (Happy Eyeballs) does, one attempt started every
 /// [`ATTEMPT_DELAY`](Self::ATTEMPT_DELAY), and the first address to connect
 /// leads the list. The probe connection is dropped and ureq opens its own to
-/// the winner, one extra handshake per request.
+/// the winner.
+///
+/// ureq resolves before it looks in its pool, so a winner is remembered per
+/// host for [`WINNER_TTL`](Self::WINNER_TTL): a request that reuses a pooled
+/// connection pays no probe, and a host's addresses are raced again once it
+/// lapses or the winner leaves the resolved set.
 #[derive(Debug, Default)]
-struct ReachableFirst(DefaultResolver);
+struct ReachableFirst {
+	resolver: DefaultResolver,
+	winners: std::sync::Mutex<HashMap<String, (SocketAddr, Instant)>>,
+}
 
 impl ReachableFirst {
 	/// The stagger between attempts, RFC 8305's recommended default.
 	const ATTEMPT_DELAY: Duration = Duration::from_millis(250);
 	/// How long one attempt may take before the race leaves it behind.
 	const ATTEMPT_TIMEOUT: Duration = Duration::from_secs(10);
+	/// How long a host's winner leads its addresses without a new race.
+	const WINNER_TTL: Duration = Duration::from_secs(300);
+
+	/// The remembered winner for `host`, while it is fresh and still among
+	/// `addrs`, else a new race's.
+	fn winner(&self, host: &str, addrs: &[SocketAddr]) -> Option<SocketAddr> {
+		let winners =
+			self.winners.lock().unwrap_or_else(|err| err.into_inner());
+		if let Some((addr, at)) = winners.get(host)
+			&& at.elapsed() < Self::WINNER_TTL
+			&& addrs.contains(addr)
+		{
+			return Some(*addr);
+		}
+		// the race runs unlocked, so one slow host holds no other back
+		drop(winners);
+		let winner = Self::race(addrs)?;
+		self.winners
+			.lock()
+			.unwrap_or_else(|err| err.into_inner())
+			.insert(host.to_string(), (winner, Instant::now()));
+		Some(winner)
+	}
 
 	/// `addrs` with the families alternating, the system's preferred family
 	/// first and each family's own order kept.
@@ -145,12 +191,13 @@ impl Resolver for ReachableFirst {
 		config: &ureq::config::Config,
 		timeout: NextTimeout,
 	) -> Result<ResolvedSocketAddrs, ureq::Error> {
-		let mut resolved = self.0.resolve(uri, config, timeout)?;
+		let mut resolved = self.resolver.resolve(uri, config, timeout)?;
 		if resolved.len() > 1 {
 			let mut ordered = Self::interleave(&resolved);
+			let host = uri.authority().map(|auth| auth.as_str()).unwrap_or("");
 			// nobody connecting leaves the interleaved order, and ureq's own
 			// attempt reports the failure
-			if let Some(winner) = Self::race(&ordered) {
+			if let Some(winner) = self.winner(host, &ordered) {
 				ordered.retain(|addr| *addr != winner);
 				ordered.insert(0, winner);
 			}
@@ -296,7 +343,7 @@ mod test {
 	#[beet_core::test(timeout_ms = 40_000)]
 	async fn body_read_does_not_block_the_caller() {
 		let (server, on_spawn) =
-			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+			HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		let url = server.local_url();
 		let (send, recv) = OnceValue::<Result<usize>>::oneshot();
 
@@ -329,12 +376,55 @@ mod test {
 			.xpect_eq(BODY_LEN);
 	}
 
+	/// Sequential requests to one host share a connection: the hyper server
+	/// keeps it alive and tags each request with its peer address, which is
+	/// the connection's identity server-side.
+	#[cfg(feature = "hyper")]
+	#[beet_core::test]
+	async fn pools_connections() {
+		let (server, on_spawn) =
+			HttpServer::bind_loopback(HttpServer::start_hyper_with_tcp);
+		let url = server.local_url();
+		std::thread::spawn(move || {
+			App::new()
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.spawn((server, on_spawn, children![exchange_ext::handler(
+					|cx| {
+						let peer = cx
+							.take()
+							.headers
+							.first_raw(crate::types::PEER_ADDR_HEADER)
+							.unwrap_or_default()
+							.to_string();
+						Response::ok_text(peer)
+					}
+				)]))
+				.run();
+		});
+		time_ext::sleep_millis(100).await;
+		let mut peers = Vec::new();
+		for _ in 0..3 {
+			peers.push(
+				Request::get(&url)
+					.send()
+					.await
+					.unwrap()
+					.text()
+					.await
+					.unwrap(),
+			);
+		}
+		peers[0].is_empty().xpect_false();
+		peers.dedup();
+		peers.len().xpect_eq(1);
+	}
+
 	/// [`Redirects::None`] answers the `3xx` itself, so a caller can carry a
 	/// session across a hop the client would otherwise strip it from.
 	#[beet_core::test]
 	async fn does_not_follow_when_told_not_to() {
 		let (server, on_spawn) =
-			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+			HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		let url = server.local_url();
 		std::thread::spawn(move || {
 			App::new()

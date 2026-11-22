@@ -185,7 +185,7 @@ judge or delete.
 	<!-- the deploy: a lambda serving the repo bucket at `beetmania.beet.org` -->
 	<Stack app_name="beetmania">
 		<!-- the block + its build artifact share one entity, booting `serve` -->
-		<LambdaSiteBlock features="lambda,aws_sdk,atproto" authorities="beetmania.beet.org" exec_route="serve"/>
+		<LambdaSiteBlock features="lambda,atproto" authorities="beetmania.beet.org" exec_route="serve"/>
 		<S3BucketBlock label="repo" {RepoStoreBlock}/>
 		<Group bx:ref="beetmania_up">
 			<TofuApply layer="storage"/>

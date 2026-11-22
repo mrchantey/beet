@@ -1047,7 +1047,7 @@ impl MintToken {
 		loop {
 			let mint = match passed.take() {
 				Some(token) => Self(token),
-				None => Self(steps.prompt()?.into()),
+				None => Self(steps.prompt().await?.into()),
 			};
 			match mint.find_tokens(account, name).await {
 				Ok(found) => return (mint, found).xok(),
@@ -1249,24 +1249,29 @@ impl MintSteps {
 		)
 	}
 
-	/// Ask for the mint token on the controlling terminal: how to roll it,
-	/// then one line read with echo off. The url stands bare so the terminal
-	/// makes it a link. Without a terminal (an agent, a pipe, CI) the steps
-	/// are the error.
-	fn prompt(&self) -> Result<String> {
-		terminal_ext::read_secret_line(&format!(
-			"\nthis elevated deploy runs Cloudflare as the mint token, rolled \
-			for this run:\n\n\
-			1. Roll it at {}\n   {}\n2. Paste it here (not echoed): ",
-			self.url(),
-			self.clicks()
-		))
-		.map(|value| value.trim().to_string())
-		.map_err(|err| {
-			bevyhow!(
-				"an elevated deploy asks for the mint token, and {err}\n\n{self}"
-			)
-		})
+	/// Ask the operator for the mint token: how to roll it, then one line
+	/// read with echo off. The url stands bare so the terminal makes it a
+	/// link. Where nobody can answer (an agent, a pipe, CI) the steps are the
+	/// error.
+	async fn prompt(&self) -> Result<String> {
+		OperatorPrompt::ask(self.ask())
+			.await
+			.map(|value| value.trim().to_string())
+	}
+
+	/// The ask for the mint token, the steps it names what to do instead.
+	fn ask(&self) -> OperatorAsk {
+		OperatorAsk::secret_line(
+			"the mint token",
+			format!(
+				"\nthis elevated deploy runs Cloudflare as the mint token, \
+				rolled for this run:\n\n\
+				1. Roll it at {}\n   {}\n2. Paste it here (not echoed): ",
+				self.url(),
+				self.clicks()
+			),
+		)
+		.with_instead(format!("an elevated deploy asks for it\n\n{self}"))
 	}
 
 	/// The refusal `err` is, when it is a credential Cloudflare refused.
@@ -1608,6 +1613,14 @@ mod test {
 			)
 			.to_string()
 			.xpect_contains("403 Forbidden")
+			.xpect_contains("1. Run this in a terminal");
+		// where nobody can paste it, the refusal is the steps
+		RefusalPrompt::new("there is no terminal to ask on")
+			.refusal(&steps.ask())
+			.to_string()
+			.xpect_starts_with(
+				"the mint token is typed by the operator, and there is no terminal",
+			)
 			.xpect_contains("1. Run this in a terminal");
 	}
 

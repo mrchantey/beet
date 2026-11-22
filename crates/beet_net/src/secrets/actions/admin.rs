@@ -2,8 +2,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::path::Path;
-use std::path::PathBuf;
 
 /// Become an administrator for a session: the one path to tier 0a.
 ///
@@ -16,7 +14,8 @@ use std::path::PathBuf;
 ///
 /// Opens the global document for [`beet-agent`](AgentIdentity)'s pair, prompts
 /// for the six-digit code on the terminal, and calls `sts:AssumeRole` on the
-/// `beet-admin` role with that code. Without `--`, the temporary credentials go
+/// `beet-admin` role with that code, signed in this process
+/// ([`AwsSts::assume_role`]). Without `--`, the temporary credentials go
 /// to `$XDG_RUNTIME_DIR/beet/admin-session` (tmpfs, mode 600) and every later
 /// [`beet aws`](AwsExec) uses them until they lapse. With `-- <command>`, the
 /// live session runs the command when it has twenty minutes or more left,
@@ -31,12 +30,12 @@ use std::path::PathBuf;
 ///
 /// ## The code is typed, and that is the design
 ///
-/// It is read from the terminal and handed to the `aws` child in a `0600` file
-/// on tmpfs, never as an argument and never as an environment variable: argv is
-/// readable by any process on the machine through `/proc/<pid>/cmdline`, an
-/// environment is readable by its children, and a shell argument lands in
-/// history. A pipe would be better still and the cli does not support one — see
-/// [`write_request`](AdminElevate::write_request).
+/// It is read from the terminal and travels only inside the one signed
+/// `sts:AssumeRole` request body this process sends: never an argument, never
+/// an environment variable, never a file. argv is readable by any process on
+/// the machine through `/proc/<pid>/cmdline`, an environment by its children,
+/// and a shell argument lands in history; a request body is readable by this
+/// process and AWS alone, and an error that echoes the code has it redacted.
 ///
 /// More importantly, a typed code is the one thing an automated process cannot
 /// supply, which is exactly why the role's trust policy conditions on it:
@@ -76,10 +75,17 @@ pub async fn AdminElevate(
 	// the member and the session inside it, when one is named
 	let member = match account.as_deref() {
 		Some(name) => {
-			let member = MemberAccount::find(&session.sdk_vars(), name).await?;
-			let inside = member
-				.assume(&session.sdk_vars(), MemberAccount::ADMIN_ROLE)
-				.await?;
+			let member =
+				MemberAccount::find(session.credentials().clone(), name)
+					.await?;
+			let inside = AdminSession::new(
+				member
+					.assume(
+						session.credentials().clone(),
+						MemberAccount::ADMIN_ROLE,
+					)
+					.await?,
+			)?;
 			Some((member, inside))
 		}
 		None => None,
@@ -141,7 +147,7 @@ pub async fn AdminElevate(
 			};
 			Response::ok_text(format!(
 				"administrator until {} ({} from now), on tmpfs at {}{reach}",
-				Timestamp::from_secs(session.expires).format_iso8601(),
+				Timestamp::from_secs(session.expires()).format_iso8601(),
 				AwsExec::describe_remaining(session.remaining_secs()),
 				AdminSession::path()?.display()
 			))
@@ -177,39 +183,11 @@ impl AdminSession {
 	/// document, the six-digit code from the phone, and `sts:AssumeRole` on
 	/// `beet-admin` with it.
 	pub async fn mint(seconds: i64) -> Result<Self> {
-		let agent = AgentIdentity::sdk_pair().await?;
-		let account = AdminElevate::account_id(&agent).await?;
-		let code = terminal_ext::read_secret_line(&format!(
-			"six-digit code for the `{}` mfa device: ",
-			AgentIdentity::USER
-		))?;
+		let sts = AwsSts::new(AgentIdentity::credentials().await?);
+		let account = AdminElevate::account_id(&sts).await?;
+		let code = OperatorPrompt::ask(AdminElevate::code_ask()).await?;
 		AdminElevate::check_code(&code)?;
-		AdminElevate::assume(&agent, &account, &code, seconds).await
-	}
-
-	/// A session from the four tab-separated fields an `sts:AssumeRole` call
-	/// answers when asked for `Credentials.[AccessKeyId,SecretAccessKey,
-	/// SessionToken,Expiration]` as text. Separated from the calls so the
-	/// shape is testable without an account.
-	pub fn parse(body: &str, seconds: i64) -> Result<Self> {
-		let fields = body.trim().split_whitespace().collect::<Vec<_>>();
-		let [key_id, secret, token, expiration] = fields.as_slice() else {
-			bevybail!(
-				"`sts:AssumeRole` answered {} field(s) rather than four, so 				there is no session to keep",
-				fields.len()
-			);
-		};
-		Self {
-			key_id: (*key_id).into(),
-			secret: (*secret).into(),
-			token: (*token).into(),
-			// the answer's own expiry rather than now plus the request, since
-			// STS clamps the duration to the role's ceiling without saying so
-			expires: Timestamp::parse_rfc3339(expiration)
-				.map(|stamp| stamp.secs())
-				.unwrap_or_else(|| Timestamp::now().secs() + seconds),
-		}
-		.xok()
+		AdminElevate::assume(&sts, &account, &code, seconds).await
 	}
 }
 
@@ -254,6 +232,20 @@ impl AdminElevate {
 		seconds.xok()
 	}
 
+	/// The ask for the six-digit code: a person's, so where no person can
+	/// type it the refusal says to run the command in a terminal.
+	fn code_ask() -> OperatorAsk {
+		OperatorAsk::code(
+			"an mfa code",
+			format!(
+				"six-digit code for the `{}` mfa device: ",
+				AgentIdentity::USER
+			),
+			6,
+		)
+		.with_instead("run `beet admin` in a terminal, then retry")
+	}
+
 	/// Six digits, checked here so a typo costs a re-prompt rather than a
 	/// round trip and a burnt code.
 	fn check_code(code: &str) -> Result {
@@ -271,145 +263,62 @@ impl AdminElevate {
 
 	/// This account, asked as the agent, so the role and device arns are
 	/// composed rather than written down anywhere.
-	async fn account_id(agent: &[(SmolStr, SmolStr)]) -> Result<String> {
-		AgentIdentity::aws(agent, [
-			"sts",
-			"get-caller-identity",
-			"--query",
-			"Account",
-			"--output",
-			"text",
-		])
-		.run_async_stdout()
-		.await
-		.map(|out| out.trim().to_string())
-		.map_err(|err| {
-			bevyhow!(
-				"`{}`'s pair does not answer `sts:GetCallerIdentity`, so \
-					there is nobody to elevate FROM: the key may have been \
-					rolled at the account without the global document \
-					following it. {err}",
-				AgentIdentity::USER
-			)
-		})
+	async fn account_id(sts: &AwsSts) -> Result<SmolStr> {
+		sts.caller_identity()
+			.await
+			.map(|identity| identity.account)
+			.map_err(|err| Self::explain(err, ""))
 	}
 
 	/// Trade the code for the role's temporary credentials.
 	async fn assume(
-		agent: &[(SmolStr, SmolStr)],
+		sts: &AwsSts,
 		account: &str,
 		code: &str,
 		seconds: i64,
 	) -> Result<AdminSession> {
-		let role = format!(
-			"arn:aws:iam::{account}:role/{}",
-			AgentIdentity::ADMIN_ROLE
-		);
 		// the device is named for the user, so its arn is composed the same way
 		let device =
 			format!("arn:aws:iam::{account}:mfa/{}", AgentIdentity::USER);
-		let (request_path, request) = Self::write_request(
-			AdminSession::dir()?,
-			&role,
-			&device,
-			code,
-			seconds,
-		)?;
-		let result = AgentIdentity::aws(agent, [
-			"sts",
-			"assume-role",
-			"--cli-input-json",
-			request.as_str(),
-			// the four fields as text rather than the json document: this crate
-			// links no json parser outside its `json` feature, and the cli's
-			// own `--query` is the narrower ask anyway
-			"--query",
-			"Credentials.[AccessKeyId,SecretAccessKey,SessionToken,Expiration]",
-			"--output",
-			"text",
-		])
-		.with_secret(code)
-		.run_async_stdout()
-		.await;
-		// the request holds the code, so it goes the moment the call returns,
-		// whichever way it went
-		fs_ext::remove(&request_path)?;
-		let body = result.map_err(|err| Self::explain(err, &device))?;
-		AdminSession::parse(&body, seconds)
-	}
-
-	/// Write the request where the cli can read it: a `0600` file in `dir`,
-	/// tmpfs in use, returning the path and the `file://` argument naming it.
-	///
-	/// **The cli cannot read `--cli-input-json` from a pipe.** `file:///dev/stdin`
-	/// is rejected as `Invalid JSON received` even from a plain shell
-	/// redirect, so the obvious way to keep the code out of argv is not
-	/// available and this is the next one: `$XDG_RUNTIME_DIR` is tmpfs, so the
-	/// code never reaches a disk, [`fs_ext::write_private`] creates the file
-	/// owner-only before a byte of it exists, and the caller removes it as soon
-	/// as the call returns.
-	///
-	/// Worth the file rather than `--token-code` on argv because argv is
-	/// readable by every process on the machine through `/proc/<pid>/cmdline`,
-	/// where this is readable by its owner alone. `with_secret` governs what
-	/// beet writes down, not what the kernel shows about a child.
-	fn write_request(
-		dir: impl AsRef<Path>,
-		role: &str,
-		device: &str,
-		code: &str,
-		seconds: i64,
-	) -> Result<(PathBuf, String)> {
-		let dir = dir.as_ref();
-		fs_ext::create_dir_private(dir)?;
-		// named for this process, so two `admin` runs never share a request
-		let path =
-			dir.join(format!("assume-request-{}.json", std::process::id()));
-		fs_ext::write_private(
-			&path,
-			Self::assume_request(role, device, code, seconds),
-		)?;
-		let arg = format!("file://{}", path.display());
-		(path, arg).xok()
-	}
-
-	/// The `sts:AssumeRole` request as json. Hand-built rather than through
-	/// `serde_json`, which this crate links only behind its `json` feature;
-	/// every field is an arn, a fixed name or digits, so there is nothing to
-	/// escape.
-	fn assume_request(
-		role: &str,
-		device: &str,
-		code: &str,
-		seconds: i64,
-	) -> String {
-		format!(
-			"{{\"RoleArn\":\"{role}\",\
-			 \"RoleSessionName\":\"beet-admin\",\
-			 \"SerialNumber\":\"{device}\",\
-			 \"TokenCode\":\"{code}\",\
-			 \"DurationSeconds\":{seconds}}}"
-		)
+		let credentials = sts
+			.assume_role(&AssumeRole {
+				role_arn: format!(
+					"arn:aws:iam::{account}:role/{}",
+					AgentIdentity::ADMIN_ROLE
+				)
+				.into(),
+				session_name: AgentIdentity::ADMIN_ROLE.into(),
+				duration_secs: seconds,
+				mfa: Some((device.as_str().into(), code.into())),
+			})
+			.await
+			.map_err(|err| Self::explain(err, &device))?;
+		// the answer's own expiry rather than now plus the request, since STS
+		// clamps the duration to the role's ceiling without saying so
+		AdminSession::new(credentials)
 	}
 
 	/// Turn the three failures that actually happen into what to do about
-	/// them. An `AccessDenied` here is almost never a permissions problem: it
-	/// is a device that is not registered yet, or a code that has rolled.
+	/// them, by the error code STS answered. An `AccessDenied` here is almost
+	/// never a permissions problem: it is a code that has rolled, or a device
+	/// that is not registered yet. A key STS does not recognize is a pair
+	/// rolled at the account without the global document following it.
 	fn explain(err: BevyError, device: &str) -> BevyError {
+		let Some(error) = AwsError::of(&err) else {
+			return err;
+		};
 		let text = err.to_string();
-		if text.contains("MultiFactorAuthentication failed")
-			|| text.contains("invalid MFA one time pass")
-		{
-			return bevyhow!(
-				"that code was not accepted. A code is valid for about thirty \
-				seconds, so the usual cause is a stale one: wait for the next \
-				and try again. {text}"
-			);
-		}
-		if text.contains("not authorized to perform: sts:AssumeRole")
-			|| text.contains("AccessDenied")
-		{
-			return bevyhow!(
+		match error.error_code() {
+			"AccessDenied"
+				if error.message().contains("MultiFactorAuthentication") =>
+			{
+				bevyhow!(
+					"that code was not accepted. A code is valid for about \
+					thirty seconds, so the usual cause is a stale one: wait for \
+					the next and try again. {text}"
+				)
+			}
+			"AccessDenied" => bevyhow!(
 				"`{}` may not assume the `{}` role with that code. If you have \
 				not registered the device yet, that is the cause and it is \
 				expected: the role's trust policy requires an mfa code, so \
@@ -422,9 +331,15 @@ impl AdminElevate {
 				AgentIdentity::USER,
 				AgentIdentity::USER,
 				AgentIdentity::USER
-			);
+			),
+			"InvalidClientTokenId" | "SignatureDoesNotMatch" => bevyhow!(
+				"`{}`'s pair does not answer `sts:GetCallerIdentity`, so there \
+				is nobody to elevate FROM: the key may have been rolled at the \
+				account without the global document following it. {text}",
+				AgentIdentity::USER
+			),
+			_ => err,
 		}
-		err
 	}
 }
 
@@ -474,101 +389,120 @@ mod test {
 		AdminElevate::check_code("12345a").unwrap_err();
 	}
 
-	/// The four fields, in the order `--query` asked for them, with the
-	/// answer's OWN expiry: STS clamps a duration to the role's ceiling
-	/// without saying so, and a session that claims more than it has is a
-	/// command that fails halfway.
+	/// STS whose every answer is `status` and `body`, keeping each request
+	/// body it was sent.
+	fn sts(
+		status: StatusCode,
+		body: &'static str,
+	) -> (AwsSts, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+		let sent = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+		let seen = sent.clone();
+		let client = AwsClient::new(AwsService::STS, "us-east-1")
+			.with_credentials(AwsCredentials::new("AKID", "secret"))
+			.with_transport(move |request| {
+				let seen = seen.clone();
+				Box::pin(async move {
+					let sent = request.body.into_bytes().await?;
+					seen.lock()
+						.unwrap()
+						.push(String::from_utf8(sent.to_vec())?);
+					Response::from_status(status).with_body(body).xok()
+				})
+			});
+		(AwsSts::from_client(client), sent)
+	}
+
+	/// The code rides the one signed request, beside the composed role and
+	/// device arns, and the session keeps the answer's OWN expiry: STS clamps
+	/// a duration to the role's ceiling without saying so, and a session that
+	/// claims more than it has is a command that fails halfway.
 	#[beet_core::test]
-	fn parses_the_credentials() {
-		let session = AdminSession::parse(
-			"ASIAEXAMPLE\tsecrethalf\tsessiontoken\t2026-09-30T12:00:00Z\n",
-			3600,
-		)
-		.unwrap();
-		session.key_id.as_str().xpect_eq("ASIAEXAMPLE");
-		session.token.as_str().xpect_eq("sessiontoken");
-		session.expires.xpect_eq(
+	async fn assumes_with_the_code() {
+		let (sts, sent) = sts(
+			StatusCode::OK,
+			"<AssumeRoleResponse><AssumeRoleResult><Credentials>\
+			<AccessKeyId>ASIAEXAMPLE</AccessKeyId>\
+			<SecretAccessKey>secrethalf</SecretAccessKey>\
+			<SessionToken>sessiontoken</SessionToken>\
+			<Expiration>2026-09-30T12:00:00Z</Expiration>\
+			</Credentials></AssumeRoleResult></AssumeRoleResponse>",
+		);
+		let session = AdminElevate::assume(&sts, "1234", "123456", 1800)
+			.await
+			.unwrap();
+		session.expires().xpect_eq(
 			Timestamp::parse_rfc3339("2026-09-30T12:00:00Z")
 				.unwrap()
 				.secs(),
 		);
-		// a short answer is no session rather than a half one
-		AdminSession::parse("ASIAEXAMPLE\tsecrethalf", 3600)
+		sent.lock().unwrap()[0]
+			.as_str()
+			.xpect_contains(
+				"RoleArn=arn%3Aaws%3Aiam%3A%3A1234%3Arole%2Fbeet-admin",
+			)
+			.xpect_contains(
+				"SerialNumber=arn%3Aaws%3Aiam%3A%3A1234%3Amfa%2Fbeet-agent",
+			)
+			.xpect_contains("TokenCode=123456")
+			.xpect_contains("DurationSeconds=1800");
+	}
+
+	/// A stale code reads as one, and never carries the code itself.
+	#[beet_core::test]
+	async fn a_stale_code_says_so() {
+		let (sts, _) = sts(
+			StatusCode::FORBIDDEN,
+			"<ErrorResponse><Error><Type>Sender</Type><Code>AccessDenied</Code>\
+			<Message>MultiFactorAuthentication failed with invalid MFA one \
+			time pass code 123456</Message></Error></ErrorResponse>",
+		);
+		AdminElevate::assume(&sts, "1234", "123456", 1800)
+			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("rather than four");
-	}
-
-	/// The DELIVERY, not just the string. The previous version of this verb
-	/// built correct json and handed it to the cli as `file:///dev/stdin`,
-	/// which the cli rejects as `Invalid JSON received` even from a plain shell
-	/// redirect — so a test that only checked the json passed while the verb
-	/// could not work at all, and the cost of finding out was a spent mfa code.
-	/// This asserts the three properties that failure had: a `file://`
-	/// argument, a file that EXISTS at that path, and owner-only permissions.
-	#[beet_core::test]
-	fn the_request_reaches_the_cli_as_a_private_file() {
-		// a scratch directory, never the real one an `admin` run is using
-		let dir = TempDir::new().unwrap();
-		let (path, arg) = AdminElevate::write_request(
-			&dir,
-			"arn:aws:iam::1234:role/beet-admin",
-			"arn:aws:iam::1234:mfa/beet-agent",
-			"123456",
-			1800,
-		)
-		.unwrap();
-		arg.as_str()
-			.xpect_starts_with("file://")
-			// a pipe is what the cli cannot read, so it must not be one
+			.xpect_contains("thirty seconds")
 			.xnot()
-			.xpect_contains("/dev/stdin");
-		fs_ext::exists(&path).unwrap().xpect_true();
-		fs_ext::is_private(&path).unwrap().xpect_true();
-		// and the code is in it, since that is the whole reason for the file
-		fs_ext::read_to_string(&path)
-			.unwrap()
-			.as_str()
-			.xpect_contains("\"TokenCode\":\"123456\"");
-		fs_ext::remove(&path).unwrap();
-	}
-
-	/// The request carries the code, and the shape is worth pinning separately
-	/// from the delivery above.
-	#[beet_core::test]
-	fn builds_the_assume_request() {
-		let body = AdminElevate::assume_request(
-			"arn:aws:iam::1234:role/beet-admin",
-			"arn:aws:iam::1234:mfa/beet-agent",
-			"123456",
-			1800,
-		);
-		body.as_str()
-			.xpect_contains("\"TokenCode\":\"123456\"")
-			.xpect_contains("\"RoleArn\":\"arn:aws:iam::1234:role/beet-admin\"")
-			.xpect_contains(
-				"\"SerialNumber\":\"arn:aws:iam::1234:mfa/beet-agent\"",
-			)
-			.xpect_contains("\"DurationSeconds\":1800")
-			.xpect_contains("\"RoleSessionName\":\"beet-admin\"");
+			.xpect_contains("123456");
 	}
 
 	/// An unregistered device is the expected first failure, so it must read
-	/// as an instruction rather than as a permissions bug.
+	/// as an instruction rather than as a permissions bug, and a rolled key as
+	/// the document lagging the account.
 	#[beet_core::test]
-	fn an_unregistered_device_says_so() {
-		AdminElevate::explain(
-			bevyhow!("AccessDenied: not authorized to perform: sts:AssumeRole"),
-			"arn:aws:iam::1234:mfa/beet-agent",
-		)
-		.to_string()
-		.xpect_contains("Assign MFA device")
-		.xpect_contains("unreachable by design");
-		AdminElevate::explain(
-			bevyhow!("MultiFactorAuthentication failed"),
-			"arn:aws:iam::1234:mfa/beet-agent",
-		)
-		.to_string()
-		.xpect_contains("thirty");
+	async fn explains_by_code() {
+		let (denied, _) = sts(
+			StatusCode::FORBIDDEN,
+			"<ErrorResponse><Error><Code>AccessDenied</Code><Message>User is \
+			not authorized to perform: sts:AssumeRole</Message></Error>\
+			</ErrorResponse>",
+		);
+		AdminElevate::assume(&denied, "1234", "123456", 1800)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("Assign MFA device")
+			.xpect_contains("unreachable by design");
+		let (rolled, _) = sts(
+			StatusCode::FORBIDDEN,
+			"<ErrorResponse><Error><Code>InvalidClientTokenId</Code><Message>\
+			The security token included in the request is invalid</Message>\
+			</Error></ErrorResponse>",
+		);
+		AdminElevate::account_id(&rolled)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("rolled at the account");
+	}
+
+	/// A code is a person's: refused headless, and never asked of a provider
+	/// no person stands behind.
+	#[beet_core::test]
+	fn a_headless_code_is_refused() {
+		RefusalPrompt::new("this launch is headless")
+			.refusal(&AdminElevate::code_ask())
+			.to_string()
+			.xpect_contains("an mfa code is typed by a person")
+			.xpect_contains("run `beet admin` in a terminal");
 	}
 }

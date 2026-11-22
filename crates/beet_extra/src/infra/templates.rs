@@ -18,7 +18,7 @@ use beet_infra::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-/// `<BeetBinaryBuild features="aws_sdk"/>` — builds the generic `beet` binary
+/// `<BeetBinaryBuild features="aws"/>` — builds the generic `beet` binary
 /// (release, zigbuild) with the given feature set as a [`BuildArtifact`], the markup
 /// form of the infra examples' `build_beet_binary`. A deploy that ships a binary (a
 /// container image, a Lambda zip) reads the produced artifact from its sibling.
@@ -79,7 +79,7 @@ pub async fn StateBackendToggle(
 }
 
 /// An **opinionated** block for websites built with lambda.
-/// `<LambdaSiteBlock features="lambda,aws_sdk"/>` — the lambda deploy block plus
+/// `<LambdaSiteBlock features="lambda"/>` — the lambda deploy block plus
 /// its build artifact, on one entity. They share an entity because
 /// `TofuApply` pairs the `BuildArtifact` with the block on the same entity
 /// to upload it under the block's label, the S3 key the lambda reads its code
@@ -136,7 +136,7 @@ pub fn LambdaSiteBlock(
 	(block, infra_ext::lambda_artifact(build))
 }
 
-/// `<LambdaJobBlock label="rollup" features="aws_sdk,lambda" exec_route="jobs"/>`
+/// `<LambdaJobBlock label="rollup" features="lambda" exec_route="jobs"/>`
 /// — an INVOKE-ONLY lambda plus its build artifact, on one entity (paired by
 /// `TofuApply`, see [`LambdaSiteBlock`]): the target a
 /// `<ScheduledJobBlock/>` drives.
@@ -190,7 +190,7 @@ pub fn LambdaWatch(timeout: Option<Duration>) -> impl Bundle {
 	)
 }
 
-/// `<LightsailSiteBlock features="aws_sdk"/>` — the lightsail deploy block plus
+/// `<LightsailSiteBlock features="aws"/>` — the lightsail deploy block plus
 /// its build artifact, on one entity (paired by `TofuApply`, see
 /// [`LambdaSiteBlock`]).
 ///
@@ -281,7 +281,7 @@ pub fn FargateWatch(timeout: Option<Duration>) -> impl Bundle {
 	infra_ext::watch(WatchTarget::Fargate, timeout)
 }
 
-/// `<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>` —
+/// `<LightsailBeetSiteBlock features="aws,ssh,geoip"/>` —
 /// the beet website's Lightsail block plus its build artifact, on one entity
 /// (paired by `TofuApply`, see [`LambdaSiteBlock`]): one `small_3_0` box
 /// (2 GB, known monthly price, no NLB) serving http behind Caddy and the beet
@@ -573,7 +573,7 @@ mod test {
 			r#"<Stack {(CloudflareAccount("account"), CloudflareZone{domain:"beet.org", id:"zone"})}>
 				<S3BucketBlock label="repo" {RepoStoreBlock}/>
 				<SecretBlock bx:ref="ssh_host_key" label="ssh-host-key" env="BEET_SSH_HOST_KEY"/>
-				<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip" {ReadsSecrets([$ssh_host_key])}/>
+				<LightsailBeetSiteBlock features="aws,ssh,geoip" {ReadsSecrets([$ssh_host_key])}/>
 			</Stack>"#,
 		);
 		let mut renders = Vec::new();
@@ -875,7 +875,7 @@ mod test {
 					     every served store: the job dispatches a route of the same
 					     document the site serves -->
 					<S3BucketBlock label="repo" {RepoStoreBlock}/>
-					<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,lambda"/>
+					<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="lambda"/>
 					<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 				</Stack>
 			</Fragment>"#,
@@ -1142,7 +1142,7 @@ mod test {
 		spawn_markup(
 			&mut world,
 			router,
-			r#"<Stack><LightsailSiteBlock features="aws_sdk"/></Stack>"#,
+			r#"<Stack><LightsailSiteBlock features="aws"/></Stack>"#,
 		);
 		world
 			.query::<&LightsailBlock>()
@@ -1169,7 +1169,7 @@ mod test {
 			&mut world,
 			router,
 			r#"<Stack>
-				<LambdaSiteBlock features="lambda,aws_sdk"/>
+				<LambdaSiteBlock features="lambda"/>
 				<S3BucketBlock label="repo" {RepoStoreBlock}/>
 			</Stack>"#,
 		);
@@ -1199,7 +1199,7 @@ mod test {
 		spawn_markup(
 			&mut world,
 			router,
-			r#"<Stack><LambdaSiteBlock features="lambda,aws_sdk"/></Stack>"#,
+			r#"<Stack><LambdaSiteBlock features="lambda"/></Stack>"#,
 		);
 	}
 

@@ -7,7 +7,8 @@
 //! [`ServiceAccess`], [`IpAddress`]),
 //! or [`PackageConfig`], the resource describing *this build* rather than
 //! *this launch* (the package's identity, usually from
-//! [`pkg_config!`](crate::pkg_config)).
+//! [`pkg_config!`](crate::pkg_config)). [`OperatorPrompt`] is how the process
+//! asks the person who launched it for anything, and whether one is there.
 
 mod bootstrap_config;
 mod child_process;
@@ -22,6 +23,11 @@ pub use server_filter::*;
 pub use service_access::*;
 pub use store_uri::*;
 
+// the operator, asked through one seam: std, for its blocking terminal read
+#[cfg(feature = "std")]
+mod operator_prompt;
+#[cfg(feature = "std")]
+pub use operator_prompt::*;
 // `heck` casing and the workspace path helpers are std-only.
 #[cfg(feature = "std")]
 mod package_config;

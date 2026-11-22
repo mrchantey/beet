@@ -17,6 +17,9 @@ pub struct ReadDir {
 	pub recursive: bool,
 	/// include the root directory
 	pub root: bool,
+	/// read through symbolic links, as a plain path read does; off, a link
+	/// and whatever it names are skipped
+	pub follow_symlinks: bool,
 }
 
 impl Default for ReadDir {
@@ -26,6 +29,7 @@ impl Default for ReadDir {
 			dirs: false,
 			recursive: false,
 			root: false,
+			follow_symlinks: true,
 		}
 	}
 }
@@ -279,6 +283,9 @@ impl ReadDir {
 					err,
 				})
 				.map(|c| c.path())?;
+			if !self.follow_symlinks && child.is_symlink() {
+				continue;
+			}
 			if child.is_dir() {
 				if self.dirs {
 					paths.push(child.clone());

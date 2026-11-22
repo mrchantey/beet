@@ -8,6 +8,14 @@
 //! - **Native with `ureq`**: Uses ureq (blocking, wrapped in unblock + async)
 //! - **Native with `reqwest`**: Uses reqwest (async)
 //!
+//! Connections are pooled by every backend, so a run of calls to one host
+//! pays its TCP and TLS handshake once:
+//!
+//! - **ureq**: one static agent, the redirect budget set per request.
+//! - **reqwest**: static clients, one per common redirect policy; an unusual
+//!   hop budget builds its own.
+//! - **fetch** (a Worker, Deno, a browser): the host's own pool.
+//!
 //! # Example
 //!
 //! ```ignore
@@ -21,12 +29,9 @@
 //!     response.text().await
 //! }
 //! ```
-// an AWS api as SigV4-signed requests over this client, as the launch's
-// credentials: the identity, the signing and the JSON 1.1 protocol.
-#[cfg(feature = "aws_rest_api")]
-mod aws_credentials;
-#[cfg(feature = "aws_rest_api")]
-mod aws_json_client;
+// AWS as Signature Version 4 requests over this client
+#[cfg(feature = "aws")]
+mod aws;
 #[cfg(feature = "http")]
 mod event_source;
 #[cfg(feature = "fs")]
@@ -53,13 +58,15 @@ mod impl_ureq;
 // std-gated `futures` channel and `send_wrapper`.
 #[cfg(all(target_arch = "wasm32", feature = "std"))]
 mod impl_web_sys;
+#[cfg(feature = "std")]
+mod request_auth;
 mod send;
-#[cfg(feature = "aws_rest_api")]
-pub use aws_credentials::*;
-#[cfg(feature = "aws_rest_api")]
-pub use aws_json_client::*;
+#[cfg(feature = "aws")]
+pub use aws::*;
 #[cfg(feature = "http")]
 pub use event_source::*;
 #[cfg(feature = "fs")]
 pub use impl_file::*;
+#[cfg(feature = "std")]
+pub use request_auth::*;
 pub use send::*;
