@@ -40,16 +40,16 @@
 //! not here?".
 //!
 //! `beet_router` reads it: a tombstone that recorded a path becomes a route
-//! that exists and refuses, so a lean binary still LISTS `/site` in `--help`
-//! and dispatching it reports the condition that excluded it rather than
-//! "unknown route". That is what lets this one mechanism cover the case a
-//! separate dispatch-time gate used to.
+//! that exists and refuses, claiming its whole subtree, so a lean binary still
+//! LISTS `/site` in `--help` and dispatching `/site` or `/site/deploy` reports
+//! the condition that excluded it rather than "unknown route". That is what
+//! lets this one mechanism cover the case a separate dispatch-time gate used
+//! to.
 //!
 //! The honest limit, which is a property of the problem and not of this design:
 //! routes *below* an excluded node cannot be listed, because the include that
-//! defines them never ran. `/site` is reported as excluded; `/site/deploy` is
-//! simply not there. Nothing could do better without running the effect that
-//! exclusion exists to prevent.
+//! defines them never ran. Nothing could do better without running the effect
+//! that exclusion exists to prevent.
 //!
 //! # The condition grammar
 //!

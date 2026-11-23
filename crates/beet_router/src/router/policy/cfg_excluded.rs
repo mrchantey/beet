@@ -19,10 +19,12 @@ use beet_net::prelude::*;
 /// because there is no name to answer at. It stays in the tree as data, which
 /// is still enough for a diagnostic to find it.
 ///
-/// The honest limit: routes BELOW the excluded node cannot be restored, since
-/// the subtree that declared them never built. `site` reports the exclusion;
-/// `site/deploy` is not found. Nothing could do better without running the
-/// effect the exclusion existed to prevent.
+/// It claims everything below its path too, so `site/deploy`, a route the
+/// excluded subtree would have declared, reports the same condition rather
+/// than 404ing. The honest limit is listing: the routes below cannot be named
+/// in `--help`, since the subtree that declared them never built, and nothing
+/// could do better without running the effect the exclusion existed to
+/// prevent.
 pub(crate) fn report_cfg_excluded(
 	ev: On<Add<CfgExcluded>>,
 	query: Query<&CfgExcluded>,
@@ -34,7 +36,11 @@ pub(crate) fn report_cfg_excluded(
 	}
 	let message = excluded.message();
 	commands.entity(ev.entity).insert((
-		PathPartial::new(excluded.path.as_str()),
+		// zero or more segments below it, the excluded subtree's whole space
+		PathPartial::parse(format!(
+			"{}/:excluded*",
+			excluded.path.trim_end_matches('/')
+		))?,
 		Action::<Request, Response>::new_pure(
 			move |_cx: ActionContext<Request>| -> Result<Response> {
 				bevybail!("{message}")
@@ -71,6 +77,26 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("excluded from this build")
+			.xpect_contains("feature:infra && feature:extra");
+	}
+
+	/// A route the excluded subtree would have declared reports the same
+	/// condition, where it used to fall through to a 404.
+	#[beet_core::test]
+	async fn a_route_below_an_excluded_one_names_the_condition() {
+		let mut world = router_world();
+		world
+			.spawn((Router::with_defaults(), children![CfgExcluded {
+				condition: "feature:infra && feature:extra".into(),
+				tag: "Route".into(),
+				path: "sso".into(),
+			}]))
+			.exchange(Request::get("sso/login"))
+			.await
+			.into_result()
+			.await
+			.unwrap_err()
+			.to_string()
 			.xpect_contains("feature:infra && feature:extra");
 	}
 
