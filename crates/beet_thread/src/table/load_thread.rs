@@ -351,17 +351,17 @@ impl Thread {
 	///    escaping value;
 	/// 2. find the stored thread `entry` continues ([`ThreadEntryParams`],
 	///    [`MountThreadStore::new`], else the newest in the directory);
-	/// 3. creating: resolve each [`SeedSource`] in author order, reduce the
-	///    scene keeping its seed posts and record `spawned_by` and
-	///    `branch_of`;
-	/// 4. continuing: reduce the scene dropping its seed posts, reading no
-	///    seed source;
+	/// 3. creating: record `spawned_by` and `branch_of`, and for a fresh
+	///    thread resolve each [`SeedSource`] in author order and reduce the
+	///    scene keeping its seed posts;
+	/// 4. continuing, or branching: reduce the scene dropping its seed posts,
+	///    reading no seed source;
 	/// 5. load the stored records, post the entry's join, then the request's
 	///    message if the entry carries one.
 	///
 	/// A thread mounting no store persists nothing, so every entry creates
 	/// it. A branch enters with its parent's history up to the branch point,
-	/// which holds its seed, so it reads no seed of its own. Once per entity:
+	/// so it opens with its parent's posts and reads no seed. Once per entity:
 	/// the mount is consumed by the first entry.
 	///
 	/// ## Errors
@@ -413,7 +413,7 @@ impl Thread {
 			}
 		};
 		let creating = stored.is_none();
-		// a branch's seed is its parent's, already in its history
+		// a branch opens with its parent's posts, so only a fresh thread seeds
 		let keep_seeds = creating && entry.params.branch_of.is_none();
 
 		// 3. creating: resolve each seed source; continuing reads none

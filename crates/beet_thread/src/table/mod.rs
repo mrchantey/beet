@@ -18,10 +18,13 @@
 //!   message, a reasoning step, a tool call, its output, or a log of
 //!   something that happened. Its [`PostIntent`] is closed and a log's kind
 //!   is open ([`LogKind`]), a downstream kind prefixing its crate.
-//! - **Seed.** The posts a thread begins with, by definition every post
-//!   before its first session post. It is written once, when the thread is
-//!   created, and a continued thread never reads the template's seed again,
-//!   so an edited seed reaches a new thread only (`--new`).
+//! - **Seed.** The posts a template opens a new thread with, authored as
+//!   [`<CreatePost>`](CreatePost) children of its actors. It is written once,
+//!   by the entry creating the thread, as the thread's first posts, and
+//!   nothing in the store marks them: a stored thread has posts, not a seed.
+//!   A template is built on every entry, so an entry continuing a thread
+//!   discards its seed unread, and an edited seed reaches a new thread only
+//!   (`--new`).
 //!
 //! Anything persisted names another thread or post by id, never by `Entity`.
 //!
@@ -82,11 +85,12 @@
 //! 1. fill the mount's path from the request, refusing an escaping value;
 //! 2. find the stored thread (`--thread`, `--new`, the mount's `new`, else the
 //!    newest in the directory), refusing a second canonical window;
-//! 3. creating: resolve each seed source (`<CreatePost src="..">`, a route's
-//!    answer) in author order, keep the scene's seed posts and record
-//!    `spawned_by` and `branch_of`;
-//! 4. continuing: drop the scene's seed posts, reading no seed source and
-//!    calling no seed route;
+//! 3. creating: record `spawned_by` and `branch_of`, and for a fresh thread
+//!    resolve each seed source (`<CreatePost src="..">`, a route's answer)
+//!    in author order and keep the scene's seed posts;
+//! 4. continuing, or branching, which continues its parent's history: drop
+//!    the scene's seed posts, reading no seed source and calling no seed
+//!    route;
 //! 5. load the stored records, join the feed, post a join for each actor
 //!    present that no other window of the runtime holds, then post the
 //!    request's message if the entry carries one.
@@ -176,8 +180,8 @@
 //!   a post, then going its own way, referencing its ancestors' posts rather
 //!   than copying them. A branch lives in its parent's store, so
 //!   `--branch-of` naming a post the mount's store lacks is refused, as is
-//!   `--branch-of` beside `--thread`. Its seed is its parent's, in the
-//!   history it continues, so creating a branch reads no seed source.
+//!   `--branch-of` beside `--thread`. It opens with its parent's posts, so
+//!   creating a branch reads no seed.
 //!
 //! # Limits
 //!

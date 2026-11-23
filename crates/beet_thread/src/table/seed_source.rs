@@ -17,7 +17,7 @@ use beet_net::prelude::*;
 /// source of a thread it creates, in author order, calling its action on the
 /// source's own entity with the [`ThreadEntry`], so it resolves
 /// what it reads by ancestry, and its text lands as a [`SeedPost`] in its
-/// place. A continued thread reads no source: its seed is the one stored.
+/// place. A continued thread reads no source: its first posts are stored.
 #[derive(Clone, Component)]
 pub struct SeedSource {
 	/// Names the source in an error, ie `<CreatePost src="seeds/system.md">`.
