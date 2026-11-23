@@ -33,8 +33,13 @@ impl OAuthBrowser {
 					true => "open",
 					false => "xdg-open",
 				};
-				if let Err(err) = ChildProcess::new(opener).with_args([url]).spawn() {
-					debug!("no browser opened ({err}): the url above is the way in");
+				// detached: the opener hands the url on and must outlive
+				// this call, where a dropped handle would kill it first
+				match ChildProcess::new(opener).with_args([url]).spawn() {
+					Ok(opener) => opener.detach(),
+					Err(err) => {
+						debug!("no browser opened ({err}): the url above is the way in")
+					}
 				}
 			} else {
 				let _ = url;

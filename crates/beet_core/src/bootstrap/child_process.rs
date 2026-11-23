@@ -57,13 +57,16 @@ impl core::fmt::Display for ChildProcess {
 }
 
 /// Handle for a long-running child process.
-/// Kills the process on drop, and also supports explicit [`kill`](ChildHandle::kill).
+/// Kills the process on drop unless [`detach`](ChildHandle::detach)ed, and
+/// also supports explicit [`kill`](ChildHandle::kill).
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub struct ChildHandle {
 	inner: async_process::Child,
 	/// The child leads its own process group (see [`ChildProcess::with_group`]),
 	/// so kill targets the group, not just the immediate child.
 	group: bool,
+	/// Let go by [`detach`](Self::detach), so dropping kills nothing.
+	detached: bool,
 }
 
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
@@ -97,6 +100,11 @@ impl ChildHandle {
 			.map_err(|err| bevyhow!("child process failed: {err}"))
 	}
 
+	/// Let the child outlive this handle, ie a desktop opener (`xdg-open`)
+	/// that hands a url to the browser and must not die with the process
+	/// that asked. The child is still reaped when it exits.
+	pub fn detach(mut self) { self.detached = true; }
+
 	/// Take the child's piped stdin, `None` unless spawned with
 	/// [`spawn_piped`](ChildProcess::spawn_piped) or already taken.
 	pub fn take_stdin(&mut self) -> Option<async_process::ChildStdin> {
@@ -118,7 +126,11 @@ impl ChildHandle {
 
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 impl Drop for ChildHandle {
-	fn drop(&mut self) { self.kill().ok(); }
+	fn drop(&mut self) {
+		if !self.detached {
+			self.kill().ok();
+		}
+	}
 }
 
 impl ChildProcess {
@@ -473,6 +485,7 @@ impl ChildProcess {
 		Ok(ChildHandle {
 			inner: child,
 			group: self.group,
+			detached: false,
 		})
 	}
 
@@ -614,6 +627,32 @@ mod test {
 			.xpect_contains(&format!(
 				"working directory {absent} does not exist"
 			));
+	}
+
+	/// A dropped handle kills its child, a detached one lets it finish: what
+	/// a desktop opener needs, since `xdg-open` killed on the spot opens no
+	/// browser.
+	#[crate::test]
+	async fn a_detached_child_outlives_its_handle() {
+		let dir = TempDir::new().unwrap();
+		let spawn_touching = |name: &str| {
+			ChildProcess::new("sh")
+				.with_args([
+					"-c",
+					&format!("sleep 0.2; touch {}", dir.path().join(name)),
+				])
+				.spawn()
+				.unwrap()
+		};
+		drop(spawn_touching("killed"));
+		spawn_touching("detached").detach();
+		time_ext::sleep_millis(600).await;
+		fs_ext::exists(dir.path().join("killed"))
+			.unwrap()
+			.xpect_false();
+		fs_ext::exists(dir.path().join("detached"))
+			.unwrap()
+			.xpect_true();
 	}
 
 	/// A missing executable with no configured message still names itself.
