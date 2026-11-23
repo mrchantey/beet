@@ -17,7 +17,7 @@ impl Default for RandomizePosition {
 
 pub(crate) fn randomize_position(
 	mut commands: Commands,
-	mut rand: ResMut<RandomSource>,
+	mut rand: ResMut<FastRandom>,
 	mut query: Populated<
 		(Entity, &mut Transform, &RandomizePosition),
 		Added<RandomizePosition>,

@@ -43,7 +43,7 @@ impl Default for SetCurveOnRun {
 pub(crate) fn set_curve_on_run(
 	ev: On<Add<Running<Outcome>>>,
 	transforms: AgentQuery<&Transform>,
-	mut rng: ResMut<RandomSource>,
+	mut rng: ResMut<FastRandom>,
 	mut query: Query<(&SetCurveOnRun, &mut PlayProceduralAnimation)>,
 ) -> Result {
 	let target = ev.event().event_target();

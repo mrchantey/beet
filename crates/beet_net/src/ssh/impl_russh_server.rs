@@ -221,7 +221,7 @@ fn host_key(declared: Option<&SshHostKey>) -> Result<PrivateKey> {
 	return parse_host_key(SshHostKey::DEBUG);
 	#[cfg(not(debug_assertions))]
 	return PrivateKey::random(
-		&mut rand::rng(),
+		&mut SecureRandom::new()?,
 		russh::keys::Algorithm::Ed25519,
 	)?
 	.xok();

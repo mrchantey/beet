@@ -426,13 +426,14 @@ impl IntoIterator for Backoff {
 use core::iter;
 /// An exponential backoff iterator.
 ///
-/// Not [`Clone`]: the jitter rng is a `ChaCha8Rng`, whose state must not be
-/// forked. Clone the [`Backoff`] and call [`Backoff::iter`] for a fresh one.
+/// Not [`Clone`]: a fork would repeat its jitter, which is what jitter
+/// exists to avoid. Clone the [`Backoff`] and call [`Backoff::iter`] for a
+/// fresh one.
 #[derive(Debug)]
 pub struct BackoffIter {
 	inner: Backoff,
 	#[cfg(feature = "rand")]
-	rng: rand::rngs::ChaCha8Rng,
+	rng: FastRandom,
 	attempts: u32,
 }
 
@@ -440,10 +441,10 @@ impl BackoffIter {
 	pub(crate) fn new(inner: Backoff) -> Self {
 		Self {
 			attempts: 0,
-			// std seeds from the thread-local entropy generator, no_std from the
-			// platform entropy source (getrandom).
+			// jitter spreads retries apart, which no adversary predicts to any
+			// gain, so the fast source
 			#[cfg(feature = "rand")]
-			rng: rand::make_rng(),
+			rng: FastRandom::default(),
 			inner,
 		}
 	}
@@ -482,13 +483,11 @@ impl iter::Iterator for BackoffIter {
 
 		// Apply jitter. Uses multiples of 100 to prevent relying on floats.
 		//
-		// We put this in a conditional block because the `fastrand` crate
-		// doesn't like `0..0` inputs, and dividing by zero is also not a good
-		// idea.
+		// conditional, since an empty `0..0` range has no value to draw and
+		// a zero factor would divide by zero
 
 		#[cfg(feature = "rand")]
 		if self.inner.jitter != 0.0 {
-			use rand::RngExt;
 			let jitter_factor = (self.inner.jitter * 100f32) as u32;
 			let random = self.rng.random_range(0..jitter_factor * 2);
 			let mut duration = duration.saturating_mul(100);

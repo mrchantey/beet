@@ -210,6 +210,12 @@ impl AwsDeployCredential {
 	/// into an account without it refuses before it writes.
 	const SERVICE_LINKED_LINE: &'static str = "service-linked-role";
 
+	/// The grant line naming the declared Identity Center's operator group
+	/// and region, ie `identity-center beet-operators ap-southeast-2`: what
+	/// the converge provisioned, recorded so a declaration the account does
+	/// not hold yet, or one that changed, makes the next deploy elevate.
+	const IDENTITY_CENTER_LINE: &'static str = "identity-center";
+
 	/// The group a first converge seals into; a record already sealed stays
 	/// in its own.
 	const DEFAULT_GROUP: &'static str = SecretsDocument::DEFAULT_GROUP;
@@ -251,15 +257,39 @@ impl AwsDeployCredential {
 		else {
 			return CredentialStatus::not_needed().xok();
 		};
-		let grants = Self::grant_lines(&apps)?;
+		// Identity Center is no grant a plain deploy acts through, so a
+		// declaration the account does not hold yet is due, never stale
+		let identity_center = Self::grant_lines(
+			&[],
+			IdentityCenter::declared(caller).await?.as_ref(),
+		)?;
+		let grants = Self::grant_lines(&apps, None)?;
 		let held = DeployCredential::sealed(caller, Self::KEY_ID).await;
-		let rendered = |line: &str| !Self::keeps(&apps, line);
+		let rendered = |line: &str| {
+			!Self::keeps(&apps, line)
+				&& !line.starts_with(Self::IDENTITY_CENTER_LINE)
+		};
 		let mut status = CredentialStatus::compare(
 			self.id(),
 			Self::KEY_ID,
 			&grants,
 			held.as_ref(),
 			Some(&rendered),
+		);
+		let held_grants = DeployCredential::held_grants(held.as_ref());
+		status.due.extend(
+			identity_center
+				.iter()
+				.filter(|line| {
+					!held_grants.iter().any(|held| held == line.as_str())
+				})
+				.map(|line| {
+					format!(
+						"{}: `{line}` is declared and not yet provisioned, \
+						which the next elevated deploy does",
+						self.id()
+					)
+				}),
 		);
 		status
 			.due
@@ -388,8 +418,13 @@ impl AwsDeployCredential {
 	/// One line per policy this launch's apps render: its name and a digest of
 	/// its document, the deploy policy unconditioned since whether it carries
 	/// the boundary conditions is an account read, not a declaration. Then one
-	/// line per service-linked role they need ([`Self::SERVICE_LINKED_LINE`]).
-	fn grant_lines(apps: &[AppPolicies]) -> Result<Vec<String>> {
+	/// line per service-linked role they need ([`Self::SERVICE_LINKED_LINE`]),
+	/// and one for the declared `identity_center` and its region
+	/// ([`Self::IDENTITY_CENTER_LINE`]).
+	fn grant_lines(
+		apps: &[AppPolicies],
+		identity_center: Option<&(IdentityCenter, SmolStr)>,
+	) -> Result<Vec<String>> {
 		let digest = |document: &Value| {
 			digest_ext::hex::<sha2::Sha256>(document.to_string().as_bytes())
 				[..16]
@@ -417,6 +452,9 @@ impl AwsDeployCredential {
 				format!("{} {service}", Self::SERVICE_LINKED_LINE)
 			}),
 		);
+		lines.extend(identity_center.map(|(center, region)| {
+			format!("{} {} {region}", Self::IDENTITY_CENTER_LINE, center.group)
+		}));
 		lines.sort();
 		lines.xok()
 	}
@@ -455,9 +493,9 @@ impl AwsDeployCredential {
 		let mut report = Vec::new();
 		// the account first, since the credential lives inside it
 		let management = AwsAdmin::new(session.credentials().clone());
+		let identity_center = IdentityCenter::declared(caller).await?;
 		let (admin, home) = match AwsAccount::declared(caller).await? {
 			Some((declared, region)) => {
-				let identity_center = IdentityCenter::declared(caller).await?;
 				let calls = AwsManagement::new(management, region.clone());
 				let calls = match &identity_center {
 					Some((_, sso_region)) => {
@@ -523,7 +561,7 @@ impl AwsDeployCredential {
 				report.push(admin.release_policy(&user, &arn).await?);
 			}
 		}
-		let grants = Self::grant_lines(&apps)?;
+		let grants = Self::grant_lines(&apps, identity_center.as_ref())?;
 		let home = KeyHome {
 			account: &account,
 			member: home.as_ref(),
@@ -1961,10 +1999,11 @@ mod test {
 		AwsDeployCredential::release(u32::MAX).xpect_false();
 	}
 
-	/// A service-linked role the stacks need is a grant line of its own, so a
-	/// plain deploy into an account the converge has not prepared refuses.
+	/// A service-linked role the stacks need and a declared Identity Center
+	/// are grant lines of their own, so a deploy into an account the converge
+	/// has not prepared refuses.
 	#[beet_core::test]
-	fn records_the_service_linked_roles_the_stacks_need() {
+	fn records_what_the_account_must_hold() {
 		let app = |declared: &[&str]| AppPolicies {
 			deploy: AwsDeployPolicy::test_lowered("my-site", declared),
 			boundaries: BTreeMap::new(),
@@ -1972,9 +2011,15 @@ mod test {
 		};
 		let line = "service-linked-role ops.apigateway.amazonaws.com";
 		let domain = vec![app(&["aws_apigatewayv2_domain_name"])];
-		AwsDeployCredential::grant_lines(&domain)
+		AwsDeployCredential::grant_lines(&domain, None)
 			.unwrap()
 			.contains(&line.to_string())
+			.xpect_true();
+		let center =
+			(IdentityCenter::default(), SmolStr::new("ap-southeast-2"));
+		AwsDeployCredential::grant_lines(&domain, Some(&center))
+			.unwrap()
+			.contains(&"identity-center beet-operators ap-southeast-2".into())
 			.xpect_true();
 		// a role the entry no longer needs is dropped with the rest
 		let bucket = vec![app(&[])];

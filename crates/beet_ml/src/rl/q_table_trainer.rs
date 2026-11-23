@@ -121,7 +121,7 @@ mod test {
 
 	#[beet_core::test]
 	fn works() {
-		let mut policy_rng = RandomSource::from_seed(0);
+		let mut policy_rng = FastRandom::from_seed(0);
 		let map = FrozenLakeMap::default_four_by_four();
 		let initial_state = map.agent_position();
 		let env = QTableEnv::new(map.transition_outcomes());

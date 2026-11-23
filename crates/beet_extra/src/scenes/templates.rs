@@ -273,7 +273,7 @@ pub fn SeekAgent2d(
 #[template(system)]
 pub fn Flock(
 	#[prop(default = 300_usize)] count: usize,
-	mut rand: ResMut<RandomSource>,
+	mut rand: ResMut<FastRandom>,
 	mut assets: BuildAssets,
 	mut commands: Commands,
 ) -> impl Bundle {

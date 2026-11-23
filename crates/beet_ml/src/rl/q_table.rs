@@ -82,7 +82,7 @@ mod test {
 	fn works() {
 		let mut source = QTable::<GridPos, GridDirection>::default();
 		let params = QLearnParams::default();
-		let mut rng = RandomSource::from_seed(0);
+		let mut rng = FastRandom::from_seed(0);
 		let map = FrozenLakeMap::default_four_by_four();
 		let initial_state = map.agent_position();
 		let env = QTableEnv::new(map.transition_outcomes());

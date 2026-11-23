@@ -19,7 +19,7 @@ impl Plugin for PerceiveActPlugin {
 			)>()
 			.add_plugins(CapabilityBindingPlugin)
 			.init_resource::<PhotoStream>()
-			.init_resource::<RandomSource>()
+			.init_resource::<FastRandom>()
 			.register_type::<TakePhoto>()
 			.register_type::<PostPhoto>()
 			.register_type::<RespondMultiModal>()

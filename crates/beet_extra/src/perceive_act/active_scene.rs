@@ -171,7 +171,7 @@ async fn maybe_rotate_scene(caller: &AsyncEntity) -> Result {
 			AncestorQuery<(&SceneRotation, &SceneCatalog, &ActiveScene)>,
 			AncestorQuery<&BlobStore>,
 			Option<Res<CycleClock>>,
-			Option<ResMut<RandomSource>>,
+			Option<ResMut<FastRandom>>,
 		), _>(
 			|entity,
 			 (config, stores, clock, mut rng)|

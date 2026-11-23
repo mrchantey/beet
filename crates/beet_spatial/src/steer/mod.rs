@@ -43,7 +43,7 @@ pub fn steer_plugin(app: &mut App) {
 		)
 			.in_set(TickSet),
 	)
-	.init_resource::<RandomSource>()
+	.init_resource::<FastRandom>()
 	.register_type::<SteerTarget>()
 	.register_type::<Seek>()
 	.register_type::<Flee>()

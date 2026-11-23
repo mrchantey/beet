@@ -45,8 +45,7 @@ impl Tid {
 			.unwrap_or_else(bevy::platform::sync::PoisonError::into_inner);
 		let (clock_id, last) = *minter.get_or_insert_with(|| {
 			(
-				RandomSource::default().random::<u16>()
-					& Self::CLOCK_MASK as u16,
+				FastRandom::default().random::<u16>() & Self::CLOCK_MASK as u16,
 				0,
 			)
 		});

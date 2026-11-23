@@ -151,11 +151,11 @@ async fn AttackPlayer(
 				})
 				.ok_or_else(|| bevyhow!("no AttackTarget entity"))?;
 			let damage: f32 = world
-				.resource_mut::<RandomSource>()
+				.resource_mut::<FastRandom>()
 				.random_range(0.0..max_damage)
 				.round();
 			let recoil: f32 = world
-				.resource_mut::<RandomSource>()
+				.resource_mut::<FastRandom>()
 				.random_range(0.0..max_recoil)
 				.round();
 			info!("Malenia attacks with {name}");
@@ -194,9 +194,9 @@ async fn AttackPlayer(
 /// A [`ScoreProvider`] returning a fresh random score on each evaluation.
 fn random_score() -> ScoreProvider<()> {
 	ScoreProvider(Action::<(), Score>::new_system(
-		|_: In<ActionContext>,
-		 mut rng: ResMut<RandomSource>|
-		 -> Result<Score> { Score(rng.random::<f32>()).xok() },
+		|_: In<ActionContext>, mut rng: ResMut<FastRandom>| -> Result<Score> {
+			Score(rng.random::<f32>()).xok()
+		},
 	))
 }
 
@@ -296,7 +296,7 @@ pub struct ActionExamplesPlugin;
 
 impl Plugin for ActionExamplesPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_resource::<RandomSource>()
+		app.init_resource::<FastRandom>()
 			// hello_world
 			.register_type::<Greet>()
 			// simple_action

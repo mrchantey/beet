@@ -42,7 +42,7 @@ mod test {
 			&Velocity::default(),
 			&mut Wander::default(),
 			MaxSpeed::default(),
-			&mut RandomSource::from_seed(0).0,
+			&mut FastRandom::from_seed(0).0,
 		)
 		.0
 		.xpect_not_eq(Vec3::ZERO);

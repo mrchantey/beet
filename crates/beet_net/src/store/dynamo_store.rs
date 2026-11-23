@@ -484,16 +484,19 @@ impl TableProvider for DynamoStore {
 mod test {
 	use super::*;
 
-	#[beet_core::test]
+	/// The store and table suites against AWS, creating and removing their
+	/// tables, so they need an identity holding `dynamodb:*` on
+	/// `beet--test--*`.
+	#[beet_core::test(timeout_ms = 120_000)]
 	#[ignore = "takes ages"]
 	async fn store() {
-		let provider = DynamoStore::new("beet-test-table", "us-west-2");
+		let provider = DynamoStore::new("beet--test--store", "us-west-2");
 		store_test::run(provider).await;
 	}
-	#[beet_core::test]
+	#[beet_core::test(timeout_ms = 120_000)]
 	#[ignore = "takes ages"]
 	async fn table() {
-		let provider = DynamoStore::new("beet-test-table", "us-west-2");
+		let provider = DynamoStore::new("beet--test--table", "us-west-2");
 		table_test::run(provider).await;
 	}
 

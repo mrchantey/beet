@@ -69,7 +69,7 @@ impl Wander {
 }
 
 pub(crate) fn wander(
-	mut rng: ResMut<RandomSource>,
+	mut rng: ResMut<FastRandom>,
 	mut agents: AgentQuery<(&Transform, &Velocity, &MaxSpeed, &mut Impulse)>,
 	mut query: Query<(Entity, &mut Wander), With<Running>>,
 ) -> Result {

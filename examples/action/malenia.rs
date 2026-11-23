@@ -84,11 +84,11 @@ async fn AttackPlayer(
 	world
 		.with(move |world: &mut World| -> Result<Outcome> {
 			let damage: f32 = world
-				.resource_mut::<RandomSource>()
+				.resource_mut::<FastRandom>()
 				.random_range(0.0..max_damage)
 				.round();
 			let recoil: f32 = world
-				.resource_mut::<RandomSource>()
+				.resource_mut::<FastRandom>()
 				.random_range(0.0..max_recoil)
 				.round();
 			info!("Malenia attacks with {name}");
@@ -127,16 +127,16 @@ async fn AttackPlayer(
 /// A [`ScoreProvider`] returning a fresh random score on each evaluation.
 fn random_score() -> ScoreProvider<()> {
 	ScoreProvider(Action::<(), Score>::new_system(
-		|_: In<ActionContext>,
-		 mut rng: ResMut<RandomSource>|
-		 -> Result<Score> { Score(rng.random::<f32>()).xok() },
+		|_: In<ActionContext>, mut rng: ResMut<FastRandom>| -> Result<Score> {
+			Score(rng.random::<f32>()).xok()
+		},
 	))
 }
 
 fn main() -> AppExit {
 	App::new()
 		.add_plugins((MinimalPlugins, LogPlugin::default(), AsyncPlugin))
-		.init_resource::<RandomSource>()
+		.init_resource::<FastRandom>()
 		.add_systems(Startup, setup)
 		.run()
 }

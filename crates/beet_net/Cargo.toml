@@ -214,7 +214,8 @@ russh_server = [
 	"russh?/ring",
 	"beet_core/tokio",
 	"dep:tokio",
-	"dep:rand",
+	# `SecureRandom`, the rng a generated host key takes
+	"beet_core/rand",
 	# base64-decode a host key (a declared `SshHostKey`, else the launch's
 	# `BEET_SSH_HOST_KEY`) into a stable fingerprint
 	"dep:base64",
@@ -314,10 +315,6 @@ futures-lite = { workspace = true, optional = true }
 #💡 ssh
 russh = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true, features = ["net", "sync", "io-util", "time", "macros"] }
-# `PrivateKey::random` takes russh's rng, so the workspace major must match its
-# rand_core requirement. `thread_rng` for `rand::rng()`, which the workspace
-# `default-features = false` drops.
-rand = { workspace = true, optional = true, features = ["thread_rng"] }
 #💡 hyper server
 hyper = { version = "1.7", features = ["server","http1"], optional = true }
 http-body-util = {workspace = true, optional = true }

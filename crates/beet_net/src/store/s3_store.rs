@@ -716,10 +716,12 @@ mod test {
 			.xpect_contains("hunter2");
 	}
 
-	#[beet_core::test]
+	/// The store suite against AWS, creating and removing the bucket itself,
+	/// so it needs an identity holding `s3:*` on `beet--test--*`.
+	#[beet_core::test(timeout_ms = 120_000)]
 	#[ignore = "hits remote s3"]
 	async fn works() {
-		let provider = S3Store::new("beet-test-bucket", "us-west-2");
+		let provider = S3Store::new("beet--test--store", "us-west-2");
 		store_test::run(provider).await;
 	}
 
@@ -737,22 +739,6 @@ mod test {
 				)),
 		)
 		.await;
-	}
-
-	#[beet_core::test]
-	#[ignore = "hits remote s3"]
-	async fn infra_store() {
-		let provider = S3Store::new("beet-site-bucket-dev", "us-west-2");
-		let store = BlobStore::new(provider);
-		store.store_try_create().await.unwrap();
-		store.store_exists().await.xpect_ok();
-
-		store
-			.get(&RelPath::new("index.html"))
-			.await
-			.unwrap()
-			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
-			.xpect_starts_with("<!DOCTYPE html>");
 	}
 
 	#[beet_core::test]
@@ -780,7 +766,7 @@ mod test {
 	/// a static-file route would redirect every visitor into.
 	#[beet_core::test]
 	async fn private_bucket_has_no_public_url() {
-		BlobStore::new(S3Store::new("beet-test", "us-west-2"))
+		BlobStore::new(S3Store::new("beet--test--store", "us-west-2"))
 			.public_url(&RelPath::from("test-file.txt"))
 			.await
 			.unwrap()
@@ -790,7 +776,8 @@ mod test {
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn s3_public_url() {
-		let provider = S3Store::new("beet-test", "us-west-2").with_public(true);
+		let provider =
+			S3Store::new("beet--test--store", "us-west-2").with_public(true);
 		let test_key = RelPath::from("test-file.txt");
 		BlobStore::new(provider)
 			.public_url(&test_key)
@@ -798,7 +785,7 @@ mod test {
 			.unwrap()
 			.unwrap()
 			.xpect_eq(format!(
-				"https://beet-test.s3.us-west-2.amazonaws.com/{test_key}"
+				"https://beet--test--store.s3.us-west-2.amazonaws.com/{test_key}"
 			));
 	}
 }

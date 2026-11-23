@@ -5,43 +5,44 @@ use rand::distr::Distribution;
 use rand::distr::StandardUniform;
 use rand::distr::uniform::SampleRange;
 use rand::distr::uniform::SampleUniform;
-use rand::rngs::ChaCha8Rng;
+use rand::rngs::Xoshiro256PlusPlus;
 
-/// A simple random source for simulation, by default seeded from entropy,
-/// or from a seed for a reproducible run. Never for a secret: a seeded source
-/// is predictable, so tokens, keys and passwords come from [`SecureRandom`].
+/// Fast, reproducible randomness for simulation: games, steering, training,
+/// jitter. Deliberately NOT secure: [`Xoshiro256PlusPlus`] is a few
+/// instructions a draw, and its whole state follows from a handful of
+/// outputs, so nothing secret may ever come from it. Tokens, keys and
+/// passwords come from [`SecureRandom`].
 ///
-/// Enable the `bevy` feature to derive [Resource](bevy::prelude::Resource)
+/// Seeded from entropy by default, or from a seed for a run that repeats
+/// exactly on every target, the algorithm pinned rather than `SmallRng`'s,
+/// which differs between 32 and 64 bit platforms.
+///
 /// ```rust
 /// # use beet_core::prelude::*;
-/// # use rand::RngExt;
-///
-/// // defaults to from entropy
-/// let mut source = RandomSource::default();
-/// // or from a seed
-/// let mut source = RandomSource::from_seed(7);
+/// // seeded from entropy
+/// let mut random = FastRandom::default();
+/// // or from a seed, the same sequence on every run
+/// let mut random = FastRandom::from_seed(7);
 /// App::new()
-/// 	.insert_resource(source)
-/// 	.add_systems(Update,use_source);
+/// 	.insert_resource(random)
+/// 	.add_systems(Update, roll);
 ///
-///
-/// fn use_source(mut source: ResMut<RandomSource>) {
-/// 	println!("Random number: {}", source.random_range(1..1000));
+/// fn roll(mut random: ResMut<FastRandom>) {
+/// 	let roll = random.random_range(1..=6);
+/// 	# assert!((1..=6).contains(&roll));
 /// }
 /// ```
-///https://bevyengine.org/examples/math/random-sampling/
-#[derive(Deref, DerefMut, Resource)]
-pub struct RandomSource(pub ChaCha8Rng);
+#[derive(Debug, Clone, Deref, DerefMut, Resource)]
+pub struct FastRandom(pub Xoshiro256PlusPlus);
 
-impl RandomSource {
-	/// Creates a new [`RandomSource`] with the given seed for reproducible randomness.
+impl FastRandom {
+	/// A source seeded with `seed`, the same sequence on every run.
 	pub fn from_seed(seed: u64) -> Self {
-		let rng = ChaCha8Rng::seed_from_u64(seed);
-		Self(rng)
+		Self(Xoshiro256PlusPlus::seed_from_u64(seed))
 	}
 }
 
-impl Default for RandomSource {
+impl Default for FastRandom {
 	fn default() -> Self {
 		// std seeds from the thread-local entropy generator, no_std (eg bare
 		// embedded) from the platform entropy source via getrandom's `sys_rng`.
@@ -52,7 +53,7 @@ impl Default for RandomSource {
 }
 
 /// save the `use rand::RngExt` shenanigans
-impl RandomSource {
+impl FastRandom {
 	/// see [RngExt::random]
 	pub fn random<T>(&mut self) -> T
 	where
@@ -64,7 +65,7 @@ impl RandomSource {
 	/// see [RngExt::random_iter]
 	pub fn random_iter<T>(
 		self,
-	) -> rand::distr::Iter<StandardUniform, ChaCha8Rng, T>
+	) -> rand::distr::Iter<StandardUniform, Xoshiro256PlusPlus, T>
 	where
 		Self: Sized,
 		StandardUniform: Distribution<T>,
@@ -98,7 +99,7 @@ impl RandomSource {
 	pub fn sample_iter<T, D>(
 		self,
 		distr: D,
-	) -> rand::distr::Iter<D, ChaCha8Rng, T>
+	) -> rand::distr::Iter<D, Xoshiro256PlusPlus, T>
 	where
 		D: Distribution<T>,
 		Self: Sized,
@@ -114,17 +115,15 @@ impl RandomSource {
 mod test {
 	use crate::prelude::*;
 
+	/// A seed repeats its sequence exactly, the value pinned so a change of
+	/// algorithm, which would shift every seeded run, cannot pass unseen.
 	#[crate::test]
-	fn seed() {
-		let mut source = RandomSource::from_seed(7);
-		let val = source.random_range(10..100);
-		val.xpect_eq(22);
-	}
+	fn seed() { FastRandom::from_seed(7).random_range(10..100).xpect_eq(14); }
 
 	#[crate::test]
 	fn entropy() {
-		let mut source = RandomSource::default();
-		let val = source.random_range(10..100);
+		let mut random = FastRandom::default();
+		let val = random.random_range(10..100);
 		(val >= 10).xpect_true();
 		(val < 100).xpect_true();
 	}

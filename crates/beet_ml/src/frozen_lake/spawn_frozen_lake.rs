@@ -24,7 +24,7 @@ pub mod frozen_lake_assets {
 /// running as soon as the entity is fully spawned.
 pub(crate) fn spawn_frozen_lake_episode(
 	mut events: MessageReader<StartEpisode<FrozenLakeEpParams>>,
-	mut rng: ResMut<RandomSource>,
+	mut rng: ResMut<FastRandom>,
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
 ) {

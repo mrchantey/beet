@@ -48,7 +48,7 @@ where
 /// Per-frame system: takes one environment step for every active
 /// [`StepEnvironment`] with [`Running`].
 pub(crate) fn step_environment<S: RlSessionTypes>(
-	mut rng: ResMut<RandomSource>,
+	mut rng: ResMut<FastRandom>,
 	mut end_episode_events: MessageWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,
 	mut sessions: Query<&mut S::QLearnPolicy>,

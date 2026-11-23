@@ -10,9 +10,11 @@ use rand::rngs::SysRng;
 ///
 /// Seeded straight from the operating system's entropy source (getrandom,
 /// WebCrypto on wasm) into a full-round ChaCha20, and deliberately not
-/// seedable, not a `Resource` and not interchangeable with [`RandomSource`],
+/// seedable, not a `Resource` and not interchangeable with [`FastRandom`],
 /// whose reproducible seeds suit a simulation and would make a secret
 /// predictable. Construct one where the secret is made, never share it.
+/// It is a [`CryptoRng`](rand::CryptoRng), so a key library takes it
+/// directly, ie `PrivateKey::random(&mut SecureRandom::new()?, ..)`.
 ///
 /// ```rust
 /// # use beet_core::prelude::*;
@@ -48,6 +50,24 @@ impl SecureRandom {
 		self.0.random_range(range)
 	}
 }
+
+impl rand::TryRng for SecureRandom {
+	type Error = core::convert::Infallible;
+
+	fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+		self.0.try_next_u32()
+	}
+
+	fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+		self.0.try_next_u64()
+	}
+
+	fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
+		self.0.try_fill_bytes(dst)
+	}
+}
+
+impl rand::TryCryptoRng for SecureRandom {}
 
 #[cfg(test)]
 mod test {

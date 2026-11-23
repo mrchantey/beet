@@ -158,7 +158,7 @@ impl SshAuthority {
 
 	/// A fresh ed25519 key.
 	pub(crate) fn generate_key() -> Result<PrivateKey> {
-		PrivateKey::random(&mut rand::rng(), Algorithm::Ed25519)?.xok()
+		PrivateKey::random(&mut SecureRandom::new()?, Algorithm::Ed25519)?.xok()
 	}
 
 	/// A private key as the store holds it, OpenSSH encoded.
@@ -180,7 +180,7 @@ impl SshAuthority {
 		let now = time_ext::now();
 		let valid_after = now.saturating_sub(Self::CLOCK_SKEW).as_secs();
 		let mut builder = Builder::new_with_random_nonce(
-			&mut rand::rng(),
+			&mut SecureRandom::new()?,
 			public.key_data().clone(),
 			valid_after,
 			valid_before,

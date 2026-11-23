@@ -32,6 +32,8 @@ mod file_span;
 mod glob_filter;
 mod into_option;
 // LazyPool is built on async_lock (std-only).
+#[cfg(feature = "rand")]
+mod fast_random;
 #[cfg(feature = "std")]
 mod lazy_pool;
 mod line_col;
@@ -45,8 +47,6 @@ pub mod poll_ext;
 /// Process and command execution utilities.
 #[cfg(feature = "std")]
 pub mod process_ext;
-#[cfg(feature = "rand")]
-mod random_source;
 #[cfg(feature = "rand")]
 mod secure_random;
 #[cfg(feature = "serde")]
@@ -93,14 +93,14 @@ pub use bevy::tasks::BoxedFuture;
 pub use cli_args::*;
 pub use coalescing_trigger::*;
 pub use date::*;
+#[cfg(feature = "rand")]
+pub use fast_random::*;
 pub use file_span::*;
 pub use glob_filter::*;
 pub use line_col::*;
 pub use once_value::*;
 #[cfg(any(feature = "std", feature = "testing_embedded"))]
 pub(crate) use panic_context::*;
-#[cfg(feature = "rand")]
-pub use random_source::*;
 #[cfg(feature = "rand")]
 pub use secure_random::*;
 pub use timestamp::*;

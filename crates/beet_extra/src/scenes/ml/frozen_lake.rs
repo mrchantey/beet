@@ -76,7 +76,7 @@ pub fn FrozenLake(
 /// Run `frozen_lake_train` first to generate `assets/ml/frozen_lake_qtable.ron`.
 #[template(system)]
 pub fn FrozenLakeRunAgent(
-	mut rng: ResMut<RandomSource>,
+	mut rng: ResMut<FastRandom>,
 	mut assets: BuildAssets,
 	mut commands: Commands,
 ) -> impl Bundle {
