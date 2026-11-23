@@ -8,13 +8,18 @@ use beet_core::prelude::*;
 /// Write one record to a document (created when it does not exist yet):
 /// the value from `--value`, `--from-env`, `--copy` (another record's),
 /// `--generate` (`--length` for other than 32 characters) or stdin, into
-/// `--group` (default `default`), with `--role`, `--note`, `--roll` and
-/// `--expires`, re-sealing the group to its current recipient list. A record
-/// already in another group moves.
+/// `--group`, with `--role`, `--note`, `--roll` and `--expires`, re-sealing
+/// the group to its current recipient list.
+///
+/// A re-set states only what changes. The record's group, role, note and
+/// roll describe the record, so each is kept unless its flag is passed,
+/// `--group` moving it; its expiry, address, metadata and `modified`
+/// describe the value, so a new value drops them. A new record lands in `default`.
 ///
 /// ```sh
-/// beet secrets/set OPENAI_API_KEY --role=env_var       # prompts, no echo
-/// beet secrets/set OPENAI_API_KEY --from-env --role=env_var --note="openai api key" --roll="manual:platform.openai.com/api-keys"
+/// beet secrets/set OPENAI_API_KEY --role=env_var --note="openai api key" --roll="manual:platform.openai.com/api-keys"
+/// beet secrets/set OPENAI_API_KEY                      # rolled: prompts, no echo
+/// beet secrets/set OPENAI_API_KEY --from-env --note="a better note"
 /// beet secrets/set TF_STATE_PASSPHRASE --generate --role=env_var
 /// echo -n "$TOKEN" | beet secrets/set CF_API_TOKEN --group=agents
 /// beet secrets/set dkim-example-com --document=mail-prod --value=..
@@ -47,30 +52,33 @@ pub async fn SecretsSet(
 	/// The length of a generated value, 32 characters when absent.
 	#[param]
 	length: Option<usize>,
-	/// The group to seal the record in, `default` when absent; created on
+	/// The group to seal the record in, moving it from its own; absent, the
+	/// record stays where it is, a new one landing in `default`. Created on
 	/// first use with this identity file's own recipients.
 	#[param]
 	group: Option<String>,
 	/// What consumes the record: `env_var` loads it into the process
-	/// environment when the document loads; absent, it is kept and viewed.
+	/// environment when the document loads. Absent, a re-set keeps the
+	/// record's own, and a new record is kept and viewed.
 	#[param]
 	role: Option<String>,
 	/// A plaintext note for the index, never a secret: one line of what the
-	/// value is.
+	/// value is. Absent, a re-set keeps the record's own.
 	#[param]
 	note: Option<String>,
 	/// How the value is rolled: `manual:<where it is re-minted>` for a
 	/// hand-made credential, the full url first and one dashboard step or
 	/// permission per line (`manual:https://dash.cloudflare.com/profile/api-tokens
 	/// > Create Token > beet-deploy`), `remint` for one `--generate` mints,
-	/// `replace:<resource>` for one an apply derives.
+	/// `replace:<resource>` for one an apply derives. Absent, a re-set keeps
+	/// the record's own.
 	#[param]
 	roll: Option<String>,
 	/// When the value stops authenticating, for a credential issued with a
 	/// lifetime: a day (`2027-01-05`, midnight UTC) or an ISO 8601 instant.
 	/// Every launch that loads it warns in the fortnight before, and
-	/// `secrets/check` fails after. Re-setting a record restates it, as it
-	/// restates the note and roll.
+	/// `secrets/check` fails after. It belongs to the value: a re-set of the
+	/// same value keeps it, a new value drops it.
 	#[param]
 	expires: Option<String>,
 	cx: ActionContext<Request>,
@@ -82,33 +90,46 @@ pub async fn SecretsSet(
 	let value = ValueSource::new(value, from_env, copy, generate, length)?
 		.resolve(&name, &document, &identity)
 		.await?;
-	// no flag for the record's metadata or its `modified`: both describe the
-	// value, so a re-set of the same value keeps them and a new value drops
-	// them, and a new note never reads as a roll (`modified` versions what a
-	// deploy writes from the record)
 	let held = document
 		.open(&identity)
 		.ok()
-		.and_then(|opened| opened.get(&name).cloned())
+		.and_then(|opened| opened.get(&name).cloned());
+	// the expiry, address, metadata and `modified` describe the value: kept
+	// for the same value and dropped for a new one, so a new note never reads
+	// as a roll (`modified` versions what a deploy writes from the record)
+	let same_value = held
+		.as_ref()
 		.filter(|held| held.value == value)
-		.map(|held| held.record)
+		.map(|held| held.record.clone())
+		.unwrap_or_default();
+	// the group, role, note and roll describe the record: a flag replaces
+	// each, else the record keeps its own
+	let (held_group, held) = held
+		.map(|held| (Some(held.group), held.record))
 		.unwrap_or_default();
 	let record = SecretRecord {
-		role: role.as_deref().map(str::parse).transpose()?,
-		note: note.map(SmolStr::new),
-		roll: roll.as_deref().map(str::parse).transpose()?,
-		expires: expires.as_deref().map(SecretsSet::expires).transpose()?,
-		modified: held.modified,
-		metadata: held.metadata,
-		..default()
+		role: role.as_deref().map(str::parse).transpose()?.or(held.role),
+		note: note.map(SmolStr::new).or(held.note),
+		roll: roll.as_deref().map(str::parse).transpose()?.or(held.roll),
+		expires: expires
+			.as_deref()
+			.map(SecretsSet::expires)
+			.transpose()?
+			.or(same_value.expires),
+		modified: same_value.modified,
+		address: same_value.address,
+		metadata: same_value.metadata,
 	};
-	let group = group.as_deref().unwrap_or(SecretsDocument::DEFAULT_GROUP);
-	document.set(&identity, group, &name, &value, record)?;
+	let group = group
+		.map(SmolStr::from)
+		.or(held_group)
+		.unwrap_or_else(|| SecretsDocument::DEFAULT_GROUP.into());
+	document.set(&identity, &group, &name, &value, record)?;
 	handle.write(&document).await?;
 	Response::ok_text(format!(
 		"set `{name}` in group `{group}` of {} ({} recipient(s))\n",
 		handle.describe(),
-		document.groups[group].recipients.len()
+		document.groups[group.as_str()].recipients.len()
 	))
 	.xok()
 }
@@ -398,6 +419,60 @@ mod test {
 		rolled.metadata.is_empty().xpect_true();
 		rolled.modified.xpect_some();
 		(rolled.modified != Some(sealed)).xpect_true();
+	}
+
+	/// Rolling a value states only the value: the record keeps its group,
+	/// role, note and roll, and drops the expiry of the value it replaced,
+	/// while a flag still replaces what it names.
+	#[beet_core::test]
+	async fn a_roll_keeps_the_record() {
+		let mut fixture = VerbWorld::new();
+		let set = async |fixture: &mut VerbWorld, args: &str| {
+			fixture
+				.call_str(
+					SecretsSet,
+					Request::from_cli_str(args)
+						.with_param("name", "OPENAI_API_KEY"),
+				)
+				.await
+				.unwrap();
+		};
+		let record = async |fixture: &mut VerbWorld| {
+			fixture
+				.document()
+				.await
+				.open(&fixture.identities())
+				.unwrap()
+				.get("OPENAI_API_KEY")
+				.unwrap()
+				.clone()
+		};
+		set(
+			&mut fixture,
+			"--value=sk-old --group=agents --role=env_var --note=billing \
+			--roll=manual:platform.openai.com/api-keys --expires=2027-01-05",
+		)
+		.await;
+		set(&mut fixture, "--value=sk-new").await;
+		let rolled = record(&mut fixture).await;
+		rolled.value.as_str().xpect_eq("sk-new");
+		rolled.group.as_str().xpect_eq("agents");
+		rolled.record.role.xpect_eq(Some(SecretRole::EnvVar));
+		rolled.record.note.xpect_eq(Some(SmolStr::from("billing")));
+		rolled
+			.record
+			.roll
+			.xpect_eq(Some(SecretRoll::manual("platform.openai.com/api-keys")));
+		rolled.record.expires.xpect_none();
+
+		set(&mut fixture, "--value=sk-new --note=renamed").await;
+		let renamed = record(&mut fixture).await;
+		renamed.record.note.xpect_eq(Some(SmolStr::from("renamed")));
+		renamed
+			.record
+			.roll
+			.xpect_eq(Some(SecretRoll::manual("platform.openai.com/api-keys")));
+		renamed.record.modified.xpect_eq(rolled.record.modified);
 	}
 
 	/// `--copy` takes another record's value without printing it, and names

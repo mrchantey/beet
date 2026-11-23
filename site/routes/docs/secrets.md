@@ -217,10 +217,20 @@ beet secrets/check
 Every record's metadata is sealed inside the blob beside its value, and the index is only a mirror of it, so a hand edit of the index is caught rather than obeyed: nothing can promote a secret into the environment by editing a plaintext line. Put the line back as it was. The way to change a note or a roll is to write the record again, with the value the launch just loaded:
 
 ```sh
-beet secrets/set DEMO_API_KEY --from-env --role=env_var --note="a demo key, with a better note" --roll="manual:https://example.com/keys > New key"
+beet secrets/set DEMO_API_KEY --from-env --note="a demo key, with a better note"
 ```
 
-`--from-env` reads the value out of the process environment, where the launch put it, and re-seals it unchanged with the new text, keeping its `modified`, since the value did not change. Run `beet secrets/ls` and see the new note. The only lines you ever edit by hand are the `recipients` lists, which is the next step.
+`--from-env` reads the value out of the process environment, where the launch put it, and re-seals it unchanged with the new text, keeping its `modified`, since the value did not change. A re-set states only what changes, so the record keeps its role, its roll and its group. Run `beet secrets/ls` and see the new note. The only lines you ever edit by hand are the `recipients` lists, which is the next step.
+
+## Roll a value
+
+A key gets revoked, leaked or simply expires. Mint a new one where the record's `roll` says (`beet secrets/ls` shows it), then set the record with nothing but its name:
+
+```sh
+beet secrets/set DEMO_API_KEY
+```
+
+Type the new value at the prompt. The note, roll, role and group stay as they were, and `modified` moves, since the value did. An `expires` belonged to the old value, so it goes: pass `--expires` again if the new one has a lifetime.
 
 ## Add a second reader
 

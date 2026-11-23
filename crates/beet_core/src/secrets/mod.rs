@@ -50,8 +50,10 @@
 //!   metadata is sealed beside its value; `open` refuses an index that
 //!   disagrees, so a hand edit never promotes a secret. Only the `recipients`
 //!   lists are edited by hand; a note or roll changes through
-//!   `secrets/set NAME --from-env --note=.. --roll=..`, which re-seals
-//!   the value the launch loaded.
+//!   `secrets/set NAME --from-env --note=..`, which re-seals the value the
+//!   launch loaded. A re-set states only what changes: the record keeps its
+//!   group, role, note and roll, so rolling a value is `secrets/set NAME`
+//!   alone, the new value typed at the prompt.
 //! - **Everything is in a group; `default` is the one you get.** Humans sit
 //!   in every group, an agent only in `agents`; a writer must be a member of
 //!   the group it writes. A list edit takes effect on the next `set` of that
