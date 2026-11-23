@@ -149,8 +149,9 @@ impl RuntimeBoundary {
 	}
 
 	/// The boundary arn every principal this stack renders must carry,
-	/// declaring the `aws_caller_identity` data source it composes with. One
-	/// call per principal, so a block cannot name the boundary without also
+	/// declaring the `aws_caller_identity` data source it composes with, or
+	/// `None` for a stack whose entry declares no [`BoundedDeploy`]. One call
+	/// per principal, so a block cannot name the boundary without also
 	/// declaring what resolves the account id.
 	///
 	/// A boundary is named by a full arn, so unlike the wildcarded account
@@ -159,7 +160,10 @@ impl RuntimeBoundary {
 	pub fn arn(
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
-	) -> Result<SmolStr> {
+	) -> Result<Option<SmolStr>> {
+		if !stack.bounded() {
+			return None.xok();
+		}
 		config.add_untyped_data_source(
 			"aws_caller_identity",
 			"current",
@@ -171,6 +175,7 @@ impl RuntimeBoundary {
 				.policy_name()
 		)
 		.xmap(SmolStr::new)
+		.xmap(Some)
 		.xok()
 	}
 
@@ -503,6 +508,26 @@ mod test {
 			))
 			.xnot()
 			.xpect_contains("iam:");
+	}
+
+	/// A principal wears the boundary only where a credential caps the
+	/// deploy: an entry with none deploys as an administrator, with nothing
+	/// to cap and no converge to create the boundary it would name.
+	#[beet_core::test]
+	fn only_a_credentialed_deploy_bounds_its_principals() {
+		let render = |bounded: bool| {
+			let (scope, _dir) = RenderScope::test_render(|parent| {
+				parent.spawn(RepoStoreBlock::test_store());
+				parent.spawn(LambdaBlock::default());
+				if bounded {
+					parent.spawn(BoundedDeploy);
+				}
+			});
+			let (_stack, _deployment, config) = scope.finish().unwrap();
+			config.to_json().to_string()
+		};
+		render(true).xpect_contains("permissions_boundary");
+		render(false).xnot().xpect_contains("permissions_boundary");
 	}
 
 	/// A stack with no principal caps nothing, so no policy is written: an

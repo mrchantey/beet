@@ -100,6 +100,7 @@ use serde_json::Value;
 ///   credential leaves nothing behind.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
+#[require(BoundedDeploy)]
 pub struct AwsDeployCredential;
 
 impl DeployCredentialProvider for AwsDeployCredential {

@@ -235,10 +235,10 @@ impl ScheduledJobBlock {
 				})
 				.to_string()
 				.into(),
-				// every principal a deploy creates is capped by its app's
+				// every principal a credentialed deploy creates is capped by its app's
 				// boundary, which is what stops an `iam:*` on this app's names
 				// from being a route to an administrator
-				permissions_boundary: Some(boundary),
+				permissions_boundary: boundary,
 				..default()
 			},
 		);

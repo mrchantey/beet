@@ -525,10 +525,10 @@ impl FargateBlock {
 			stack.resource_ident(self.build_label("exec-role")),
 			AwsIamRoleDetails {
 				assume_role_policy: ecs_assume_role_policy(),
-				// every principal a deploy creates is capped by its app's
+				// every principal a credentialed deploy creates is capped by its app's
 				// boundary, which is what stops an `iam:*` on this app's names
 				// from being a route to an administrator
-				permissions_boundary: Some(boundary.clone()),
+				permissions_boundary: boundary.clone(),
 				..default()
 			},
 		);
@@ -556,10 +556,10 @@ impl FargateBlock {
 			stack.resource_ident(self.build_label("task-role")),
 			AwsIamRoleDetails {
 				assume_role_policy: ecs_assume_role_policy(),
-				// every principal a deploy creates is capped by its app's
+				// every principal a credentialed deploy creates is capped by its app's
 				// boundary, which is what stops an `iam:*` on this app's names
 				// from being a route to an administrator
-				permissions_boundary: Some(boundary),
+				permissions_boundary: boundary,
 				..default()
 			},
 		);

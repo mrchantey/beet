@@ -105,6 +105,7 @@ impl Stack {
 				.map(StateEncryption::passphrase)
 				.unwrap_or_default(),
 			params: self.params.clone(),
+			bounded: true,
 		}
 	}
 }
@@ -146,6 +147,10 @@ pub struct ResolvedStack {
 	/// [`Deployment`] when the stack's config is seeded.
 	state_encryption: StateEncryption,
 	params: MultiMap<SmolStr, SmolStr>,
+	/// Whether every principal this stack renders wears its app and stage's
+	/// runtime boundary: true wherever a [`BoundedDeploy`] is declared, and
+	/// for a stack resolved outside a world, the safe side.
+	bounded: bool,
 }
 
 impl ResolvedStack {
@@ -306,6 +311,17 @@ impl Stack {
 	}
 }
 
+/// Marks an entry whose AWS deploy runs as a scoped credential, so every
+/// principal its stacks render wears its app and stage's runtime boundary,
+/// the cap that stops the credential's `iam:*` on its own names granting
+/// more than the app's runtimes need. Required by the AWS deploy credential;
+/// an entry without one deploys as whoever runs it, an administrator, with
+/// no credential to cap and no converge to create a boundary, so its
+/// principals wear none.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct BoundedDeploy;
+
 /// The stage every stack that declares none resolves at while this resource
 /// is present, in place of the launch's: set around one render by
 /// [`RenderScope::render_all_at`], which is how a deploy credential lowers
@@ -338,6 +354,7 @@ pub struct StackQuery<'w, 's> {
 	/// The secret store a declaration landed, see
 	/// [`secret_store`](Self::secret_store).
 	secret_stores: AncestorQuery<'w, 's, &'static SecretStore>,
+	bounded: Query<'w, 's, (), With<BoundedDeploy>>,
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
@@ -356,6 +373,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 			self.regions.get(entity).ok().map(|region| region.0.clone());
 		stack.cloudflare_account = self.accounts.get(entity).ok().cloned();
 		stack.cloudflare_zone = self.zones.get(entity).ok().cloned();
+		stack.bounded = !self.bounded.is_empty();
 		stack
 	}
 
