@@ -24,7 +24,7 @@ tokens = ["proc-macro2", "quote", "syn"]
 aws = ["bindings_aws_common"]
 # A deployer renders every always-compiled declaration, so it carries the
 # binding `<SecretBlock/>`'s parameter renders through.
-deploy = ["beet_router", "dep:base64", "vault", "bindings_aws_ssm", "dep:ssh-key", "beet_core/rand"]
+deploy = ["beet_router", "dep:base64", "base64/std", "vault", "bindings_aws_ssm", "dep:ssh-key", "beet_core/rand"]
 # A secrets document as a stack's secret store (`<DocumentSecrets/>`) and the
 # store's export, restore and revoke verbs, on the secrets document in
 # `beet_net/secrets`. The seam, parameter store and `<SecretBlock/>` need none
@@ -141,6 +141,8 @@ semver.workspace = true
 # not optional: a block's machine-config digest (`LightsailBlock::machine_config_hash`)
 # decides whether a deploy rebuilds the box, so it must render on every target.
 sha2 = { workspace = true }
+# `std` under `deploy`: only with it is `DecodeError` an `Error`, which a `?`
+# into `BevyError` needs
 base64 = { workspace = true, optional = true }
 
 thiserror = { workspace = true }
