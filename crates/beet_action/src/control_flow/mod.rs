@@ -10,6 +10,8 @@ mod highest_score;
 pub use highest_score::*;
 mod parallel;
 pub use parallel::*;
+mod race;
+pub use race::*;
 mod score;
 pub use score::*;
 mod repeat;

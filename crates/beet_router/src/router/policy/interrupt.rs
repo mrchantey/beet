@@ -1,18 +1,18 @@
 //! Interrupt middleware for action subtrees.
 //!
-//! [`InterruptRun`] is no longer queued by default, so interruption is
-//! opt-in via these middleware. [`InterruptOnRun`] clears stale [`Running`]
-//! descendants before dispatching (a parent re-run should not leave old
-//! children running), while [`InterruptOnEnd`] cancels any descendants still
-//! running once the inner action resolves. Descendants carrying
-//! [`NoInterrupt`] are skipped by [`InterruptRun`].
+//! Interruption is opt-in via these middleware, each queueing an
+//! [`InterruptRun`], which stops every action call in flight beneath the host,
+//! async or parked. [`InterruptOnRun`] stops them before dispatching (a parent
+//! re-run should not leave old children running), while [`InterruptOnEnd`]
+//! stops any still running once the inner action resolves. Descendants
+//! carrying [`NoInterrupt`] are skipped.
 
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// Middleware that interrupts running descendants before dispatching,
-/// clearing stale [`Running`] state left by a previous run.
+/// stopping the calls a previous run left in flight.
 #[action]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
@@ -21,7 +21,7 @@ pub async fn InterruptOnRun(
 ) -> Result<Response> {
 	let caller = cx.caller.clone();
 	let (request, next) = cx.take();
-	caller.queue(InterruptRun::<Outcome>::new()).await??;
+	caller.queue(InterruptRun::new()).await??;
 	next.call(request).await
 }
 
@@ -36,7 +36,7 @@ pub async fn InterruptOnEnd(
 	let caller = cx.caller.clone();
 	let (request, next) = cx.take();
 	let response = next.call(request).await;
-	caller.queue(InterruptRun::<Outcome>::new()).await??;
+	caller.queue(InterruptRun::new()).await??;
 	response
 }
 

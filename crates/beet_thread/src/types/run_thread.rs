@@ -33,7 +33,7 @@ use beet_net::prelude::*;
 ///   without owning argv, and works identically under a launched entry, which
 ///   fires the same request shape.
 ///
-/// The call is detached, so a finite loop ([`RepeatTimes`],
+/// Nothing awaits the call ([`CallOnStart`]), so a finite loop ([`RepeatTimes`],
 /// [`RepeatWhileFunctionCallOutput`]) completes and leaves the servers serving
 /// the final transcript, while an endless [`Repeat`] simply never returns.
 /// Calling the **thread**, never an "agent", is the whole point: the `Sequence`

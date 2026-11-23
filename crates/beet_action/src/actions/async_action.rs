@@ -30,15 +30,20 @@ where
 					input,
 				};
 				let func = func.clone();
-				// entity-scoped: if `caller` despawns while the handler future is in
-				// flight (a scene swap, an episode ending), the task is cancelled with
-				// it rather than erroring into the panicking handler.
-				commands.entity(caller).queue_async(
-					async move |entity: AsyncEntity| -> Result {
-						let result: Result<Out> = func(arg).await.into_result();
-						out_handler
-							.call_async(entity.world().clone(), result)
+				// one entry of the caller's `ActionCalls`: a despawn, an interrupt
+				// or the caller dropping its future cancels it
+				ActionCalls::queue(
+					&mut commands.commands,
+					caller,
+					move |entity| {
+						entity.run_task(async move |entity: AsyncEntity| {
+							ActionCalls::run(
+								entity.world().clone(),
+								func(arg),
+								out_handler,
+							)
 							.await
+						})
 					},
 				);
 				Ok(())
@@ -72,14 +77,21 @@ where
 					input,
 				};
 				let func = func.clone();
-				// entity-scoped (see `new_async`): a caller despawned mid-flight cancels
-				// the task rather than panicking the schedule.
-				commands.entity(caller).queue_async_local(
-					async move |entity: AsyncEntity| -> Result {
-						let result: Result<Out> = func(arg).await.into_result();
-						out_handler
-							.call_async(entity.world().clone(), result)
-							.await
+				// held as `new_async` holds its call
+				ActionCalls::queue(
+					&mut commands.commands,
+					caller,
+					move |entity| {
+						entity.run_task_local(
+							async move |entity: AsyncEntity| {
+								ActionCalls::run(
+									entity.world().clone(),
+									func(arg),
+									out_handler,
+								)
+								.await
+							},
+						)
 					},
 				);
 				Ok(())

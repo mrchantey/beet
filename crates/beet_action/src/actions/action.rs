@@ -268,7 +268,12 @@ impl<'w, 's, In, Out> ActionCall<'w, 's, In, Out> {}
 /// Delivers an action's output or error back to the caller.
 ///
 /// Wraps a closure so that different delivery mechanisms (channels,
-/// pipe chains, etc.) share a uniform interface.
+/// pipe chains, etc.) share a uniform interface, and carries the
+/// [`CallerGone`] an async action races its work against. A handler made
+/// here has nobody to leave; `entity.call(..)` builds one whose future's drop
+/// is the caller leaving, and a handler forwarding another passes its
+/// [`caller_gone`](Self::caller_gone) on through
+/// [`with_caller_gone`](Self::with_caller_gone).
 pub struct OutHandler<Out = ()> {
 	func: Box<
 		dyn 'static
@@ -276,14 +281,17 @@ pub struct OutHandler<Out = ()> {
 			+ Sync
 			+ FnOnce(AsyncCommands, Result<Out>) -> Result,
 	>,
+	caller_gone: CallerGone,
 }
 
 impl<Out> Default for OutHandler<Out> {
+	/// Discard the output and propagate an error, save an interruption,
+	/// which is control flow rather than a fault.
 	fn default() -> Self {
-		Self {
-			// by default discard the out value, propagating the error
-			func: Box::new(|_, result| result.map(|_| ())),
-		}
+		Self::new(|_, result| match result {
+			Err(err) if ControlFlowError::is_interrupted(&err) => Ok(()),
+			result => result.map(|_| ()),
+		})
 	}
 }
 
@@ -291,27 +299,37 @@ impl<Out> OutHandler<Out> {
 	/// Exit with [`AppExit::Success`] once the action call is complete,
 	/// discarding the [`Out`] value.
 	pub fn exit() -> Self {
-		OutHandler {
-			func: Box::new(|commands, result| {
-				result?;
-				commands.run(async |world| {
-					world.write_message(AppExit::Success).await;
-				});
-				Ok(())
-			}),
-		}
+		Self::new(|commands, result| {
+			result?;
+			commands.run(async |world| {
+				world.write_message(AppExit::Success).await;
+			});
+			Ok(())
+		})
 	}
 }
 
 impl<Out> OutHandler<Out> {
-	/// Create an [`OutHandler`] from any compatible closure.
+	/// Create an [`OutHandler`] from any compatible closure, its caller
+	/// [`never`](CallerGone::never) gone.
 	pub fn new<F>(func: F) -> Self
 	where
 		F: 'static + Send + Sync + FnOnce(AsyncCommands, Result<Out>) -> Result,
 	{
 		Self {
 			func: Box::new(func),
+			caller_gone: CallerGone::never(),
 		}
+	}
+
+	/// Resolves once the caller awaiting this output is gone.
+	pub fn caller_gone(&self) -> CallerGone { self.caller_gone.clone() }
+
+	/// Tie this handler to another's caller, so a handler forwarding to it
+	/// stops when that caller leaves.
+	pub fn with_caller_gone(mut self, caller_gone: CallerGone) -> Self {
+		self.caller_gone = caller_gone;
+		self
 	}
 
 	/// Deliver the result, consuming this handler.

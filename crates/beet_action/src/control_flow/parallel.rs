@@ -7,8 +7,10 @@ use beet_core::prelude::*;
 /// Returns the first [`Outcome::Fail`] if any child fails, otherwise
 /// [`Outcome::Pass`] with the original input once all children pass.
 ///
-/// Children are awaited together; cancellation of in-flight siblings on
-/// the first failure is deferred to the async runtime overhaul.
+/// The first fail or error drops the children still running, which stops each
+/// at its next await (a dropped call cancels its callee), their callers never
+/// reading what they would have answered. [`Race`] resolves with whichever
+/// child finishes first instead.
 ///
 /// Child error handling is controlled by [`BypassErrors`].
 ///
@@ -38,26 +40,29 @@ where
 	let world = cx.world().clone();
 	let input = cx.input;
 
-	// resolved up-front by the shared query, so they all run concurrently
-	let mut calls = Vec::new();
-	for child in children {
+	// resolved up-front by the shared query, so they all run concurrently; a
+	// fail short-circuits the join as an `Err` beside a child's error, so
+	// either drops the rest
+	let calls = children.into_iter().map(|child| {
 		let world = world.clone();
 		let input = input.clone();
-		calls.push(async move {
-			world
+		async move {
+			match world
 				.entity(child)
 				.call::<Input, Outcome<Input, Output>>(input)
 				.await
-		});
-	}
-
-	for outcome in async_ext::try_join_all(calls).await? {
-		if let Outcome::Fail(output) = outcome {
-			return Ok(Outcome::Fail(output));
+			{
+				Ok(Outcome::Pass(_)) => Ok(()),
+				Ok(fail) => Err(Ok(fail)),
+				Err(err) => Err(Err(err)),
+			}
 		}
-	}
+	});
 
-	Ok(Outcome::Pass(input))
+	match async_ext::try_join_all(calls).await {
+		Ok(_) => Ok(Outcome::Pass(input)),
+		Err(stopped) => stopped,
+	}
 }
 
 impl Parallel {
@@ -125,6 +130,27 @@ mod tests {
 			.await
 			.unwrap()
 			.xpect_eq(Outcome::Fail(()));
+	}
+
+	/// The first fail drops the siblings still running.
+	#[beet_core::test]
+	async fn a_fail_stops_its_siblings() {
+		let mut world = AsyncPlugin::world();
+		let slow = Store::<bool>::default();
+		let parallel = world
+			.spawn((Parallel::new(), children![
+				crate::actions::test_support::sleep_then_set(30, slow.clone()),
+				outcome_fail(),
+			]))
+			.id();
+		world
+			.entity_mut(parallel)
+			.call::<(), Outcome<(), ()>>(())
+			.await
+			.unwrap()
+			.xpect_eq(Outcome::Fail(()));
+		crate::actions::test_support::settle(&mut world, 80).await;
+		slow.get().xpect_false();
 	}
 
 	#[beet_core::test]

@@ -127,6 +127,47 @@ The set owns the entity's single parked action: calling it parks a `Running<Out>
 
 Servers (`HttpServer`, `CliServer`, `TuiServer`, ...) are just facets, with no exceptions: see `beet_net` for the server topology and the lifecycle verbs (`CallOnReady`, `CallOnStart`) that call these actions.
 
+## Stopping work: a dropped future
+
+Stopping work is one idea, a dropped future, as it already is for every other task in beet (an [`AsyncTask`] cancels on drop). The future of `entity.call(..)` owns the work it asked for: dropped before it resolves, the callee's task for that call ends at its next await, and so do the calls that task was awaiting, so a `timeout` around a call, a [`Race`] or a failing [`Parallel`] stops what it gave up on. A stopped call's awaiting caller, if any, reads [`ControlFlowError::Interrupted`].
+
+Each async call in flight is its own entry in the callee's [`ActionCalls`], held apart from the entity's other tasks ([`EntityTasks`], ie a server's connections), and a despawn ends both. A parked [`Running`] is a call in flight too, registered there by type. A call made with a handler of its own, `commands.entity(entity).call(input, OutHandler::default())`, has no caller to leave, so it runs until it resolves or is stopped from above: that is how work outlives whoever started it, ie `CallOnStart`'s behavior.
+
+Stopping a subtree takes one of three scopes, each queued on the entity whose descendants should stop, the entity itself left alone:
+
+| stops | leaves | way in |
+| --- | --- | --- |
+| actions | other tasks | `InterruptRun::new()` |
+| other tasks | actions | `CancelTasks` |
+| both | nothing | `InterruptRun::all()` |
+
+[`NoInterrupt`] on a descendant keeps its actions running through either `InterruptRun`.
+
+### The drop guard pattern
+
+A stopped future is dropped at its next await and never resumed, so nothing after that await runs. An action owning state a stopped future would strand, ie a flag set while it works or a claim on a shared resource, tidies it in a guard's `Drop`, which runs whether the action finishes or is stopped:
+
+```rust
+# use beet_core::prelude::*;
+# use beet_action::prelude::*;
+/// Clears the flag however its action ends.
+struct Busy(Store<bool>);
+
+impl Drop for Busy {
+	fn drop(&mut self) { self.0.set(false); }
+}
+
+fn work(busy: Store<bool>) -> Action<(), Outcome> {
+	Action::new_async(move |_: ActionContext| async move {
+		busy.set(true);
+		let _busy = Busy(busy);
+		// stopped here, `_busy` still drops and clears the flag
+		time_ext::sleep_millis(50).await;
+		Outcome::PASS.xok::<BevyError>()
+	})
+}
+```
+
 ## Scripts and the world bridge
 
 A [`Script`] is a JavaScript program carried as data, transforming `Input` into `Output`. It holds a program, not an engine: the backend is chosen at compile time from the target and the `quickjs` feature, and a build with no usable backend errors when run rather than silently degrading.

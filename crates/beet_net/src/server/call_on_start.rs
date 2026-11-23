@@ -25,47 +25,44 @@ use beet_core::prelude::*;
 /// </CallOnReady>
 /// ```
 ///
-/// The call is detached, so a finite behavior completes while the servers keep
-/// serving, and an endless one simply never returns. It owns no action slot and
-/// never writes [`AppExit`]: process lifetime belongs to the run, not to what it
-/// started.
+/// Nothing awaits the call: it is made with a handler of its own
+/// ([`OutHandler::default`]), so it is one of the entity's [`ActionCalls`]
+/// and no task holds it. A finite behavior completes while the servers keep
+/// serving, an endless one simply never returns, and only a despawn or an
+/// [`InterruptRun`] above it stops it. It owns no action slot and never writes
+/// [`AppExit`]: process lifetime belongs to the run, not to what it started.
+///
+/// The call resolves whichever shape the entity serves:
+///
+/// - `Request -> Outcome`, for a behavior whose start depends on the request
+///   (a thread reading `--new`)
+/// - `() -> Outcome`, a plain behavior
+///
+/// The outcome is the behavior's own; nothing above a start consumes it, so
+/// only an error propagates, through the world's error handler.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_add = hook_ext::observe(on_start_call))]
 pub struct CallOnStart;
 
-impl CallOnStart {
-	/// Call `entity`'s action with `request`, resolving whichever shape it serves:
-	///
-	/// - `Request -> Outcome`, for a behavior whose start depends on the request
-	///   (a thread reading `--new`)
-	/// - `() -> Outcome`, a plain behavior
-	///
-	/// The outcome is the behavior's own; nothing above a start consumes it, so
-	/// only an error propagates.
-	pub async fn call(entity: AsyncEntity, request: Request) -> Result {
-		match entity
-			.get(|meta: &ActionMeta| meta.matches::<Request, Outcome>())
-			.await
-			.unwrap_or(false)
-		{
-			true => entity.call::<Request, Outcome>(request).await?,
-			false => entity.call::<(), Outcome>(()).await?,
-		};
-		Ok(())
-	}
-}
-
-/// On the start sweep reaching this entity, queue [`CallOnStart::call`] with the
-/// start request, detached, so a parked behavior never holds the sweep up.
+/// On the start sweep reaching this entity, call its action with the start
+/// request, so a parked behavior never holds the sweep up.
 fn on_start_call(
 	ev: On<StartRunning<Request>>,
+	metas: Query<&ActionMeta>,
 	mut commands: Commands,
 ) -> Result {
 	let parts = ev.with(|request| request.parts().clone())?;
-	let request = Request::from_parts(parts, default());
-	commands
-		.entity(ev.entity)
-		.queue_async_local(move |entity| CallOnStart::call(entity, request));
+	let mut entity = commands.entity(ev.entity);
+	match metas
+		.get(ev.entity)
+		.is_ok_and(|meta| meta.matches::<Request, Outcome>())
+	{
+		true => entity.call::<Request, Outcome>(
+			Request::from_parts(parts, default()),
+			OutHandler::default(),
+		),
+		false => entity.call::<(), Outcome>((), OutHandler::default()),
+	}
 	Ok(())
 }

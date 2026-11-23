@@ -158,6 +158,33 @@ where
 	.await
 }
 
+/// Polls a collection of futures concurrently, resolving with the output of
+/// the first to complete and dropping the rest unfinished, or [`None`] when
+/// given none. Ties go to the earliest in iteration order. no_std.
+pub async fn race_all<Fut, T>(
+	futures: impl IntoIterator<Item = Fut>,
+) -> Option<T>
+where
+	Fut: Future<Output = T>,
+{
+	let mut futures: Vec<Pin<Box<Fut>>> =
+		futures.into_iter().map(Box::pin).collect();
+	if futures.is_empty() {
+		return None;
+	}
+	core::future::poll_fn(move |cx| {
+		futures
+			.iter_mut()
+			.find_map(|fut| match fut.as_mut().poll(cx) {
+				Poll::Ready(value) => Some(value),
+				Poll::Pending => None,
+			})
+			.map_or(Poll::Pending, Poll::Ready)
+	})
+	.await
+	.xsome()
+}
+
 /// Like [`join_all`], but with at most `limit` futures in flight at once.
 ///
 /// A future does no work until it is first polled, so this admits a new future

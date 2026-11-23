@@ -28,6 +28,7 @@ impl Plugin for ActionPlugin {
 		.register_type::<InfallibleSequence<(), ()>>()
 		.register_type::<Fallback<(), ()>>()
 		.register_type::<Parallel<(), ()>>()
+		.register_type::<Race<(), ()>>()
 		.register_type::<HighestScore<(), ()>>()
 		.register_type::<Score>()
 		.register_type::<Repeat<(), ()>>()

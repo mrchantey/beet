@@ -63,7 +63,7 @@ where
 	}
 }
 
-/// Wires a [`OnceValue::oneshot`]-backed [`OutHandler`] and calls [`call_world`].
+/// Wires a [`CallRx`]-backed [`OutHandler`] and calls [`call_world`].
 ///
 /// Returns the receiving half so the caller can await the result. The value
 /// carries `Result<Out>` so async action errors propagate back to the caller
@@ -72,7 +72,7 @@ where
 fn call_with_oneshot<Input, Out>(
 	entity: &mut EntityWorldMut,
 	input: Input,
-) -> Result<OnceValueRx<Result<Out>>>
+) -> Result<CallRx<Out>>
 where
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
@@ -82,23 +82,43 @@ where
 	Ok(recv)
 }
 
-/// A oneshot-backed [`OutHandler`] and the receiver awaiting it.
+/// A oneshot-backed [`OutHandler`] and the [`CallRx`] awaiting it.
 ///
 /// A handler dropped unresolved fails the receiver with
-/// [`ControlFlowError::Interrupted`] rather than parking it forever: the action
-/// task holding it was cancelled (its entity despawned), or the [`Running`]
-/// parking it was removed.
-fn oneshot_out_handler<Out>() -> (OutHandler<Out>, OnceValueRx<Result<Out>>)
+/// [`ControlFlowError::Interrupted`] rather than parking it forever: the call
+/// was stopped (its entity despawned, an [`InterruptRun`] above it) or the
+/// [`Running`] parking it was removed.
+fn oneshot_out_handler<Out>() -> (OutHandler<Out>, CallRx<Out>)
 where
 	Out: 'static + Send + Sync,
 {
 	let (send, recv) = OnceValue::<Result<Out>>::oneshot();
+	let (guard, caller_gone) = CallerGuard::new();
 	let mut send = InterruptOnDrop(Some(send));
 	let out_handler = OutHandler::new(move |_commands, result: Result<Out>| {
 		send.signal(result);
 		Ok(())
-	});
-	(out_handler, recv)
+	})
+	.with_caller_gone(caller_gone);
+	(out_handler, CallRx { recv, guard })
+}
+
+/// The caller's half of a call: awaiting it yields the output, and dropping it
+/// unresolved stops the call, its [`CallerGuard`] resolving the
+/// [`CallerGone`] the callee races against.
+struct CallRx<Out> {
+	recv: OnceValueRx<Result<Out>>,
+	guard: CallerGuard,
+}
+
+impl<Out> CallRx<Out> {
+	async fn wait(self) -> Result<Out> {
+		let Self { recv, guard } = self;
+		let output = recv.wait().await;
+		// released once the output has landed, when there is nothing left to stop
+		drop(guard);
+		output
+	}
 }
 
 /// The sending half of a call's oneshot, resolving the receiver as interrupted
@@ -124,7 +144,7 @@ impl<Out> Drop for InterruptOnDrop<Out> {
 ///
 /// std-only: it owns and drives the world itself. The bridge-based
 /// [`AsyncEntityActionExt`] paths instead rely on the running app's update
-/// loop and resume via the [`OnceValue::oneshot`] waker, so they are no_std-clean.
+/// loop and resume via the [`CallRx`] waker, so they are no_std-clean.
 #[cfg(feature = "std")]
 async fn call_polling<Input, Out>(
 	mut entity: EntityWorldMut<'_>,
@@ -161,6 +181,7 @@ pub impl EntityWorldMut<'_> {
 	}
 
 	/// Call an action asynchronously, polling the world until completion.
+	/// Dropping the future stops the call, as [`AsyncEntity::call`] does.
 	///
 	/// # Errors
 	/// Errors if the entity serves no matching signature or the call fails.
@@ -185,7 +206,7 @@ fn call_with_oneshot_for_value<Input, Out>(
 	entity: EntityWorldMut,
 	action: Action<Input, Out>,
 	input: Input,
-) -> Result<OnceValueRx<Result<Out>>>
+) -> Result<CallRx<Out>>
 where
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
@@ -201,7 +222,9 @@ pub impl AsyncEntity {
 	/// Make an action call asynchronously.
 	///
 	/// The world's normal update loop drives any async work inside the action;
-	/// this side just awaits the [`OnceValue::oneshot`] result.
+	/// this side just awaits the result. The future owns the work it asked
+	/// for: dropped before it resolves, the callee's task for this call ends at
+	/// its next await, and so do the calls that task was awaiting.
 	///
 	/// # Errors
 	/// Errors if the entity serves no matching signature or the call fails.
@@ -261,7 +284,11 @@ pub impl AsyncEntity {
 pub impl EntityCommands<'_> {
 	/// Queue an action call with the provided input and output handler.
 	///
-	/// The call will be executed when commands are applied.
+	/// The call will be executed when commands are applied. Nobody awaits it,
+	/// so it runs until it resolves, its entity despawns or an [`InterruptRun`]
+	/// above it stops it: the way to start work that outlives whoever started
+	/// it, its output or error going to `out_handler` ([`OutHandler::default`]
+	/// raises an error through the world's error handler).
 	fn call<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		&mut self,
 		input: Input,
@@ -276,8 +303,73 @@ pub impl EntityCommands<'_> {
 
 #[cfg(test)]
 mod test {
+	use crate::actions::test_support;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+
+	/// Call `entity`, dropping the call after a few milliseconds, then settle
+	/// long enough for anything still running to land.
+	async fn drop_call(world: &mut World, entity: Entity) {
+		world
+			.run_async_then(move |world| async move {
+				async_ext::timeout(
+					Duration::from_millis(5),
+					world.entity(entity).call::<(), Outcome>(()),
+				)
+				.await
+				.xpect_err();
+			})
+			.await;
+		test_support::settle(world, 80).await;
+	}
+
+	#[beet_core::test]
+	async fn a_dropped_call_never_lands() {
+		let mut world = AsyncPlugin::world();
+		let landed = Store::<bool>::default();
+		let entity = world
+			.spawn(test_support::sleep_then_set(30, landed.clone()))
+			.id();
+		drop_call(&mut world, entity).await;
+		landed.get().xpect_false();
+		world.get::<ActionCalls>(entity).unwrap().len().xpect_eq(0);
+	}
+
+	/// The callee's dropped future drops the call it was awaiting in turn.
+	#[beet_core::test]
+	async fn a_dropped_call_stops_two_deep() {
+		let mut world = AsyncPlugin::world();
+		let landed = Store::<bool>::default();
+		let inner = world
+			.spawn(test_support::sleep_then_set(30, landed.clone()))
+			.id();
+		let outer = world
+			.spawn(Action::<(), Outcome>::new_async(
+				move |cx: ActionContext| async move {
+					cx.world().entity(inner).call::<(), Outcome>(()).await
+				},
+			))
+			.id();
+		drop_call(&mut world, outer).await;
+		landed.get().xpect_false();
+		world.get::<ActionCalls>(inner).unwrap().len().xpect_eq(0);
+	}
+
+	/// A call made with a handler has no caller to leave, so it lands.
+	#[beet_core::test]
+	async fn a_call_with_a_handler_runs_unawaited() {
+		let mut world = AsyncPlugin::world();
+		let landed = Store::<bool>::default();
+		let entity = world
+			.spawn(test_support::sleep_then_set(30, landed.clone()))
+			.id();
+		world
+			.commands()
+			.entity(entity)
+			.call((), OutHandler::<Outcome>::default());
+		test_support::settle(&mut world, 80).await;
+		landed.get().xpect_true();
+	}
 
 	fn double() -> Action<i32, i32> {
 		Action::new_pure(|cx: ActionContext<i32>| (*cx * 2).xok())

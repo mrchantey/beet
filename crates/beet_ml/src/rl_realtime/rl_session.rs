@@ -150,7 +150,7 @@ fn handle_episode_end<T: EpisodeParams>(
 			if **parent_session == session_entity {
 				commands
 					.entity(e_despawn)
-					.queue(InterruptRun::<Outcome>::new())
+					.queue(InterruptRun::new())
 					.despawn();
 			}
 		}
@@ -173,7 +173,7 @@ fn handle_episode_end<T: EpisodeParams>(
 				if **parent_session == session_entity {
 					commands
 						.entity(e_despawn)
-						.queue(InterruptRun::<Outcome>::new())
+						.queue(InterruptRun::new())
 						.despawn();
 				}
 			}

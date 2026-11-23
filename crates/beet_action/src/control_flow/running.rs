@@ -27,10 +27,12 @@ use core::marker::PhantomData;
 /// Inserted by [`ContinueRun::start_running`] (the action behind [`ContinueRun`]) and
 /// removed by [`EndRun`]. Stored as
 /// [`SparseSet`](bevy::ecs::component::StorageType::SparseSet) since it is
-/// frequently added and removed.
+/// frequently added and removed. It is a call in flight, so it registers with
+/// the entity's [`ActionCalls`] and an [`InterruptRun`] above it resolves it
+/// whatever `T` is.
 #[derive(Component)]
-#[component(storage = "SparseSet")]
-#[require(RunTimer)]
+#[component(storage = "SparseSet", on_add = ActionCalls::register_running::<T>)]
+#[require(RunTimer, ActionCalls)]
 pub struct Running<T = Outcome>(OutHandler<T>)
 where
 	T: 'static + Send + Sync;
@@ -68,13 +70,13 @@ where
 	}
 }
 
-/// Errors produced when a [`Running`] action is ended by control flow rather
-/// than completing normally.
+/// Errors produced when an action call is ended by control flow rather than
+/// completing normally.
 #[derive(Debug, thiserror::Error)]
 pub enum ControlFlowError {
-	/// A running action was interrupted before it could resolve: a sibling
-	/// failed, a parent was re-run, its [`Running`] was removed, or the task
-	/// driving it was cancelled by its entity's despawn.
+	/// An action call was stopped before it could resolve: an [`InterruptRun`]
+	/// above it, a sibling failing or winning a race, its [`Running`] removed,
+	/// or its entity despawned.
 	#[error("the running action was interrupted")]
 	Interrupted,
 }
@@ -319,64 +321,73 @@ where
 	}
 }
 
-/// Prevents [`InterruptRun`] from interrupting this action.
+/// Prevents [`InterruptRun`] from interrupting this entity's actions, its
+/// parked [`Running`] and its async calls alike.
 ///
 /// Interruption only ever descends from an ancestor, so a direct
-/// [`EndRun`]/[`InterruptRun`] on the entity itself still resolves it.
+/// [`EndRun`] on the entity itself still resolves it.
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct NoInterrupt;
 
-/// Interrupts every [`Running<T>`] descendant of an entity, resolving each
-/// with [`ControlFlowError::Interrupted`].
+/// Asks everything beneath an entity to stop, whatever kind of action it is:
+/// every descendant's [`ActionCalls`], each async call in flight and each
+/// parked [`Running`] whatever its output, their callers resolving as
+/// [`ControlFlowError::Interrupted`].
 ///
 /// Descendants carrying [`NoInterrupt`] are skipped, and the target entity
-/// itself is left alone (it has typically only just started).
+/// itself is left alone, being the one interrupting or only just started.
+/// The descendants' other tasks ([`EntityTasks`], ie a server's connections)
+/// keep running; [`all`](Self::all) cancels those too, as [`CancelTasks`]
+/// alone does, [`NoInterrupt`] guarding actions only.
 ///
-/// Queue on an entity whose subtree should be cancelled, ie before re-running
-/// a parent or when a racing sibling has resolved first.
-pub struct InterruptRun<T = Outcome>(PhantomData<fn() -> T>)
-where
-	T: 'static + Send + Sync;
-
-impl<T> Default for InterruptRun<T>
-where
-	T: 'static + Send + Sync,
-{
-	fn default() -> Self { Self(PhantomData) }
+/// Queue on an entity whose subtree should stop, ie before re-running a
+/// parent:
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_action::prelude::*;
+/// let mut world = AsyncPlugin::world();
+/// let parent = world.spawn(children![ContinueRun::<(), Outcome>::default()]).id();
+/// world.commands().entity(parent).queue(InterruptRun::new());
+/// world.flush();
+/// ```
+#[derive(Debug, Default, Clone)]
+pub struct InterruptRun {
+	/// Whether the descendants' other tasks are cancelled too.
+	tasks: bool,
 }
 
-impl<T> InterruptRun<T>
-where
-	T: 'static + Send + Sync,
-{
-	/// Create an [`InterruptRun`] for `Running<T>` descendants.
+impl InterruptRun {
+	/// Interrupt the actions beneath the entity, leaving its other tasks.
 	pub fn new() -> Self { Self::default() }
+
+	/// Interrupt the actions beneath the entity and cancel its other tasks.
+	pub fn all() -> Self { Self { tasks: true } }
 }
 
-impl<T> EntityCommand for InterruptRun<T>
-where
-	T: 'static + Send + Sync,
-{
+impl EntityCommand for InterruptRun {
 	type Out = Result;
 
 	fn apply(self, entity: EntityWorldMut) -> Result {
 		let target = entity.id();
 		let world = entity.into_world_mut();
 		let interruptible = world.with_state::<(
-			Query<(), (With<Running<T>>, Without<NoInterrupt>)>,
+			Query<(), (With<ActionCalls>, Without<NoInterrupt>)>,
 			Query<&Children>,
-		), _>(|(running, children)| {
+		), _>(|(calls, children)| {
 			children
 				.iter_descendants(target)
-				.filter(|child| running.contains(*child))
+				.filter(|child| calls.contains(*child))
 				.collect::<Vec<_>>()
 		});
 		for child in interruptible {
-			if let Some(running) = world.entity_mut(child).take::<Running<T>>()
-			{
-				running.interrupt(world)?;
-			}
+			ActionCalls::interrupt(world, child)?;
+		}
+		if self.tasks
+			&& let Ok(entity) = world.get_entity_mut(target)
+		{
+			CancelTasks.apply(entity);
 		}
 		Ok(())
 	}
@@ -462,6 +473,7 @@ where
 
 #[cfg(test)]
 mod test {
+	use crate::actions::test_support;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
@@ -571,14 +583,148 @@ mod test {
 		let store = Store::<Option<bool>>::default();
 		let (parent, child) = spawn_running_child(&mut world, store.clone());
 
-		world
-			.commands()
-			.entity(parent)
-			.queue(InterruptRun::<Outcome>::new());
+		world.commands().entity(parent).queue(InterruptRun::new());
 		world.flush();
 
 		world.get::<Running<Outcome>>(child).xpect_none();
 		store.get().xpect_eq(Some(true));
+	}
+
+	/// What landed in a [`Subtree`] once it settled.
+	#[derive(Debug, PartialEq)]
+	struct Landed {
+		action: bool,
+		guarded: bool,
+		task: bool,
+	}
+
+	/// A parent over an async action in flight, a second carrying
+	/// [`NoInterrupt`], and an entity task standing in for a server's
+	/// connection, each setting its store once it is done.
+	struct Subtree {
+		parent: Entity,
+		action: Store<bool>,
+		guarded: Store<bool>,
+		task: Store<bool>,
+	}
+
+	impl Subtree {
+		fn spawn(world: &mut World) -> Self {
+			let (action, guarded, task) = default();
+			let parent = world
+				.spawn(children![
+					test_support::sleep_then_set(30, Store::clone(&action)),
+					(
+						NoInterrupt,
+						test_support::sleep_then_set(
+							30,
+							Store::clone(&guarded)
+						)
+					),
+				])
+				.id();
+			let callees =
+				world.entity(parent).get::<Children>().unwrap().to_vec();
+			for callee in callees {
+				world
+					.commands()
+					.entity(callee)
+					.call((), OutHandler::<Outcome>::default());
+			}
+			let task_store = Store::clone(&task);
+			world.spawn(ChildOf(parent)).run_async(move |_| async move {
+				time_ext::sleep_millis(30).await;
+				task_store.set(true);
+			});
+			world.flush();
+			Self {
+				parent,
+				action,
+				guarded,
+				task,
+			}
+		}
+
+		/// Stop the subtree with `command`, then report what still landed.
+		async fn stop(
+			self,
+			world: &mut World,
+			command: impl EntityCommand<Out = Result>,
+		) -> Landed {
+			command.apply(world.entity_mut(self.parent)).unwrap();
+			test_support::settle(world, 80).await;
+			Landed {
+				action: self.action.get(),
+				guarded: self.guarded.get(),
+				task: self.task.get(),
+			}
+		}
+	}
+
+	#[beet_core::test]
+	async fn interrupt_stops_actions_and_leaves_tasks() {
+		let mut world = AsyncPlugin::world();
+		Subtree::spawn(&mut world)
+			.stop(&mut world, InterruptRun::new())
+			.await
+			.xpect_eq(Landed {
+				action: false,
+				guarded: true,
+				task: true,
+			});
+	}
+
+	#[beet_core::test]
+	async fn cancel_tasks_leaves_actions() {
+		let mut world = AsyncPlugin::world();
+		Subtree::spawn(&mut world)
+			.stop(&mut world, |entity: EntityWorldMut| -> Result {
+				CancelTasks.apply(entity);
+				Ok(())
+			})
+			.await
+			.xpect_eq(Landed {
+				action: true,
+				guarded: true,
+				task: false,
+			});
+	}
+
+	#[beet_core::test]
+	async fn interrupt_all_stops_both() {
+		let mut world = AsyncPlugin::world();
+		Subtree::spawn(&mut world)
+			.stop(&mut world, InterruptRun::all())
+			.await
+			.xpect_eq(Landed {
+				action: false,
+				guarded: true,
+				task: false,
+			});
+	}
+
+	/// An interrupted async call resolves its awaiting caller as interrupted.
+	#[beet_core::test]
+	async fn an_interrupted_caller_reads_interrupted() {
+		let mut world = AsyncPlugin::world();
+		let callee = world
+			.spawn(test_support::sleep_then_set(30, default()))
+			.id();
+		let parent = world.spawn_empty().add_child(callee).id();
+		world
+			.run_async_local_then(move |world| async move {
+				world
+					.run_async_local(move |world| async move {
+						time_ext::sleep_millis(5).await;
+						world.entity(parent).queue(InterruptRun::new()).await?
+					})
+					.await;
+				world.entity(callee).call::<(), Outcome>(()).await
+			})
+			.await
+			.unwrap_err()
+			.xmap(|err| ControlFlowError::is_interrupted(&err))
+			.xpect_true();
 	}
 
 	#[beet_core::test]
@@ -588,10 +734,7 @@ mod test {
 		let (parent, child) = spawn_running_child(&mut world, store.clone());
 		world.entity_mut(child).insert(NoInterrupt);
 
-		world
-			.commands()
-			.entity(parent)
-			.queue(InterruptRun::<Outcome>::new());
+		world.commands().entity(parent).queue(InterruptRun::new());
 		world.flush();
 
 		world.get::<Running<Outcome>>(child).xpect_some();
