@@ -20,7 +20,7 @@ use beet_router::prelude::*;
 /// 1. builds a fresh thread from `template`, a name resolved as a [`Layout`]
 ///    resolves its own ([`BsxTemplate::named`]), with the request on the
 ///    [`RequestContextStack`] for the build, then attaches it beneath the
-///    route, where it resolves the ancestor [`BlobStore`] and the host url
+///    route, where it resolves the ancestor stores and the host url
 ///    space as if authored there. It is built detached first, so the host
 ///    [`RouteTree`] never rebuilds for it;
 /// 2. enters it ([`Thread::enter`]), the template's [`MountThreadStore`]
@@ -319,6 +319,13 @@ mod test {
 </Thread>
 "#;
 
+	/// A thread whose agent holds its turn until the test releases it.
+	const HOLDING_THREAD: &str = r#"
+<Thread {(Sequence, MountThreadStore{path:"held"})}>
+	<CreateActor name="Agent" kind="Agent" id=2 {Hold}/>
+</Thread>
+"#;
+
 	/// A thread a person types into.
 	#[cfg(feature = "ui")]
 	const SITTING_THREAD: &str = r#"
@@ -335,13 +342,34 @@ mod test {
 	#[require(Action<(), Outcome> = Action::new_async(bail))]
 	struct Bail;
 
+	/// Lets every [`Hold`] turn pass.
+	#[derive(Resource)]
+	struct Release;
+
+	/// A turn waiting for [`Release`].
+	async fn hold(cx: ActionContext) -> Result<Outcome> {
+		while !cx
+			.world()
+			.with(|world: &mut World| world.contains_resource::<Release>())
+			.await
+		{
+			async_ext::yield_now().await;
+		}
+		Outcome::PASS.xok()
+	}
+	#[derive(Component, Reflect, Default)]
+	#[reflect(Component, Default)]
+	#[require(Action<(), Outcome> = Action::new_async(hold))]
+	struct Hold;
+
 	/// A host url space over an in-memory store, its routes running each
 	/// template.
 	fn host() -> (App, Entity, BlobStore) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.install_type::<ThreadPlugin>()
-			.register_type::<Bail>();
+			.register_type::<Bail>()
+			.register_type::<Hold>();
 		#[cfg(feature = "ui")]
 		app.register_type::<UserInput>();
 		let mut registry = app
@@ -351,6 +379,7 @@ mod test {
 			("ReviewThread", REVIEW_THREAD),
 			("DelegateThread", DELEGATE_THREAD),
 			("FailingThread", FAILING_THREAD),
+			("HoldingThread", HOLDING_THREAD),
 			#[cfg(feature = "ui")]
 			("SittingThread", SITTING_THREAD),
 		] {
@@ -364,6 +393,7 @@ mod test {
 	<Route path="edit/:document" {ThreadRoute{template:"ReviewThread", message:"edit {document}", actor:3}}/>
 	<Route path="delegate" {ThreadRoute{template:"DelegateThread"}}/>
 	<Route path="fail" {ThreadRoute{template:"FailingThread"}}/>
+	<Route path="hold" {ThreadRoute{template:"HoldingThread"}}/>
 	<Route path="lonely" {ThreadRoute{template:"FailingThread", message:"anyone?"}}/>
 	<Route path="sit" {ThreadRoute{template:"SittingThread"}}/>
 </Router>"#,
@@ -371,7 +401,9 @@ mod test {
 		.unwrap()
 		.spawn(app.world_mut())
 		.unwrap();
-		app.world_mut().entity_mut(router).insert(store.clone());
+		app.world_mut()
+			.entity_mut(router)
+			.insert((store.clone(), TableStore::new(store.clone())));
 		(app, router, store)
 	}
 
@@ -387,8 +419,8 @@ mod test {
 	}
 
 	/// The records under `path` in `store`.
-	fn thread_store(store: &BlobStore, path: &str) -> BlobThreadStore {
-		BlobThreadStore::new(store.with_subdir(RelPath::new(path)))
+	fn thread_store(store: &BlobStore, path: &str) -> ThreadStore {
+		ThreadStore::new(TableStore::new(store.clone()), RelPath::new(path))
 	}
 
 	/// The text posts of `posts`, the tool calls and sessions aside.
@@ -407,7 +439,7 @@ mod test {
 		let records = thread_store(store, path);
 		let threads = records.threads().await.unwrap();
 		threads.len().xpect_eq(1);
-		let posts = records.thread_posts(threads[0].id(), None).await.unwrap();
+		let posts = records.posts(threads[0].id()).await.unwrap();
 		(threads[0].clone(), posts)
 	}
 
@@ -490,9 +522,11 @@ mod test {
 			("review product".to_string(), ActorId::from_u128(1)),
 			("edit product".to_string(), ActorId::from_u128(3)),
 		]);
-		// each message directly follows its own session's opened post
+		// each message directly follows its own entry's joins
 		for (index, post) in posts.iter().enumerate() {
-			if SessionOpened::opens(post) {
+			if SessionOpened::opens(post)
+				&& !SessionOpened::opens(&posts[index + 1])
+			{
 				matches!(
 					posts[index + 1].to_string().as_str(),
 					"review product" | "edit product"
@@ -532,7 +566,7 @@ mod test {
 		}
 		let records = thread_store(&store, "threads/product");
 		records.threads().await.unwrap().len().xpect_eq(2);
-		texts(&records.thread_posts(first.id(), None).await.unwrap())
+		texts(&records.posts(first.id()).await.unwrap())
 			.len()
 			.xpect_eq(4);
 		review(
@@ -545,9 +579,9 @@ mod test {
 		.xpect_eq(StatusCode::BAD_REQUEST);
 	}
 
-	/// Each request is a session bracketed by its posts, the second naming
-	/// its own cause while the thread keeps its creator, and model input
-	/// carries neither.
+	/// Each request joins every actor of its scene and closes the window, the
+	/// second request's joins naming its own cause while the thread keeps its
+	/// creator, and model input carries neither.
 	#[beet_core::test]
 	async fn sessions_are_bracketed_by_posts() {
 		let (mut app, router, store) = host();
@@ -566,12 +600,24 @@ mod test {
 		}
 		let (thread, posts) = only_thread(&store, "threads/product").await;
 		thread.spawned_by().xpect_eq(Some(&creator));
+		// each entry joins every actor of the scene, each by itself
 		posts
 			.iter()
-			.filter_map(|post| post.log::<SessionOpened>())
-			.map(|opened| opened.spawned_by)
+			.filter_map(|post| {
+				post.log::<SessionOpened>()
+					.map(|opened| (post.author(), opened.spawned_by))
+			})
 			.collect::<Vec<_>>()
-			.xpect_eq(vec![Some(creator), Some(second)]);
+			.xpect_eq(
+				[&creator, &second]
+					.into_iter()
+					.flat_map(|cause| {
+						[1, 2, 3].map(|actor| {
+							(ActorId::from_u128(actor), Some(cause.clone()))
+						})
+					})
+					.collect::<Vec<_>>(),
+			);
 		let closed = posts
 			.iter()
 			.filter_map(|post| post.log::<SessionClosed>())
@@ -588,7 +634,7 @@ mod test {
 		// the scripted agent answered the review both times, never a session
 		let mut records = ThreadRecords::new();
 		for actor in thread_store(&store, "threads/product")
-			.actors()
+			.actors(thread.id())
 			.await
 			.unwrap()
 		{
@@ -646,6 +692,51 @@ mod test {
 			.map(|closed| closed.outcome)
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![Outcome::FAIL]);
+	}
+
+	/// A request for a thread whose canonical window is live, a request
+	/// before it still running, answers `409`, and the first answers once its
+	/// turn passes.
+	#[beet_core::test]
+	async fn a_live_thread_answers_conflict() {
+		let (mut app, router, _) = host();
+		let (first, second) = app
+			.world_mut()
+			.entity_mut(router)
+			.run_async_then(async move |router: AsyncEntity| {
+				let world = router.world().clone();
+				let second = async {
+					// the first request's window is live once entered
+					while !world
+						.with(|world: &mut World| {
+							world
+								.query_filtered::<(), With<ThreadStore>>()
+								.iter(world)
+								.next()
+								.is_some()
+						})
+						.await
+					{
+						async_ext::yield_now().await;
+					}
+					let response = router.exchange(Request::get("hold")).await;
+					world
+						.with(|world: &mut World| {
+							world.insert_resource(Release)
+						})
+						.await;
+					response
+				};
+				futures::join!(router.exchange(Request::get("hold")), second)
+			})
+			.await;
+		first.status().xpect_eq(StatusCode::OK);
+		second.status().xpect_eq(StatusCode::CONFLICT);
+		second
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("already runs its behavior in the window");
 	}
 
 	/// A template a person types into is refused, naming the actor.

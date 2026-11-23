@@ -1,12 +1,12 @@
-//! Sessions as posts: the bracket around one thread entity's life.
+//! Sessions as posts, the words defined in the [`table`](crate::table)
+//! module docs.
 //!
-//! A session is one thread entity's life, from entry to despawn: one
-//! [`ThreadRoute`] request, one [`RunThread`] entry. Entry appends a
-//! [`SessionOpened`] post and the end a [`SessionClosed`] post, both
-//! [`LogKind`]s authored by the thread's System actor. Model input skips them ([`ThreadRecords::model_posts`])
-//! and a `ThreadView` renders them as dividers. An opened post with no closed
-//! post before the next opened post, or before the end, is a session that
-//! aborted.
+//! Entering a window appends a [`SessionOpened`] post, a join, for each
+//! actor its scene authors that no other window of the runtime holds and that
+//! is not of kind System, authored by that actor. The end of a window's life
+//! appends a [`SessionClosed`] post authored by the thread's System actor.
+//! Model input skips both ([`ThreadRecords::model_posts`]) and a `ThreadView`
+//! renders them as dividers.
 use crate::prelude::*;
 #[cfg(feature = "action")]
 use beet_action::prelude::*;
@@ -14,12 +14,12 @@ use beet_core::prelude::*;
 #[cfg(feature = "action")]
 use std::time::Duration;
 
-/// The log of a session entering its thread.
+/// The log of an actor joining its thread, authored by the actor.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionOpened {
-	/// The post whose action asked for this session, ie the loop decision
+	/// The post whose action asked for the entry, ie the loop decision
 	/// requesting the unit. A thread keeps its creator in
-	/// [`Thread::spawned_by`]; each session records its own cause here.
+	/// [`Thread::spawned_by`]; each join records its entry's cause here.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub spawned_by: Option<PostRef>,
 }
@@ -53,9 +53,10 @@ impl LogKind for SessionClosed {
 }
 
 impl ThreadRecords {
-	/// The thread's System actor, the author of its session posts: the first
-	/// by id the records hold, or one created here if the template authored
-	/// none, so every template brackets its sessions unchanged.
+	/// The thread's System actor, the author of its [`SessionClosed`] posts:
+	/// the first by id the records hold, or one created here if the template
+	/// authored none.
+	#[cfg(feature = "action")]
 	pub fn system_actor(&mut self) -> ActorId {
 		self.actors()
 			.values()
@@ -65,16 +66,25 @@ impl ThreadRecords {
 			.unwrap_or_else(|| self.insert_actor(Actor::system()))
 	}
 
-	/// Append the [`SessionOpened`] post of a session entering `thread`.
-	pub fn open_session(
+	/// Append a [`SessionOpened`] post for each of `actors` that is not of
+	/// kind System, authored by it.
+	///
+	/// ## Errors
+	///
+	/// Errors when an actor is not in the records.
+	pub fn join(
 		&mut self,
 		thread: ThreadId,
-		opened: SessionOpened,
-	) -> Result<PostId> {
-		let post = Post::new_log(self.system_actor(), thread, &opened)?;
-		let id = post.id();
-		self.upsert_post(post);
-		id.xok()
+		actors: impl IntoIterator<Item = ActorId>,
+		opened: &SessionOpened,
+	) -> Result {
+		for actor in actors {
+			if self.actor(actor)?.kind() == ActorKind::System {
+				continue;
+			}
+			self.upsert_post(Post::new_log(actor, thread, opened)?);
+		}
+		Ok(())
 	}
 
 	/// Append the [`SessionClosed`] post ending the session the last

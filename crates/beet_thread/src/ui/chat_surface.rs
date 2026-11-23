@@ -424,9 +424,6 @@ mod test {
 			app.update();
 		}
 
-		// the turn marks its thread awaiting the owner until the submit
-		app.world().get::<AwaitingOwner>(thread).xpect_some();
-
 		// the user ends their turn by submitting "hello" on the composer's <form>
 		let form = element_by_tag(&mut app, "form").unwrap();
 		let values = Value::Map(
@@ -439,7 +436,6 @@ mod test {
 		drive_until(&mut app, surface, "you said: hello")
 			.xpect_contains("User")
 			.xpect_contains("Agent");
-		app.world().get::<AwaitingOwner>(thread).xpect_none();
 	}
 
 	/// The full deterministic interaction: real keystrokes through the terminal

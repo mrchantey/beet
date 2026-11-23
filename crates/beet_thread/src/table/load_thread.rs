@@ -10,9 +10,11 @@ use beet_net::prelude::*;
 /// The path names the thread. Each `{param}` is filled from the request
 /// entering it ([`ThreadEntry::fill_path`]), and the newest thread in the
 /// filled directory continues, so `threads/coach/{claim}` keeps one thread
-/// per claim. A deferred mount: [`Thread::enter`] fills it, picks the stored
-/// thread and only then inserts the [`ThreadStore`], so the persistence sync
-/// never flushes a thread before it knows which one it is.
+/// per claim. The records are rows of the [`TableStore`] at or above the
+/// thread, keyed under the filled path ([`ThreadStore`]). A deferred mount:
+/// [`Thread::enter`] fills it, picks the stored thread and only then inserts
+/// the [`ThreadStore`], so the persistence sync never flushes a thread before
+/// it knows which one it is.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct MountThreadStore {
@@ -25,7 +27,7 @@ pub struct MountThreadStore {
 }
 
 impl MountThreadStore {
-	/// The [`ThreadStore`] `entry` opens: the filled path in `store`.
+	/// The [`ThreadStore`] `entry` opens: the filled path in `table`.
 	///
 	/// ## Errors
 	///
@@ -33,14 +35,12 @@ impl MountThreadStore {
 	/// value would leave the mount's prefix.
 	pub fn build(
 		&self,
-		store: &BlobStore,
+		table: &TableStore,
 		entry: &ThreadEntry,
 	) -> Result<ThreadStore> {
 		entry
 			.fill_path(&self.path)?
-			.xmap(|path| store.with_subdir(path))
-			.xmap(BlobThreadStore::new)
-			.xmap(ThreadStore::new)
+			.xmap(|path| ThreadStore::new(table.clone(), path))
 			.xok()
 	}
 }
@@ -236,12 +236,7 @@ impl ThreadEntry {
 				Ok(None)
 			}
 			(None, None) if self.params.new || mount.new => Ok(None),
-			(None, None) => store
-				.threads()
-				.await?
-				.into_iter()
-				.max_by_key(|thread| (thread.created(), thread.id()))
-				.xok(),
+			(None, None) => store.newest().await,
 		}
 	}
 
@@ -297,7 +292,7 @@ impl ThreadEntry {
 		fresh
 	}
 
-	/// The join this entry writes.
+	/// The join this entry writes for each actor.
 	#[cfg(feature = "action")]
 	fn opened(&self) -> SessionOpened {
 		SessionOpened {
@@ -344,20 +339,23 @@ impl ThreadEntry {
 }
 
 impl Thread {
-	/// Enter the thread at `entity` before its behavior runs, the one place
+	/// Enter the window at `entity` before its behavior runs, the one place
 	/// that knows whether its thread is created or continued:
 	///
 	/// 1. fill its [`MountThreadStore`] from the request, refusing an
 	///    escaping value;
 	/// 2. find the stored thread `entry` continues ([`ThreadEntryParams`],
-	///    [`MountThreadStore::new`], else the newest in the directory);
+	///    [`MountThreadStore::new`], else the newest in the directory), and
+	///    refuse a second canonical window ([`ThreadWindows::assert_canonical`]);
 	/// 3. creating: record `spawned_by` and `branch_of`, and for a fresh
 	///    thread resolve each [`SeedSource`] in author order and reduce the
 	///    scene keeping its seed posts;
 	/// 4. continuing, or branching: reduce the scene dropping its seed posts,
 	///    reading no seed source;
-	/// 5. load the stored records, post the entry's join, then the request's
-	///    message if the entry carries one.
+	/// 5. load the stored records, join the feed with another window's
+	///    records if one is live, post a join for each actor the scene authors
+	///    that no other window holds ([`PresentActors`]), then the request's
+	///    message if the entry carries one, and write them.
 	///
 	/// A thread mounting no store persists nothing, so every entry creates
 	/// it. A branch enters with its parent's history up to the branch point,
@@ -368,8 +366,9 @@ impl Thread {
 	///
 	/// Errors when the mount's path cannot be filled, when the mount has no
 	/// store above the thread, when the params name a thread or post the
-	/// store lacks, when a seed cannot be read, naming it, and when the
-	/// request's message has no author.
+	/// store lacks, when another window holds the thread's behavior, when a
+	/// seed cannot be read, naming it, and when the request's message has no
+	/// author.
 	#[cfg(feature = "action")]
 	pub async fn enter(
 		world: AsyncWorld,
@@ -386,8 +385,8 @@ impl Thread {
 				else {
 					return Ok(None);
 				};
-				let store = world
-					.with_state::<AncestorQuery<&BlobStore>, _>(|query| {
+				let table = world
+					.with_state::<AncestorQuery<&TableStore>, _>(|query| {
 						query.get(entity).cloned()
 					})
 					.map_err(|_| {
@@ -396,15 +395,15 @@ impl Thread {
 							mount.path
 						)
 					})?;
-				let thread_store = mount.build(&store, &mount_entry)?;
+				let thread_store = mount.build(&table, &mount_entry)?;
 				(mount, thread_store).xsome().xok()
 			})
 			.await?;
 
-		// 2. find the stored thread
+		// 2. find the stored thread, and claim it as this window's
 		let stored = match &mounted {
 			Some((mount, store)) => {
-				store.store_try_create().await?;
+				store.try_create().await?;
 				entry.find(mount, store).await?
 			}
 			None => {
@@ -412,48 +411,95 @@ impl Thread {
 				None
 			}
 		};
-		let creating = stored.is_none();
 		// a branch opens with its parent's posts, so only a fresh thread seeds
-		let keep_seeds = creating && entry.params.branch_of.is_none();
-
-		// 3. creating: resolve each seed source; continuing reads none
-		if keep_seeds {
-			SeedSource::resolve_all(&world, entity, &entry).await?;
-		}
+		let keep_seeds = stored.is_none() && entry.params.branch_of.is_none();
 		let creator = entry.clone();
 		let record = world
 			.with(move |world: &mut World| -> Result<Thread> {
-				ThreadRecords::reduce_entered(world, entity, keep_seeds)?;
 				let fresh = world
 					.get::<Thread>(entity)
 					.cloned()
 					.ok_or_else(|| bevyhow!("entered {entity} is no thread"))?;
-				stored.unwrap_or_else(|| creator.create(fresh)).xok()
+				let record = stored.unwrap_or_else(|| creator.create(fresh));
+				let id = record.id();
+				world.with_state::<ThreadWindows, _>(|windows| {
+					windows.assert_canonical(id, entity)
+				})?;
+				world.entity_mut(entity).insert(record.clone());
+				record.xok()
 			})
 			.await?;
 
-		// 5. load the stored records, join, then post the request's message
+		// 3. creating: resolve each seed source; 4. continuing reads none
+		if keep_seeds {
+			SeedSource::resolve_all(&world, entity, &entry).await?;
+		}
+		world
+			.with(move |world: &mut World| {
+				ThreadRecords::reduce_entered(world, entity, keep_seeds)
+			})
+			.await?;
+
+		// 5. load the stored records, join the feed and each absent actor,
+		// then post the request's message
 		let loaded = match &mounted {
 			Some((_, store)) => store.load_records(&record).await?,
 			None => ThreadRecords::new(),
 		};
 		world
 			.with(move |world: &mut World| -> Result {
-				let synced = loaded.posts().iter().map(Post::id).collect();
+				let id = record.id();
+				let mut present = world
+					.get::<ThreadRecords>(entity)
+					.ok_or_else(|| bevyhow!("thread {entity} despawned"))?
+					.actors()
+					.keys()
+					.copied()
+					.collect::<Vec<_>>();
+				present.sort();
+				let (live, absent) =
+					world
+						.with_state::<(ThreadWindows, Query<&ThreadRecords>), _>(
+							|(windows, records)| {
+								let live = windows
+									.of(id, entity)
+									.find_map(|window| records.get(window).ok())
+									.map(ThreadRecords::as_feed);
+								let absent = present
+									.iter()
+									.copied()
+									.filter(|actor| {
+										!windows.holds_actor(id, entity, *actor)
+									})
+									.collect::<Vec<_>>();
+								(live, absent)
+							},
+						);
+				let mut synced =
+					loaded.posts().iter().map(Post::id).collect::<HashSet<_>>();
 				let mut records = world
 					.get_mut::<ThreadRecords>(entity)
 					.ok_or_else(|| bevyhow!("thread {entity} despawned"))?;
 				records.merge_stored(loaded);
-				records.open_session(record.id(), entry.opened())?;
-				entry.post_message(&mut records, record.id())?;
+				if let Some(live) = live {
+					synced.extend(live.posts.iter().map(Post::id));
+					records.receive(&live);
+				}
+				records.join(id, absent, &entry.opened())?;
+				entry.post_message(&mut records, id)?;
 				let mut entity = world.entity_mut(entity);
-				entity.insert((record, SyncedPosts::new(synced)));
+				entity.insert((
+					PresentActors::new(present),
+					SyncedPosts::new(synced),
+				));
 				if let Some((_, store)) = mounted {
 					entity.insert(store);
 				}
 				Ok(())
 			})
-			.await
+			.await?;
+		// written at once, so the next entry finds the thread it created
+		ThreadStore::flush(&world.entity(entity)).await
 	}
 }
 
@@ -478,10 +524,8 @@ mod test {
 			.install_type::<ThreadPlugin>();
 		let thread = app
 			.world_mut()
-			.spawn((store.clone(), children![(
-				Thread::default(),
-				mount,
-				children![
+			.spawn((store.clone(), TableStore::new(store.clone()), children![
+				(Thread::default(), mount, children![
 					(
 						Actor::new_with_id(
 							ActorId::from_u128(1),
@@ -495,8 +539,8 @@ mod test {
 						"Person",
 						ActorKind::User,
 					),
-				]
-			)]))
+				])
+			]))
 			.get::<Children>()
 			.unwrap()[0];
 		let entry = ThreadEntry::parse(request.parts().clone())?;
@@ -541,10 +585,12 @@ mod test {
 
 	/// The threads stored under `path` in `store`.
 	async fn stored(store: &BlobStore, path: &str) -> Vec<Thread> {
-		BlobThreadStore::new(store.with_subdir(RelPath::new(path)))
-			.threads()
-			.await
-			.unwrap()
+		threads(store, path).threads().await.unwrap()
+	}
+
+	/// The thread store of `path` in `store`.
+	fn threads(store: &BlobStore, path: &str) -> ThreadStore {
+		ThreadStore::new(TableStore::new(store.clone()), RelPath::new(path))
 	}
 
 	/// A continued thread reads no seed file and calls no seed route: both
@@ -745,21 +791,15 @@ mod test {
 		(branch.id() != parent.id()).xpect_true();
 		texts(&records).xpect_eq(vec!["be brief".to_string()]);
 		// the branch's join is its own, the parent's posts untouched
-		let threads =
-			BlobThreadStore::new(store.with_subdir(RelPath::new("threads")));
+		let threads = threads(&store, "threads");
 		threads
-			.thread_posts(branch.id(), None)
+			.posts(branch.id())
 			.await
 			.unwrap()
 			.iter()
 			.all(|post| post.thread() == branch.id())
 			.xpect_true();
-		threads
-			.thread_posts(parent.id(), None)
-			.await
-			.unwrap()
-			.len()
-			.xpect_eq(3);
+		threads.posts(parent.id()).await.unwrap().len().xpect_eq(3);
 	}
 
 	/// A branch point the mount's store lacks is refused, as is a branch

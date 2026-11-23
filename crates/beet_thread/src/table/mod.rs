@@ -40,28 +40,31 @@
 //! outside the mount's own prefix. A mount declaring `new:true` persists and
 //! never continues: every entry behaves as `--new`.
 //!
-//! The store is the `TableStore` at the mount path: the thread, each actor,
-//! each post and each response's metadata ([`ResponseMeta`]) is its own row,
-//! keyed by its id. A write is a row, never a rewrite of the thread, so two
-//! writers on one thread never erase each other, and whatever backs the
-//! table, json over blobs, sqlite or dynamo, backs the thread.
+//! The store is the `TableStore` at or above the thread, its rows keyed under
+//! the mount's filled path ([`ThreadStore`], which gives the layout): the
+//! thread, each actor, each post and each response's metadata
+//! ([`ResponseMeta`]) is its own row, keyed by its id. A write is a row, never
+//! a rewrite of the thread, so two writers on one thread never erase each
+//! other, and whatever backs the table, json over blobs, sqlite or dynamo,
+//! backs the thread.
 //!
 //! # Windows
 //!
 //! - **Window.** A thread entity, open onto one stored thread, which is the
-//!   truth: it holds that thread's records in memory ([`ThreadRecords`], loaded whole), writes what it posts to the
-//!   store and receives what other windows post. A thread has any number of
-//!   windows, on any surfaces, each with its own view and composer.
+//!   truth: it holds that thread's records in memory ([`ThreadRecords`],
+//!   loaded whole), writes what it posts to the store and receives what other
+//!   windows post. A thread has any number of windows, on any surfaces, each
+//!   with its own view and composer.
 //! - **Feed.** Within one runtime, a post pushed to one window's records is
-//!   applied to every other window of the same stored thread at once, a post
-//!   in progress included, so a reply streams in every window. Only a
-//!   completed post is written to the store, once, by the window that
-//!   authored it; a window never writes a post it received.
+//!   applied to every other window of the same stored thread at once
+//!   ([`ThreadFeed`]), a post in progress included, so a reply streams in
+//!   every window. Only a completed post is written to the store, once, by
+//!   the window that authored it; a window never writes a post it received.
 //! - **Behavior.** A scene holding an action on an actor, ie a `Sequence`
 //!   over an agent's streamer and a person's `UserInput`.
 //! - **Canonical window.** The window holding a thread's behavior; a thread
-//!   has at most one in a runtime, and every other window is a view and a
-//!   composer with no behavior. Entering a thread with behavior while another
+//!   has at most one in a runtime ([`ThreadWindows`]), and every other window
+//!   is a view and a composer with no behavior. Entering a thread with behavior while another
 //!   window holds behavior for it is refused, naming both: two agents
 //!   answering is a mistake in what was installed, never a race to resolve.
 //!   A post from any window reaches the canonical window by the feed, so a
@@ -92,8 +95,8 @@
 //!    the scene's seed posts, reading no seed source and calling no seed
 //!    route;
 //! 5. load the stored records, join the feed, post a join for each actor
-//!    present that no other window of the runtime holds, then post the
-//!    request's message if the entry carries one.
+//!    present that no other window of the runtime holds ([`PresentActors`]),
+//!    then post the request's message if the entry carries one.
 //!
 //! A seed source is resolved by the entry creating its thread and by nothing
 //! else, so building a template reads no file and calls no route.
@@ -212,15 +215,13 @@ mod seed_source;
 mod thread;
 mod thread_query;
 mod thread_records;
-pub mod thread_store;
+mod thread_store;
+pub use document::*;
 #[cfg(feature = "action")]
 pub use seed_source::*;
 pub use thread_store::SyncedPosts;
-mod blob_thread_store;
-mod thread_store_provider;
-pub use blob_thread_store::*;
-pub use document::*;
-pub use thread_store_provider::*;
+pub use thread_store::ThreadStore;
+pub(crate) use thread_store::sync_records_to_store;
 mod agent_post;
 pub use agent_post::*;
 mod post;
@@ -228,6 +229,7 @@ mod post_log;
 mod post_ref;
 pub use post_ref::*;
 mod session;
+mod window;
 pub use actor::*;
 pub use post::*;
 pub use post_log::*;
@@ -235,6 +237,7 @@ pub use session::*;
 pub use thread::*;
 pub use thread_query::*;
 pub use thread_records::*;
+pub use window::*;
 mod response_meta;
 pub use response_meta::*;
 #[cfg(feature = "action")]

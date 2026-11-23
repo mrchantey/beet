@@ -78,6 +78,7 @@ beet_core = { workspace = true, features = ["testing", "fs", "rand"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet_thread = { path = ".", features = ["native-tls"] }
+beet_net = { workspace = true, features = ["sqlite"] }
 
 [lib]
 harness = false

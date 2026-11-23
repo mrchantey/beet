@@ -132,17 +132,8 @@ fn user_input_on_add(mut world: DeferredWorld, cx: HookContext) {
 		.insert(Action::<(), Outcome>::new_async(user_input_action));
 }
 
-/// Marks a live thread whose owner's turn waits on a submit, from the turn's
-/// start to the submit ending it: what a navigator in follow mode focuses.
-/// A thread is live while its entity exists, under a [`ThreadRoute`] or a
-/// [`RunThread`].
-#[derive(Debug, Default, Clone, Copy, Component, Reflect)]
-#[reflect(Component, Default)]
-pub struct AwaitingOwner;
-
-/// The user's turn: mark the thread [`AwaitingOwner`], await its composer
-/// [`Submit`], append the typed post authored by this actor, and [`Pass`] so
-/// the `Sequence` advances.
+/// The user's turn: await its composer [`Submit`], append the typed post
+/// authored by this actor, and [`Pass`] so the `Sequence` advances.
 async fn user_input_action(cx: ActionContext) -> Result<Outcome> {
 	// resolve which thread + actor this user turn belongs to
 	let (thread_entity, actor_id, thread_id) = cx
@@ -157,14 +148,6 @@ async fn user_input_action(cx: ActionContext) -> Result<Outcome> {
 			},
 		)
 		.await??;
-	cx.world()
-		.with(move |world: &mut World| {
-			if let Ok(mut thread) = world.get_entity_mut(thread_entity) {
-				thread.insert(AwaitingOwner);
-			}
-		})
-		.await;
-
 	// the composer bound to this thread is the input surface; await its <form>.
 	// It may not be mounted yet, so yield a tick and retry until it is.
 	let form = loop {
@@ -199,13 +182,6 @@ async fn user_input_action(cx: ActionContext) -> Result<Outcome> {
 	};
 
 	// append the typed post and advance the Sequence
-	cx.world()
-		.with(move |world: &mut World| {
-			if let Ok(mut thread) = world.get_entity_mut(thread_entity) {
-				thread.remove::<AwaitingOwner>();
-			}
-		})
-		.await;
 	cx.caller
 		.with_state::<ThreadRecordsQuery, _>(
 			move |entity, mut records_mut| -> Result {

@@ -124,7 +124,9 @@ mod test {
 		.unwrap()
 		.spawn(app.world_mut())
 		.unwrap();
-		app.world_mut().entity_mut(router).insert(store.clone());
+		app.world_mut()
+			.entity_mut(router)
+			.insert((store.clone(), TableStore::new(store.clone())));
 		app.world_mut()
 			.spawn((Notes::default(), ChildOf(router)))
 			.flush();
@@ -147,9 +149,9 @@ mod test {
 		let (mut app, router, store) = host("notes?about={document}");
 		review(&mut app, router).await.0.xpect_eq(StatusCode::OK);
 		let records =
-			BlobThreadStore::new(store.with_subdir(RelPath::new("threads")));
+			ThreadStore::new(TableStore::new(store), RelPath::new("threads"));
 		let thread = records.threads().await.unwrap()[0].id();
-		records.thread_posts(thread, None).await.unwrap()[0]
+		records.posts(thread).await.unwrap()[0]
 			.to_string()
 			.xpect_eq("notes on product");
 	}

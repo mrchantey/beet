@@ -515,7 +515,7 @@ mod test {
 			"hello",
 			PostStatus::Completed,
 		));
-		records.open_session(thread, default()).unwrap();
+		records.join(thread, [user], &default()).unwrap();
 		let rows = |field: &str| {
 			super::project_records(&records)
 				.get("posts")

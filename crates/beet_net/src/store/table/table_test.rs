@@ -440,6 +440,23 @@ async fn scans(store: &TableStore) {
 			});
 		}
 	}
+	// a parent's keys at any depth, never a sibling sharing its name as a
+	// prefix
+	let nested = ["batch/0", "batch/deep/0", "batch0", "batches/0"];
+	for key in nested {
+		rows.put(NamedRow::new(key, 0)).await.unwrap();
+	}
+	for parent in ["batch", "batch/"] {
+		key_of(rows.scan_all(Scan::default().under(parent)).await.unwrap())
+			.xpect_eq(vec!["batch/0", "batch/deep/0"]);
+	}
+	rows.scan_all(Scan::default().under("nowhere"))
+		.await
+		.unwrap()
+		.xpect_empty();
+	for key in nested {
+		rows.remove(key).await.unwrap();
+	}
 	// a bounded, paged scan
 	let mut scan = Scan::default().from("A").before("é").limit(3);
 	let mut seen = Vec::new();

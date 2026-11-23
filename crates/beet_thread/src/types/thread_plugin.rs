@@ -96,6 +96,9 @@ impl Plugin for ThreadPlugin {
 
 		app.add_systems(First, ThreadRecords::reduce)
 			.add_systems(Update, sync_string_enum_options)
-			.add_systems(PostUpdate, thread_store::sync_records_to_store);
+			.add_systems(
+				PostUpdate,
+				(feed_windows, sync_records_to_store).chain(),
+			);
 	}
 }

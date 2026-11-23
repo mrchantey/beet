@@ -160,7 +160,7 @@ async fn enter_mounted(app: &mut App) {
 	for thread in &threads {
 		app.world_mut()
 			.entity_mut(*thread)
-			.insert(BlobStore::temp());
+			.insert(InMemoryStore::new());
 	}
 	app.world_mut()
 		.run_async_local_then(async move |world: AsyncWorld| -> Result {

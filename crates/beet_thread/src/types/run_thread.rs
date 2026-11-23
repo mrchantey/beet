@@ -180,7 +180,12 @@ mod test {
 	fn run_once(store: &BlobStore, system: ActorId, agent: ActorId) {
 		let mut app = app();
 		app.world_mut()
-			.spawn((sweep(), store.clone(), children![scene(system, agent)]))
+			.spawn((
+				sweep(),
+				store.clone(),
+				TableStore::new(store.clone()),
+				children![scene(system, agent)],
+			))
 			.trigger(|entity| StartRunning::new(entity, Request::default()));
 		pump(&mut app, 120);
 	}
@@ -201,7 +206,7 @@ mod test {
 	/// The stored thread count, read through a fresh thread store so the
 	/// records are re-read rather than served from an in-memory snapshot.
 	async fn stored_threads(store: &BlobStore) -> usize {
-		BlobThreadStore::new(store.with_subdir(RelPath::new(RECORDS)))
+		ThreadStore::new(TableStore::new(store.clone()), RelPath::new(RECORDS))
 			.threads()
 			.await
 			.unwrap()
@@ -246,7 +251,10 @@ mod test {
 		// would run its seed alone, ending on two posts rather than continuing the
 		// stored conversation, its sessions aside.
 		let mut app = app();
-		let root = app.world_mut().spawn(store.clone()).id();
+		let root = app
+			.world_mut()
+			.spawn((store.clone(), TableStore::new(store.clone())))
+			.id();
 		let thread = app
 			.world_mut()
 			.spawn((ChildOf(root), scene(system, agent)))
