@@ -364,7 +364,7 @@ impl S3Store {
 				.map(|key| {
 					format!(
 						"<Object><Key>{}</Key></Object>",
-						XmlElement::escape(key)
+						XmlElement::escape_text(key)
 					)
 				})
 				.collect::<String>();
@@ -494,7 +494,7 @@ impl BlobStoreProvider for S3Store {
 					xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
 					<LocationConstraint>{}</LocationConstraint>\
 					</CreateBucketConfiguration>",
-					XmlElement::escape(region)
+					XmlElement::escape_text(region)
 				)),
 			};
 			this.send(request).await?;

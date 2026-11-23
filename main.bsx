@@ -119,8 +119,10 @@ stays, an inert tag in a lean build.
 	<AwsDeployCredential bx:cfg="feature:infra && feature:extra"/>
 	<!-- the repo's own AWS account, a member of the Organization the AWS deploy
 	     credential lives and deploys in. The root carries no region, so it is
-	     spread here: the state bucket and the Recycle Bin rules land there -->
-	<AwsAccount name="beet" bx:cfg="feature:infra && feature:extra" {(AwsRegion("us-west-2"), IdentityCenter{group:"beet-operators"})}/>
+	     spread here: the state bucket and the Recycle Bin rules land there.
+	     Identity Center names its own: the instance's primary region, fixed
+	     when it was enabled and independent of where the stacks deploy -->
+	<AwsAccount name="beet" bx:cfg="feature:infra && feature:extra" {(AwsRegion("us-west-2"), IdentityCenter{group:"beet-operators", region:"ap-southeast-2"})}/>
 	<!-- a person's Identity Center sign in, the human path into every member
 	     account: `beet sso login`, then `beet aws --account=beet -- ..` -->
 	<Route path="sso" bx:cfg="feature:infra && feature:extra"><SsoRoutes/></Route>

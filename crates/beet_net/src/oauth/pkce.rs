@@ -25,7 +25,9 @@ impl Pkce {
 	pub const METHOD: &'static str = "S256";
 
 	/// A fresh pair: 32 random bytes as the verifier's 43 characters.
-	pub fn new() -> Self { Self::from_verifier(OAuthState::random_token()) }
+	pub fn new() -> Result<Self> {
+		OAuthState::random_token()?.xmap(Self::from_verifier).xok()
+	}
 
 	/// The pair of `verifier`, its challenge derived.
 	pub fn from_verifier(verifier: impl Into<SmolStr>) -> Self {
@@ -52,7 +54,7 @@ pub struct OAuthState(SmolStr);
 
 impl OAuthState {
 	/// A fresh state.
-	pub fn new() -> Self { Self(Self::random_token()) }
+	pub fn new() -> Result<Self> { Self(Self::random_token()?).xok() }
 
 	/// The value.
 	pub fn as_str(&self) -> &str { &self.0 }
@@ -69,12 +71,12 @@ impl OAuthState {
 		}
 	}
 
-	/// 32 random bytes, base64url without padding.
-	pub(crate) fn random_token() -> SmolStr {
-		let bytes = RandomSource::default().random::<[u8; 32]>();
+	/// 32 random bytes from [`SecureRandom`], base64url without padding.
+	fn random_token() -> Result<SmolStr> {
 		base64::engine::general_purpose::URL_SAFE_NO_PAD
-			.encode(bytes)
-			.into()
+			.encode(SecureRandom::new()?.bytes::<32>())
+			.xmap(SmolStr::from)
+			.xok()
 	}
 }
 
@@ -90,13 +92,13 @@ mod test {
 		pkce.challenge()
 			.xpect_eq("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
 		format!("{pkce:?}").xnot().xpect_contains("dBjftJeZ4CVP");
-		Pkce::new().verifier().len().xpect_eq(43);
+		Pkce::new().unwrap().verifier().len().xpect_eq(43);
 	}
 
 	/// A state checks against itself alone.
 	#[beet_core::test]
 	fn checks_the_state() {
-		let state = OAuthState::new();
+		let state = OAuthState::new().unwrap();
 		state.check(Some(state.as_str())).unwrap();
 		state.check(Some("forged")).unwrap_err();
 		state.check(None).unwrap_err();

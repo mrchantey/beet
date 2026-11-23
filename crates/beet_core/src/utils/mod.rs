@@ -47,6 +47,8 @@ pub mod poll_ext;
 pub mod process_ext;
 #[cfg(feature = "rand")]
 mod random_source;
+#[cfg(feature = "rand")]
+mod secure_random;
 #[cfg(feature = "serde")]
 pub mod serde_ext;
 /// Comma separated list parsing ([`str_ext::csv`]).
@@ -99,6 +101,8 @@ pub use once_value::*;
 pub(crate) use panic_context::*;
 #[cfg(feature = "rand")]
 pub use random_source::*;
+#[cfg(feature = "rand")]
+pub use secure_random::*;
 pub use timestamp::*;
 pub use tree::*;
 pub use xtend::*;

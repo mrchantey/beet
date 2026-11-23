@@ -344,9 +344,6 @@ qrcode = { version = "0.14", default-features = false }
 #💡 http
 http = "1"
 http-body-util = "0.1"
-# the xml AWS answers S3 and the query protocols in (`AwsClient`), read into a
-# small element tree rather than through serde
-quick-xml = { version = "0.41", default-features = false }
 
 #💡 tui
 vte = "0.15.0"

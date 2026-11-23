@@ -7,7 +7,9 @@ use rand::distr::uniform::SampleRange;
 use rand::distr::uniform::SampleUniform;
 use rand::rngs::ChaCha8Rng;
 
-/// A simple random source, by default retrieved from entropy.
+/// A simple random source for simulation, by default seeded from entropy,
+/// or from a seed for a reproducible run. Never for a secret: a seeded source
+/// is predictable, so tokens, keys and passwords come from [`SecureRandom`].
 ///
 /// Enable the `bevy` feature to derive [Resource](bevy::prelude::Resource)
 /// ```rust

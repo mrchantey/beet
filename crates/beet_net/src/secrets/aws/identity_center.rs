@@ -169,8 +169,8 @@ impl IdentityCenterClient {
 		world: &AsyncWorld,
 	) -> Result<IdentityCenterSession> {
 		let client = self.client(dir).await?;
-		let pkce = Pkce::new();
-		let state = OAuthState::new();
+		let pkce = Pkce::new()?;
+		let state = OAuthState::new()?;
 		let receiver = LoopbackRedirect::open(world).await?;
 		let redirect_uri = receiver.redirect_uri();
 		let url = self.authorize_url(&client, &redirect_uri, &pkce, &state);

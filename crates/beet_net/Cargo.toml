@@ -153,7 +153,8 @@ aws = [
 	"dep:serde_json",
 	"dep:sha2",
 	"dep:hmac",
-	"dep:quick-xml",
+	# `XmlElement`, the S3 and query protocol answers
+	"beet_core/bsx",
 	"dep:serde_dynamo",
 	"beet_core/rand",
 	# Identity Center's login is an OAuth flow over the same client
@@ -281,7 +282,6 @@ eventsource-stream = { version = "0.2.3", optional = true }
 serde_dynamo = { version = "4", optional = true }
 sha2 = { workspace = true, optional = true }
 hmac = { workspace = true, optional = true }
-quick-xml = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-process = { workspace = true, optional = true }

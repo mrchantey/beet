@@ -230,10 +230,10 @@ impl Secret {
 				Self::MIN_GENERATED_LENGTH
 			);
 		}
-		let mut source = RandomSource::default();
+		let mut random = SecureRandom::new()?;
 		(0..length)
 			.map(|_| {
-				Self::ALPHABET[source.random_range(0..Self::ALPHABET.len())]
+				Self::ALPHABET[random.random_range(0..Self::ALPHABET.len())]
 					as char
 			})
 			.collect::<String>()

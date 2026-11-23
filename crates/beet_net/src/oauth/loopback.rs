@@ -109,7 +109,7 @@ mod test {
 		let receiver = LoopbackRedirect::open(&crate::oauth::threaded_world())
 			.await
 			.unwrap();
-		let state = OAuthState::new();
+		let state = OAuthState::new().unwrap();
 		let uri = format!(
 			"{}?code=abc&state={}",
 			receiver.redirect_uri(),

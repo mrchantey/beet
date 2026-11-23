@@ -7,21 +7,14 @@
 //! - [`SecretsQuery`]: a document by `<Secrets>` label or by path
 //! - the `<Secrets>` load on scene build, gating `Ready`
 //! - the verbs, one file each under `actions`, mounted by `<SecretsRoutes/>`
-//! - [`AgentIdentity`]: the global document holding this machine's own aws
-//!   pair, and [`AdminSession`], the tmpfs session that elevates it
-//! - [`MemberAccount`]: a repo's own account in the operator's Organization,
-//!   and the roles that reach it from the management account
-//! - [`IdentityCenterClient`] and its [`IdentityCenterSession`]: the human path
-//!   into every member account, one browser sign in
+//! - `aws`: one provider's authority over the account it deploys into, this
+//!   machine's identity, a person's elevation and sign in, and the verbs
+//!   reaching through them (native, `fs` and `aws` only)
 
 mod actions;
-// native and fs only, like the `aws`/`admin` verbs that read it
+// native and fs only: the verbs read this machine's files and run the cli
 #[cfg(all(feature = "fs", feature = "aws", not(target_arch = "wasm32")))]
-mod agent_identity;
-#[cfg(all(feature = "fs", feature = "aws", not(target_arch = "wasm32")))]
-mod identity_center;
-#[cfg(all(feature = "fs", feature = "aws", not(target_arch = "wasm32")))]
-mod member_account;
+mod aws;
 mod secrets_handle;
 mod secrets_load;
 mod secrets_plugin;
@@ -29,11 +22,7 @@ mod secrets_query;
 
 pub use actions::*;
 #[cfg(all(feature = "fs", feature = "aws", not(target_arch = "wasm32")))]
-pub use agent_identity::*;
-#[cfg(all(feature = "fs", feature = "aws", not(target_arch = "wasm32")))]
-pub use identity_center::*;
-#[cfg(all(feature = "fs", feature = "aws", not(target_arch = "wasm32")))]
-pub use member_account::*;
+pub use aws::*;
 pub use secrets_handle::*;
 pub(crate) use secrets_load::*;
 pub use secrets_plugin::*;
