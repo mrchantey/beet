@@ -98,7 +98,7 @@ impl Plugin for ThreadPlugin {
 			.add_systems(Update, sync_string_enum_options)
 			.add_systems(
 				PostUpdate,
-				(feed_windows, sync_records_to_store).chain(),
+				(sync_windows, sync_records_to_store).chain(),
 			);
 	}
 }

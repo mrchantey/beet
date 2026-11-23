@@ -1,5 +1,5 @@
-//! Windows onto one stored thread: the feed carrying each window's posts to
-//! the others, the canonical window holding its behavior, and the actors
+//! Windows onto one stored thread: window sync applying each window's changes
+//! to the others, the canonical window holding its behavior, and the actors
 //! each window holds.
 use crate::prelude::*;
 #[cfg(feature = "action")]
@@ -110,10 +110,10 @@ impl ThreadWindows<'_, '_> {
 	}
 }
 
-/// The feed: each window's changed posts, in progress or completed, applied
+/// Window sync: each window's changed posts, in progress or completed, applied
 /// to every other window of the same stored thread, each received post marked
 /// written so only its author's window ever flushes it.
-pub(crate) fn feed_windows(
+pub(crate) fn sync_windows(
 	mut windows: Query<(
 		Entity,
 		&Thread,
@@ -123,19 +123,19 @@ pub(crate) fn feed_windows(
 ) {
 	let mut sent = Vec::new();
 	for (entity, thread, mut records, _) in windows.iter_mut() {
-		if records.has_feed() {
-			let feed = records.bypass_change_detection().take_feed();
-			sent.push((entity, thread.id(), feed));
+		if records.has_changes() {
+			let changes = records.bypass_change_detection().take_changes();
+			sent.push((entity, thread.id(), changes));
 		}
 	}
-	for (source, id, feed) in sent {
+	for (source, id, changes) in sent {
 		for (_, _, mut records, synced) in
 			windows.iter_mut().filter(|(entity, thread, ..)| {
 				*entity != source && thread.id() == id
 			}) {
-			records.receive(&feed);
+			records.apply_changes(&changes);
 			if let Some(mut synced) = synced {
-				for post in &feed.posts {
+				for post in &changes.posts {
 					synced.insert(post.id());
 				}
 			}

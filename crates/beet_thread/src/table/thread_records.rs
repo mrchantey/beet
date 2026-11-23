@@ -8,8 +8,8 @@ use beet_core::prelude::*;
 ///
 /// A copy of the [`ThreadStore`], never a truth of its own, loaded whole: the
 /// window's behavior streams into it, its view projects it, each model call
-/// derives its input from it ([`Self::model_posts`]) and the feed carries
-/// each change to the thread's other windows ([`ThreadFeed`]).
+/// derives its input from it ([`Self::model_posts`]) and window sync applies
+/// each change to the thread's other windows ([`ThreadChanges`]).
 ///
 /// Author resolution is in memory (`records.actor(post.author())`), with no
 /// entity walk; ordering is by [`PostId`] (a time-sortable [`Uuid7`]).
@@ -21,9 +21,9 @@ pub struct ThreadRecords {
 	posts: Vec<Post>,
 	/// Per-post response metadata, used for `previous_response_id` chaining.
 	metas: HashMap<PostId, ResponseMeta>,
-	/// The posts pushed or updated here since the feed last took them, each
+	/// The posts pushed or updated here since window sync last took them, each
 	/// once, in the order they changed.
-	fed: Vec<PostId>,
+	changed: Vec<PostId>,
 }
 
 impl ThreadRecords {
@@ -54,15 +54,15 @@ impl ThreadRecords {
 	pub fn is_empty(&self) -> bool { self.posts.is_empty() }
 	pub fn last_post(&self) -> Option<&Post> { self.posts.last() }
 
-	/// Append a post, or replace the existing post with the same id, for the
-	/// feed to carry to the thread's other windows. New posts keep insertion
+	/// Append a post, or replace the existing post with the same id, for window
+	/// sync to apply to the thread's other windows. New posts keep insertion
 	/// (ie [`PostId`]) order; modified posts update in place.
 	pub fn upsert_post(&mut self, post: Post) {
-		self.feed(post.id());
+		self.mark_changed(post.id());
 		self.upsert_quiet(post);
 	}
 
-	/// Upsert `post` without feeding it.
+	/// Upsert `post` without marking it changed.
 	fn upsert_quiet(&mut self, post: Post) {
 		match self
 			.posts
@@ -74,10 +74,10 @@ impl ThreadRecords {
 		}
 	}
 
-	/// Mark `id` changed, for the feed.
-	fn feed(&mut self, id: PostId) {
-		if !self.fed.contains(&id) {
-			self.fed.push(id);
+	/// Mark `id` changed, for window sync.
+	fn mark_changed(&mut self, id: PostId) {
+		if !self.changed.contains(&id) {
+			self.changed.push(id);
 		}
 	}
 
@@ -119,7 +119,7 @@ impl ThreadRecords {
 			actors,
 			posts,
 			metas,
-			fed: _,
+			changed: _,
 		} = stored;
 		for (id, actor) in actors {
 			self.actors.entry(id).or_insert(actor);
@@ -131,52 +131,52 @@ impl ThreadRecords {
 		self.posts.sort_by_key(|post| post.id());
 	}
 
-	/// Take what changed since the feed last took it: each changed post as it
+	/// Take what changed since window sync last took it: each changed post as it
 	/// stands, its author and its metadata. Empty when nothing changed.
-	pub fn take_feed(&mut self) -> ThreadFeed {
-		let mut feed = ThreadFeed::default();
-		for id in core::mem::take(&mut self.fed) {
+	pub fn take_changes(&mut self) -> ThreadChanges {
+		let mut changes = ThreadChanges::default();
+		for id in core::mem::take(&mut self.changed) {
 			let Some(post) = self.posts.iter().find(|post| post.id() == id)
 			else {
 				continue;
 			};
 			if let Some(actor) = self.actors.get(&post.author())
-				&& !feed.actors.iter().any(|known| known.id() == actor.id())
+				&& !changes.actors.iter().any(|known| known.id() == actor.id())
 			{
-				feed.actors.push(actor.clone());
+				changes.actors.push(actor.clone());
 			}
 			if let Some(meta) = self.metas.get(&id) {
-				feed.metas.push(meta.clone());
+				changes.metas.push(meta.clone());
 			}
-			feed.posts.push(post.clone());
+			changes.posts.push(post.clone());
 		}
-		feed
+		changes
 	}
 
-	/// Whether anything changed since the feed last took it.
-	pub fn has_feed(&self) -> bool { !self.fed.is_empty() }
+	/// Whether anything changed since window sync last took it.
+	pub fn has_changes(&self) -> bool { !self.changed.is_empty() }
 
-	/// Apply `feed`, another window's changes, in [`PostId`] order and
-	/// without feeding them again: an actor these records lack is added, the
+	/// Apply `changes`, another window's, in [`PostId`] order and without
+	/// marking them changed again: an actor these records lack is added, the
 	/// rest are replaced.
-	pub fn receive(&mut self, feed: &ThreadFeed) {
-		for actor in &feed.actors {
+	pub fn apply_changes(&mut self, changes: &ThreadChanges) {
+		for actor in &changes.actors {
 			self.actors
 				.entry(actor.id())
 				.or_insert_with(|| actor.clone());
 		}
-		for post in &feed.posts {
+		for post in &changes.posts {
 			self.upsert_quiet(post.clone());
 		}
-		for meta in &feed.metas {
+		for meta in &changes.metas {
 			self.metas.insert(meta.post_id, meta.clone());
 		}
 		self.posts.sort_by_key(|post| post.id());
 	}
 
-	/// Every record here as a feed, for a window joining the thread.
-	pub fn as_feed(&self) -> ThreadFeed {
-		ThreadFeed {
+	/// Every record here as changes, for a window joining the thread.
+	pub fn as_changes(&self) -> ThreadChanges {
+		ThreadChanges {
 			actors: self.actors.values().cloned().collect(),
 			posts: self.posts.clone(),
 			metas: self.metas.values().cloned().collect(),
@@ -185,9 +185,9 @@ impl ThreadRecords {
 
 	// ── response metadata ───────────────────────────────────────────────
 
-	/// Set the metadata of its post, for the feed to carry.
+	/// Set the metadata of its post, for window sync to apply.
 	pub fn set_meta(&mut self, meta: ResponseMeta) {
-		self.feed(meta.post_id);
+		self.mark_changed(meta.post_id);
 		self.metas.insert(meta.post_id, meta);
 	}
 	pub fn meta(&self, post_id: PostId) -> Option<&ResponseMeta> {
@@ -247,17 +247,17 @@ impl ThreadRecords {
 		{
 			post.set_media_type(MediaType::Text);
 			post.set_text(STUBBED_IMAGE);
-			if !self.fed.contains(&post.id()) {
-				self.fed.push(post.id());
+			if !self.changed.contains(&post.id()) {
+				self.changed.push(post.id());
 			}
 		}
 	}
 }
 
-/// One window's changes to its records, carried to every other window of
-/// the same stored thread ([`ThreadRecords::take_feed`]).
+/// One window's changes to its records, applied to every other window of
+/// the same stored thread ([`ThreadRecords::take_changes`]).
 #[derive(Debug, Default, Clone)]
-pub struct ThreadFeed {
+pub struct ThreadChanges {
 	/// The authors of [`Self::posts`].
 	pub actors: Vec<Actor>,
 	/// Each post as it stands, a post in progress included.
@@ -266,7 +266,7 @@ pub struct ThreadFeed {
 	pub metas: Vec<ResponseMeta>,
 }
 
-impl ThreadFeed {
+impl ThreadChanges {
 	pub fn is_empty(&self) -> bool { self.posts.is_empty() }
 }
 

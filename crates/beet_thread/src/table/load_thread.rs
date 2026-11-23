@@ -352,8 +352,8 @@ impl Thread {
 	///    scene keeping its seed posts;
 	/// 4. continuing, or branching: reduce the scene dropping its seed posts,
 	///    reading no seed source;
-	/// 5. load the stored records, join the feed with another window's
-	///    records if one is live, post a join for each actor the scene authors
+	/// 5. load the stored records, apply a live window's records if there is
+	///    one, post a join for each actor the scene authors
 	///    that no other window holds ([`PresentActors`]), then the request's
 	///    message if the entry carries one, and write them.
 	///
@@ -440,7 +440,7 @@ impl Thread {
 			})
 			.await?;
 
-		// 5. load the stored records, join the feed and each absent actor,
+		// 5. load the stored records, apply a live window's and join each absent actor,
 		// then post the request's message
 		let loaded = match &mounted {
 			Some((_, store)) => store.load_records(&record).await?,
@@ -464,7 +464,7 @@ impl Thread {
 								let live = windows
 									.of(id, entity)
 									.find_map(|window| records.get(window).ok())
-									.map(ThreadRecords::as_feed);
+									.map(ThreadRecords::as_changes);
 								let absent = present
 									.iter()
 									.copied()
@@ -483,7 +483,7 @@ impl Thread {
 				records.merge_stored(loaded);
 				if let Some(live) = live {
 					synced.extend(live.posts.iter().map(Post::id));
-					records.receive(&live);
+					records.apply_changes(&live);
 				}
 				records.join(id, absent, &entry.opened())?;
 				entry.post_message(&mut records, id)?;

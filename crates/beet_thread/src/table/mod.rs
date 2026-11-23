@@ -55,9 +55,9 @@
 //!   loaded whole), writes what it posts to the store and receives what other
 //!   windows post. A thread has any number of windows, on any surfaces, each
 //!   with its own view and composer.
-//! - **Feed.** Within one runtime, a post pushed to one window's records is
-//!   applied to every other window of the same stored thread at once
-//!   ([`ThreadFeed`]), a post in progress included, so a reply streams in
+//! - **Window sync.** Within one runtime, a post pushed to one window's
+//!   records is applied to every other window of the same stored thread at
+//!   once ([`ThreadChanges`]), a post in progress included, so a reply streams in
 //!   every window. Only a completed post is written to the store, once, by
 //!   the window that authored it; a window never writes a post it received.
 //! - **Behavior.** A scene holding an action on an actor, ie a `Sequence`
@@ -67,7 +67,7 @@
 //!   is a view and a composer with no behavior. Entering a thread with behavior while another
 //!   window holds behavior for it is refused, naming both: two agents
 //!   answering is a mistake in what was installed, never a race to resolve.
-//!   A post from any window reaches the canonical window by the feed, so a
+//!   A post from any window reaches the canonical window by window sync, so a
 //!   person typing in a browser tab is answered, or interrupts, exactly as one
 //!   typing beside it.
 //!
@@ -94,7 +94,7 @@
 //! 4. continuing, or branching, which continues its parent's history: drop
 //!    the scene's seed posts, reading no seed source and calling no seed
 //!    route;
-//! 5. load the stored records, join the feed, post a join for each actor
+//! 5. load the stored records, apply a live window's, post a join for each actor
 //!    present that no other window of the runtime holds ([`PresentActors`]),
 //!    then post the request's message if the entry carries one.
 //!
@@ -193,7 +193,7 @@
 //! - every surface of a template is the same User actor, since people have no
 //!   identity yet;
 //! - no route lists the threads of a store;
-//! - the feed is one runtime's, so windows in two runtimes see each other's
+//! - window sync is one runtime's, so windows in two runtimes see each other's
 //!   posts only on entering, and a backend's own change feed is unused;
 //! - an actor's leaving is not recorded: presence is a status nothing keeps;
 //! - compaction: nothing bounds a thread by post count, and fitting a long
