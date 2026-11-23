@@ -12,10 +12,11 @@
 //! # }
 //! ```
 //!
-//! Each format rides its own feature (`json`, `ron`, `toml`, `postcard`,
+//! Each format rides its own feature (`json`, `toml`, `postcard`,
 //! `serde_plain`, `dag_cbor`), and a build without it answers the same
 //! "feature is required" error from every caller, so a disabled format fails
-//! identically everywhere. [`MediaType::Yaml`] is beet's own, the subset a
+//! identically everywhere. Why RON is none of them is written once, in the
+//! [`StructuredParser`] docs. [`MediaType::Yaml`] is beet's own, the subset a
 //! frontmatter block uses read and written through [`Value`], so it needs no
 //! feature beyond `serde` (see the `yaml` module). [`MediaType::DagCbor`] is canonical DAG-CBOR
 //! through the atproto data model ([`AtprotoValue`]): a link is CBOR tag 42,
@@ -96,7 +97,6 @@ impl MediaType {
 	/// |----------------------|----------|-----------------|
 	/// | `Text`               | plain    | `serde_plain`   |
 	/// | `Json`               | JSON     | `json`          |
-	/// | `Ron`                | RON      | `ron`           |
 	/// | `Toml`               | TOML     | `toml`          |
 	/// | `Yaml`               | YAML, frontmatter's subset | `serde` |
 	/// | `DagCbor`            | DAG-CBOR | `dag_cbor`      |
@@ -144,33 +144,6 @@ impl MediaType {
 						let _ = (value, options);
 						bevybail!(
 							"The `json` feature is required for JSON serialization"
-						)
-					}
-				}
-			}
-			MediaType::Ron => {
-				cfg_if! {
-					if #[cfg(feature = "ron")] {
-						if options.pretty {
-							let pretty_config = ron::ser::PrettyConfig::default()
-								.indentor("  ".to_string())
-								.new_line("\n".to_string());
-							ron::ser::to_string_pretty(value, pretty_config)
-								.map(|s| s.into_bytes())
-								.map_err(|err| {
-									bevyhow!("Failed to serialize RON: {err}")
-								})
-						} else {
-							ron::ser::to_string(value)
-								.map(|s| s.into_bytes())
-								.map_err(|err| {
-									bevyhow!("Failed to serialize RON: {err}")
-								})
-						}
-					} else {
-						let _ = (value, options);
-						bevybail!(
-							"The `ron` feature is required for RON serialization"
 						)
 					}
 				}
@@ -257,7 +230,6 @@ impl MediaType {
 	/// |----------------------|----------|-----------------|
 	/// | `Text`               | plain    | `serde_plain`   |
 	/// | `Json`               | JSON     | `json`          |
-	/// | `Ron`                | RON      | `ron`           |
 	/// | `Toml`               | TOML     | `toml`          |
 	/// | `Yaml`               | YAML, frontmatter's subset | `serde` |
 	/// | `DagCbor`            | DAG-CBOR | `dag_cbor`      |
@@ -294,23 +266,6 @@ impl MediaType {
 						let _ = bytes;
 						bevybail!(
 							"The `json` feature is required for JSON deserialization"
-						)
-					}
-				}
-			}
-			MediaType::Ron => {
-				cfg_if! {
-					if #[cfg(feature = "ron")] {
-						let string = core::str::from_utf8(bytes).map_err(|err| {
-							bevyhow!("RON data is not valid UTF-8: {err}")
-						})?;
-						ron::de::from_str(string).map_err(|err| {
-							bevyhow!("Failed to deserialize RON body: {err}")
-						})
-					} else {
-						let _ = bytes;
-						bevybail!(
-							"The `ron` feature is required for RON deserialization"
 						)
 					}
 				}
@@ -418,30 +373,6 @@ mod test {
 		result.xpect_eq(());
 	}
 
-	#[cfg(feature = "ron")]
-	#[crate::test]
-	fn roundtrip_ron() {
-		let input = Pair { a: 7, b: 8 };
-		let bytes = MediaType::Ron.serialize(&input).unwrap();
-		let output: Pair = MediaType::Ron.deserialize(&bytes).unwrap();
-		output.xpect_eq(input);
-	}
-
-	#[cfg(feature = "ron")]
-	#[crate::test]
-	fn ron_pretty() {
-		let input = Pair { a: 7, b: 8 };
-		let options = SerializeOptions { pretty: true };
-		let bytes = MediaType::Ron
-			.serialize_with_options(&input, options)
-			.unwrap();
-		let text = std::str::from_utf8(&bytes).unwrap();
-		// pretty RON has newlines
-		text.xref().xpect_contains("\n");
-		let output: Pair = MediaType::Ron.deserialize(&bytes).unwrap();
-		output.xpect_eq(input);
-	}
-
 	#[cfg(feature = "postcard")]
 	#[crate::test]
 	fn roundtrip_postcard() {
@@ -473,17 +404,17 @@ mod test {
 		bytes.media_type().xpect_eq(MediaType::Json);
 	}
 
-	#[cfg(feature = "ron")]
+	#[cfg(feature = "toml")]
 	#[crate::test]
-	fn serialize_accepts_ron() {
+	fn serialize_accepts_toml() {
 		#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 		struct Val {
 			num: u32,
 		}
 		let input = Val { num: 10 };
 		let bytes =
-			MediaType::serialize_accepts(&[MediaType::Ron], &input).unwrap();
-		bytes.media_type().xpect_eq(MediaType::Ron);
+			MediaType::serialize_accepts(&[MediaType::Toml], &input).unwrap();
+		bytes.media_type().xpect_eq(MediaType::Toml);
 		let output: Val = bytes.deserialize().unwrap();
 		output.xpect_eq(input);
 	}

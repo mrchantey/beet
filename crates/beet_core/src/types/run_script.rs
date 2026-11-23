@@ -11,14 +11,15 @@ use crate::prelude::*;
 /// Data alone: `beet_action`'s scripting makes it a behaviour-tree leaf,
 /// and with it the `world` bridge a script reaches the world through, so a
 /// binary without scripting still loads and saves a scene holding one. A
-/// script is behaviour and not content, so no render walks its subtree.
+/// script is behaviour and not content, so it is [`NotRendered`].
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
+#[require(NotRendered)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub struct RunScript;
 
-/// Names the event a script answers: the child a `bx:<event>="source"`
+/// Names the event a script answers: the child a `bx:on<event>="source"`
 /// directive lowers to, carrying [`RunScript`] and the source as its
 /// [`Value`], so a saved document keeps its handlers. The plugin owning the
 /// event runs it when the event reaches the child's parent; an event no
@@ -27,7 +28,7 @@ pub struct RunScript;
 #[reflect(Component, Default)]
 #[require(RunScript)]
 pub struct OnEvent {
-	/// The event name, ie `click` for `bx:click`.
+	/// The event name, ie `click` for `bx:onclick`.
 	pub event: SmolStr,
 }
 

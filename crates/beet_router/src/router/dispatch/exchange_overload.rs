@@ -92,9 +92,10 @@ impl IntoResponseWithRequestParts<ScriptAnswerMarker> for Value {
 			match self {
 				Value::Str(text) => Response::ok()
 					.with_media(MediaBytes::new_text(text.to_string())),
-				answer => Response::ok().with_media(MediaBytes::new_json(
-					serde_json::to_string(&answer)?,
-				)),
+				answer => Response::ok().with_media(MediaBytes::serialize(
+					MediaType::Json,
+					&answer,
+				)?),
 			}
 			.xok()
 		})

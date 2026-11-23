@@ -320,14 +320,18 @@ mod test {
 	fn round_trips_to_valid_json() {
 		let (mut world, router) = manifest_world();
 		let manifest = DiagnosticsManifest::build(&mut world, router).unwrap();
-		let json = serde_json::to_string_pretty(&manifest).unwrap();
+		let json = MediaBytes::serialize_with_options(
+			MediaType::Json,
+			&manifest,
+			SerializeOptions { pretty: true },
+		)
+		.unwrap();
 		// re-parsing proves it is valid JSON carrying the expected sections.
-		let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-		parsed["routes"].is_array().xpect_true();
-		parsed["classes"].is_array().xpect_true();
-		parsed["tags"].is_array().xpect_true();
-		parsed["style_props"].is_array().xpect_true();
+		let parsed = json.deserialize::<Value>().unwrap();
+		for section in ["routes", "classes", "tags", "style_props"] {
+			parsed.get(section).unwrap().is_list().xpect_true();
+		}
 		// a known route survives the JSON round-trip.
-		json.as_str().xpect_contains("/about");
+		json.as_utf8().unwrap().xpect_contains("/about");
 	}
 }

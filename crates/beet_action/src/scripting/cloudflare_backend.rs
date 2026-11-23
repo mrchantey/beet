@@ -13,7 +13,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::Value as JsonValue;
 
 /// Refuses to evaluate, naming the one supported path.
 ///
@@ -31,7 +30,7 @@ pub(crate) async fn run_cloudflare<Sink>(
 	_request: ScriptRequest,
 	_sink: Sink,
 	_bridge: Option<&WorldBridge>,
-) -> Result<Option<JsonValue>>
+) -> Result<Option<Value>>
 where
 	Sink: FnMut(ConsoleStream, &str),
 {

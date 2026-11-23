@@ -1,8 +1,8 @@
 //! The `beet_ui` BSX front-end: a thin [`DocParser`] that delegates parsing to
 //! the core BSX parser ([`beet_core::bsx`]).
 //!
-//! The grammar, the value model, the `bx:` directives, the `bx:<event>`
-//! lowering, and the AST-to-world resolution all live in `beet_core`; this file
+//! The grammar, the value model, the `bx:` directive rewrites, and the
+//! AST-to-world resolution all live in `beet_core`; this file
 //! only adapts that to the [`DocParsers`] registry. One parser, one grammar:
 //! [`MediaType::Bsx`] parses with BSX features on, [`MediaType::Html`] with them
 //! off (the HTML-only subset), and [`MediaType::Xml`] as XML, building plain

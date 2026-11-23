@@ -96,7 +96,6 @@ impl SceneBody {
 							registry,
 							value,
 						)?,
-						value: value.clone(),
 					}))
 				}
 				Some(registration) => components.push(ComponentSlot::Value(
@@ -454,11 +453,12 @@ mod test {
 		shielded().as_utf8().unwrap().xpect_snapshot();
 	}
 
-	/// Every format round trips through the saver and the loader.
-	#[cfg(all(feature = "ron", feature = "postcard"))]
+	/// Every structured format round trips through the saver and the loader.
+	#[cfg(all(feature = "postcard", feature = "toml"))]
 	#[crate::test]
 	fn round_trips_every_format() {
-		for media_type in [MediaType::Json, MediaType::Ron, MediaType::Postcard]
+		for media_type in
+			[MediaType::Json, MediaType::Postcard, MediaType::Toml]
 		{
 			let mut source = world(true);
 			let root = source
@@ -483,12 +483,13 @@ mod test {
 	}
 
 	/// A body holding a `Value`, an entity reference, a resource and a template
-	/// invocation round trips through json and postcard: the invocation
-	/// expands on load, and a re-save writes it back in place of what it
-	/// expanded to, byte identical.
+	/// invocation spawns the invocation expanded, and a save of that world is
+	/// a snapshot, output only: what the template built and never the
+	/// invocation, so loading the snapshot builds nothing a second time and
+	/// re-saves it byte identical through json and postcard.
 	#[cfg(feature = "postcard")]
 	#[crate::test]
-	fn an_invocation_round_trips_byte_identical() {
+	fn a_snapshot_holds_what_a_template_built() {
 		let badge = "beet_core::template_serde::scene_reflect::test::Badge";
 		let value = "beet_core::types::value::value::Value";
 		let score = "beet_core::template_serde::scene_reflect::test::Score";
@@ -503,22 +504,33 @@ mod test {
 				.save_roots(world, media_type, [root])
 				.unwrap()
 		};
+		// the reference lands on the text child, whatever key it saved under
+		let expect_built = |world: &World, root: Entity| {
+			world.get::<Health>(root).unwrap().xpect_eq(Health(9));
+			world.resource::<Score>().clone().xpect_eq(Score(4));
+			world
+				.entity(root)
+				.get::<Children>()
+				.unwrap()
+				.len()
+				.xpect_eq(2);
+			world
+				.get::<Value>(world.get::<Links>(root).unwrap().first)
+				.unwrap()
+				.xpect_eq(Value::Str("text".into()));
+		};
 		let mut loaded = world(true);
 		let root = load(&mut loaded, &authored);
-		// the invocation expanded: its component and its child
-		loaded.get::<Health>(root).unwrap().xpect_eq(Health(9));
-		loaded.resource::<Score>().clone().xpect_eq(Score(4));
+		expect_built(&loaded, root);
 		let json = save(&mut loaded, root, MediaType::Json);
 		json.as_utf8()
 			.unwrap()
 			.xref()
-			.xpect_contains(badge)
-			.xpect_contains(r#""first":"1""#)
+			.xpect_contains(HEALTH)
+			.xpect_contains("bevy_ecs::name::Name")
 			.xpect_contains(score)
 			.xnot()
-			.xpect_contains(HEALTH)
-			.xnot()
-			.xpect_contains("bevy_ecs::name::Name");
+			.xpect_contains(badge);
 
 		for media_type in [MediaType::Json, MediaType::Postcard] {
 			let bytes = json
@@ -528,10 +540,7 @@ mod test {
 				.unwrap();
 			let mut reloaded = world(true);
 			let root = load(&mut reloaded, &bytes);
-			reloaded.get::<Health>(root).unwrap().xpect_eq(Health(9));
-			let child =
-				reloaded.entity(root).get::<Children>().unwrap().to_vec();
-			child.len().xpect_eq(2);
+			expect_built(&reloaded, root);
 			save(&mut reloaded, root, media_type).xpect_eq(bytes);
 		}
 	}
@@ -552,25 +561,20 @@ mod test {
 			weight: 7,
 		});
 		let bytes = save(&mut source, root, MediaType::Json);
-		let json: serde_json::Value =
-			serde_json::from_str(bytes.as_utf8().unwrap()).unwrap();
-		json["entities"]["0"][LINKS]["first"]
-			.as_str()
+		let scene = bytes.deserialize::<Value>().unwrap();
+		let links = SceneEntities::entity_value(&scene, 0)
 			.unwrap()
-			.xpect_eq("2");
-		json["entities"]["0"][LINKS]["rest"][0]
-			.as_str()
+			.get(LINKS)
+			.unwrap();
+		links.get("first").unwrap().as_str().unwrap().xpect_eq("2");
+		let rest = links.get("rest").unwrap();
+		rest.get_index(0).unwrap().as_str().unwrap().xpect_eq("1");
+		rest.get_index(1).unwrap().as_str().unwrap().xpect_eq("2");
+		links.get("weight").unwrap().as_u64().unwrap().xpect_eq(7);
+		SceneEntities::entity_value(&scene, 1)
 			.unwrap()
-			.xpect_eq("1");
-		json["entities"]["0"][LINKS]["rest"][1]
-			.as_str()
+			.get("bevy_ecs::hierarchy::ChildOf")
 			.unwrap()
-			.xpect_eq("2");
-		json["entities"]["0"][LINKS]["weight"]
-			.as_u64()
-			.unwrap()
-			.xpect_eq(7);
-		json["entities"]["1"]["bevy_ecs::hierarchy::ChildOf"]
 			.as_str()
 			.unwrap()
 			.xpect_eq("0");

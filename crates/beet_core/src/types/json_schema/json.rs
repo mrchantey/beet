@@ -5,6 +5,10 @@ impl From<JsonSchema> for serde_json::Value {
 	fn from(schema: JsonSchema) -> Self { schema.into_inner().into_json() }
 }
 
+impl From<Value> for JsonSchema {
+	fn from(value: Value) -> Self { JsonSchema::from_value(value) }
+}
+
 impl From<serde_json::Value> for JsonSchema {
 	fn from(json: serde_json::Value) -> Self {
 		JsonSchema::from_value(Value::from_json(json))

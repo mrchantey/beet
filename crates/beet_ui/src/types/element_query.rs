@@ -19,8 +19,9 @@ pub struct ElementQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	attributes: Query<'w, 's, (Entity, &'static Attribute, &'static Value)>,
 	values: Query<'w, 's, &'static Value, Without<Element>>,
-	/// Scripts, behaviour rather than content, so never an element's text.
-	scripts: Query<'w, 's, (), With<RunScript>>,
+	/// What renders, so never a script nor a held or disabled entity, which
+	/// Bevy's default filters leave out.
+	shown: Query<'w, 's, (), Without<NotRendered>>,
 	/// An element's own value, read for the form controls that display it.
 	control_values: Query<'w, 's, &'static Value, With<Element>>,
 	/// Used by descendant traversal — picks up `Children` regardless of whether
@@ -50,16 +51,15 @@ impl ElementQuery<'_, '_> {
 	}
 
 	/// The [`Value`] of the sole child when present, ie the text content
-	/// of an element whose only child is a text node, its scripts (a
-	/// `bx:<event>` handler) not counted.
+	/// of an element whose only child is a text node, what never renders (a
+	/// `bx:onclick` handler) not counted.
 	fn collect_inner_text(
 		&self,
 		children: Option<&Children>,
 	) -> Option<(Entity, &Value)> {
 		let children = children?;
-		let mut iter = children
-			.iter()
-			.filter(|child| !self.scripts.contains(*child));
+		let mut iter =
+			children.iter().filter(|child| self.shown.contains(*child));
 		let only_child = iter.next()?;
 		if iter.next().is_some() {
 			return None;

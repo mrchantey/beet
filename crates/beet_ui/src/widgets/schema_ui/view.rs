@@ -565,7 +565,7 @@ mod test {
 	}
 
 	/// A reference resolves against the registry and lays out the schema it
-	/// names, which is what lets a data document composing
+	/// names, which is what lets a state document composing
 	/// `List(Reference("TodoItem"))` still generate a real table.
 	#[beet_core::test]
 	fn a_reference_resolves_through_the_registry() {

@@ -1271,8 +1271,8 @@ impl LightsailBlock {
 		config.add_untyped_resource(
 			"terraform_data",
 			&roll_label,
-			&json!({
-				"input": Self::machine_config_hash(&user_data)
+			&value!({
+				"input": (Self::machine_config_hash(&user_data))
 			}),
 		)?;
 
@@ -1407,8 +1407,8 @@ impl LightsailBlock {
 				config.set_lifecycle(
 					"aws_iam_access_key",
 					access_key.ident().label(),
-					json!({
-						"replace_triggered_by": [format!("terraform_data.{roll_label}")]
+					value!({
+						"replace_triggered_by": [(format!("terraform_data.{roll_label}"))]
 					}),
 				)
 			})?
@@ -1427,8 +1427,8 @@ impl LightsailBlock {
 				config.set_lifecycle(
 					"aws_lightsail_instance_public_ports",
 					ports.ident().label(),
-					json!({
-						"replace_triggered_by": [instance.field("id")]
+					value!({
+						"replace_triggered_by": [(instance.field("id"))]
 					}),
 				)
 			})?;
@@ -1458,8 +1458,8 @@ impl LightsailBlock {
 				config.set_lifecycle(
 					"aws_lightsail_static_ip_attachment",
 					ip_attach.ident().label(),
-					json!({
-						"replace_triggered_by": [instance.field("id")]
+					value!({
+						"replace_triggered_by": [(instance.field("id"))]
 					}),
 				)?;
 				self.emit_dns(
@@ -1612,8 +1612,7 @@ mod tests {
 			.resource_ident(block.build_label("key-rotation"))
 			.label()
 			.to_string();
-		let json = scope.finish().unwrap().2.to_json_string().unwrap();
-		serde_json::from_str::<serde_json::Value>(&json).unwrap()["resource"]
+		scope.finish().unwrap().2.to_json().into_json()["resource"]
 			["terraform_data"][label]["input"]
 			.as_str()
 			.unwrap()
@@ -1731,8 +1730,7 @@ mod tests {
 			.resource_ident(block.build_label("instance"))
 			.label()
 			.to_string();
-		let json = scope.finish().unwrap().2.to_json_string().unwrap();
-		let config: serde_json::Value = serde_json::from_str(&json).unwrap();
+		let config = scope.finish().unwrap().2.to_json().into_json();
 		let ports = &config["resource"]["aws_lightsail_instance_public_ports"]
 			[&ports_label];
 		ports["lifecycle"]["replace_triggered_by"][0]
@@ -1769,8 +1767,7 @@ mod tests {
 			.resource_ident(block.build_label("logs"))
 			.label()
 			.to_string();
-		let json = scope.finish().unwrap().2.to_json_string().unwrap();
-		let config: serde_json::Value = serde_json::from_str(&json).unwrap();
+		let config = scope.finish().unwrap().2.to_json().into_json();
 		config["resource"]["aws_lightsail_instance"][&instance_label]
 			["depends_on"][0]
 			.as_str()
@@ -1802,8 +1799,9 @@ mod tests {
 			.resource_ident(block.build_label("logs"))
 			.label()
 			.to_string();
-		let json = scope.finish().unwrap().2.to_json_string().unwrap();
-		let config: serde_json::Value = serde_json::from_str(&json).unwrap();
+		let rendered = scope.finish().unwrap().2;
+		let json = rendered.to_json_string().unwrap();
+		let config = rendered.to_json().into_json();
 		config["resource"]["aws_cloudwatch_log_group"][&logs_label]
 			["retention_in_days"]
 			.as_i64()

@@ -16,8 +16,8 @@
 //! not track it for us), and the reflect-serde read only runs for
 //! actually-changed resources.
 //!
-//! Gated behind `json` like [`ReflectFieldRef`]: the `Value`-field bridge goes
-//! through serde.
+//! Gated behind `serde` like [`ReflectFieldRef`]: the `Value`-field bridge goes
+//! through reflect serde.
 
 use crate::prelude::*;
 use bevy::ecs::component::ComponentId;

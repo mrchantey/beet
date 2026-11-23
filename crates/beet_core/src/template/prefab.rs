@@ -4,21 +4,22 @@ use bevy::ecs::component::ComponentId;
 use bevy::ecs::entity::EntityCloner;
 use bevy::ecs::entity::EntityHashMap;
 
-/// The root of a prefab: a subtree held [`Disabled`] as a template and
-/// cloned under each use site with Bevy's entity cloning
-/// ([`clone_under`](Self::clone_under)), never built again. Each use has its
-/// own entities, state and input target.
+/// The root of a prefab: a subtree held as a template and cloned under each
+/// use site with Bevy's entity cloning ([`clone_under`](Self::clone_under)),
+/// never built again. Each use has its own entities, state and input target.
+/// In markup a prefab is HTML's `<template>`.
 ///
-/// The whole subtree is held [`Disabled`] ([`hold`](Self::hold)), so nothing
-/// of it shows or runs where it is held: no render walks it and no system
-/// binds it. The marker holds its subtree once the spawn adding it settles,
-/// a builder that spawns the subtree in steps holds it when done, and a body
-/// load holds every prefab it spawned. `Disabled` is derived state, never
-/// saved: a prefab that is content, the item template of a
-/// [`ReactiveChildren`], saves as this marker and its subtree.
+/// The whole subtree is [`Held`] ([`hold`](Self::hold)), so nothing of it
+/// shows or runs where it is held: no render walks it and no system binds
+/// it. The marker holds its subtree once the spawn adding it settles, a
+/// builder that spawns the subtree in steps holds it when done, and a body
+/// load holds every prefab it spawned. A prefab that is content, the
+/// `<template>` of a [`ReactiveChildren`], saves as this marker and its
+/// subtree, and an authored [`Disabled`] within it saves and clones as the
+/// content it is.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(Disabled)]
+#[require(Held)]
 #[component(on_add = hook_ext::entity_hook(|entity| {
 	entity.queue(|entity: EntityWorldMut| {
 		let prefab = entity.id();
@@ -26,6 +27,25 @@ use bevy::ecs::entity::EntityHashMap;
 	});
 }))]
 pub struct Prefab;
+
+/// Holds an entity under a [`Prefab`]: a disabling component beside Bevy's
+/// [`Disabled`], so a query skips a held entity unless it names `Held`.
+/// Installed by type, `app.install_type::<Held>()`, by every plugin a prefab
+/// may appear under, before any query is built. Never reflected, so never
+/// saved: a load holds each prefab it spawns again, and a clone never carries
+/// it.
+///
+/// Distinct from [`Disabled`], which is content an author writes and a save
+/// keeps, so `Held` never brings `Disabled` with it.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Component)]
+pub struct Held;
+
+/// Registers `Held` as a disabling component, idempotently.
+impl TypeInstaller for Held {
+	fn install(app: &mut App) {
+		app.world_mut().register_disabling_component::<Self>();
+	}
+}
 
 /// What [`Prefab::clone_under`] spawned.
 #[derive(Debug, Clone)]
@@ -40,9 +60,8 @@ pub struct PrefabClone {
 impl Prefab {
 	/// Clone the prefab rooted at `prefab` under `target`, its root the
 	/// clone's root and every entity reference within it remapped to the
-	/// clone, so two clones share nothing. The clone is enabled, carrying
-	/// neither [`Prefab`] nor [`Disabled`], and lands after `target`'s
-	/// existing children.
+	/// clone, so two clones share nothing. The clone carries neither
+	/// [`Prefab`] nor [`Held`], and lands after `target`'s existing children.
 	///
 	/// `use_site` is inserted on the clone's root before anything is cloned,
 	/// so every hook the clone runs already sees it, ie a row's
@@ -85,7 +104,7 @@ impl Prefab {
 			let mut builder = EntityCloner::build_opt_out(world);
 			// the hierarchy rebuilds from each clone's `ChildOf`, in tree order
 			builder
-				.deny::<(Self, Disabled, Children, TemplateEntityMap)>()
+				.deny::<(Self, Held, Children, TemplateEntityMap)>()
 				.deny_by_ids(derived);
 			builder.finish()
 		};
@@ -123,11 +142,11 @@ impl Prefab {
 			.collect()
 	}
 
-	/// Hold every entity under the prefab [`Disabled`] beside its root, once
-	/// its subtree is built, so no system binds or renders the template.
+	/// Hold every entity under the prefab [`Held`] beside its root, once its
+	/// subtree is built, so no system binds or renders the template.
 	pub fn hold(world: &mut World, prefab: Entity) {
 		for entity in Self::subtree(world, prefab) {
-			world.entity_mut(entity).insert(Disabled);
+			world.entity_mut(entity).insert(Held);
 		}
 	}
 
@@ -171,7 +190,7 @@ mod test {
 
 	#[crate::test]
 	fn clones_are_independent_and_remapped() {
-		let mut world = World::new();
+		let mut world = TemplatePlugin::world();
 		let prefab = prefab(&mut world);
 		Prefab::hold(&mut world, prefab);
 		let (first, second) =
@@ -182,14 +201,11 @@ mod test {
 		for (clone, target) in clones.iter().zip([first, second]) {
 			let root = world.entity(clone.root);
 			root.get::<ChildOf>().unwrap().parent().xpect_eq(target);
-			root.contains::<Disabled>().xpect_false();
+			root.contains::<Held>().xpect_false();
 			root.contains::<Prefab>().xpect_false();
 			let children = root.get::<Children>().unwrap().to_vec();
 			children.len().xpect_eq(2);
-			world
-				.entity(children[0])
-				.contains::<Disabled>()
-				.xpect_false();
+			world.entity(children[0]).contains::<Held>().xpect_false();
 			// the reference lands on this clone's sibling, not the prefab's
 			world
 				.get::<Points>(children[1])
@@ -201,7 +217,28 @@ mod test {
 		}
 		(clones[0].root == clones[1].root).xpect_false();
 		// the prefab itself is untouched and still held
-		world.entity(prefab).contains::<Disabled>().xpect_true();
+		world.entity(prefab).contains::<Held>().xpect_true();
+	}
+
+	/// An authored `Disabled` is content: a held query skips it as it skips
+	/// the held subtree, and a clone keeps it where the clone drops `Held`.
+	#[crate::test]
+	fn held_is_not_disabled() {
+		let mut world = TemplatePlugin::world();
+		let prefab = world.spawn(Prefab).id();
+		let off = world
+			.spawn((Name::new("off"), Disabled, ChildOf(prefab)))
+			.id();
+		Prefab::hold(&mut world, prefab);
+		world.entity(prefab).contains::<Disabled>().xpect_false();
+		world.query::<&Name>().iter(&world).count().xpect_eq(0);
+		world.entity(off).contains::<Held>().xpect_true();
+		let target = world.spawn_empty().id();
+		let clone =
+			Prefab::clone_under(&mut world, prefab, target, ()).unwrap();
+		let child = world.entity(clone.root).get::<Children>().unwrap()[0];
+		world.entity(child).contains::<Disabled>().xpect_true();
+		world.entity(child).contains::<Held>().xpect_false();
 	}
 
 	/// A row a nested generator made under the prefab is not cloned.
@@ -214,5 +251,40 @@ mod test {
 		let clone =
 			Prefab::clone_under(&mut world, prefab, target, ()).unwrap();
 		world.entity(clone.root).get::<Children>().xpect_none();
+	}
+
+	/// An authored `Disabled` is content a save keeps, where `Held` is never
+	/// written and a load holds the prefab again.
+	#[cfg(feature = "json")]
+	#[crate::test]
+	fn disabled_saves_and_held_does_not() {
+		let new_world = || <(TemplatePlugin, MinimalTypesPlugin)>::world();
+		let mut world = new_world();
+		let root = world.spawn(Name::new("root")).id();
+		world.spawn((Name::new("off"), Disabled, ChildOf(root)));
+		let prefab = world.spawn((Prefab, ChildOf(root))).id();
+		world.spawn((Name::new("held"), ChildOf(prefab)));
+		world.flush();
+		let bytes = TemplateSaver::new()
+			.save_roots(&mut world, MediaType::Json, [root])
+			.unwrap();
+		bytes
+			.as_utf8()
+			.unwrap()
+			.xref()
+			.xpect_contains("Disabled")
+			.xpect_contains("Prefab")
+			.xnot()
+			.xpect_contains("Held");
+		let mut loaded = new_world();
+		let root = TemplateLoader::new(&mut loaded).load(&bytes).unwrap()[0];
+		loaded.flush();
+		let children = loaded.entity(root).get::<Children>().unwrap().to_vec();
+		loaded
+			.entity(children[0])
+			.contains::<Disabled>()
+			.xpect_true();
+		let held = loaded.entity(children[1]).get::<Children>().unwrap()[0];
+		loaded.entity(held).contains::<Held>().xpect_true();
 	}
 }

@@ -326,7 +326,7 @@ mod test_request {
 	async fn post_json_works() {
 		let server = EchoHttpServer::new().await;
 		Request::post(server.url().clone().push("post"))
-			.with_json_body(&serde_json::json!({"foo": "bar"}))
+			.with_json_body(&value!({"foo": "bar"}))
 			.unwrap()
 			.send()
 			.await
@@ -477,10 +477,10 @@ mod test_response {
 	#[beet_core::test]
 	async fn post() {
 		let server = EchoHttpServer::new().await;
-		let original = serde_json::json!({"foo": "bar"});
 		let resp: EchoResponse =
 			Request::post(server.url().clone().push("post"))
-				.with_body(original.to_string())
+				.with_json_body(&value!({"foo": "bar"}))
+				.unwrap()
 				.send()
 				.await
 				.unwrap()

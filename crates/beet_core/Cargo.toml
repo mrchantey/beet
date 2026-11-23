@@ -83,7 +83,6 @@ std = [
 	"tracing/std",
 	"serde?/std",
 	"serde_json?/std",
-	"ron?/std",
 	"futures-lite/race",
 	# the async bridge is std-independent, but every std build wants it
 	"bevy_async",
@@ -157,8 +156,8 @@ bevy_color = ["bevy/bevy_color"]
 # loading. The no_std core stays asset-free; removing this leaves a fully
 # functional asset-free substrate where `Ready` fires immediately.
 bevy_asset = ["bevy/bevy_asset"]
-# no_std base serialization support. Heavier format crates (`ron`,
-# `serde_plain`, json, postcard) are opt-in via their own features.
+# no_std base serialization support. Heavier format crates (`serde_plain`,
+# json, postcard, toml) are opt-in via their own features.
 serde = [
 	"bevy/serialize",
 	"dep:serde",
@@ -168,8 +167,6 @@ serde = [
 	# `MediaBytes` serializes its shared buffer as a byte string
 	"bytes/serde",
 ]
-# RON text format, used by `MediaType::Ron` and `template_serde` loading.
-ron = ["serde", "dep:ron"]
 # Plaintext (de)serialization for `MediaType::Text` via serde_plain.
 serde_plain = ["serde", "dep:serde_plain"]
 json = ["serde", "dep:serde_json"]
@@ -237,7 +234,8 @@ rsx = ["beet_core_macros/rsx"]
 # a lot of code: an ultra-minimal build can drop it and keep the serde
 # front-ends. The parser is no_std-capable; `register_dir` is additionally
 # `fs`-gated, remote fetch `bevy_async`-gated, and JSON schemas `json`-gated.
-bsx = ["serde"]
+# Its directive set travels in the format registry, `template_serde`'s.
+bsx = ["template_serde"]
 
 
 [dependencies]
@@ -277,7 +275,6 @@ serde = { workspace = true, optional = true, features = ["alloc", "rc"] }
 serde_plain = {workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
-ron = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
 # canonical DAG-CBOR, hand rolling being where map ordering and tag 42 go
 # subtly wrong (`dag_cbor`)

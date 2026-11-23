@@ -163,7 +163,8 @@ pub(crate) fn resolve_styles(
 	// inheritance cache friendly parallelism, top down queue,
 	// as described in stylo https://youtu.be/Y6SSTRr2mFU?t=310
 	// a root walked up from a node under a held prefab is the held entity
-	// itself, which no style query matches and nothing renders
+	// itself, which Bevy's default filters leave out of every style query,
+	// as they do an authored `Disabled` one, and nothing renders
 	let mut queue = roots
 		.into_iter()
 		.map(|root| tree.resolve(root))

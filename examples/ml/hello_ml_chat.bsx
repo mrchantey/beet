@@ -10,7 +10,7 @@ A terminal chat where each typed sentence is bert-matched against the child `<Se
 	<AppWindow/>
 	<Camera2d/>
 	<UiTerminal input=true/>
-	<ChatSentenceAgent src="ml/default-bert.ron">
+	<ChatSentenceAgent src="ml/default.bert.json">
 		<SentenceOption text="heal"/>
 		<SentenceOption text="attack"/>
 	</ChatSentenceAgent>

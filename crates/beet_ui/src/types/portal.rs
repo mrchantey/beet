@@ -67,10 +67,11 @@ impl PortalOf {
 /// Neither [`ChildOf`] nor [`Portal`] admits a self-referential edge, so the
 /// upward walk always terminates.
 ///
-/// A [`RunScript`] child is behaviour rather than content, and a
-/// [`Disabled`] one is held, ie a [`Prefab`] template, so the downward walk
-/// never yields either or its subtree: a `bx:click` handler under a button
-/// renders as nothing, and so does a list's item template. The tags a text walk skips are owned here too:
+/// The downward walk yields only what is shown: never a [`NotRendered`] entity
+/// (a script beet runs, ie a `bx:onclick` handler under a button) nor one
+/// Bevy's default query filters leave out, a [`Held`] prefab subtree (a list's
+/// `<template>`) or an authored [`Disabled`] entity, nor the subtree of
+/// either. The tags a text walk skips are owned here too:
 /// [`is_textless`](Self::is_textless).
 #[derive(SystemParam)]
 pub struct RenderTreeQuery<'w, 's> {
@@ -78,7 +79,9 @@ pub struct RenderTreeQuery<'w, 's> {
 	parents: Query<'w, 's, &'static ChildOf>,
 	portals: Query<'w, 's, &'static Portal>,
 	holders: Query<'w, 's, &'static PortalOf>,
-	hidden: Query<'w, 's, (), Or<(With<RunScript>, With<Disabled>)>>,
+	/// Kept to Bevy's default filters, which leave out a held or disabled
+	/// entity.
+	shown: Query<'w, 's, (), Without<NotRendered>>,
 }
 
 impl RenderTreeQuery<'_, '_> {
@@ -123,7 +126,7 @@ impl RenderTreeQuery<'_, '_> {
 			.get(self.resolve(entity))
 			.into_iter()
 			.flat_map(|children| children.iter())
-			.filter(|child| !self.hidden.contains(*child))
+			.filter(|child| self.shown.contains(*child))
 			.map(|child| self.resolve(child))
 	}
 

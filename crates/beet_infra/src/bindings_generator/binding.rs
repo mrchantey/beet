@@ -1069,7 +1069,7 @@ mod test {
 	/// (plugin-framework style) holding a `single` nested object, a cty
 	/// `object` with optional attribute names, and a cty list-of-object.
 	fn nested_schema() -> TerraformSchemaExport {
-		serde_json::from_value(serde_json::json!({
+		value!({
 			"format_version": "1.0",
 			"provider_schemas": {
 				"registry.opentofu.org/cloudflare/cloudflare": {
@@ -1112,7 +1112,8 @@ mod test {
 					}
 				}
 			}
-		}))
+		})
+		.into_serde::<TerraformSchemaExport>()
 		.unwrap()
 	}
 
@@ -1307,44 +1308,44 @@ mod test {
 	/// changed (this is what made a regeneration machine-dependent).
 	#[beet_core::test]
 	fn field_docs_resolve_own_container() {
-		let schema: TerraformSchemaExport =
-			serde_json::from_value(serde_json::json!({
-				"format_version": "1.0",
-				"provider_schemas": {
-					"registry.opentofu.org/hashicorp/aws": {
-						"provider": { "version": 0, "block": { "attributes": {} } },
-						"resource_schemas": {
-							"test_res_a": {
-								"version": 0,
-								"block": {
-									"attributes": {
-										"shared": { "type": "string", "required": true }
-									},
-									"block_types": {
-										"inline": {
-											"nesting_mode": "list",
-											"block": {
-												"attributes": {
-													"shared": { "type": "string", "optional": true }
-												}
+		let schema = value!({
+			"format_version": "1.0",
+			"provider_schemas": {
+				"registry.opentofu.org/hashicorp/aws": {
+					"provider": { "version": 0, "block": { "attributes": {} } },
+					"resource_schemas": {
+						"test_res_a": {
+							"version": 0,
+							"block": {
+								"attributes": {
+									"shared": { "type": "string", "required": true }
+								},
+								"block_types": {
+									"inline": {
+										"nesting_mode": "list",
+										"block": {
+											"attributes": {
+												"shared": { "type": "string", "optional": true }
 											}
 										}
 									}
 								}
-							},
-							"test_res_b": {
-								"version": 0,
-								"block": {
-									"attributes": {
-										"shared": { "type": "string", "optional": true, "computed": true }
-									}
+							}
+						},
+						"test_res_b": {
+							"version": 0,
+							"block": {
+								"attributes": {
+									"shared": { "type": "string", "optional": true, "computed": true }
 								}
 							}
 						}
 					}
 				}
-			}))
-			.unwrap();
+			}
+		})
+		.into_serde::<TerraformSchemaExport>()
+		.unwrap();
 		let filter = terra::ResourceFilter::default().with_resources(
 			"registry.opentofu.org/hashicorp/aws",
 			&["test_res_a".to_string(), "test_res_b".to_string()],

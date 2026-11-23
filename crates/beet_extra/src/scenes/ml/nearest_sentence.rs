@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 
 /// A sentence-matching agent: a prompt [`Sentence`] plus a [`BertHandle`] over a
 /// [`Bert`] model, eg `<NearestSentenceAgent prompt="please kill the baddies"
-/// src="ml/default-bert.ron"><SentenceOption text="heal"/><SentenceOption text="attack"/>
+/// src="ml/default.bert.json"><SentenceOption text="heal"/><SentenceOption text="attack"/>
 /// </NearestSentenceAgent>`. The candidate sentences are children (via `<Slot/>`);
 /// `Handle<Bert>` is minted through the deferred [`BuildAssets`] path because a handle
 /// is not a markup value, so `Ready` waits for the model. [`CallOnReady`] then

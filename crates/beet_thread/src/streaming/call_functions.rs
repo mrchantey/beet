@@ -83,7 +83,9 @@ async fn call_function(
 					body
 				} else {
 					// Wrap non-JSON responses as a JSON string value
-					serde_json::to_string(&body).unwrap_or(body)
+					MediaBytes::serialize(MediaType::Json, &body)
+						.and_then(|bytes| bytes.as_utf8().map(str::to_string))
+						.unwrap_or(body)
 				}
 			}
 			Err(err) => {

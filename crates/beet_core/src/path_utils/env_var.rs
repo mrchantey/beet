@@ -114,23 +114,24 @@ mod test {
 		var.value().xpect_eq("test_value");
 
 		// serializes as just the key string
-		let json = serde_json::to_string(&var).unwrap();
-		json.xpect_eq("\"BEET_TEST_ENV_VAR\"");
+		let bytes = MediaBytes::serialize(MediaType::Json, &var).unwrap();
+		bytes.as_utf8().unwrap().xpect_eq("\"BEET_TEST_ENV_VAR\"");
 
 		// deserializes by resolving the env var
-		let roundtripped: EnvVar = serde_json::from_str(&json).unwrap();
+		let roundtripped = bytes.deserialize::<EnvVar>().unwrap();
 		roundtripped.key().xpect_eq("BEET_TEST_ENV_VAR");
 		roundtripped.value().xpect_eq("test_value");
 	}
 
 	#[crate::test]
 	fn deserialize_missing_var_errors() {
-		serde_json::from_str::<EnvVar>("\"BEET_NONEXISTENT_VAR_XYZ\"")
+		MediaType::Json
+			.deserialize::<EnvVar>(b"\"BEET_NONEXISTENT_VAR_XYZ\"")
 			.unwrap_err();
 	}
 }
 
-#[cfg(all(test, feature = "ron"))]
+#[cfg(all(test, feature = "serde"))]
 #[cfg(not(target_arch = "wasm32"))]
 mod reflect_test {
 	use super::*;
@@ -165,13 +166,13 @@ mod reflect_test {
 		// serde::Serialize impl, outputting just the key string.
 		let serializer =
 			ReflectSerializer::new(var.as_partial_reflect(), &registry);
-		let serialized = ron::to_string(&serializer).unwrap();
+		let serialized = Value::from_serde(&serializer).unwrap();
 
 		// Deserialize: ReflectDeserializer finds ReflectDeserialize and calls
 		// our serde::Deserialize impl, which resolves the value from the env.
 		let reflect_deserializer = ReflectDeserializer::new(&registry);
 		let deserialized = reflect_deserializer
-			.deserialize(&mut ron::Deserializer::from_str(&serialized).unwrap())
+			.deserialize(ValueDeserializer::new(serialized))
 			.unwrap();
 
 		// from_reflect: downcasts the concrete EnvVar returned by

@@ -41,7 +41,7 @@ const COUNTER_BSX: &str = r#"
 <article bx:scope="counter">
 	<widgets::Card title="Counter">
 		<p>You have clicked {@doc:count=0} times.</p>
-		<button bx:click="target.with_field('count', count => count + 1)">More</button>
+		<button bx:onclick="target.with_field('count', count => count + 1)">More</button>
 	</widgets::Card>
 </article>
 "#;
@@ -325,9 +325,9 @@ async fn counter_page_renders_its_bindings() {
 		.xpect_contains("<h2>Counter</h2>")
 		// the scoped `@doc:count=0` init paints its value
 		.xpect_contains("You have clicked 0 times.")
-		// the `bx:click` script is a directive, never an emitted html attribute
+		// the `bx:onclick` script is a directive, never an emitted html attribute
 		.xnot()
-		.xpect_contains("bx:click");
+		.xpect_contains("bx:onclick");
 	// exactly one og:site_name: the default head owns it, no duplicate.
 	html.matches("og:site_name").count().xpect_eq(1);
 }

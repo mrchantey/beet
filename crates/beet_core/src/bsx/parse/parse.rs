@@ -81,9 +81,9 @@ pub(super) const VOID_ELEMENTS: &[&str] = &[
 	"param", "source", "track", "wbr",
 ];
 
-/// Elements whose content is raw text up to their closing tag: HTML's, and a
-/// [`RunScript`](crate::prelude::RunScript), whose body is its source.
-const RAW_TEXT_ELEMENTS: &[&str] = &["script", "style", "RunScript"];
+/// Elements whose content is raw text up to their closing tag, HTML's own:
+/// a `<script {RunScript}>`'s body is its source.
+const RAW_TEXT_ELEMENTS: &[&str] = &["script", "style"];
 
 impl BsxNode {
 	/// Parse a full document into a flat list of root nodes.
@@ -466,9 +466,6 @@ fn parse_attribute(
 	cursor: &mut Cursor,
 	config: &BsxParseConfig,
 ) -> Result<BsxAttribute> {
-	// the source position of the key, mapped onto the minted inline class for a
-	// `bx:style` directive (the markup twin of `inline_class!`'s callsite).
-	let key_offset = cursor.offset();
 	let key = cursor
 		.take_while(|ch| is_attr_key_char(ch) || (config.is_xml() && ch == '.'))
 		.to_string();
@@ -486,23 +483,6 @@ fn parse_attribute(
 		});
 	}
 	cursor.skip_ws();
-	// `bx:style="prop=value .."` declares a one-off rule; its value is parsed
-	// downstream where the style types live, so keep the raw text plus the source
-	// span (for a stable inline class).
-	if config.is_bsx() && key == "bx:style" {
-		let source = parse_attr_string(cursor)?;
-		return Ok(BsxAttribute {
-			key,
-			value: AttrValue::Style {
-				source: source.into(),
-				span: FileSpan::new(
-					"bsx",
-					cursor.line_col(key_offset),
-					cursor.line_col(cursor.offset()),
-				),
-			},
-		});
-	}
 	let value = match cursor.peek() {
 		Some('"' | '\'') => {
 			let written = parse_attr_string(cursor)?;

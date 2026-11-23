@@ -209,11 +209,14 @@ mod test {
 	#[cfg(feature = "json")]
 	fn serde_roundtrip() {
 		let original = RelPath::new("hello/world");
-		serde_json::to_string(&original)
+		MediaBytes::serialize(MediaType::Json, &original)
+			.unwrap()
+			.as_utf8()
 			.unwrap()
 			.xpect_eq("\"hello/world\"");
-		let deserialized: RelPath =
-			serde_json::from_str("\"/hello/world\"").unwrap();
-		original.xpect_eq(deserialized);
+		MediaType::Json
+			.deserialize::<RelPath>(b"\"/hello/world\"")
+			.unwrap()
+			.xpect_eq(original);
 	}
 }

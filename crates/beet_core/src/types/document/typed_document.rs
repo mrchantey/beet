@@ -33,7 +33,7 @@ pub struct TypedDocument {
 }
 
 impl TypedDocument {
-	/// Declare a data document from a schema and its value.
+	/// Declare a state document from a schema and its value.
 	pub fn new(schema: ValueSchema, value: Value) -> Self {
 		Self { schema, value }
 	}
@@ -77,35 +77,38 @@ impl TypedDocument {
 		self.value.clone().into_serde()
 	}
 
-	/// The components a data document lands on an entity as.
+	/// The components a state document lands on an entity as.
 	pub fn bundle(self) -> impl Bundle {
 		(Document::new(self.value), DocumentSchema(self.schema))
 	}
 
-	/// Read a data document from JSON, validating it against its own schema.
+	/// Read a state document from `bytes` in the format their media type names,
+	/// validating it against its own schema.
 	///
 	/// Validating here rather than leaving it to the caller is the read
 	/// backstop: a document that diverged outside the editor must fail loudly
 	/// at the moment it is read, naming `subject` and the offending field, so
 	/// no reading path can quietly accept data its schema rejects.
-	#[cfg(feature = "json")]
+	#[cfg(feature = "serde")]
 	pub async fn read(
 		resolver: SchemaResolver<'_>,
 		subject: &str,
-		json: &str,
+		bytes: &MediaBytes,
 	) -> Result<Self> {
-		let mut document: Self = serde_json::from_str(json)?;
+		let mut document: Self = bytes.deserialize()?;
 		document.assert_valid(resolver, subject).await?;
 		document.xok()
 	}
 
-	/// Serialize to JSON.
+	/// Serialize as `media_type`, pretty where the format has a pretty form.
 	///
 	/// Byte-deterministic: [`Map`] emits its keys sorted, so an unchanged
 	/// document reopens and re-saves byte-identically.
-	#[cfg(feature = "json")]
-	pub fn to_json(&self) -> Result<String> {
-		serde_json::to_string_pretty(self).map_err(Into::into)
+	#[cfg(feature = "serde")]
+	pub fn to_bytes(&self, media_type: MediaType) -> Result<MediaBytes> {
+		MediaBytes::serialize_with_options(media_type, self, SerializeOptions {
+			pretty: true,
+		})
 	}
 
 	/// Validate the value against its schema, naming `subject` on failure.
@@ -122,7 +125,7 @@ impl TypedDocument {
 			.await
 	}
 
-	/// Evolve this data document under a new `schema` for `declaration`, the
+	/// Evolve this state document under a new `schema` for `declaration`, the
 	/// schema document it names.
 	///
 	/// Item 21's commit at document scope: the new schema and every backfill it
@@ -132,7 +135,7 @@ impl TypedDocument {
 	/// schema is a Rust type is refused: a type changes by rebuilding the
 	/// binary, not by an editor.
 	///
-	/// The data document's own declaration is not rewritten, because it names
+	/// The state document's own declaration is not rewritten, because it names
 	/// *where* its schema lives and that does not move when the schema changes.
 	/// The one exception is a document that inlines the very schema being
 	/// committed, which has no separate declaration to point at.
@@ -197,12 +200,17 @@ impl TypedDocument {
 mod test {
 	use crate::prelude::*;
 
-	/// Read `json` as `"todos.json"`, the subject every test here names.
-	async fn read(resolver: SchemaResolver<'_>, json: &str) -> TypedDocument {
-		TypedDocument::read(resolver, "todos.json", json)
+	/// Read `bytes` as `"todos.json"`, the subject every test here names.
+	async fn read(
+		resolver: SchemaResolver<'_>,
+		bytes: &MediaBytes,
+	) -> TypedDocument {
+		TypedDocument::read(resolver, "todos.json", bytes)
 			.await
 			.unwrap()
 	}
+
+	fn todo_document() -> MediaBytes { MediaBytes::new_json(todo_json()) }
 
 	fn todo_json() -> &'static str {
 		r#"{
@@ -239,13 +247,16 @@ mod test {
 	#[crate::test]
 	async fn round_trips_byte_identically() {
 		let resolver = SchemaResolver::default();
-		let json = read(resolver, todo_json()).await.to_json().unwrap();
-		// a reopen of the re-serialized bytes produces the same bytes again
-		read(resolver, &json)
+		let bytes = read(resolver, &todo_document())
 			.await
-			.to_json()
+			.to_bytes(MediaType::Json)
+			.unwrap();
+		// a reopen of the re-serialized bytes produces the same bytes again
+		read(resolver, &bytes)
+			.await
+			.to_bytes(MediaType::Json)
 			.unwrap()
-			.xpect_eq(json);
+			.xpect_eq(bytes);
 	}
 
 	/// The read backstop: a document whose value lost a required field fails at
@@ -255,7 +266,9 @@ mod test {
 		TypedDocument::read(
 			SchemaResolver::default(),
 			"todos.json",
-			&todo_json().replace(r#"{ "label": "buy milk" }"#, "{}"),
+			&MediaBytes::new_json(
+				todo_json().replace(r#"{ "label": "buy milk" }"#, "{}"),
+			),
 		)
 		.await
 		.unwrap_err()
@@ -286,7 +299,7 @@ mod test {
 	#[crate::test]
 	async fn value_lands_as_a_document_pair() {
 		let mut world = DocumentPlugin::world();
-		let document = read(SchemaResolver::default(), todo_json()).await;
+		let document = read(SchemaResolver::default(), &todo_document()).await;
 		let entity = world.spawn(document.bundle()).id();
 		world
 			.entity(entity)
@@ -307,7 +320,7 @@ mod test {
 	async fn the_pair_is_expressible_in_the_schema_language() {
 		let registry = SchemaRegistry::default();
 		let resolver = SchemaResolver::default().with_schemas(&registry);
-		let mut document = serde_json::from_str::<Value>(todo_json()).unwrap();
+		let mut document = todo_document().deserialize::<Value>().unwrap();
 		TypedDocument::describing_schema()
 			.assert_valid_in(resolver, "todos.json", &mut document)
 			.await
@@ -315,9 +328,10 @@ mod test {
 
 		// and a value its own declared schema rejects fails the same walk,
 		// naming the field, with nothing hardcoded about the pair
-		let mut diverged = serde_json::from_str::<Value>(
-			&todo_json().replace(r#""label": "buy milk""#, r#""label": 7"#),
+		let mut diverged = MediaBytes::new_json(
+			todo_json().replace(r#""label": "buy milk""#, r#""label": 7"#),
 		)
+		.deserialize::<Value>()
 		.unwrap();
 		TypedDocument::describing_schema()
 			.assert_valid_in(resolver, "todos.json", &mut diverged)
@@ -341,13 +355,13 @@ mod test {
 			.unwrap();
 		document.to_schema().unwrap().xpect_eq(schema);
 		// and it survives the json round trip the editor saves through
-		read(resolver, &document.to_json().unwrap())
+		read(resolver, &document.to_bytes(MediaType::Json).unwrap())
 			.await
 			.xpect_eq(document);
 	}
 
 	/// The acceptance loop of item 3 at the data layer: add a bool field to the
-	/// schema document, and the data document's rows grow the column.
+	/// schema document, and the state document's rows grow the column.
 	#[crate::test]
 	async fn a_schema_edit_evolves_both_documents() {
 		let registry = SchemaRegistry::default();
@@ -389,8 +403,8 @@ mod test {
 	}
 
 	/// The todo app's own shape: the schema document holds the *row* schema and
-	/// the data document only composes it by reference, so a schema edit
-	/// backfills every row while the data document's declaration stays put.
+	/// the state document only composes it by reference, so a schema edit
+	/// backfills every row while the state document's declaration stays put.
 	#[crate::test]
 	async fn a_row_schema_edit_backfills_every_row() {
 		let mut registry = SchemaRegistry::default();
@@ -430,7 +444,7 @@ mod test {
 			{ "label": "a", "is_really_difficult": false },
 			{ "label": "b", "is_really_difficult": false },
 		]));
-		// the data document still composes its rows exactly as authored
+		// the state document still composes its rows exactly as authored
 		data.schema.xpect_eq(rows);
 	}
 

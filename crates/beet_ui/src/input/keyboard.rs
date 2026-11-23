@@ -26,7 +26,7 @@ use bevy::input::keyboard::KeyboardInput;
 /// `PointerDown`+`PointerUp` on it.
 ///
 /// Keyboard activation reuses the click path, so a focused `<button>` runs its
-/// `bx:click` script and a focused `<a>` navigates, with no separate keyboard
+/// `bx:onclick` script and a focused `<a>` navigates, with no separate keyboard
 /// wiring. Fires only on a focused element (a plain text input gets no `<button>`
 /// activation; Enter in a text field is handled by the text-entry system).
 pub(super) fn activate_focused_on_enter(

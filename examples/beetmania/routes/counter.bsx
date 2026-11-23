@@ -11,8 +11,8 @@
 	<widgets::Card title="Today">
 		<p>Beets eaten today: {@doc:count=0}</p>
 		<div class="design-row">
-			<button class="btn btn-filled" bx:click="target.with_field('count', count => count + 1)">Ate one</button>
-			<button class="btn btn-tonal" bx:click="target.with_field('count', count => count - 1)">Put one back</button>
+			<button class="btn btn-filled" bx:onclick="target.with_field('count', count => count + 1)">Ate one</button>
+			<button class="btn btn-tonal" bx:onclick="target.with_field('count', count => count - 1)">Put one back</button>
 		</div>
 	</widgets::Card>
 </article>

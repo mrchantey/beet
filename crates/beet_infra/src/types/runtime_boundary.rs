@@ -167,7 +167,7 @@ impl RuntimeBoundary {
 		config.add_untyped_data_source(
 			"aws_caller_identity",
 			"current",
-			&json!({}),
+			&value!({}),
 		)?;
 		format!(
 			"arn:aws:iam::${{data.aws_caller_identity.current.account_id}}:policy/{}",
@@ -682,7 +682,7 @@ mod test {
 			.add_untyped_resource(
 				"aws_iam_role_policy_attachment",
 				"app__prod__thing",
-				&serde_json::json!({
+				&value!({
 					"role": "x",
 					"policy_arn": "arn:aws:iam::aws:policy/AdministratorAccess",
 				}),
@@ -706,9 +706,9 @@ mod test {
 				.add_untyped_resource(
 					"aws_iam_role_policy",
 					label,
-					&serde_json::json!({
+					&value!({
 						"role": "x",
-						"policy": serde_json::json!({
+						"policy": (serde_json::json!({
 							"Version": "2012-10-17",
 							"Statement": [{
 								"Sid": "ReadStores",
@@ -716,7 +716,7 @@ mod test {
 								"Action": "s3:GetObject",
 								"Resource": format!("arn:aws:s3:::{label}"),
 							}],
-						}).to_string(),
+						}).to_string()),
 					}),
 				)
 				.unwrap();

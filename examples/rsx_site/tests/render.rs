@@ -101,7 +101,7 @@ async fn buttons_page_renders_in_layout() {
 /// The Rust-authored counter renders its document atom's value into the page:
 /// the `{count}` display reads the field at render time, and its buttons drive
 /// the count through native `PointerUp` observers (the native-target path). The
-/// web-interactive `bx:click` script counter is the no-code `beetmania` page.
+/// web-interactive `bx:onclick` script counter is the no-code `beetmania` page.
 #[beet::test]
 async fn counter_renders_its_document_value() {
 	site_world()

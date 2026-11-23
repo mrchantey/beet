@@ -14,8 +14,8 @@ use crate::prelude::*;
 /// `text/*` is for content a person reads as written (prose, source code),
 /// `application/*` for content a program reads, which is nearly every
 /// structured format, json and yaml included. A format with a registered name
-/// takes it; an unregistered one sits in the vendor tree (`application/vnd.ron`,
-/// beet's own `application/vnd.beet.bsx`), never behind an `x-` prefix. A
+/// takes it; an unregistered one sits in the vendor tree
+/// (`application/vnd.postcard`, beet's own `application/vnd.beet.bsx`), never behind an `x-` prefix. A
 /// superseded spelling, ie `application/x-yaml`, parses as [`MediaType::Other`].
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
@@ -40,8 +40,6 @@ pub enum MediaType {
 	WebManifest,
 	/// `application/vnd.postcard`
 	Postcard,
-	/// `application/vnd.ron`
-	Ron,
 	/// `application/vnd.ipld.dag-cbor`, the canonical CBOR an atproto repo
 	/// stores and hashes a record as.
 	DagCbor,
@@ -168,7 +166,6 @@ impl MediaType {
 	// ── Canonical strings ──────────────────────────────────────────
 	const JSON: &'static str = "application/json";
 	const POSTCARD: &'static str = "application/vnd.postcard";
-	const RON: &'static str = "application/vnd.ron";
 	const DAG_CBOR: &'static str = "application/vnd.ipld.dag-cbor";
 	const TEXT: &'static str = "text/plain";
 	const HTML: &'static str = "text/html";
@@ -257,7 +254,6 @@ impl MediaType {
 			val if val.contains(Self::WEB_MANIFEST) => MediaType::WebManifest,
 			val if val.contains(Self::JSON) => MediaType::Json,
 			val if val.contains(Self::POSTCARD) => MediaType::Postcard,
-			val if val.contains(Self::RON) => MediaType::Ron,
 			val if val.contains(Self::DAG_CBOR) => MediaType::DagCbor,
 			val if val.contains(Self::HTML) => MediaType::Html,
 			val if val.contains(Self::BSX) => MediaType::Bsx,
@@ -356,7 +352,6 @@ impl MediaType {
 			"yaml" | "yml" => MediaType::Yaml,
 			"csv" => MediaType::Csv,
 			"toml" => MediaType::Toml,
-			"ron" => MediaType::Ron,
 			"cbor" => MediaType::DagCbor,
 			"sql" => MediaType::Sql,
 			"graphql" | "gql" => MediaType::GraphQl,
@@ -462,7 +457,6 @@ impl MediaType {
 			MediaType::Pptx => Some("pptx"),
 			MediaType::Wasm => Some("wasm"),
 			MediaType::Postcard => Some("postcard"),
-			MediaType::Ron => Some("ron"),
 			MediaType::DagCbor => Some("cbor"),
 			MediaType::Protobuf => Some("proto"),
 			MediaType::MessagePack => Some("msgpack"),
@@ -507,7 +501,6 @@ impl MediaType {
 			MediaType::Json => Self::JSON,
 			MediaType::WebManifest => Self::WEB_MANIFEST,
 			MediaType::Postcard => Self::POSTCARD,
-			MediaType::Ron => Self::RON,
 			MediaType::DagCbor => Self::DAG_CBOR,
 			MediaType::Markdown => Self::MARKDOWN,
 			MediaType::Bsx => Self::BSX,
@@ -567,14 +560,13 @@ impl MediaType {
 		}
 	}
 
-	/// Whether this is a structured serde format, ie json, postcard, ron,
-	/// toml or DAG-CBOR.
+	/// Whether this is a structured serde format, ie json, postcard, toml or
+	/// DAG-CBOR.
 	pub fn is_serializable(&self) -> bool {
 		matches!(
 			self,
 			MediaType::Json
 				| MediaType::Postcard
-				| MediaType::Ron
 				| MediaType::Toml
 				| MediaType::DagCbor
 		)
@@ -875,7 +867,6 @@ mod test {
 			MediaType::Json,
 			MediaType::WebManifest,
 			MediaType::Postcard,
-			MediaType::Ron,
 			MediaType::Markdown,
 			MediaType::Bsx,
 			MediaType::EventStream,

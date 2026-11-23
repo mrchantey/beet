@@ -178,16 +178,14 @@ pub(super) async fn connect_webrtc(
 
 /// The `session.update` client event applying `request`'s session settings.
 fn session_update(request: &RealtimeSessionCreateRequest) -> Result<Value> {
-	Value::from_serde(serde_json::json!({
+	value!({
 		"type": "session.update",
-		"session": request,
-	}))
+		"session": (Value::from_serde(request)?),
+	})
+	.xok()
 }
 
 /// The wire name a [`Model`] serializes to, ie `gpt-4o-realtime-preview`.
 fn model_slug(model: Model) -> Result<String> {
-	serde_json::to_value(model)?
-		.as_str()
-		.map(str::to_string)
-		.ok_or_else(|| bevyhow!("model must serialize to a string"))
+	Value::from_serde(model)?.as_str()?.to_string().xok()
 }

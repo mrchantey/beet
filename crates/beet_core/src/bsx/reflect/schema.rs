@@ -220,11 +220,8 @@ fn attr_prop_value(value: &AttrValue) -> Option<Value> {
 		AttrValue::Expr(ValueExpr::Literal(literal)) => {
 			literal_prop_value(literal)
 		}
-		// a binding, entity ref, spread or style directive is not a plain prop
-		// value
-		AttrValue::Expr(_) | AttrValue::Spread(_) | AttrValue::Style { .. } => {
-			None
-		}
+		// a binding, entity ref or spread is not a plain prop value
+		AttrValue::Expr(_) | AttrValue::Spread(_) => None,
 	}
 }
 

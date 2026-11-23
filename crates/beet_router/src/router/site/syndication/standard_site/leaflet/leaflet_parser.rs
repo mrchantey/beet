@@ -592,10 +592,19 @@ mod test {
 		json: &str,
 		source: Option<&LexiconSource>,
 	) -> Entity {
-		let member = serde_json::from_str::<Value>(json)
-			.unwrap()
-			.xmap(OpenUnion::try_from)
+		let member = MediaType::Json
+			.deserialize::<Value>(json.as_bytes())
 			.unwrap();
+		parse_value(world, member, source)
+	}
+
+	/// `member` parsed onto a fresh entity of `world`.
+	fn parse_value(
+		world: &mut World,
+		member: Value,
+		source: Option<&LexiconSource>,
+	) -> Entity {
+		let member = OpenUnion::try_from(member).unwrap();
 		let mut entity = world.spawn_empty();
 		LexiconParsers::parse(&mut entity, &member, source).unwrap();
 		entity.id()
@@ -631,8 +640,9 @@ mod test {
 
 	/// The blocks of `json`, a `pub.leaflet.content`, that this build does
 	/// not know.
-	fn unknown_blocks(json: &str) -> Vec<OpenUnion> {
-		serde_json::from_str::<LeafletContent>(json)
+	fn unknown_blocks(json: &[u8]) -> Vec<OpenUnion> {
+		MediaType::Json
+			.deserialize::<LeafletContent>(json)
 			.unwrap()
 			.pages
 			.into_iter()
@@ -698,11 +708,10 @@ fn main() { println!("hello"); }
 			))
 			.unwrap();
 		let original = html(&mut source, post, true);
-		let member = Value::from(render(&mut source, post))
-			.xmap(|value| serde_json::to_string(&value).unwrap());
+		let member = Value::from(render(&mut source, post));
 
 		let mut read = world();
-		let entity = parse(&mut read, &member, None);
+		let entity = parse_value(&mut read, member, None);
 		let round_trip = html(&mut read, entity, false);
 		// what Leaflet does say survives untouched
 		for kept in [
@@ -752,8 +761,9 @@ fn main() { println!("hello"); }
 		let mut world = world();
 		let entity = parse(&mut world, NEWSLETTER_MODE, Some(&leaflet_lab()));
 		let written = Value::from(render(&mut world, entity))
-			.xmap(|value| serde_json::to_string(&value).unwrap());
-		let unknown = unknown_blocks(NEWSLETTER_MODE);
+			.xmap(|value| MediaType::Json.serialize(&value))
+			.unwrap();
+		let unknown = unknown_blocks(NEWSLETTER_MODE.as_bytes());
 		unknown
 			.iter()
 			.map(|member| member.r#type().to_string())

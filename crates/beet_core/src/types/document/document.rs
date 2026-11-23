@@ -1,10 +1,26 @@
+//! [`Document`], and the two ways a document is used.
+//!
+//! A document is at bottom one thing, a json-like object, used two ways:
+//!
+//! - A **scene document** is compiled: `.bsx`, markdown, a structured file
+//!   carrying a scene body ([`DocParser`]). It is strictly upstream of its
+//!   scene, edited as its source and recompiled, and nothing is ever written
+//!   back into it from a running world.
+//! - A **state document** is a [`Document`], always: the value widgets bind to
+//!   through [`FieldRef`], created by a binding's `=init` or loaded from a
+//!   file, with a file behind it or none, and written back to that file when
+//!   one backs it, which is what saving state means. It round trips because a
+//!   value has nothing to expand.
+//!
+//! This is the one statement of the pair; every other page cites it.
 use crate::prelude::*;
 
-/// In-memory document that can be attached to entities.
+/// A state document on its entity: a [`Value`] widgets bind to and edit
+/// (see the [module docs](self)).
 ///
-/// Documents provide structured storage for cards and other entities,
-/// similar to document databases. Fields can be accessed and modified
-/// using [`FieldSegment`] to navigate nested structures.
+/// Structured storage for cards and other entities, similar to a document
+/// database. Fields are read and written through [`FieldSegment`] paths into
+/// nested structures.
 #[derive(
 	Debug,
 	Default,
@@ -99,7 +115,7 @@ impl Document {
 	///
 	/// Returns an error if the path doesn't exist, the type is incorrect,
 	/// or conversion fails.
-	#[cfg(feature = "json")]
+	#[cfg(feature = "serde")]
 	pub fn get_field<T>(
 		&self,
 		path: &[FieldSegment],

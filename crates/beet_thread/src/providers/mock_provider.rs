@@ -455,7 +455,7 @@ mod test {
 		let tool: ToolDefinition = FunctionToolDefinition::new(
 			"greet",
 			"Greet someone",
-			serde_json::json!({
+			value!({
 				"type": "object",
 				"properties": {
 					"name": { "type": "string" },
@@ -500,7 +500,7 @@ mod test {
 			FunctionToolDefinition::new(
 				"greet",
 				"Greet someone",
-				serde_json::json!({
+				value!({
 					"type": "object",
 					"properties": { "name": { "type": "string" } }
 				}),
@@ -515,11 +515,8 @@ mod test {
 				(
 					Actor::agent(),
 					MockPostStreamer::with_script([
-						MockTurn::call(
-							"greet",
-							serde_json::json!({"name":"Ada"})
-						)
-						.unwrap(),
+						MockTurn::call("greet", value!({"name":"Ada"}))
+							.unwrap(),
 						MockTurn::Text("all greeted".into()),
 					]),
 					children![(Router, children![tool()])],
@@ -601,7 +598,7 @@ mod test {
 		let tool: ToolDefinition = FunctionToolDefinition::new(
 			"place",
 			"Place a marker",
-			serde_json::json!({
+			value!({
 				"type": "object",
 				"properties": {
 					"label": { "type": "string" },

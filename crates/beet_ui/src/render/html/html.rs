@@ -12,8 +12,7 @@ pub struct HtmlRenderer {
 	/// HTML fragments to hoist into `<head>` (emitted before `</head>`),
 	/// contributed by any render feature via [`hoist_into_head`](Self::hoist_into_head).
 	/// Drained once at the head close, or post-walk for a fragment with no
-	/// `<head>` (the emptied vec gives once-only semantics). A future build-time
-	/// `bx:hoist` directive is intended to feed this same collection.
+	/// `<head>` (the emptied vec gives once-only semantics).
 	head_hoist: Vec<String>,
 	/// If `Some`, creates newlines after open/close tags
 	/// and indents children with the provided indentation.
@@ -320,9 +319,7 @@ impl NodeVisitor for HtmlRenderer {
 
 		// inject any hoisted head fragments inside `<head>`, before its close tag.
 		// `<head>` is the single injection point; a fragment with no head falls
-		// back to a post-walk append in `render`. Any feature can contribute; a
-		// future build-time `bx:hoist` directive is intended to feed the same
-		// collection.
+		// back to a post-walk append in `render`. Any feature can contribute.
 		if element.tag() == "head" {
 			if let Some(hoisted) = self.take_head_hoist() {
 				self.write_indent();

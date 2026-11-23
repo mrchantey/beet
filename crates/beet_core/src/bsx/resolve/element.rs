@@ -4,7 +4,6 @@
 use super::binding::*;
 use super::directives::*;
 use super::entity_refs::*;
-use super::events::*;
 use super::literal::*;
 use super::resolve::*;
 use super::spread::*;
@@ -46,7 +45,9 @@ fn is_uppercase_tag(tag: &str) -> bool {
 }
 
 /// Build a lowercase HTML element: an `Element` host plus the neutral
-/// [`build_fragment`] content (directives, attributes, children).
+/// [`build_fragment`] content (directives, attributes, children). A
+/// `<template>` is a [`Prefab`], its subtree held as the item a
+/// [`ReactiveChildren`] clones, as HTML's `<template>` holds inert content.
 fn build_html_element(
 	el: &BsxElement,
 	registry: &BsxTemplateRegistry,
@@ -54,6 +55,9 @@ fn build_html_element(
 	cx: &mut TemplateContext,
 ) -> Result<()> {
 	cx.entity.insert(Element::new(el.tag.clone()));
+	if el.tag == "template" {
+		cx.entity.insert(Prefab);
+	}
 	build_fragment(el, registry, refs, cx)
 }
 
@@ -75,7 +79,7 @@ fn build_fragment(
 
 /// Build a `<Slot>` placeholder into `entity` as a [`SlotTarget`] marker, with
 /// its children as fallback content. A named slot targets by name; a transfer
-/// `<Slot name bx:slot=..>` also carries a [`SlotChild`].
+/// `<Slot name slot=..>` also carries a [`SlotChild`].
 fn build_slot(el: &BsxElement, entity: &mut EntityWorldMut) -> Result<()> {
 	let name = string_attr(el, "name");
 	match &name {
@@ -105,8 +109,8 @@ fn build_slot(el: &BsxElement, entity: &mut EntityWorldMut) -> Result<()> {
 	Ok(())
 }
 
-/// Apply the `bx:scope`/`bx:for`/`bx:key`/`bx:ref`/`bx:<event>`/`slot` directives
-/// shared by every tag kind onto `cx.entity`.
+/// Apply the `bx:ref` and `slot` directives shared by every tag kind onto
+/// `cx.entity`, the ones the build walk still reads.
 pub(super) fn apply_common_directives(
 	el: &BsxElement,
 	refs: &RefBindings,
@@ -119,59 +123,20 @@ pub(super) fn apply_common_directives(
 			cx.entity_references.set(reference, id);
 		}
 	}
-	// `bx:scope` -> a `DocumentScope` prefix.
-	if let Some(scope) = string_attr(el, "bx:scope") {
-		cx.entity.insert(DocumentScope {
-			path: FieldPath::new([scope]),
-			terminate: false,
-		});
-	}
-	// a `slot`/`bx:slot` routes this whole node into a parent slot.
+	// a `slot` routes this whole node into a parent slot.
 	if let Some(slot) = slot_routing(el) {
 		cx.entity.insert(slot);
-	}
-	// `bx:style="prop=value .."` declares a one-off rule and attaches a unique,
-	// span-derived class, the markup twin of `inline_class!`. The declaration
-	// grammar lives in a higher crate, so it resolves through the `StyleResolver`
-	// seam (a graceful no-op when no handler is registered).
-	if let Some((source, span)) = bsx_style_attr(el) {
-		let handler = cx
-			.entity
-			.world_scope(|world| world.get_resource::<StyleResolver>()?.get());
-		if let Some(handler) = handler {
-			handler(cx.entity, source, span)?;
-		}
-	}
-	// `bx:<event>="script"` events, each lowered to an `OnEvent` child. The
-	// event name is the directive suffix after `bx:`.
-	for attr in &el.attributes {
-		if !is_event_directive(&attr.key) {
-			continue;
-		}
-		let AttrValue::Str(script) = &attr.value else {
-			bevybail!(
-				"`{key}` expects a script string, ie \
-				 `{key}=\"target.with_field('count', count => count + 1)\"`",
-				key = attr.key
-			);
-		};
-		let event = attr.key.strip_prefix("bx:").unwrap_or(&attr.key);
-		install_event(cx.entity, event, script.as_str());
 	}
 	Ok(())
 }
 
-/// Build an element's child nodes. A `bx:for` element instead materializes a
-/// reactive list, one child per item over the named array field.
+/// Build an element's child nodes.
 pub(super) fn build_children(
 	el: &BsxElement,
 	registry: &BsxTemplateRegistry,
 	refs: &RefBindings,
 	cx: &mut TemplateContext,
 ) -> Result<()> {
-	if let Some(field) = string_attr(el, "bx:for") {
-		return build_reactive_children(el, &field, registry, refs, cx);
-	}
 	let parent = cx.entity.id();
 	for child in &el.children {
 		spawn_child(child, parent, registry, refs, cx)?;
@@ -179,39 +144,10 @@ pub(super) fn build_children(
 	Ok(())
 }
 
-/// `bx:for="items"` + optional `bx:key`: a [`ReactiveChildren`] over the `items`
-/// array, the element's children built once into its inline [`Prefab`], which
-/// each row clones in a terminating index scope. With `bx:key="field"` it
-/// reconciles by that per-item key so an append reuses existing rows instead
-/// of rebuilding them.
-fn build_reactive_children(
-	el: &BsxElement,
-	field: &str,
-	registry: &BsxTemplateRegistry,
-	_refs: &RefBindings,
-	cx: &mut TemplateContext,
-) -> Result<()> {
-	let parent = cx.entity.id();
-	// SAFETY: only used to spawn and build the item prefab under the element.
-	let world = unsafe { cx.entity.world_mut() };
-	let prefab = world.spawn((Prefab, ChildOf(parent))).id();
-	let template =
-		BsxTemplate::container(el.children.clone(), registry.clone());
-	if let Err(error) = world.entity_mut(prefab).build_template(&template) {
-		world.entity_mut(prefab).insert(TemplateError::new(error));
-	}
-	Prefab::hold(world, prefab);
-	// the element gained its prefab child, so its cached location moved
-	cx.entity.update_location();
-	// the field backing the list: its synced `Value` drives the rebuild.
-	let mut reactive = ReactiveChildren::default();
-	reactive.key = string_attr(el, "bx:key").map(|key| FieldPath::parse(&key));
-	cx.entity.insert((FieldRef::new(field), reactive));
-	Ok(())
-}
-
 /// Build the caller content of an uppercase tag as slot children: each child its
-/// own entity carrying a default [`SlotChild`] unless it routes itself.
+/// own entity carrying a default [`SlotChild`] unless it routes itself. A
+/// child that never renders, a `<script {OnEvent}>` a `bx:onclick` rewrote to,
+/// is behaviour of the tag itself and stays on it, never slotted.
 pub(super) fn build_slot_children(
 	el: &BsxElement,
 	registry: &BsxTemplateRegistry,
@@ -225,7 +161,10 @@ pub(super) fn build_slot_children(
 		if !child_routes_itself(child) {
 			// SAFETY: only used to mark the spawned slot child.
 			let world = unsafe { cx.entity.world_mut() };
-			if !world.entity(entity).contains::<SlotChild>() {
+			let child = world.entity(entity);
+			if !child.contains::<SlotChild>()
+				&& !child.contains::<NotRendered>()
+			{
 				world.entity_mut(entity).insert(SlotChild::new());
 			}
 		}
@@ -233,7 +172,7 @@ pub(super) fn build_slot_children(
 	Ok(())
 }
 
-/// Whether a child element carries its own `slot`/`bx:slot` routing.
+/// Whether a child element carries its own `slot` routing.
 fn child_routes_itself(node: &BsxNode) -> bool {
 	matches!(node, BsxNode::Element(el) if slot_routing(el).is_some())
 }
@@ -282,9 +221,8 @@ pub(super) fn apply_attribute(
 				let comp_target = attr_comp_target(expr, parent, entity_refs);
 				apply_value_expr(expr, &mut attr_entity, comp_target)?;
 			}
-			// spreads and `bx:style` are handled elsewhere (the directives
-			// pass / spread pass).
-			AttrValue::Spread(_) | AttrValue::Style { .. } => {}
+			// spreads apply in the spread pass
+			AttrValue::Spread(_) => {}
 		}
 		Ok(())
 	})

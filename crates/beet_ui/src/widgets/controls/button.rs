@@ -111,7 +111,7 @@ mod test {
 
 	/// Spawn a `<Button>` whose action (a `PointerUp` observer) counts firings,
 	/// returning the `<button>` entity. Activation (click or Enter) fires
-	/// `PointerUp`, the same path `bx:click` rides.
+	/// `PointerUp`, the same path `bx:onclick` rides.
 	fn spawn_button(app: &mut App) -> Entity {
 		app.world_mut()
 			.spawn_template(rsx! { <div><Button>"Save"</Button></div> })

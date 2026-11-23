@@ -289,7 +289,9 @@ mod test {
 	fn unknown_member_round_trips() {
 		let json = r#"{"$type":"com.example.poll","options":["a","b"],"question":{"text":"which?","weight":2}}"#;
 		let mut world = world_ext::ui_world();
-		let member: Value = serde_json::from_str(json).unwrap();
+		let member = MediaType::Json
+			.deserialize::<Value>(json.as_bytes())
+			.unwrap();
 		let entity = parse(&mut world, member);
 		LexiconRenderers::render(
 			&mut world,
@@ -299,7 +301,9 @@ mod test {
 		)
 		.unwrap()
 		.xmap(Value::from)
-		.xmap(|value| serde_json::to_string(&value).unwrap())
+		.xmap(|value| MediaBytes::serialize(MediaType::Json, &value).unwrap())
+		.as_utf8()
+		.unwrap()
 		.xpect_eq(json);
 	}
 

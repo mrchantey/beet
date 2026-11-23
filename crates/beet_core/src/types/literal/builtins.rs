@@ -137,7 +137,10 @@ fn add_strings(table: &mut Table) {
 		// and a store key to a `RelPath`, from a greedy route capture's
 		// segments as readily as from one string
 		.add_path(|string| SmolPath::new(string))
-		.add_path(|string| RelPath::new(string));
+		.add_path(|string| RelPath::new(string))
+		// a field path in its dotted spelling, so `{DocumentScope{path:"user"}}`
+		// and `bx:key="user.id"` author one
+		.add_str(|string| FieldPath::parse(string));
 
 	// a url is authored as the string it displays as, and the strict
 	// `Url::parse` is what makes a control character in a frontmatter

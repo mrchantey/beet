@@ -8,11 +8,11 @@ mod document_sync;
 mod field_query;
 mod field_ref;
 mod reactive_children;
-#[cfg(feature = "json")]
+#[cfg(feature = "serde")]
 mod reflect_binding;
-#[cfg(feature = "json")]
+#[cfg(feature = "serde")]
 pub mod reflect_value_ext;
-#[cfg(feature = "json")]
+#[cfg(feature = "serde")]
 mod resource_binding;
 mod source_binding;
 mod typed_document;
@@ -26,9 +26,9 @@ pub use document_sync::*;
 pub use field_query::*;
 pub use field_ref::*;
 pub use reactive_children::*;
-#[cfg(feature = "json")]
+#[cfg(feature = "serde")]
 pub use reflect_binding::*;
-#[cfg(feature = "json")]
+#[cfg(feature = "serde")]
 pub use resource_binding::*;
 pub use source_binding::*;
 pub use typed_document::*;

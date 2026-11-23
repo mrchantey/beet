@@ -188,7 +188,11 @@ mod test {
 	/// `record` parsed from the json a PDS answered.
 	#[cfg(feature = "json")]
 	fn record(json: &str) -> AtprotoValue {
-		AtprotoValue::from_json(serde_json::from_str(json).unwrap()).unwrap()
+		MediaType::Json
+			.deserialize::<Value>(json.as_bytes())
+			.unwrap()
+			.xmap(AtprotoValue::from_wire)
+			.unwrap()
 	}
 
 	/// beet.org's profile, read from its PDS with the cid the PDS computed. It

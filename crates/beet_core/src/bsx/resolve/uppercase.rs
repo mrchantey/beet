@@ -394,14 +394,8 @@ fn apply_component_field_bindings(
 			}
 			_ => continue,
 		}
-		// the `Value`<->reflect bridge needs `serde_json` (the `json` feature); an
-		// embedded build without it keeps the source binding but loses the
-		// bidirectional reflect-field write (Risk: documented, acceptable).
-		#[cfg(feature = "json")]
-		{
-			let component = el.tag.rsplit("::").next().unwrap_or(&el.tag);
-			entity.insert(ReflectFieldRef::new(component, attr.key.as_str()));
-		}
+		let component = el.tag.rsplit("::").next().unwrap_or(&el.tag);
+		entity.insert(ReflectFieldRef::new(component, attr.key.as_str()));
 		// one binding per entity: the first binding-valued attribute owns it.
 		break;
 	}
@@ -460,16 +454,12 @@ fn apply_props_store(
 				PropBindingSource::Field(source) => {
 					binding_entity.insert(source);
 				}
-				#[cfg(feature = "json")]
 				PropBindingSource::Resource(source) => {
 					binding_entity.insert(source);
 				}
-				#[cfg(feature = "json")]
 				PropBindingSource::Component(source) => {
 					binding_entity.insert(source);
 				}
-				#[cfg(not(feature = "json"))]
-				PropBindingSource::Seed => {}
 			}
 		}
 	});
@@ -482,14 +472,9 @@ enum PropBindingSource {
 	/// `@doc`/`@prop`: a one-way document mirror.
 	Field(SourceFieldRef),
 	/// `@res`: a bidirectional resource field sync.
-	#[cfg(feature = "json")]
 	Resource(ResourceFieldRef),
 	/// `@comp`: a bidirectional component field sync.
-	#[cfg(feature = "json")]
 	Component(ReflectFieldRef),
-	/// `@res`/`@comp` without the `json` reflect bridge: the seed only.
-	#[cfg(not(feature = "json"))]
-	Seed,
 }
 
 /// Build the source component for a binding-valued prop. The document-sourced
@@ -501,8 +486,6 @@ fn prop_binding_source(
 	store: Entity,
 	entity_refs: &HashMap<SmolStr, Entity>,
 ) -> PropBindingSource {
-	#[cfg(not(feature = "json"))]
-	let _ = entity_refs;
 	match binding.source {
 		BindingSource::Doc => SourceFieldRef::new(binding.field_path.clone())
 			.with_subject(store)
@@ -511,13 +494,11 @@ fn prop_binding_source(
 			.with_document(DocumentPath::Props)
 			.with_subject(store)
 			.xmap(PropBindingSource::Field),
-		#[cfg(feature = "json")]
 		BindingSource::Res => ResourceFieldRef::new(
 			binding.type_path.clone().unwrap_or_default(),
 			binding.field_path.to_string(),
 		)
 		.xmap(PropBindingSource::Resource),
-		#[cfg(feature = "json")]
 		BindingSource::Comp => {
 			let target = match &binding.selector {
 				Some(name) => map_selector_target(name, entity_refs),
@@ -530,8 +511,6 @@ fn prop_binding_source(
 			.with_target(target)
 			.xmap(PropBindingSource::Component)
 		}
-		#[cfg(not(feature = "json"))]
-		BindingSource::Res | BindingSource::Comp => PropBindingSource::Seed,
 	}
 }
 

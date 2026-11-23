@@ -109,15 +109,22 @@ mod test {
 	#[crate::test]
 	fn round_trips_a_member() {
 		let json = r#"{"$type":"app.bsky.embed.external","external":{"uri":"https://beet.org"}}"#;
-		let member = serde_json::from_str::<OpenUnion>(json).unwrap();
+		let member = MediaType::Json
+			.deserialize::<OpenUnion>(json.as_bytes())
+			.unwrap();
 		member.r#type().as_str().xpect_eq("app.bsky.embed.external");
 		member.fields().contains("$type").xpect_false();
-		serde_json::to_string(&member).unwrap().xpect_eq(json);
+		MediaBytes::serialize(MediaType::Json, &member)
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.xpect_eq(json);
 	}
 
 	#[crate::test]
 	fn refuses_a_member_without_a_type() {
-		serde_json::from_str::<OpenUnion>(r#"{"uri":"https://beet.org"}"#)
+		MediaType::Json
+			.deserialize::<OpenUnion>(br#"{"uri":"https://beet.org"}"#)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("$type");

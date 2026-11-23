@@ -110,7 +110,7 @@ pub fn FetchFox(
 	mut graphs: ResMut<Assets<AnimationGraph>>,
 	mut assets: BuildAssets,
 ) -> impl Bundle {
-	let bert = assets.load::<Bert>("ml/default-bert.ron");
+	let bert = assets.load::<Bert>("ml/default.bert.json");
 	// the idle (Animation0) + walk (Animation1) graph; the actions resolve their
 	// clip paths against the `AnimationGraphClips` it puts on the fox.
 	let clips = vec![

@@ -31,7 +31,7 @@ use bevy::platform::sync::Mutex;
 ///
 /// A **schema** document (one whose declared schema is the meta-schema) also
 /// registers into the [`SchemaRegistry`] by location as it lands, under the name
-/// it declares for itself. That is what lets a data document composing only the
+/// it declares for itself. That is what lets a state document composing only the
 /// row schema (`List(Ref(Name("TodoItem")))`) resolve it without knowing where it
 /// is stored, and it is the same [`SchemaRegistry::insert_located`] entry point
 /// [`read_located_schemas`](super::read_located_schemas) uses, so the two ways a
@@ -164,7 +164,7 @@ async fn read_document_blob(
 	let document = TypedDocument::read(
 		SchemaResolver::default().with_schemas(&snapshot),
 		path.as_str(),
-		core::str::from_utf8(&bytes)?,
+		&MediaBytes::new(super::document_media_type(&path), bytes),
 	)
 	.await?;
 	// a schema document is a `ValueSchema` stored as data, so its own declared
@@ -251,10 +251,12 @@ async fn write_document_blob(
 			TypedDocument::new(schema, value).xok()
 		})
 		.await??;
-	// the byte-deterministic json a reopen re-saves identically
-	let json = document.to_json()?;
-	blob.insert(json.clone()).await?;
-	last_written.set(json.as_bytes());
+	// the byte-deterministic form a reopen re-saves identically
+	let (_, bytes) = document
+		.to_bytes(super::document_media_type(blob.path()))?
+		.take();
+	blob.insert(bytes.clone()).await?;
+	last_written.set(&bytes);
 	OK
 }
 
@@ -277,8 +279,8 @@ mod test {
 		})
 	}
 
-	/// The list of rows the data document composes by reference, the entry's own
-	/// shape: the schema document holds the row, the data document the list.
+	/// The list of rows the state document composes by reference, the entry's own
+	/// shape: the schema document holds the row, the state document the list.
 	fn rows_schema() -> ValueSchema {
 		ValueSchema::List(ListSchema {
 			item: Box::new(ValueSchema::reference("TodoItem")),
@@ -314,7 +316,7 @@ mod test {
 		inner
 	}
 
-	/// An app under a store: the schema document and the data document, spawned
+	/// An app under a store: the schema document and the state document, spawned
 	/// as the entry authors them.
 	async fn todo_app() -> (App, Entity, Entity) {
 		let mut app = App::new();
@@ -358,7 +360,7 @@ mod test {
 
 	/// Both documents land as the pair every binding resolves against, and the
 	/// schema document joins the one namespace under the name it declares, so
-	/// the data document's `List(Ref("TodoItem"))` resolves.
+	/// the state document's `List(Ref("TodoItem"))` resolves.
 	#[beet_core::test]
 	async fn a_stored_document_lands_as_a_document() {
 		let (app, schema, data) = todo_app().await;

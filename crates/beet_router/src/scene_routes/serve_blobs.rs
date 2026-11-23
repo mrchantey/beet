@@ -118,7 +118,7 @@ async fn list_blobs(
 		keys
 	})
 	.xref()
-	.xmap(Response::ok_json)
+	.xmap(Response::with_json)
 }
 
 /// A listing answers json, so a build without it refuses one.

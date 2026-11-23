@@ -269,7 +269,8 @@ impl Request {
 	/// ```
 	/// # use beet_net::prelude::*;
 	/// # use beet_net::headers;
-	/// let request = Request::with_json("/api/users", &serde_json::json!({"name": "Ada"})).unwrap();
+	/// # use beet_core::prelude::*;
+	/// let request = Request::with_json("/api/users", &value!({"name": "Ada"})).unwrap();
 	/// let media_type = request.headers.get::<headers::ContentType>().unwrap().unwrap();
 	/// assert_eq!(media_type, MediaType::Json);
 	/// ```
@@ -311,12 +312,8 @@ impl Request {
 
 	/// Sets a JSON body and content-type header on an existing request.
 	#[cfg(feature = "json")]
-	pub fn with_json_body<T: serde::Serialize>(
-		self,
-		body: &T,
-	) -> Result<Self, serde_json::Error> {
-		let body = serde_json::to_string(body)?;
-		self.with_body(Bytes::from(body))
+	pub fn with_json_body<T: serde::Serialize>(self, body: &T) -> Result<Self> {
+		self.with_body(Body::from_json(body)?)
 			.with_content_type(MediaType::Json)
 			.xok()
 	}
@@ -889,7 +886,8 @@ mod test {
 			.xpect_eq(MediaType::Json);
 
 		let body_bytes = request.body.try_into_bytes().unwrap();
-		let roundtrip: Payload = serde_json::from_slice(&body_bytes).unwrap();
+		let roundtrip: Payload =
+			MediaType::Json.deserialize(&body_bytes).unwrap();
 		roundtrip.xpect_eq(payload);
 	}
 

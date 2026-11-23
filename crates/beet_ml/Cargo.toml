@@ -24,7 +24,7 @@ cuda = ["burn/cuda"]
 
 [dependencies]
 beet_action = { workspace = true, features = ["std", "reflect"] }
-beet_core = { workspace = true, features = ["std", "rand", "fs"] }
+beet_core = { workspace = true, features = ["std", "rand", "fs", "json"] }
 beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "ureq", "rustls-tls"] }
 beet_spatial = { workspace = true, optional = true, features = ["std"] }
 
@@ -43,7 +43,6 @@ branches = { version = "0.4", default-features = false, features = ["std"] }
 
 futures.workspace = true
 log.workspace = true
-ron.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 strum.workspace = true

@@ -286,8 +286,8 @@ impl S3BucketBlock {
 		config.add_untyped_resource(
 			"aws_s3_bucket_versioning",
 			&self.versioning_label(stack),
-			&json!({
-				"bucket": bucket.field_ref("id"),
+			&value!({
+				"bucket": (bucket.field_ref("id")),
 				"versioning_configuration": { "status": "Enabled" },
 			}),
 		)?;
@@ -315,22 +315,22 @@ impl S3BucketBlock {
 		// the class moves objects in place, so declaring it on a bucket already
 		// holding objects migrates them without a re-upload
 		if let Some(class) = self.storage_class.declared() {
-			rules.push(json!({
+			rules.push(value!({
 				"id": "transition-objects",
 				"status": "Enabled",
 				"filter": {},
 				"transition": {
-					"days": class.min_transition_days(),
-					"storage_class": class.as_str(),
+					"days": (class.min_transition_days()),
+					"storage_class": (class.as_str()),
 				},
 			}));
 		}
 		if self.expire_days > 0 {
-			rules.push(json!({
+			rules.push(value!({
 				"id": "expire-objects",
 				"status": "Enabled",
 				"filter": {},
-				"expiration": { "days": self.expire_days },
+				"expiration": { "days": (self.expire_days) },
 			}));
 		}
 		for prefix in &self.expire_prefixes {
@@ -339,14 +339,14 @@ impl S3BucketBlock {
 		// versions only accumulate on a bucket that keeps them, so the sweep is
 		// meaningless (and the `depends_on` below unsatisfiable) without it
 		if self.object_versioning && self.expire_noncurrent_days > 0 {
-			rules.push(json!({
+			rules.push(value!({
 				"id": "expire-noncurrent-versions",
 				"status": "Enabled",
 				// every object: provider 6 requires a filter or a prefix, and
 				// an empty filter is how "all of them" is spelled.
 				"filter": {},
 				"noncurrent_version_expiration": {
-					"noncurrent_days": self.expire_noncurrent_days
+					"noncurrent_days": (self.expire_noncurrent_days)
 				},
 			}));
 		}
@@ -354,17 +354,20 @@ impl S3BucketBlock {
 			return Ok(());
 		}
 		self.assert_unique_rule_ids(&rules)?;
-		let mut resource = json!({
-			"bucket": bucket.field_ref("id"),
+		let mut resource = value!({
+			"bucket": (bucket.field_ref("id")),
 			"rule": rules,
 		});
 		if self.object_versioning {
 			// versioning must be on before a rule can talk about noncurrent
 			// versions
-			resource["depends_on"] = json!([format!(
-				"aws_s3_bucket_versioning.{}",
-				self.versioning_label(stack)
-			)]);
+			resource.as_map_mut()?.insert(
+				"depends_on",
+				value!([(format!(
+					"aws_s3_bucket_versioning.{}",
+					self.versioning_label(stack)
+				))]),
+			);
 		}
 		config.add_untyped_resource(
 			"aws_s3_bucket_lifecycle_configuration",
@@ -378,22 +381,24 @@ impl S3BucketBlock {
 
 	/// The S3 lifecycle rule a [`PrefixExpiry`] renders as, failing the render
 	/// on a declaration AWS would reject.
-	fn prefix_rule(expiry: &PrefixExpiry) -> Result<serde_json::Value> {
+	fn prefix_rule(expiry: &PrefixExpiry) -> Result<Value> {
 		expiry.validate()?;
-		json!({
-			"id": expiry.rule_id(),
+		value!({
+			"id": (expiry.rule_id()),
 			"status": "Enabled",
-			"filter": { "prefix": expiry.prefix() },
-			"expiration": { "days": expiry.expire_days() },
+			"filter": { "prefix": (expiry.prefix()) },
+			"expiration": { "days": (expiry.expire_days()) },
 		})
 		.xok()
 	}
 
 	/// See [`PrefixExpiry::assert_unique_ids`].
-	fn assert_unique_rule_ids(&self, rules: &[serde_json::Value]) -> Result {
+	fn assert_unique_rule_ids(&self, rules: &[Value]) -> Result {
 		PrefixExpiry::assert_unique_ids(
 			&self.label,
-			rules.iter().filter_map(|rule| rule["id"].as_str()),
+			rules
+				.iter()
+				.filter_map(|rule| rule.get("id")?.as_str().ok()),
 		)
 	}
 }

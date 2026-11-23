@@ -100,7 +100,7 @@ impl Secrets {
 #[cfg(feature = "vault")]
 impl Secrets {
 	/// The formats a conventional document may be written in, by extension.
-	const EXTENSIONS: &'static [&'static str] = &["toml", "json", "ron"];
+	const EXTENSIONS: &'static [&'static str] = &["toml", "json"];
 
 	/// The document's format, from its path.
 	pub fn media_type(&self) -> Result<MediaType> {
@@ -166,9 +166,9 @@ impl Secrets {
 		opened.set_env_vars()
 	}
 
-	/// The one `secrets.<format>` in `dir` (`secrets.toml`, `secrets.json`,
-	/// `secrets.ron`), `None` when there is none, an error naming both when
-	/// there are two. Probes the three names rather than listing the
+	/// The one `secrets.<format>` in `dir` (`secrets.toml`, `secrets.json`),
+	/// `None` when there is none, an error naming both when there are two.
+	/// Probes the names rather than listing the
 	/// directory: a listing on a js host is a recursive walk, and a repo
 	/// root holds a `target/`.
 	fn find_in_dir(dir: &Path) -> Result<Option<PathBuf>> {

@@ -574,7 +574,7 @@ impl LambdaBlock {
 		config.set_lifecycle(
 			"aws_acm_certificate",
 			cert.ident().label(),
-			json!({ "create_before_destroy": true }),
+			value!({ "create_before_destroy": true }),
 		)?;
 
 		// The gateway stage is named, not referenced, by the mapping, so the

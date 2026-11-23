@@ -299,20 +299,21 @@ mod test {
 			.contains::<ResolvedFieldPath>()
 			.xpect_true();
 
-		let json = TemplateSaver::new()
+		let scene = TemplateSaver::new()
 			.save_roots(&mut world, MediaType::Json, [root])
 			.unwrap()
-			.as_utf8()
-			.unwrap()
-			.xmap(serde_json::from_str::<serde_json::Value>)
+			.deserialize::<Value>()
 			.unwrap();
-		let mut dumped = json["entities"]
-			.as_object()
+		let mut dumped = scene
+			.get(SceneEntities::ENTITIES)
 			.unwrap()
+			.as_map()
+			.unwrap()
+			.0
 			.keys()
 			.map(|key| EntityKey::parse(key).unwrap())
-			.map(|key| SceneEntities::entity_json(&json, key))
-			.flat_map(|entity| entity.as_object().unwrap().keys())
+			.map(|key| SceneEntities::entity_value(&scene, key).unwrap())
+			.flat_map(|entity| entity.as_map().unwrap().0.keys())
 			.cloned()
 			.collect::<Vec<_>>();
 		dumped.sort();

@@ -1028,7 +1028,7 @@ impl StalwartBlock {
 		config.add_untyped_data_source(
 			"aws_ssm_parameter",
 			&ami_label,
-			&json!({ "name": Self::AMI_PARAMETER }),
+			&value!({ "name": (Self::AMI_PARAMETER) }),
 		)?;
 
 		// declared so `tofu destroy` removes it; the agent writes into the
@@ -1138,14 +1138,14 @@ impl StalwartBlock {
 			config.set_lifecycle(
 				"aws_ebs_volume",
 				data_volume.ident().label(),
-				json!({ "prevent_destroy": true }),
+				value!({ "prevent_destroy": true }),
 			)?;
 		}
 		config.set_lifecycle(
 			"aws_volume_attachment",
 			data_attachment.ident().label(),
-			json!({
-				"replace_triggered_by": [instance.field("id")]
+			value!({
+				"replace_triggered_by": [(instance.field("id"))]
 			}),
 		)?;
 
@@ -3260,9 +3260,12 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_eq("_25._tcp.mail.beetmash.com");
-		record["data"]["usage"].xpect_eq(serde_json::json!(3));
-		record["data"]["selector"].xpect_eq(serde_json::json!(1));
-		record["data"]["matching_type"].xpect_eq(serde_json::json!(1));
+		record["data"]["usage"].as_u64().unwrap().xpect_eq(3);
+		record["data"]["selector"].as_u64().unwrap().xpect_eq(1);
+		record["data"]["matching_type"]
+			.as_u64()
+			.unwrap()
+			.xpect_eq(1);
 		record["data"]["certificate"]
 			.as_str()
 			.unwrap()
@@ -3336,7 +3339,9 @@ mod tests {
 			.values()
 			.next()
 			.unwrap()["ipv6_address_count"]
-			.xpect_eq(serde_json::json!(1));
+			.as_u64()
+			.unwrap()
+			.xpect_eq(1);
 		let aaaa = json["resource"]["cloudflare_dns_record"]
 			.as_object()
 			.unwrap()

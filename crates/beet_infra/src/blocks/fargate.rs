@@ -951,7 +951,7 @@ impl FargateBlock {
 		config.set_lifecycle(
 			"aws_acm_certificate",
 			cert.ident().label(),
-			json!({ "create_before_destroy": true }),
+			value!({ "create_before_destroy": true }),
 		)?;
 		Ok(https_listener)
 	}

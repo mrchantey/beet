@@ -1,7 +1,7 @@
 //! Serde representation for [`Value`].
 //!
 //! Two forms, switched on `is_human_readable`. A self describing format
-//! (json, ron, a [`Value`] itself) takes the value as it reads, `"hi"` or
+//! (json, toml, a [`Value`] itself) takes the value as it reads, `"hi"` or
 //! `{"a": 1}`, and reads it back by what it finds. A binary format that cannot
 //! say what comes next (postcard) takes it tagged, each value an enum variant
 //! naming its kind, so it reads back without `deserialize_any`.
@@ -297,8 +297,9 @@ mod test {
 			("list", Value::new_list([1u64, 2])),
 			("map", Value::Map(Map::new([("z", 1u64), ("a", 2)]))),
 		]));
-		let bytes = postcard::to_allocvec(&value).unwrap();
-		postcard::from_bytes::<Value>(&bytes)
+		let bytes = MediaType::Postcard.serialize(&value).unwrap();
+		MediaType::Postcard
+			.deserialize::<Value>(&bytes)
 			.unwrap()
 			.xpect_eq(value);
 	}
@@ -309,8 +310,10 @@ mod test {
 		map.insert("z", 1_i64);
 		map.insert("a", 2_i64);
 
-		serde_json::to_string(&Value::Map(map))
+		MediaBytes::serialize(MediaType::Json, &Value::Map(map))
 			.unwrap()
-			.xpect_eq(r#"{"a":2,"z":1}"#.to_string());
+			.as_utf8()
+			.unwrap()
+			.xpect_eq(r#"{"a":2,"z":1}"#);
 	}
 }

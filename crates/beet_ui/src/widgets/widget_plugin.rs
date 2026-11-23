@@ -82,7 +82,7 @@ pub(crate) fn widget_plugin(app: &mut App) {
 			.in_set(DocumentSyncSet::Rebuild),
 	);
 	// a schema editor commits every change of the schema document it names
-	// against the data document it sits in, the one transaction an edit rides;
+	// against the state document it sits in, the one transaction an edit rides;
 	// the commit evolves data off a task, so the plugin that registers it
 	// declares the bridge that carries it
 	app.install_type::<AsyncPlugin>()

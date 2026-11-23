@@ -22,7 +22,7 @@ use crate::prelude::*;
 /// document a [`FieldRef`] resolves against (that stays [`FieldRef::document`] /
 /// [`FieldOf`]).
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct DocumentScope {
 	/// Segments prepended to descendant field paths.
 	pub path: FieldPath,

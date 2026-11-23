@@ -12,7 +12,7 @@
 //!
 //! What survives is the **transaction**. A schema edit changes what existing
 //! data must satisfy, so every change of the schema document is committed
-//! against the data document it describes through
+//! against the state document it describes through
 //! [`TypedDocument::commit_schema`], which evolves the pair together or
 //! neither. A refused commit reverts the schema document to what was last
 //! committed, snapping the control that asked back, and lands its reason in
@@ -113,11 +113,11 @@ pub(in crate::widgets) struct SchemaEditorRoot {
 #[derive(Component)]
 pub(in crate::widgets) struct ErrorLine;
 
-/// System: commit each changed schema document against the data document its
+/// System: commit each changed schema document against the state document its
 /// editor is mounted in, one commit in flight per editor.
 ///
 /// Resolution is structural: the schema document is the one the editor's
-/// [`DocRef`] names, and the data document is the nearest document above the
+/// [`DocRef`] names, and the state document is the nearest document above the
 /// editor (item 87's three-document resolution, less the draft). A schema
 /// document that has not arrived yet leaves the editor waiting rather than
 /// reporting, since a store read lands frames after the tree is built.
@@ -151,7 +151,7 @@ pub(in crate::widgets) fn commit_schema_edits(
 		}
 		let (base, next) = (committed.clone(), document.0.clone());
 		state.in_flight = true;
-		// the data document is the one the editor sits in, resolved from
+		// the state document is the one the editor sits in, resolved from
 		// above the editor's own `DocRef` so the walk does not end at the
 		// schema document it names
 		let data_doc = resolver.entity_above(editor, &DocumentPath::Ancestor);
@@ -171,14 +171,14 @@ pub(in crate::widgets) fn commit_schema_edits(
 	OK
 }
 
-/// The commit itself, across two exclusive world hops: read the data document
+/// The commit itself, across two exclusive world hops: read the state document
 /// out, evolve it under `next` against `base`, then write it back and publish
 /// the new schema so every subtree generated from it rebuilds. The schema
 /// document already holds `next`, so only the data moves here.
 ///
 /// The registry is *cloned* into the task rather than borrowed, because no world
 /// borrow may be held across the evolution's awaits. The gap between the hops is
-/// the one window in which a concurrent write to the data document would be
+/// the one window in which a concurrent write to the state document would be
 /// lost; multi-writer arbitration is the workstream item 15 parks, and until it
 /// lands the editor is the only writer of a schema.
 async fn commit(
@@ -220,7 +220,7 @@ async fn commit(
 
 	data.commit_schema(
 		SchemaResolver::default().with_schemas(&registry),
-		"the data document",
+		"the state document",
 		&mut declaration,
 		next.clone(),
 	)
@@ -228,11 +228,10 @@ async fn commit(
 
 	world
 		.with(move |world: &mut World| {
-			*world
-				.get_mut::<Document>(data_doc)
-				.ok_or_else(|| bevyhow!("the data document was despawned"))? =
-				Document::new(data.value);
-			// the data document's own declaration moves only when the commit
+			*world.get_mut::<Document>(data_doc).ok_or_else(|| {
+				bevyhow!("the state document was despawned")
+			})? = Document::new(data.value);
+			// the state document's own declaration moves only when the commit
 			// moved it, ie when it inlined exactly what the schema document held
 			if world
 				.get::<DocumentSchema>(data_doc)
@@ -350,7 +349,7 @@ mod test {
 		NamedFieldSchema::new("label", ValueSchema::String(default()))
 	}
 
-	/// The todo app's shape, settled: a data document of rows composing the row
+	/// The todo app's shape, settled: a state document of rows composing the row
 	/// schema by reference, a schema document holding that row schema, a view
 	/// generated from it, and an editor pointed at it.
 	async fn app() -> (World, Entity, Entity) {

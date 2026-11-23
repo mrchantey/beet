@@ -194,7 +194,7 @@ pub(super) enum Placement {
 /// IRs: `DynamicTemplate` is the serde round-trip form, `BsxTemplate` a syntax
 /// tree resolved against live registries, with no serializable value form.
 pub enum EntryTemplate {
-	/// The serde IR, from RON/JSON/postcard bytes.
+	/// The serde IR, from the bytes of a structured format.
 	Serde(super::DynamicTemplate),
 	/// The BSX markup IR, from `.bsx`/`.html` source.
 	#[cfg(feature = "bsx")]
@@ -314,7 +314,7 @@ mod entry_test {
 	}
 }
 
-#[cfg(all(test, feature = "ron"))]
+#[cfg(all(test, feature = "json"))]
 mod test {
 	use crate::prelude::*;
 
@@ -335,10 +335,10 @@ mod test {
 	/// A whole-world dump round-trips, and carries no clock: [`Time`] is derived
 	/// state, marked once at registration rather than denied by this save site.
 	#[crate::test]
-	fn round_trip_ron() {
+	fn round_trip_json() {
 		let mut app = serde_world();
 		let bytes = TemplateSaver::new_all(app.world())
-			.save(app.world(), MediaType::Ron)
+			.save(app.world(), MediaType::Json)
 			.unwrap();
 		bytes
 			.as_utf8()
@@ -359,7 +359,7 @@ mod test {
 
 		let bytes = TemplateSaver::new()
 			.with_entity_tree(app.world(), entity)
-			.save(app.world(), MediaType::Ron)
+			.save(app.world(), MediaType::Json)
 			.unwrap();
 		let text = bytes.as_utf8().unwrap();
 		text.xref().xpect_contains("Root");
@@ -374,7 +374,7 @@ mod test {
 		let child = app.world_mut().spawn(Name::new("TemplateChild")).id();
 		let bytes = TemplateSaver::new()
 			.with_entities([child])
-			.save(app.world(), MediaType::Ron)
+			.save(app.world(), MediaType::Json)
 			.unwrap();
 
 		let target = app
@@ -421,7 +421,7 @@ mod test {
 			.id();
 		let bytes = TemplateSaver::new()
 			.with_entity_tree(app.world(), root)
-			.save(app.world(), MediaType::Ron)
+			.save(app.world(), MediaType::Json)
 			.unwrap();
 
 		let mut app = serde_world();

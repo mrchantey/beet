@@ -19,8 +19,9 @@ fn setup(ruleset: Res<RuleSet>, query: StyleQuery) -> Result {
 			.unwrap();
 
 	// write the store for inspection
-	let json = serde_json::to_string_pretty(&*ruleset).unwrap();
-	fs_ext::write(&ruleset_path, json).unwrap();
+	let json = MediaType::Json
+		.serialize_with_options(&*ruleset, SerializeOptions { pretty: true })?;
+	fs_ext::write(&ruleset_path, json)?;
 	info!("Ruleset written to: {}", ruleset_path);
 
 	let css = query.build_css(

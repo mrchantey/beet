@@ -109,9 +109,6 @@ pub(super) fn attr_to_literal(value: &AttrValue) -> Result<DataLiteral> {
 			bevybail!("an `@` binding is not a component patch value")
 		}
 		AttrValue::Spread(_) => bevybail!("a spread is not an attribute value"),
-		AttrValue::Style { .. } => {
-			bevybail!("a `bx:style` directive is not a component patch value")
-		}
 	}
 }
 

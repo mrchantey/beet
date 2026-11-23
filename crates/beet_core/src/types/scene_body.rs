@@ -29,13 +29,11 @@
 //! `template_serde` (`SceneBody::reflect` and `TemplateBuilder`).
 use crate::prelude::*;
 use indexmap::IndexMap;
-use serde::ser::SerializeMap;
-use serde::ser::SerializeStruct;
 
 /// A scene as data: its resources and its entities, each an [`EntityBody`] of
 /// type path to [`Value`]. See the [module docs](self) for the wire shape.
 ///
-/// The serde form of every scene format (json, ron, postcard, toml), and
+/// The serde form of every scene format (json, postcard, toml), and
 /// `org.beet.scene#body` as an atproto lexicon object ([`NSID`](Self::NSID)).
 /// Two bodies are equal when they write the same document, so entity order
 /// counts.
@@ -48,98 +46,74 @@ pub struct SceneBody {
 	pub entities: IndexMap<EntityKey, EntityBody, FixedHasher>,
 }
 
-/// The body as written, `$type` first, so a reader probing a structured
-/// document's root finds it before anything else. A map in a human readable
-/// format, since `$type` is no identifier ron allows, and a struct in a
-/// binary one, whose fields are positional.
+/// One serde path for every format through the private [`Wire`] shape, a
+/// map in a self describing format and positional fields in postcard, whose
+/// leading `$type` doubles as the magic telling a body from a value.
 impl Serialize for SceneBody {
 	fn serialize<S: serde::Serializer>(
 		&self,
 		serializer: S,
 	) -> Result<S::Ok, S::Error> {
-		if serializer.is_human_readable() {
-			let mut body = serializer.serialize_map(Some(3))?;
-			body.serialize_entry(OpenUnion::TYPE_KEY, Self::NSID.as_str())?;
-			body.serialize_entry("resources", &self.resources)?;
-			body.serialize_entry("entities", &self.entities)?;
-			body.end()
-		} else {
-			let mut body = serializer.serialize_struct("SceneBody", 3)?;
-			body.serialize_field(OpenUnion::TYPE_KEY, Self::NSID.as_str())?;
-			body.serialize_field("resources", &self.resources)?;
-			body.serialize_field("entities", &self.entities)?;
-			body.end()
+		WireRef {
+			r#type: SceneBodyType,
+			resources: &self.resources,
+			entities: &self.entities,
 		}
+		.serialize(serializer)
 	}
 }
 
-/// The body as read: its `$type` checked, and absent in a union member's
-/// fields or a hand written document.
 impl<'de> Deserialize<'de> for SceneBody {
 	fn deserialize<D: serde::Deserializer<'de>>(
 		deserializer: D,
 	) -> Result<Self, D::Error> {
-		const FIELDS: &[&str] = &[OpenUnion::TYPE_KEY, "resources", "entities"];
-		match deserializer.is_human_readable() {
-			true => deserializer.deserialize_map(SceneBodyVisitor),
-			false => deserializer.deserialize_struct(
-				"SceneBody",
-				FIELDS,
-				SceneBodyVisitor,
-			),
-		}
-	}
-}
-
-struct SceneBodyVisitor;
-
-impl<'de> serde::de::Visitor<'de> for SceneBodyVisitor {
-	type Value = SceneBody;
-
-	fn expecting(
-		&self,
-		formatter: &mut core::fmt::Formatter,
-	) -> core::fmt::Result {
-		formatter.write_str("a scene body, `{ resources, entities }`")
-	}
-
-	fn visit_map<A: serde::de::MapAccess<'de>>(
-		self,
-		mut map: A,
-	) -> Result<SceneBody, A::Error> {
-		let mut body = SceneBody::default();
-		while let Some(key) = map.next_key::<SmolStr>()? {
-			match key.as_str() {
-				OpenUnion::TYPE_KEY => {
-					map.next_value::<SceneBodyType>()?;
-				}
-				"resources" => body.resources = map.next_value()?,
-				"entities" => body.entities = map.next_value()?,
-				_ => {
-					map.next_value::<serde::de::IgnoredAny>()?;
-				}
-			}
-		}
-		Ok(body)
-	}
-
-	fn visit_seq<A: serde::de::SeqAccess<'de>>(
-		self,
-		mut seq: A,
-	) -> Result<SceneBody, A::Error> {
-		let missing = |index| serde::de::Error::invalid_length(index, &self);
-		seq.next_element::<SceneBodyType>()?
-			.ok_or_else(|| missing(0))?;
-		Ok(SceneBody {
-			resources: seq.next_element()?.ok_or_else(|| missing(1))?,
-			entities: seq.next_element()?.ok_or_else(|| missing(2))?,
+		let Wire {
+			r#type: SceneBodyType,
+			resources,
+			entities,
+		} = Wire::deserialize(deserializer)?;
+		Ok(Self {
+			resources,
+			entities,
 		})
 	}
 }
 
-/// A `$type` that must name [`SceneBody::NSID`], read as a plain string in
-/// every format so postcard's positional fields agree with the writer.
+/// The body as written, `$type` first, so a reader probing a structured
+/// document's root finds it before anything else. Borrowed, so a write
+/// clones nothing.
+#[derive(Serialize)]
+struct WireRef<'a> {
+	#[serde(rename = "$type")]
+	r#type: SceneBodyType,
+	resources: &'a EntityBody,
+	entities: &'a IndexMap<EntityKey, EntityBody, FixedHasher>,
+}
+
+/// The body as read: its `$type` checked, and absent in a union member's
+/// fields or a hand written document, as either half may be.
+#[derive(Deserialize)]
+struct Wire {
+	#[serde(rename = "$type", default)]
+	r#type: SceneBodyType,
+	#[serde(default)]
+	resources: EntityBody,
+	#[serde(default)]
+	entities: IndexMap<EntityKey, EntityBody, FixedHasher>,
+}
+
+/// A `$type` that must name [`SceneBody::NSID`], written as a plain string.
+#[derive(Default)]
 struct SceneBodyType;
+
+impl Serialize for SceneBodyType {
+	fn serialize<S: serde::Serializer>(
+		&self,
+		serializer: S,
+	) -> Result<S::Ok, S::Error> {
+		serializer.serialize_str(SceneBody::NSID.as_str())
+	}
+}
 
 impl<'de> Deserialize<'de> for SceneBodyType {
 	fn deserialize<D: serde::Deserializer<'de>>(

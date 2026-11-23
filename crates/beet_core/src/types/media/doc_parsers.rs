@@ -3,6 +3,11 @@
 //! a format's parser is chosen and the one path a parse into a world takes,
 //! the parsing counterpart of `beet_ui`'s `DocRenderers`.
 //!
+//! What a parser reads is a scene document: a document compiled into a scene,
+//! strictly upstream of it and never written back from a running world. The
+//! distinction from a state document, the [`Document`] a widget binds to, is
+//! stated once, in the `document` module docs.
+//!
 //! A parser touches no world: bytes in, scene body out, and everything after
 //! the body is one pipeline that knows nothing of the format it came from.
 //! [`DocParsers::parse`] is that pipeline: choose the parser, parse, spawn the
@@ -12,7 +17,7 @@
 //! world with none installed still reads them:
 //!
 //! ```text
-//! application/json, application/ron,      a scene body when the root object
+//! application/json,                       a scene body when the root object
 //! application/postcard, application/toml  carries `$type: org.beet.scene#body`,
 //!                                         else one entity holding the `Value`
 //! text/javascript                         one entity carrying `RunScript`, the
@@ -82,16 +87,24 @@ pub trait DocParser: 'static + Send + Sync + Clone + Installer {
 ///
 /// Every parse into a world ends in one [`PostParseTree`] run, whatever the
 /// format, with the document's root marked [`ParsedRoot`] for its duration.
+///
+/// It carries the [`BsxDirectives`] too, so every parser that lowers BSX,
+/// markdown's embedded BSX included, reads one directive set with no world.
 #[derive(Clone, Resource)]
 pub struct DocParsers {
 	parsers: Vec<Arc<dyn ErasedDocParser>>,
+	#[cfg(feature = "bsx")]
+	directives: BsxDirectives,
 }
 
-/// The base parsers: plain text, javascript and the structured formats.
+/// The base parsers: plain text, javascript and the structured formats, and
+/// the standard directives.
 impl Default for DocParsers {
 	fn default() -> Self {
 		let mut parsers = Self {
 			parsers: Vec::new(),
+			#[cfg(feature = "bsx")]
+			directives: default(),
 		};
 		parsers
 			.register(PlainTextParser::default())
@@ -115,6 +128,16 @@ impl DocParsers {
 		app.world_mut()
 			.get_resource_or_init::<Self>()
 			.register(parser);
+	}
+
+	/// The directives every BSX lowering rewrites.
+	#[cfg(feature = "bsx")]
+	pub fn directives(&self) -> &BsxDirectives { &self.directives }
+
+	/// The directives, to register one ([`BsxDirectives::register_on`]).
+	#[cfg(feature = "bsx")]
+	pub fn directives_mut(&mut self) -> &mut BsxDirectives {
+		&mut self.directives
 	}
 
 	/// Every media type a registered parser reads, in registration order.

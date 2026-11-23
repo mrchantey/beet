@@ -28,7 +28,6 @@
 
 use crate::prelude::*;
 use bevy::ecs::component::ComponentCloneBehavior;
-use bevy::ecs::component::ComponentId;
 use bevy::ecs::entity::EntityMapper;
 use bevy::ecs::reflect::AppTypeRegistry;
 use bevy::ecs::reflect::ReflectComponent;
@@ -46,7 +45,7 @@ use bevy_reflect::TypeRegistry;
 /// list of entities, each slot a reflectable value or a named deferred
 /// template. What a [`SceneBody`] spawns through ([`SceneBody::reflect`]).
 ///
-/// This is the IR for the serde formats (RON/JSON/postcard), not for markup: BSX
+/// This is the IR for the serde formats (json, postcard, toml), not for markup: BSX
 /// is its own syntax-tree IR ([`BsxTemplate`](crate::prelude::BsxTemplate))
 /// resolved against live registries, with no serializable value form. Both
 /// implement [`Template`] and the unified
@@ -111,8 +110,8 @@ pub enum ComponentSlot {
 /// when the slot builds and never before (design: a scene is never target
 /// specific through a baked expansion).
 ///
-/// Its build is retained on the entity as a [`TemplateInvocation`], so a save
-/// writes the invocation back in place of what it expanded to.
+/// A template is a builder: it runs once and is consumed, so a save of the
+/// world it built into writes what it built and nothing of the invocation.
 pub struct DeferredTemplate {
 	/// The registered template's type path, full or short, the registry
 	/// lookup key.
@@ -120,30 +119,6 @@ pub struct DeferredTemplate {
 	/// The reflected patch over the template's default, typically a
 	/// `DynamicStruct` carrying only the provided fields.
 	pub patch: Box<dyn PartialReflect>,
-	/// The patch as its body wrote it, which a save writes back.
-	pub value: Value,
-}
-
-/// The template invocations a scene body expanded on this entity, each
-/// written back by a saver as one of the entity's own keys in place of what
-/// it expanded to: the components it inserted are left out, and the entities
-/// it spawned are [`Derived`]. So a scene holding an invocation re-saves byte
-/// identical, and re-expands on the next load.
-///
-/// Never saved as itself, and read directly, so it needs no registration.
-#[derive(Debug, Default, Clone, Component, Deref)]
-pub struct TemplateInvocations(Vec<TemplateInvocation>);
-
-/// One template invocation a body expanded, see [`TemplateInvocations`].
-#[derive(Debug, Clone)]
-pub struct TemplateInvocation {
-	/// The template's type path, the key a save writes it under.
-	pub name: SmolStr,
-	/// The patch as its body wrote it.
-	pub value: Value,
-	/// The type paths of the components its expansion inserted on the entity,
-	/// which a save leaves out.
-	pub expanded: Vec<SmolStr>,
 }
 
 impl Template for DynamicTemplate {
@@ -266,12 +241,10 @@ fn build_entity(
 				)?;
 			}
 			ComponentSlot::Template(deferred) => {
-				// SAFETY: only used to acquire the mapped entity for a scoped
-				// build and to retain what that build expanded.
-				let world = unsafe { cx.entity.world_mut() };
-				let before = ExpansionSnapshot::new(world, entity_id);
 				// build the deferred template into a context scoped to this
 				// entity, sharing the reference map so cross-entity refs resolve.
+				// SAFETY: only used to acquire the mapped entity for a scoped build.
+				let world = unsafe { cx.entity.world_mut() };
 				let mut entity = world.entity_mut(entity_id);
 				let mut scoped =
 					TemplateContext::new(&mut entity, cx.entity_references);
@@ -281,76 +254,10 @@ fn build_entity(
 					deferred.patch.as_ref(),
 					&mut scoped,
 				)?;
-				before.retain(world, entity_id, registry, deferred);
 			}
 		}
 	}
 	Ok(())
-}
-
-/// An entity's components and children before a template expands on it, so
-/// what the expansion added is retained as its [`TemplateInvocation`].
-struct ExpansionSnapshot {
-	components: Vec<ComponentId>,
-	children: Vec<Entity>,
-}
-
-impl ExpansionSnapshot {
-	fn new(world: &World, entity: Entity) -> Self {
-		let entity = world.entity(entity);
-		Self {
-			components: entity.archetype().components().to_vec(),
-			children: entity
-				.get::<Children>()
-				.map(|children| children.to_vec())
-				.unwrap_or_default(),
-		}
-	}
-
-	/// Retain `deferred`'s expansion on `entity`: the components it added, by
-	/// type path, and every child it spawned marked [`Derived`].
-	fn retain(
-		self,
-		world: &mut World,
-		entity: Entity,
-		registry: &TypeRegistry,
-		deferred: &DeferredTemplate,
-	) {
-		let target = world.entity(entity);
-		let expanded = target
-			.archetype()
-			.components()
-			.iter()
-			.filter(|id| !self.components.contains(id))
-			.filter_map(|id| world.components().get_info(*id)?.type_id())
-			.filter_map(|type_id| registry.get(type_id))
-			.map(|registration| {
-				SmolStr::new(registration.type_info().type_path())
-			})
-			.collect::<Vec<_>>();
-		let spawned = target
-			.get::<Children>()
-			.into_iter()
-			.flatten()
-			.filter(|child| !self.children.contains(child))
-			.copied()
-			.collect::<Vec<_>>();
-		for child in spawned {
-			world.entity_mut(child).insert(Derived);
-		}
-		let invocation = TemplateInvocation {
-			name: deferred.name.clone(),
-			value: deferred.value.clone(),
-			expanded,
-		};
-		let mut target = world.entity_mut(entity);
-		match target.get_mut::<TemplateInvocations>() {
-			Some(mut invocations) => invocations.0.push(invocation),
-			None => {
-				target.insert(TemplateInvocations(vec![invocation]));
-			}
-		}
-	}
 }
 
 /// The deterministic [`SceneEntityReference`] for an in-template entity, keyed on
@@ -685,7 +592,6 @@ mod test {
 				DeferredTemplate {
 					name: "Label".into(),
 					patch: Box::new(patch),
-					value: value!({ "text": "deferred" }),
 				},
 			)])],
 		};

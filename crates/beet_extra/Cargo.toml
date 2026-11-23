@@ -27,7 +27,7 @@ bevy_default = [
 ml = ["dep:beet_ml"]
 # serde (de)serialization, used by the thread examples' tool schemas (eg
 # `ChoiceInput`/`BinaryOp`). Pulled in by `json`/`thread`, not standalone.
-serde = ["dep:serde", "dep:serde_json"]
+serde = ["dep:serde"]
 # JSON (de)serialization across the sub-crate surface, mirroring the umbrella
 # `beet` crate's `json` feature shape for whichever sub-crates are deps here.
 json = ["serde", "beet_core/json", "beet_action/json", "beet_net?/json", "beet_router?/json"]
@@ -73,7 +73,6 @@ beet_infra = { workspace = true, optional = true }
 
 
 serde = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
 # beet = { workspace = true, features = ["reflect"] }
 bevy = { workspace = true }
 # bevy-inspector-egui = "0.25.0"

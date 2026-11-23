@@ -1,7 +1,7 @@
 //! Documents through a [`BlobStore`], and the by-*location* half of schema
 //! resolution.
 //!
-//! A data document may name its schema by pointing at another document
+//! A state document may name its schema by pointing at another document
 //! ([`SchemaRef::Document`]), resolved by default in the naming document's own
 //! store, the `AncestorQuery<&BlobStore>` idiom. The index that answers such a
 //! reference is [`SchemaRegistry`]'s by-location one, which sits beside the
@@ -19,24 +19,27 @@ impl BlobStore {
 		resolver: SchemaResolver<'_>,
 		path: &RelPath,
 	) -> Result<TypedDocument> {
-		let bytes = self.get(path).await?;
-		TypedDocument::read(
-			resolver,
-			path.as_str(),
-			core::str::from_utf8(&bytes)?,
-		)
-		.await
+		let bytes =
+			MediaBytes::new(document_media_type(path), self.get(path).await?);
+		TypedDocument::read(resolver, path.as_str(), &bytes).await
 	}
 
-	/// Write `document` to `path`, as the byte-deterministic json a reopen
+	/// Write `document` to `path`, in the byte-deterministic form a reopen
 	/// re-saves identically.
 	pub async fn insert_document(
 		&self,
 		path: &RelPath,
 		document: &TypedDocument,
 	) -> Result {
-		self.insert(path, document.to_json()?).await
+		let (_, bytes) = document.to_bytes(document_media_type(path))?.take();
+		self.insert(path, bytes).await
 	}
+}
+
+/// The format a document at `path` is stored in: the one its extension names,
+/// json for a path naming none.
+pub(crate) fn document_media_type(path: &RelPath) -> MediaType {
+	path.media_type().unwrap_or(MediaType::Json)
 }
 
 /// The nearest ancestor [`BlobStore`] of `entity`, or `None` while none has
@@ -142,7 +145,7 @@ mod test {
 	}
 
 	/// A store holding `schema.json` (the schema document) and `todos.json`
-	/// (the data document naming it by location).
+	/// (the state document naming it by location).
 	async fn todo_store() -> BlobStore {
 		let store = BlobStore::temp();
 		store
@@ -180,7 +183,7 @@ mod test {
 	}
 
 	/// Until the schema document is read the arm defers to a wildcard; after it
-	/// is, the data document validates against the schema it named.
+	/// is, the state document validates against the schema it named.
 	#[beet_core::test]
 	async fn a_located_schema_resolves_after_it_arrives() {
 		let mut registry = SchemaRegistry::default();

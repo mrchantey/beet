@@ -199,12 +199,18 @@ mod test {
 	#[crate::test]
 	fn serde_is_the_string() {
 		let recipient = AgeIdentity::generate().to_recipient();
-		let json = serde_json::to_string(&recipient).unwrap();
-		json.xpect_eq(format!("\"{recipient}\""));
-		serde_json::from_str::<AgeRecipient>(&json)
+		let bytes = MediaBytes::serialize(MediaType::Json, &recipient).unwrap();
+		bytes
+			.as_utf8()
+			.unwrap()
+			.xpect_eq(format!("\"{recipient}\""));
+		bytes
+			.deserialize::<AgeRecipient>()
 			.unwrap()
 			.xpect_eq(recipient);
-		serde_json::from_str::<AgeRecipient>("\"age1nope\"").unwrap_err();
+		MediaType::Json
+			.deserialize::<AgeRecipient>(b"\"age1nope\"")
+			.unwrap_err();
 	}
 
 	#[crate::test]

@@ -51,7 +51,7 @@ pub(crate) enum RsxAttr {
 
 /// A keyed attribute, ie `class="card"`, `disabled`, `onclick={..}`.
 pub(crate) struct RsxKeyedAttr {
-	/// The attribute key, ie `class`, `disabled`, `bx:slot`.
+	/// The attribute key, ie `class`, `disabled`, `data-id`.
 	pub key: RsxName,
 	/// What the key holds.
 	pub value: RsxAttrValue,
@@ -87,7 +87,7 @@ pub(crate) enum RsxAttrValue {
 /// A tag or attribute name.
 ///
 /// Covers a Rust path (`div`, `Foo`, `path::to::Foo`) and an SGML-style
-/// punctuated name (`foo-bar`, `bx:slot`, `data-foo`). The slot/fragment
+/// punctuated name (`foo-bar`, `xlink:href`, `data-foo`). The slot/fragment
 /// specials are their own nodes, not names.
 pub(crate) enum RsxName {
 	/// A path of `::`-separated idents, ie `div`, `Foo`, `path::to::Foo`.
@@ -97,7 +97,7 @@ pub(crate) enum RsxName {
 		/// The span of the first segment, for diagnostics.
 		span: Span,
 	},
-	/// A name punctuated by `-`, `:`, or `.`, ie `foo-bar`, `bx:slot`.
+	/// A name punctuated by `-`, `:`, or `.`, ie `foo-bar`, `xlink:href`.
 	Punctuated {
 		/// The rendered name, ie `foo-bar`.
 		value: String,
@@ -114,7 +114,7 @@ impl RsxName {
 		}
 	}
 
-	/// The name rendered as a string, ie `div`, `path::to::Foo`, `bx:slot`.
+	/// The name rendered as a string, ie `div`, `path::to::Foo`, `xlink:href`.
 	pub fn value(&self) -> String {
 		match self {
 			Self::Path { path, .. } => path

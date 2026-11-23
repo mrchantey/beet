@@ -429,7 +429,7 @@ mod test {
 		// Serialize
 		let template_bytes = TemplateSaver::new()
 			.with_entities([entity])
-			.save(app.world(), MediaType::Ron)
+			.save(app.world(), MediaType::Json)
 			.unwrap();
 		template_bytes
 			.as_utf8()
@@ -470,7 +470,7 @@ mod test {
 		// Serialize then despawn
 		let template_bytes = TemplateSaver::new()
 			.with_entities([entity])
-			.save(app.world(), MediaType::Ron)
+			.save(app.world(), MediaType::Json)
 			.unwrap();
 		app.world_mut().entity_mut(entity).despawn();
 		app.update();

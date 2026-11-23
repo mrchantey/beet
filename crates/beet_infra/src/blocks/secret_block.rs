@@ -511,10 +511,7 @@ mod test {
 			parent.spawn(block.clone());
 		});
 		let (stack, _deployment, config) = scope.finish().unwrap();
-		let json = serde_json::from_str::<serde_json::Value>(
-			&config.to_json_string().unwrap(),
-		)
-		.unwrap();
+		let json = config.to_json().into_json();
 		let parameters = json["resource"][SecretBlock::RESOURCE_TYPE]
 			.as_object()
 			.unwrap();
@@ -787,23 +784,23 @@ mod test {
 			config
 				.add_untyped_provider(
 					"aws",
-					&serde_json::json!({
+					&value!({
 						"region": "us-west-2",
 						"access_key": "AKIAFAKEFAKEFAKEFAKE",
 						"secret_key": "fake",
 						"skip_credentials_validation": true,
 						"skip_requesting_account_id": true,
 						"skip_metadata_api_check": true,
-						"endpoints": { "ssm": url },
+						"endpoints": { "ssm": (&url) },
 					}),
 				)
 				.unwrap()
 				.add_untyped_resource(
 					"terraform_data",
 					"box",
-					&serde_json::json!({
+					&value!({
 						"input": "box",
-						"depends_on": [block.parameter_address(&stack)],
+						"depends_on": [(block.parameter_address(&stack))],
 					}),
 				)
 				.unwrap();

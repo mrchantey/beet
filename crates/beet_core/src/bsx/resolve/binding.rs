@@ -52,12 +52,8 @@ pub(super) fn apply_binding(
 					.with_document(DocumentPath::Props),
 			);
 		}
-		// the `Value`<->reflect bridge needs `serde_json` (the `json` feature);
-		// an embedded build without it keeps the `Value` but loses the
-		// resource/component sync (Risk: documented, acceptable).
 		BindingSource::Res => {
 			insert_value_if_missing(entity);
-			#[cfg(feature = "json")]
 			entity.insert(ResourceFieldRef::new(
 				binding.type_path.clone().unwrap_or_default(),
 				binding.field_path.to_string(),
@@ -65,17 +61,12 @@ pub(super) fn apply_binding(
 		}
 		BindingSource::Comp => {
 			insert_value_if_missing(entity);
-			#[cfg(feature = "json")]
-			{
-				let mut reflect_ref = ReflectFieldRef::new(
-					binding.type_path.clone().unwrap_or_default(),
-					binding.field_path.to_string(),
-				);
-				reflect_ref.target = comp_target;
-				entity.insert(reflect_ref);
-			}
-			#[cfg(not(feature = "json"))]
-			let _ = comp_target;
+			let mut reflect_ref = ReflectFieldRef::new(
+				binding.type_path.clone().unwrap_or_default(),
+				binding.field_path.to_string(),
+			);
+			reflect_ref.target = comp_target;
+			entity.insert(reflect_ref);
 		}
 	}
 	Ok(())

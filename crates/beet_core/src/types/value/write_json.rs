@@ -147,13 +147,13 @@ mod test {
 	#[cfg(feature = "json")]
 	#[crate::test]
 	fn agrees_with_serde() {
-		let value = Value::from_json(serde_json::json!({
-			"nested": { "list": [1, -2, 1.5, true, null], "text": "a\"b\nc" },
+		let value = value!({
+			"nested": { "list": [1, (-2), 1.5, true, null], "text": "a\"b\nc" },
 			"bytes": [0, 255],
-		}));
-		serde_json::from_str::<serde_json::Value>(&value.to_json_string())
+		});
+		MediaType::Json
+			.deserialize::<Value>(value.to_json_string().as_bytes())
 			.unwrap()
-			.xmap(Value::from_json)
 			.xpect_eq(value);
 	}
 }

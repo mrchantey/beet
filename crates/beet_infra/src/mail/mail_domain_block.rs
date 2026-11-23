@@ -3,7 +3,6 @@ use crate::mail::*;
 use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
-use serde_json::json;
 
 /// Which of a mail domain's records a [`MailDomainBlock`] publishes.
 ///
@@ -813,7 +812,7 @@ impl MailDomainBlock {
 		config.add_untyped_data_source(
 			"aws_caller_identity",
 			"current",
-			&json!({}),
+			&value!({}),
 		)?;
 		// SES drops every event it may not publish, without a word, so the
 		// policy granting it goes in the layer with the destination; the topic
@@ -964,7 +963,7 @@ impl MailDomainBlock {
 		config.add_untyped_data_source(
 			"aws_caller_identity",
 			"current",
-			&json!({}),
+			&value!({}),
 		)?;
 		let mut addresses = Vec::new();
 		for (metric, threshold, description) in alarms {
@@ -979,21 +978,21 @@ impl MailDomainBlock {
 			config.add_untyped_resource(
 				"aws_cloudwatch_metric_alarm",
 				&label,
-				&json!({
-					"alarm_name": format!("{}-{metric}", self.slug()),
-					"alarm_description": format!("{} {description}", self.domain),
+				&value!({
+					"alarm_name": (format!("{}-{metric}", self.slug())),
+					"alarm_description": (format!("{} {description}", self.domain)),
 					"namespace": namespace,
-					"metric_name": metric,
+					"metric_name": (*metric),
 					"dimensions": { dimension: dimension_value },
 					"statistic": "Average",
 					"comparison_operator": "GreaterThanThreshold",
-					"threshold": threshold,
+					"threshold": (*threshold),
 					"period": 3600,
 					"evaluation_periods": 1,
 					// no data means nothing was sent, which is not a fault
 					"treat_missing_data": "notBreaching",
-					"alarm_actions": [&topic],
-					"ok_actions": [&topic],
+					"alarm_actions": [(&topic)],
+					"ok_actions": [(&topic)],
 				}),
 			)?;
 			addresses.push(format!("aws_cloudwatch_metric_alarm.{label}"));

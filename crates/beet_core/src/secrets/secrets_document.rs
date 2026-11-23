@@ -9,7 +9,7 @@ use crate::prelude::*;
 /// recipients. Everyone sees which records exist and who may read them;
 /// only a group's members read its values; `ls` needs no identity at all.
 /// The only cipher is age and the only composition a payload in the
-/// document's own format, so the file is a plain toml (or json, or ron)
+/// document's own format, so the file is a plain toml (or json)
 /// whose sealed values are age files: a blob pasted out of it opens with
 /// `age -d` on any laptop.
 ///
@@ -160,17 +160,15 @@ impl SecretsDocument {
 	pub fn media_type(&self) -> MediaType { self.media_type.clone() }
 
 	/// The format `path` names by its extension: `secrets.toml` is toml,
-	/// `x.json` json, `x.ron` ron. Errors on any other extension.
+	/// `x.json` json. Errors on any other extension.
 	pub fn media_type_of(path: &str) -> Result<MediaType> {
 		match SmolPath::new(path).media_type() {
-			Some(
-				media_type @ (MediaType::Toml
-				| MediaType::Json
-				| MediaType::Ron),
-			) => media_type.xok(),
+			Some(media_type @ (MediaType::Toml | MediaType::Json)) => {
+				media_type.xok()
+			}
 			_ => bevybail!(
 				"`{path}` is not a secrets document: its extension names the \
-				format, `toml`, `json` or `ron`, ie `{}`",
+				format, `toml` or `json`, ie `{}`",
 				Secrets::DEFAULT_PATH
 			),
 		}
@@ -965,7 +963,9 @@ mod test {
 			.xpect_contains("[secrets.OPENAI_API_KEY]")
 			.xpect_contains("value = \"sk-test\"")
 			.xpect_contains("role = \"env_var\"");
-		toml::from_str::<toml::Table>(&text).unwrap();
+		MediaType::Toml
+			.deserialize::<Value>(text.as_bytes())
+			.unwrap();
 	}
 
 	#[crate::test]

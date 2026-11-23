@@ -48,8 +48,8 @@
 //!
 //! # High-level API
 //!
-//! - [`TemplateSaver`] - Serialize a world or entity subtree to RON, JSON, or
-//!   postcard, as a [`SceneBody`].
+//! - [`TemplateSaver`] - Serialize a world or entity subtree to a structured
+//!   format, as a [`SceneBody`].
 //! - [`TemplateLoader`] - Deserialize bytes into a [`DynamicTemplate`] and build
 //!   it through `spawn_template`.
 //!

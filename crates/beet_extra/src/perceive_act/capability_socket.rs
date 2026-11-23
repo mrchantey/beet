@@ -233,15 +233,11 @@ mod test {
 				agent
 					.call_detached(
 						Router::action(),
-						Request::get("show-image")
-							.with_body(serde_json::to_string(
-								&ShowImageInput {
-									src: "/img/anger.png".into(),
-								},
-							)?)
-							.with_header::<header::ContentType>(
-								MediaType::Json,
-							),
+						Request::get("show-image").with_json_body(
+							&ShowImageInput {
+								src: "/img/anger.png".into(),
+							},
+						)?,
 					)
 					.await?;
 				Ok(())

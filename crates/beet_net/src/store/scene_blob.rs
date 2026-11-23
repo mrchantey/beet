@@ -281,9 +281,8 @@ mod test {
 		world.get::<ChildOf>(root).unwrap().parent().xpect_eq(host);
 		// the fork carries the record, and reads back as the document
 		let fork = store.get_media(&RelPath::from("app.json")).await.unwrap();
-		let json: serde_json::Value =
-			serde_json::from_slice(fork.bytes()).unwrap();
-		SceneEntities::entity_json(&json, 0)
+		SceneEntities::entity_value(&fork.deserialize::<Value>().unwrap(), 0)
+			.unwrap()
 			.get("beet_core::template_serde::scene_document::SceneFork")
 			.xpect_some();
 	}

@@ -25,8 +25,8 @@
 //!   ticks are compared against a manually tracked `last_run` snapshot (the
 //!   sync is exclusive, so bevy does not track it for us).
 //!
-//! Gated behind `json`: the bridge between a [`Value`] and a reflected field goes
-//! through serde, and the no_std core stays free of it.
+//! Gated behind `serde`: the bridge between a [`Value`] and a reflected field
+//! goes through reflect serde.
 
 use crate::prelude::*;
 use bevy::ecs::component::ComponentId;

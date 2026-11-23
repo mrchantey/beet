@@ -1580,7 +1580,7 @@ mod test {
 			.add_untyped_resource(
 				"terraform_data",
 				"box",
-				&serde_json::json!({ "input": "box" }),
+				&value!({ "input": "box" }),
 			)
 			.unwrap();
 		let project = terra::Project::new(

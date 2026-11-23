@@ -87,7 +87,7 @@ web-sys = { workspace = true, optional = true, features = [
 
 [dev-dependencies]
 beet_action = { path = ".", features= ["template_serde", "scripting"] }
-beet_core = { workspace = true, features = ["testing", "ron"] }
+beet_core = { workspace = true, features = ["testing", "json"] }
 
 [lib]
 harness = false

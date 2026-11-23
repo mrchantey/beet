@@ -140,7 +140,7 @@ impl RenderScope {
 		let mut config = deployment.create_config(&stack);
 		config.add_provider_config(
 			&terra::Provider::AWS,
-			&serde_json::json!({ "region": stack.aws_region()? }),
+			&value!({ "region": (stack.aws_region()?) }),
 		)?;
 		Ok(Self {
 			stack,

@@ -286,14 +286,14 @@ mod test {
 	fn web_theme_is_all_variables() {
 		let (theme, layout) =
 			build_theme(&mut |paint| paint.css_value(), default());
-		serde_json::to_value(&theme)
+		Value::from_serde(&theme)
 			.unwrap()
-			.as_object()
+			.as_map()
 			.unwrap()
 			.iter()
 			.flat_map(|(key, value)| match value {
-				serde_json::Value::String(value) => vec![(key, value.clone())],
-				serde_json::Value::Array(values) => values
+				Value::Str(value) => vec![(key, value.to_string())],
+				Value::List(values) => values
 					.iter()
 					.map(|value| (key, value.as_str().unwrap().to_string()))
 					.collect(),

@@ -2,7 +2,6 @@ use crate::bindings::*;
 use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
-use serde_json::json;
 
 /// An HTTP failover in front of a primary origin (eg a Fargate NLB) and a
 /// fallback origin (eg a Lambda serving the same site bucket), as a Cloudflare
@@ -70,9 +69,9 @@ impl CloudflareFailoverBlock {
 		config.add_untyped_resource(
 			"cloudflare_load_balancer_pool",
 			&label,
-			&json!({
-				"account_id": stack.cloudflare_account()?.id(),
-				"name": ident.primary_identifier(),
+			&value!({
+				"account_id": (stack.cloudflare_account()?.id()),
+				"name": (ident.primary_identifier()),
 				"monitor": monitor_address,
 				"origins": [{
 					"name": suffix,

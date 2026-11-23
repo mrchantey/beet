@@ -250,14 +250,10 @@ fn parse_fragment_attributes(cursor: &mut Cursor) -> Result<Vec<BsxAttribute>> {
 
 /// Parse one fragment attribute: `key`, `key="v"`, `key=unquoted`, `key={..}`.
 ///
-/// A fragment is always BSX (it already parses `{..}` spreads and expressions),
-/// so the `bx:` directives are resolved here too, identically to the document
-/// parser ([`parse_attribute`]): a `bx:style` keeps its raw text plus span for a
-/// stable inline class. Without this, embedded markdown markup silently drops
-/// these directives (the `.md`/`.bsx` parity gap surfaced by the no-code site
-/// rehearsal).
+/// A fragment is always BSX (it already parses `{..}` spreads and
+/// expressions), so its `bx:` directives read as the document parser's
+/// ([`parse_attribute`]) do, and rewrite through the same set.
 fn parse_fragment_attribute(cursor: &mut Cursor) -> Result<BsxAttribute> {
-	let key_offset = cursor.offset();
 	let key = cursor.take_while(is_attr_key_char).to_string();
 	if key.is_empty() {
 		bevybail!("expected an attribute name");
@@ -270,23 +266,6 @@ fn parse_fragment_attribute(cursor: &mut Cursor) -> Result<BsxAttribute> {
 		});
 	}
 	cursor.skip_ws();
-	// `bx:style="prop=value .."` declares a one-off rule; its value is parsed
-	// downstream where the style types live, so keep the raw text plus a source
-	// span (for a stable inline class), mirroring the document parser.
-	if key == "bx:style" {
-		let source = parse_fragment_string(cursor);
-		return Ok(BsxAttribute {
-			key,
-			value: AttrValue::Style {
-				source: source.into(),
-				span: FileSpan::new(
-					"bsx",
-					cursor.line_col(key_offset),
-					cursor.line_col(cursor.offset()),
-				),
-			},
-		});
-	}
 	let value = match cursor.peek() {
 		Some('"') | Some('\'') => AttrValue::Str(parse_fragment_string(cursor)),
 		Some('{') => {
@@ -528,7 +507,7 @@ mod test {
 	#[crate::test]
 	fn fragment_braced_attr_uses_value_grammar() {
 		let BsxFragmentToken::Open { attributes, .. } =
-			&fragment("<button bx:click={count.increment}>")[0]
+			&fragment("<button bx:onclick={count.increment}>")[0]
 		else {
 			panic!("expected open");
 		};

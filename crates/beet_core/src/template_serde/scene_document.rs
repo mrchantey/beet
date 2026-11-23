@@ -1116,13 +1116,15 @@ mod conformance {
 			.unwrap();
 		let fork =
 			SceneDocument::fork(&mut world, host, MediaType::Json).unwrap();
-		let json = fork
-			.as_utf8()
-			.unwrap()
-			.xmap(serde_json::from_str::<serde_json::Value>)
-			.unwrap();
 		// the element, its attribute and the text under it
-		json["entities"].as_object().unwrap().len().xpect_eq(4);
+		fork.deserialize::<Value>()
+			.unwrap()
+			.get(SceneEntities::ENTITIES)
+			.unwrap()
+			.as_map()
+			.unwrap()
+			.len()
+			.xpect_eq(4);
 
 		let mut rebooted = new_world();
 		let host = rebooted.spawn_empty().id();
@@ -1174,16 +1176,21 @@ mod conformance {
 		let mut world = new_world();
 		let host = spawn_host(&mut world);
 		world.entity_mut(host).insert(Name::new("host"));
-		let json = SceneDocument::fork(&mut world, host, MediaType::Json)
+		let scene = SceneDocument::fork(&mut world, host, MediaType::Json)
 			.unwrap()
-			.as_utf8()
-			.unwrap()
-			.xmap(serde_json::from_str::<serde_json::Value>)
+			.deserialize::<Value>()
 			.unwrap();
-		json["entities"].as_object().unwrap().len().xpect_eq(3);
-		let root = SceneEntities::entity_json(&json, 0);
+		scene
+			.get(SceneEntities::ENTITIES)
+			.unwrap()
+			.as_map()
+			.unwrap()
+			.len()
+			.xpect_eq(3);
+		let root = SceneEntities::entity_value(&scene, 0).unwrap();
 		root.get("bevy_ecs::hierarchy::ChildOf").xpect_none();
-		root["bevy_ecs::name::Name"]
+		root.get("bevy_ecs::name::Name")
+			.unwrap()
 			.as_str()
 			.unwrap()
 			.xpect_eq("parent");

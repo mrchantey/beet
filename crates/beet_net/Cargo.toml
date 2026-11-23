@@ -88,7 +88,7 @@ atproto = ["std", "json", "dag_cbor", "beet_core/rand"]
 # `rusqlite/serialize` reads and writes a whole database as bytes, how an
 # archive is built in memory and opened again from a bucket.
 sqlite = ["std", "json", "dep:rusqlite", "rusqlite/serialize", "dep:blocking"]
-postcard = ["serde", "dep:postcard", "beet_core/postcard"]
+postcard = ["serde", "beet_core/postcard"]
 # offline geoip country lookup for analytics: pulls the pure-rust `maxminddb`
 # reader (cross-platform, in-memory). Off by default; the analytics country field
 # stays `None` until enabled and a document declares a `<GeoIpDb/>` resolving to a
@@ -270,7 +270,6 @@ md-5.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 serde_urlencoded = { version = "0.7", optional = true }
-postcard = { workspace = true, optional = true }
 # the terminal qr print behind `vault backup --qr`
 qrcode = { workspace = true, optional = true }
 

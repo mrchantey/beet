@@ -221,7 +221,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	fn tool(path: &str) -> Result<FunctionToolDefinition> {
-		FunctionToolDefinition::new(path, "a tool", serde_json::json!({}))
+		FunctionToolDefinition::new(path, "a tool", value!({}))
 	}
 
 	/// A provider sees the route path with each `/` as `__`, and a call's name

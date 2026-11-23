@@ -110,6 +110,32 @@ impl<'de, 'a> de::Deserializer<'de> for ValueDeserializer<'a> {
 		}
 	}
 
+	/// A byte string reads as its bytes for a target asking for a sequence,
+	/// ie a `Vec<u8>` or a reflected list, which has no byte string form.
+	fn deserialize_seq<V: de::Visitor<'de>>(
+		self,
+		visitor: V,
+	) -> DeResult<V::Value> {
+		match self.value {
+			Value::Bytes(bytes) => visitor.visit_seq(
+				de::value::SeqDeserializer::<_, DeError>::new(
+					bytes.into_iter(),
+				),
+			),
+			_ => self.deserialize_any(visitor),
+		}
+	}
+
+	/// A byte string reads as its bytes for a fixed length target, ie a
+	/// `[u8; N]`, as [`deserialize_seq`](Self::deserialize_seq) does.
+	fn deserialize_tuple<V: de::Visitor<'de>>(
+		self,
+		_len: usize,
+		visitor: V,
+	) -> DeResult<V::Value> {
+		self.deserialize_seq(visitor)
+	}
+
 	fn deserialize_option<V: de::Visitor<'de>>(
 		self,
 		visitor: V,
@@ -166,7 +192,7 @@ impl<'de, 'a> de::Deserializer<'de> for ValueDeserializer<'a> {
 
 	::serde::forward_to_deserialize_any! {
 		bool i8 i16 i32 i64 i128 u8 u16 u32 u128 f32 f64 char str
-		string bytes byte_buf unit unit_struct seq tuple tuple_struct
+		string bytes byte_buf unit unit_struct tuple_struct
 		map struct identifier ignored_any
 	}
 }

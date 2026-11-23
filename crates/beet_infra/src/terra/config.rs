@@ -32,7 +32,7 @@
 //! ```rust,ignore
 //! let mut config = Config::new();
 //! config.add_required_provider("aws", "hashicorp/aws", "= 6.66.0")?;
-//! config.add_untyped_provider("aws", &json!({"region": "us-west-2"}))?;
+//! config.add_untyped_provider("aws", &value!({"region": "us-west-2"}))?;
 //! config.add_untyped_resource("aws_instance", "web", &my_instance)?;
 //! config.export_to_file("main.tf.json").await?;
 //! ```
@@ -465,8 +465,8 @@ impl Config {
 	///
 	/// ```ignore
 	/// let config = Config::new()
-	///     .with_provider_config(&Provider::AWS, &json!({"region": "us-east-1"}))?
-	///     .with_provider_alias(&Provider::AWS, "eu_west_1", &json!({"region": "eu-west-1"}))?;
+	///     .with_provider_config(&Provider::AWS, &value!({"region": "us-east-1"}))?
+	///     .with_provider_alias(&Provider::AWS, "eu_west_1", &value!({"region": "eu-west-1"}))?;
 	/// ```
 	pub fn with_provider_alias(
 		mut self,
@@ -654,7 +654,7 @@ impl Config {
 	/// `resource_type` and `label` identify the target resource,
 	/// and `lifecycle` is the JSON value for the lifecycle block, ie:
 	/// ```ignore
-	/// json!({ "replace_triggered_by": ["aws_lightsail_instance.xxx"] })
+	/// value!({ "replace_triggered_by": ["aws_lightsail_instance.xxx"] })
 	/// ```
 	pub fn set_lifecycle(
 		&mut self,
@@ -792,7 +792,7 @@ impl Config {
 	/// Serialize [`Self::to_json`] to a compact JSON string, entries sorted
 	/// by key.
 	pub fn to_json_string(&self) -> Result<String> {
-		serde_json::to_string(&self.to_json())?.xok()
+		self.to_json().to_json_string().xok()
 	}
 
 	// =====================================================================
@@ -906,16 +906,11 @@ mod tests {
 	#[beet_core::test]
 	fn imports_render_as_a_list_or_not_at_all() {
 		let mut config = Config::new();
-		config
-			.to_json()
-			.into_json()
-			.get("import")
-			.is_none()
-			.xpect_true();
+		config.to_json().get("import").is_none().xpect_true();
 		config
 			.add_import("aws_sns_topic.events", "arn:aws:sns:r:1:events")
 			.unwrap();
-		config.to_json().into_json()["import"].xpect_eq(serde_json::json!([
+		config.to_json().get("import").unwrap().xpect_eq(value!([
 			{ "to": "aws_sns_topic.events", "id": "arn:aws:sns:r:1:events" }
 		]));
 		// twice at one address is a declaration error, not a second stanza

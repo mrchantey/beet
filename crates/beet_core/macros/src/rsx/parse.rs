@@ -487,7 +487,7 @@ mod test {
 				.contains("SlotTarget :: named (\"x\")")
 		);
 		// a slot transfer carries both a target and a child marker.
-		let transfer = lower(quote! { <Slot name="x" bx:slot="y"/> });
+		let transfer = lower(quote! { <Slot name="x" slot="y"/> });
 		assert!(transfer.contains("SlotTarget :: named (\"x\")"));
 		assert!(transfer.contains("SlotChild :: named (\"y\")"));
 		// `slot=` routes an element into a parent slot.

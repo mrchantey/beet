@@ -1,4 +1,4 @@
-//! The concrete `bx:<event>` handler: a `click` reaching an element runs each
+//! The concrete `bx:on<event>` handler: a `click` reaching an element runs each
 //! of its `OnEvent { event: "click" }` children against the live world.
 use crate::prelude::*;
 use beet_action::prelude::*;
@@ -16,7 +16,7 @@ use beet_core::prelude::*;
 /// The prelude makes the composed source a block, so the authored body has to
 /// carry its own `return` only where its *own* shape is a block. An expression
 /// body needs neither `return` nor `await`, which is why the counter is one
-/// line: `bx:click="target.with_field('count', count => count + 1)"` becomes
+/// line: `bx:onclick="target.with_field('count', count => count + 1)"` becomes
 /// `return (..)` inside an async function, whose promise the run adopts, so the
 /// write is awaited and its errors reported rather than left floating.
 ///
@@ -39,7 +39,7 @@ fn event_script_body(script: &str) -> String {
 /// a saved scene runs as one authored in markup. What it may reach is the
 /// host's own [`ScriptConfig`] when it carries one, so narrowing a button's
 /// grant is an ordinary spread
-/// (`<button bx:click=".." {ScriptConfig{write:["Document"]}}>`); absent one
+/// (`<button bx:onclick=".." {ScriptConfig{write:["Document"]}}>`); absent one
 /// it is [`ScriptConfig::default`], world-capable and unrestricted.
 pub(super) fn run_click_scripts(
 	ev: On<PointerDown>,
@@ -121,7 +121,7 @@ mod test {
 		let button = click_target(
 			&mut world,
 			doc,
-			r#"<button bx:click="target.with_field('count', count => count + 1)">+</button>"#,
+			r#"<button bx:onclick="target.with_field('count', count => count + 1)">+</button>"#,
 		);
 		click(&mut world, button).await;
 		count(&world, doc, "count").xpect_eq(1);
@@ -142,7 +142,7 @@ mod test {
 		let button = click_target(
 			&mut world,
 			doc,
-			r#"<button bx:click="target.with_field('user', user => { user.name = 'ada lovelace' })">rename</button>"#,
+			r#"<button bx:onclick="target.with_field('user', user => { user.name = 'ada lovelace' })">rename</button>"#,
 		);
 		click(&mut world, button).await;
 		let doc = world.entity(doc).get::<Document>().unwrap();
@@ -164,7 +164,7 @@ mod test {
 		let button = click_target(
 			&mut world,
 			doc,
-			r#"<div bx:scope="counter"><button bx:click="target.set_field('count', 7)">+</button></div>"#,
+			r#"<div bx:scope="counter"><button bx:onclick="target.set_field('count', 7)">+</button></div>"#,
 		)
 		.xmap(|div| world.entity(div).get::<Children>().unwrap()[0]);
 		click(&mut world, button).await;
@@ -185,7 +185,7 @@ mod test {
 		let button = click_target(
 			&mut world,
 			doc,
-			r#"<button bx:click="{
+			r#"<button bx:onclick="{
 				const status = await target.get_field('status');
 				await target.set_field('status', status === 'done' ? 'pending' : 'done');
 			}">ok</button>"#,
@@ -217,7 +217,7 @@ mod test {
 		let button = click_target(
 			&mut world,
 			doc,
-			r#"<button bx:click="target.set_field('count', 7)">+</button>"#,
+			r#"<button bx:onclick="target.set_field('count', 7)">+</button>"#,
 		);
 		HtmlRenderer::new()
 			.render(&mut RenderContext::new(
@@ -232,34 +232,37 @@ mod test {
 			.xpect_contains("set_field");
 	}
 
-	/// A handler is data, so it survives a save and a reload and still runs.
+	/// A handler is data, so it survives a save and a reload and still runs,
+	/// written explicitly as a `<script {OnEvent}>` child or as the
+	/// `bx:onclick` that is sugar for one.
 	#[cfg(feature = "json")]
 	#[beet_core::test]
 	async fn a_handler_survives_a_save_and_a_reload() {
-		let mut world = world_ext::ui_world();
-		let doc = world.spawn(Document::new(value!({ "count": 0 }))).id();
-		let button = click_target(
-			&mut world,
-			doc,
-			r#"<button bx:click="target.with_field('count', count => count + 1)">+</button>"#,
-		);
-		let bytes = TemplateSaver::new()
-			.save_roots(&mut world, MediaType::Json, [button])
-			.unwrap();
-		bytes
-			.as_utf8()
-			.unwrap()
-			.xref()
-			.xpect_contains("OnEvent")
-			.xpect_contains("with_field");
+		for markup in [
+			r#"<button>+<script {OnEvent{event:"click"}}>target.with_field('count', count => count + 1)</script></button>"#,
+			r#"<button bx:onclick="target.with_field('count', count => count + 1)">+</button>"#,
+		] {
+			let mut world = world_ext::ui_world();
+			let doc = world.spawn(Document::new(value!({ "count": 0 }))).id();
+			let button = click_target(&mut world, doc, markup);
+			let bytes = TemplateSaver::new()
+				.save_roots(&mut world, MediaType::Json, [button])
+				.unwrap();
+			bytes
+				.as_utf8()
+				.unwrap()
+				.xref()
+				.xpect_contains("OnEvent")
+				.xpect_contains("with_field");
 
-		let mut world = world_ext::ui_world();
-		let doc = world.spawn(Document::new(value!({ "count": 0 }))).id();
-		let button = TemplateLoader::new(&mut world)
-			.with_entity(doc)
-			.load(&bytes)
-			.unwrap()[0];
-		click(&mut world, button).await;
-		count(&world, doc, "count").xpect_eq(1);
+			let mut world = world_ext::ui_world();
+			let doc = world.spawn(Document::new(value!({ "count": 0 }))).id();
+			let button = TemplateLoader::new(&mut world)
+				.with_entity(doc)
+				.load(&bytes)
+				.unwrap()[0];
+			click(&mut world, button).await;
+			count(&world, doc, "count").xpect_eq(1);
+		}
 	}
 }

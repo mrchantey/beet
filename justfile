@@ -51,7 +51,7 @@ init-repo:
 	just init-cli
 	just beet-shared pull
 	just site-shared pull
-	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
+	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default.bert.json crates/beet_ml/assets/ml/default.bert.json
 
 #💡 CLI
 
@@ -546,7 +546,6 @@ clear-ice:
 clear-artifacts:
 	just clear-ice
 	rm -rf examples/rsx_site/src/codegen
-	rm -rf launch.ron
 	rm -rf target
 
 # massive purge

@@ -70,7 +70,7 @@ pub async fn tool_calling(streamer: impl Component + PostStreamer + Clone) {
 	let tool: ToolDefinition = FunctionToolDefinition::new(
 		"get_weather",
 		"Get the current weather for a location",
-		serde_json::json!({
+		value!({
 			"type": "object",
 			"properties": {
 				"location": {

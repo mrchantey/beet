@@ -243,18 +243,7 @@ impl Body {
 		let value = match content_type {
 			// json parses into a structured value so fields are directly readable.
 			#[cfg(feature = "json")]
-			Some(MediaType::Json) => {
-				let slice = if bytes.is_empty() {
-					b"null".as_slice()
-				} else {
-					bytes.as_ref()
-				};
-				let json: serde_json::Value = serde_json::from_slice(slice)
-					.map_err(|err| {
-						bevyhow!("failed to parse json body: {err}")
-					})?;
-				Value::from_json(json)
-			}
+			Some(MediaType::Json) => MediaType::Json.deserialize(&bytes)?,
 			// a declared text type is decoded as UTF-8 (lossily, never failing).
 			Some(media_type) if media_type.is_text() => {
 				Value::str(String::from_utf8_lossy(&bytes).into_owned())

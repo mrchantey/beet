@@ -5,7 +5,7 @@ pub use self::trigger_with_user_sentence::*;
 
 use beet_core::prelude::*;
 
-/// Registers [`Sentence`] and the [`Bert`] asset (+ `.ron` loader) for
+/// Registers [`Sentence`] and the [`Bert`] asset (+ `.bert.json` loader) for
 /// embedding-driven actions like [`NearestSentence`] and (with the
 /// `spatial` feature) [`SentenceSteerTarget`]. Also wires the
 /// [`trigger_with_user_sentence`] observer so [`TriggerWithUserSentence`]

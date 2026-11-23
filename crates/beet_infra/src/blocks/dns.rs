@@ -2,7 +2,6 @@ use crate::bindings::*;
 use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
-use serde_json::json;
 
 /// A DNS record provider, embedded in a block that needs to publish a hostname
 /// (a [`LambdaBlock`] gateway, a [`FargateBlock`] load balancer, a
@@ -530,7 +529,7 @@ fn quote_txt_value(value: &str) -> String {
 /// `main.tf.json`.
 #[cfg(feature = "cloudflare_dns")]
 pub(crate) fn ensure_cloudflare_provider(config: &mut terra::Config) -> Result {
-	config.ensure_provider_config(&terra::Provider::CLOUDFLARE, &json!({}))?;
+	config.ensure_provider_config(&terra::Provider::CLOUDFLARE, &value!({}))?;
 	Ok(())
 }
 

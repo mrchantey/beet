@@ -10,7 +10,7 @@
 
 mod check_routes;
 // the machine-readable export of the site's tags/classes/routes/style-props for a
-// future editor; needs `serde_json` to serialize and the BSX registries (`bsx`,
+// future editor; needs `json` to serialize and the BSX registries (`bsx`,
 // pulled in by `std`) to enumerate handler/template tags.
 #[cfg(all(feature = "json", feature = "bsx"))]
 mod manifest;

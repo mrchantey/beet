@@ -296,9 +296,6 @@ ipld-core = { version = "0.4", default-features = false, features = ["serde"] }
 md-5 = { version = "0.11", default-features = false }
 # the `Digest` trait sha2 and md-5 implement, for a digest helper generic over both
 digest = { version = "0.11", default-features = false }
-# 0.12 is the version `bevy_asset` pulls. no_std by default; std consumers
-# re-enable `ron/std` (eg via `beet_core/std`).
-ron = { version = "0.12", default-features = false }
 
 #💡 vault
 # age file encryption (`beet_core/vault`): pure rust, the same format the
@@ -429,8 +426,6 @@ geoip = ["beet_net?/geoip"]
 # on wasm).
 sqlite = ["net", "beet_net?/sqlite"]
 postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
-# RON text format for `MediaType::Ron` and `template_serde` loading.
-ron = ["serde", "beet_core/ron"]
 # Plaintext (de)serialization for `MediaType::Text`.
 serde_plain = ["serde", "beet_core/serde_plain"]
 # The vault layer and the secrets document on it: age identities, recipients

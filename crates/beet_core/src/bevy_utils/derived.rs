@@ -1,5 +1,12 @@
 //! [`ReflectDerived`] and [`Derived`]: the marks saying a type, or an entity
 //! and its subtree, is derived state, never content.
+//!
+//! Derived state is what a system or a hook will make again from what was
+//! saved: a generator's output ([`ReactiveChildren`]'s rows, a binding's
+//! value), never a builder's. A builder (a `#[template]`, a directive, an
+//! activated instance) runs once and is consumed, so a snapshot writes what it
+//! built as plain content and loading the snapshot builds nothing a second
+//! time; a template's output is never derived.
 use crate::prelude::*;
 use bevy_reflect::CreateTypeData;
 

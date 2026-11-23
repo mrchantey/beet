@@ -53,6 +53,7 @@ impl Plugin for DocumentPlugin {
 			// a list's generator and the item template it clones
 			.register_type::<ReactiveChildren>()
 			.register_type::<Prefab>()
+			.install_type::<Held>()
 			.register_type::<ResolvedFieldPath>()
 			.register_type::<Value>()
 			.register_type::<Map>()
@@ -75,7 +76,7 @@ impl Plugin for DocumentPlugin {
 			.add_observer(unlink_field_from_document)
 			.add_observer(resolve_field_path);
 
-		#[cfg(feature = "json")]
+		#[cfg(feature = "serde")]
 		app.register_type::<ReflectFieldRef>()
 			.register_type::<ResourceFieldRef>();
 
@@ -85,10 +86,10 @@ impl Plugin for DocumentPlugin {
 		// Resources sync before components so a co-located pair (eg
 		// `<MyComponent value=@res:Type.field>`) seeds outside-in: the resource
 		// fills the `Value`, which the component sync then propagates.
-		#[cfg(feature = "json")]
+		#[cfg(feature = "serde")]
 		let reflect_sync =
 			(sync_resource_field_bindings, sync_reflect_field_bindings).chain();
-		#[cfg(not(feature = "json"))]
+		#[cfg(not(feature = "serde"))]
 		let reflect_sync = || {};
 		// a scene document drives its world after the write-back, so an
 		// inspector's edit reaches the live entity in the pass it reaches the

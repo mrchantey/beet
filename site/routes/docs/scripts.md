@@ -12,13 +12,21 @@ A script adds behavior a scene has no words for, without recompiling anything. I
 
 ## A script is a scene
 
-A script is not a second kind of file. It is an entity carrying `RunScript`, its program its own text and every descendant's, so it is stored, shared, edited and versioned exactly as any other scene. A javascript document is one such entity with its source as its text. In markup `<RunScript>` reads its body as raw text, the way `<script>` does, and a route that is a script is one tag:
+A script is not a second kind of file. It is an entity carrying `RunScript`, its program its own text and every descendant's, so it is stored, shared, edited and versioned exactly as any other scene. A javascript document is one such entity with its source as its text. In markup it is HTML's own `<script>` carrying the component, its body raw text by HTML's own rule, and what it may reach a sibling spread:
+
+```jsx
+<script {RunScript} {ScriptConfig{read:["guestbook.*"]}}>
+	const [entry] = await world.entities('guestbook.Visits');
+</script>
+```
+
+A bare `<script>` is not one of these: it stays page content, run by the browser. A route that is a script is one tag:
 
 ```jsx
 <ScriptRoute path="greet" script="'hello ' + (input.params.name ? input.params.name[0] : 'stranger')"/>
 ```
 
-Every script is an async function body. It receives its `input` and what it returns is its answer, a string as plain text and anything else as JSON. An event on a page, `bx:click` for one, is a script of the same kind: a child of the element naming the event it answers, so a saved page keeps its handlers, and never part of what the page shows.
+Every script is an async function body. It receives its `input` and what it returns is its answer, a string as plain text and anything else as JSON. An event on a page is a script of the same kind, `<script {OnEvent{event:"click"}}>` as a child of the element it answers for, so a saved page keeps its handlers and none of them is part of what the page shows. `bx:onclick="target.with_field('count', count => count + 1)"` is sugar for exactly that child, and `bx:on<event>` for any other event.
 
 ## No authority of its own
 

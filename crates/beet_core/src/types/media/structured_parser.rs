@@ -1,7 +1,13 @@
 //! [`StructuredParser`], the self describing data formats.
+//!
+//! The structured formats are json, postcard and toml, each behind its own
+//! feature, and DAG-CBOR where a record is the protocol. RON is not among
+//! them, deliberately: every shape beet shares with atproto carries a
+//! `$type` (a scene body names `org.beet.scene#body`), which is no field name
+//! RON accepts, and beet does not shape its types around one format.
 use crate::prelude::*;
 
-/// Reads the structured formats this build has a feature for (json, ron,
+/// Reads the structured formats this build has a feature for (json,
 /// postcard, toml) as a scene body when the root object names one in its
 /// `$type` (`org.beet.scene#body`), else as one entity holding the parsed
 /// [`Value`], so a foreign json document is a value as a foreign Automerge
@@ -16,7 +22,6 @@ impl DocParser for StructuredParser {
 	fn media_types(&self) -> Vec<MediaType> {
 		[
 			cfg!(feature = "json").then_some(MediaType::Json),
-			cfg!(feature = "ron").then_some(MediaType::Ron),
 			cfg!(feature = "postcard").then_some(MediaType::Postcard),
 			cfg!(feature = "toml").then_some(MediaType::Toml),
 		]

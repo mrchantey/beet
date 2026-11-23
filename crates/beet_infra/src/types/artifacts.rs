@@ -258,7 +258,10 @@ impl ArtifactsClient {
 
 	/// Upload the version ledger and set it as current.
 	pub async fn publish_ledger(&self) -> Result {
-		let bytes = serde_json::to_vec_pretty(&self.ledger)?;
+		let bytes = MediaType::Json
+			.serialize_with_options(&self.ledger, SerializeOptions {
+				pretty: true,
+			})?;
 		// store version ledger
 		self.store
 			.insert(&self.ledger.ledger_key(), bytes.clone())
@@ -296,7 +299,7 @@ impl ArtifactsClient {
 			return Ok(None);
 		}
 		let bytes = self.store.get(&key).await?;
-		serde_json::from_slice(&bytes).map(Some).map_err(Into::into)
+		MediaType::Json.deserialize(&bytes).map(Some)
 	}
 
 	/// Download an artifact by name and version.
@@ -313,7 +316,8 @@ impl ArtifactsClient {
 	pub async fn set_current(&self, version: &Uuid) -> Result<ArtifactLedger> {
 		let key = ArtifactLedger::version_ledger_key(version);
 		let ledger_bytes = self.store.get(&key).await?;
-		let ledger: ArtifactLedger = serde_json::from_slice(&ledger_bytes)?;
+		let ledger: ArtifactLedger =
+			MediaType::Json.deserialize(&ledger_bytes)?;
 		self.store
 			.insert(&ArtifactLedger::current_ledger_key(), ledger_bytes)
 			.await?;
@@ -515,15 +519,15 @@ mod tests {
 	async fn a_ledger_without_a_repo_still_parses() {
 		let store = BlobStore::temp();
 		let ledger = test_ledger(vec![("app", "versions/v1/app", "h1")]);
-		let json = serde_json::json!({
-			"deploy_id": ledger.deploy_id,
-			"timestamp": ledger.timestamp,
-			"artifacts": ledger.artifacts,
+		let json = value!({
+			"deploy_id": (Value::from_serde(&ledger.deploy_id).unwrap()),
+			"timestamp": (&ledger.timestamp),
+			"artifacts": (Value::from_serde(&ledger.artifacts).unwrap()),
 		});
 		store
 			.insert(
 				&ArtifactLedger::current_ledger_key(),
-				serde_json::to_vec(&json).unwrap(),
+				MediaType::Json.serialize(&json).unwrap(),
 			)
 			.await
 			.unwrap();

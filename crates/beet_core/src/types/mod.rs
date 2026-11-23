@@ -32,6 +32,8 @@ mod entity_body;
 pub use entity_body::*;
 mod run_script;
 pub use run_script::*;
+mod not_rendered;
+pub use not_rendered::*;
 mod entity_key;
 pub use entity_key::*;
 #[cfg(feature = "serde")]

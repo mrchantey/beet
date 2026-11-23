@@ -2,7 +2,6 @@ use crate::bindings::*;
 use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
-use serde_json::json;
 
 /// The company Postgres instance: one managed database in the private subnets
 /// of a [`VpcBlock`], reachable only from the security groups of the blocks

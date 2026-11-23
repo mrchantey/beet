@@ -46,13 +46,15 @@ impl ExchangeSocket {
 		}
 	}
 
-	/// Enable the exchange with the compact binary [`PostcardCodec`] (the default).
+	/// Enable the exchange with compact binary [`MediaType::Postcard`] frames
+	/// (the default), clean for the raw bytes a photo tool returns.
 	#[cfg(feature = "postcard")]
-	pub fn postcard() -> Self { Self::new(PostcardCodec) }
+	pub fn postcard() -> Self { Self::new(MediaCodec(MediaType::Postcard)) }
 
-	/// Enable the exchange with the human-readable [`JsonCodec`], for debugging.
+	/// Enable the exchange with human-readable [`MediaType::Json`] frames, for
+	/// debugging.
 	#[cfg(feature = "json")]
-	pub fn json() -> Self { Self::new(JsonCodec) }
+	pub fn json() -> Self { Self::new(MediaCodec(MediaType::Json)) }
 }
 
 impl ExchangeSocket {
@@ -99,39 +101,28 @@ pub trait ExchangeCodec: 'static + Send + Sync {
 	fn decode(&self, message: &Message) -> Result<Option<ExchangeFrame>>;
 }
 
-/// The compact binary default codec: `postcard` over [`Message::Binary`], clean for
-/// the raw bytes a photo tool returns.
-#[cfg(feature = "postcard")]
-pub struct PostcardCodec;
+/// The default codec: an [`ExchangeFrame`] in a [`MediaType`]'s format, riding
+/// [`Message::Text`] for a text media type and [`Message::Binary`] otherwise.
+#[cfg(feature = "serde")]
+pub struct MediaCodec(pub MediaType);
 
-#[cfg(feature = "postcard")]
-impl ExchangeCodec for PostcardCodec {
+#[cfg(feature = "serde")]
+impl ExchangeCodec for MediaCodec {
 	fn encode(&self, frame: &ExchangeFrame) -> Result<Message> {
-		Message::binary(postcard::to_allocvec(frame)?).xok()
-	}
-	fn decode(&self, message: &Message) -> Result<Option<ExchangeFrame>> {
-		match message {
-			Message::Binary(bytes) => {
-				postcard::from_bytes(bytes).map(Some).map_err(Into::into)
-			}
-			_ => Ok(None),
+		let bytes = self.0.serialize(frame)?;
+		match self.0.is_text() {
+			true => Message::text(String::from_utf8(bytes)?),
+			false => Message::binary(bytes),
 		}
-	}
-}
-
-/// The human-readable debugging codec: JSON over [`Message::Text`].
-#[cfg(feature = "json")]
-pub struct JsonCodec;
-
-#[cfg(feature = "json")]
-impl ExchangeCodec for JsonCodec {
-	fn encode(&self, frame: &ExchangeFrame) -> Result<Message> {
-		Message::text(serde_json::to_string(frame)?).xok()
+		.xok()
 	}
 	fn decode(&self, message: &Message) -> Result<Option<ExchangeFrame>> {
-		match message {
-			Message::Text(text) => {
-				serde_json::from_str(text).map(Some).map_err(Into::into)
+		match (message, self.0.is_text()) {
+			(Message::Text(text), true) => {
+				self.0.deserialize(text.as_bytes()).map(Some)
+			}
+			(Message::Binary(bytes), false) => {
+				self.0.deserialize(bytes).map(Some)
 			}
 			_ => Ok(None),
 		}
@@ -410,5 +401,27 @@ mod test {
 		socket.pending.insert(7, sender);
 		drain_pending(&mut socket);
 		reply.wait().await.status().as_u16().xpect_eq(502);
+	}
+
+	/// A text media type frames as text, which a binary codec passes over.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	fn json_frames_ride_text() {
+		let json = MediaCodec(MediaType::Json);
+		let message = json
+			.encode(&ExchangeFrame::Response {
+				id: 3,
+				status: StatusCode::OK,
+				headers: default(),
+				body: b"hi".to_vec(),
+			})
+			.unwrap();
+		matches!(message, Message::Text(_)).xpect_true();
+		MediaCodec(MediaType::Postcard)
+			.decode(&message)
+			.unwrap()
+			.is_none()
+			.xpect_true();
+		json.decode(&message).unwrap().is_some().xpect_true();
 	}
 }

@@ -69,8 +69,8 @@ impl Plugin for ParsePlugin {
 		Self::register_markup(
 			&mut app.world_mut().get_resource_or_init::<DocParsers>(),
 		);
-		// the default BSX event vocabulary (the `click` script installer), so
-		// every `bx:click="..."` resolves through the core seam.
+		// the default BSX event vocabulary, so every `bx:onclick="..."` runs
+		// its script on a click.
 		#[cfg(feature = "bsx")]
 		app.install_type::<crate::prelude::BsxDefaultsPlugin>();
 		// a document's root metadata and its route's, which frontmatter

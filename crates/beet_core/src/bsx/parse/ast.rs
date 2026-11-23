@@ -160,6 +160,64 @@ impl BsxElement {
 	}
 }
 
+/// Edits a directive's rewrite makes.
+impl BsxElement {
+	/// An element as a rewrite authors it, self closing when it has no
+	/// children.
+	pub fn new(
+		tag: impl Into<String>,
+		attributes: Vec<BsxAttribute>,
+		children: Vec<BsxNode>,
+	) -> Self {
+		Self {
+			tag: tag.into(),
+			tag_literal: None,
+			attributes,
+			self_closing: children.is_empty(),
+			children,
+		}
+	}
+
+	/// Remove the attribute keyed `key`, answering its value.
+	pub fn take_attribute(&mut self, key: &str) -> Option<AttrValue> {
+		let index = self.attributes.iter().position(|attr| attr.key == key)?;
+		Some(self.attributes.remove(index).value)
+	}
+
+	/// Remove the attribute keyed `key`, which must hold a quoted string.
+	pub fn take_str_attribute(&mut self, key: &str) -> Result<String> {
+		match self.take_attribute(key) {
+			Some(AttrValue::Str(value)) => Ok(value),
+			Some(_) => bevybail!(
+				"`{key}` on `<{}>` expects a quoted string, ie `{key}=\"..\"`",
+				self.tag
+			),
+			None => bevybail!("`<{}>` carries no `{key}`", self.tag),
+		}
+	}
+
+	/// Append a bare spread of `item`.
+	pub fn push_spread(&mut self, item: SpreadItem) {
+		self.push_spread_items([item]);
+	}
+
+	/// Append a bare spread of `items`: one component as itself, as
+	/// `{Foo}`, anything else a tuple, as `{(Foo, @doc:bar)}`.
+	pub fn push_spread_items(
+		&mut self,
+		items: impl IntoIterator<Item = SpreadItem>,
+	) {
+		let spread = match <[SpreadItem; 1]>::try_from(
+			items.into_iter().collect::<Vec<_>>(),
+		) {
+			Ok([SpreadItem::Named(named)]) => SpreadExpr::Named(named),
+			Ok([item]) => SpreadExpr::Tuple(vec![item]),
+			Err(items) => SpreadExpr::Tuple(items),
+		};
+		self.attributes.push(BsxAttribute::spread(spread));
+	}
+}
+
 impl BsxNode {
 	/// The first element of a parsed document, its document element.
 	pub fn document_element(nodes: &[BsxNode]) -> Option<&BsxElement> {
@@ -200,6 +258,16 @@ pub struct BsxAttribute {
 	pub value: AttrValue,
 }
 
+impl BsxAttribute {
+	/// A bare-position spread, `<el {..}>`, which has no key.
+	pub fn spread(spread: SpreadExpr) -> Self {
+		Self {
+			key: String::new(),
+			value: AttrValue::Spread(spread),
+		}
+	}
+}
+
 /// What an attribute can hold, position-disambiguated by the parser.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AttrValue {
@@ -213,17 +281,6 @@ pub enum AttrValue {
 	Expr(ValueExpr),
 	/// A bare-position spread `<el {..}>`: one or more components/templates.
 	Spread(SpreadExpr),
-	/// A `bx:style` directive's one-off rule declarations, eg
-	/// `bx:style="display=Flex max-width=Rem(40.0)"`. The raw declaration text is
-	/// kept verbatim (parsed downstream where the style types live), paired with
-	/// the source [`FileSpan`] so the minted inline class is stable across spawns
-	/// of the same callsite, the markup twin of `inline_class!`'s `panic::Location`.
-	Style {
-		/// The raw `prop=value ..` declaration text, parsed downstream.
-		source: SmolStr,
-		/// The directive's source span, mapped onto the minted inline class.
-		span: FileSpan,
-	},
 }
 
 /// A value in attribute-value or text position: a literal or a reference.
@@ -322,6 +379,16 @@ pub enum SpreadItem {
 	Binding(BindingExpr),
 }
 
+impl SpreadItem {
+	/// The component `name` with `fields`, see [`NamedLiteral::component`].
+	pub fn component<'a>(
+		name: &str,
+		fields: impl IntoIterator<Item = (&'a str, DataLiteral)>,
+	) -> Self {
+		Self::Named(NamedLiteral::component(name, fields))
+	}
+}
+
 /// A literal in the BSX value grammar, beet's own grammar inspired by bevy's
 /// `bsn!` value surface.
 #[derive(Debug, Clone, PartialEq)]
@@ -403,6 +470,27 @@ pub struct NamedLiteral {
 	pub name: SmolStr,
 	/// The variant/struct fields.
 	pub fields: NamedFields,
+}
+
+impl NamedLiteral {
+	/// The component `name` with named `fields`, as `Foo{a:1}` authors it, or
+	/// bare, as `Foo`, when there are none.
+	pub fn component<'a>(
+		name: &str,
+		fields: impl IntoIterator<Item = (&'a str, DataLiteral)>,
+	) -> Self {
+		let fields = fields
+			.into_iter()
+			.map(|(key, value)| (SmolStr::new(key), value))
+			.collect::<Vec<_>>();
+		Self {
+			name: name.into(),
+			fields: match fields.is_empty() {
+				true => NamedFields::Unit,
+				false => NamedFields::Struct(fields),
+			},
+		}
+	}
 }
 
 /// The fields of a [`NamedLiteral`]: unit, tuple, or named-struct.

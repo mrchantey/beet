@@ -172,11 +172,11 @@ web_head = ["web", "beet/perceive_act_web"]
 # that needs a larger set. Build with: `just build-wasm-min`.
 web_min = ["web"]
 # `beet-ui.wasm`, the editor middle: the browser binary plus the scripting seam
-# (`beet/scripting`: the engine-agnostic `Script` and the `bx:<event>` installer),
+# (`beet/scripting`: the engine-agnostic `Script` and the `bx:on<event>` runner),
 # so a page edits its own scene and its event scripts run in the tab. The editor
 # itself (`beet_ui`'s `template`/`style`/`template_serde` widgets, `beet_net`'s
 # `SceneBlob`) already rides `web`, since the base `beet` dep below carries those
-# features on every target; what `web_min` lacks is behaviour behind a `bx:click`.
+# features on every target; what `web_min` lacks is behaviour behind a `bx:onclick`.
 # No engine: scripts run through the iframe backend, the sandbox the browser
 # already has, and the embedded engine stays `web_full`'s.
 # Excluded, each for its reason: `winit`/`ml` (a page is not a wgpu scene), `tui`

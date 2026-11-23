@@ -22,7 +22,7 @@ use beet_net::prelude::*;
 /// binary walks the cwd and its ancestors for the first match; the `check`/`serve`/
 /// `export-static` commands search a single given site dir for it. Shared so both
 /// agree on what an entry document is named.
-pub const ENTRY_NAMES: &[&str] = &["main.bsx", "main.json", "main.ron"];
+pub const ENTRY_NAMES: &[&str] = &["main.bsx", "main.json"];
 
 /// Pre-scan the raw entry document through `store` against the registered
 /// [`Prescan`] set, the one registry-free walk entry resolution reads its

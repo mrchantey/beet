@@ -11,7 +11,7 @@ pub fn ui_world() -> World { core::mem::take(ui_app().world_mut()) }
 /// [`TemplatePlugin`], the [`DocumentPlugin`] templates lean on, the built-in
 /// doc parsers and doc renderers ([`ParsePlugin`], [`RenderPlugin`]),
 /// the parse plugin bringing (when `bsx` is enabled) the default BSX event
-/// vocabulary ([`BsxDefaultsPlugin`]) so a parsed `bx:click` resolves.
+/// vocabulary ([`BsxDefaultsPlugin`]) so a parsed `bx:onclick` resolves.
 pub fn ui_app() -> App {
 	let mut app = App::new();
 	app.add_plugins((

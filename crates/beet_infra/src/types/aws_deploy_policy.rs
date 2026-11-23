@@ -809,7 +809,7 @@ impl AwsDeployPolicy {
 		let (stack, _deployment, mut config) = scope.finish().unwrap();
 		for kind in declared {
 			config
-				.add_untyped_resource(kind, "test", &serde_json::json!({}))
+				.add_untyped_resource(kind, "test", &value!({}))
 				.unwrap();
 		}
 		Self::new(app, "beet-state-1234")

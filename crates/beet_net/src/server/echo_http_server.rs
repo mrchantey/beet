@@ -108,8 +108,7 @@ fn standard_echo_response(req: Request) -> Response {
 		body,
 	};
 
-	let json = serde_json::to_string(&echo).unwrap();
-	Response::ok_body(json, MediaType::Json)
+	Response::with_json(&echo).unwrap()
 }
 
 /// Returns a Server-Sent Events stream.
@@ -121,13 +120,14 @@ fn sse_response(req: &Request) -> Response {
 		.unwrap_or(3);
 
 	let stream = futures::stream::iter((0..count).map(|idx| {
-		let event = SseTestEvent {
+		let data = MediaType::Json.serialize(&SseTestEvent {
 			index: idx,
 			msg: "hello".into(),
-		};
-		let data = serde_json::to_string(&event).unwrap();
-		let formatted = format!("event: message\ndata: {}\n\n", data);
-		Ok(Bytes::from(formatted))
+		})?;
+		[b"event: message\ndata: ".as_slice(), &data, b"\n\n"]
+			.concat()
+			.xmap(Bytes::from)
+			.xok()
 	}));
 
 	Response::ok()
@@ -145,9 +145,8 @@ fn stream_response(req: &Request) -> Response {
 		.unwrap_or(3);
 
 	let stream = futures::stream::iter((0..count).map(|idx| {
-		let json = serde_json::json!({"index": idx, "data": "stream-chunk"});
-		let line = format!("{}\n", json);
-		Ok(Bytes::from(line))
+		let line = value!({"index": (idx), "data": "stream-chunk"});
+		Ok(Bytes::from(format!("{}\n", line.to_json_string())))
 	}));
 
 	Response::ok()

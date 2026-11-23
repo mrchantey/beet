@@ -1,9 +1,9 @@
 //! The default BSX event handlers.
 //!
-//! Core lowers `bx:<event>` to an [`OnEvent`] child and knows no concrete
-//! event, and no way to evaluate a script, so neither bevy picking nor a JS
+//! Core rewrites `bx:on<event>` to a `<script {OnEvent}>` child and knows no
+//! concrete event, and no way to evaluate a script, so neither bevy picking nor a JS
 //! engine enters it. This plugin runs the `click` handlers, so every
-//! `bx:click="await target.set_field('count', 1)"` works. An app that wants
+//! `bx:onclick="await target.set_field('count', 1)"` works. An app that wants
 //! another trigger adds its own observer beside this one.
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -13,7 +13,7 @@ use beet_core::prelude::*;
 ///
 /// Builds on [`BsxPlugin`]. With the `scripting` feature it also runs `click`
 /// handlers and installs the [`AsyncPlugin`] their evaluations resolve
-/// against; without it a `bx:<event>` directive still builds, its handler
+/// against; without it a `bx:on<event>` directive still builds, its handler
 /// inert.
 #[derive(Default)]
 pub struct BsxDefaultsPlugin;

@@ -17,10 +17,11 @@
 //!
 //! Internal split, one directory per stage: source text to syntax tree in
 //! `parse` (the cursor, the markup parser, the value grammar, the
-//! source-format registry), literal to reflected value in `reflect` (with the
-//! root declaration block and prop-schema verification), and syntax tree to
-//! world in `resolve` (the build walk, the event seam, and the resolver
-//! hooks a host installs into it). Alongside them sit the BSX-template registry
+//! source-format registry), syntax tree to explicit syntax tree in
+//! `directive` (every `bx:` directive rewritten away, touching no world),
+//! literal to reflected value in `reflect` (with the root declaration block
+//! and prop-schema verification), and syntax tree to world in `resolve` (the
+//! build walk and the resolver hooks a host installs into it). Alongside them sit the BSX-template registry
 //! ([`BsxTemplateRegistry`]) and the entry-document front-end.
 //!
 //! # Syntax
@@ -28,12 +29,9 @@
 //! Lowercase tags are HTML [`Element`]s; attributes become attribute child
 //! entities; text becomes a [`Value`]. A braced `{..}` block is the value
 //! grammar: a `{literal}` lowers to a [`Value`], an `{@source:path}` binding to
-//! its reactive sync components. The `bx:` directives (`bx:scope`, `bx:ref`,
-//! `bx:click`, ...) attach their document-system and slot-marker components:
-//! `bx:for` a [`ReactiveChildren`] whose item template is the element's
-//! children held as an inline [`Prefab`], `bx:<event>` an [`OnEvent`] child.
-//! `<script>`, `<style>` and `<RunScript>` read their body as raw text, a
-//! [`RunScript`]'s body being its source. An uppercase tag or a spread nothing is registered under is not an error:
+//! its reactive sync components. `<script>` and `<style>` read their body as
+//! raw text, HTML's own rule. An uppercase tag or a spread nothing is
+//! registered under is not an error:
 //! it warns, is held with its value in the entity's [`Unregistered`] and, for
 //! a tag, builds its children anyway, so a lean binary loads the same document
 //! shape a full one does and only its behavior is missing.
@@ -78,19 +76,51 @@
 //! Bindings work in attribute position (`value=@res:Theme.contrast`), text
 //! position (`{@doc:name}`), and as spread-tuple items
 //! (`{(Slider{value:3}, @comp:Slider.value)}`), pairing a component insert with
-//! a binding on the same entity. An event directive is a script:
-//! `bx:click="target.with_field('count', count => count + 1)"` lowers to an
-//! [`OnEvent`] child carrying [`RunScript`] and its source, which the plugin
-//! owning the event runs with the event target entity bound to `target`. No mirror is lowered onto the host: the script writes the
-//! real document through the same ancestor-document walk a display binding
-//! reads through, and document-sync fans the change out.
+//! a binding on the same entity.
+//!
+//! ## Scripts and templates, in HTML's words
+//!
+//! Beet's powers ride HTML's own vocabulary or a component, never a parallel
+//! tag. A script beet runs is `<script {RunScript}>`, against the world under
+//! the grant a sibling spread gives it (`beet_action`'s `ScriptConfig`); a
+//! bare `<script>` stays page content the HTML renderer emits for the browser.
+//! An event handler is `<script {OnEvent{event:"click"}}>`, a child of the
+//! element it answers for, which the plugin owning the event runs with the
+//! event target bound to `target`: no mirror is lowered onto the host, the
+//! script writing the real document through the same ancestor-document walk a
+//! display binding reads through. A prefab is `<template>`: an element
+//! carrying [`Prefab`], its subtree held inert as the item a
+//! [`ReactiveChildren`] clones per row.
+//!
+//! ## Directives
+//!
+//! A `bx:` directive is sugar for explicit BSX and nothing else, rewritten
+//! between parsing and the build ([`BsxDirectives`]), so the scene, a save and
+//! the runtime never learn it existed. The line between the two kinds of
+//! shorthand is the world: a directive needs none and runs as a document
+//! lowers, where a `#[template]` needs one and runs at spawn. The standard set:
+//!
+//! ```text
+//! bx:scope="user"                    {DocumentScope{path:"user"}}
+//! bx:for="entries" bx:key="name"     {(ReactiveChildren{key:"name"}, @doc:entries)}
+//!                                    with the children wrapped in a <template>
+//! bx:onclick="src"                   <script {OnEvent{event:"click"}}>src</script>,
+//!                                    one `bx:on<event>` directive for every event
+//! bx:style="decls"                   {InlineStyle{declarations:"decls"}}
+//! ```
+//!
+//! A downstream directive is a [`BsxDirective`] installed like any registry
+//! entry, `app.install(MyDirective)`, landing in the set [`DocParsers`]
+//! carries and shadowing an earlier one for the keys it matches. A `bx:` key
+//! nothing matches refuses the document. `bx:ref`, `bx:cfg` and `bx:schema`
+//! are still read by the build walk itself, and `slot` is HTML's own.
 //!
 //! ```
 //! use beet_core::prelude::*;
 //!
 //! let mut world = (TemplatePlugin, DocumentPlugin).into_world();
 //! let nodes = BsxNode::parse_document(
-//!     r#"<section bx:scope="user"><p>{@doc:name="Ada"}</p><button bx:click="target.with_field('clicks', clicks => clicks + 1)">+</button></section>"#,
+//!     r#"<section bx:scope="user"><p>{@doc:name="Ada"}</p><button bx:onclick="target.with_field('clicks', clicks => clicks + 1)">+</button></section>"#,
 //!     &BsxParseConfig::bsx(),
 //! )
 //! .unwrap();
@@ -223,6 +253,7 @@
 //! precedence, and an unknown namespace is a hard error, never a silent false.
 
 mod bsx_plugin;
+mod directive;
 mod entry;
 mod parse;
 mod reflect;
@@ -230,6 +261,7 @@ mod registry;
 mod resolve;
 
 pub use bsx_plugin::*;
+pub use directive::*;
 pub use parse::*;
 pub use reflect::*;
 pub use registry::*;

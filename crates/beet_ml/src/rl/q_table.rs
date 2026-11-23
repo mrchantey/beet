@@ -4,22 +4,43 @@ use serde::Deserialize;
 use serde::Serialize;
 pub type QValue = f32;
 
+/// The learned value of each action in each state.
+///
+/// Serialized as a list of `(state, actions)` entries rather than a map,
+/// since a state may be compound (a [`GridPos`]), which no text format takes
+/// as a map key.
 #[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Component,
-	Deref,
-	DerefMut,
-	Reflect,
-	Serialize,
-	Deserialize,
-	Asset,
+	Debug, Clone, PartialEq, Component, Deref, DerefMut, Reflect, Asset,
 )]
 #[reflect(Default, Component)]
 pub struct QTable<State: StateSpace, Action: ActionSpace>(
 	pub HashMap<State, HashMap<Action, QValue>>,
 );
+
+impl<State: StateSpace + Serialize, Action: ActionSpace + Serialize> Serialize
+	for QTable<State, Action>
+{
+	fn serialize<S: serde::Serializer>(
+		&self,
+		serializer: S,
+	) -> Result<S::Ok, S::Error> {
+		serializer.collect_seq(self.0.iter())
+	}
+}
+
+impl<
+	'de,
+	State: StateSpace + Deserialize<'de>,
+	Action: ActionSpace + Deserialize<'de>,
+> Deserialize<'de> for QTable<State, Action>
+{
+	fn deserialize<D: serde::Deserializer<'de>>(
+		deserializer: D,
+	) -> Result<Self, D::Error> {
+		Vec::<(State, HashMap<Action, QValue>)>::deserialize(deserializer)
+			.map(|entries| Self(entries.into_iter().collect()))
+	}
+}
 
 impl<State: StateSpace, Action: ActionSpace> Default for QTable<State, Action> {
 	fn default() -> Self { Self(HashMap::default()) }
@@ -125,5 +146,18 @@ mod test {
 		eval.mean.xpect_eq(1.);
 		eval.std.xpect_eq(0.);
 		eval.total_steps.xpect_eq(600);
+	}
+
+	/// A table keyed by a compound state round trips through json, which
+	/// takes no such map key.
+	#[beet_core::test]
+	fn round_trips_through_json() {
+		let mut table = QTable::<GridPos, GridDirection>::default();
+		table.set_q(&GridPos::new(UVec2::new(1, 3)), &GridDirection::Up, 0.9);
+		let bytes = MediaType::Json.serialize(&table).unwrap();
+		MediaType::Json
+			.deserialize::<QTable<GridPos, GridDirection>>(&bytes)
+			.unwrap()
+			.xpect_eq(table);
 	}
 }

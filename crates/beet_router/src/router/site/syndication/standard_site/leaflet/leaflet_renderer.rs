@@ -894,31 +894,31 @@ mod test {
 		)
 	}
 
-	/// `member` as json.
-	fn to_json(member: OpenUnion) -> serde_json::Value {
-		serde_json::to_value(Value::from(member)).unwrap()
-	}
-
-	/// The blocks the tree at `root` renders as, as json.
-	fn blocks(world: &mut World, root: Entity) -> serde_json::Value {
-		let content = to_json(leaflet(world, root).unwrap());
-		content["pages"][0]["blocks"]
-			.as_array()
+	/// The blocks the tree at `root` renders as.
+	fn blocks(world: &mut World, root: Entity) -> Value {
+		Value::from(leaflet(world, root).unwrap())
+			.get("pages")
+			.and_then(|pages| pages.get_index(0))
+			.and_then(|page| page.get("blocks"))
+			.unwrap()
+			.as_list()
 			.unwrap()
 			.iter()
-			.map(|slot| slot["block"].clone())
-			.collect()
+			.map(|slot| slot.get("block").unwrap().clone())
+			.collect::<Vec<_>>()
+			.xmap(Value::List)
 	}
 
 	/// The blocks `bundle` renders as.
-	fn render(bundle: impl Bundle) -> serde_json::Value {
+	fn render(bundle: impl Bundle) -> Value {
 		let mut world = world();
 		let root = world.spawn(bundle).id();
 		blocks(&mut world, root)
 	}
 
-	fn json(text: &str) -> serde_json::Value {
-		serde_json::from_str(text).unwrap()
+	/// `text` parsed as json.
+	fn json(text: &str) -> Value {
+		MediaType::Json.deserialize(text.as_bytes()).unwrap()
 	}
 
 	#[beet_core::test]
@@ -948,10 +948,12 @@ mod test {
 		let blocks = render(rsx! {
 			<p>"Grüße "<strong>"bold "<em>"both"</em></strong>" "<code>"code"</code>" "<a href="https://beet.org">"link"</a>"."</p>
 		});
-		let block = &blocks[0];
-		block["plaintext"].xpect_eq(json(r#""Grüße bold both code link.""#));
+		let block = blocks.get_index(0).unwrap();
+		block
+			.get("plaintext")
+			.xpect_eq(Some(&json(r#""Grüße bold both code link.""#)));
 		// `Grüße ` is 8 bytes, `ü` and `ß` being two each
-		block["facets"].xpect_eq(json(
+		block.get("facets").unwrap().xpect_eq(json(
 			r#"[
 				{"index":{"byteStart":13,"byteEnd":17},"features":[{"$type":"pub.leaflet.richtext.facet#italic"}]},
 				{"index":{"byteStart":8,"byteEnd":17},"features":[{"$type":"pub.leaflet.richtext.facet#bold"}]},
@@ -966,25 +968,35 @@ mod test {
 	fn maps_every_mark() {
 		render(rsx! {
 			<p><b>"b"</b><i>"i"</i><mark>"m"</mark><u>"u"</u><s>"s"</s><del>"d"</del></p>
-		})[0]["facets"]
-			.as_array()
-			.unwrap()
-			.iter()
-			.map(|facet| {
-				facet["features"][0]["$type"].as_str().unwrap().to_string()
-			})
-			.collect::<Vec<_>>()
-			.xpect_eq(
-				[
-					"bold",
-					"italic",
-					"highlight",
-					"underline",
-					"strikethrough",
-					"strikethrough",
-				]
-				.map(|feature| format!("pub.leaflet.richtext.facet#{feature}")),
-			);
+		})
+		.get_index(0)
+		.and_then(|block| block.get("facets"))
+		.unwrap()
+		.as_list()
+		.unwrap()
+		.iter()
+		.map(|facet| {
+			facet
+				.get("features")
+				.and_then(|features| features.get_index(0))
+				.and_then(|feature| feature.get("$type"))
+				.unwrap()
+				.as_str()
+				.unwrap()
+				.to_string()
+		})
+		.collect::<Vec<_>>()
+		.xpect_eq(
+			[
+				"bold",
+				"italic",
+				"highlight",
+				"underline",
+				"strikethrough",
+				"strikethrough",
+			]
+			.map(|feature| format!("pub.leaflet.richtext.facet#{feature}")),
+		);
 	}
 
 	/// A relative link resolves against the homepage over the request's
@@ -994,8 +1006,14 @@ mod test {
 		let link = || rsx! { <p><a href="../docs">"docs"</a></p> };
 		let mut world = world();
 		let root = world.spawn(link()).id();
-		blocks(&mut world, root)[0]["facets"][0]["features"][0]["uri"]
-			.xpect_eq(json(r#""https://beet.org/docs""#));
+		blocks(&mut world, root)
+			.get_index(0)
+			.and_then(|block| block.get("facets"))
+			.and_then(|facets| facets.get_index(0))
+			.and_then(|facet| facet.get("features"))
+			.and_then(|features| features.get_index(0))
+			.and_then(|feature| feature.get("uri"))
+			.xpect_eq(Some(&Value::from("https://beet.org/docs")));
 		let mut world = world_at(None);
 		let root = world.spawn(link()).id();
 		leaflet(&mut world, root)
@@ -1092,15 +1110,13 @@ mod test {
 			MediaBytes::new(MediaType::Png, png(1448, 1074)),
 		);
 		world.entity_mut(fetched).insert(blob.clone());
-		let blob_ref = serde_json::to_value(blob.blob_ref()).unwrap();
-		blocks(&mut world, root).xpect_eq(json(&format!(
-			r#"[
-				{{"$type":"pub.leaflet.blocks.text","plaintext":"Before"}},
-				{{"$type":"pub.leaflet.blocks.image","image":{blob_ref},"alt":"Fetched","aspectRatio":{{"width":1448,"height":1074}}}},
-				{{"$type":"pub.leaflet.blocks.text","plaintext":"after."}},
-				{{"$type":"pub.leaflet.blocks.website","src":"https://beet.org/linked.png","title":"Linked"}}
-			]"#
-		)));
+		let blob_ref = Value::from_serde(blob.blob_ref()).unwrap();
+		blocks(&mut world, root).xpect_eq(value!([
+			{"$type": "pub.leaflet.blocks.text", "plaintext": "Before"},
+			{"$type": "pub.leaflet.blocks.image", "image": blob_ref, "alt": "Fetched", "aspectRatio": {"width": 1448, "height": 1074}},
+			{"$type": "pub.leaflet.blocks.text", "plaintext": "after."},
+			{"$type": "pub.leaflet.blocks.website", "src": "https://beet.org/linked.png", "title": "Linked"}
+		]));
 	}
 
 	/// A table is a pipe table in a code block, its columns aligned.
@@ -1175,10 +1191,12 @@ mod test {
 				..default()
 			},
 			rsx! { <p>"Body"</p> },
-		))[0]
-			.xpect_eq(json(
-				r#"{"$type":"pub.leaflet.blocks.iframe","url":"https://www.youtube.com/embed/7koepBSRoUI","aspectRatio":{"width":16,"height":9}}"#,
-			));
+		))
+		.get_index(0)
+		.unwrap()
+		.xpect_eq(json(
+			r#"{"$type":"pub.leaflet.blocks.iframe","url":"https://www.youtube.com/embed/7koepBSRoUI","aspectRatio":{"width":16,"height":9}}"#,
+		));
 	}
 
 	/// The `--root=content` Leaflet render of the site's own blog post at
@@ -1215,7 +1233,15 @@ mod test {
 			})
 			.await
 			.unwrap();
-		serde_json::to_string_pretty(&to_json(content)).unwrap()
+		MediaBytes::serialize_with_options(
+			MediaType::Json,
+			&Value::from(content),
+			SerializeOptions { pretty: true },
+		)
+		.unwrap()
+		.as_utf8()
+		.unwrap()
+		.to_string()
 	}
 
 	#[cfg(all(

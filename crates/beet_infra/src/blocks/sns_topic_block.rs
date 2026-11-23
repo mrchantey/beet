@@ -206,7 +206,7 @@ impl EmitBlock for SnsTopicBlock {
 		config.add_untyped_data_source(
 			"aws_caller_identity",
 			"current",
-			&json!({}),
+			&value!({}),
 		)?;
 		let topic =
 			ResourceDef::new_secondary(self.ident(stack), AwsSnsTopicDetails {
@@ -308,7 +308,7 @@ mod tests {
 				.with_name("beetmash-ses-events")
 				.with_adopt(true),
 		);
-		json["import"].xpect_eq(json!([
+		json["import"].xpect_eq(value!([
 			{
 				"to": "aws_sns_topic.beet_infra__dev__ses_events",
 				"id": "arn:aws:sns:ap-southeast-2:${data.aws_caller_identity.current.account_id}:beetmash-ses-events"
@@ -317,7 +317,7 @@ mod tests {
 				"to": "aws_sns_topic_policy.beet_infra__dev__ses_events_policy",
 				"id": "arn:aws:sns:ap-southeast-2:${data.aws_caller_identity.current.account_id}:beetmash-ses-events"
 			}
-		]));
+		]).into_json());
 	}
 
 	/// A publisher that is not a service principal is a typo, caught before a

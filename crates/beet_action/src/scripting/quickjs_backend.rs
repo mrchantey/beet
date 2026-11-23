@@ -25,7 +25,6 @@ use rquickjs::Function;
 use rquickjs::Runtime;
 use rquickjs::Value as JsValue;
 use rquickjs::function::MutFn;
-use serde_json::Value as JsonValue;
 
 /// The engine's single host import on wasm: microseconds since the unix epoch.
 ///
@@ -235,7 +234,7 @@ enum Completion {
 	/// none).
 	Ok {
 		#[serde(default)]
-		value: Option<JsonValue>,
+		value: Option<Value>,
 	},
 	/// It rejected, with the flattened failure.
 	Err { message: String },
@@ -256,10 +255,10 @@ enum Pumped {
 ///
 /// `source` is an async function body wrapped by [`Script::async_body`], so the
 /// evaluation always yields a promise; `input` is bound to the `input` global,
-/// and the value the script returns comes back as JSON, absent when it returned
-/// none. What globals it sees at all is `config`'s to say: a withheld `console`
-/// or `world` is simply not installed, so reaching for it is an ordinary
-/// catchable `ReferenceError`.
+/// and the value the script returns comes back as a [`Value`], absent when it
+/// returned none. What globals it sees at all is `config`'s to say: a withheld
+/// `console` or `world` is simply not installed, so reaching for it is an
+/// ordinary catchable `ReferenceError`.
 ///
 /// The engine is synchronous and its `Context` is `!Send`, so this is a local
 /// future: it never holds a `Ctx` across an await. A bridged run pumps between
@@ -270,11 +269,11 @@ enum Pumped {
 /// [`Script::async_body`]: crate::prelude::Script
 pub(crate) async fn run_quickjs<Sink>(
 	source: &str,
-	input: &JsonValue,
+	input: &Value,
 	config: &ScriptConfig,
 	bridge: Option<&WorldBridge>,
 	sink: Sink,
-) -> Result<Option<JsonValue>>
+) -> Result<Option<Value>>
 where
 	Sink: 'static + FnMut(ConsoleStream, &str),
 {
@@ -323,13 +322,14 @@ where
 
 	match bridge {
 		Some(bridge) => drive_bridge(&bounded, &queue, bridge).await,
-		None => Ok(settled),
-	}?
-	.map(|output| {
-		serde_json::from_str(&output)
-			.map_err(|err| bevyhow!("quickjs: failed to decode output: {err}"))
-	})
-	.transpose()
+		None => settled
+			.map(|output| {
+				serde_json::from_str(&output).map_err(|err| {
+					bevyhow!("quickjs: failed to decode output: {err}")
+				})
+			})
+			.transpose(),
+	}
 }
 
 /// Bind the host half of the world bridge: the sink the shim sends calls
@@ -357,7 +357,7 @@ fn install_bridge(
 }
 
 /// Serve the script's world calls until its own promise settles, and answer
-/// with the JSON it settled with (absent when it produced none).
+/// with the value it settled with (absent when it produced none).
 ///
 /// A call answered here resolves a promise, which queues more work, which may
 /// ask again. The engine is only entered between awaits, never across one.
@@ -365,16 +365,14 @@ async fn drive_bridge(
 	bounded: &BoundedRuntime,
 	queue: &Rc<RefCell<Vec<String>>>,
 	bridge: &WorldBridge,
-) -> Result<Option<String>> {
+) -> Result<Option<Value>> {
 	loop {
 		match bounded.pump(queue)? {
 			Pumped::Done(done) => {
 				return match serde_json::from_str::<Completion>(&done)
 					.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?
 				{
-					Completion::Ok { value } => {
-						value.map(|value| value.to_string()).xok()
-					}
+					Completion::Ok { value } => value.xok(),
 					Completion::Err { message } => {
 						Err(bevyhow!("quickjs: {message}"))
 					}
@@ -399,7 +397,7 @@ async fn drive_bridge(
 }
 
 /// `input` as the JSON encoding the engine parses it from.
-fn encode_input(input: &JsonValue) -> Result<String> {
+fn encode_input(input: &Value) -> Result<String> {
 	serde_json::to_string(input)
 		.map_err(|err| bevyhow!("quickjs: failed to encode input: {err}"))
 }
@@ -459,7 +457,6 @@ mod test {
 	use crate::prelude::*;
 	use crate::scripting::test_support::*;
 	use beet_core::prelude::*;
-	use serde_json::Value as JsonValue;
 
 	#[beet_core::test]
 	async fn increments_a_number() {
@@ -732,7 +729,7 @@ mod test {
 	///
 	/// Straight to the backend, since the point is the split the host-facing
 	/// [`Script::run_captured`] flattens into one body.
-	async fn capture(script: &str, input: JsonValue) -> ConsoleOutput {
+	async fn capture(script: &str, input: Value) -> ConsoleOutput {
 		use std::cell::RefCell;
 		use std::rc::Rc;
 		let output = Rc::new(RefCell::new(ConsoleOutput::default()));
@@ -761,7 +758,7 @@ mod test {
 	/// something, rather than as an empty string or a thrown `TypeError`.
 	#[beet_core::test]
 	async fn console_formats_unstringifiable_values() {
-		capture(r#"console.log(undefined, 1n, "x")"#, JsonValue::Null)
+		capture(r#"console.log(undefined, 1n, "x")"#, Value::Null)
 			.await
 			.stdout
 			.xpect_eq(vec!["undefined 1 x".to_string()]);
@@ -770,7 +767,7 @@ mod test {
 	#[beet_core::test]
 	async fn console_log_streams_stdout() {
 		let output =
-			capture(r#"console.log("hello world")"#, JsonValue::Null).await;
+			capture(r#"console.log("hello world")"#, Value::Null).await;
 		output.stdout.xpect_eq(vec!["hello world".to_string()]);
 		output.stderr.xpect_empty();
 	}
@@ -779,7 +776,7 @@ mod test {
 	async fn console_reads_input_and_splits_streams() {
 		let output = capture(
 			r#"{ console.log(input.name); console.error("oops") }"#,
-			serde_json::json!({ "name": "ada" }),
+			value!({ "name": "ada" }),
 		)
 		.await;
 		output.stdout.xpect_eq(vec!["ada".to_string()]);
@@ -793,7 +790,7 @@ mod test {
 	async fn drains_async_microtasks() {
 		capture(
 			r#"Promise.resolve().then(() => console.log("later"))"#,
-			JsonValue::Null,
+			Value::Null,
 		)
 		.await
 		.stdout

@@ -28,6 +28,11 @@ fn save(world: &mut World, root: Entity) -> String {
 		.to_string()
 }
 
+/// The saved `text` as the [`Value`] a probe indexes.
+fn parse(text: &str) -> Value {
+	MediaBytes::new_json(text).deserialize::<Value>().unwrap()
+}
+
 /// The file keys in **file order**, read back as a [`SceneBody`].
 ///
 /// A `serde_json::Value` would lose that order (its map sorts keys as
@@ -51,24 +56,30 @@ fn entity_keys(json: &str) -> Vec<String> {
 fn format_probe() {
 	let mut world = world();
 	let root = spawn_tree(&mut world);
-	let text = save(&mut world, root);
-	let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+	let scene = parse(&save(&mut world, root));
 
-	let entities = json["entities"].as_object().unwrap();
+	let entities = scene
+		.get(SceneEntities::ENTITIES)
+		.unwrap()
+		.as_map()
+		.unwrap();
 	entities.len().xpect_eq(3);
 	for key in ["0", "1", "2"] {
-		entities.contains_key(key).xpect_true();
+		entities.contains(key).xpect_true();
 	}
 	// the root carries no parent, each child points at file key 0
-	SceneEntities::entity_json(&json, 0)
+	SceneEntities::entity_value(&scene, 0)
+		.unwrap()
 		.get("bevy_ecs::hierarchy::ChildOf")
 		.xpect_none();
 	// an `Entity`-typed field is a reference, written as its target's key:
 	// bevy's own encoding of one (`Entity::to_bits`, opaque and not
 	// guaranteed across versions) never reaches a document.
 	for child in [1, 2] {
-		SceneEntities::entity_json(&json, child)
-			["bevy_ecs::hierarchy::ChildOf"]
+		SceneEntities::entity_value(&scene, child)
+			.unwrap()
+			.get("bevy_ecs::hierarchy::ChildOf")
+			.unwrap()
 			.as_str()
 			.unwrap()
 			.xpect_eq("0");
@@ -89,15 +100,16 @@ fn resources_are_flat() {
 		.write()
 		.register::<Score>();
 	world.insert_resource(Score(7));
-	let json = TemplateSaver::new()
+	TemplateSaver::new()
 		.extract_resources()
 		.save(&world, MediaType::Json)
 		.unwrap()
-		.as_utf8()
+		.deserialize::<Value>()
 		.unwrap()
-		.xmap(serde_json::from_str::<serde_json::Value>)
-		.unwrap();
-	json["resources"][Score::type_path()]
+		.get(SceneEntities::RESOURCES)
+		.unwrap()
+		.get(Score::type_path())
+		.unwrap()
 		.as_u64()
 		.unwrap()
 		.xpect_eq(7);
@@ -142,8 +154,10 @@ fn added_entity_mints_a_fresh_key() {
 	// the loaded entities keep their keys, the new one takes the next unused
 	// key, and file order still carries child order
 	entity_keys(&text).xpect_eq(vec!["0", "3", "1", "2"]);
-	let json: serde_json::Value = serde_json::from_str(&text).unwrap();
-	SceneEntities::entity_json(&json, 3)["bevy_ecs::name::Name"]
+	SceneEntities::entity_value(&parse(&text), 3)
+		.unwrap()
+		.get("bevy_ecs::name::Name")
+		.unwrap()
 		.as_str()
 		.unwrap()
 		.xpect_eq("new");

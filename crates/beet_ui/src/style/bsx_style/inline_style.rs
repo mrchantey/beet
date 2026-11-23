@@ -1,10 +1,8 @@
-//! The `bx:style` directive: the no-code analogue of the Rust `inline_class!`
-//! macro.
+//! [`InlineStyle`]: a one-off style rule for one element, the markup twin of
+//! the Rust `inline_class!` macro and what `bx:style` rewrites to.
 //!
-//! `bx:style` declares a **one-off** style rule for a single element and attaches
-//! a unique, source-derived class to it, exactly as `inline_class!` does in Rust.
-//! Its value is space-separated `prop=value` pairs in the BSX enum-value grammar,
-//! reusing the `<Rule>` declaration surface ([`apply_declarations`]):
+//! Its value is space-separated `prop=value` pairs in the BSX enum-value
+//! grammar, reusing the `<Rule>` declaration surface ([`apply_declarations`]):
 //!
 //! ```html
 //! <div bx:style="display=Flex flex-direction=Column align-items=Center
@@ -14,34 +12,81 @@
 //! It lowers to the same runtime as `inline_class!` ([`register_inline_rule`]):
 //! a one-off [`Rule`] keyed on the minted class is inserted into the [`RuleSet`]
 //! and the class is added to the element's [`Classes`]. The class is a
-//! [`ClassName::Inline`] derived from the directive's BSX [`FileSpan`] rather than
-//! a `panic::Location`, so the selector name differs from the Rust one but the
+//! [`ClassName::Inline`] derived from the declarations' content rather than a
+//! `panic::Location`, so the selector name differs from the Rust one but the
 //! resolved style is identical.
 use crate::prelude::*;
 use crate::style::apply_declarations;
 use beet_core::prelude::*;
+use bevy::ecs::lifecycle::HookContext;
+use bevy::ecs::world::DeferredWorld;
 
-/// Register the `bx:style` handler into the [`StyleResolver`] seam, so a
-/// `bx:style` directive declares a one-off rule and attaches a span-derived
-/// inline class at build time.
-pub(crate) fn register_inline_style(world: &mut World) {
-	world.get_resource_or_init::<StyleResolver>().set(
-		|entity, source, _span| {
-			let (class, rule) = inline_style_rule(source)?;
-			register_inline_rule(entity, class, rule)
-		},
-	);
+/// A one-off style rule for its element: `bx:style="display=Flex"` is
+/// `{InlineStyle{declarations:"display=Flex"}}`.
+///
+/// Inserting it registers its rule in the [`RuleSet`], keyed on a class
+/// derived from the declarations ([`inline_style_rule`]), so identical
+/// declarations share one class and one rule, and adds that class to the
+/// element's [`Classes`]. Plain data, so a save keeps it and a load registers
+/// its rule again; a binary without it holds the name as unregistered.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
+#[reflect(Component, Default)]
+#[component(on_insert = InlineStyle::on_insert())]
+pub struct InlineStyle {
+	/// The `prop=value ..` declarations, ie `display=Flex max-width=Rem(40.0)`.
+	pub declarations: SmolStr,
 }
 
-/// The one-off [`Rule`] a `bx:style` `source` declares and the class that keys
-/// it, for any pass that makes a declaration on an element's behalf (a fence
-/// info word) to register through [`register_inline_rule`] exactly as the
-/// directive would, so identical declarations share one class and one rule.
+impl InlineStyle {
+	/// A one-off rule of `declarations`.
+	pub fn new(declarations: impl Into<SmolStr>) -> Self {
+		Self {
+			declarations: declarations.into(),
+		}
+	}
+
+	fn on_insert() -> impl FnOnce(DeferredWorld, HookContext) {
+		|mut world, cx| {
+			let Some(declarations) = world
+				.get::<Self>(cx.entity)
+				.map(|style| style.declarations.clone())
+			else {
+				return;
+			};
+			let (class, rule) = match inline_style_rule(&declarations) {
+				Ok(parsed) => parsed,
+				Err(err) => {
+					world.commands().handle_command_error::<Self>(err);
+					return;
+				}
+			};
+			// the rule lands synchronously where it can, as a `<Rule>`'s does:
+			// a stylesheet baked later in the same build reads the rule set
+			// before any command flush
+			if let Some(mut rules) = world.get_resource_mut::<RuleSet>()
+				&& !rules.has_inline(rule.selector())
+			{
+				rules.try_insert_inline(rule.clone());
+			}
+			world.commands().entity(cx.entity).queue(
+				move |mut entity: EntityWorldMut| {
+					register_inline_rule(&mut entity, class, rule)
+				},
+			);
+		}
+	}
+}
+
+/// The one-off [`Rule`] an [`InlineStyle`]'s `source` declares and the class
+/// that keys it, for any pass that makes a declaration on an element's behalf
+/// (a fence info word) to register through [`register_inline_rule`] exactly as
+/// the component would, so identical declarations share one class and one
+/// rule.
 ///
-/// The class is keyed on the declaration content, not the BSX span: a markdown
-/// fragment's span is relative to its own HTML block, so two `bx:style`
-/// directives on different file lines can collide on one span-derived class
-/// and clobber each other's rule.
+/// The class is keyed on the declaration content, never a source span: a
+/// markdown fragment's span is relative to its own HTML block, so two
+/// declarations on different file lines could collide on one span-derived
+/// class and clobber each other's rule.
 pub(crate) fn inline_style_rule(source: &str) -> Result<(ClassName, Rule)> {
 	let class = ClassName::from_inline_source(source);
 	let rule = parse_inline_style(class.clone(), source)?;
@@ -88,6 +133,7 @@ fn parse_declaration_pairs(source: &str) -> Result<Vec<(SmolStr, AttrValue)>> {
 
 #[cfg(test)]
 mod test {
+	use super::inline_style_rule;
 	use crate::prelude::*;
 	use crate::style::common_props;
 	use crate::style::material::MaterialStylePlugin;
@@ -233,19 +279,47 @@ mod test {
 
 	#[beet_core::test]
 	fn unknown_prop_errors() {
-		let mut world = MaterialStylePlugin::world();
-		world
-			.spawn_template(BsxTemplate::container(
-				BsxNode::parse_document(
-					r#"<div bx:style="not-a-prop=Flex"/>"#,
-					&BsxParseConfig::bsx(),
-				)
-				.unwrap(),
-				BsxTemplateRegistry::default(),
-			))
-			.err()
-			.unwrap()
+		inline_style_rule("not-a-prop=Flex")
+			.unwrap_err()
 			.to_string()
 			.xpect_contains("not a known style property");
+	}
+
+	/// The component is plain data, so a saved element keeps it and a load
+	/// registers its rule and class again.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	fn survives_a_save_and_a_load() {
+		let (mut world, element) =
+			inline_style_world(r#"<div bx:style="max-width=Rem(12.0)"/>"#);
+		let bytes = TemplateSaver::new()
+			.save_roots(&mut world, MediaType::Json, [element])
+			.unwrap();
+		bytes
+			.as_utf8()
+			.unwrap()
+			.xref()
+			.xpect_contains("InlineStyle");
+		let mut loaded = MaterialStylePlugin::world();
+		let element = TemplateLoader::new(&mut loaded).load(&bytes).unwrap()[0];
+		loaded.flush();
+		let class = loaded
+			.entity(element)
+			.get::<Classes>()
+			.unwrap()
+			.iter()
+			.next()
+			.unwrap()
+			.clone();
+		loaded
+			.resource::<RuleSet>()
+			.rules()
+			.find(|rule| {
+				rule.selector() == &Selector::Class(class.as_selector())
+			})
+			.unwrap()
+			.get_typed::<style::Length>(&common_props::MaxWidth.into())
+			.unwrap()
+			.xpect_eq(style::Length::Rem(12.0));
 	}
 }

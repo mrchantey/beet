@@ -315,7 +315,7 @@ mod test {
 	}
 
 	/// A reference resolves against the registry and dispatches to the schema it
-	/// names, which is what lets a data document compose `Reference("TodoItem")`
+	/// names, which is what lets a state document compose `Reference("TodoItem")`
 	/// and still generate a real form.
 	#[beet_core::test]
 	fn a_reference_resolves_through_the_registry() {

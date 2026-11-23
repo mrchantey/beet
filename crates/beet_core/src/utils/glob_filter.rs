@@ -526,7 +526,7 @@ mod test {
 			.with_exclude("*target*");
 
 		filter
-			.passes("/home/pete/me/beet/target/snippets/snippets.ron")
+			.passes("/home/pete/me/beet/target/snippets/snippets.json")
 			.xpect_false();
 		// test multi exclude
 
@@ -605,24 +605,25 @@ mod test {
 			.with_include("**/*.rs")
 			.with_exclude("*target*");
 
-		let json = serde_json::to_string(&filter).unwrap();
-		let deserialized: GlobFilter = serde_json::from_str(&json).unwrap();
-
+		MediaBytes::serialize(MediaType::Json, &filter)
+			.unwrap()
+			.deserialize::<GlobFilter>()
+			.unwrap()
+			.xpect_eq(filter.clone());
 		filter.rules.clone().xpect_eq(vec![
 			GlobRule::Include(GlobPattern::new("**/*.rs")),
 			GlobRule::Exclude(GlobPattern::new("*target*")),
 		]);
-		filter.xpect_eq(deserialized);
 	}
 
 	#[crate::test]
 	#[cfg(feature = "json")]
 	fn glob_pattern_serde() {
 		let pattern = GlobPattern::new("*foo*");
-		let json = serde_json::to_string(&pattern).unwrap();
-		json.xpect_eq("\"*foo*\"");
+		let bytes = MediaBytes::serialize(MediaType::Json, &pattern).unwrap();
+		bytes.as_utf8().unwrap().xpect_eq("\"*foo*\"");
 
-		let deserialized: GlobPattern = serde_json::from_str(&json).unwrap();
+		let deserialized = bytes.deserialize::<GlobPattern>().unwrap();
 		deserialized.as_str().xpect_eq("*foo*");
 		pattern.xpect_eq(deserialized);
 	}

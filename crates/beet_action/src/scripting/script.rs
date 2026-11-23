@@ -3,7 +3,6 @@ use beet_core::prelude::*;
 use core::marker::PhantomData;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use serde_json::Value as JsonValue;
 
 /// A JavaScript program carried as data, transforming `Input` into `Output`.
 ///
@@ -220,12 +219,12 @@ where
 		world: AsyncWorld,
 		config: &ScriptConfig,
 		sink: Sink,
-	) -> Result<Option<JsonValue>>
+	) -> Result<Option<Value>>
 	where
 		Sink: 'static + Send + FnMut(ConsoleStream, &str),
 	{
 		let source = Self::async_body(&self.content);
-		let input = serde_json::to_value(input)
+		let input = Value::from_serde(input)
 			.map_err(|err| bevyhow!("failed to encode input: {err}"))?;
 		// the bridge exists only where the config grants a world, so a
 		// `world: false` script has no `world` global to reach for.
@@ -279,22 +278,20 @@ where
 	///
 	/// A `()` output discards whatever the body evaluated to, the way any
 	/// language discards a statement's value: an expression body always produces
-	/// one, and a `<RunScript>` is run for its effects, not its answer.
+	/// one, and a `<script {RunScript}>` is run for its effects, not its answer.
 	///
 	/// For any other output a missing value is a `null`, which only a block body
 	/// that chose not to return can produce, so the error says that rather than
 	/// reporting a serde type mismatch the author cannot act on.
-	fn decode_output(
-		value: Option<JsonValue>,
-		content: &str,
-	) -> Result<Output> {
+	fn decode_output(value: Option<Value>, content: &str) -> Result<Output> {
 		if core::any::TypeId::of::<Output>() == core::any::TypeId::of::<()>() {
-			return serde_json::from_value(JsonValue::Null)
+			return Value::Null
+				.into_serde()
 				.map_err(|err| bevyhow!("failed to decode output: {err}"));
 		}
-		let value = value.unwrap_or(JsonValue::Null);
+		let value = value.unwrap_or_default();
 		let empty = value.is_null();
-		serde_json::from_value(value).map_err(|err| match empty {
+		value.into_serde().map_err(|err| match empty {
 			true => match content.trim_start().starts_with('{') {
 				true => bevyhow!(
 					"script produced no value: a block body answers with `return`"
@@ -390,7 +387,7 @@ async fn host_backend<Sink>(
 	request: ScriptRequest,
 	sink: Sink,
 	bridge: Option<&WorldBridge>,
-) -> Result<Option<JsonValue>>
+) -> Result<Option<Value>>
 where
 	Sink: FnMut(ConsoleStream, &str),
 {
@@ -457,5 +454,35 @@ where
 				script.run(cx.input, world, &ScriptConfig::default()).await
 			}
 		})
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// A json decoder reads a non-negative integer as [`Value::Uint`] and a
+	/// negative one as [`Value::Int`], so either form decodes into any numeric
+	/// output, a float included.
+	#[beet_core::test]
+	fn integer_forms_decode_into_any_number() {
+		Script::<(), f64>::decode_output(Some(Value::Uint(2)), "2")
+			.unwrap()
+			.xpect_eq(2.0);
+		Script::<(), i64>::decode_output(Some(Value::Uint(2)), "2")
+			.unwrap()
+			.xpect_eq(2);
+		Script::<(), i32>::decode_output(Some(Value::Int(-2)), "-2")
+			.unwrap()
+			.xpect_eq(-2);
+	}
+
+	#[beet_core::test]
+	fn a_missing_value_names_the_body_shape() {
+		Script::<(), i64>::decode_output(None, "{ input }")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("answers with `return`");
 	}
 }

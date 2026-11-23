@@ -567,12 +567,16 @@ mod test {
 	#[cfg(feature = "json")]
 	fn serde_roundtrip() {
 		let original = SmolPath::new("/hello/world");
-		let serialized = serde_json::to_string(&original).unwrap();
-		serialized.xpect_eq("\"/hello/world\"");
-		let deserialized: SmolPath = serde_json::from_str(&serialized).unwrap();
-		original.xpect_eq(deserialized);
+		let serialized =
+			MediaBytes::serialize(MediaType::Json, &original).unwrap();
+		serialized.as_utf8().unwrap().xpect_eq("\"/hello/world\"");
+		serialized
+			.deserialize::<SmolPath>()
+			.unwrap()
+			.xpect_eq(original);
 		// a deserialized path is cleaned
-		serde_json::from_str::<SmolPath>("\"a//b/./c\"")
+		MediaType::Json
+			.deserialize::<SmolPath>(b"\"a//b/./c\"")
 			.unwrap()
 			.xpect_eq(SmolPath::new("a/b/c"));
 	}

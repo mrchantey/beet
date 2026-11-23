@@ -67,7 +67,7 @@ The site is the router under the `serve` command:
 
 All interpolation is reactive and source-prefixed with `@` (the canonical grammar reference is the `beet_core::bsx` module doc). The site uses each source:
 
-- `@doc:` document state: the beet counter binds `{@doc:count=0}` and the buttons mutate it from a one-line event script, `bx:click="target.with_field('count', count => count + 1)"`.
+- `@doc:` document state: the beet counter binds `{@doc:count=0}` and the buttons mutate it from a one-line event script, `bx:onclick="target.with_field('count', count => count + 1)"`.
 - `@res:` resource fields: the footer pulls `@res:PackageConfig.description` straight from the resource (the default document head emits `og:site_name` from `PackageConfig.title` automatically, so the layout no longer hand-writes it).
 - `@prop:` template props: `widgets::Card` binds its heading to `{@prop:title}`, filled by the caller's `title="Today"` attribute.
 
@@ -80,7 +80,7 @@ The same site renders on the web (a full HTML document), in the terminal (charce
 `routes/counter.bsx` is a single no-code page that runs on every target, unchanged:
 
 - **Terminal (in-process):** `beet serve --server=tui` drives the same `@doc:count` and event scripts natively through the document sync, the count repainting in charcell on each click.
-- **Web (the browser runtime):** `beet serve --server=http` serves the page as its first paint, and the `<Wasm route="serve"/>` in `templates/Layout.bsx` boots the wasm `beet` binary on this same entry, read through `/repo`, dispatching `serve` under `--server=dom` and opening at the page's own url. The tab then runs the page's world: a click reaches the button's entity through the DOM binding, its `bx:click` script runs in the sandboxed iframe backend, and the bound count repaints in place with no network round-trip. Until it boots, the served page is inert.
+- **Web (the browser runtime):** `beet serve --server=http` serves the page as its first paint, and the `<Wasm route="serve"/>` in `templates/Layout.bsx` boots the wasm `beet` binary on this same entry, read through `/repo`, dispatching `serve` under `--server=dom` and opening at the page's own url. The tab then runs the page's world: a click reaches the button's entity through the DOM binding, its `bx:onclick` script runs in the sandboxed iframe backend, and the bound count repaints in place with no network round-trip. Until it boots, the served page is inert.
 - **Static export:** `beet export-static examples/beetmania` writes the page with its bindings settled to the initial state, the correct first paint.
 
 There is no framework tier between SSR and the world: below wasm the page is plain HTML and CSS, and above it the browser is one more beet runtime, launched by the page.

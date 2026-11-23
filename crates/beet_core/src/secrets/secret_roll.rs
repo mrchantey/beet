@@ -158,15 +158,21 @@ mod test {
 				roll: Some(roll.clone()),
 				..default()
 			};
-			let toml = toml::to_string(&record).unwrap();
-			toml.xpect_eq(format!("roll = {text:?}\n"));
-			toml::from_str::<SecretRecord>(&toml)
+			let bytes =
+				MediaBytes::serialize(MediaType::Toml, &record).unwrap();
+			bytes
+				.as_utf8()
+				.unwrap()
+				.xpect_eq(format!("roll = {text:?}\n"));
+			bytes
+				.deserialize::<SecretRecord>()
 				.unwrap()
 				.roll
 				.xpect_eq(Some(roll));
 		}
 		// the retired `rotation` key is refused rather than dropped
-		toml::from_str::<SecretRecord>("rotation = \"remint\"\n")
+		MediaType::Toml
+			.deserialize::<SecretRecord>(b"rotation = \"remint\"\n")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("unknown field `rotation`");

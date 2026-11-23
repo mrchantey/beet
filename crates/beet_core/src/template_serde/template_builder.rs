@@ -49,12 +49,11 @@ use serde::Serialize;
 /// back as one of the entity's own keys, beside the resolved ones, so a round
 /// trip through a binary lacking a plugin loses nothing.
 ///
-/// # Template Invocations
+/// # Builders
 ///
-/// A template a body invoked is written back as its invocation, one of the
-/// entity's own keys, from the entity's retained [`TemplateInvocations`]: the
-/// components its expansion inserted are left out, and the entities it
-/// spawned are [`Derived`], so the scene re-expands on the next load.
+/// A snapshot is output only: a template a body invoked expanded when it
+/// spawned, and a save writes what it built and nothing of the invocation,
+/// so loading the save builds nothing a second time.
 ///
 /// # Runtime Components
 ///
@@ -324,12 +323,6 @@ impl<'w> TemplateBuilder<'w> {
 			.get::<Unregistered>()
 			.map(|unregistered| (**unregistered).clone())
 			.unwrap_or_default();
-		// a template a body invoked goes back as its invocation, never as
-		// what it expanded to
-		let invocations = original_entity
-			.get::<TemplateInvocations>()
-			.map(|invocations| invocations.to_vec())
-			.unwrap_or_default();
 
 		for &component_id in original_entity.archetype().components().iter() {
 			let Some(info) = world.components().get_info(component_id) else {
@@ -361,7 +354,6 @@ impl<'w> TemplateBuilder<'w> {
 				continue;
 			};
 			if type_id == TypeId::of::<Unregistered>()
-				|| type_id == TypeId::of::<TemplateInvocations>()
 				|| self.component_filter.is_denied_by_id(type_id)
 			{
 				continue;
@@ -399,20 +391,12 @@ impl<'w> TemplateBuilder<'w> {
 				}
 			};
 			let type_path = registration.type_info().type_path();
-			if invocations.iter().any(|invocation| {
-				invocation.expanded.iter().any(|path| path == type_path)
-			}) {
-				continue;
-			}
 			let value = self
 				.component_value(value, registration, reflect_component)
 				.map_err(|err| {
 					bevyhow!("component `{type_path}` on {entity}: {err}")
 				})?;
 			resolved.insert(type_path, value);
-		}
-		for invocation in invocations {
-			resolved.insert(invocation.name, invocation.value);
 		}
 		// a resolved component wins the key a held one also names
 		for (name, value) in Map::from(held) {

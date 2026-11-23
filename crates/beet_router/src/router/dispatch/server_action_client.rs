@@ -95,7 +95,7 @@ mod test {
 
 	fn ok_body<T: serde::Serialize>(value: &T) -> Response {
 		Response::ok_body(
-			serde_json::to_string(value).unwrap(),
+			MediaType::Json.serialize(value).unwrap(),
 			MediaType::Json,
 		)
 	}
@@ -116,7 +116,7 @@ mod test {
 	async fn parses_err_at_err_status() {
 		let response = Response::from_status_body(
 			JsonResult::DEFAULT_ERR_STATUS,
-			serde_json::to_string("bad input").unwrap(),
+			MediaType::Json.serialize(&"bad input").unwrap(),
 			MediaType::Json,
 		);
 		ServerActionClient::parse_fallible_response::<i32, String>(

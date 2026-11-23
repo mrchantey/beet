@@ -27,9 +27,9 @@ use serde::Serialize;
 /// components and an exclude carves one out of an otherwise open grant:
 ///
 /// ```ignore
-/// <RunScript {ScriptConfig{read:["guestbook.*","Text"], write:["guestbook.*"]}}>
+/// <script {RunScript} {ScriptConfig{read:["guestbook.*","Text"], write:["guestbook.*"]}}>
 ///   ..
-/// </RunScript>
+/// </script>
 /// ```
 ///
 /// A component passes a filter if *any* of its names (full type path, short

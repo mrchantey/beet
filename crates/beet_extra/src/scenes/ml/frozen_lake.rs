@@ -73,7 +73,7 @@ pub fn FrozenLake(
 /// then [`TranslateGrid`]) is built as Rust children since [`CallOnSpawn`] and
 /// [`ReadQPolicy`] are generic, not markup spreads.
 ///
-/// Run `frozen_lake_train` first to generate `assets/ml/frozen_lake_qtable.ron`.
+/// Run `frozen_lake_train` first to generate `assets/ml/frozen_lake_qtable.json`.
 #[template(system)]
 pub fn FrozenLakeRunAgent(
 	mut rng: ResMut<FastRandom>,
@@ -88,7 +88,7 @@ pub fn FrozenLakeRunAgent(
 	let agent_pos = grid_to_world.world_pos(*agent_grid_pos);
 	let object_scale = Vec3::splat(grid_to_world.cell_width * 0.5);
 
-	let qtable = assets.load::<FrozenLakeQTable>("ml/frozen_lake_qtable.ron");
+	let qtable = assets.load::<FrozenLakeQTable>("ml/frozen_lake_qtable.json");
 
 	// Spawned top-level (not as a child of the scene host) so the action tree
 	// resolves its agent to this entity — its root ancestor — rather than the

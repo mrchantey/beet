@@ -71,26 +71,27 @@ pub async fn RespondMultiModal(
 	);
 	let started = Instant::now();
 	// each capability call, timed for the summary log below.
-	let run = |path: &'static str, body: String| {
+	let run = |path: &'static str, body: Request| {
 		let caller = cx.caller.clone();
 		async move {
 			let started = Instant::now();
-			let result = call_capability(&caller, path, body).await;
+			let result = call_capability(&caller, body).await;
 			(path, started.elapsed(), result)
 		}
 	};
 	let face = (
 		"show-image",
-		serde_json::to_string(&ShowImageInput {
+		Request::get("show-image").with_json_body(&ShowImageInput {
 			src: src.to_string(),
 		})?,
 	);
 	let speak = (
 		"speak-text",
-		serde_json::to_string(&SpeakTextInput { text: say })?,
+		Request::get("speak-text")
+			.with_json_body(&SpeakTextInput { text: say })?,
 	);
 	// the clamped, agent-chosen drive command sent to the `drive` capability route.
-	let drive = ("drive", serde_json::to_string(&drive)?);
+	let drive = ("drive", Request::get("drive").with_json_body(&drive)?);
 	let outcomes = if parallel {
 		// fan all three out at once: the robot may move while it is still talking.
 		async_ext::join_all([
@@ -141,18 +142,14 @@ pub async fn RespondMultiModal(
 /// stall the robot's life.
 const CAPABILITY_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Call a capability route with a JSON body, in the url space surrounding the
+/// Call a capability route with its request, in the url space surrounding the
 /// agent ([`ThreadQuery::agent_url_space`]): the capabilities are routes beside the
 /// agent, never its own tools.
 ///
 /// A body that cannot block on its own effect (the esp robot: no async-timer
 /// waker in its handler task) replies with a [`SettleTime`] instead, and the
 /// wait happens here, so the next photo still only follows a settled robot.
-async fn call_capability(
-	caller: &AsyncEntity,
-	path: &str,
-	body: String,
-) -> Result {
+async fn call_capability(caller: &AsyncEntity, request: Request) -> Result {
 	let url_space = caller
 		.with_state::<ThreadQuery, _>(|entity, query| {
 			query.agent_url_space(entity)
@@ -160,12 +157,10 @@ async fn call_capability(
 		.await??;
 	let response = async_ext::timeout(
 		CAPABILITY_TIMEOUT,
-		caller.world().entity(url_space).call_detached(
-			Router::action(),
-			Request::get(path)
-				.with_body(body)
-				.with_header::<header::ContentType>(MediaType::Json),
-		),
+		caller
+			.world()
+			.entity(url_space)
+			.call_detached(Router::action(), request),
 	)
 	.await
 	.map_err(|_| bevyhow!("timed out after {CAPABILITY_TIMEOUT:?}"))??
@@ -232,16 +227,13 @@ mod test {
 		app.world_mut().spawn((config, ChildOf(tools)));
 		app.world_mut().flush();
 
-		let body = serde_json::to_string(&input).unwrap();
+		let request = Request::get("respond-multi-modal")
+			.with_json_body(&input)
+			.unwrap();
 		app.world_mut().entity_mut(tools).run_async_local(
 			move |tools| async move {
 				tools
-					.call_detached(
-						Router::action(),
-						Request::get("respond-multi-modal")
-							.with_body(body)
-							.with_header::<header::ContentType>(MediaType::Json),
-					)
+					.call_detached(Router::action(), request)
 					.await?
 					.into_result()
 					.await?;

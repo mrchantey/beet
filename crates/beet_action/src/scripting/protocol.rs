@@ -16,7 +16,6 @@ use crate::scripting::dynamic::WORLD_SHIM;
 use beet_core::prelude::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use serde_json::Value as JsonValue;
 
 /// One evaluation request: the whole of what a backend needs to run a script.
 ///
@@ -30,7 +29,7 @@ pub struct ScriptRequest {
 	/// The JavaScript source to evaluate.
 	pub source: String,
 	/// The value bound to the script's `input` global.
-	pub input: JsonValue,
+	pub input: Value,
 	/// The ceilings the backend enforces, to whatever extent it can.
 	pub limits: ScriptLimits,
 	/// Whether to install the `world` global at all: false, and the script has
@@ -88,7 +87,7 @@ pub enum ScriptEvent {
 	Output {
 		/// The completion value, absent when the script produced none.
 		#[serde(default)]
-		value: Option<JsonValue>,
+		value: Option<Value>,
 	},
 	/// The script (or the backend running it) failed, the last event of a failed
 	/// run. A message rather than a typed error: the failure happened in another
@@ -218,7 +217,7 @@ pub(crate) enum Received {
 	/// A world call, blocking the script until its reply travels back.
 	Call(WorldCall),
 	/// The terminal event: the completion value, or the failure.
-	Done(Result<Option<JsonValue>>),
+	Done(Result<Option<Value>>),
 }
 
 /// Classify one received protocol line, forwarding a console line to `sink` on
@@ -291,7 +290,7 @@ mod test {
 	fn request() -> ScriptRequest {
 		ScriptRequest {
 			source: "input.name".to_string(),
-			input: serde_json::json!({ "name": "ada" }),
+			input: value!({ "name": "ada" }),
 			limits: ScriptLimits::default(),
 			world: false,
 			console: true,
@@ -322,11 +321,11 @@ mod test {
 	/// world unless one is asked for, a console unless one is withheld.
 	#[beet_core::test]
 	fn missing_grants_decode_as_their_defaults() {
-		let mut encoded = serde_json::to_value(request()).unwrap();
-		let fields = encoded.as_object_mut().unwrap();
+		let mut encoded = Value::from_serde(request()).unwrap();
+		let fields = encoded.as_map_mut().unwrap();
 		fields.remove("world");
 		fields.remove("console");
-		let request = serde_json::from_value::<ScriptRequest>(encoded).unwrap();
+		let request = encoded.into_serde::<ScriptRequest>().unwrap();
 		request.world.xpect_false();
 		request.console.xpect_true();
 	}
@@ -351,7 +350,7 @@ mod test {
 				},
 			},
 			ScriptEvent::Output {
-				value: Some(serde_json::json!(42)),
+				value: Some(value!(42)),
 			},
 			ScriptEvent::Output { value: None },
 			ScriptEvent::Error {
@@ -363,6 +362,19 @@ mod test {
 				.unwrap()
 				.xpect_eq(event);
 		}
+	}
+
+	/// JSON has no non-finite numbers, so a `NaN` or infinite input crosses
+	/// the wire as `null`, which is what the script sees.
+	#[beet_core::test]
+	fn non_finite_input_encodes_as_null() {
+		ScriptRequest {
+			input: value!([(f64::NAN), (f64::INFINITY)]),
+			..request()
+		}
+		.to_line()
+		.unwrap()
+		.xpect_contains(r#""input":[null,null]"#);
 	}
 
 	/// The JS side emits `{"event":"output"}` with no `value` key for a script

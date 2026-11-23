@@ -150,7 +150,7 @@ pub impl Response {
 	/// # Example
 	/// ```ignore
 	/// let stream = response.event_source_mapped(|event| {
-	///     let data: MyType = serde_json::from_str(&event.data)?;
+	///     let data: MyType = MediaType::Json.deserialize(event.data.as_bytes())?;
 	///     Ok(SseBody::new(event.event, data))
 	/// }).await?;
 	/// ```
@@ -309,9 +309,12 @@ mod test {
 			.await
 			.unwrap()
 			.event_source_mapped(|event| {
-				let data: serde_json::Value =
-					serde_json::from_str(&event.data)?;
-				let msg = data["msg"].as_str().unwrap_or_default().to_string();
+				let msg = MediaType::Json
+					.deserialize::<Value>(event.data.as_bytes())?
+					.get("msg")
+					.and_then(|msg| msg.as_str().ok())
+					.unwrap_or_default()
+					.to_string();
 				SseBody::new(event.event, msg).xok()
 			})
 			.await

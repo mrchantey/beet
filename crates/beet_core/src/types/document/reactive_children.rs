@@ -3,7 +3,8 @@ use bevy::ecs::query::Allow;
 use bevy::platform::sync::Arc;
 
 /// Reactive structure: one child per item of a list-typed document field,
-/// reconciled whenever that field's [`Value`] changes. `bx:for` in markup.
+/// reconciled whenever that field's [`Value`] changes. `bx:for` in markup
+/// is sugar for it.
 ///
 /// The companion to [`FieldRef`], which reactively syncs a single [`Value`].
 /// Spawn it beside the ref backing it, `(FieldRef::new("items"),
@@ -11,10 +12,11 @@ use bevy::platform::sync::Arc;
 /// the synced [`Value`], so a `Changed<Value>` on this entity drives the
 /// rebuild.
 ///
-/// Each row is a clone of the item template, an inline [`Prefab`] child of
-/// this entity ([`Prefab::clone_under`]), in a terminating
-/// [`DocumentScope`] at its item, so a binding in the template reads its own
-/// item. Rows are [`Derived`], so a save writes the generator and its
+/// Each row is a clone of the item template, a [`Prefab`] child of this
+/// entity, in markup its `<template>` ([`Prefab::clone_under`]), in a
+/// terminating [`DocumentScope`] at its item, so a binding in the template
+/// reads its own item. A row cloned from a `<template>` element is its
+/// content and never a `<template>` itself. Rows are [`Derived`], so a save writes the generator and its
 /// template and never the rows, which the next load regenerates. With a
 /// [`key`](Self::key) a change reconciles by key rather than rebuilding:
 /// matching rows are reused, removed keys despawned and new keys spawned, so
@@ -99,10 +101,22 @@ impl ReactiveChildren {
 			}
 			(None, Some(prefab)) => {
 				commands.queue(move |world: &mut World| {
-					if let Err(err) =
-						Prefab::clone_under(world, prefab, parent, row)
-					{
-						world.handle_command_error::<ReactiveChildren>(err);
+					match Prefab::clone_under(world, prefab, parent, row) {
+						// a row cloned from a `<template>` is its content, as
+						// cloning HTML's `template.content` is, never a
+						// `<template>` itself
+						Ok(clone) => {
+							if world.get::<Element>(clone.root).is_some_and(
+								|element| element.tag() == "template",
+							) {
+								world
+									.entity_mut(clone.root)
+									.remove::<Element>();
+							}
+						}
+						Err(err) => {
+							world.handle_command_error::<ReactiveChildren>(err);
+						}
 					}
 				});
 			}
@@ -131,7 +145,7 @@ pub(super) fn update_reactive_children(
 		Changed<Value>,
 	>,
 	reactive_children: Query<(), With<ReactiveChild>>,
-	prefabs: Query<(), (With<Prefab>, Allow<Disabled>)>,
+	prefabs: Query<(), (With<Prefab>, Allow<Held>)>,
 	child_keys: Query<&ReactiveChildKey>,
 ) -> Result {
 	for (entity, value, resolved, reactive, children) in changed.iter() {

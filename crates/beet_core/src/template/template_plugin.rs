@@ -31,10 +31,10 @@ impl Plugin for TemplatePlugin {
 			.register_type::<TemplatesLoaded>()
 			// the marker holding what a loader could not resolve on an entity.
 			.register_type::<Unregistered>()
-			// a held template subtree, whose `Disabled` is never content
+			// a held template subtree, and `Disabled`, plain content an
+			// author writes and a save keeps
 			.register_type::<Prefab>()
 			.register_type::<Disabled>()
-			.register_type_data::<Disabled, ReflectDerived>()
 			// the markup nodes every front-end authors: registered here rather
 			// than by a renderer, so a page forked into a scene keeps its
 			// elements and attributes whichever binary dumps it
@@ -42,7 +42,7 @@ impl Plugin for TemplatePlugin {
 			// a text node, and the whole of a plain text or foreign data
 			// document
 			.register_type::<Value>()
-			// a script, and the event a `bx:<event>` handler answers
+			// a script, and the event a `bx:on<event>` handler answers
 			.register_type::<RunScript>()
 			.register_type::<OnEvent>()
 			.register_type::<Comment>()
@@ -52,17 +52,20 @@ impl Plugin for TemplatePlugin {
 			.register_type::<Attribute>()
 			.register_type::<AttributeOf>()
 			.register_type::<Attributes>()
+			// a prefab's subtree is held out of every query that does not
+			// name it
+			.install_type::<Held>()
 			.add_systems(Update, sweep_dropped_pending);
 		#[cfg(feature = "template_serde")]
 		app.add_observer(hold_loaded_prefabs);
 	}
 }
 
-/// Hold every prefab a body load spawned, whose `Disabled` no body carries.
+/// Hold every prefab a body load spawned, whose [`Held`] no body carries.
 #[cfg(feature = "template_serde")]
 fn hold_loaded_prefabs(
 	ev: On<LoadTemplateSerde>,
-	prefabs: Query<Entity, (With<Prefab>, Allow<Disabled>)>,
+	prefabs: Query<Entity, (With<Prefab>, Allow<Held>)>,
 	mut commands: Commands,
 ) {
 	for prefab in ev

@@ -73,8 +73,7 @@ impl Default for PingTime {
 impl PingTime {
 	/// Converts this ping time into a WebSocket [`Message::Ping`].
 	pub fn into_message(&self) -> Message {
-		let ping_time = serde_json::to_vec(&self).unwrap();
-		Message::Ping(ping_time.into())
+		Message::Ping(MediaType::Json.serialize(self).unwrap().into())
 	}
 }
 
@@ -85,7 +84,8 @@ pub fn echo_pingtime(ev: On<MessageRecv>) {
 	match ev.event().inner() {
 		// 1. print the round trip duration and send a text message
 		Message::Pong(payload) => {
-			let Ok(ping_time) = serde_json::from_slice::<PingTime>(&payload)
+			let Ok(ping_time) =
+				MediaType::Json.deserialize::<PingTime>(payload)
 			else {
 				return;
 			};

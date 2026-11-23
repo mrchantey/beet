@@ -1,5 +1,5 @@
 //! Trains a Q-table on the 4x4 frozen lake and writes it to
-//! `assets/ml/frozen_lake_qtable.ron`.
+//! `assets/ml/frozen_lake_qtable.json`.
 use beet_core::prelude::*;
 use beet_ml::prelude::*;
 
@@ -21,7 +21,10 @@ fn main() -> Result {
 	assert_eq!(eval.std, 0.);
 	assert_eq!(eval.total_steps, 600);
 
-	let text = ron::ser::to_string_pretty(&trainer.table, Default::default())?;
-	fs_ext::write("assets/ml/frozen_lake_qtable.ron", text)?;
+	let bytes = MediaType::Json
+		.serialize_with_options(&trainer.table, SerializeOptions {
+			pretty: true,
+		})?;
+	fs_ext::write("assets/ml/frozen_lake_qtable.json", bytes)?;
 	Ok(())
 }

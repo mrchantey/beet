@@ -10,7 +10,10 @@ impl Value {
 
 	/// Converts into a pretty-printed JSON string.
 	pub fn to_string_pretty(&self) -> Result<String> {
-		serde_json::to_string_pretty(self)?.xok()
+		MediaType::Json
+			.serialize_with_options(self, SerializeOptions { pretty: true })?
+			.xmap(String::from_utf8)?
+			.xok()
 	}
 }
 

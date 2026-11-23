@@ -76,7 +76,6 @@ use futures_lite::StreamExt;
 use futures_lite::io::AsyncRead;
 use futures_lite::io::AsyncWrite;
 use futures_lite::io::BufReader;
-use serde_json::Value as JsonValue;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -152,7 +151,7 @@ pub(crate) async fn run_deno_cli<Sink>(
 	request: ScriptRequest,
 	sink: Sink,
 	bridge: Option<&WorldBridge>,
-) -> Result<Option<JsonValue>>
+) -> Result<Option<Value>>
 where
 	Sink: FnMut(ConsoleStream, &str),
 {
@@ -268,7 +267,7 @@ async fn read_events<Out, Err, In, Sink>(
 	stdin: Option<In>,
 	bridge: Option<&WorldBridge>,
 	mut sink: Sink,
-) -> Result<Option<JsonValue>>
+) -> Result<Option<Value>>
 where
 	Out: Unpin + AsyncRead,
 	Err: Unpin + AsyncRead,

@@ -134,9 +134,9 @@ pub fn reflect_to_value(
 /// entry, continues into the deserializer, so a structural [`Value::Map`] never
 /// shadows serde. The read direction ([`reflect_to_value`]) stays serde.
 ///
-/// Serde bridges through `serde_json::Value` so no private deserializer is
-/// needed, and a value it cannot read is `Ok(None)` rather than an error, as
-/// a binding syncs every pass.
+/// Serde reads the [`Value`] directly through a [`ValueDeserializer`], and a
+/// value it cannot read is `Ok(None)` rather than an error, as a binding syncs
+/// every pass.
 pub fn value_to_reflect(
 	value: &Value,
 	type_id: Option<TypeId>,
@@ -153,9 +153,8 @@ pub fn value_to_reflect(
 	let Some(registration) = registry.get(type_id) else {
 		return Ok(None);
 	};
-	let json = serde_json::to_value(value)?;
 	bevy::reflect::serde::TypedReflectDeserializer::new(registration, registry)
-		.deserialize(json)
+		.deserialize(ValueDeserializer::new(value.clone()))
 		.ok()
 		.xok()
 }
@@ -202,5 +201,25 @@ mod test {
 		.unwrap()
 		.map(|reflected| bool::from_reflect(reflected.as_ref()).unwrap())
 		.xpect_eq(Some(true));
+	}
+
+	/// A byte string writes back into a byte list, and an unsigned integer
+	/// into a signed field, as serde reads the [`Value`] directly.
+	#[crate::test]
+	fn writes_back_bytes_and_integers() {
+		let mut registry = TypeRegistry::default();
+		registry.register::<Vec<u8>>();
+		value_to_reflect(
+			&Value::Bytes(vec![0, 255]),
+			Some(TypeId::of::<Vec<u8>>()),
+			&registry,
+		)
+		.unwrap()
+		.map(|reflected| Vec::<u8>::from_reflect(reflected.as_ref()).unwrap())
+		.xpect_eq(Some(vec![0, 255]));
+		value_to_reflect(&Value::Uint(7), Some(TypeId::of::<i32>()), &registry)
+			.unwrap()
+			.map(|reflected| i32::from_reflect(reflected.as_ref()).unwrap())
+			.xpect_eq(Some(7));
 	}
 }

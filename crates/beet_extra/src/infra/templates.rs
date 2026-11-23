@@ -582,14 +582,18 @@ mod test {
 				RenderScope::render_all_at(&mut world, &stage.into()).unwrap();
 			for scope in scopes {
 				let (stack, _deployment, config) = scope.finish().unwrap();
-				renders.push((stack, config.to_json_string().unwrap()));
+				renders.push((
+					stack,
+					config.to_json_string().unwrap(),
+					config.to_json(),
+				));
 			}
 		}
 		// SAFETY: as above
 		unsafe { env_ext::remove_var("BEET_SSH_HOST_KEY") }.unwrap();
 
 		renders.len().xpect_eq(2);
-		for (stack, json) in renders {
+		for (stack, json, config) in renders {
 			json.as_str()
 				// the box is rendered, and reads the key from its store
 				.xpect_contains("user_data")
@@ -607,26 +611,45 @@ mod test {
 				.xpect_contains("BEET_SSH_HOST_KEY=");
 			// the parameter's value is a reference to the write-only input,
 			// which is ephemeral, sensitive and has nothing to fall back to
-			let config =
-				serde_json::from_str::<serde_json::Value>(&json).unwrap();
-			let parameter = config["resource"]["aws_ssm_parameter"]
-				.as_object()
+			let parameter = config
+				.get("resource")
+				.and_then(|resource| resource.get("aws_ssm_parameter"))
+				.unwrap()
+				.as_map()
 				.unwrap()
 				.values()
 				.next()
 				.unwrap();
-			parameter["value_wo"]
+			parameter
+				.get("value_wo")
+				.unwrap()
 				.as_str()
 				.unwrap()
 				.xpect_eq("${var.BEET_SSH_HOST_KEY}");
 			parameter.get("value").xpect_none();
-			let variable = &config["variable"]["BEET_SSH_HOST_KEY"];
-			variable["ephemeral"].as_bool().unwrap().xpect_true();
-			variable["sensitive"].as_bool().unwrap().xpect_true();
+			let variable = config
+				.get("variable")
+				.and_then(|variable| variable.get("BEET_SSH_HOST_KEY"))
+				.unwrap();
+			variable
+				.get("ephemeral")
+				.unwrap()
+				.as_bool()
+				.unwrap()
+				.xpect_true();
+			variable
+				.get("sensitive")
+				.unwrap()
+				.as_bool()
+				.unwrap()
+				.xpect_true();
 			variable.get("default").xpect_none();
 			// and the box boots after it
-			config["resource"]["aws_lightsail_instance"]
-				.to_string()
+			config
+				.get("resource")
+				.and_then(|resource| resource.get("aws_lightsail_instance"))
+				.unwrap()
+				.to_json_string()
 				.xpect_contains(&format!(
 					"aws_ssm_parameter.{}",
 					stack.resource_ident("ssh-host-key").label()

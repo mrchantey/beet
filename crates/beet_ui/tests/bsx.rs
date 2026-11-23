@@ -594,8 +594,9 @@ fn reactive_children_survive_a_save_and_a_reload() {
 		.xref()
 		.xpect_contains("ReactiveChildren")
 		.xpect_contains("Prefab")
+		.xpect_contains("template")
 		.xnot()
-		.xpect_contains("Disabled");
+		.xpect_contains("Held");
 
 	let mut world = self::world();
 	let doc = world
@@ -607,6 +608,96 @@ fn reactive_children_survive_a_save_and_a_reload() {
 		.unwrap()[0];
 	world.update_local();
 	rows(&world, list).xpect_eq(3);
+}
+
+/// The rows a [`ReactiveChildren`] generated under `list`, in order.
+fn reactive_rows(world: &World, list: Entity) -> Vec<Entity> {
+	world
+		.entity(list)
+		.get::<Children>()
+		.unwrap()
+		.iter()
+		.filter(|child| world.entity(*child).contains::<ReactiveChild>())
+		.collect()
+}
+
+/// A keyed list authored with its `<template>` and one written with the
+/// `bx:for` that is sugar for it build the same rows, each the template's
+/// content binding its own item, and an append reuses every existing row.
+#[beet_core::test]
+fn a_keyed_list_reuses_its_rows_authored_or_sugared() {
+	for markup in [
+		r#"<ul {(ReactiveChildren{key:"name"}, @doc:entries)}><template><li>{@doc:name}</li></template></ul>"#,
+		r#"<ul bx:for="entries" bx:key="name"><li>{@doc:name}</li></ul>"#,
+	] {
+		let mut world = world();
+		let doc = world
+			.spawn(Document::new(value!({
+				"entries": [{ "name": "ada" }, { "name": "bob" }]
+			})))
+			.id();
+		let list = spawn_bsx_under(&mut world, Some(doc), markup);
+		world.update_local();
+		let before = reactive_rows(&world, list);
+		before.len().xpect_eq(2);
+		world
+			.entity_mut(doc)
+			.get_mut::<Document>()
+			.unwrap()
+			.0
+			.get_mut("entries")
+			.unwrap()
+			.as_list_mut()
+			.unwrap()
+			.push(value!({ "name": "cleo" }));
+		world.update_local();
+		let after = reactive_rows(&world, list);
+		after.len().xpect_eq(3);
+		after[..2].to_vec().xpect_eq(before);
+		render_html(&mut world, list)
+			.xref()
+			.xpect_contains("<li>ada</li><li>bob</li><li>cleo</li>")
+			.xnot()
+			.xpect_contains("template");
+	}
+}
+
+// ---- scripts and what renders -------------------------------------------------
+
+/// A script beet runs is behaviour, neither rendered nor any part of its
+/// parent's text, where a bare `<script>` is page content for the browser.
+#[beet_core::test]
+fn a_run_script_is_not_rendered() {
+	let mut world = world();
+	let root = spawn_bsx(
+		&mut world,
+		r#"<div><p>hi<script {RunScript}>secret()</script></p><script>page()</script></div>"#,
+	);
+	render_html(&mut world, root)
+		.xref()
+		.xpect_contains("<p>hi</p>")
+		.xpect_contains("page()")
+		.xnot()
+		.xpect_contains("secret");
+}
+
+/// An authored `Disabled` entity and a held `<template>` are both left out of
+/// the render walk, by Bevy's default filters rather than by name.
+#[beet_core::test]
+fn disabled_and_held_entities_are_not_rendered() {
+	let mut world = world();
+	let root = spawn_bsx(
+		&mut world,
+		r#"<div><p {Disabled}>off</p><template><p>held</p></template><p>on</p></div>"#,
+	);
+	world.update_local();
+	render_html(&mut world, root)
+		.xref()
+		.xpect_contains("on")
+		.xnot()
+		.xpect_contains("off")
+		.xnot()
+		.xpect_contains("held");
 }
 
 // ---- props store ------------------------------------------------------------
@@ -759,7 +850,7 @@ fn slots_via_registered_template() {
 
 	let root = spawn_bsx(
 		&mut world,
-		"<Card><div>Body</div><h1 bx:slot=\"header\">Title</h1></Card>",
+		"<Card><div>Body</div><h1 slot=\"header\">Title</h1></Card>",
 	);
 	let html = render_html(&mut world, root);
 	// the header slot took the caller's title, the default slot the body.
@@ -829,7 +920,7 @@ async fn click(world: &mut World, entity: Entity) {
 	AsyncRunner::settle_async_tasks(world).await;
 }
 
-/// A `bx:click` runs its authored script against the live world, and the script
+/// A `bx:onclick` runs its authored script against the live world, and the script
 /// is the whole vocabulary: nothing in rust knows what "increment" means.
 #[cfg(feature = "scripting")]
 #[beet_core::test]
@@ -839,7 +930,7 @@ async fn click_runs_its_script() {
 	let button = spawn_bsx_under(
 		&mut world,
 		Some(doc),
-		r#"<button bx:click="target.with_field('count', count => count + 1)">+</button>"#,
+		r#"<button bx:onclick="target.with_field('count', count => count + 1)">+</button>"#,
 	);
 	world.update_local();
 	// the host carries no mirror: the script writes the document, not a local Value.
@@ -867,7 +958,7 @@ async fn scoped_counter_page() {
 	let mut world = world();
 	let root = spawn_bsx(
 		&mut world,
-		r#"<article bx:scope="counter"><p>clicked {@doc:count=0} times</p><button bx:click="target.with_field('count', count => count + 1)">More</button></article>"#,
+		r#"<article bx:scope="counter"><p>clicked {@doc:count=0} times</p><button bx:onclick="target.with_field('count', count => count + 1)">More</button></article>"#,
 	);
 	// settle the init -> document chain
 	world.update_local();
@@ -930,8 +1021,8 @@ async fn scoped_counter_page() {
 const COUNTER_BSX: &str = r#"<article bx:scope="counter">
 	<widgets::Card title="Counter">
 		<p>You have clicked {@doc:count=0} times.</p>
-		<button bx:click="target.with_field('count', count => count + 1)">More</button>
-		<button bx:click="target.with_field('count', count => count - 1)">Less</button>
+		<button bx:onclick="target.with_field('count', count => count + 1)">More</button>
+		<button bx:onclick="target.with_field('count', count => count - 1)">Less</button>
 	</widgets::Card>
 </article>"#;
 

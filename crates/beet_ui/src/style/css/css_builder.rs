@@ -13,9 +13,9 @@ impl Plugin for CssPlugin {
 		// the `<Rule>` markup tag declares a named rule into the `RuleSet` at
 		// build time, the no-code analogue of a typed `Rule` in Rust.
 		register_rule_tag(app.world_mut());
-		// `bx:style` declares a one-off rule + span-derived inline class, the
-		// no-code analogue of the `inline_class!` macro.
-		register_inline_style(app.world_mut());
+		// `bx:style` rewrites to an `InlineStyle`, a one-off rule and its
+		// inline class, the no-code analogue of the `inline_class!` macro.
+		app.register_type::<InlineStyle>();
 	}
 }
 

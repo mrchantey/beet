@@ -51,8 +51,13 @@ mod test {
 	fn round_trips_the_union_member() {
 		let json = r#"{"$type":"com.atproto.label.defs#selfLabels","values":[{"val":"graphic-media"}]}"#;
 		let labels = SelfLabels::from_values(["graphic-media"]).unwrap();
-		serde_json::to_string(&labels).unwrap().xpect_eq(json);
-		serde_json::from_str::<SelfLabels>(json)
+		MediaBytes::serialize(MediaType::Json, &labels)
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.xpect_eq(json);
+		MediaType::Json
+			.deserialize::<SelfLabels>(json.as_bytes())
 			.unwrap()
 			.xpect_eq(labels);
 		SelfLabels::from_values(Vec::<SmolStr>::new()).xpect_none();

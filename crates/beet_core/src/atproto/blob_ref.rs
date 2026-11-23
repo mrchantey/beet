@@ -99,10 +99,16 @@ mod test {
 	#[crate::test]
 	fn round_trips_the_wire_form() {
 		let json = r#"{"$type":"blob","ref":{"$link":"bafkreievhbcfvoqgwlttfzvismqchhb3hphb6dss7lsbtqvv42x7cipzxe"},"mimeType":"image/jpeg","size":10012}"#;
-		let blob = serde_json::from_str::<BlobRef>(json).unwrap();
+		let blob = MediaType::Json
+			.deserialize::<BlobRef>(json.as_bytes())
+			.unwrap();
 		blob.mime_type.xpect_eq(MediaType::Jpeg);
 		blob.size.xpect_eq(10012);
-		serde_json::to_string(&blob).unwrap().xpect_eq(json);
+		MediaBytes::serialize(MediaType::Json, &blob)
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.xpect_eq(json);
 	}
 
 	#[crate::test]

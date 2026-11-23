@@ -40,7 +40,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::Value as JsonValue;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use wasm_bindgen::closure::Closure;
@@ -68,7 +67,7 @@ pub(crate) async fn run_deno_worker<Sink>(
 	request: ScriptRequest,
 	mut sink: Sink,
 	bridge: Option<&WorldBridge>,
-) -> Result<Option<JsonValue>>
+) -> Result<Option<Value>>
 where
 	Sink: FnMut(ConsoleStream, &str),
 {

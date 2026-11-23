@@ -62,8 +62,8 @@ async fn AnalyticsHandler(cx: ActionContext<Request>) -> Result<Response> {
 		.await
 		.map_err(|err| HttpError::bad_request(format!("beacon body: {err}")))?;
 	let body = match body {
-		Value::Str(text) => serde_json::from_str::<serde_json::Value>(&text)
-			.map(Value::from_json)
+		Value::Str(text) => MediaType::Json
+			.deserialize::<Value>(text.as_bytes())
 			.map_err(|err| {
 				HttpError::bad_request(format!("beacon body: {err}"))
 			})?,

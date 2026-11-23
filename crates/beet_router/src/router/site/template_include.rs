@@ -2,7 +2,7 @@
 //!
 //! Generalizes the old remote-template front-end. A no-code entry composes from
 //! other files, so no single giant `main.bsx`: `src` names another entry of any
-//! format (bsx, json, ron), read and parsed through the unified
+//! format (bsx, json), read and parsed through the unified
 //! [`EntryTemplate`], then built where the `<Template>` tag sits. Installed
 //! through the [`BsxTagResolvers`] seam, so it overrides the core stub when a
 //! router app is present.

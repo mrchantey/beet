@@ -309,6 +309,10 @@ mod test {
 
 	/// The rendered json for a valid schedule related to the `rollup` lambda.
 	fn build_json(block: &ScheduledJobBlock) -> Result<String> {
+		build_config(block)?.to_json_string()
+	}
+
+	fn build_config(block: &ScheduledJobBlock) -> Result<terra::Config> {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
 			parent.spawn(RepoStoreBlock::test_store());
 			let lambda = parent
@@ -317,7 +321,7 @@ mod test {
 			parent.spawn((block.clone(), InvokeTarget(lambda)));
 		});
 		let (_stack, _deployment, config) = scope.finish()?;
-		config.to_json_string()
+		config.xok()
 	}
 
 	fn rollup_daily() -> ScheduledJobBlock {
@@ -381,11 +385,13 @@ mod test {
 	#[beet_core::test]
 	fn renders_deterministically() {
 		let schedule = || {
-			serde_json::from_str::<serde_json::Value>(
-				&build_json(&rollup_daily()).unwrap(),
-			)
-			.unwrap()["resource"]["aws_scheduler_schedule"]
-				.clone()
+			build_config(&rollup_daily())
+				.unwrap()
+				.to_json()
+				.get("resource")
+				.and_then(|resource| resource.get("aws_scheduler_schedule"))
+				.cloned()
+				.unwrap()
 		};
 		schedule().xpect_eq(schedule());
 	}

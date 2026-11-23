@@ -12,10 +12,10 @@
 //!   inserted onto the entity, also through `IntoSnippetBundle`.
 //! - An attribute or text `{..}` is a **value**: a Rust expression, lifted via
 //!   `IntoSnippet`.
-//! - `<Slot/>` lowers to a `SlotTarget` marker; `bx:slot="x"`/`slot="x"` on a
+//! - `<Slot/>` lowers to a `SlotTarget` marker; `slot="x"` on a
 //!   node lowers to a `SlotChild` marker. The walker resolves them.
 //! - `on*` events lower to observers, taking a rust handler expression. A
-//!   `bx:<event>` is the BSX seam's JavaScript half and is not lowered here; in
+//!   `bx:on<event>` is the BSX seam's JavaScript half and is not lowered here; in
 //!   `rsx!` it stays an ordinary attribute.
 use super::ast::*;
 use alloc::format;
@@ -79,7 +79,7 @@ fn tokenize_element(el: &RsxElement) -> TokenStream {
 /// targets the named slot; children are the fallback rendered when the caller
 /// supplies no matching content (the walker drops them otherwise).
 ///
-/// An Astro-style transfer `<Slot name="x" bx:slot="y"/>` (or `slot="y"`)
+/// An Astro-style transfer `<Slot name="x" slot="y"/>`
 /// forwards content received in this template's `x` slot into the `y` slot of
 /// the enclosing template: it lowers to both a `SlotTarget` and a `SlotChild`,
 /// which the walker re-opens as it composes.
@@ -95,7 +95,7 @@ fn tokenize_slot(el: &RsxElement) -> TokenStream {
 			return None;
 		};
 		let key = attr.key_str();
-		(key == "slot" || key == "bx:slot").then(|| slot_child_marker(attr))
+		(key == "slot").then(|| slot_child_marker(attr))
 	}) {
 		parts.push(transfer);
 	}
@@ -122,7 +122,7 @@ fn slot_name_attr(el: &RsxElement) -> Option<alloc::string::String> {
 	})
 }
 
-/// Extract a node's `slot="name"` / `bx:slot="name"` routing attribute, marking
+/// Extract a node's `slot="name"` routing attribute, marking
 /// content destined for a parent template's named slot. Default-slot content has
 /// no such attribute.
 fn node_slot_child(node: &RsxNode) -> Option<TokenStream> {
@@ -134,7 +134,7 @@ fn node_slot_child(node: &RsxNode) -> Option<TokenStream> {
 			return None;
 		};
 		let key = attr.key_str();
-		if key != "slot" && key != "bx:slot" {
+		if key != "slot" {
 			return None;
 		}
 		Some(slot_child_marker(attr))
@@ -157,9 +157,9 @@ fn tokenize_html_element(el: &RsxElement, tag: &str) -> TokenStream {
 			}
 			RsxAttr::Keyed(attr) => {
 				let key = attr.key_str();
-				// `slot`/`bx:slot` route this element into a parent's named slot;
+				// `slot` route this element into a parent's named slot;
 				// emitted as a `SlotChild` marker, not an HTML attribute.
-				if key == "slot" || key == "bx:slot" {
+				if key == "slot" {
 					extra.push(slot_child_marker(attr));
 					continue;
 				}
@@ -201,7 +201,7 @@ fn tokenize_html_element(el: &RsxElement, tag: &str) -> TokenStream {
 	quote! { (#(#parts),*) }
 }
 
-/// Emit the `SlotChild` marker for a `slot`/`bx:slot` routing attribute.
+/// Emit the `SlotChild` marker for a `slot` routing attribute.
 fn slot_child_marker(attr: &RsxKeyedAttr) -> TokenStream {
 	match attr.value_literal_string() {
 		Some(name) => quote! { SlotChild::named(#name) },
@@ -238,9 +238,9 @@ fn tokenize_component(el: &RsxElement, tag: &str) -> TokenStream {
 		match attr {
 			RsxAttr::Keyed(attr) => {
 				let key = attr.key_str();
-				// a `slot`/`bx:slot` on the component tag routes the whole built
+				// a `slot` on the component tag routes the whole built
 				// component into a parent's named slot.
-				if key == "slot" || key == "bx:slot" {
+				if key == "slot" {
 					self_slot = Some(slot_child_marker(attr));
 					continue;
 				}
@@ -274,7 +274,7 @@ fn tokenize_component(el: &RsxElement, tag: &str) -> TokenStream {
 	parts.extend(spreads);
 
 	// caller content: each child spawns its own entity carrying a `SlotChild`
-	// marker, routed by the walker. A child with its own `slot=`/`bx:slot=`
+	// marker, routed by the walker. A child with its own `slot=`
 	// already emits a named `SlotChild` via its element lowering; an unmarked
 	// child goes to the default slot, so wrap it here.
 	let child_tokens: Vec<TokenStream> = el

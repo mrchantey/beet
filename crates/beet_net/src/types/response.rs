@@ -153,7 +153,8 @@ impl Response {
 	/// ```
 	/// # use beet_net::prelude::*;
 	/// # use beet_net::headers;
-	/// let response = Response::with_json(&serde_json::json!({"foo": 42})).unwrap();
+	/// # use beet_core::prelude::*;
+	/// let response = Response::with_json(&value!({"foo": 42})).unwrap();
 	/// assert_eq!(response.status(), StatusCode::OK);
 	/// let media_type = response.parts.headers.get::<headers::ContentType>().unwrap().unwrap();
 	/// assert_eq!(media_type, MediaType::Json);
@@ -267,12 +268,6 @@ impl Response {
 	/// Create an OK (200) response with a plain-text body.
 	pub fn ok_text(text: impl Into<Body>) -> Self {
 		Self::ok_body(text, MediaType::Text)
-	}
-
-	/// Create an OK (200) response with a JSON body.
-	#[cfg(feature = "json")]
-	pub fn ok_json<T: serde::Serialize>(value: &T) -> Result<Self> {
-		Self::ok_body(serde_json::to_string(value)?, MediaType::Json).xok()
 	}
 
 	/// Create a response with the given status and a plain-text body.
@@ -631,7 +626,8 @@ mod test {
 			.xpect_eq(MediaType::Json);
 
 		let body_bytes = response.body.try_into_bytes().unwrap();
-		let roundtrip: Payload = serde_json::from_slice(&body_bytes).unwrap();
+		let roundtrip: Payload =
+			MediaType::Json.deserialize(&body_bytes).unwrap();
 		roundtrip.xpect_eq(payload);
 	}
 

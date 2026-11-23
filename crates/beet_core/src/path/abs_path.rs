@@ -319,9 +319,15 @@ mod std_test {
 	#[cfg(feature = "json")]
 	fn serde_roundtrip() {
 		let original = abs_file!();
-		let serialized = serde_json::to_string(&original).unwrap();
-		serialized.xpect_eq(format!("\"{}\"", file!()));
-		let deserialized: AbsPath = serde_json::from_str(&serialized).unwrap();
-		original.xpect_eq(deserialized);
+		let serialized =
+			MediaBytes::serialize(MediaType::Json, &original).unwrap();
+		serialized
+			.as_utf8()
+			.unwrap()
+			.xpect_eq(format!("\"{}\"", file!()));
+		serialized
+			.deserialize::<AbsPath>()
+			.unwrap()
+			.xpect_eq(original);
 	}
 }

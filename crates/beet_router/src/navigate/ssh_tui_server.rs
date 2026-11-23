@@ -1349,7 +1349,7 @@ mod test {
 	/// advances only A's own count; the idle session B's count is unchanged, the
 	/// deploy's multi-tenant check asserting independent per-session counts.
 	/// Driven through the full input pipeline (SGR bytes, hit-test, then the
-	/// `bx:click` script's own round trips through the world bridge) over the
+	/// `bx:onclick` script's own round trips through the world bridge) over the
 	/// real shared-content Portal structure: the `bx:scope`/`@doc:count` reactive
 	/// document is parsed fresh per session, so each binds its own.
 	#[cfg(all(feature = "bsx", feature = "scripting"))]
@@ -1360,7 +1360,7 @@ mod test {
 		store
 			.insert(
 				&"counter.bsx".into(),
-				r#"<article bx:scope="counter"><p>You have clicked {@doc:count=0} times.</p><button bx:click="target.with_field('count', count => count + 1)">More</button></article>"#
+				r#"<article bx:scope="counter"><p>You have clicked {@doc:count=0} times.</p><button bx:onclick="target.with_field('count', count => count + 1)">More</button></article>"#
 					.to_string(),
 			)
 			.await

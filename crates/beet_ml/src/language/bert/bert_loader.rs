@@ -6,7 +6,7 @@ use bevy::asset::LoadContext;
 use bevy::asset::io::Reader;
 use bevy::tasks::ConditionalSendFuture;
 
-/// `AssetLoader` for `.ron` files containing a [`BertConfig`].
+/// `AssetLoader` for `.bert.json` files containing a [`BertConfig`].
 ///
 /// Reads the config, then awaits [`Bert::new`] (which downloads the
 /// underlying safetensors / tokenizer via [`fetch_ext::fetch_bytes`]). Lets you
@@ -29,10 +29,10 @@ impl AssetLoader for BertLoader {
 		Box::pin(async move {
 			let mut bytes = Vec::new();
 			reader.read_to_end(&mut bytes).await?;
-			let config: BertConfig = ron::de::from_bytes(&bytes)?;
+			let config: BertConfig = MediaType::Json.deserialize(&bytes)?;
 			Bert::new(config).await
 		})
 	}
 
-	fn extensions(&self) -> &[&str] { &["ron"] }
+	fn extensions(&self) -> &[&str] { &["bert.json"] }
 }

@@ -90,18 +90,12 @@ impl<T: serde::Serialize, E: serde::Serialize> TryInto<Response>
 
 	fn try_into(self) -> Result<Response, Self::Error> {
 		match self.result {
-			Ok(val) => {
-				let ok_body = serde_json::to_string(&val)?;
-				Response::ok_body(ok_body, MediaType::Json)
-			}
-			Err(err) => {
-				let err_body = serde_json::to_string(&err)?;
-				Response::from_status_body(
-					self.err_status,
-					err_body,
-					MediaType::Json,
-				)
-			}
+			Ok(val) => Response::with_json(&val)?,
+			Err(err) => Response::from_status_body(
+				self.err_status,
+				MediaType::Json.serialize(&err)?,
+				MediaType::Json,
+			),
 		}
 		.xok()
 	}
@@ -132,10 +126,15 @@ impl<T: serde::de::DeserializeOwned> FromRequest<Self> for Json<T> {
 				error!("Failed to read request body: {}", err);
 				HttpError::bad_request("Failed to read stream")
 			})?;
-			let json = serde_json::from_slice(&body).map_err(|err| {
-				HttpError::bad_request(format!("Failed to parse JSON: {}", err))
-			})?;
-			Ok(Self(json))
+			// an empty body is a missing payload, not json `null`
+			if body.is_empty() {
+				return Err(HttpError::bad_request("Empty JSON body").into());
+			}
+			MediaType::Json
+				.deserialize::<T>(&body)
+				.map_err(|err| HttpError::bad_request(err.to_string()))?
+				.xmap(Self)
+				.xok()
 		})
 	}
 }
@@ -144,8 +143,7 @@ impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 	type Error = HttpError;
 
 	fn try_into(self) -> Result<Response, Self::Error> {
-		let json_str = serde_json::to_string(&self.0)?;
-		Ok(Response::ok_body(json_str, MediaType::Json))
+		Response::with_json(&self.0)?.xok()
 	}
 }
 
@@ -214,5 +212,21 @@ mod test {
 
 		let parts_without = RequestParts::get("/test");
 		parts_without.has_body().xpect_false();
+	}
+
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn json_rejects_malformed_or_empty_body() {
+		for body in ["", "{not json"] {
+			<Json<Value> as FromRequest<Json<Value>>>::from_request(
+				Request::with_json_str("/", body),
+			)
+			.await
+			.err()
+			.unwrap()
+			.xmap(HttpError::from_opaque)
+			.status_code
+			.xpect_eq(StatusCode::BAD_REQUEST);
+		}
 	}
 }

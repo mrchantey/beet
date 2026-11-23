@@ -64,16 +64,15 @@ impl<'a> SceneEntities<'a> {
 		scene
 	}
 
-	/// The raw json of the entity at `key` in a serialized scene: what a
-	/// conformance probe indexes, straight off the bytes rather than through
-	/// this view, so the format is pinned independently of how it is read.
-	/// `Null` where there is none, as json indexing reads.
-	#[cfg(feature = "json")]
-	pub fn entity_json(
-		scene: &serde_json::Value,
+	/// The raw entity at `key` in a deserialized scene: what a conformance
+	/// probe indexes, straight off the bytes rather than through this view, so
+	/// the format is pinned independently of how it is read. `None` where there
+	/// is none.
+	pub fn entity_value(
+		scene: &Value,
 		key: impl Into<EntityKey>,
-	) -> &serde_json::Value {
-		&scene[Self::ENTITIES][key.into().as_str()]
+	) -> Option<&Value> {
+		scene.get(Self::ENTITIES)?.get(key.into().as_str())
 	}
 
 	/// The path of the entity at `key` within its scene document: its

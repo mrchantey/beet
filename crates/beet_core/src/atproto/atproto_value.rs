@@ -369,7 +369,9 @@ mod test {
 		let value = value!({ "x": 0.5, "b": (Value::Bytes(b"hi".to_vec())) });
 		let record = AtprotoValue::try_from(value.clone()).unwrap();
 		let json = record.to_json();
-		serde_json::to_string(&json)
+		MediaBytes::serialize(MediaType::Json, &json)
+			.unwrap()
+			.as_utf8()
 			.unwrap()
 			.xpect_contains(
 				r#""x":{"$type":"org.beet.core#float","value":"0.5"}"#,

@@ -21,8 +21,8 @@
 //!   in the sync pass via [`BindingTarget::Reserved`];
 //! - a `$`reference resolves to a `bx:ref`-named entity through the one entity
 //!   model;
-//! - `bx:scope`/`bx:for`+`bx:key`/`<Slot>`/`bx:slot`/`bx:click` lower to their
-//!   document-system and slot-marker components.
+//! - `<Slot>` and `slot` lower to their slot-marker components, every other
+//!   directive having been rewritten into explicit BSX ([`BsxDirectives`]).
 //!
 //! Entity references resolve through `cx.entity_references` with a two-pass walk
 //! (collect `bx:ref` names, then resolve `$name`), so `$name` may point forward.
@@ -91,22 +91,36 @@ impl BsxTemplate {
 impl Template for BsxTemplate {
 	type Output = ();
 	fn build_template(&self, cx: &mut TemplateContext) -> Result<()> {
-		// pass 0: `bx:cfg` exclusion, before anything looks at the tree. An
-		// excluded branch is removed from the SYNTAX, so no later pass can
+		// pass 0: every directive rewritten into the explicit BSX it is sugar
+		// for, touching no world, through the set the world's parsers carry.
+		// Only a document that writes one pays for the clone.
+		let rewritten = match BsxDirectives::any_in(&self.nodes) {
+			true => {
+				let mut nodes = self.nodes.clone();
+				DocParsers::of(cx.entity.world())
+					.directives()
+					.rewrite(&mut nodes)?;
+				Some(nodes)
+			}
+			false => None,
+		};
+		let nodes = rewritten.as_deref().unwrap_or(&self.nodes);
+		// pass 1: `bx:cfg` exclusion, before anything else looks at the tree.
+		// An excluded branch is removed from the SYNTAX, so no later pass can
 		// observe it: no pinned `bx:ref`, no entity, no build-time effect. Only
 		// a document that declares a condition pays for the walk.
-		let pruned = if contains_build_cfg(&self.nodes) {
+		let pruned = if contains_build_cfg(nodes) {
 			// SAFETY: reads the condition seam and crate registrations, no flush.
 			let world = unsafe { cx.entity.world_mut() };
-			Some(prune_build_cfg(&self.nodes, world)?)
+			Some(prune_build_cfg(nodes, world)?)
 		} else {
 			None
 		};
 		let (nodes, excluded) = match &pruned {
 			Some((nodes, excluded)) => (nodes.as_slice(), excluded.clone()),
-			None => (self.nodes.as_slice(), default()),
+			None => (nodes, default()),
 		};
-		// pass 1: collect every `bx:ref` name -> a pinned reference id, so a `$name`
+		// pass 2: collect every `bx:ref` name -> a pinned reference id, so a `$name`
 		// forward reference resolves to the same placeholder entity; a name the
 		// exclusion above removed is remembered so reaching for it warns.
 		let mut refs = RefBindings::default().with_excluded(excluded);
@@ -390,6 +404,23 @@ mod test {
 		})
 	}
 
+	/// A directive rewrites in a binary lacking the type it names, which then
+	/// holds that type as any unregistered name: core has no `InlineStyle`.
+	#[crate::test]
+	fn a_lean_binary_holds_an_inline_style() {
+		let (world, root) = build(r#"<div bx:style="display=Flex"/>"#);
+		let div = world.entity(root).get::<Children>().unwrap()[0];
+		world
+			.entity(div)
+			.get::<Unregistered>()
+			.unwrap()
+			.clone()
+			.xpect_eq(Unregistered::new(
+				"InlineStyle",
+				value!({ "declarations": "display=Flex" }),
+			));
+	}
+
 	/// Structure is universal: an unresolvable tag is an inert entity holding
 	/// the component it named, attributes and all, and its children build
 	/// under it exactly as they would in a binary that linked the type.
@@ -449,7 +480,7 @@ mod test {
 			.to_string()
 			.xpect_contains("`<RequireCfg>` has no field `cfgs`")
 			.xpect_contains("its fields are cfg");
-		try_build(r#"<RequireCfg cfg="feature:ml" bx:key="one"/>"#).unwrap();
+		try_build(r#"<RequireCfg cfg="feature:ml" bx:ref="one"/>"#).unwrap();
 	}
 
 	/// A `$name` reference into a formerly-gated region resolves to the real

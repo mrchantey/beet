@@ -36,7 +36,7 @@
 //! binding does: the subject entity's nearest ancestor
 //! [`Document`](beet_core::prelude::Document), prefixed by any
 //! [`DocumentScope`](beet_core::prelude::DocumentScope) between them. So a
-//! `bx:<event>` script writes the field its own markup names without ever naming
+//! `bx:on<event>` script writes the field its own markup names without ever naming
 //! a document, and the change fans out to every widget bound to it. Reach is
 //! checked against `Document` itself, so a config narrowing components narrows
 //! the helpers with it.

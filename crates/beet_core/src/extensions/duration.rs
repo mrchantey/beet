@@ -176,21 +176,24 @@ mod test {
 	#[crate::test]
 	fn duration_str_requires_a_unit() {
 		// a unit string round-trips as `"1.5s"`
-		let json =
-			serde_json::to_string(&Wrap(Duration::from_secs_f64(1.5))).unwrap();
-		json.xpect_eq(r#""1.5s""#.to_string());
-		serde_json::from_str::<Wrap>(&json)
+		let bytes = MediaBytes::serialize(
+			MediaType::Json,
+			&Wrap(Duration::from_secs_f64(1.5)),
+		)
+		.unwrap();
+		bytes.as_utf8().unwrap().xpect_eq(r#""1.5s""#);
+		bytes
+			.deserialize::<Wrap>()
 			.unwrap()
 			.xpect_eq(Wrap(Duration::from_secs_f64(1.5)));
 		// other units decode
-		serde_json::from_str::<Wrap>(r#""250ms""#)
+		MediaType::Json
+			.deserialize::<Wrap>(br#""250ms""#)
 			.unwrap()
 			.0
 			.xpect_eq(Duration::from_millis(250));
 		// a bare number is rejected, whether a JSON number or a unit-less string
-		serde_json::from_str::<Wrap>("1.5").is_err().xpect_true();
-		serde_json::from_str::<Wrap>(r#""1.5""#)
-			.is_err()
-			.xpect_true();
+		MediaType::Json.deserialize::<Wrap>(b"1.5").xpect_err();
+		MediaType::Json.deserialize::<Wrap>(br#""1.5""#).xpect_err();
 	}
 }
