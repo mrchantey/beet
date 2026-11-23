@@ -45,8 +45,8 @@ impl core::fmt::Display for AnalyticsScope {
 /// One day of [`AnalyticsEvent`]s reduced to counts, for one
 /// [`AnalyticsScope`].
 ///
-/// Aggregates and compacted raw archives are kept indefinitely, while transient
-/// segment shards are deleted after compaction. Everything a long-range report
+/// Aggregates are kept indefinitely, while the raw events they reduce are
+/// archived once cold. Everything a long-range report
 /// needs should still fit this tiny row, so it carries recombinable distributions
 /// rather than means (a dwell mean is a lie anyway — see [`Buckets::DWELL`]) and
 /// a [`version`](Self::version).
@@ -102,15 +102,6 @@ impl AnalyticsRollup {
 	/// field changes, never when one is added.
 	pub const VERSION: u32 = 1;
 
-	/// The prefix analytics owns in a rollup store; aggregate rows sit under
-	/// it in their [`table_name`](TableStoreRow::table_name), at
-	/// `analytics/rollup/`.
-	///
-	/// That keyspace is a sibling of [`AnalyticsArchive::PREFIX`] rather than a
-	/// nesting of it: the two are disjoint by construction, so one store holds
-	/// both and the rollup rows never look like a segment day to compaction.
-	pub const PREFIX: &'static str = "analytics";
-
 	/// The namespace every aggregate row id derives from, so an id is a pure
 	/// function of what it summarizes and re-running a day overwrites it.
 	const NAMESPACE: Uuid =
@@ -122,16 +113,6 @@ impl AnalyticsRollup {
 			&Self::NAMESPACE,
 			format!("{}:{date}:{}", Self::VERSION, scope.id_key()).as_bytes(),
 		)
-	}
-
-	/// The aggregate table `store` holds, scoped to [`Self::PREFIX`].
-	///
-	/// Every reader and writer of aggregates goes through here, so the prefix is
-	/// stated once and a store holding raw segments too is addressed correctly
-	/// by both.
-	#[cfg(feature = "json")]
-	pub fn table(store: BlobStore) -> Table<Self> {
-		Table::new(store.with_subdir(RelPath::new(Self::PREFIX)))
 	}
 
 	/// A zeroed row for `date` and `scope`.
@@ -194,16 +175,12 @@ impl AnalyticsRollup {
 	}
 }
 
-/// The primary key is the deterministic [`row_id`](AnalyticsRollup::row_id), a
-/// name-based uuid rather than a time-based one, so
-/// [`timestamp`](TableStoreRow::timestamp) reads the covered day off the row
-/// rather than decoding an id that embeds no clock.
+/// One row per day and scope in `analytics_rollup`, keyed `<date>#<id>`: the
+/// date first so the table scans in day order and its last row is the latest
+/// day covered, then the deterministic [`row_id`](AnalyticsRollup::row_id).
+#[cfg(feature = "json")]
 impl TableStoreRow for AnalyticsRollup {
-	fn table_name() -> SmolStr { "rollup".into() }
-	fn key(&self) -> TableKey { self.id.into() }
-	fn timestamp(&self) -> Option<Timestamp> {
-		Date::parse(&self.date).ok().map(|date| date.timestamp())
-	}
+	fn key(&self) -> TableKey { format!("{}#{}", self.date, self.id).into() }
 }
 
 /// The mutable half of a rollup: the count maps and the session set a row is
@@ -633,23 +610,29 @@ mod test {
 		]);
 	}
 
-	/// A row lands at `analytics/rollup/<id>`, the keyspace every deployed
-	/// rollup store already holds, and reads back by its uuid.
+	/// Rows order by day, so the last row is the latest day covered.
 	#[cfg(feature = "json")]
 	#[beet_core::test]
-	async fn rows_keep_the_rollup_keyspace() {
-		let store = BlobStore::temp();
-		let row = AnalyticsRollup::new("2026-08-01", AnalyticsScope::Site);
-		let table = AnalyticsRollup::table(store.clone());
-		table.push(row.clone()).await.unwrap();
-		store
-			.list()
+	async fn rows_order_by_day() {
+		let table = Table::<AnalyticsRollup>::temp();
+		table.name().xpect_eq("analytics_rollup");
+		let later = AnalyticsRollup::new("2026-08-02", AnalyticsScope::Site);
+		let earlier = AnalyticsRollup::new(
+			"2026-08-01",
+			AnalyticsScope::Path("/".into()),
+		);
+		table.put(later.clone()).await.unwrap();
+		table.put(earlier.clone()).await.unwrap();
+		table
+			.scan(Scan::default().reverse().limit(1))
 			.await
 			.unwrap()
-			.xpect_eq(vec![RelPath::new(format!(
-				"analytics/rollup/{}",
-				row.id
-			))]);
-		table.get(row.id).await.unwrap().xpect_eq(row);
+			.rows
+			.xpect_eq(vec![later]);
+		table
+			.get(earlier.key())
+			.await
+			.unwrap()
+			.xpect_eq(Some(earlier));
 	}
 }

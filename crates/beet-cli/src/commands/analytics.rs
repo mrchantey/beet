@@ -11,30 +11,26 @@ use beet::prelude::*;
 /// `--service-access=remote` turns the same report onto the cloud store. A
 /// store uri names one directly, for a tool with no config in reach.
 ///
-/// Two keyspaces form one report: daily [`AnalyticsRollup`] rows carry the
-/// compacted history, while uncompacted segments carry the live tail. A date is
-/// read from exactly one source.
+/// Two tables form one report: the daily [`AnalyticsRollup`] rows carry the
+/// history, and the raw `analytics_event` rows the days after the last of
+/// them. A day is read from exactly one.
 ///
 /// ```sh
 /// beet --entry=site analytics summary                          # the site's declared store
 /// beet --entry=site --service-access=remote analytics summary  # the same declaration, deployed
-/// beet analytics summary --store fs:target/stores/beet-site--dev--analytics
-/// beet analytics summary --store s3://beet-site--prod--analytics
+/// beet analytics summary --store sqlite:target/stores/analytics.db
+/// beet analytics summary --store dynamo://beet-site--prod--analytics
 /// ```
 #[action(route = "analytics/*args")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn AnalyticsReport(
-	/// The analytics store, ie `fs:target/stores/my-app--dev--analytics` or
-	/// `s3://my-app--prod--analytics`, for a report over a store no entry
+	/// The analytics store, ie `sqlite:target/stores/analytics.db` or
+	/// `dynamo://my-app--prod--analytics`, for a report over a store no entry
 	/// declares. Absent, the report reads the store the entry's
 	/// `AnalyticsConfig` writes to, local or remote by `--service-access`.
 	#[param]
 	store: Option<StoreUri>,
-	/// A separate store holding the daily aggregates. Absent, the raw store
-	/// itself.
-	#[param]
-	rollup: Option<StoreUri>,
 	/// Report only the raw events, skipping the aggregates the long history
 	/// lives in.
 	#[param]
@@ -42,34 +38,80 @@ pub async fn AnalyticsReport(
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let world = cx.caller.world().clone();
-
-	// the raw segments and the aggregate rows, both json over blobs and both in
-	// ONE store by default: segments own `analytics/raw/`, aggregates own
-	// `analytics/rollup/`, so the single `<S3BucketBlock label="analytics"/>`
-	// the deploy provisions holds them both. `--rollup` names a store keeping
-	// the aggregates apart.
-	let store = match &store {
-		Some(uri) => AnalyticsStore::new(BlobStore::from_uri(uri)?),
-		None => {
-			let config = one_config(&world).await?;
-			StoreRef::resolve::<AnalyticsStore>(&world, config).await?
-		}
-	};
-	let rollups = match &rollup {
-		Some(uri) => BlobStore::from_uri(uri)?,
-		None => store.store.clone(),
-	};
 	// a store never written to (no analytics collected yet) summarizes as
-	// empty rather than an error, so the command works on a fresh site. The
-	// lossy reads skip (and warn on) legacy-schema or corrupt rows rather than
-	// failing the whole summary.
-	let rollups = AnalyticsRollup::table(rollups);
-	store
-		.summary((!raw_only).then_some(&rollups))
+	// empty rather than an error, so the command works on a fresh site
+	AnalyticsReport::resolve(&world, store.as_ref())
+		.await?
+		.summary(raw_only)
 		.await?
 		.to_string()
 		.xmap(Response::ok_text)
 		.xok()
+}
+
+impl AnalyticsReport {
+	/// The analytics tables `store` names, else the one the entry's config
+	/// writes to.
+	async fn resolve(
+		world: &AsyncWorld,
+		store: Option<&StoreUri>,
+	) -> Result<AnalyticsStore> {
+		match store {
+			Some(uri) => AnalyticsStore::new(TableStore::from_uri(uri)?).xok(),
+			None => {
+				let config = one_config(world).await?;
+				StoreRef::resolve::<AnalyticsStore>(world, config).await
+			}
+		}
+	}
+}
+
+/// Import the analytics history kept as zstd JSONL objects before events were
+/// rows, once: every `analytics/raw/**.jsonl.zst` daily archive and unrolled
+/// segment in each `--from` store becomes an `analytics_event` row of the
+/// analytics store (`--store`, else the entry's), deduplicated, under keys its
+/// events determine, so a rerun rewrites the same rows. The old objects are
+/// left in place; remove them once the import is checked, then run the rollup
+/// with `--full` to rebuild the aggregates.
+///
+/// ```sh
+/// beet --entry=site --stage=prod --service-access=remote analytics import \
+/// 	--from s3://beet-site--prod--archive --from s3://beet-site--prod--analytics
+/// ```
+#[cfg(feature = "legacy_analytics")]
+#[action(route = "analytics/import")]
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+pub async fn ImportAnalytics(
+	/// A store holding legacy `analytics/raw/` objects, repeatable.
+	#[param]
+	from: Vec<StoreUri>,
+	/// The analytics store to import into, absent the one the entry's
+	/// `AnalyticsConfig` writes to.
+	#[param]
+	store: Option<StoreUri>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
+	if from.is_empty() {
+		bevybail!(
+			"name the stores holding the legacy objects with `--from <uri>`, ie \
+			 `--from s3://my-app--prod--archive`"
+		);
+	}
+	let world = cx.caller.world().clone();
+	let sources = from
+		.iter()
+		.map(BlobStore::from_uri)
+		.collect::<Result<Vec<_>>>()?;
+	AnalyticsImport::new(
+		sources,
+		AnalyticsReport::resolve(&world, store.as_ref()).await?,
+	)
+	.run()
+	.await?
+	.to_string()
+	.xmap(Response::ok_text)
+	.xok()
 }
 
 /// The one [`AnalyticsConfig`] in the world, whose writer the report reads.
@@ -200,39 +242,33 @@ mod test {
 			.xpect_contains("AnalyticsConfig");
 	}
 
-	/// One report over the two keyspaces of ONE store, and a date is read from
-	/// exactly one of them: `analytics/raw/` answers the live tail no aggregate
-	/// covers yet, `analytics/rollup/` answers the compacted history whose
-	/// segments are gone.
+	/// One report over the two tables of one store: the aggregates answer
+	/// the rolled up days, the raw events the days after them.
 	#[beet::test]
-	async fn reads_segments_and_rollups_from_one_store() {
+	async fn reads_rollups_and_events() {
 		let temp = TempDir::new().unwrap();
 		let dir = AbsPath::new(temp.path()).unwrap();
-		let store = BlobStore::new(FsStore::new(dir.clone()));
-		let raw = AnalyticsStore::new(store.clone());
-		let recent =
-			AnalyticsEvent::new("/recent", AnalyticsEventData::PageView {
-				duration_ms: 1_000,
-				referrer: None,
-				title: None,
-				client: default(),
-			});
-		raw.record(recent).await.unwrap();
-		raw.flush().await.unwrap();
-
-		let mut old =
-			AnalyticsEvent::new("/old", AnalyticsEventData::PageView {
-				duration_ms: 2_000,
-				referrer: None,
-				title: None,
-				client: default(),
-			});
-		old.timestamp -= 2 * 86_400_000;
-		let rollups = AnalyticsRollup::table(store);
-		for row in AnalyticsRollup::from_events(&[old]) {
-			rollups.push(row).await.unwrap();
+		let store = AnalyticsStore::new(
+			TableStore::from_uri(
+				&StoreUri::parse(&format!("fs:{dir}")).unwrap(),
+			)
+			.unwrap(),
+		);
+		let view = |path: &str, days: u64| {
+			let mut event =
+				AnalyticsEvent::new(path, AnalyticsEventData::PageView {
+					duration_ms: 1_000,
+					referrer: None,
+					title: None,
+					client: default(),
+				});
+			event.timestamp -= days * 86_400_000;
+			event.with_fresh_key()
+		};
+		store.record(view("/recent", 0)).await.unwrap();
+		for row in AnalyticsRollup::from_events(&[view("/old", 2)]) {
+			store.rollups().put(row).await.unwrap();
 		}
-
 		report(&format!("analytics summary --store fs:{dir}"))
 			.await
 			.as_str()

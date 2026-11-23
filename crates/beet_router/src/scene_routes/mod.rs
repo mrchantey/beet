@@ -87,6 +87,11 @@ pub use routes_dir::*;
 // nearest `BlobStore`. cross-platform: the wasm Worker serves a site's assets too.
 mod serve_blobs;
 pub use serve_blobs::*;
+// the table wire protocol over a mounted route, the table twin of `ServeBlobs`
+#[cfg(feature = "json")]
+mod serve_tables;
+#[cfg(feature = "json")]
+pub use serve_tables::*;
 
 use beet_core::prelude::*;
 use beet_net::prelude::*;

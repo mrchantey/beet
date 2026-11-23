@@ -67,6 +67,33 @@ impl FsStore {
 	}
 }
 
+/// The locks a conditional write holds while it checks then writes a file,
+/// striped by path so unrelated files never wait on each other. In process
+/// only: two processes writing one file conditionally are not serialized.
+static CONDITIONAL_LOCKS: [async_lock::Mutex<()>; 64] =
+	[const { async_lock::Mutex::new(()) }; 64];
+
+impl FsStore {
+	/// The stripe of [`CONDITIONAL_LOCKS`] guarding `path`.
+	fn conditional_lock(path: &AbsPath) -> &'static async_lock::Mutex<()> {
+		use core::hash::BuildHasher;
+		let hash = bevy::platform::hash::FixedHasher.hash_one(path.as_str());
+		&CONDITIONAL_LOCKS[hash as usize % CONDITIONAL_LOCKS.len()]
+	}
+
+	/// The file at `path` with its digest, `None` when there is none.
+	async fn read_versioned(
+		path: &AbsPath,
+	) -> Result<Option<(Bytes, BlobVersion)>> {
+		if !fs_ext::exists_async(path).await? {
+			return Ok(None);
+		}
+		let bytes = Bytes::from(fs_ext::read_async(path).await?);
+		let version = BlobVersion::of(&bytes);
+		Some((bytes, version)).xok()
+	}
+}
+
 impl BlobStoreProvider for FsStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
@@ -198,6 +225,10 @@ impl BlobStoreProvider for FsStore {
 			read.read_async(&root)
 				.await?
 				.into_iter()
+				// a conditional write's file on its way into place
+				.filter(|path| {
+					!path.to_string_lossy().ends_with(fs_ext::REPLACING_SUFFIX)
+				})
 				.map(|path| {
 					let path = AbsPath::new_unchecked(path.to_string_lossy());
 					path.strip_prefix(&root)
@@ -255,6 +286,61 @@ impl BlobStoreProvider for FsStore {
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let path = self.resolve_path(path);
 		Box::pin(async move { fs_ext::remove_async(path).await?.xok() })
+	}
+
+	fn get_versioned(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+		let path = self.resolve_path(path);
+		Box::pin(async move { Self::read_versioned(&path).await })
+	}
+
+	/// Checked and written under the path's in-process lock, the version
+	/// the content's digest, the file replaced whole so an unlocked reader
+	/// never reads it torn.
+	fn insert_if(
+		&self,
+		path: &RelPath,
+		body: Bytes,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result<BlobVersion>> {
+		let rel = path.clone();
+		let path = self.resolve_path(path);
+		Box::pin(async move {
+			let _guard = Self::conditional_lock(&path).lock().await;
+			let found = Self::read_versioned(&path).await?;
+			BlobConflict::check(
+				&condition,
+				&rel,
+				found.as_ref().map(|(_, version)| version),
+			)?;
+			let version = BlobVersion::of(&body);
+			fs_ext::write_replacing_async(&path, body).await?;
+			version.xok()
+		})
+	}
+
+	fn remove_if(
+		&self,
+		path: &RelPath,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result> {
+		let rel = path.clone();
+		let path = self.resolve_path(path);
+		Box::pin(async move {
+			let _guard = Self::conditional_lock(&path).lock().await;
+			let found = Self::read_versioned(&path).await?;
+			BlobConflict::check(
+				&condition,
+				&rel,
+				found.as_ref().map(|(_, version)| version),
+			)?;
+			if found.is_some() {
+				fs_ext::remove_async(&path).await?;
+			}
+			Ok(())
+		})
 	}
 
 	/// Digested in chunks on the blocking pool, so a stat of a multi-gigabyte

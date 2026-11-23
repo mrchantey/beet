@@ -20,6 +20,7 @@ pub struct IndexedDbStore {
 	/// The IndexedDB database name.
 	db_name: SmolStr,
 	/// Optional subdirectory prefix for all keys.
+	#[reflect(default)]
 	subdir: Option<RelPath>,
 }
 
@@ -157,6 +158,57 @@ async fn db_exists(db_name: &str) -> Result<bool> {
 		// the aborted fresh creation rejects: absence, not an error
 		Err(_) if fresh.get() => Ok(false),
 		Err(err) => Err(err),
+	}
+}
+
+/// The lock a conditional write holds while it checks then writes, one for
+/// every database in this tab: a check and a write span two idb transactions,
+/// which another write could land between. Per tab, so two tabs writing one
+/// object conditionally are not serialized.
+static CONDITIONAL_LOCK: async_lock::Mutex<()> = async_lock::Mutex::new(());
+
+impl IndexedDbStore {
+	/// The object at `key` in `db_name`, `None` where there is none.
+	async fn read(db_name: &str, key: &str) -> Result<Option<Bytes>> {
+		let db = open_db(db_name).await?;
+		let tx = db
+			.transaction_with_str_and_mode(
+				STORE_NAME,
+				IdbTransactionMode::Readonly,
+			)
+			.map_jserr()?;
+		let store = tx.object_store(STORE_NAME).map_jserr()?;
+		let req = store.get(&JsValue::from_str(key)).map_jserr()?;
+		let value = await_idb_request(req).await?;
+		match value.is_undefined() || value.is_null() {
+			true => None,
+			false => Some(Bytes::from(Uint8Array::new(&value).to_vec())),
+		}
+		.xok()
+	}
+
+	/// Write `body` at `key` in `db_name`, or delete it for `None`.
+	async fn write(db_name: &str, key: &str, body: Option<&[u8]>) -> Result {
+		let db = open_db(db_name).await?;
+		let tx = db
+			.transaction_with_str_and_mode(
+				STORE_NAME,
+				IdbTransactionMode::Readwrite,
+			)
+			.map_jserr()?;
+		let store = tx.object_store(STORE_NAME).map_jserr()?;
+		let req = match body {
+			Some(body) => {
+				let arr = Uint8Array::new_with_length(body.len() as u32);
+				arr.copy_from(body);
+				store
+					.put_with_key(&arr, &JsValue::from_str(key))
+					.map_jserr()?
+			}
+			None => store.delete(&JsValue::from_str(key)).map_jserr()?,
+		};
+		await_idb_request(req).await?;
+		Ok(())
 	}
 }
 
@@ -332,6 +384,70 @@ impl BlobStoreProvider for IndexedDbStore {
 		}))
 	}
 
+	fn get_versioned(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+		let db_name = self.db_name.clone();
+		let key = self.effective_key(path);
+		Box::pin(SendWrapper::new(async move {
+			Self::read(&db_name, &key)
+				.await?
+				.map(|bytes| {
+					let version = BlobVersion::of(&bytes);
+					(bytes, version)
+				})
+				.xok()
+		}))
+	}
+
+	/// Checked and written under the tab's conditional lock, the version the
+	/// content's digest.
+	fn insert_if(
+		&self,
+		path: &RelPath,
+		body: Bytes,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result<BlobVersion>> {
+		let db_name = self.db_name.clone();
+		let key = self.effective_key(path);
+		let path = path.clone();
+		Box::pin(SendWrapper::new(async move {
+			let _guard = CONDITIONAL_LOCK.lock().await;
+			let found = Self::read(&db_name, &key).await?;
+			BlobConflict::check(
+				&condition,
+				&path,
+				found.as_deref().map(BlobVersion::of).as_ref(),
+			)?;
+			Self::write(&db_name, &key, Some(&body)).await?;
+			BlobVersion::of(&body).xok()
+		}))
+	}
+
+	fn remove_if(
+		&self,
+		path: &RelPath,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result> {
+		let db_name = self.db_name.clone();
+		let key = self.effective_key(path);
+		let path = path.clone();
+		Box::pin(SendWrapper::new(async move {
+			let _guard = CONDITIONAL_LOCK.lock().await;
+			let found = Self::read(&db_name, &key).await?;
+			BlobConflict::check(
+				&condition,
+				&path,
+				found.as_deref().map(BlobVersion::of).as_ref(),
+			)?;
+			if found.is_some() {
+				Self::write(&db_name, &key, None).await?;
+			}
+			Ok(())
+		}))
+	}
+
 	fn public_url(
 		&self,
 		_path: &RelPath,
@@ -350,5 +466,13 @@ mod test {
 	async fn works() {
 		let provider = IndexedDbStore::new("test-store");
 		store_test::run(provider).await;
+	}
+
+	#[beet_core::test(browser)]
+	async fn table() {
+		table_test::run(TableStore::new(BlobStore::new(IndexedDbStore::new(
+			"test-table",
+		))))
+		.await;
 	}
 }

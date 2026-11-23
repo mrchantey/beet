@@ -31,6 +31,7 @@ pub struct HttpStore {
 	/// The url the store is mounted at, absolute or origin-relative.
 	base: Url,
 	/// Optional subdirectory prefix for all keys.
+	#[reflect(default)]
 	subdir: Option<RelPath>,
 }
 

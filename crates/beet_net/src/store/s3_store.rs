@@ -17,24 +17,30 @@ pub struct S3Store {
 	/// (`AWS_REGION`). A store built at the process boundary leaves it unset;
 	/// one built from a declaration carries the region that declaration
 	/// resolved.
+	#[reflect(default)]
 	region: Option<SmolStr>,
 	/// Optional subdirectory prefix for all keys.
+	#[reflect(default)]
 	subdir: Option<RelPath>,
 	/// Optional S3 endpoint override. Unset uses the default AWS endpoint;
 	/// set (with path-style addressing) targets an S3-compatible service such as
 	/// Cloudflare R2. See [`S3Store::r2`].
+	#[reflect(default)]
 	endpoint: Option<SmolStr>,
 	/// Whether the bucket's objects are anonymously readable at their url, so a
 	/// static-file route may redirect a visitor straight to the bucket instead of
 	/// streaming the bytes. Buckets are private unless a policy says otherwise,
 	/// so this is `false` by default: claiming a url the bucket will not serve
 	/// turns every static file into a redirect to a 403.
+	#[reflect(default)]
 	public: bool,
 	/// The storage class every write lands in (`STANDARD_IA`, `GLACIER_IR`),
 	/// else the bucket's default.
+	#[reflect(default)]
 	storage_class: Option<SmolStr>,
 	/// Send every request unsigned, a read of a public bucket from a launch
 	/// that holds no credential for it.
+	#[reflect(default)]
 	anonymous: bool,
 	/// An explicit credential, else the launch's own. Set for a bucket at
 	/// another vendor (an R2 bucket under the token pair an apply parked)
@@ -423,6 +429,34 @@ impl S3Store {
 		request.with_header("content-md5", encoded)
 	}
 
+	/// `request` carrying `condition` as its conditional header.
+	fn with_condition(
+		request: AwsRequest,
+		condition: &BlobCondition,
+	) -> AwsRequest {
+		match condition {
+			BlobCondition::Any => request,
+			BlobCondition::Absent => request.with_header("if-none-match", "*"),
+			BlobCondition::Matches(version) => {
+				request.with_header("if-match", version.as_str())
+			}
+		}
+	}
+
+	/// Whether `err` is a failed conditional write: `412`, or `409` for one
+	/// racing another.
+	fn is_conflict(err: &BevyError) -> bool {
+		AwsError::is(err, &["PreconditionFailed", "ConditionalRequestConflict"])
+	}
+
+	/// The version a response's `ETag` names.
+	fn version_of(response: &Response, key: &str) -> Result<BlobVersion> {
+		match response.headers().first_raw("etag") {
+			Some(etag) => BlobVersion::new(etag).xok(),
+			None => bevybail!("s3 answered `{key}` without an etag"),
+		}
+	}
+
 	/// Resolve the S3 object key from a [`RelPath`].
 	fn resolve_key(&self, path: &RelPath) -> String {
 		match &self.subdir {
@@ -666,6 +700,101 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
+	/// `GetObject`, the version its `ETag`.
+	fn get_versioned(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
+		Box::pin(async move {
+			match this
+				.send(AwsRequest::get("GetObject", Self::key_path(&key)))
+				.await
+			{
+				Ok(response) => {
+					let version = Self::version_of(&response, &key)?;
+					Some((response.body.into_bytes().await?, version)).xok()
+				}
+				Err(err) if AwsError::is(&err, &["NoSuchKey", "NotFound"]) => {
+					None.xok()
+				}
+				Err(err) => Err(err),
+			}
+		})
+	}
+
+	/// `PutObject` with `If-None-Match: *` or `If-Match: <etag>`, which S3
+	/// and R2 check and write as one step, answering `412` (or `409` for a
+	/// write racing another conditional one) when the condition fails.
+	fn insert_if(
+		&self,
+		path: &RelPath,
+		body: Bytes,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result<BlobVersion>> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
+		let path = path.clone();
+		let request =
+			AwsRequest::put("PutObject", Self::key_path(&key)).with_body(body);
+		let request = match &self.storage_class {
+			Some(class) => {
+				request.with_header("x-amz-storage-class", class.as_str())
+			}
+			None => request,
+		};
+		let request = Self::with_condition(request, &condition);
+		Box::pin(async move {
+			match this.send(request).await {
+				Ok(response) => Self::version_of(&response, &key),
+				Err(err) if Self::is_conflict(&err) => {
+					Err(BlobConflict::at(&path))
+				}
+				Err(err) => Err(err),
+			}
+		})
+	}
+
+	/// `DeleteObject` with `If-Match: <etag>` for a version, a `HeadObject`
+	/// first for absence; a missing object under [`BlobCondition::Any`] is
+	/// already removed.
+	fn remove_if(
+		&self,
+		path: &RelPath,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
+		let path = path.clone();
+		Box::pin(async move {
+			if condition == BlobCondition::Absent {
+				return match this.exists(&path).await? {
+					true => Err(BlobConflict::at(&path)),
+					false => Ok(()),
+				};
+			}
+			let request = Self::with_condition(
+				AwsRequest::delete("DeleteObject", Self::key_path(&key)),
+				&condition,
+			);
+			match this.send(request).await {
+				Ok(_) => Ok(()),
+				Err(err)
+					if Self::is_conflict(&err)
+						|| (matches!(condition, BlobCondition::Matches(_))
+							&& AwsError::is(&err, &[
+								"NoSuchKey",
+								"NotFound",
+							])) =>
+				{
+					Err(BlobConflict::at(&path))
+				}
+				Err(err) => Err(err),
+			}
+		})
+	}
+
 	fn public_url(
 		&self,
 		path: &RelPath,
@@ -727,7 +856,7 @@ mod test {
 
 	/// The store suite against a local S3 server (SeaweedFS's gateway on
 	/// 8333, its identity `beetlocal`), path style as any endpoint is.
-	#[beet_core::test]
+	#[beet_core::test(timeout_ms = 120_000)]
 	#[ignore = "needs a local S3 server on 127.0.0.1:8333"]
 	async fn local_s3() {
 		store_test::run(
@@ -738,6 +867,33 @@ mod test {
 					"beetlocalsecret",
 				)),
 		)
+		.await;
+	}
+
+	/// The table suite over a bucket, every precondition an S3 conditional
+	/// write, so it needs an identity holding `s3:*` on `beet--test--*`.
+	#[beet_core::test(timeout_ms = 600_000)]
+	#[ignore = "hits remote s3"]
+	async fn table() {
+		table_test::run(TableStore::new(BlobStore::new(S3Store::new(
+			"beet--test--table",
+			"us-west-2",
+		))))
+		.await;
+	}
+
+	/// The table suite against a local S3 server, see [`local_s3`].
+	#[beet_core::test(timeout_ms = 120_000)]
+	#[ignore = "needs a local S3 server on 127.0.0.1:8333"]
+	async fn local_table() {
+		table_test::run(TableStore::new(BlobStore::new(
+			S3Store::new("beet-local-table", "us-east-1")
+				.with_endpoint("http://127.0.0.1:8333")
+				.with_credentials(AwsCredentials::new(
+					"beetlocal",
+					"beetlocalsecret",
+				)),
+		)))
 		.await;
 	}
 

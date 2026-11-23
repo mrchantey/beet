@@ -1,216 +1,165 @@
-//! Analytics compaction: archives and rollups are verified before shards delete.
+//! The nightly analytics job: each complete day rolled up, then each cold day
+//! archived.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// Runs analytics compaction over raw, rollup, and archive blob stores.
+/// One run of the nightly job over an [`AnalyticsStore`].
 ///
-/// Complete-day segments are merged with that day's existing archive and
-/// deduplicated by event ID. Every archive and JSON-over-blob rollup row is read
-/// back and compared before any source segment is deleted, making retries safe
-/// after a failure at every stage.
+/// Each complete UTC day after the last one rolled up is scanned (one key
+/// range of `analytics_event`), reduced to [`AnalyticsRollup`] rows, and each
+/// row written and read back. The rows are keyed by day and scope, so a rerun
+/// rewrites the same rows: idempotent, and `full` rebuilds every day still
+/// holding raw events. Then every day older than `keep_days` is moved to the
+/// archive bucket as one SQLite file, `analytics/events/<date>.db`
+/// ([`TableArchive`]), and its rows retired from the table, so the hot table
+/// holds a bounded window while the aggregates and the archives hold
+/// everything.
 pub struct AnalyticsRollupRun {
-	raw: BlobStore,
-	rollups: Table<AnalyticsRollup>,
-	archive: BlobStore,
+	store: AnalyticsStore,
+	archive: Option<BlobStore>,
+	keep_days: u32,
 	full: bool,
 }
 
 impl AnalyticsRollupRun {
-	/// Creates a run over raw, rollup, and archive blob stores.
-	///
-	/// The three may be one store: each keyspace is a disjoint prefix, so a
-	/// deployment collapses them by pointing two refs at one declaration.
-	pub fn new(raw: BlobStore, rollups: BlobStore, archive: BlobStore) -> Self {
+	/// The raw days a run keeps in the table by default before archiving.
+	pub const KEEP_DAYS: u32 = 30;
+
+	/// A run over `store`, archiving into `archive` when given.
+	pub fn new(store: AnalyticsStore, archive: Option<BlobStore>) -> Self {
 		Self {
-			raw,
-			rollups: AnalyticsRollup::table(rollups),
+			store,
 			archive,
+			keep_days: Self::KEEP_DAYS,
 			full: false,
 		}
 	}
 
-	/// Configures whether every archived complete day is rebuilt.
+	/// Rebuild every day still holding raw events, not only the new ones.
 	pub fn with_full(mut self, full: bool) -> Self {
 		self.full = full;
 		self
 	}
 
-	/// Compacts all eligible days and reports the verified work.
+	/// Keep `keep_days` complete days of raw events before archiving.
+	pub fn with_keep_days(mut self, keep_days: u32) -> Self {
+		self.keep_days = keep_days;
+		self
+	}
+
+	/// Where a day's archive lives in the archive bucket.
+	pub fn archive_path(date: Date) -> RelPath {
+		RelPath::new(format!("analytics/events/{date}.db"))
+	}
+
+	/// Roll up, then archive, reporting the verified work.
 	pub async fn call(&self) -> Result<AnalyticsRollupReport> {
-		// the eligible dates are decided from paths alone, so the current day's
-		// segments (the bulk of the keyspace) are never fetched to be discarded
-		let dates = self.dates().await?;
-		let mut segments =
-			HashMap::<SmolStr, Vec<(RelPath, Vec<AnalyticsEvent>)>>::default();
-		for (path, events) in
-			AnalyticsSegment::read_dates(&self.raw, |date| dates.contains(date))
-				.await?
-		{
-			let date = AnalyticsSegment::date(&path).ok_or_else(|| {
-				bevyhow!("invalid analytics segment path `{path}`")
-			})?;
-			segments.entry(date).or_default().push((path, events));
-		}
-
-		let mut scanned = 0;
-		let mut days = Vec::new();
-		for date in &dates {
-			let mut events = AnalyticsArchive::read(&self.archive, date)
-				.await?
-				.unwrap_or_default();
-			let mut paths = Vec::new();
-			if let Some(shards) = segments.remove(date) {
-				for (path, shard_events) in shards {
-					paths.push(path);
-					events.extend(shard_events);
-				}
-			}
-			scanned += events.len() as u32;
-			days.push(AnalyticsDay {
-				date: date.clone(),
-				events: AnalyticsStore::dedupe(events),
-				segments: paths,
-			});
-		}
-
-		// Nothing below may delete a shard until every archive has exact readback.
-		let mut archived = Vec::new();
-		for day in &days {
-			archived.push(
-				AnalyticsArchive::write(&self.archive, &day.date, &day.events)
-					.await?
-					.to_string()
-					.into(),
-			);
-		}
-
-		// Force the blanket JSON-over-Blob TableProvider and verify each value.
-		let writes = days
-			.iter()
-			.flat_map(|day| AnalyticsRollup::from_events(&day.events))
-			.map(async |row| {
-				let id = row.id;
-				self.rollups.push(row.clone()).await?;
-				let actual = self.rollups.get(id).await?;
-				if actual != row {
-					bevybail!(
-						"analytics rollup row {id} for {} was written to {} but failed read-back verification",
-						row.date,
-						self.rollups.describe()
-					);
-				}
-				Ok(())
-			});
-		let rollups = Self::drive(writes).await?;
-
-		// Archive and every aggregate are durable; source shards may now disappear.
-		let deletes = days
-			.iter()
-			.flat_map(|day| day.segments.iter().cloned())
-			.map(async |path| {
-				self.raw.remove(&path).await?;
-				if self.raw.exists(&path).await? {
-					bevybail!(
-						"analytics segment `{path}` still exists in {} after deletion",
-						self.raw.describe()
-					);
-				}
-				Ok(())
-			});
-		let deleted = Self::drive(deletes).await?;
-
-		AnalyticsRollupReport {
+		let today = Date::today();
+		let mut report = AnalyticsRollupReport {
 			full: self.full,
-			scanned,
-			dates,
-			archived,
-			rollups,
-			deleted,
+			..default()
+		};
+		let Some(first) = self.store.first_day().await? else {
+			return report.xok();
+		};
+		let start = match (self.full, self.store.last_rolled_day().await?) {
+			(false, Some(last)) => last.add_days(1).max(first),
+			_ => first,
+		};
+		// roll up each complete day, writing and reading back every row
+		let rollups = self.store.rollups();
+		let mut date = start;
+		while date < today {
+			let events = self.store.day(date).await?;
+			report.scanned += events.len() as u32;
+			for row in AnalyticsRollup::from_events(&events) {
+				rollups.put(row.clone()).await?;
+				if rollups.get(row.key()).await?.as_ref() != Some(&row) {
+					bevybail!(
+						"analytics rollup row {} for {} was written to {} but failed read-back verification",
+						row.id,
+						row.date,
+						rollups.describe()
+					);
+				}
+				report.rollups += 1;
+			}
+			if !events.is_empty() {
+				report.dates.push(date.to_string().into());
+			}
+			date = date.add_days(1);
 		}
-		.xok()
-	}
-
-	/// Returns complete days requiring compaction or aggregate recovery.
-	///
-	/// A day is complete once UTC has moved past it, so the current day is
-	/// always left alone: its segments are still being appended to and an
-	/// archive written now would be replaced by the next run anyway.
-	async fn dates(&self) -> Result<Vec<SmolStr>> {
-		let today = Date::today().to_string();
-		let mut dates = AnalyticsSegment::dates(&self.raw)
-			.await?
-			.into_iter()
-			.filter(|date| date.as_str() < today.as_str())
-			.collect::<HashSet<_>>();
-		for date in AnalyticsArchive::dates(&self.archive)
-			.await?
-			.into_iter()
-			.filter(|date| date.as_str() < today.as_str())
-		{
-			if self.full || !self.covered(&date).await? {
-				dates.insert(date);
+		if let Some(archive) = &self.archive {
+			cfg_if! {
+				if #[cfg(feature = "sqlite")] {
+					self.archive(archive, first, today, &mut report).await?;
+				} else {
+					let _ = archive;
+					bevybail!(
+						"archiving analytics needs the `sqlite` feature: each cold \
+						 day is archived as a SQLite file"
+					);
+				}
 			}
 		}
-		let mut dates = dates.into_iter().collect::<Vec<_>>();
-		dates.sort();
-		dates.xok()
+		report.xok()
 	}
 
-	/// Returns whether a date has its archive and site-wide aggregate.
-	async fn covered(&self, date: &str) -> Result<bool> {
-		Ok(self
-			.archive
-			.exists(&AnalyticsArchive::object_path(date))
-			.await? && self
-			.rollups
-			.exists(AnalyticsRollup::row_id(date, &AnalyticsScope::Site))
-			.await?)
-	}
-
-	/// Drives bounded store operations and returns their completed count.
-	async fn drive(
-		writes: impl Iterator<Item = impl Future<Output = Result>>,
-	) -> Result<u32> {
-		let results =
-			async_ext::join_all_bounded(BlobStore::GET_ALL_CONCURRENCY, writes)
-				.await;
-		let total = results.len() as u32;
-		results.into_iter().collect::<Result<Vec<_>>>()?;
-		total.xok()
+	/// Archive each day from `first` past the window whose aggregate is
+	/// already written.
+	#[cfg(feature = "sqlite")]
+	async fn archive(
+		&self,
+		archive: &BlobStore,
+		first: Date,
+		today: Date,
+		report: &mut AnalyticsRollupReport,
+	) -> Result {
+		let cutoff = today.add_days(-(self.keep_days as i64));
+		let rolled = self.store.last_rolled_day().await?;
+		let mut date = first;
+		while date < cutoff && rolled.is_some_and(|rolled| date <= rolled) {
+			let path = Self::archive_path(date);
+			let moved = TableArchive::new(
+				&self.store.events(),
+				AnalyticsEvent::day_scan(date),
+			)
+			.run(archive, &path)
+			.await?;
+			if moved.rows > 0 {
+				report.archived.push(path.to_string().into());
+				report.retired += moved.rows as u32;
+			}
+			date = date.add_days(1);
+		}
+		Ok(())
 	}
 }
 
-/// Holds one complete day's merged compaction input.
-struct AnalyticsDay {
-	date: SmolStr,
-	events: Vec<AnalyticsEvent>,
-	segments: Vec<RelPath>,
-}
-
-/// Reports the verified work completed by one [`AnalyticsRollupRun`].
+/// The verified work of one [`AnalyticsRollupRun`].
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AnalyticsRollupReport {
-	/// Whether the run rebuilt every complete archived day.
+	/// Whether the run rebuilt every day still holding raw events.
 	pub full: bool,
-	/// Raw records merged before event-ID deduplication.
+	/// Raw events reduced, heartbeats deduplicated.
 	pub scanned: u32,
-	/// Complete UTC dates compacted in ascending order.
+	/// The days rolled up, ascending.
 	pub dates: Vec<SmolStr>,
-	/// Daily archive objects written and verified.
-	pub archived: Vec<SmolStr>,
 	/// Aggregate rows written and verified.
 	pub rollups: u32,
-	/// Source segment objects deleted after verification.
-	pub deleted: u32,
+	/// Archive files written and verified.
+	pub archived: Vec<SmolStr>,
+	/// Raw events moved out of the table into those archives.
+	pub retired: u32,
 }
 
 impl core::fmt::Display for AnalyticsRollupReport {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		writeln!(
 			f,
-			"analytics {}: {} days from {} raw records",
+			"analytics {}: {} days from {} raw events",
 			if self.full { "backfill" } else { "rollup" },
 			self.dates.len(),
 			self.scanned
@@ -220,50 +169,52 @@ impl core::fmt::Display for AnalyticsRollupReport {
 		{
 			writeln!(f, "  days:       {first} .. {last}")?;
 		}
-		writeln!(f, "  archived:   {} objects", self.archived.len())?;
 		writeln!(f, "  aggregates: {} rows", self.rollups)?;
-		write!(f, "  deleted:    {} segments", self.deleted)
+		write!(
+			f,
+			"  archived:   {} days, {} events",
+			self.archived.len(),
+			self.retired
+		)
 	}
 }
 
-/// Compacts raw analytics segments into daily archives and aggregates.
+/// Rolls up each complete day of analytics and archives the cold ones.
 ///
-/// The route names its raw, rollup, and archive stores as fields of the job
-/// itself, one per role, so a missing one is an error by field name and half a
-/// pointing is not authorable. A run is idempotent: archive paths and aggregate
-/// IDs are deterministic, while event-ID deduplication makes a retry safe if a
-/// prior run archived but did not delete.
+/// The route names its two stores as fields of the job itself, one per role,
+/// so a missing one is an error by field name: the table store the events
+/// and aggregates live in, and the bucket cold days are archived to. A run is
+/// idempotent, see [`AnalyticsRollupRun`].
 #[action]
 #[derive(Default, Component, Reflect, MapEntities)]
 #[reflect(Component, Default, MapEntities)]
 pub async fn AnalyticsRollupJob(
-	/// The blob store holding the raw [`AnalyticsSegment`] shards.
+	/// The table store holding the `analytics_event` and `analytics_rollup`
+	/// tables, the one the site's `AnalyticsConfig` records to.
 	#[field(required)]
 	#[entities]
-	raw: Entity,
-	/// The blob store this job writes [`AnalyticsRollup`] rows to. May name the
-	/// same declaration as `raw`: their prefixes are disjoint, which is how a
-	/// deployment collapses the two into one bucket.
-	#[field(required)]
-	#[entities]
-	rollups: Entity,
-	/// The blob store this job writes daily raw archives to.
+	analytics: Entity,
+	/// The bucket each cold day is archived to as a SQLite file.
 	#[field(required)]
 	#[entities]
 	archive: Entity,
-	/// Rebuilds every complete archived day, not only new or uncovered days.
+	/// Rebuilds every day still holding raw events, not only new days.
 	#[param]
 	full: bool,
+	/// Complete days of raw events kept in the table before archiving.
+	#[param]
+	keep_days: Option<u32>,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let world = cx.caller.world().clone();
-
 	let report = AnalyticsRollupRun::new(
-		StoreRef::resolve::<BlobStore>(&world, raw).await?,
-		StoreRef::resolve::<BlobStore>(&world, rollups).await?,
-		StoreRef::resolve::<BlobStore>(&world, archive).await?,
+		AnalyticsStore::new(
+			StoreRef::resolve::<TableStore>(&world, analytics).await?,
+		),
+		Some(StoreRef::resolve::<BlobStore>(&world, archive).await?),
 	)
 	.with_full(full)
+	.with_keep_days(keep_days.unwrap_or(AnalyticsRollupRun::KEEP_DAYS))
 	.call()
 	.await?;
 	info!("{report}");
@@ -272,33 +223,10 @@ pub async fn AnalyticsRollupJob(
 
 #[cfg(test)]
 mod test {
-	use crate::exports::bytes::Bytes;
-	use crate::prelude::*;
+	use super::*;
 	use beet_action::prelude::*;
-	use beet_core::prelude::*;
 
 	const DAY_MS: u64 = 86_400_000;
-
-	fn run() -> (
-		AnalyticsRollupRun,
-		BlobStore,
-		Table<AnalyticsRollup>,
-		BlobStore,
-	) {
-		let raw = BlobStore::temp();
-		let rollup_store = BlobStore::temp();
-		let archive = BlobStore::temp();
-		(
-			AnalyticsRollupRun::new(
-				raw.clone(),
-				rollup_store.clone(),
-				archive.clone(),
-			),
-			raw,
-			AnalyticsRollup::table(rollup_store),
-			archive,
-		)
-	}
 
 	fn page_view(days: u64, path: &str, session: u128) -> AnalyticsEvent {
 		let mut event =
@@ -309,218 +237,165 @@ mod test {
 				client: default(),
 			})
 			.with_session(Some(Uuid::from_u128(session)));
-		event.timestamp = analytics_ext::now_ms() - days * DAY_MS;
-		event
+		event.timestamp -= days * DAY_MS;
+		event.with_fresh_key()
 	}
 
-	async fn write_segment(
-		store: &BlobStore,
-		events: &[AnalyticsEvent],
-		sequence: u64,
-	) -> RelPath {
-		let path = AnalyticsSegment::object_path(
-			&events[0].date(),
-			Uuid::from_u128(sequence as u128 + 1),
-			events[0].timestamp,
-			sequence,
-		);
-		AnalyticsSegment::write(store, path.clone(), events)
-			.await
-			.unwrap();
-		path
-	}
-
-	#[beet_core::test]
-	async fn archives_rolls_up_then_deletes_segments() {
-		let (run, raw, rollups, archive) = run();
-		let sources = [
-			page_view(3, "/", 1),
-			page_view(3, "/docs", 1),
-			page_view(2, "/", 2),
-		];
-		let older_path = write_segment(&raw, &sources[..2], 1).await;
-		let newer_path = write_segment(&raw, &sources[2..], 2).await;
-		let report = run.call().await.unwrap();
-		report.scanned.xpect_eq(3);
-		report.dates.len().xpect_eq(2);
-		report.archived.len().xpect_eq(2);
-		report.rollups.xpect_eq(5);
-		report.deleted.xpect_eq(2);
-		raw.exists(&older_path).await.unwrap().xpect_false();
-		raw.exists(&newer_path).await.unwrap().xpect_false();
-
-		let date = sources[0].date();
-		AnalyticsArchive::read(&archive, &date)
-			.await
-			.unwrap()
-			.unwrap()
-			.len()
-			.xpect_eq(2);
-		let site = rollups
-			.get(AnalyticsRollup::row_id(&date, &AnalyticsScope::Site))
-			.await
-			.unwrap();
-		site.views.xpect_eq(2);
-		site.visits.xpect_eq(1);
-	}
-
-	/// The current day is still being appended to, so it is neither compacted
-	/// nor read: the unreadable object proves the second half, since decoding it
-	/// would fail the run rather than leave it alone.
-	#[beet_core::test]
-	async fn leaves_today_segments_alone() {
-		let (run, raw, ..) = run();
-		let today = page_view(0, "/", 1);
-		let path = write_segment(&raw, &[today.clone()], 1).await;
-		let corrupt = AnalyticsSegment::object_path(
-			&today.date(),
-			Uuid::from_u128(9),
-			today.timestamp,
-			9,
-		);
-		raw.insert(&corrupt, Bytes::from_static(b"not zstd"))
-			.await
-			.unwrap();
-		let report = run.call().await.unwrap();
-		report.dates.is_empty().xpect_true();
-		report.deleted.xpect_eq(0);
-		raw.exists(&path).await.unwrap().xpect_true();
-		raw.exists(&corrupt).await.unwrap().xpect_true();
-	}
-
-	#[beet_core::test]
-	async fn merges_archive_and_late_segments_with_deduplication() {
-		let (run, raw, rollups, archive) = run();
-		let old = page_view(2, "/docs", 1);
-		AnalyticsArchive::write(&archive, &old.date(), &[old.clone()])
-			.await
-			.unwrap();
-		for row in AnalyticsRollup::from_events(&[old.clone()]) {
-			rollups.push(row).await.unwrap();
+	async fn recorded(events: &[AnalyticsEvent]) -> AnalyticsStore {
+		let store = AnalyticsStore::new(TableStore::temp());
+		for event in events {
+			store.record(event.clone()).await.unwrap();
 		}
-		let mut newest = old.clone();
-		newest.timestamp += 1;
-		newest.data = AnalyticsEventData::PageView {
-			duration_ms: 24_000,
-			referrer: None,
-			title: None,
-			client: default(),
-		};
-		let path = write_segment(&raw, &[newest.clone()], 1).await;
-
-		let report = run.call().await.unwrap();
-		report.scanned.xpect_eq(2);
-		report.dates.xpect_eq(vec![old.date()]);
-		report.deleted.xpect_eq(1);
-		raw.exists(&path).await.unwrap().xpect_false();
-		let archived = AnalyticsArchive::read(&archive, &old.date())
-			.await
-			.unwrap()
-			.unwrap();
-		archived.len().xpect_eq(1);
-		archived[0].timestamp.xpect_eq(newest.timestamp);
+		store
 	}
 
+	/// Complete days roll up, today does not, and a rerun rewrites the same
+	/// rows.
 	#[beet_core::test]
-	async fn recovers_uncovered_archives_and_supports_full_rebuilds() {
-		let (run, _raw, rollups, archive) = run();
-		let event = page_view(2, "/", 1);
-		AnalyticsArchive::write(&archive, &event.date(), &[event.clone()])
+	async fn rolls_up_complete_days() {
+		let store = recorded(&[
+			page_view(2, "/a", 1),
+			page_view(2, "/b", 1),
+			page_view(1, "/a", 2),
+			page_view(0, "/today", 3),
+		])
+		.await;
+		let report = AnalyticsRollupRun::new(store.clone(), None)
+			.call()
 			.await
 			.unwrap();
-		run.call().await.unwrap().dates.len().xpect_eq(1);
-		run.call().await.unwrap().dates.is_empty().xpect_true();
-		rollups
-			.remove(AnalyticsRollup::row_id(
-				&event.date(),
-				&AnalyticsScope::Site,
-			))
-			.await
+		report.dates.len().xpect_eq(2);
+		report.scanned.xpect_eq(3);
+		let yesterday = Date::today().add_days(-1);
+		let rows = store.rollups().get_all().await.unwrap();
+		let site = rows
+			.iter()
+			.find(|row| {
+				row.date == yesterday.to_string()
+					&& row.scope == AnalyticsScope::Site
+			})
 			.unwrap();
-		run.call().await.unwrap().dates.len().xpect_eq(1);
-		run.with_full(true)
+		site.views.xpect_eq(1);
+		rows.iter()
+			.any(|row| row.date == Date::today().to_string())
+			.xpect_false();
+		// the next run has nothing new, a full one rebuilds the same rows
+		AnalyticsRollupRun::new(store.clone(), None)
+			.call()
+			.await
+			.unwrap()
+			.dates
+			.xpect_empty();
+		AnalyticsRollupRun::new(store.clone(), None)
+			.with_full(true)
 			.call()
 			.await
 			.unwrap()
 			.dates
 			.len()
-			.xpect_eq(1);
-	}
-
-	#[beet_core::test]
-	async fn dispatches_over_named_blob_stores() {
-		let mut world = (AsyncPlugin, analytics_plugin).into_world();
-		let stores = [(); 3].map(|_| world.spawn(InMemoryStore::new()).flush());
-		let [raw, rollups, archive] = stores;
-		let event = page_view(2, "/docs", 1);
-		let raw_store = world.entity(raw).get::<BlobStore>().unwrap().clone();
-		write_segment(&raw_store, &[event.clone()], 1).await;
-		let job = world
-			.spawn(AnalyticsRollupJob {
-				raw: Some(raw),
-				rollups: Some(rollups),
-				archive: Some(archive),
-			})
-			.flush();
-
-		let report = world
-			.entity_mut(job)
-			.call::<Request, Response>(Request::new(
-				HttpMethod::Post,
-				"rollup?full=true",
-			))
+			.xpect_eq(2);
+		store
+			.rollups()
+			.get_all()
 			.await
 			.unwrap()
-			.unwrap_str()
-			.await;
-		report
+			.len()
+			.xpect_eq(rows.len());
+	}
+
+	/// A day past the window is archived into its own file and leaves the
+	/// table, its aggregate kept; the summary still counts it.
+	#[cfg(feature = "sqlite")]
+	#[beet_core::test]
+	async fn archives_cold_days() {
+		let store =
+			recorded(&[page_view(40, "/cold", 1), page_view(1, "/warm", 2)])
+				.await;
+		let archive = BlobStore::temp();
+		let report =
+			AnalyticsRollupRun::new(store.clone(), Some(archive.clone()))
+				.call()
+				.await
+				.unwrap();
+		let cold = Date::today().add_days(-40);
+		report.archived.xpect_eq(vec![SmolStr::from(
+			AnalyticsRollupRun::archive_path(cold).to_string(),
+		)]);
+		report.retired.xpect_eq(1);
+		store.day(cold).await.unwrap().xpect_empty();
+		store.events().list().await.unwrap().len().xpect_eq(1);
+		Table::<AnalyticsEvent>::new(
+			TableArchive::open(
+				&archive,
+				&AnalyticsRollupRun::archive_path(cold),
+			)
+			.await
+			.unwrap(),
+		)
+		.get_all()
+		.await
+		.unwrap()[0]
+			.path
 			.as_str()
-			.xpect_contains("analytics backfill: 1 days")
-			.xpect_contains("deleted:    1 segments");
-		let rollup_store =
-			world.entity(rollups).get::<BlobStore>().unwrap().clone();
-		AnalyticsRollup::table(rollup_store)
-			.get(AnalyticsRollup::row_id(
-				&event.date(),
-				&AnalyticsScope::Site,
-			))
+			.xpect_eq("/cold");
+		store.summary(false).await.unwrap().page_views.xpect_eq(2);
+		// a rerun moves nothing more
+		AnalyticsRollupRun::new(store, Some(archive))
+			.call()
 			.await
 			.unwrap()
-			.views
-			.xpect_eq(1);
+			.retired
+			.xpect_eq(0);
 	}
 
-	/// A required field is validated at call time and the failure names it, so
-	/// the job says which store it is missing rather than which relation it
-	/// went looking for.
-	#[beet_core::test]
-	async fn an_unpointed_job_fails_loudly() {
-		let mut world = (AsyncPlugin, analytics_plugin).into_world();
-		let unpointed = world.spawn(AnalyticsRollupJob::default()).flush();
-		world
-			.entity_mut(unpointed)
-			.call::<Request, Response>(Request::new(HttpMethod::Post, "rollup"))
+	/// The job runs in a Worker under `wrangler dev`, its events in Durable
+	/// Objects and its archive built in the Worker's own SQLite (`sqlite-wasm-rs`
+	/// in workerd's memory) and written to R2: a document mounting
+	/// `<DurableObjectStore bx:ref="tables" binding="TABLES"><ServeTables
+	/// prefix="tables"/></DurableObjectStore>`, `<R2WorkersStore
+	/// bx:ref="archive" binding="ARCHIVE"/>` and `<Route path="rollup"
+	/// {AnalyticsRollupJob{analytics: $tables, archive: $archive}}/>`.
+	#[cfg(all(feature = "ureq", not(target_arch = "wasm32")))]
+	#[beet_core::test(timeout_ms = 600_000)]
+	#[ignore = "needs a Worker under wrangler dev on 127.0.0.1:8787"]
+	async fn archives_in_a_worker() {
+		let store = AnalyticsStore::new(TableStore::new(
+			TableWireClient::connect(
+				TableWireTransport::http("http://127.0.0.1:8787/tables")
+					.unwrap(),
+			)
 			.await
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("missing required field `raw`");
+			.unwrap(),
+		));
+		store.record(page_view(3, "/cold", 1)).await.unwrap();
+		Request::post("http://127.0.0.1:8787/rollup?keep_days=0")
+			.send()
+			.await
+			.unwrap()
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("archived:   1 days, 1 events");
+		store
+			.day(Date::today().add_days(-3))
+			.await
+			.unwrap()
+			.xpect_empty();
 	}
 
-	/// The two-bucket deployment: raw and rollups share one declaration under
-	/// disjoint prefixes, which the job says by naming it in two fields.
+	/// The job resolves its two stores by field and reports.
 	#[beet_core::test]
-	async fn two_fields_may_name_one_declaration() {
+	async fn job_runs_from_its_fields() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
 		let analytics = world.spawn(InMemoryStore::new()).flush();
 		let archive = world.spawn(InMemoryStore::new()).flush();
-		let event = page_view(2, "/docs", 1);
-		let raw_store =
-			world.entity(analytics).get::<BlobStore>().unwrap().clone();
-		write_segment(&raw_store, &[event.clone()], 1).await;
+		let store = AnalyticsStore::new(
+			world.entity(analytics).get::<TableStore>().unwrap().clone(),
+		);
+		store.record(page_view(1, "/a", 1)).await.unwrap();
 		let job = world
 			.spawn(AnalyticsRollupJob {
-				raw: Some(analytics),
-				rollups: Some(analytics),
+				analytics: Some(analytics),
 				archive: Some(archive),
 			})
 			.flush();
@@ -531,16 +406,6 @@ mod test {
 			.unwrap()
 			.unwrap_str()
 			.await
-			.as_str()
-			.xpect_contains("deleted:    1 segments");
-		AnalyticsRollup::table(raw_store)
-			.get(AnalyticsRollup::row_id(
-				&event.date(),
-				&AnalyticsScope::Site,
-			))
-			.await
-			.unwrap()
-			.views
-			.xpect_eq(1);
+			.xpect_contains("1 days from 1 raw events");
 	}
 }

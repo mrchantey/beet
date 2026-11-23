@@ -441,7 +441,13 @@ pub async fn CloudflareWorkerDeployAction(
 	let block = sibling::<CloudflareWorkerBlock>(&cx).await?;
 	build_worker_artifacts().await?;
 	let dir = wrangler_ext::project_dir(block.name())?;
-	write_worker_wrangler(&dir, &block, &worker_vars(&cx, &block).await?)?;
+	let objects = table_object_bindings(&cx).await?;
+	write_worker_wrangler(
+		&dir,
+		&block,
+		&worker_vars(&cx, &block).await?,
+		&objects,
+	)?;
 
 	wrangler_r2_create(&access, block.bucket()).await?;
 	wrangler_ext::deploy(&access, &dir, None).await?;
@@ -477,11 +483,33 @@ async fn worker_vars(
 	vars.xok()
 }
 
+/// The namespace binding of every [`DurableObjectStore`] the document
+/// declares, each bound to the one object class the Worker exports: the
+/// declaration is the store, so the deploy reads it rather than repeating it.
+async fn table_object_bindings(
+	cx: &ActionContext<Request>,
+) -> Result<Vec<SmolStr>> {
+	let mut bindings = cx
+		.caller
+		.world()
+		.with_state::<Query<&DurableObjectStore>, _>(|stores| {
+			stores
+				.iter()
+				.map(|store| store.binding().clone())
+				.collect::<Vec<_>>()
+		})
+		.await;
+	bindings.sort();
+	bindings.dedup();
+	bindings.xok()
+}
+
 /// Write [`worker_wrangler_json`] into the wrangler project directory.
 fn write_worker_wrangler(
 	dir: &AbsPath,
 	block: &CloudflareWorkerBlock,
 	vars: &BTreeMap<SmolStr, SmolStr>,
+	objects: &[SmolStr],
 ) -> Result {
 	// `main` is the built `index.js` (the wasm-bindgen entry; its `index_bg.wasm`
 	// sibling resolves by relative import). An absolute path outside this wrangler
@@ -490,7 +518,7 @@ fn write_worker_wrangler(
 		AbsPath::new_workspace_rel(WORKER_BUILD_DIR)?.join("index.js");
 	fs_ext::write(
 		dir.join("wrangler.jsonc"),
-		worker_wrangler_json(block, &main_js.to_string(), vars)?,
+		worker_wrangler_json(block, &main_js.to_string(), vars, objects)?,
 	)?;
 	Ok(())
 }
@@ -498,11 +526,14 @@ fn write_worker_wrangler(
 /// `wrangler.jsonc` for the wasm Worker: `main` points at the built artifacts
 /// (no `build.command`, so the deploy uploads them as-is), plus the R2 bucket
 /// bound by the block's [`binding`](CloudflareWorkerBlock::binding), the
-/// `vars` ([`worker_vars`]) and any custom domains the block declares.
+/// `vars` ([`worker_vars`]), any custom domains the block declares, and each
+/// table object namespace (`objects`) bound to [`DurableObjectStore::CLASS`]
+/// with the migration that makes it a SQLite class.
 fn worker_wrangler_json(
 	block: &CloudflareWorkerBlock,
 	main_js: &str,
 	vars: &BTreeMap<SmolStr, SmolStr>,
+	objects: &[SmolStr],
 ) -> Result<String> {
 	// `custom_domain` rather than a route pattern: wrangler then provisions the
 	// zone record and the certificate, so a declared host is reachable over
@@ -532,6 +563,23 @@ fn worker_wrangler_json(
 	// nowhere" and unpublishes the `workers.dev` host.
 	if !routes.is_empty() {
 		config["routes"] = routes.into();
+	}
+	// one class however many namespaces bind it; the migration tag is applied
+	// once and kept, as wrangler requires of every migration it has run
+	if !objects.is_empty() {
+		config["durable_objects"] = serde_json::json!({
+			"bindings": objects
+				.iter()
+				.map(|binding| serde_json::json!({
+					"name": binding,
+					"class_name": DurableObjectStore::CLASS,
+				}))
+				.collect::<Vec<_>>(),
+		});
+		config["migrations"] = serde_json::json!([{
+			"tag": "beet-table-object-v1",
+			"new_sqlite_classes": [DurableObjectStore::CLASS],
+		}]);
 	}
 	serde_json::to_string_pretty(&config)?.xok()
 }
@@ -1018,7 +1066,7 @@ mod test {
 	#[beet_core::test]
 	fn routes_render_as_custom_domains() {
 		let block = CloudflareWorkerBlock::new("mta-sts");
-		worker_wrangler_json(&block, "index.js", &default())
+		worker_wrangler_json(&block, "index.js", &default(), &[])
 			.unwrap()
 			.as_str()
 			.xnot()
@@ -1027,6 +1075,7 @@ mod test {
 			&block.with_route("mta-sts.stalwart.beetmash.com"),
 			"index.js",
 			&default(),
+			&[],
 		)
 		.unwrap()
 		.as_str()
@@ -1053,12 +1102,37 @@ mod test {
 		.to_env()
 		.into_iter()
 		.collect();
-		worker_wrangler_json(&block, "index.js", &vars)
+		worker_wrangler_json(&block, "index.js", &vars, &[])
 			.unwrap()
 			.as_str()
 			.xpect_contains("\"binding\": \"SITE\"")
 			.xpect_contains("\"bucket_name\": \"hello-site\"")
 			.xpect_contains("\"BEET_REPO\": \"r2://SITE\"");
+	}
+
+	/// Each table object namespace is bound to the one class, made a SQLite
+	/// class by the migration; a Worker with none renders neither.
+	#[beet_core::test]
+	fn binds_table_objects() {
+		let block = CloudflareWorkerBlock::new("hello");
+		worker_wrangler_json(&block, "index.js", &default(), &[])
+			.unwrap()
+			.as_str()
+			.xnot()
+			.xpect_contains("durable_objects");
+		worker_wrangler_json(
+			&block,
+			"index.js",
+			&default(),
+			&["TABLES".into()],
+		)
+		.unwrap()
+		.as_str()
+		.xpect_contains("\"name\": \"TABLES\"")
+		.xpect_contains("\"class_name\": \"BeetTableObject\"")
+		.xpect_contains(
+			"\"new_sqlite_classes\": [\n        \"BeetTableObject\"",
+		);
 	}
 
 	#[beet_core::test]

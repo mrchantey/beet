@@ -1,0 +1,43 @@
+<!--
+# Tables on Durable Objects, under wrangler dev
+
+The document a Worker built from beet serves to prove its tables locally: every
+partition of `TABLES` a Durable Object of the one class the Worker exports
+(`BeetTableObject`), owning that partition's SQLite storage. Two mounts answer
+the table wire protocol, a route reading and writing partitioned tables from
+outside the Worker: `/tables` over the objects, `/r2` a blob backed table over
+the `ARCHIVE` bucket's binding. `/rollup` runs the analytics job against the
+objects, archiving cold days into the bucket as SQLite files built inside the
+Worker.
+
+Both mounts write without asking who is calling, so this document is for a
+local `wrangler dev` alone: beet has no request authentication to put in front
+of them yet, and a deployed site must not mount them.
+
+## Usage
+
+Build the Worker, put this document in the local site bucket as `main.bsx`, and
+start the dev server with the bindings `examples/infra/cloudflare_workers.bsx`
+deploys (`TABLES` bound to `BeetTableObject` with its `new_sqlite_classes`
+migration, the `SITE` and `ARCHIVE` buckets, `BEET_REPO=r2://SITE`):
+
+    worker-build --release crates/beet-cli -- --no-default-features --features cloudflare,sqlite
+    wrangler r2 object put probe-site/main.bsx --file examples/infra/cloudflare_tables.bsx --local
+    wrangler dev --local --port 8787
+
+Then the table suite through the Worker, the row cases over the bucket
+binding, and the archive built in the Worker:
+
+    cargo test -p beet_net --features sqlite,server,ureq --lib durable_objects -- --ignored
+    cargo test -p beet_net --features sqlite,server,ureq --lib r2_binding -- --ignored
+    cargo test -p beet_net --features sqlite,server,ureq --lib archives_in_a_worker -- --ignored
+-->
+<Router>
+	<DurableObjectStore bx:ref="tables" binding="TABLES">
+		<ServeTables prefix="tables"/>
+	</DurableObjectStore>
+	<R2WorkersStore bx:ref="archive" binding="ARCHIVE">
+		<ServeTables prefix="r2"/>
+	</R2WorkersStore>
+	<Route path="rollup" {AnalyticsRollupJob{analytics: $tables, archive: $archive}}/>
+</Router>

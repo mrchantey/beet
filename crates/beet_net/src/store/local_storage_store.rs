@@ -14,6 +14,7 @@ pub struct LocalStorageStore {
 	/// The store name used as part of the localStorage key prefix.
 	store_name: SmolStr,
 	/// Optional subdirectory prefix for all keys.
+	#[reflect(default)]
 	subdir: Option<RelPath>,
 }
 
@@ -191,11 +192,87 @@ impl BlobStoreProvider for LocalStorageStore {
 		})
 	}
 
+	fn get_versioned(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+		let key = self.storage_key(path);
+		Box::pin(async move {
+			Self::read(&key)?
+				.map(|bytes| {
+					let version = BlobVersion::of(&bytes);
+					(bytes, version)
+				})
+				.xok()
+		})
+	}
+
+	/// Checked and written in one synchronous step, which nothing in the tab
+	/// can interleave, the version the content's digest.
+	fn insert_if(
+		&self,
+		path: &RelPath,
+		body: Bytes,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result<BlobVersion>> {
+		let key = self.storage_key(path);
+		let path = path.clone();
+		Box::pin(async move {
+			let found = Self::read(&key)?;
+			BlobConflict::check(
+				&condition,
+				&path,
+				found.as_deref().map(BlobVersion::of).as_ref(),
+			)?;
+			Self::local_storage()
+				.set_item(&key, &BASE64_STANDARD.encode(&body))
+				.map_jserr()?;
+			BlobVersion::of(&body).xok()
+		})
+	}
+
+	fn remove_if(
+		&self,
+		path: &RelPath,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result> {
+		let key = self.storage_key(path);
+		let path = path.clone();
+		Box::pin(async move {
+			let found = Self::read(&key)?;
+			BlobConflict::check(
+				&condition,
+				&path,
+				found.as_deref().map(BlobVersion::of).as_ref(),
+			)?;
+			Self::local_storage().remove_item(&key).map_jserr()?;
+			Ok(())
+		})
+	}
+
 	fn public_url(
 		&self,
 		_path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { None.xok() })
+	}
+}
+
+impl LocalStorageStore {
+	/// The object at `key`, `None` where there is none.
+	fn read(key: &str) -> Result<Option<Bytes>> {
+		Self::local_storage()
+			.get_item(key)
+			.map_jserr()?
+			.map(|value| {
+				// base64 is no_std here, so DecodeError lacks the `Error`
+				// impl BevyError's blanket `From` needs; wrap via Display.
+				BASE64_STANDARD
+					.decode(value)
+					.map(Bytes::from)
+					.map_err(|err| bevyhow!("{err}"))
+			})
+			.transpose()
 	}
 }
 
@@ -279,5 +356,13 @@ mod test {
 	async fn works() {
 		let provider = LocalStorageStore::new("test-store");
 		store_test::run(provider).await;
+	}
+
+	#[beet_core::test(browser)]
+	async fn table() {
+		table_test::run(TableStore::new(BlobStore::new(
+			LocalStorageStore::new("test-table"),
+		)))
+		.await;
 	}
 }

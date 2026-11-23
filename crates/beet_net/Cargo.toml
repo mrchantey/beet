@@ -45,6 +45,10 @@ std = [
 	"uuid/v5",
 	"uuid/std",
 	"beet_core/uuid",
+	# an analytics event's row key is a TID with random low digits
+	"beet_core/rand",
+	# `DecodeError` is an `Error` only with std, so a decode reaches `?`
+	"base64?/std",
 	# url-encoded query-param extractors: serde_urlencoded forces serde/std,
 	# so it (and the extractors that use it) are std-only.
 	"dep:serde_urlencoded",
@@ -62,10 +66,12 @@ action = ["dep:beet_action"]
 # tungstenite/web-sys transports and the server/channel backends ride their own
 # features on top of it.
 sockets = ["action", "dep:sha1", "dep:base64"]
-# json is the newline-delimited payload of analytics segments and daily
-# archives; zstd is the codec every JSONL object is written under, the C library
-# natively and the pure-rust `ruzstd` on wasm, each through its target table below.
-json = ["serde", "dep:serde_json", "dep:zstd", "dep:ruzstd", "beet_core/json", "beet_action?/json"]
+# Tables ride `json`: rows are canonical json, hashed through `dag_cbor`, keyed
+# by default by a TID `rand` mints.
+json = ["serde", "dep:serde_json", "beet_core/json", "beet_action?/json", "dag_cbor", "beet_core/rand"]
+# `AnalyticsImport`, the one-time import of the zstd JSONL analytics history
+# kept before events were rows, decoded by the pure-rust `ruzstd`.
+legacy_analytics = ["json", "dep:ruzstd"]
 # The `atproto` module's data model half: the `Pds` family, `EmulatorPds`, the
 # converge and the `<AtprotoAccount/>` declaration, every record crossing
 # through `MediaType::DagCbor`. No network.
@@ -82,10 +88,9 @@ atproto = ["std", "json", "dag_cbor", "beet_core/rand"]
 # its ffi for `sqlite-wasm-rs` on wasm (see the workspace manifest). `blocking`
 # is in the native target table, so wasm simply does not get it — which is the
 # point, there being no thread there to hand a query to.
-sqlite = ["std", "json", "dep:rusqlite", "dep:blocking"]
-# The gzip `JsonlCodec` (`.jsonl.gz`), for JSONL objects another tool produced;
-# nothing beet writes uses it.
-gzip = ["json", "dep:flate2"]
+# `rusqlite/serialize` reads and writes a whole database as bytes, how an
+# archive is built in memory and opened again from a bucket.
+sqlite = ["std", "json", "dep:rusqlite", "rusqlite/serialize", "dep:blocking"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # offline geoip country lookup for analytics: pulls the pure-rust `maxminddb`
 # reader (cross-platform, in-memory). Off by default; the analytics country field
@@ -145,17 +150,17 @@ cloudflare = ["std", "dep:worker"]
 # (`AwsClient`, `AwsCredentialSource`, `SigV4`) and the stores over it
 # (`S3Store`, `DynamoStore`): no SDK, no async runtime and no `aws` cli, so
 # every target, a Cloudflare Worker included. `rand` jitters the retry
-# backoff; `serde_dynamo` maps a row onto DynamoDB's attribute json.
+# backoff.
 aws = [
 	"std",
 	"http",
 	"serde",
-	"dep:serde_json",
+	# `DynamoStore` is a table backend
+	"json",
 	"dep:sha2",
 	"dep:hmac",
 	# `XmlElement`, the S3 and query protocol answers
 	"beet_core/bsx",
-	"dep:serde_dynamo",
 	"beet_core/rand",
 	# Identity Center's login is an OAuth flow over the same client
 	"oauth",
@@ -252,6 +257,8 @@ tracing.workspace = true
 uuid = { workspace = true, optional = true }
 send_wrapper = { workspace = true, optional = true }
 bytes.workspace = true
+# the legacy analytics import's zstd decoder, pure rust on every target
+ruzstd = { workspace = true, optional = true }
 # async (no_std core stream trait)
 futures-core.workspace = true
 # async (std-only)
@@ -265,7 +272,6 @@ base64 = { workspace = true, optional = true }
 sha1 = { workspace = true, optional = true }
 # the store mirror's change detection, see `BlobStat`
 md-5.workspace = true
-flate2 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 serde_urlencoded = { version = "0.7", optional = true }
@@ -280,7 +286,6 @@ eventsource-stream = { version = "0.2.3", optional = true }
 #💡 aws
 # a row as DynamoDB's attribute json, through the crate's own `AttributeValue`
 # (no SDK feature)
-serde_dynamo = { version = "4", optional = true }
 sha2 = { workspace = true, optional = true }
 hmac = { workspace = true, optional = true }
 
@@ -325,13 +330,6 @@ pin-project = { workspace = true, optional = true }
 #💡 lambda
 # (the runtime loop is this crate's own client, see `lambda_server.rs`)
 
-# the zstd C library, the native `JsonlCodec::Zstd` backend. Hosted targets only:
-# a bare-metal build (`target_os = "none"`, eg esp32 firmware) has no libc for it
-# to compile against, and its JSONL codec is std-only anyway, so `dep:zstd` is
-# inert there.
-[target.'cfg(all(not(target_arch = "wasm32"), not(target_os = "none")))'.dependencies]
-zstd = { workspace = true, optional = true }
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # non-optional on wasm: `Body`'s stream is not `Send`, so the `SendWrapper` that
 # makes it storable in the ECS is needed by the no_std core too, not just the
@@ -343,8 +341,6 @@ wasm-bindgen-futures.workspace = true
 # the workspace sets `default-features = false` so uuid compiles no_std; on wasm
 # the std `uuid/v7` needs a randomness backend, so re-add the `js` (WebCrypto) one.
 uuid = { workspace = true, optional = true, features = ["js"] }
-# the pure-rust zstd, the `JsonlCodec::Zstd` backend where the C library cannot build.
-ruzstd = { workspace = true, optional = true }
 # the Cloudflare Workers SDK, behind the `cloudflare` feature (the `R2WorkersStore`
 # backend + the `worker::Env`/`worker::Bucket` bindings it resolves).
 worker = { workspace = true, optional = true }

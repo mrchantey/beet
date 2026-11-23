@@ -1,229 +1,143 @@
-//! Buffered analytics persistence over [`BlobStore`].
+//! Analytics persistence: each event a row the moment it happens.
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::sync::Arc;
-use std::sync::Mutex;
 
-/// A buffered raw analytics writer backed solely by a [`BlobStore`].
+/// The analytics tables of one [`TableStore`]: raw events in
+/// `analytics_event`, one row each, written as they happen with no buffer,
+/// and their daily aggregates in `analytics_rollup`.
 ///
-/// Each clone shares one in-process buffer and one writer UUID. Events flush to
-/// immutable zstd JSONL segments when the buffer reaches its age or byte limit,
-/// and the analytics plugin gates [`AppExit`] until every remaining event has
-/// flushed. Fresh writer/timestamp keys make concurrent processes contention-free.
-#[derive(Clone, Deref, Component)]
+/// Every writer writes its own rows, so any number of processes record at
+/// once, a serverless one evicted without notice included, and nothing is
+/// lost at exit that was recorded before it.
+#[derive(Clone, Component)]
 pub struct AnalyticsStore {
-	/// The resolved raw-segment store.
-	#[deref]
-	pub store: BlobStore,
-	writer: Uuid,
-	buffer: Arc<Mutex<AnalyticsBuffer>>,
+	store: TableStore,
 }
 
 impl AnalyticsStore {
-	/// Create a writer over `store` with the default buffer limits.
-	pub fn new(store: BlobStore) -> Self {
-		Self::with_config(store, &AnalyticsConfig::default())
-	}
+	/// How many fresh keys a write tries before giving up on a collision,
+	/// which needs two writers to draw the same of a million keys in one
+	/// millisecond.
+	const KEY_ATTEMPTS: usize = 4;
 
-	/// Create a writer over `store` with `config`'s buffer limits.
-	pub fn with_config(store: BlobStore, config: &AnalyticsConfig) -> Self {
-		Self {
-			store,
-			writer: uuid_ext::now_v7(),
-			buffer: Arc::new(Mutex::new(AnalyticsBuffer::new(
-				config.segment_max_age,
-				config.segment_max_bytes,
-			))),
-		}
-	}
+	/// The analytics tables of `store`.
+	pub fn new(store: TableStore) -> Self { Self { store } }
 
-	/// Buffers an event, flushing when the configured size is reached.
-	///
-	/// A failed write restores every unwritten event to the buffer so a later age,
-	/// size, or shutdown flush can retry it.
-	pub async fn record(&self, event: AnalyticsEvent) -> Result {
-		let encoded_len = Self::encoded_len(&event)?;
-		let events = self.buffer.lock().unwrap().push(event, encoded_len);
-		match events {
-			Some(events) => self.write(events).await,
-			None => Ok(()),
-		}
-	}
+	/// The store the tables live in.
+	pub fn store(&self) -> &TableStore { &self.store }
 
-	/// Flush every buffered event, doing nothing when the buffer is empty.
-	pub async fn flush(&self) -> Result {
-		let events = self.buffer.lock().unwrap().take();
-		match events {
-			Some(events) => self.write(events).await,
-			None => Ok(()),
-		}
-	}
+	/// The raw events.
+	pub fn events(&self) -> Table<AnalyticsEvent> { self.store.table() }
 
-	/// Read every raw event this writer can see: each segment in the store and
-	/// its own buffer not yet flushed, deduplicating repeated event ids to their
-	/// newest timestamp and skipping unreadable segment objects with a warning.
-	pub async fn read_all_lossy(&self) -> Result<Vec<AnalyticsEvent>> {
-		let segments = AnalyticsSegment::read_all_lossy(&self.store).await?;
-		let buffered = self.buffer.lock().unwrap().events.clone();
-		segments
-			.into_iter()
-			.flat_map(|(_, events)| events)
-			.chain(buffered)
-			.xmap(Self::dedupe)
-			.xok()
-	}
+	/// The daily aggregates.
+	pub fn rollups(&self) -> Table<AnalyticsRollup> { self.store.table() }
 
-	/// Compose the [`AnalyticsSummary`] of everything recorded: the daily
-	/// aggregates in `rollups` for the days they cover, and the raw events
-	/// (this writer's buffer included) for the rest. `None` reads the raw
-	/// events alone, and a rollup store never written to reads as empty, so a
-	/// fresh site summarizes rather than failing.
-	pub async fn summary(
-		&self,
-		rollups: Option<&Table<AnalyticsRollup>>,
-	) -> Result<AnalyticsSummary> {
-		let events = self.read_all_lossy().await?;
-		let rollups = match rollups {
-			Some(table) if table.store_exists().await? => table
-				.get_all_lossy()
-				.await?
-				.into_iter()
-				.map(|(_, row)| row)
-				.collect(),
-			_ => Vec::new(),
-		};
-		AnalyticsSummary::compose(&rollups, &events).xok()
-	}
+	/// Where the tables live, for any error naming them.
+	pub fn describe(&self) -> String { self.store.describe() }
 
-	/// Take the buffer only when its oldest event reached the age limit.
-	fn take_aged(&self) -> Option<Vec<AnalyticsEvent>> {
-		self.buffer.lock().unwrap().take_aged()
-	}
-
-	/// Writes a drained buffer as one segment per event day.
-	async fn write(&self, events: Vec<AnalyticsEvent>) -> Result {
-		let mut by_date = HashMap::<SmolStr, Vec<AnalyticsEvent>>::default();
-		for event in events {
-			by_date.entry(event.date()).or_default().push(event);
-		}
-		let mut days = by_date.into_iter().collect::<Vec<_>>();
-		days.sort_by(|left, right| left.0.cmp(&right.0));
-		for (index, (date, events)) in days.iter().enumerate() {
-			let (timestamp, sequence) = {
-				let mut buffer = self.buffer.lock().unwrap();
-				buffer.next_sequence += 1;
-				(analytics_ext::now_ms(), buffer.next_sequence)
-			};
-			let path = AnalyticsSegment::object_path(
-				date,
-				self.writer,
-				timestamp,
-				sequence,
-			);
-			if let Err(err) =
-				AnalyticsSegment::write(&self.store, path, events).await
-			{
-				let pending = days[index..]
-					.iter()
-					.flat_map(|(_, events)| events.iter().cloned())
-					.collect::<Vec<_>>();
-				let bytes = pending.iter().try_fold(0, |bytes, event| {
-					Ok::<_, BevyError>(bytes + Self::encoded_len(event)?)
-				})?;
-				self.buffer.lock().unwrap().restore(pending, bytes);
-				bevybail!(
-					"analytics: could not write a segment to {}; unwritten events remain buffered.\n{err}",
-					self.store.describe()
-				);
-			}
-		}
-		Ok(())
-	}
-
-	/// Returns one event's uncompressed JSONL size.
-	fn encoded_len(event: &AnalyticsEvent) -> Result<usize> {
-		Ok(serde_json::to_vec(event)?.len() + 1)
-	}
-
-	/// Keep the latest occurrence of each event id, sorted by id.
-	pub(crate) fn dedupe(
-		events: impl IntoIterator<Item = AnalyticsEvent>,
-	) -> Vec<AnalyticsEvent> {
-		let mut by_id = HashMap::<Uuid, AnalyticsEvent>::default();
-		for event in events {
-			match by_id.get(&event.id) {
-				Some(existing) if existing.timestamp > event.timestamp => {}
-				_ => {
-					by_id.insert(event.id, event);
+	/// Write `event` as a new row, retrying a key another writer took.
+	pub async fn record(&self, mut event: AnalyticsEvent) -> Result {
+		let events = self.events();
+		for _ in 0..Self::KEY_ATTEMPTS {
+			match events.push(event.clone()).await {
+				Ok(_) => return Ok(()),
+				Err(err) if TableError::is_conflict(&err) => {
+					event = event.with_fresh_key();
+				}
+				Err(err) => {
+					bevybail!(
+						"analytics: could not record an event to {}: {err}",
+						self.describe()
+					)
 				}
 			}
 		}
-		let mut events = by_id.into_values().collect::<Vec<_>>();
-		events.sort_by_key(|event| event.id);
-		events
+		bevybail!(
+			"analytics: {} keys collided recording an event to {}",
+			Self::KEY_ATTEMPTS,
+			self.describe()
+		)
 	}
-}
 
-/// Mutable state shared by every clone of one process writer.
-struct AnalyticsBuffer {
-	events: Vec<AnalyticsEvent>,
-	bytes: usize,
-	opened: Option<Instant>,
-	max_age: Duration,
-	max_bytes: usize,
-	next_sequence: u64,
-}
+	/// Every event recorded on `date`, a page view's heartbeats reduced to
+	/// its last.
+	pub async fn day(&self, date: Date) -> Result<Vec<AnalyticsEvent>> {
+		self.events()
+			.scan_all(AnalyticsEvent::day_scan(date))
+			.await?
+			.xmap(AnalyticsEvent::dedupe)
+			.xok()
+	}
 
-impl AnalyticsBuffer {
-	fn new(max_age: Duration, max_bytes: usize) -> Self {
-		Self {
-			events: Vec::new(),
-			bytes: 0,
-			opened: None,
-			max_age,
-			max_bytes: max_bytes.max(1),
-			next_sequence: 0,
+	/// The day of the earliest event still in the table, `None` when it is
+	/// empty.
+	pub async fn first_day(&self) -> Result<Option<Date>> {
+		self.events()
+			.scan(Scan::default().limit(1))
+			.await?
+			.rows
+			.first()
+			.map(|event| {
+				Date::from(Timestamp::from_millis(event.timestamp as i64))
+			})
+			.xok()
+	}
+
+	/// The latest day an aggregate covers, `None` before the first rollup.
+	pub async fn last_rolled_day(&self) -> Result<Option<Date>> {
+		match self
+			.rollups()
+			.scan(Scan::default().reverse().limit(1))
+			.await?
+			.rows
+			.first()
+		{
+			Some(rollup) => Some(Date::parse(&rollup.date)?),
+			None => None,
 		}
+		.xok()
 	}
 
-	fn push(
-		&mut self,
-		event: AnalyticsEvent,
-		encoded_len: usize,
-	) -> Option<Vec<AnalyticsEvent>> {
-		self.opened.get_or_insert_with(Instant::now);
-		self.bytes += encoded_len;
-		self.events.push(event);
-		(self.bytes >= self.max_bytes)
-			.then(|| self.take())
-			.flatten()
-	}
-
-	fn take_aged(&mut self) -> Option<Vec<AnalyticsEvent>> {
-		self.opened
-			.filter(|opened| opened.elapsed() >= self.max_age)
-			.and_then(|_| self.take())
-	}
-
-	fn take(&mut self) -> Option<Vec<AnalyticsEvent>> {
-		if self.events.is_empty() {
-			return None;
-		}
-		self.bytes = 0;
-		self.opened = None;
-		Some(core::mem::take(&mut self.events))
-	}
-
-	fn restore(&mut self, mut events: Vec<AnalyticsEvent>, bytes: usize) {
-		self.opened.get_or_insert_with(Instant::now);
-		self.bytes += bytes;
-		events.append(&mut self.events);
-		self.events = events;
+	/// Compose the [`AnalyticsSummary`] of everything recorded: the daily
+	/// aggregates for the days they cover, and the raw events of the days
+	/// after the last of them. `raw_only` reads the raw events alone. An
+	/// unreadable row is skipped with a warning rather than failing the
+	/// summary, and a store never written to summarizes as empty.
+	pub async fn summary(&self, raw_only: bool) -> Result<AnalyticsSummary> {
+		let rollups = match raw_only {
+			true => Vec::new(),
+			false => self.rollups().get_all_lossy().await?,
+		};
+		let since = match raw_only {
+			true => None,
+			false => self.last_rolled_day().await?.map(|day| day.add_days(1)),
+		};
+		let scan = match since {
+			Some(day) => Scan::default().from(Tid::from(day.timestamp())),
+			None => Scan::default(),
+		};
+		let events = self
+			.events()
+			.scan_stored(scan)
+			.await?
+			.into_iter()
+			.filter_map(|row| {
+				let (key, _, row) = row.into_parts();
+				AnalyticsEvent::from_row(&key, row)
+					.map_err(|err| {
+						warn!(
+							"skipping unreadable analytics event {key}: {err}"
+						)
+					})
+					.ok()
+			})
+			.xmap(AnalyticsEvent::dedupe);
+		AnalyticsSummary::compose(&rollups, &events).xok()
 	}
 }
 
-/// Observer: resolve the [`BlobStore`] named beside an [`AnalyticsConfig`] and
-/// attach its buffered writer to that config entity.
+/// Observer: resolve the [`TableStore`] named beside an [`AnalyticsConfig`]
+/// and attach its [`AnalyticsStore`] to that config entity.
 pub(super) fn spawn_store_on_config(
 	ev: On<Add<AnalyticsConfig>>,
 	stores: Query<&AnalyticsStore>,
@@ -243,21 +157,16 @@ pub(super) fn spawn_store_on_config(
 			.await
 		else {
 			bevybail!(
-				"an `AnalyticsConfig` records to the store it names: add a `StoreRef` beside it pointing at a blob-store declaration, ie `<S3BucketBlock bx:ref=\"analytics\" label=\"analytics\" runtime_write=true deploy_versioned=false object_versioning=true/>` and `{{(AnalyticsConfig, StoreRef($analytics))}}`"
+				"an `AnalyticsConfig` records to the store it names: add a `StoreRef` beside it pointing at a store declaration, ie `<DynamoTableBlock bx:ref=\"analytics\" label=\"analytics\"/>` and `{{(AnalyticsConfig, StoreRef($analytics))}}`"
 			);
 		};
-		let config = config_entity
-			.get::<AnalyticsConfig, _>(Clone::clone)
-			.await?;
-		let store = StoreRef::resolve::<BlobStore>(&world, target).await?;
-		config_entity
-			.insert(AnalyticsStore::with_config(store, &config))
-			.await?;
+		let store = StoreRef::resolve::<TableStore>(&world, target).await?;
+		config_entity.insert(AnalyticsStore::new(store)).await?;
 		Ok(())
 	});
 }
 
-/// Observer: send every emitted event to each configured buffered writer.
+/// Observer: write every emitted event to each configured store.
 pub(super) fn handle_analytics_event(
 	ev: On<AnalyticsEvent>,
 	stores: Query<&AnalyticsStore, With<AnalyticsConfig>>,
@@ -272,65 +181,6 @@ pub(super) fn handle_analytics_event(
 		for store in stores {
 			store.record(event.clone()).await?;
 		}
-		Ok(())
-	});
-}
-
-/// Flush buffers whose oldest event reached its configured age.
-pub(super) fn flush_aged_buffers(
-	stores: Query<&AnalyticsStore>,
-	commands: AsyncCommands,
-) {
-	for store in stores.iter() {
-		let Some(events) = store.take_aged() else {
-			continue;
-		};
-		let store = store.clone();
-		commands.run(async move |_| store.write(events).await);
-	}
-}
-
-/// State for the one exit signal currently waiting on analytics flushes.
-#[derive(Default, Resource)]
-pub(super) struct AnalyticsShutdown {
-	exit: Option<AppExit>,
-	flushing: bool,
-	ready: bool,
-}
-
-/// Delay process exit until every in-process analytics buffer has flushed.
-pub(super) fn flush_on_exit(
-	mut exits: ResMut<Messages<AppExit>>,
-	mut shutdown: ResMut<AnalyticsShutdown>,
-	stores: Query<&AnalyticsStore>,
-	commands: AsyncCommands,
-) {
-	if shutdown.ready || stores.is_empty() {
-		return;
-	}
-	for candidate in exits.drain() {
-		if shutdown.exit.is_none() || candidate.is_error() {
-			shutdown.exit = Some(candidate);
-		}
-	}
-	if shutdown.flushing || shutdown.exit.is_none() {
-		return;
-	}
-	shutdown.flushing = true;
-	let stores = stores.iter().cloned().collect::<Vec<_>>();
-	commands.run(async move |world| {
-		for store in stores {
-			if let Err(err) = store.flush().await {
-				world.handle_command_error::<AnalyticsShutdown>(err).await;
-			}
-		}
-		let exit = world
-			.with_resource::<AnalyticsShutdown, _>(|mut shutdown| {
-				shutdown.ready = true;
-				shutdown.exit.take().unwrap_or(AppExit::Success)
-			})
-			.await;
-		world.write_message(exit).await;
 		Ok(())
 	});
 }
@@ -352,125 +202,79 @@ mod test {
 		})
 	}
 
-	fn immediate_config() -> AnalyticsConfig {
-		AnalyticsConfig {
-			segment_max_bytes: 1,
-			..default()
-		}
-	}
-
 	fn config_with_store(
 		world: &mut World,
 		store: impl Bundle,
 	) -> (Entity, Entity) {
 		let store = world.spawn(store).flush();
-		let config = world.spawn((immediate_config(), StoreRef(store))).flush();
+		let config = world
+			.spawn((AnalyticsConfig::default(), StoreRef(store)))
+			.flush();
 		(config, store)
 	}
 
+	/// An event is a row the moment it is recorded, read back by its day.
 	#[beet_core::test]
-	async fn size_flush_roundtrips_a_segment() {
-		let store = BlobStore::temp();
-		let analytics = AnalyticsStore::with_config(store, &immediate_config());
+	async fn records_a_row() {
+		let analytics = AnalyticsStore::new(TableStore::temp());
 		let event = request("/about");
 		let id = event.id;
 		analytics.record(event).await.unwrap();
-		let loaded = analytics.read_all_lossy().await.unwrap();
+		let loaded = analytics.day(Date::today()).await.unwrap();
 		loaded.len().xpect_eq(1);
 		loaded[0].id.xpect_eq(id);
 		loaded[0].path.as_str().xpect_eq("/about");
+		analytics
+			.first_day()
+			.await
+			.unwrap()
+			.xpect_eq(Some(Date::today()));
 	}
 
-	/// A summary reads the writer's unflushed buffer beside its segments and
-	/// the aggregates, so a count is current to the last event recorded.
+	/// A key another writer took is retried with a fresh one, so both
+	/// events land.
 	#[beet_core::test]
-	async fn summary_reads_the_buffer() {
-		let store = BlobStore::temp();
-		let analytics = AnalyticsStore::new(store.clone());
-		analytics.record(request("/flushed")).await.unwrap();
-		analytics.flush().await.unwrap();
-		analytics.record(request("/buffered")).await.unwrap();
+	async fn retries_a_taken_key() {
+		let analytics = AnalyticsStore::new(TableStore::temp());
+		let first = request("/first");
+		let mut second = request("/second");
+		second.key = first.key;
+		analytics.record(first).await.unwrap();
+		analytics.record(second).await.unwrap();
+		analytics.events().list().await.unwrap().len().xpect_eq(2);
+	}
+
+	/// A page view's heartbeats share its id and keep only the newest.
+	#[beet_core::test]
+	async fn heartbeats_dedupe() {
+		let analytics = AnalyticsStore::new(TableStore::temp());
+		let first = request("/view");
+		let mut later = first.clone().with_fresh_key();
+		later.timestamp += 1;
+		later.path = "/view-later".into();
+		analytics.record(first).await.unwrap();
+		analytics.record(later).await.unwrap();
+		let day = analytics.day(Date::today()).await.unwrap();
+		day.len().xpect_eq(1);
+		day[0].path.as_str().xpect_eq("/view-later");
+	}
+
+	/// A summary reads the aggregates for the days they cover and the raw
+	/// events after them, each day from one source.
+	#[beet_core::test]
+	async fn summary_composes_rollups_and_events() {
+		let analytics = AnalyticsStore::new(TableStore::temp());
+		analytics.record(request("/today")).await.unwrap();
 		let mut old = request("/old");
 		old.timestamp -= 2 * 86_400_000;
-		let rollups = AnalyticsRollup::table(store);
-		for row in AnalyticsRollup::from_events(&[old]) {
-			rollups.push(row).await.unwrap();
+		let old = old.with_fresh_key();
+		for row in AnalyticsRollup::from_events(&[old.clone()]) {
+			analytics.rollups().put(row).await.unwrap();
 		}
-		analytics.summary(None).await.unwrap().requests.xpect_eq(2);
-		analytics
-			.summary(Some(&rollups))
-			.await
-			.unwrap()
-			.requests
-			.xpect_eq(3);
-	}
-
-	#[cfg(not(target_arch = "wasm32"))]
-	#[beet_core::test]
-	async fn fs_segments_are_multi_writer_safe() {
-		let dir = TempDir::new_ws().unwrap();
-		let store = BlobStore::new(FsStore::new(dir.path().clone()));
-		let left =
-			AnalyticsStore::with_config(store.clone(), &immediate_config());
-		let right =
-			AnalyticsStore::with_config(store.clone(), &immediate_config());
-		left.record(request("/left")).await.unwrap();
-		right.record(request("/right")).await.unwrap();
-		let paths = store.list().await.unwrap();
-		paths.len().xpect_eq(2);
-		for writer in [left.writer, right.writer] {
-			paths
-				.iter()
-				.any(|path| path.as_str().contains(&writer.to_string()))
-				.xpect_true();
-		}
-		paths[0].xpect_not_eq(paths[1].clone());
-	}
-
-	#[beet_core::test]
-	async fn age_flushes_without_another_event() {
-		let config = AnalyticsConfig {
-			segment_max_age: Duration::ZERO,
-			segment_max_bytes: usize::MAX,
-			..default()
-		};
-		let store = BlobStore::temp();
-		let analytics = AnalyticsStore::with_config(store.clone(), &config);
-		analytics.record(request("/aged")).await.unwrap();
-		let mut world = (AsyncPlugin,).into_world();
-		world.spawn(analytics);
-		world.run_system_once(flush_aged_buffers).unwrap();
-		AsyncRunner::settle_async_tasks(&mut world).await;
-		AnalyticsSegment::read_dates(&store, |_| true)
-			.await
-			.unwrap()
-			.len()
-			.xpect_eq(1);
-	}
-
-	#[beet_core::test]
-	async fn exit_waits_for_the_last_buffer() {
-		let config = AnalyticsConfig {
-			segment_max_bytes: usize::MAX,
-			..default()
-		};
-		let store = BlobStore::temp();
-		let analytics = AnalyticsStore::with_config(store.clone(), &config);
-		analytics.record(request("/shutdown")).await.unwrap();
-		let mut world = (AsyncPlugin,).into_world();
-		world.init_resource::<Messages<AppExit>>();
-		world.init_resource::<AnalyticsShutdown>();
-		world.spawn(analytics);
-		world.write_message(AppExit::Success);
-		world.run_system_once(flush_on_exit).unwrap();
-		world.should_exit().xpect_none();
-		AsyncRunner::settle_async_tasks(&mut world).await;
-		world.should_exit().xpect_some();
-		AnalyticsSegment::read_dates(&store, |_| true)
-			.await
-			.unwrap()
-			.len()
-			.xpect_eq(1);
+		// the old day's raw event, already rolled, is not counted twice
+		analytics.record(old).await.unwrap();
+		analytics.summary(false).await.unwrap().requests.xpect_eq(2);
+		analytics.summary(true).await.unwrap().requests.xpect_eq(2);
 	}
 
 	#[beet_core::test]
@@ -494,16 +298,10 @@ mod test {
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		let store = world
 			.entity(store_entity)
-			.get::<BlobStore>()
+			.get::<TableStore>()
 			.unwrap()
 			.clone();
-		AnalyticsSegment::read_dates(&store, |_| true)
-			.await
-			.unwrap()
-			.into_iter()
-			.flat_map(|(_, events)| events)
-			.next()
-			.unwrap()
+		AnalyticsStore::new(store).day(Date::today()).await.unwrap()[0]
 			.path
 			.as_str()
 			.xpect_eq("/about");
@@ -548,8 +346,7 @@ mod test {
 		raised.len().xpect_eq(8);
 		raised[0]
 			.as_str()
-			.xpect_contains("could not write a segment to")
-			.xpect_contains("unwritten events remain buffered")
+			.xpect_contains("could not record an event to")
 			.xpect_contains("no-such-store");
 		attempts.load(Ordering::SeqCst).xpect_eq(8);
 	}
@@ -585,6 +382,14 @@ mod test {
 			_path: &RelPath,
 			_body: Bytes,
 		) -> SendBoxedFuture<Result> {
+			Box::pin(async { bevybail!("store unavailable") })
+		}
+		fn insert_if(
+			&self,
+			_path: &RelPath,
+			_body: Bytes,
+			_condition: BlobCondition,
+		) -> SendBoxedFuture<Result<BlobVersion>> {
 			self.attempts.fetch_add(1, Ordering::SeqCst);
 			Box::pin(async { bevybail!("store unavailable") })
 		}

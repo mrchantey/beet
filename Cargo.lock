@@ -1323,7 +1323,6 @@ dependencies = [
  "bytes",
  "eventsource-stream",
  "extend",
- "flate2",
  "futures",
  "futures-core",
  "futures-lite",
@@ -1348,7 +1347,6 @@ dependencies = [
  "ruzstd 0.9.0",
  "send_wrapper",
  "serde",
- "serde_dynamo",
  "serde_json",
  "serde_urlencoded",
  "sha1 0.11.0",
@@ -1363,7 +1361,6 @@ dependencies = [
  "web-sys",
  "webpki-roots 1.0.7",
  "worker",
- "zstd 0.14.0",
 ]
 
 [[package]]
@@ -11903,17 +11900,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_dynamo"
-version = "4.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "873a97c3f7a67dd042bceb47d056d288424b82d4c66b0a25e1a3b34675620951"
-dependencies = [
- "base64 0.21.7",
- "serde",
- "serde_core",
-]
-
-[[package]]
 name = "serde_ipld_dagcbor"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15586,7 +15572,7 @@ dependencies = [
  "pbkdf2 0.11.0",
  "sha1 0.10.6",
  "time",
- "zstd 0.11.2+zstd.1.5.2",
+ "zstd",
 ]
 
 [[package]]
@@ -15620,16 +15606,7 @@ version = "0.11.2+zstd.1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20cc960326ece64f010d2d2107537f26dc589a6573a316bd5b1dba685fa5fde4"
 dependencies = [
- "zstd-safe 5.0.2+zstd.1.5.2",
-]
-
-[[package]]
-name = "zstd"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf06bd8162af0734b344780deb55b42a2429ae430870d13fcc12f238e880fe6e"
-dependencies = [
- "zstd-safe 8.0.0",
+ "zstd-safe",
 ]
 
 [[package]]
@@ -15639,15 +15616,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d2a5585e04f9eea4b2a3d1eca508c4dee9592a89ef6f450c11719da0726f4db"
 dependencies = [
  "libc",
- "zstd-sys",
-]
-
-[[package]]
-name = "zstd-safe"
-version = "8.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae42c0555055784c70058d19ba8e275528e8a99a706684868ace5da4e716a4ab"
-dependencies = [
  "zstd-sys",
 ]
 

@@ -12,6 +12,9 @@
 //! - [`DynamoStore`]: AWS DynamoDB storage (requires `aws`)
 //! - [`SqliteStore`]: a SQLite database file, blobs and real SQL tables with an
 //!   SQL escape hatch (requires `sqlite`)
+//! - [`DurableObjectStore`]: tables whose every partition is a Cloudflare
+//!   Durable Object, natively a [`PartitionHost`] of SQLite files (requires
+//!   `json`)
 //! - [`HttpStore`]: a store served over http (a `<ServeBlobs>` mount), read-only
 //!   (requires `json`; reads need a transport, wasm's fetch or `ureq`/`reqwest`)
 //! - [`StoreFork`]: a local store forked off an upstream one, the fork a
@@ -30,9 +33,9 @@
 //! Use [`StorePlugin`] to register store types for world serialization.
 //! Concrete store types (like [`FsStore`], [`S3Store`]) are Components whose
 //! insert hooks derive the type-erased currencies: a [`BlobStore`], and a
-//! `TableStore` (through the `json` blob adapter, or natively for a table
-//! backend like DynamoDB), so a consumer resolves either from the entity
-//! without naming a backend. Every store is selected by a `StoreUri` and
+//! `TableStore` (blob backed, or natively for a table backend like SQLite or
+//! DynamoDB, see [`TableStore`] and the crate README's table section), so a
+//! consumer resolves either from the entity without naming a backend. Every store is selected by a `StoreUri` and
 //! built through `StoreProvider::from_uri`, the one place a uri becomes a
 //! backend.
 //!
@@ -85,10 +88,6 @@ mod analytics;
 mod document_blob;
 #[cfg(feature = "json")]
 mod document_store;
-// canonical json rows under zstd (or gzip, behind its feature), the codec named
-// by the extension. std: the codecs stream through `std::io`.
-#[cfg(all(feature = "std", feature = "json"))]
-mod jsonl;
 // the http-served store: its listing endpoint answers json.
 #[cfg(all(feature = "std", feature = "json"))]
 mod http_store;
@@ -101,8 +100,10 @@ mod store_ref;
 // the uri -> concrete component seam every store construction goes through.
 #[cfg(feature = "std")]
 mod store_provider;
-#[cfg(feature = "std")]
-mod table_store;
+// tables, beet's one database dialect: rows as canonical json, keyed and
+// hashed through DAG-CBOR, so `json` (which brings `dag_cbor`).
+#[cfg(feature = "json")]
+mod table;
 // the scene fork: a `template_serde` document in a store, the serde form
 // gating with the json format it is written in.
 #[cfg(all(feature = "template_serde", feature = "json"))]
@@ -117,16 +118,14 @@ pub use document_blob::*;
 pub(crate) use document_store::*;
 #[cfg(all(feature = "std", feature = "json"))]
 pub use http_store::*;
-#[cfg(all(feature = "std", feature = "json"))]
-pub use jsonl::*;
 #[cfg(all(feature = "template_serde", feature = "json"))]
 pub use scene_blob::*;
 #[cfg(feature = "std")]
 pub use store_provider::*;
 #[cfg(feature = "std")]
 pub use store_ref::*;
-#[cfg(feature = "std")]
-pub use table_store::*;
+#[cfg(feature = "json")]
+pub use table::*;
 // the `WatchDir` registration component (any `std` target) and the notify-based
 // directory watcher backing it. The watcher itself is native+fs only for now (deno
 // directory watching is unimplemented), so a wasm `FsStore` works without live
@@ -146,6 +145,9 @@ mod indexed_db_store;
 mod local_storage_store;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 mod r2_workers_store;
+// the Worker runtime's ambient env and request conversions
+#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
+mod worker_env;
 #[cfg(feature = "std")]
 pub use fs_store::*;
 #[cfg(all(target_arch = "wasm32", feature = "std"))]
@@ -156,6 +158,8 @@ pub use local_storage_store::*;
 pub use r2_workers_store::*;
 #[cfg(feature = "aws")]
 pub use s3_store::*;
+#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
+pub use worker_env::*;
 #[cfg(feature = "aws")]
 mod s3_fs_store;
 #[cfg(feature = "aws")]
@@ -267,6 +271,11 @@ impl Plugin for StorePlugin {
 		// the database-file store, so a scene declares a local index.
 		#[cfg(feature = "sqlite")]
 		app.register_type::<SqliteStore>();
+
+		// partitions as Durable Objects (natively a partition host), so a
+		// scene declares `<DurableObjectStore binding="TABLES"/>`
+		#[cfg(feature = "json")]
+		app.register_type::<DurableObjectStore>();
 
 		// the http-served store, so a scene declares a remote repo it reads.
 		#[cfg(all(feature = "std", feature = "json"))]

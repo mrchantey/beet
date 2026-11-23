@@ -1,4 +1,5 @@
-//! A DynamoDB table deploy block, for the analytics store's remote backend.
+//! A DynamoDB table deploy block: a table store's remote backend, in the
+//! single-table layout [`DynamoStore`] reads and writes.
 //!
 //! Uses the generated [`AwsDynamodbTableDetails`] binding (in `bindings/aws_dynamo.rs`).
 use crate::bindings::*;
@@ -7,7 +8,11 @@ use crate::terra::ResourceDef;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// A DynamoDB table with a single string hash key, provisioned pay-per-request.
+/// A DynamoDB table in [`DynamoStore`]'s single-table layout, provisioned
+/// pay-per-request: `pk`/`sk` string keys, the four generic index slots
+/// (`gsi1` to `gsi4`, each projecting every attribute) a declared secondary
+/// index writes into, so declaring one never provisions infrastructure, and
+/// expiry on the `ttl` attribute an archived row is stamped with.
 ///
 /// Mirrors [`S3BucketBlock`](crate::prelude::S3BucketBlock): the declaration
 /// carries only its `label`, and the `<app>--<stage>--<label>` name composes at
@@ -29,22 +34,6 @@ use beet_net::prelude::*;
 pub struct DynamoTableBlock {
 	/// The unprefixed table label (eg `analytics`).
 	label: SmolStr,
-	/// The hash (partition) key attribute name.
-	hash_key: SmolStr,
-	/// The attribute DynamoDB reads a row's expiry from, ie `ttl`. Unset (the
-	/// default) keeps every row forever.
-	///
-	/// A row whose attribute holds a unix SECOND in the past is deleted, free,
-	/// within a couple of days; a row without the attribute is never touched, so
-	/// enabling this expires nothing on its own — the writer decides what
-	/// carries a stamp, and for analytics nothing is stamped until its cold
-	/// archive and its daily aggregate both exist.
-	///
-	/// Turning it on is an in-place update to a live table: it is a sub-resource
-	/// of the table rather than one of the fields (the name, the key schema) a
-	/// change to would replace it.
-	#[set_with(unwrap_option, into)]
-	ttl: Option<SmolStr>,
 	/// The deploy layer ([`Config::STORAGE_LAYER`](terra::Config::STORAGE_LAYER)
 	/// by default): the runtime writes to this table from its first request, and
 	/// nothing in the tofu graph orders the table before the service (the name
@@ -58,13 +47,10 @@ impl Default for DynamoTableBlock {
 }
 
 impl DynamoTableBlock {
-	/// A table `label` keyed by a string `id` hash key, the attribute a
-	/// `DynamoStore` keys every item by, blob and [`TableStoreRow`] alike.
+	/// The table `label`.
 	pub fn new(label: impl Into<SmolStr>) -> Self {
 		Self {
 			label: label.into(),
-			hash_key: "id".into(),
-			ttl: None,
 			layer: terra::Config::STORAGE_LAYER.into(),
 		}
 	}
@@ -117,32 +103,51 @@ impl EmitBlock for DynamoTableBlock {
 }
 
 impl DynamoTableBlock {
-	/// Emit the pay-per-request table, with its ttl sub-resource when declared.
+	/// Emit the pay-per-request table in the single-table layout.
 	fn emit(
 		&self,
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
 	) -> Result {
+		let string =
+			|name: String| AwsDynamodbTableResourceBlockTypeAttribute {
+				name: name.into(),
+				r#type: "S".into(),
+			};
+		let slots = 1..=DynamoStore::INDEX_SLOTS;
 		let table = ResourceDef::new_primary(
 			stack.resource_ident(self.label.clone()),
 			AwsDynamodbTableDetails {
 				billing_mode: Some("PAY_PER_REQUEST".into()),
-				hash_key: Some(self.hash_key.clone()),
-				attribute: Some(vec![
-					AwsDynamodbTableResourceBlockTypeAttribute {
-						name: self.hash_key.clone(),
-						r#type: "S".into(),
-					},
-				]),
+				hash_key: Some("pk".into()),
+				range_key: Some("sk".into()),
+				attribute: Some(
+					["pk".to_string(), "sk".to_string()]
+						.into_iter()
+						.chain(slots.clone().flat_map(|slot| {
+							[format!("gsi{slot}pk"), format!("gsi{slot}sk")]
+						}))
+						.map(string)
+						.collect(),
+				),
+				global_secondary_index: Some(
+					slots
+						.map(|slot| {
+							AwsDynamodbTableResourceBlockTypeGlobalSecondaryIndex {
+								name: format!("gsi{slot}").into(),
+								hash_key: Some(format!("gsi{slot}pk").into()),
+								range_key: Some(format!("gsi{slot}sk").into()),
+								projection_type: "ALL".into(),
+								..default()
+							}
+						})
+						.collect(),
+				),
 				region: Some(stack.aws_region()?.clone()),
-				// absent unless declared, so a table that expires nothing
-				// renders exactly as it did before this field existed
-				ttl: self.ttl.clone().map(|attribute_name| {
-					vec![AwsDynamodbTableResourceBlockTypeTtl {
-						attribute_name: Some(attribute_name),
-						enabled: Some(true),
-					}]
-				}),
+				ttl: Some(vec![AwsDynamodbTableResourceBlockTypeTtl {
+					attribute_name: Some(DynamoStore::TTL_ATTRIBUTE.into()),
+					enabled: Some(true),
+				}]),
 				..default()
 			},
 		);
@@ -161,33 +166,6 @@ mod test {
 		RenderScope::test_json(|parent| {
 			parent.spawn(block);
 		})
-	}
-
-	/// Enabling expiry is an IN-PLACE update to a live table: the ttl block is
-	/// the only difference in the rendered resource, and none of the fields a
-	/// change to would replace the table (its name, its key schema, its
-	/// attributes, its billing mode) moves.
-	///
-	/// The live analytics table holds the only copy of anything not yet
-	/// archived, so a replacement here is data loss on a green deploy.
-	#[beet_core::test]
-	fn enabling_ttl_is_an_in_place_change() {
-		let before = build_json(DynamoTableBlock::new("analytics"));
-		let after =
-			build_json(DynamoTableBlock::new("analytics").with_ttl("ttl"));
-		before
-			.as_str()
-			.xnot()
-			.xpect_contains("ttl")
-			.xpect_contains("PAY_PER_REQUEST");
-		after.as_str().xpect_contains(
-			r#""ttl":[{"attribute_name":"ttl","enabled":true}]"#,
-		);
-		// everything else is byte-identical: removing the ttl block from the
-		// rendered json gives back exactly the config that is already deployed
-		after
-			.replace(r#","ttl":[{"attribute_name":"ttl","enabled":true}]"#, "")
-			.xpect_eq(before);
 	}
 
 	/// The declaration contributes its read/write grant through the schedule's
@@ -231,16 +209,24 @@ mod test {
 			.xpect_eq("dynamo://app--prod--analytics?region=eu-west-1");
 	}
 
-	/// The block emits an `aws_dynamodb_table` with a stage-prefixed name, an `id`
-	/// string hash key, and pay-per-request billing.
+	/// The block emits the single-table layout: `pk`/`sk`, the four index
+	/// slots, expiry on `ttl`, pay-per-request billing.
 	#[beet_core::test]
-	fn emits_dynamodb_table() {
-		build_json(DynamoTableBlock::new("analytics"))
-			.as_str()
+	fn emits_the_single_table_layout() {
+		let json = build_json(DynamoTableBlock::new("analytics"));
+		json.as_str()
 			.xpect_contains("aws_dynamodb_table")
 			.xpect_contains("PAY_PER_REQUEST")
-			.xpect_contains("analytics")
-			.xpect_contains("hash_key")
-			.xpect_contains("\"id\"");
+			.xpect_contains(r#""hash_key":"pk""#)
+			.xpect_contains(r#""range_key":"sk""#)
+			.xpect_contains(
+				r#""ttl":[{"attribute_name":"ttl","enabled":true}]"#,
+			);
+		for slot in 1..=4 {
+			json.as_str()
+				.xpect_contains(&format!(r#""name":"gsi{slot}""#))
+				.xpect_contains(&format!(r#""hash_key":"gsi{slot}pk""#))
+				.xpect_contains(&format!(r#""range_key":"gsi{slot}sk""#));
+		}
 	}
 }

@@ -601,6 +601,46 @@ pub async fn write_async(
 	}
 }
 
+/// The suffix of the temporary file [`write_replacing_async`] renames into
+/// place, so a listing in flight can skip it.
+pub const REPLACING_SUFFIX: &str = ".beet-replacing";
+
+/// Write a file whole or not at all, ensuring the path exists: the data
+/// lands in a sibling temporary file, named with [`REPLACING_SUFFIX`], renamed
+/// over `path`, so a concurrent reader sees the old content or the new and
+/// never a torn write. On wasm a plain [`write_async`], the runner's fs
+/// having no rename.
+pub async fn write_replacing_async(
+	path: impl AsRef<Path>,
+	data: impl AsRef<[u8]>,
+) -> FsResult {
+	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
+	{
+		fs_ext::write_async(path, data).await
+	}
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	{
+		use core::sync::atomic::AtomicU64;
+		use core::sync::atomic::Ordering;
+		static NEXT: AtomicU64 = AtomicU64::new(0);
+		let path = path.as_ref();
+		let name = path
+			.file_name()
+			.map(|name| name.to_string_lossy().to_string())
+			.unwrap_or_default();
+		let temp = path.with_file_name(format!(
+			".{name}.{}-{}{REPLACING_SUFFIX}",
+			std::process::id(),
+			NEXT.fetch_add(1, Ordering::Relaxed)
+		));
+		fs_ext::write_async(&temp, data).await?;
+		async_fs::rename(&temp, path)
+			.await
+			.map_err(|err| FsError::io(path, err))?;
+		Ok(())
+	}
+}
+
 /// Write a file only if the data is different from the existing file.
 /// If the file does not exist it will be created.
 pub fn write_if_diff(

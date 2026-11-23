@@ -24,9 +24,13 @@ qrcode = ["dep:qrcode", "dep:image", "beet/qrcode"]
 # plain dev build never links `maxminddb`. Deployed via `<BeetBinaryBuild
 # features="..,geoip"/>` in the site entry.
 geoip = ["beet/geoip"]
-# The gzip `JsonlCodec` (`.jsonl.gz`), for JSONL objects another tool produced.
-# Analytics writes and reads zstd alone, so no beet deploy carries it.
-gzip = ["beet/gzip"]
+# `SqliteStore`: a database file as a store, and the in-memory database a
+# `TableArchive` builds, so a job archiving cold rows (the analytics rollup)
+# runs in this binary, a Worker's included.
+sqlite = ["beet/sqlite"]
+# `beet analytics import`, the one-time import of the zstd JSONL analytics
+# history kept before events were rows.
+legacy_analytics = ["beet/legacy_analytics"]
 # `beet export-pdf` page concatenation: pulls `lopdf` to merge the per-route
 # prints into one document. Optional so a build that only emits separate
 # per-route PDFs (or skips the command) never links `lopdf`.

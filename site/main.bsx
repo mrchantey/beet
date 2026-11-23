@@ -30,7 +30,7 @@ command route.
 
 ## One declaration, two meanings
 
-`<S3BucketBlock bx:ref="analytics" label="analytics"/>` is declared once under the stage `<Stack>`. The deploy provisions it into that stack, and the runtime attaches a blob store for it, which the content router names with `StoreRef($analytics)` (a `bx:ref` is document-global, and the declaration builds in every binary, so the serving side reaches it from a different branch of the tree). Both sides compose `<app>--<stage>--analytics` through the one resolved `Stack`, whose app name comes from this entry's `<PackageConfig/>`, so they cannot disagree.
+`<DynamoTableBlock bx:ref="analytics" label="events"/>` is declared once under the stage `<Stack>`. The deploy provisions it into that stack, and the runtime attaches a table store for it, which the content router names with `StoreRef($analytics)` (a `bx:ref` is document-global, and the declaration builds in every binary, so the serving side reaches it from a different branch of the tree). Both sides compose `<app>--<stage>--events` through the one resolved `Stack`, whose app name comes from this entry's `<PackageConfig/>`, so they cannot disagree.
 
 A resource belongs to the stack it is authored under and to no other. There is no
 adoption: a declaration outside every `<Stack>` still resolves its runtime name,
@@ -39,19 +39,17 @@ this?" rather than one inferred from the process stage.
 
 ## Analytics, and what outlives it
 
-Raw events buffer into immutable zstd JSONL segments under `analytics/raw/segments/` in the `analytics` bucket. The nightly compaction job merges each complete day's segments with its existing `analytics/raw/<date>.jsonl.zst` archive, writes and verifies that archive plus deterministic daily rows under `analytics/rollup/` in that same bucket, then deletes the source segments. The archive is the compact primary raw history and is kept indefinitely; rollups are small and re-derivable from it.
-
-Two buckets rather than three: the rollup rows are a different dataset from the segments but not a different trust boundary or durability grade, so they ride a sibling prefix. The archive is genuinely separate — it is the sole copy, and it lives in the `archive` bucket whose whole identity is that nothing there expires.
+Every event is a row of the `analytics_event` table in the `events` Dynamo table the moment it happens, written by whichever process saw it, with nothing buffered, so the box and any other writer record at once and nothing is lost when one stops. The nightly job reduces each complete day to `analytics_rollup` rows in the same table, then moves each day older than thirty to the `archive` bucket as one SQLite file, `analytics/events/<date>.db`, before retiring its rows (stamped with the table's `ttl`, so Dynamo deletes them for free). The aggregates are the long history and the archives the raw one; nothing in the `archive` bucket expires.
 
 `<Route path="jobs">` hosts that job and the deployed `rollup` lambda is the only
 thing that boots it: the schedule invokes the function, the function's `bootstrap`
 loads THIS document out of the repo store and dispatches `rollup` into the `jobs`
 router. The function publishes no url, no gateway and no hostname, so a sweep
-that compacts the analytics stores is reachable by nothing but its timer, and
+that rolls up and archives the analytics is reachable by nothing but its timer, and
 the site's own router is a different url space entirely.
 
     beet --entry=site jobs                        # the job host, over http
-    beet --entry=site analytics summary           # aggregates + the recent raws, from the store the site writes to
+    beet --entry=site analytics summary           # the aggregates + the raws after them, from the store the site writes to
     beet --entry=site --stage=prod --service-access=remote analytics summary   # the same config, deployed
 
 ## The served site
@@ -125,7 +123,7 @@ with the verbs it hosts) adds the tofu lifecycle routes
 stack hosts it, plus the two lifecycle verbs that run the `<Group>`s it names:
 `deploy` forward and `destroy` in reverse.
 
-The deploy group applies once per layer, and the order is the point: `<TofuApply layer="storage"/>` brings up the repo, analytics, rollup, and archive stores. `<RepoAssemble>` assembles the site, its borrowed files and its derived files in `target/infra/beet-site/repo`, `<RepoSync/>` mirrors that dir into this deploy's version of the repo store (`<id>/repo/`), and a bare `<TofuApply/>` converges the whole stack:
+The deploy group applies once per layer, and the order is the point: `<TofuApply layer="storage"/>` brings up the repo store, the analytics table and the archive bucket. `<RepoAssemble>` assembles the site, its borrowed files and its derived files in `target/infra/beet-site/repo`, `<RepoSync/>` mirrors that dir into this deploy's version of the repo store (`<id>/repo/`), and a bare `<TofuApply/>` converges the whole stack:
 it builds and uploads the binary beside that document (`<id>/bin/`), publishes
 the release pointer naming both, and converges the instance against a bucket
 that already holds the site. One apply boots the new instance first, so it finds
@@ -417,13 +415,16 @@ binary serves the records and the comments (`atproto`).
 	     unreachable from the served site even though both live in this file. -->
 	<Route path="jobs" {HttpServer}>
 		<Router>
-			<Route path="rollup" {AnalyticsRollupJob{raw: $analytics, rollups: $analytics, archive: $archive}}/>
+			<Route path="rollup" {AnalyticsRollupJob{analytics: $analytics, archive: $archive}}/>
 		</Router>
 	</Route>
 	<!-- the report reads the store the serving router's `AnalyticsConfig`
 	     writes to, so `beet --entry=site analytics summary` reads exactly what
 	     the served site wrote, locally or (`--service-access=remote`) deployed,
 	     with no binding of its own. -->
+	<!-- the one-time import of the history kept as zstd JSONL objects before
+	     events were rows, an operator's verb -->
+	<ImportAnalytics bx:cfg="feature:legacy_analytics"/>
 	<AnalyticsReport/>
 	<!-- the deploy credentials this entry deploys with, one per provider,
 	     `beet-site-deploy` at each, sealed in this entry's own document:
@@ -449,17 +450,17 @@ binary serves the records and the comments (`atproto`).
 	     excluded declaration binds to nothing (see "The deploy" above). -->
 	<Route path="site">
 		<Stack>
-			<!-- Raw segments and aggregate rows share ONE writable store, under the
-			     disjoint prefixes `analytics/raw/segments/` and `analytics/rollup/`.
-			     A bucket is this codebase's unit of IAM grant, so it earns its place
-			     by a different writer or a different durability grade, not by
-			     holding a different dataset: these two have the same writer, the
-			     same grant, and neither is a sole copy for long (rollup rows use the
-			     blanket JSON-over-blob TableProvider and are re-derivable from the
-			     archive, segments are transient by design). A segment IS the only
-			     copy of its events between landing and that night's rollup, which
-			     is why the bucket is versioned. -->
-			<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true object_versioning=true/>
+			<!-- the analytics database: raw events and their daily aggregates,
+			     each event a row written as it happens, in Dynamo's single-table
+			     layout. Granted to the box that records and the job that rolls up
+			     and archives, the two computes of this stack. -->
+			<DynamoTableBlock bx:ref="analytics" label="events"/>
+			<!-- the zstd JSONL history recorded before events were rows, held
+			     until `beet analytics import --from` has moved it into the table
+			     and the summary agrees: dropping this declaration first would
+			     destroy the bucket at the next apply. Removing it, then the bucket,
+			     is the operator's. -->
+			<S3BucketBlock label="analytics" deploy_versioned=false object_versioning=true force_destroy=false/>
 			<!-- the REPO STORE, marked so the deploy publishes the site into it and
 			     the ledger names it; deploy-versioned by taking the default. The box
 			     does not bake the prefix into its `user_data` (that would rebuild it
@@ -468,9 +469,9 @@ binary serves the records and the comments (`atproto`).
 			<S3BucketBlock label="repo" {RepoStoreBlock}/>
 			<!-- the `archive` profile: append-only cold data, the inverse of the app
 			     bucket by lifecycle. Never touched by a deploy sync, which would prune
-			     it. Analytics owns the `analytics/raw/` prefix; these compact daily
-			     objects are the primary raw history, so nothing here expires. -->
-			<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
+			     it. Analytics owns the `analytics/` prefix: each cold day's events as
+			     one SQLite file, the primary raw history, so nothing here expires. -->
+			<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true force_destroy=false/>
 			<!-- the box's ssh host key, so every start presents one fingerprint: the
 			     `BEET_SSH_HOST_KEY` record, written by the full apply into this
 			     stack's parameter `/beet-site/<stage>/ssh-host-key` as a write-only
@@ -487,7 +488,7 @@ binary serves the records and the comments (`atproto`).
 			<!-- the box is replaceable, so it owns no durable timer: the rollup runs
 			     as an invoke-only lambda the schedule calls at 03:00 UTC, booting the
 			     `jobs` verb of this same document. -->
-			<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="ssh,geoip,lambda,atproto"/>
+			<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="ssh,geoip,lambda,atproto,sqlite"/>
 			<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 			<!-- 💡 what a deploy DOES, as an ordered group rather than a route: the
 			     `deploy` verb `<DeployRoutes/>` spawns runs this list forward. -->

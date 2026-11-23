@@ -331,13 +331,11 @@ impl BlobStoreProvider for InMemoryStore {
 				.ok_or_else(|| bevyhow!("store not created"))?;
 			match &this.subdir {
 				Some(sub) => {
-					// filter keys by prefix and strip it
+					// filter keys by prefix, segment-wise so `sub` never
+					// matches `subway`, and strip it
 					map.keys()
-						.filter_map(|key| {
-							key.as_str()
-								.strip_prefix(sub.as_str())
-								.map(RelPath::new)
-						})
+						.filter_map(|key| key.strip_prefix(sub))
+						.filter(|key| !key.is_empty())
 						.collect::<Vec<_>>()
 						.xok()
 				}
@@ -382,6 +380,82 @@ impl BlobStoreProvider for InMemoryStore {
 			#[cfg(feature = "std")]
 			this.emit(&path, BlobEventKind::Removed);
 			let _ = path;
+			Ok(())
+		})
+	}
+
+	fn get_versioned(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
+		Box::pin(async move {
+			let guard = this.inner.map.read().unwrap();
+			let map = guard
+				.as_ref()
+				.ok_or_else(|| bevyhow!("store not created"))?;
+			map.get(&key)
+				.map(|bytes| (bytes.clone(), BlobVersion::of(bytes)))
+				.xok()
+		})
+	}
+
+	/// Checked and written under the backing's write lock, the version the
+	/// content's digest.
+	fn insert_if(
+		&self,
+		path: &RelPath,
+		body: Bytes,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result<BlobVersion>> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
+		let path = path.clone();
+		Box::pin(async move {
+			let version = BlobVersion::of(&body);
+			let existed = {
+				let mut guard = this.inner.map.write().unwrap();
+				let map = guard
+					.as_mut()
+					.ok_or_else(|| bevyhow!("store not created"))?;
+				let found = map.get(&key).map(|bytes| BlobVersion::of(bytes));
+				BlobConflict::check(&condition, &path, found.as_ref())?;
+				map.insert(key, body).is_some()
+			};
+			#[cfg(feature = "std")]
+			this.emit(&path, match existed {
+				true => BlobEventKind::Changed,
+				false => BlobEventKind::Created,
+			});
+			let _ = (existed, path);
+			version.xok()
+		})
+	}
+
+	fn remove_if(
+		&self,
+		path: &RelPath,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
+		let path = path.clone();
+		Box::pin(async move {
+			let removed = {
+				let mut guard = this.inner.map.write().unwrap();
+				let map = guard
+					.as_mut()
+					.ok_or_else(|| bevyhow!("store not created"))?;
+				let found = map.get(&key).map(|bytes| BlobVersion::of(bytes));
+				BlobConflict::check(&condition, &path, found.as_ref())?;
+				map.remove(&key).is_some()
+			};
+			#[cfg(feature = "std")]
+			if removed {
+				this.emit(&path, BlobEventKind::Removed);
+			}
+			let _ = (removed, path);
 			Ok(())
 		})
 	}

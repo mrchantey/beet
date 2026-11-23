@@ -201,6 +201,19 @@ mod stalled_store_test {
 				Ok(())
 			})
 		}
+		/// An event's row is a conditional write, which parks the same way.
+		fn insert_if(
+			&self,
+			_path: &RelPath,
+			_body: Bytes,
+			_condition: BlobCondition,
+		) -> SendBoxedFuture<Result<BlobVersion>> {
+			self.started.fetch_add(1, Ordering::SeqCst);
+			Box::pin(async {
+				time_ext::sleep(STALL).await;
+				bevybail!("stalled")
+			})
+		}
 		fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 			Box::pin(async { Vec::new().xok() })
 		}
@@ -270,14 +283,7 @@ mod stalled_store_test {
 			// the server owns the boot, the analytics router is its dispatch child
 			app.world_mut().spawn((server, on_spawn, children![(
 				Router,
-				// every event flushes as it arrives: the buffer's default
-				// 64KB/60s thresholds would park these forty tiny events in
-				// memory, so the store is never reached and the invariant under
-				// test is never exercised.
-				AnalyticsConfig {
-					segment_max_bytes: 1,
-					..default()
-				},
+				AnalyticsConfig::default(),
 				StoreRef(store),
 				AnalyticsMiddleware::default(),
 				children![render_action::fixed_func_route("about", || rsx! {

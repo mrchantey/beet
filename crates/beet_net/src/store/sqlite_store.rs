@@ -4,13 +4,15 @@ use bytes::Bytes;
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::params;
+use rusqlite::types::Value as SqlValue;
 use rusqlite::types::ValueRef;
 use std::sync::Arc;
 use std::sync::Mutex;
 
 /// A SQLite database file as a store, the one a `sqlite:<path>` uri names:
 /// blobs in one `blobs` table, and each [`TableStoreRow`] table as a real SQL
-/// table (`key TEXT PRIMARY KEY, json TEXT NOT NULL`), so a backend-agnostic
+/// table (`key TEXT PRIMARY KEY, json TEXT NOT NULL, cid TEXT NOT NULL`, see
+/// its [`TableProvider`] impl), so a backend-agnostic
 /// caller reaches it through the erased [`BlobStore`] and [`TableStore`] like
 /// any other store while a consumer that chose SQLite indexes and queries the
 /// rows with SQL ([`execute`](Self::execute), [`query`](Self::query)), or from
@@ -71,6 +73,62 @@ impl Default for SqliteStore {
 }
 
 impl SqliteStore {
+	/// The path prefix naming a database held in memory rather than a file.
+	const MEMORY_ROOT: &'static str = "/:memory:";
+
+	/// A database held in memory under `name`, shared by every store of that
+	/// name in this process and gone when the last is removed: what an
+	/// archive is built in before it is serialized, and where a fetched one
+	/// is opened.
+	pub fn memory(name: impl AsRef<str>) -> Self {
+		Self::new(AbsPath::new_unchecked(format!(
+			"{}/{}",
+			Self::MEMORY_ROOT,
+			name.as_ref()
+		)))
+	}
+
+	/// A read-only database opened in memory from the `bytes` of a database
+	/// file, ie an archive fetched from a bucket, under `name`: queryable with
+	/// [`SqlSelect`](crate::prelude::SqlSelect), [`query`](Self::query) and
+	/// the same [`Table`] reads as any database, refusing every write.
+	pub async fn from_bytes(
+		name: impl AsRef<str>,
+		bytes: Vec<u8>,
+	) -> Result<Self> {
+		let store = Self::memory(name);
+		let conn = Self::offload(move || {
+			let mut conn = Connection::open_in_memory()?;
+			conn.deserialize_read_exact(
+				rusqlite::MAIN_DB,
+				std::io::Cursor::new(&bytes),
+				bytes.len(),
+				true,
+			)?;
+			conn.pragma_update(None, "query_only", true)?;
+			Arc::new(Mutex::new(conn)).xok()
+		})
+		.await?;
+		POOL.insert(store.path.clone(), conn).await;
+		store.xok()
+	}
+
+	/// The whole database as the bytes of its file, what an archive writes
+	/// to a bucket: serialized from the live connection, so it works alike
+	/// for a file and a database held in memory, a Worker's included.
+	pub async fn to_bytes(&self) -> Result<Vec<u8>> {
+		self.run(|conn| conn.serialize(rusqlite::MAIN_DB)?.to_vec().xok())
+			.await
+	}
+
+	/// Whether this database is held in memory rather than in a file: every
+	/// database on wasm, whose default VFS is memory, and a
+	/// [`memory`](Self::memory) one anywhere.
+	fn in_memory(&self) -> bool {
+		cfg!(target_arch = "wasm32")
+			|| self.path.as_str().starts_with(Self::MEMORY_ROOT)
+	}
+
 	/// The store at the database file `path`, created on first use.
 	pub fn new(path: impl Into<AbsPath>) -> Self {
 		Self {
@@ -83,6 +141,36 @@ impl SqliteStore {
 	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
+	}
+
+	/// The database file of partition `id`: `<dir>/<stem>/<id>.db` beside
+	/// this one, a nested id a nested directory, so a partition is one
+	/// exportable file and [`SqlSelect`](crate::prelude::SqlSelect),
+	/// [`execute`](Self::execute) and [`query`](Self::query) work against it
+	/// as against any database.
+	pub fn partition_store(&self, id: &PartitionId) -> Self {
+		let mut path = self.partitions_dir();
+		let segments = id.segments().collect::<Vec<_>>();
+		for (idx, segment) in segments.iter().enumerate() {
+			path = match idx + 1 == segments.len() {
+				true => path.join(format!("{segment}.db")),
+				false => path.join(segment),
+			};
+		}
+		Self::new(path)
+	}
+
+	/// The directory this database's partitions live in, `<dir>/<stem>`.
+	fn partitions_dir(&self) -> AbsPath {
+		let stem = self
+			.path
+			.file_stem()
+			.map(|stem| stem.to_string())
+			.unwrap_or_default();
+		self.path
+			.parent()
+			.map(|parent| parent.join(&stem))
+			.unwrap_or_else(|| AbsPath::new_unchecked(stem))
 	}
 
 	/// The store a `sqlite:<path>` uri names, a relative path resolved against
@@ -160,17 +248,25 @@ impl SqliteStore {
 	/// than a location, there is no directory to create, no second process to
 	/// shield and no shared memory to journal through. Registering a durable
 	/// browser VFS (OPFS) is the seam to widen this at.
+	///
+	/// A [`memory`](Self::memory) path opens a database in memory anywhere.
 	fn open(path: &AbsPath) -> Result<SharedConnection> {
-		#[cfg(not(target_arch = "wasm32"))]
-		if let Some(parent) = path.parent() {
-			fs_ext::create_dir_all(&parent)?;
-		}
-		let conn = Connection::open(path.as_str())?;
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			conn.pragma_update(None, "journal_mode", "WAL")?;
-			conn.pragma_update(None, "synchronous", "NORMAL")?;
-		}
+		let conn = match path.as_str().starts_with(Self::MEMORY_ROOT) {
+			true => Connection::open_in_memory()?,
+			false => {
+				#[cfg(not(target_arch = "wasm32"))]
+				if let Some(parent) = path.parent() {
+					fs_ext::create_dir_all(&parent)?;
+				}
+				let conn = Connection::open(path.as_str())?;
+				#[cfg(not(target_arch = "wasm32"))]
+				{
+					conn.pragma_update(None, "journal_mode", "WAL")?;
+					conn.pragma_update(None, "synchronous", "NORMAL")?;
+				}
+				conn
+			}
+		};
 		conn.execute_batch(
 			"CREATE TABLE IF NOT EXISTS blobs (\
 				path TEXT PRIMARY KEY, body BLOB NOT NULL)",
@@ -277,56 +373,6 @@ fn value_of(value: ValueRef) -> Result<Value> {
 	.xok()
 }
 
-/// The quoted identifier for `table`, validated against `[a-z][a-z0-9_]*`
-/// (the shape [`TableStoreRow::table_name`] produces) so a name never reaches
-/// the SQL text unchecked, and refusing `blobs`, the blob table.
-fn table_ident(table: &str) -> Result<String> {
-	let valid = table
-		.chars()
-		.next()
-		.is_some_and(|first| first.is_ascii_lowercase())
-		&& table.chars().all(|ch| {
-			ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_'
-		});
-	if !valid {
-		bevybail!(
-			"invalid sqlite table name `{table}`: expected [a-z][a-z0-9_]*"
-		);
-	}
-	if table == "blobs" {
-		bevybail!("`blobs` is the sqlite blob table, not a row table");
-	}
-	format!("\"{table}\"").xok()
-}
-
-/// Whether the row table `table` exists, for a read that must answer "none"
-/// rather than create it.
-fn table_exists(conn: &Connection, table: &str) -> Result<bool> {
-	conn.query_row(
-		"SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1",
-		params![table],
-		|_| Ok(()),
-	)
-	.optional()?
-	.is_some()
-	.xok()
-}
-
-/// Create the row table `ident` if it is missing, for a write.
-fn ensure_table(conn: &Connection, ident: &str) -> Result {
-	conn.execute_batch(&format!(
-		"CREATE TABLE IF NOT EXISTS {ident} (\
-			key TEXT PRIMARY KEY, json TEXT NOT NULL)"
-	))?;
-	Ok(())
-}
-
-/// The canonical text of a row: sorted keys via `serde_json::Value`, never
-/// beet's insertion-ordered [`Value::Map`].
-fn canonical_json(row: Value) -> Result<String> {
-	serde_json::to_string(&serde_json::Value::from(row))?.xok()
-}
-
 impl BlobStoreProvider for SqliteStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
@@ -360,10 +406,11 @@ impl BlobStoreProvider for SqliteStore {
 	/// connection to it.
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let path = self.path.clone();
-		cfg_if! {
-			if #[cfg(target_arch = "wasm32")] {
+		match self.in_memory() {
+			true => {
 				Self::erase(async move { POOL.contains(&path).await.xok() })
-			} else {
+			}
+			false => {
 				Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
 			}
 		}
@@ -384,7 +431,7 @@ impl BlobStoreProvider for SqliteStore {
 	}
 
 	/// Close the pooled connection and delete the file, with the WAL sidecars
-	/// a crash may have left beside it. Under the wasm memory VFS closing IS
+	/// a crash may have left beside it and every partition's file. Under the wasm memory VFS closing IS
 	/// the delete: the database lives in the connection, and there is no file
 	/// and no sidecar to unlink.
 	///
@@ -397,8 +444,18 @@ impl BlobStoreProvider for SqliteStore {
 				bevybail!("sqlite store `{}` does not exist", this.path);
 			}
 			this.close().await;
-			#[cfg(not(target_arch = "wasm32"))]
-			{
+			// this database's partitions go with it
+			let partitions = this.partitions_dir();
+			let closed = POOL
+				.remove_where(|path| {
+					path.as_str().starts_with(&format!("{partitions}/"))
+				})
+				.await;
+			let _ = Self::offload(move || Ok(drop(closed))).await;
+			if !this.in_memory() {
+				if fs_ext::exists_async(&partitions).await? {
+					fs_ext::remove_async(&partitions).await?;
+				}
 				fs_ext::remove_async(&this.path).await?;
 				for sidecar in ["-wal", "-shm"] {
 					let sidecar = format!("{}{sidecar}", this.path);
@@ -483,6 +540,58 @@ impl BlobStoreProvider for SqliteStore {
 		})
 	}
 
+	fn get_versioned(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+		let key = self.qualify(path);
+		self.run(move |conn| Self::versioned_blob(conn, &key))
+	}
+
+	/// Checked and written under the connection's lock, the version the
+	/// content's digest.
+	fn insert_if(
+		&self,
+		path: &RelPath,
+		body: Bytes,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result<BlobVersion>> {
+		let key = self.qualify(path);
+		let path = path.clone();
+		self.run(move |conn| {
+			let found = Self::versioned_blob(conn, &key)?;
+			BlobConflict::check(
+				&condition,
+				&path,
+				found.as_ref().map(|(_, version)| version),
+			)?;
+			conn.execute(
+				"INSERT OR REPLACE INTO blobs (path, body) VALUES (?1, ?2)",
+				params![key, body.as_ref()],
+			)?;
+			BlobVersion::of(&body).xok()
+		})
+	}
+
+	fn remove_if(
+		&self,
+		path: &RelPath,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result> {
+		let key = self.qualify(path);
+		let path = path.clone();
+		self.run(move |conn| {
+			let found = Self::versioned_blob(conn, &key)?;
+			BlobConflict::check(
+				&condition,
+				&path,
+				found.as_ref().map(|(_, version)| version),
+			)?;
+			conn.execute("DELETE FROM blobs WHERE path = ?1", params![key])?;
+			Ok(())
+		})
+	}
+
 	fn public_url(
 		&self,
 		_path: &RelPath,
@@ -491,202 +600,169 @@ impl BlobStoreProvider for SqliteStore {
 	}
 }
 
-/// Native table form: one SQL table per [`TableStoreRow::table_name`],
-/// created on first write, the row's canonical json beside its key. Every
-/// read answers for a table that does not exist yet as it would for an empty
-/// one, so a consumer's first query needs no prior write.
+impl SqliteStore {
+	/// The blob at `key` with its digest, `None` where there is none.
+	fn versioned_blob(
+		conn: &Connection,
+		key: &str,
+	) -> Result<Option<(Bytes, BlobVersion)>> {
+		conn.query_row(
+			"SELECT body FROM blobs WHERE path = ?1",
+			params![key],
+			|row| row.get::<_, Vec<u8>>(0),
+		)
+		.optional()?
+		.map(|body| {
+			let version = BlobVersion::of(&body);
+			(Bytes::from(body), version)
+		})
+		.xok()
+	}
+}
+
+/// Native table form: [`SqlTable`]'s schema and semantics run through this
+/// connection, every precondition one statement under the connection's lock
+/// and [`apply`](TableProvider::apply) one transaction. A partition is its own
+/// database file, `<dir>/<stem>/<partition>.db` beside this one
+/// ([`partition_store`](Self::partition_store)), so one partition is one
+/// exportable file.
 impl TableProvider for SqliteStore {
 	fn box_clone_table(&self) -> Box<dyn TableProvider> {
 		Box::new(self.clone())
 	}
 
-	fn insert_row(
-		&self,
-		table: &str,
-		key: &TableKey,
-		row: Value,
-	) -> SendBoxedFuture<Result> {
-		let table = SmolStr::from(table);
-		let key = key.clone();
-		self.run(move |conn| {
-			let ident = table_ident(&table)?;
-			ensure_table(conn, &ident)?;
-			conn.execute(
-				&format!(
-					"INSERT OR REPLACE INTO {ident} (key, json) VALUES (?1, ?2)"
-				),
-				params![key.as_ref() as &str, canonical_json(row)?],
-			)?;
-			Ok(())
-		})
+	fn partition(&self, id: &PartitionId) -> Box<dyn TableProvider> {
+		Box::new(self.partition_store(id))
 	}
 
-	/// One transaction for the whole batch, so a segment of thousands of
-	/// rows is one commit and the table is never seen half-applied.
-	fn insert_rows(
-		&self,
-		table: &str,
-		rows: Vec<(TableKey, Value)>,
-	) -> SendBoxedFuture<Result> {
-		let table = SmolStr::from(table);
-		self.run(move |conn| {
-			let ident = table_ident(&table)?;
-			ensure_table(conn, &ident)?;
-			let tx = conn.unchecked_transaction()?;
-			{
-				let mut stmt = tx.prepare(&format!(
-					"INSERT OR REPLACE INTO {ident} (key, json) VALUES (?1, ?2)"
-				))?;
-				for (key, row) in rows {
-					stmt.execute(params![
-						key.as_ref() as &str,
-						canonical_json(row)?
-					])?;
-				}
-			}
-			tx.commit()?;
-			Ok(())
-		})
-	}
+	fn supports(&self, _capability: Capability) -> bool { true }
 
 	fn get_row(
 		&self,
-		table: &str,
+		table: &TableSpec,
 		key: &TableKey,
-	) -> SendBoxedFuture<Result<Value>> {
-		let table = SmolStr::from(table);
+	) -> SendBoxedFuture<Result<Option<StoredRow>>> {
+		let table = table.clone();
 		let key = key.clone();
-		self.run(move |conn| {
-			let ident = table_ident(&table)?;
-			let missing = || Self::not_found(format!("row `{table}/{key}`"));
-			if !table_exists(conn, &table)? {
-				return Err(missing());
-			}
-			conn.query_row(
-				&format!("SELECT json FROM {ident} WHERE key = ?1"),
-				params![key.as_ref() as &str],
-				|row| row.get::<_, String>(0),
-			)
-			.optional()?
-			.ok_or_else(missing)
-			.and_then(|json| serde_json::from_str::<Value>(&json)?.xok())
-		})
+		self.run(move |conn| SqlTable::new(&table)?.get(conn, &key))
 	}
 
-	/// One prepared select run per key on the blocking thread, so a diff of
-	/// a whole segment is one hop rather than one per row.
-	fn get_rows(
+	fn put_row(
 		&self,
-		table: &str,
-		keys: Vec<TableKey>,
-	) -> SendBoxedFuture<Result<Vec<Option<Value>>>> {
-		let table = SmolStr::from(table);
+		table: &TableSpec,
+		row: StoredRow,
+		precondition: Precondition,
+	) -> SendBoxedFuture<Result> {
+		let table = table.clone();
 		self.run(move |conn| {
-			let ident = table_ident(&table)?;
-			if !table_exists(conn, &table)? {
-				return Ok(vec![None; keys.len()]);
-			}
-			let mut stmt = conn
-				.prepare(&format!("SELECT json FROM {ident} WHERE key = ?1"))?;
-			keys.iter()
-				.map(|key| {
-					stmt.query_row(params![key.as_ref() as &str], |row| {
-						row.get::<_, String>(0)
-					})
-					.optional()?
-					.map(|json| serde_json::from_str::<Value>(&json)?.xok())
-					.transpose()
-				})
-				.collect()
-		})
-	}
-
-	fn row_exists(
-		&self,
-		table: &str,
-		key: &TableKey,
-	) -> SendBoxedFuture<Result<bool>> {
-		let table = SmolStr::from(table);
-		let key = key.clone();
-		self.run(move |conn| {
-			let ident = table_ident(&table)?;
-			if !table_exists(conn, &table)? {
-				return Ok(false);
-			}
-			conn.query_row(
-				&format!("SELECT 1 FROM {ident} WHERE key = ?1"),
-				params![key.as_ref() as &str],
-				|_| Ok(()),
-			)
-			.optional()?
-			.is_some()
-			.xok()
+			SqlTable::new(&table)?.put(conn, &row, &precondition)
 		})
 	}
 
 	fn remove_row(
 		&self,
-		table: &str,
+		table: &TableSpec,
 		key: &TableKey,
+		precondition: Precondition,
 	) -> SendBoxedFuture<Result> {
-		let table = SmolStr::from(table);
+		let table = table.clone();
 		let key = key.clone();
 		self.run(move |conn| {
-			let ident = table_ident(&table)?;
-			let missing = || Self::not_found(format!("row `{table}/{key}`"));
-			if !table_exists(conn, &table)? {
-				return Err(missing());
-			}
-			match conn.execute(
-				&format!("DELETE FROM {ident} WHERE key = ?1"),
-				params![key.as_ref() as &str],
-			)? {
-				0 => Err(missing()),
-				_ => Ok(()),
-			}
+			SqlTable::new(&table)?.remove(conn, &key, &precondition)
 		})
 	}
 
-	fn list_keys(&self, table: &str) -> SendBoxedFuture<Result<Vec<TableKey>>> {
-		let table = SmolStr::from(table);
-		self.run(move |conn| {
-			let ident = table_ident(&table)?;
-			if !table_exists(conn, &table)? {
-				return Ok(Vec::new());
-			}
-			conn.prepare(&format!("SELECT key FROM {ident} ORDER BY key"))?
-				.query_map([], |row| row.get::<_, String>(0))?
-				.map(|key| key.map(TableKey::from).map_err(BevyError::from))
-				.collect()
-		})
-	}
-
-	/// Every row in key order, straight off one select: the listing carries
-	/// the bodies, so the N+1 default is never wanted here.
-	fn get_all_rows(
+	fn scan_rows(
 		&self,
-		table: &str,
-	) -> SendBoxedFuture<Result<Vec<(TableKey, Result<Value>)>>> {
-		let table = SmolStr::from(table);
+		table: &TableSpec,
+		scan: Scan,
+	) -> SendBoxedFuture<Result<ScanPage>> {
+		let table = table.clone();
+		self.run(move |conn| SqlTable::new(&table)?.scan(conn, &scan))
+	}
+
+	fn apply(&self, writes: Vec<TableWrite>) -> SendBoxedFuture<Result> {
+		self.run(move |conn| SqlTable::apply(conn, &writes))
+	}
+
+	fn scan_index(
+		&self,
+		table: &TableSpec,
+		index: &TableIndex,
+		scan: IndexScan,
+	) -> SendBoxedFuture<Result<ScanPage>> {
+		let table = table.clone();
+		let index = index.clone();
 		self.run(move |conn| {
-			let ident = table_ident(&table)?;
-			if !table_exists(conn, &table)? {
-				return Ok(Vec::new());
-			}
-			conn.prepare(&format!(
-				"SELECT key, json FROM {ident} ORDER BY key"
-			))?
-			.query_map([], |row| {
-				Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-			})?
-			.map(|row| {
-				let (key, json) = row?;
-				let row = serde_json::from_str::<Value>(&json)
-					.map_err(BevyError::from);
-				Ok((TableKey::from(key), row))
-			})
-			.collect()
+			SqlTable::new(&table)?.scan_index(conn, &index, &scan)
 		})
+	}
+}
+
+/// A rusqlite connection runs [`SqlTable`]'s statements.
+impl SqlEngine for Connection {
+	fn execute(&self, sql: &str, args: &[SqlArg]) -> Result<usize> {
+		Connection::execute(
+			self,
+			sql,
+			rusqlite::params_from_iter(args.iter().map(SqliteStore::to_sql)),
+		)?
+		.xok()
+	}
+
+	fn query(&self, sql: &str, args: &[SqlArg]) -> Result<Vec<Vec<SqlArg>>> {
+		let mut stmt = self.prepare(sql)?;
+		let columns = stmt.column_count();
+		let mut rows = stmt.query(rusqlite::params_from_iter(
+			args.iter().map(SqliteStore::to_sql),
+		))?;
+		let mut out = Vec::new();
+		while let Some(row) = rows.next()? {
+			out.push(
+				(0..columns)
+					.map(|idx| SqliteStore::from_sql(row.get_ref(idx)?))
+					.collect::<Result<Vec<_>>>()?,
+			);
+		}
+		out.xok()
+	}
+
+	fn transaction(
+		&self,
+		func: &mut dyn FnMut(&dyn SqlEngine) -> Result,
+	) -> Result {
+		// dropped uncommitted on an error, rolling every statement back
+		let tx = self.unchecked_transaction()?;
+		func(&*tx)?;
+		tx.commit()?;
+		Ok(())
+	}
+}
+
+impl SqliteStore {
+	/// An [`SqlArg`] as rusqlite binds it.
+	fn to_sql(arg: &SqlArg) -> SqlValue {
+		match arg {
+			SqlArg::Null => SqlValue::Null,
+			SqlArg::Integer(int) => SqlValue::Integer(*int),
+			SqlArg::Real(float) => SqlValue::Real(*float),
+			SqlArg::Text(text) => SqlValue::Text(text.clone()),
+			SqlArg::Blob(blob) => SqlValue::Blob(blob.clone()),
+		}
+	}
+
+	/// A column as an [`SqlArg`].
+	fn from_sql(value: ValueRef) -> Result<SqlArg> {
+		match value {
+			ValueRef::Null => SqlArg::Null,
+			ValueRef::Integer(int) => SqlArg::Integer(int),
+			ValueRef::Real(float) => SqlArg::Real(float),
+			ValueRef::Text(text) => {
+				SqlArg::Text(core::str::from_utf8(text)?.into())
+			}
+			ValueRef::Blob(blob) => SqlArg::Blob(blob.to_vec()),
+		}
+		.xok()
 	}
 }
 
@@ -752,10 +828,11 @@ mod test {
 		store_test::run(store).await;
 	}
 
-	#[beet_core::test]
+	/// The whole suite, a few hundred commits, each a blocking pool hop.
+	#[beet_core::test(timeout_ms = 60_000)]
 	async fn table() {
 		let (_dir, store) = temp_store();
-		table_test::run(store).await;
+		table_test::run(TableStore::new(store)).await;
 	}
 
 	/// The component hook derives both erased currencies, the table one
@@ -798,7 +875,7 @@ mod test {
 	async fn generated_columns_are_indexed() {
 		let (_dir, store) = temp_store();
 		let table = Table::<TableItem<u32>>::new(store.clone());
-		table.push(TableItem::new(7u32)).await.unwrap();
+		table.put(TableItem::new(7u32)).await.unwrap();
 		store
 			.execute(
 				"ALTER TABLE table_item ADD COLUMN data INTEGER \
@@ -818,14 +895,41 @@ mod test {
 			.xpect_contains("idx_table_item_data");
 	}
 
+	/// A declared index is an expression index the planner walks for an
+	/// index scan, rather than sorting the table.
+	#[beet_core::test]
+	async fn declared_index_is_walked() {
+		let (_dir, store) = temp_store();
+		let table = Table::<table_test::IndexedRow>::new(store.clone());
+		table
+			.put(table_test::IndexedRow {
+				key: "k".into(),
+				group: Value::from("g"),
+				rank: 1,
+			})
+			.await
+			.unwrap();
+		store
+			.query(
+				"EXPLAIN QUERY PLAN SELECT key FROM indexed_row \
+				 ORDER BY json_extract(json, '$.\"rank\"'), key",
+			)
+			.await
+			.unwrap()
+			.xmap(|rows| format!("{rows:?}"))
+			.xpect_contains("indexed_row__by_rank")
+			.xnot()
+			.xpect_contains("TEMP B-TREE");
+	}
+
 	/// The escape hatch: a view over `json_extract` reads the rows a typed
 	/// table wrote, each result row keyed by column name.
 	#[beet_core::test]
 	async fn query_reads_json_extract() {
 		let (_dir, store) = temp_store();
 		let table = Table::<TableItem<u32>>::new(store.clone());
-		table.push(TableItem::new(7u32)).await.unwrap();
-		table.push(TableItem::new(9u32)).await.unwrap();
+		table.put(TableItem::new(7u32)).await.unwrap();
+		table.put(TableItem::new(9u32)).await.unwrap();
 		store
 			.execute(
 				"CREATE VIEW payloads AS \
@@ -842,56 +946,87 @@ mod test {
 				Value::Map(Map::new([("data", 7i64)])),
 				Value::Map(Map::new([("data", 9i64)])),
 			]);
-		store
-			.query("SELECT count(*) AS n FROM table_item")
-			.await
-			.unwrap()
-			.xpect_eq(vec![Value::Map(Map::new([("n", 2i64)]))]);
 	}
 
-	/// Two inserts of the same document with different map insertion order
-	/// store identical text, so a diff by text means a diff by content.
+	/// Two writes of the same document with different map insertion order
+	/// store identical text and cid, so a diff by text means a diff by
+	/// content.
 	#[beet_core::test]
 	async fn canonical_json_is_stable() {
 		let (_dir, store) = temp_store();
-		let key = TableKey::from("row");
-		let first = Value::Map(Map::new([("b", 2), ("a", 1)]));
-		let second = Value::Map(Map::new([("a", 1), ("b", 2)]));
+		let tables = TableStore::new(store.clone());
 		let stored = async |row: Value| {
-			store.insert_row("rows", &key, row).await.unwrap();
+			tables
+				.put(
+					"rows",
+					StoredRow::new("row", Row::from_value(row).unwrap())
+						.unwrap(),
+					Precondition::Any,
+				)
+				.await
+				.unwrap();
 			store
-				.query("SELECT json FROM rows")
+				.query("SELECT json, cid FROM rows")
 				.await
 				.unwrap()
 				.xmap(|rows| rows[0].clone())
 		};
-		let text = stored(first).await;
-		text.xpect_eq(Value::Map(Map::new([("json", r#"{"a":1,"b":2}"#)])));
-		stored(second).await.xpect_eq(text);
+		let text = stored(value!({ "b": 2, "a": 1 })).await;
+		text.as_map()
+			.unwrap()
+			.get("json")
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::from(r#"{"a":1,"b":2}"#));
+		stored(value!({ "a": 1, "b": 2 })).await.xpect_eq(text);
 	}
 
-	/// A read of a table nothing has written yet is empty, not an error, and
-	/// an invalid or reserved table name never reaches the SQL.
+	/// An invalid or reserved table name never reaches the SQL, and a record
+	/// table's NSID is a valid one.
 	#[beet_core::test]
-	async fn reads_before_writes_and_bad_names() {
+	async fn table_names() {
 		let (_dir, store) = temp_store();
-		let key = TableKey::from("k");
-		store.list_keys("unwritten").await.unwrap().xpect_eq(vec![]);
-		store
-			.get_all_rows("unwritten")
+		let tables = TableStore::new(store);
+		let row = || StoredRow::new("k", Row::default()).unwrap();
+		for bad in ["Foo-Bar", "1abc", "", "blobs", "a\"b"] {
+			tables.put(bad, row(), Precondition::Any).await.unwrap_err();
+		}
+		tables
+			.get("com.example.note", "k")
+			.await
+			.unwrap()
+			.xpect_none();
+	}
+
+	/// A partition is its own database file beside the declared one, which
+	/// the SQL escape hatch reads, and removing the store removes it.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[beet_core::test]
+	async fn partition_is_a_file() {
+		let (_dir, store) = temp_store();
+		store.store_try_create().await.unwrap();
+		let partition =
+			store.partition_store(&PartitionId::parse("did:plc:abc").unwrap());
+		partition.path().to_string().xpect_eq(
+			store
+				.path()
+				.parent()
+				.unwrap()
+				.join("store/did:plc:abc.db")
+				.to_string(),
+		);
+		Table::<table_test::NamedRow>::new(partition.clone())
+			.put(table_test::NamedRow::new("x", 1))
+			.await
+			.unwrap();
+		partition
+			.query("SELECT key FROM named_rows")
 			.await
 			.unwrap()
 			.len()
-			.xpect_eq(0);
-		store
-			.row_exists("unwritten", &key)
-			.await
-			.unwrap()
-			.xpect_false();
-		store.get_row("unwritten", &key).await.xpect_err();
-		store.remove_row("unwritten", &key).await.xpect_err();
-		for bad in ["Foo-Bar", "1abc", "", "blobs"] {
-			store.insert_row(bad, &key, Value::Null).await.xpect_err();
-		}
+			.xpect_eq(1);
+		fs_ext::exists(partition.path()).unwrap().xpect_true();
+		store.store_remove().await.unwrap();
+		fs_ext::exists(partition.path()).unwrap().xpect_false();
 	}
 }

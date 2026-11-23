@@ -334,6 +334,27 @@ impl BlobStoreProvider for BlobStore {
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		self.provider.remove(path)
 	}
+	fn get_versioned(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+		self.provider.get_versioned(path)
+	}
+	fn insert_if(
+		&self,
+		path: &RelPath,
+		body: Bytes,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result<BlobVersion>> {
+		self.provider.insert_if(path, body, condition)
+	}
+	fn remove_if(
+		&self,
+		path: &RelPath,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result> {
+		self.provider.remove_if(path, condition)
+	}
 	fn stat(
 		&self,
 		path: &RelPath,
@@ -458,6 +479,72 @@ pub mod store_test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// A conditional write checked and written as one step: absent on an
+	/// existing object, matches on a changed one, and removes alike.
+	async fn conditional(store: &BlobStore) {
+		let path = RelPath::from("conditional/object");
+		let is_conflict = |err: BevyError| {
+			err.downcast_ref::<BlobConflict>().is_some().xpect_true();
+		};
+		store.get_versioned(&path).await.unwrap().xpect_none();
+		let first = store
+			.insert_if(&path, "one".into(), BlobCondition::Absent)
+			.await
+			.unwrap();
+		let (bytes, version) =
+			store.get_versioned(&path).await.unwrap().unwrap();
+		bytes.xpect_eq(bytes::Bytes::from("one"));
+		version.clone().xpect_eq(first.clone());
+		store
+			.insert_if(&path, "two".into(), BlobCondition::Absent)
+			.await
+			.unwrap_err()
+			.xmap(is_conflict);
+		let second = store
+			.insert_if(
+				&path,
+				"two".into(),
+				BlobCondition::Matches(first.clone()),
+			)
+			.await
+			.unwrap();
+		store
+			.insert_if(
+				&path,
+				"three".into(),
+				BlobCondition::Matches(first.clone()),
+			)
+			.await
+			.unwrap_err()
+			.xmap(is_conflict);
+		store
+			.get(&path)
+			.await
+			.unwrap()
+			.xpect_eq(bytes::Bytes::from("two"));
+		store
+			.remove_if(&path, BlobCondition::Matches(first.clone()))
+			.await
+			.unwrap_err()
+			.xmap(is_conflict);
+		store
+			.remove_if(&path, BlobCondition::Absent)
+			.await
+			.unwrap_err()
+			.xmap(is_conflict);
+		store
+			.remove_if(&path, BlobCondition::Matches(second))
+			.await
+			.unwrap();
+		store.remove_if(&path, BlobCondition::Any).await.unwrap();
+		store.remove_if(&path, BlobCondition::Absent).await.unwrap();
+		store
+			.remove_if(&path, BlobCondition::Matches(first))
+			.await
+			.unwrap_err()
+			.xmap(is_conflict);
+	}
+
 	/// Runs the standard store provider test suite.
 	pub async fn run(provider: impl BlobStoreProvider) {
 		let store = BlobStore::new(provider);
@@ -525,6 +612,7 @@ pub mod store_test {
 		store.remove(&path).await.unwrap();
 		store.get(&path).await.xpect_err();
 		store.stat(&path).await.unwrap().xpect_none();
+		conditional(&store).await;
 
 		// a file inserts as its bytes and is left in place
 		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]

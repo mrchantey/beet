@@ -55,6 +55,80 @@ impl BlobDir {
 	}
 }
 
+/// A blob's version token, the backend's own: an S3 or R2 ETag, or for a
+/// local store the content digest it compares under its lock. Opaque, only
+/// compared for equality, so a conditional write never interleaves with
+/// another undetected.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref)]
+pub struct BlobVersion(SmolStr);
+
+impl BlobVersion {
+	/// The version `token` names.
+	pub fn new(token: impl Into<SmolStr>) -> Self { Self(token.into()) }
+
+	/// The version a local store gives `bytes`: their MD5 hex digest, the
+	/// same number an S3 single-part ETag is.
+	pub fn of(bytes: &[u8]) -> Self {
+		Self(digest_ext::hex::<md5::Md5>(bytes).into())
+	}
+
+	/// The token.
+	pub fn as_str(&self) -> &str { &self.0 }
+}
+
+/// What a conditional blob write ([`BlobStoreProvider::insert_if`],
+/// [`BlobStoreProvider::remove_if`]) requires of the object there now.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub enum BlobCondition {
+	/// Whatever is there, including nothing.
+	#[default]
+	Any,
+	/// Nothing is there.
+	Absent,
+	/// The object there is at exactly this version.
+	Matches(BlobVersion),
+}
+
+impl BlobCondition {
+	/// Whether this holds of the object at `found`, `None` for no object.
+	pub fn holds(&self, found: Option<&BlobVersion>) -> bool {
+		match (self, found) {
+			(Self::Any, _) => true,
+			(Self::Absent, found) => found.is_none(),
+			(Self::Matches(expected), Some(found)) => expected == found,
+			(Self::Matches(_), None) => false,
+		}
+	}
+}
+
+/// A conditional blob write whose [`BlobCondition`] did not hold, the error a
+/// caller matches to retry.
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[error("blob `{path}` was not as the write required")]
+pub struct BlobConflict {
+	/// The object written.
+	pub path: RelPath,
+}
+
+impl BlobConflict {
+	/// The conflict at `path`, as a [`BevyError`].
+	pub fn at(path: &RelPath) -> BevyError {
+		Self { path: path.clone() }.into()
+	}
+
+	/// [`BlobCondition::holds`], else the conflict at `path`.
+	pub fn check(
+		condition: &BlobCondition,
+		path: &RelPath,
+		found: Option<&BlobVersion>,
+	) -> Result {
+		match condition.holds(found) {
+			true => Ok(()),
+			false => Err(Self::at(path)),
+		}
+	}
+}
+
 /// Trait for store storage backends (S3, filesystem, memory, etc.).
 ///
 /// Implementations provide the actual storage operations for [`BlobStore`].
@@ -377,6 +451,55 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// ```
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result>;
 
+	/// The object with its [`BlobVersion`], `None` when it does not exist:
+	/// the read a conditional write swaps on. Refused by a backend without
+	/// conditional writes, which is the default.
+	fn get_versioned(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+		let refusal = self.refuse_conditional(path);
+		Box::pin(async move { Err(refusal) })
+	}
+
+	/// Insert `body` when `condition` holds of the object there now, checked
+	/// and written as one step, answering the new version; a
+	/// [`BlobConflict`] when it does not hold. Refused by a backend without
+	/// conditional writes, which is the default.
+	fn insert_if(
+		&self,
+		path: &RelPath,
+		body: Bytes,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result<BlobVersion>> {
+		let _ = (body, condition);
+		let refusal = self.refuse_conditional(path);
+		Box::pin(async move { Err(refusal) })
+	}
+
+	/// Remove the object when `condition` holds of it, a [`BlobConflict`]
+	/// when it does not; removing a missing object under
+	/// [`BlobCondition::Any`] succeeds. Refused by a backend without
+	/// conditional writes, which is the default.
+	fn remove_if(
+		&self,
+		path: &RelPath,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result> {
+		let _ = condition;
+		let refusal = self.refuse_conditional(path);
+		Box::pin(async move { Err(refusal) })
+	}
+
+	/// The refusal of a conditional write by a backend that cannot make one.
+	fn refuse_conditional(&self, path: &RelPath) -> BevyError {
+		bevyhow!(
+			"`{}` cannot write `{path}` conditionally: it has no conditional \
+			 writes",
+			self.describe()
+		)
+	}
+
 	/// The object's [`BlobStat`], `None` when it does not exist. The default
 	/// reads the object and digests it; a backend that answers from metadata
 	/// (S3's `HeadObject`) overrides it.
@@ -516,6 +639,27 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	}
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		self.as_ref().remove(path)
+	}
+	fn get_versioned(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+		self.as_ref().get_versioned(path)
+	}
+	fn insert_if(
+		&self,
+		path: &RelPath,
+		body: Bytes,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result<BlobVersion>> {
+		self.as_ref().insert_if(path, body, condition)
+	}
+	fn remove_if(
+		&self,
+		path: &RelPath,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result> {
+		self.as_ref().remove_if(path, condition)
 	}
 	fn stat(
 		&self,

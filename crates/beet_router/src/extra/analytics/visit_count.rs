@@ -10,7 +10,8 @@ use beet_net::prelude::*;
 /// is never linked across visits ([`AnalyticsSummary::visits`]). The store is
 /// the one the nearest [`AnalyticsConfig`] above the page's route records to,
 /// and the count composes its aggregates and raw tail as `beet analytics`
-/// does ([`AnalyticsStore::summary`]), so every render reads the whole store:
+/// does ([`AnalyticsStore::summary`]), so every render reads the aggregates
+/// and the days after them:
 /// place it in a [`ServerIsland`] behind a short edge cache, never in a page
 /// cached whole.
 ///
@@ -54,14 +55,10 @@ impl VisitCount {
 	/// `entity` and resolve the dependency.
 	async fn read(entity: AsyncEntity, config: Entity, guard: PendingGuard) {
 		let world = entity.world();
-		// the aggregates share the raw segments' store, as the rollup job and
-		// `beet analytics` default them
 		let visits = async {
-			let store =
-				StoreRef::resolve::<AnalyticsStore>(&world, config).await?;
-			let rollups = AnalyticsRollup::table(store.store.clone());
-			store
-				.summary(Some(&rollups))
+			StoreRef::resolve::<AnalyticsStore>(&world, config)
+				.await?
+				.summary(false)
 				.await
 				.map(|summary| summary.visits)
 		}
@@ -110,12 +107,12 @@ mod test {
 			})
 			.with_session(Some(session));
 		event.timestamp -= days_ago * 86_400_000;
-		event
+		event.with_fresh_key()
 	}
 
 	/// A router recording analytics to `store`, its home page holding the
 	/// count in an island, and the island route.
-	fn site(store: BlobStore) -> (World, Entity) {
+	fn site(store: InMemoryStore) -> (World, Entity) {
 		let mut world = App::new()
 			.with_plugins((AsyncPlugin, RouterPlugin))
 			.world_mut()
@@ -144,21 +141,20 @@ mod test {
 	/// of the rest, and is worded as visits.
 	#[beet_core::test]
 	async fn counts_rollups_and_raw_events() {
-		let store = BlobStore::temp();
-		let raw = AnalyticsStore::new(store.clone());
+		let store = InMemoryStore::new();
+		let analytics =
+			AnalyticsStore::new(TableStore::new(BlobStore::new(store.clone())));
 		// two visits today, one of them reading two pages
 		let (left, right) = (uuid_ext::now_v7(), uuid_ext::now_v7());
 		for event in [view(left, 0), view(left, 0), view(right, 0)] {
-			raw.record(event).await.unwrap();
+			analytics.record(event).await.unwrap();
 		}
-		raw.flush().await.unwrap();
-		// three visits on a compacted day, its raw events gone
-		let rollups = AnalyticsRollup::table(store.clone());
+		// three visits on a rolled up day, its raw events gone
 		let old = (0..3)
 			.map(|_| view(uuid_ext::now_v7(), 2))
 			.collect::<Vec<_>>();
 		for row in AnalyticsRollup::from_events(&old) {
-			rollups.push(row).await.unwrap();
+			analytics.rollups().put(row).await.unwrap();
 		}
 
 		let (mut world, router) = site(store);
@@ -178,7 +174,7 @@ mod test {
 	/// declaration it needs.
 	#[beet_core::test]
 	async fn needs_an_analytics_config() {
-		let (mut world, router) = site(BlobStore::temp());
+		let (mut world, router) = site(InMemoryStore::new());
 		world.entity_mut(router).remove::<AnalyticsConfig>();
 		world
 			.entity_mut(router)

@@ -13,7 +13,7 @@ use beet::prelude::*;
 /// An analytics store seeded with one prior event (to prove new events are added,
 /// not a fresh store), returned alongside its prior event's id.
 async fn seeded_store() -> (AnalyticsStore, Uuid) {
-	let store = AnalyticsStore::new(BlobStore::temp());
+	let store = AnalyticsStore::new(TableStore::temp());
 	let prior = AnalyticsEvent::new("/old", AnalyticsEventData::PageView {
 		duration_ms: 500,
 		referrer: None,
@@ -23,7 +23,6 @@ async fn seeded_store() -> (AnalyticsStore, Uuid) {
 	.with_client_kind(ClientKind::Web);
 	let prior_id = prior.id;
 	store.record(prior).await.unwrap();
-	store.flush().await.unwrap();
 	(store, prior_id)
 }
 
@@ -71,10 +70,9 @@ async fn web_flow_records_and_retains_prior() {
 		.status()
 		.xpect_eq(StatusCode::OK);
 
-	// Drain fire-and-forget records, then force the partial segment to durable storage.
+	// drain the fire-and-forget records, each a row once written
 	AsyncRunner::settle_async_tasks(&mut world).await;
-	readback.flush().await.unwrap();
-	let events = readback.read_all_lossy().await.unwrap();
+	let events = readback.day(Date::today()).await.unwrap();
 
 	// the prior event is retained.
 	events.iter().any(|event| event.id == prior_id).xpect_true();

@@ -188,6 +188,20 @@ impl StoreProvider {
 	pub fn into_blob_store(self) -> BlobStore {
 		each_store!(self, |store| BlobStore::new(store))
 	}
+
+	/// The erased table store, for a caller with no entity to land it on: a
+	/// table-native backend's own tables, any other the blob backed form,
+	/// exactly as the component hooks materialize it.
+	#[cfg(feature = "json")]
+	pub fn into_table_store(self) -> TableStore {
+		match self {
+			#[cfg(feature = "aws")]
+			Self::Dynamo(store) => TableStore::new(store),
+			#[cfg(feature = "sqlite")]
+			Self::Sqlite(store) => TableStore::new(store),
+			other => TableStore::new(other.into_blob_store()),
+		}
+	}
 }
 
 #[cfg(test)]

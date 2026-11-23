@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use send_wrapper::SendWrapper;
-use std::cell::RefCell;
 
 /// A store provider backed by a Cloudflare R2 bucket through the Worker runtime's
 /// R2 binding.
@@ -11,7 +10,7 @@ use std::cell::RefCell;
 /// reads through the in-isolate binding (`env.bucket(..)`), so no credentials or
 /// network round-trip to the S3 endpoint are needed: the deployed Worker streams
 /// the site straight from R2. The live [`worker::Bucket`] is resolved per call
-/// from the ambient [`worker::Env`] stashed in [`R2WorkersStore::set_env`] at the top of
+/// from the ambient [`worker::Env`] stashed in [`WorkerEnv::set`] at the top of
 /// the `fetch` handler, mirroring how [`IndexedDbStore`] resolves the ambient
 /// IndexedDB from `window`.
 ///
@@ -24,25 +23,13 @@ use std::cell::RefCell;
 pub struct R2WorkersStore {
 	/// The R2 binding name, as declared in `wrangler.toml`.
 	binding: SmolStr,
-	/// Optional subdirectory prefix for all keys.
+	/// Optional subdirectory prefix for all keys, absent from markup that
+	/// names only the binding.
+	#[reflect(default)]
 	subdir: Option<RelPath>,
 }
 
-thread_local! {
-	/// The ambient Worker [`Env`](worker::Env), set at the top of the `fetch`
-	/// handler so a [`R2WorkersStore`] can resolve its live bucket binding. The
-	/// runtime is single-threaded, so a thread-local is the isolate-global slot.
-	static WORKER_ENV: RefCell<Option<worker::Env>> = const { RefCell::new(None) };
-}
-
 impl R2WorkersStore {
-	/// Stash the request's [`worker::Env`] so any [`R2WorkersStore`] can resolve
-	/// its live bucket binding for the duration of the `fetch` invocation. Call
-	/// this at the top of the Worker entry, before building or driving the app.
-	pub fn set_env(env: worker::Env) {
-		WORKER_ENV.with(|slot| *slot.borrow_mut() = Some(env));
-	}
-
 	/// Creates a new R2-binding-backed store provider for the given binding name.
 	pub fn new(binding: impl Into<SmolStr>) -> Self {
 		Self {
@@ -99,16 +86,8 @@ impl R2WorkersStore {
 
 	/// Resolve the live [`worker::Bucket`] from the ambient [`worker::Env`].
 	fn bucket(&self) -> Result<worker::Bucket> {
-		WORKER_ENV.with(|slot| {
-			slot.borrow()
-				.as_ref()
-				.ok_or_else(|| {
-					bevyhow!(
-						"R2WorkersStore: no worker::Env set; call R2WorkersStore::set_env \
-						at the top of the fetch handler"
-					)
-				})?
-				.bucket(&self.binding)
+		WorkerEnv::with(|env| {
+			env.bucket(&self.binding)
 				.map_err(|err| bevyhow!("R2 binding `{}`: {err}", self.binding))
 		})
 	}
@@ -245,6 +224,86 @@ impl BlobStoreProvider for R2WorkersStore {
 		}))
 	}
 
+	/// The object and its etag, the version the binding's conditional put
+	/// compares.
+	fn get_versioned(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+		let bucket = self.bucket();
+		let key = self.effective_key(path);
+		Box::pin(SendWrapper::new(async move {
+			let Some(object) = bucket?.get(&key).execute().await? else {
+				return None.xok();
+			};
+			let version = BlobVersion::new(object.etag());
+			let body = object
+				.body()
+				.ok_or_else(|| bevyhow!("Object has no body: {key}"))?;
+			Some((Bytes::from(body.bytes().await?), version)).xok()
+		}))
+	}
+
+	/// The binding's put with `onlyIf`: `etagMatches` for a version and
+	/// `etagDoesNotMatch: "*"` for absence, R2 answering no object when the
+	/// condition fails.
+	fn insert_if(
+		&self,
+		path: &RelPath,
+		body: Bytes,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result<BlobVersion>> {
+		let bucket = self.bucket();
+		let key = self.effective_key(path);
+		let path = path.clone();
+		Box::pin(SendWrapper::new(async move {
+			let bucket = bucket?;
+			let put = bucket.put(key, body.to_vec());
+			let put = match condition {
+				BlobCondition::Any => put,
+				BlobCondition::Absent => put.only_if(worker::Conditional {
+					etag_does_not_match: Some("*".into()),
+					..Default::default()
+				}),
+				BlobCondition::Matches(version) => {
+					put.only_if(worker::Conditional {
+						etag_matches: Some(version.as_str().into()),
+						..Default::default()
+					})
+				}
+			};
+			match put.execute().await? {
+				Some(object) => BlobVersion::new(object.etag()).xok(),
+				None => Err(BlobConflict::at(&path)),
+			}
+		}))
+	}
+
+	/// The binding has no conditional delete, so a version is compared on a
+	/// `head` and then deleted: a write landing between the two is removed
+	/// with it, the one conditional write this store cannot make atomic.
+	fn remove_if(
+		&self,
+		path: &RelPath,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result> {
+		let bucket = self.bucket();
+		let key = self.effective_key(path);
+		let path = path.clone();
+		Box::pin(SendWrapper::new(async move {
+			let bucket = bucket?;
+			let found = bucket
+				.head(key.clone())
+				.await?
+				.map(|object| BlobVersion::new(object.etag()));
+			BlobConflict::check(&condition, &path, found.as_ref())?;
+			if found.is_some() {
+				bucket.delete(key).await?;
+			}
+			Ok(())
+		}))
+	}
+
 	fn public_url(
 		&self,
 		_path: &RelPath,
@@ -252,5 +311,26 @@ impl BlobStoreProvider for R2WorkersStore {
 		// no public URL: the Worker streams the object through the binding rather
 		// than handing out a bucket URL.
 		Box::pin(SendWrapper::new(async move { None.xok() }))
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// Markup naming only the binding builds the store.
+	///
+	/// REGRESSION: without a default for `subdir`, reflection could not build
+	/// `<R2WorkersStore binding="ARCHIVE"/>` and the Worker panicked loading
+	/// any document declaring one.
+	#[beet_core::test]
+	fn builds_from_the_binding_alone() {
+		let mut dynamic = bevy::reflect::structs::DynamicStruct::default();
+		dynamic.insert("binding", SmolStr::from("ARCHIVE"));
+		R2WorkersStore::from_reflect(&dynamic)
+			.unwrap()
+			.root_key()
+			.xpect_eq("r2_workers:ARCHIVE");
 	}
 }

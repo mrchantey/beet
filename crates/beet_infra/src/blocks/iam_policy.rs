@@ -366,6 +366,7 @@ impl IamPolicy {
 		"dynamodb:Scan",
 		"dynamodb:BatchGetItem",
 		"dynamodb:BatchWriteItem",
+		"dynamodb:ConditionCheckItem",
 	];
 
 	/// The bucket-level and object-level arn for each of `buckets`: an s3 action
@@ -386,11 +387,21 @@ impl IamPolicy {
 	/// The arn of each of `tables`, in this policy's region. A table is one arn,
 	/// unlike a bucket, since the dynamodb actions all address the table itself.
 	#[cfg(feature = "bindings_aws_dynamo")]
+	///
+	/// Each table's global secondary indexes beside it, which a `Query` of an
+	/// index slot is authorized against.
 	fn table_arns(&self, tables: &[String]) -> Vec<String> {
 		let region = &self.region;
 		tables
 			.iter()
-			.map(|table| format!("arn:aws:dynamodb:{region}:*:table/{table}"))
+			.flat_map(|table| {
+				[
+					format!("arn:aws:dynamodb:{region}:*:table/{table}"),
+					format!(
+						"arn:aws:dynamodb:{region}:*:table/{table}/index/*"
+					),
+				]
+			})
 			.collect()
 	}
 }

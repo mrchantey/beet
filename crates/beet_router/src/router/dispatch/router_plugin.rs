@@ -19,6 +19,11 @@ pub struct RouterPlugin;
 
 impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
+		// the table wire protocol over a mounted route (`<ServeTables
+		// prefix="tables"/>`), the table twin of `ServeBlobs`
+		#[cfg(feature = "json")]
+		app.install_type::<ServeTables>()
+			.register_type::<ServeTablesHandler>();
 		app.install_type::<(
 			ActionPlugin,
 			AsyncPlugin,

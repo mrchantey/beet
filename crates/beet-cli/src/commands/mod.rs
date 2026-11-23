@@ -54,6 +54,8 @@ impl Plugin for CliCommandsPlugin {
 			.register_type::<CaptureScreenshot>();
 		#[cfg(feature = "qrcode")]
 		app.register_type::<QrCode>();
+		#[cfg(feature = "legacy_analytics")]
+		app.register_type::<ImportAnalytics>();
 		// NOTE: deploy tags are NOT allowlisted here. Structure is universal: a
 		// build without those features loads the same document and leaves an
 		// inert entity holding each as `Unregistered`, instead of relying on a

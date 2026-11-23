@@ -142,6 +142,18 @@ impl Date {
 	/// ```
 	pub fn days_until(&self, later: Date) -> i64 { later.0 - self.0 }
 
+	/// The day `days` after this one, before it for a negative count.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// Date::parse("2026-02-28")
+	/// 	.unwrap()
+	/// 	.add_days(1)
+	/// 	.to_string()
+	/// 	.xpect_eq("2026-03-01");
+	/// ```
+	pub fn add_days(&self, days: i64) -> Self { Self(self.0 + days) }
+
 	/// Midnight UTC, the instant this day begins.
 	pub fn timestamp(&self) -> Timestamp {
 		Timestamp::from_millis(self.0 * Self::MILLIS_PER_DAY)

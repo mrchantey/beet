@@ -38,6 +38,32 @@ impl<K, V, O> LazyPool<K, V, O> {
 	{
 		self.map.write().await.remove(key)
 	}
+
+	/// Pool `value` under `key`, replacing any there: a value constructed
+	/// some other way than the pool's constructor, answered by every later
+	/// [`get`](Self::get).
+	pub async fn insert(&self, key: K, value: V) -> Option<V>
+	where
+		K: core::hash::Hash + Eq,
+	{
+		self.map.write().await.insert(key, value)
+	}
+
+	/// Evict every value whose key satisfies `predicate`, answering them:
+	/// what a store does before deleting a directory of files its pooled
+	/// connections are open on.
+	pub async fn remove_where(&self, predicate: impl Fn(&K) -> bool) -> Vec<V>
+	where
+		K: core::hash::Hash + Eq + Clone,
+	{
+		let mut map = self.map.write().await;
+		let keys = map
+			.keys()
+			.filter(|key| predicate(key))
+			.cloned()
+			.collect::<Vec<_>>();
+		keys.iter().filter_map(|key| map.remove(key)).collect()
+	}
 }
 
 impl<K, V> LazyPool<K, V, V>

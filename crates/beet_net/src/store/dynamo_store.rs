@@ -1,15 +1,40 @@
 use crate::prelude::*;
+use base64::Engine;
 use beet_core::prelude::*;
 use bytes::Bytes;
-use serde_dynamo::AttributeValue;
+use core::ops::Bound;
 use serde_json::Value as JsonValue;
 use serde_json::json;
-use std::collections::HashMap as StdHashMap;
 
-/// AWS DynamoDB provider storing its configuration as serializable fields.
-/// Each call is an [`AwsClient`] request (`awsJson1_0`) signed as the
-/// launch's own credential, in the region this store names, else the one
-/// the launch does ([`AwsClient::launch_region`]).
+/// AWS DynamoDB as a store: one Dynamo table holds every partition's rows and
+/// blobs in a single-table layout. Each call is an [`AwsClient`] request
+/// (`awsJson1_0`) signed as the launch's own credential, in the region this
+/// store names, else the one the launch does ([`AwsClient::launch_region`]).
+///
+/// # Layout
+///
+/// - `pk`, the partition key: the partition id, `@` for the declaration's own
+///   (never a partition id, whose alphabet has no `@`).
+/// - `sk`, the sort key: `<table>#<key>` for a row and `@blob#<path>` for a
+///   blob (no table name begins with `@`), so a table is one key range of
+///   its partition, scanned with `Query` in the key's byte order.
+/// - `row` the row's canonical json text and `cid` its cid; `data` a blob's
+///   bytes.
+/// - `gsi1pk`/`gsi1sk` to `gsi4pk`/`gsi4sk`: generic global secondary index
+///   slots. A row's nth declared index writes `<partition>#<table>#<index>`
+///   and its [`IndexKey`] text into slot n, so declaring an index never
+///   provisions infrastructure; a row type declaring more than
+///   [`INDEX_SLOTS`](Self::INDEX_SLOTS) is refused with
+///   [`TableError::Limit`].
+/// - `ttl`, the expiry an archived row is stamped with.
+///
+/// A precondition is a `ConditionExpression` (`attribute_not_exists(pk)`,
+/// `cid = :cid`), and [`apply`](TableProvider::apply) is one
+/// `TransactWriteItems`, refused over its limit of
+/// [`MAX_BATCH`](Self::MAX_BATCH) writes. An item is at most 400KB, a row or
+/// a blob alike. Index scans read a global secondary index, so they are
+/// eventually consistent: a row just written may briefly be missing from
+/// one, or found at its previous position.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[component(on_insert = on_insert_dynamo)]
@@ -20,11 +45,18 @@ pub struct DynamoStore {
 	/// (`AWS_REGION`). A configured region always wins: a declaration that
 	/// named its region must not be silently beaten by the environment the
 	/// process happens to carry.
+	#[reflect(default)]
 	region: Option<SmolStr>,
-	/// Optional subdirectory prefix for all keys.
+	/// Optional subdirectory prefix for all blob keys.
+	#[reflect(default)]
 	subdir: Option<RelPath>,
 	/// An endpoint override, ie DynamoDB Local, else AWS's regional host.
+	#[reflect(default)]
 	endpoint: Option<SmolStr>,
+	/// The partition this handle reads and writes, the declaration's own
+	/// when `None`.
+	#[reflect(ignore)]
+	partition: Option<PartitionId>,
 }
 
 impl DynamoStore {
@@ -49,6 +81,7 @@ impl DynamoStore {
 			region: None,
 			subdir: None,
 			endpoint: None,
+			partition: None,
 		}
 	}
 
@@ -122,33 +155,193 @@ impl DynamoStore {
 		self.client()?.call_json(action, &body).await
 	}
 
-	/// The `id` attribute `path` keys to: the path under this store's subdir.
-	fn qualify(&self, path: &RelPath) -> String {
+	/// The most writes one `TransactWriteItems` takes.
+	pub const MAX_BATCH: usize = 100;
+	/// The global secondary index slots every table is created with.
+	pub const INDEX_SLOTS: usize = 4;
+	/// The attribute an expiring item carries its expiry in, epoch seconds.
+	pub const TTL_ATTRIBUTE: &'static str = "ttl";
+	/// The sort key prefix of a blob.
+	const BLOB_PREFIX: &'static str = "@blob#";
+
+	/// The `pk` this handle's partition keys to.
+	fn pk(&self) -> String {
+		self.partition
+			.as_ref()
+			.map_or_else(|| "@".to_string(), |id| id.to_string())
+	}
+
+	/// The `sk` a blob at `path` keys to, under this store's subdir.
+	fn blob_sk(&self, path: &RelPath) -> String {
 		match &self.subdir {
-			Some(sub) => format!("{sub}/{path}"),
-			None => path.to_string(),
+			Some(sub) => format!("{}{sub}/{path}", Self::BLOB_PREFIX),
+			None => format!("{}{path}", Self::BLOB_PREFIX),
 		}
 	}
 
-	/// The key `path` addresses, as DynamoDB's wire json.
-	fn key_of(&self, path: &RelPath) -> JsonValue {
-		json!({"id": {"S": self.qualify(path)}})
+	/// The `sk` a row of `table` at `key` keys to.
+	fn row_sk(table: &TableSpec, key: &TableKey) -> String {
+		format!("{}#{key}", table.name)
 	}
 
-	/// An item from DynamoDB's wire json.
-	fn item_of(json: &JsonValue) -> Result<StdHashMap<String, AttributeValue>> {
-		serde_json::from_value::<StdHashMap<String, AttributeValue>>(
-			json.clone(),
-		)
-		.map_err(BevyError::from)
+	/// The item key of `sk` in this partition, as wire json.
+	fn item_key(&self, sk: &str) -> JsonValue {
+		json!({"pk": {"S": self.pk()}, "sk": {"S": sk}})
 	}
 
-	/// The document a table item carries under `row`.
-	fn row_of(mut item: StdHashMap<String, AttributeValue>) -> Result<Value> {
-		let Some(row) = item.remove("row") else {
-			bevybail!("item carries no row document");
+	/// The string attribute `name` of a wire item.
+	fn string_attr<'a>(item: &'a JsonValue, name: &str) -> Option<&'a str> {
+		item[name]["S"].as_str()
+	}
+
+	/// Whether a wire item's `ttl` has passed: expired, so gone to every read
+	/// here though Dynamo has not deleted it yet.
+	fn is_expired(item: &JsonValue) -> bool {
+		item[Self::TTL_ATTRIBUTE]["N"]
+			.as_str()
+			.and_then(|ttl| ttl.parse::<i64>().ok())
+			.is_some_and(|ttl| ttl <= Timestamp::now().secs())
+	}
+
+	/// The stored row a wire item holds.
+	fn stored_row(table: &TableSpec, item: &JsonValue) -> Result<StoredRow> {
+		let (Some(sk), Some(row), Some(cid)) = (
+			Self::string_attr(item, "sk"),
+			Self::string_attr(item, "row"),
+			Self::string_attr(item, "cid"),
+		) else {
+			bevybail!("dynamo item is not a row: {item}");
 		};
-		serde_dynamo::from_attribute_value::<_, Value>(row)?.xok()
+		let Some(key) = sk.strip_prefix(&format!("{}#", table.name)) else {
+			bevybail!("dynamo item `{sk}` is not a row of `{}`", table.name);
+		};
+		StoredRow::from_parts(
+			key.into(),
+			Cid::parse(cid)?,
+			Row::from_json(serde_json::from_str(row)?)?,
+		)
+		.xok()
+	}
+
+	/// The refusal of a row type declaring more indexes than there are
+	/// slots.
+	fn check_index_slots(&self, table: &TableSpec) -> Result {
+		match table.indexes.len() > Self::INDEX_SLOTS {
+			true => Err(TableError::Limit {
+				backend: self.describe().into(),
+				what: format!("indexes on `{}`", table.name).into(),
+				limit: Self::INDEX_SLOTS,
+				found: table.indexes.len(),
+			}
+			.into()),
+			false => Ok(()),
+		}
+	}
+
+	/// The wire item a row is written as: its key, row text, cid and an
+	/// index slot per declared index.
+	fn row_item(
+		&self,
+		table: &TableSpec,
+		row: &StoredRow,
+	) -> Result<JsonValue> {
+		self.check_index_slots(table)?;
+		let mut item = json!({
+			"pk": {"S": self.pk()},
+			"sk": {"S": Self::row_sk(table, row.key())},
+			"row": {"S": serde_json::to_string(&row.row().to_json())?},
+			"cid": {"S": row.cid().as_str()},
+		});
+		for (slot, index) in table.indexes.iter().enumerate() {
+			let slot = slot + 1;
+			item[format!("gsi{slot}pk")] = json!({
+				"S": format!("{}#{}#{}", self.pk(), table.name, index.name)
+			});
+			item[format!("gsi{slot}sk")] = json!({"S": index.entry(row.key(), row.row())?.to_sortable_text()});
+		}
+		item.xok()
+	}
+
+	/// Set `precondition`'s condition on a request body or transaction item:
+	/// a row whose `ttl` has passed counts as absent, as every read here
+	/// treats it.
+	fn with_condition(
+		mut body: JsonValue,
+		precondition: &Precondition,
+	) -> JsonValue {
+		let now = json!({"N": Timestamp::now().secs().to_string()});
+		let (expression, values) = match precondition {
+			Precondition::Any => return body,
+			Precondition::Absent => (
+				"attribute_not_exists(pk) OR #ttl <= :now",
+				json!({":now": now}),
+			),
+			Precondition::Matches(cid) => (
+				"cid = :cid AND (attribute_not_exists(#ttl) OR #ttl > :now)",
+				json!({":cid": {"S": cid.as_str()}, ":now": now}),
+			),
+		};
+		body["ConditionExpression"] = json!(expression);
+		body["ExpressionAttributeNames"] = json!({"#ttl": Self::TTL_ATTRIBUTE});
+		body["ExpressionAttributeValues"] = values;
+		body
+	}
+
+	/// The conflict at `key`, naming the row there now.
+	async fn conflict(
+		&self,
+		table: &TableSpec,
+		key: &TableKey,
+		precondition: &Precondition,
+	) -> BevyError {
+		match self.get_row(table, key).await {
+			Ok(found) => TableError::Conflict {
+				table: table.name.clone(),
+				key: key.clone(),
+				expected: precondition.clone(),
+				found: found.map(|row| row.cid().clone()),
+			}
+			.into(),
+			Err(err) => err,
+		}
+	}
+
+	/// Every item `body` queries, following `LastEvaluatedKey` until `enough`
+	/// items are read or there are no more, answering whether more remain.
+	async fn query(
+		&self,
+		mut body: JsonValue,
+		enough: Option<usize>,
+		keep: impl Fn(&JsonValue) -> bool,
+	) -> Result<(Vec<JsonValue>, bool)> {
+		let mut items = Vec::new();
+		loop {
+			if let Some(enough) = enough {
+				// a few spare for the bounds filtered client side
+				body["Limit"] = json!(enough - items.len() + 2);
+			}
+			let out = self.call("Query", body.clone()).await?;
+			items.extend(
+				out["Items"]
+					.as_array()
+					.into_iter()
+					.flatten()
+					.filter(|item| keep(item))
+					.cloned(),
+			);
+			let more = matches!(
+				&out["LastEvaluatedKey"],
+				JsonValue::Object(key) if !key.is_empty()
+			);
+			if enough.is_some_and(|enough| items.len() >= enough) {
+				items.truncate(enough.unwrap());
+				return (items, true).xok();
+			}
+			if !more {
+				return (items, false).xok();
+			}
+			body["ExclusiveStartKey"] = out["LastEvaluatedKey"].clone();
+		}
 	}
 
 	/// Get the table status, returning `None` if the table does not exist.
@@ -191,40 +384,12 @@ impl DynamoStore {
 		}
 		bevybail!("Table did not reach {target:?} in time");
 	}
-
-	/// Every item of a paginated `Scan` over this table, `extra` naming its
-	/// projection or filter.
-	async fn scan(
-		&self,
-		extra: JsonValue,
-	) -> Result<Vec<StdHashMap<String, AttributeValue>>> {
-		let mut items = Vec::new();
-		let mut start_key: Option<JsonValue> = None;
-		loop {
-			let mut body = extra.clone();
-			if let Some(key) = start_key.take() {
-				body["ExclusiveStartKey"] = key;
-			}
-			let out = self.call("Scan", body).await?;
-			for item in out["Items"].as_array().into_iter().flatten() {
-				items.push(Self::item_of(item)?);
-			}
-			// an absent (or empty) last evaluated key ends the scan
-			match &out["LastEvaluatedKey"] {
-				JsonValue::Object(key) if !key.is_empty() => {
-					start_key = Some(out["LastEvaluatedKey"].clone());
-				}
-				_ => break,
-			}
-		}
-		items.xok()
-	}
 }
 
 /// Insert both erased store currencies: the [`BlobStore`] every provider gets,
 /// then the [`TableStore`] wrapping this provider directly, so its native
-/// document form wins over the json-over-blobs table the blob hook
-/// materializes under `json`.
+/// single-table layout wins over the blob backed table the blob hook
+/// materializes.
 fn on_insert_dynamo(mut world: DeferredWorld, cx: HookContext) {
 	BlobStore::on_insert::<DynamoStore>(world.reborrow(), cx);
 	TableStore::on_insert::<DynamoStore>(world, cx);
@@ -253,8 +418,16 @@ impl BlobStoreProvider for DynamoStore {
 	fn id(&self) -> &'static str { "dynamo" }
 
 	fn root_key(&self) -> SmolStr {
-		format!("dynamo:{}", self.table_name).into()
+		match &self.partition {
+			Some(partition) => {
+				format!("dynamo:{}/{partition}", self.table_name)
+			}
+			None => format!("dynamo:{}", self.table_name),
+		}
+		.into()
 	}
+
+	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
 
 	fn region(&self) -> Option<String> {
 		self.region.as_ref().map(ToString::to_string)
@@ -267,24 +440,24 @@ impl BlobStoreProvider for DynamoStore {
 		})
 	}
 
+	/// The single-table layout: `pk`/`sk`, the four index slots each a
+	/// global secondary index projecting every attribute, on-demand billing
+	/// (an index under provisioned billing needs its own throughput), and
+	/// the expiry attribute enabled.
 	fn store_create(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		Box::pin(async move {
+			this.call("CreateTable", Self::create_table_body()).await?;
+			this.await_status("CREATING", Some("ACTIVE")).await?;
 			this.call(
-				"CreateTable",
-				json!({
-					"AttributeDefinitions": [
-						{"AttributeName": "id", "AttributeType": "S"}
-					],
-					"KeySchema": [{"AttributeName": "id", "KeyType": "HASH"}],
-					"ProvisionedThroughput": {
-						"ReadCapacityUnits": 1,
-						"WriteCapacityUnits": 1
-					}
-				}),
+				"UpdateTimeToLive",
+				json!({"TimeToLiveSpecification": {
+					"Enabled": true,
+					"AttributeName": Self::TTL_ATTRIBUTE
+				}}),
 			)
 			.await?;
-			this.await_status("CREATING", Some("ACTIVE")).await
+			Ok(())
 		})
 	}
 
@@ -298,73 +471,77 @@ impl BlobStoreProvider for DynamoStore {
 
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		let id = self.qualify(path);
-		let data = serde_json::to_value(AttributeValue::B(body.to_vec()));
+		let sk = self.blob_sk(path);
 		Box::pin(async move {
-			let item = json!({"id": {"S": id}, "data": data?});
-			this.call("PutItem", json!({"Item": item})).await?;
+			this.call("PutItem", json!({"Item": this.blob_item(&sk, &body)}))
+				.await?;
 			Ok(())
 		})
 	}
 
-	/// List every key in the table.
-	///
-	/// A DynamoDB `Scan` returns at most 1MB per call, so this follows
-	/// `LastEvaluatedKey` to exhaustion; a single call silently truncates a
-	/// table of any real size (prod analytics returned 4k of 200k rows) and the
-	/// caller cannot tell a truncated page from a small table. Projects to the
-	/// `id` attribute so pages carry keys rather than row bodies, which is both
-	/// cheaper and far more keys per page.
+	/// Every blob in this scope, one `Query` of the partition's blob range.
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let this = self.clone();
 		Box::pin(async move {
-			let prefix = this.subdir.as_ref().map(|s| format!("{}/", s));
-			this.scan(json!({"ProjectionExpression": "id"}))
-				.await?
-				.into_iter()
-				.filter_map(|item| match item.get("id") {
-					Some(AttributeValue::S(id)) => match &prefix {
-						Some(prefix) => {
-							id.strip_prefix(prefix.as_str()).map(RelPath::new)
-						}
-						None => Some(RelPath::new(id)),
-					},
-					_ => None,
-				})
+			let prefix = this.blob_sk(&RelPath::default());
+			let prefix = match this.subdir.is_some() {
+				true => prefix,
+				false => Self::BLOB_PREFIX.to_string(),
+			};
+			let (items, _) = this
+				.query(
+					json!({
+						"KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+						"ExpressionAttributeValues": {
+							":pk": {"S": this.pk()},
+							":prefix": {"S": prefix}
+						},
+						"ProjectionExpression": "sk"
+					}),
+					None,
+					|_| true,
+				)
+				.await?;
+			items
+				.iter()
+				.filter_map(|item| Self::string_attr(item, "sk"))
+				.filter_map(|sk| sk.strip_prefix(prefix.as_str()))
+				.map(RelPath::new)
 				.collect::<Vec<_>>()
 				.xok()
 		})
 	}
 
-	/// Retrieve an object by path.
-	///
-	/// Assumes a two-field schema: `id` (path) and `data` (binary).
-	/// For typed tables, see [`TableProvider`].
 	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
-		let key = self.key_of(path);
+		let key = self.item_key(&self.blob_sk(path));
+		let path = path.clone();
 		Box::pin(async move {
-			let out = this.call("GetItem", json!({"Key": key})).await?;
-			if out["Item"].is_null() {
-				bevybail!("Item not found");
-			}
-			let Some(AttributeValue::B(data)) =
-				Self::item_of(&out["Item"])?.remove("data")
-			else {
-				bevybail!("No data field found");
+			let out = this
+				.call("GetItem", json!({"Key": key, "ConsistentRead": true}))
+				.await?;
+			let Some(data) = out["Item"]["data"]["B"].as_str() else {
+				return Err(HttpError::new(
+					StatusCode::NOT_FOUND,
+					format!("blob `{path}` not found"),
+				)
+				.into());
 			};
-			Bytes::from(data).xok()
+			base64::engine::general_purpose::STANDARD
+				.decode(data)?
+				.xmap(Bytes::from)
+				.xok()
 		})
 	}
 
 	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
-		let key = self.key_of(path);
+		let key = self.item_key(&self.blob_sk(path));
 		Box::pin(async move {
 			match this
 				.call(
 					"GetItem",
-					json!({"Key": key, "ProjectionExpression": "id"}),
+					json!({"Key": key, "ProjectionExpression": "pk", "ConsistentRead": true}),
 				)
 				.await
 			{
@@ -381,7 +558,7 @@ impl BlobStoreProvider for DynamoStore {
 
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		let key = self.key_of(path);
+		let key = self.item_key(&self.blob_sk(path));
 		Box::pin(async move {
 			let out = this
 				.call(
@@ -396,6 +573,89 @@ impl BlobStoreProvider for DynamoStore {
 		})
 	}
 
+	fn get_versioned(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+		let this = self.clone();
+		let key = self.item_key(&self.blob_sk(path));
+		Box::pin(async move {
+			let out = this
+				.call("GetItem", json!({"Key": key, "ConsistentRead": true}))
+				.await?;
+			let item = &out["Item"];
+			let (Some(data), Some(version)) = (
+				item["data"]["B"].as_str(),
+				Self::string_attr(item, "version"),
+			) else {
+				return None.xok();
+			};
+			Some((
+				Bytes::from(
+					base64::engine::general_purpose::STANDARD.decode(data)?,
+				),
+				BlobVersion::new(version),
+			))
+			.xok()
+		})
+	}
+
+	/// `PutItem` conditioned on the item's `version` attribute, its content
+	/// digest.
+	fn insert_if(
+		&self,
+		path: &RelPath,
+		body: Bytes,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result<BlobVersion>> {
+		let this = self.clone();
+		let sk = self.blob_sk(path);
+		let path = path.clone();
+		Box::pin(async move {
+			let version = BlobVersion::of(&body);
+			let body = Self::with_blob_condition(
+				json!({"Item": this.blob_item(&sk, &body)}),
+				&condition,
+			);
+			match this.call("PutItem", body).await {
+				Ok(_) => version.xok(),
+				Err(err)
+					if AwsError::is(&err, &[
+						"ConditionalCheckFailedException",
+					]) =>
+				{
+					Err(BlobConflict::at(&path))
+				}
+				Err(err) => Err(err),
+			}
+		})
+	}
+
+	fn remove_if(
+		&self,
+		path: &RelPath,
+		condition: BlobCondition,
+	) -> SendBoxedFuture<Result> {
+		let this = self.clone();
+		let key = self.item_key(&self.blob_sk(path));
+		let path = path.clone();
+		Box::pin(async move {
+			let body =
+				Self::with_blob_condition(json!({"Key": key}), &condition);
+			match this.call("DeleteItem", body).await {
+				Ok(_) => Ok(()),
+				Err(err)
+					if AwsError::is(&err, &[
+						"ConditionalCheckFailedException",
+					]) =>
+				{
+					Err(BlobConflict::at(&path))
+				}
+				Err(err) => Err(err),
+			}
+		})
+	}
+
 	fn public_url(
 		&self,
 		_path: &RelPath,
@@ -404,78 +664,434 @@ impl BlobStoreProvider for DynamoStore {
 	}
 }
 
-/// Native document form: a row lands as a structured DynamoDB item (queryable
-/// attributes), never json bytes, so this backend needs no `json` codec at
-/// all. The item is keyed by [`TableKey::path`] in its `id` attribute, under
-/// this store's subdir exactly as a blob is, and carries the document under
-/// `row`, so a row's own `id` field never collides with the hash key.
+impl DynamoStore {
+	/// The wire item a blob is written as: its bytes and their digest, the
+	/// version a conditional write compares.
+	fn blob_item(&self, sk: &str, body: &[u8]) -> JsonValue {
+		let mut item = self.item_key(sk);
+		item["data"] = json!({"B": base64::engine::general_purpose::STANDARD.encode(body)});
+		item["version"] = json!({"S": BlobVersion::of(body).as_str()});
+		item
+	}
+
+	/// Set a blob condition on a request body.
+	fn with_blob_condition(
+		mut body: JsonValue,
+		condition: &BlobCondition,
+	) -> JsonValue {
+		match condition {
+			BlobCondition::Any => {}
+			BlobCondition::Absent => {
+				body["ConditionExpression"] = json!("attribute_not_exists(pk)");
+			}
+			BlobCondition::Matches(version) => {
+				body["ConditionExpression"] = json!("version = :version");
+				body["ExpressionAttributeValues"] =
+					json!({":version": {"S": version.as_str()}});
+			}
+		}
+		body
+	}
+
+	/// The `CreateTable` request the single-table layout is.
+	fn create_table_body() -> JsonValue {
+		let mut attributes = vec![
+			json!({"AttributeName": "pk", "AttributeType": "S"}),
+			json!({"AttributeName": "sk", "AttributeType": "S"}),
+		];
+		let mut indexes = Vec::new();
+		for slot in 1..=Self::INDEX_SLOTS {
+			attributes.push(
+				json!({"AttributeName": format!("gsi{slot}pk"), "AttributeType": "S"}),
+			);
+			attributes.push(
+				json!({"AttributeName": format!("gsi{slot}sk"), "AttributeType": "S"}),
+			);
+			indexes.push(json!({
+				"IndexName": format!("gsi{slot}"),
+				"KeySchema": [
+					{"AttributeName": format!("gsi{slot}pk"), "KeyType": "HASH"},
+					{"AttributeName": format!("gsi{slot}sk"), "KeyType": "RANGE"}
+				],
+				"Projection": {"ProjectionType": "ALL"}
+			}));
+		}
+		json!({
+			"AttributeDefinitions": attributes,
+			"KeySchema": [
+				{"AttributeName": "pk", "KeyType": "HASH"},
+				{"AttributeName": "sk", "KeyType": "RANGE"}
+			],
+			"GlobalSecondaryIndexes": indexes,
+			"BillingMode": "PAY_PER_REQUEST"
+		})
+	}
+
+	/// A key condition over `sk` (or an index's sort key) from inclusive
+	/// `low` to exclusive `high`, either open: `BETWEEN` where both are set,
+	/// the excluded high itself dropped client side.
+	fn sort_condition(
+		attribute: &str,
+		low: Option<String>,
+		high: Option<String>,
+		values: &mut JsonValue,
+	) -> Option<String> {
+		match (low, high) {
+			(Some(low), Some(high)) => {
+				values[":low"] = json!({"S": low});
+				values[":high"] = json!({"S": high});
+				Some(format!("{attribute} BETWEEN :low AND :high"))
+			}
+			(Some(low), None) => {
+				values[":low"] = json!({"S": low});
+				Some(format!("{attribute} >= :low"))
+			}
+			(None, Some(high)) => {
+				values[":high"] = json!({"S": high});
+				Some(format!("{attribute} < :high"))
+			}
+			(None, None) => None,
+		}
+	}
+
+	/// One write of a transaction, as its `TransactItems` entry.
+	fn transact_item(&self, write: &TableWrite) -> Result<JsonValue> {
+		match write {
+			TableWrite::Put {
+				table,
+				row,
+				precondition,
+			} => json!({"Put": Self::with_condition(json!({
+				"TableName": self.table_name.as_str(),
+				"Item": self.row_item(table, row)?
+			}), precondition)}),
+			TableWrite::Remove {
+				table,
+				key,
+				precondition,
+			} => json!({"Delete": Self::with_condition(json!({
+				"TableName": self.table_name.as_str(),
+				"Key": self.item_key(&Self::row_sk(table, key))
+			}), precondition)}),
+		}
+		.xok()
+	}
+
+	/// The index of the first write a cancelled transaction's message names
+	/// as failing its condition, ie `.. reasons [None, ConditionalCheckFailed]`.
+	fn failed_condition(message: &str) -> Option<usize> {
+		let reasons = message.rsplit_once('[')?.1.split_once(']')?.0;
+		reasons
+			.split(',')
+			.position(|reason| reason.trim() == "ConditionalCheckFailed")
+	}
+}
+
 impl TableProvider for DynamoStore {
 	fn box_clone_table(&self) -> Box<dyn TableProvider> {
 		Box::new(self.clone())
 	}
 
-	fn insert_row(
-		&self,
-		table: &str,
-		key: &TableKey,
-		row: Value,
-	) -> SendBoxedFuture<Result> {
-		let this = self.clone();
-		let id = self.qualify(&key.path(table));
-		let row = serde_dynamo::to_attribute_value::<_, AttributeValue>(row)
-			.map_err(BevyError::from)
-			.and_then(|row| serde_json::to_value(row).map_err(BevyError::from));
-		Box::pin(async move {
-			let item = json!({"id": {"S": id}, "row": row?});
-			this.call("PutItem", json!({"Item": item})).await?;
-			Ok(())
+	fn partition(&self, id: &PartitionId) -> Box<dyn TableProvider> {
+		Box::new(DynamoStore {
+			partition: Some(match &self.partition {
+				Some(parent) => parent.join(id),
+				None => id.clone(),
+			}),
+			subdir: None,
+			..self.clone()
 		})
+	}
+
+	fn supports(&self, capability: Capability) -> bool {
+		matches!(capability, Capability::AtomicApply | Capability::Indexes)
 	}
 
 	fn get_row(
 		&self,
-		table: &str,
+		table: &TableSpec,
 		key: &TableKey,
-	) -> SendBoxedFuture<Result<Value>> {
+	) -> SendBoxedFuture<Result<Option<StoredRow>>> {
 		let this = self.clone();
-		let key = self.key_of(&key.path(table));
+		let table = table.clone();
+		let item_key = self.item_key(&Self::row_sk(&table, key));
 		Box::pin(async move {
-			let out = this.call("GetItem", json!({"Key": key})).await?;
-			if out["Item"].is_null() {
-				bevybail!("Item not found");
+			let out = this
+				.call(
+					"GetItem",
+					json!({"Key": item_key, "ConsistentRead": true}),
+				)
+				.await?;
+			match out["Item"].is_null() || Self::is_expired(&out["Item"]) {
+				true => None,
+				false => Some(Self::stored_row(&table, &out["Item"])?),
 			}
-			Self::row_of(Self::item_of(&out["Item"])?)
+			.xok()
 		})
 	}
 
-	/// Read every row of `table` with a paginated `Scan` filtered to the
-	/// table's `id` prefix, deserializing the items the scan already returned.
-	///
-	/// The [`TableProvider::get_all_rows`] default would list the keys and then
-	/// issue one `GetItem` per row, an N+1 that a scan makes unnecessary: the
-	/// scan carries the bodies.
-	fn get_all_rows(
+	fn put_row(
 		&self,
-		table: &str,
-	) -> SendBoxedFuture<Result<Vec<(TableKey, Result<Value>)>>> {
+		table: &TableSpec,
+		row: StoredRow,
+		precondition: Precondition,
+	) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		let prefix = format!("{}/", self.qualify(&RelPath::new(table)));
+		let table = table.clone();
 		Box::pin(async move {
-			this.scan(json!({
-				"FilterExpression": "begins_with(id, :prefix)",
-				"ExpressionAttributeValues": {":prefix": {"S": prefix}}
-			}))
-			.await?
-			.into_iter()
-			.filter_map(|item| {
-				let Some(AttributeValue::S(id)) = item.get("id") else {
-					return None;
-				};
-				let key = TableKey::from(id.strip_prefix(prefix.as_str())?);
-				Some((key, Self::row_of(item)))
-			})
-			.collect::<Vec<_>>()
-			.xok()
+			let body = Self::with_condition(
+				json!({"Item": this.row_item(&table, &row)?}),
+				&precondition,
+			);
+			match this.call("PutItem", body).await {
+				Ok(_) => Ok(()),
+				Err(err)
+					if AwsError::is(&err, &[
+						"ConditionalCheckFailedException",
+					]) =>
+				{
+					Err(this.conflict(&table, row.key(), &precondition).await)
+				}
+				Err(err) => Err(err),
+			}
+		})
+	}
+
+	fn remove_row(
+		&self,
+		table: &TableSpec,
+		key: &TableKey,
+		precondition: Precondition,
+	) -> SendBoxedFuture<Result> {
+		let this = self.clone();
+		let table = table.clone();
+		let key = key.clone();
+		Box::pin(async move {
+			let body = Self::with_condition(
+				json!({"Key": this.item_key(&Self::row_sk(&table, &key))}),
+				&precondition,
+			);
+			match this.call("DeleteItem", body).await {
+				Ok(_) => Ok(()),
+				Err(err)
+					if AwsError::is(&err, &[
+						"ConditionalCheckFailedException",
+					]) =>
+				{
+					Err(this.conflict(&table, &key, &precondition).await)
+				}
+				Err(err) => Err(err),
+			}
+		})
+	}
+
+	/// A `Query` of the partition's `<table>#` range, bounds as a `BETWEEN`
+	/// over the sort key and the excluded ends dropped client side.
+	fn scan_rows(
+		&self,
+		table: &TableSpec,
+		scan: Scan,
+	) -> SendBoxedFuture<Result<ScanPage>> {
+		let this = self.clone();
+		let table = table.clone();
+		Box::pin(async move {
+			let scan = scan.after_key_cursor();
+			let sk = |key: &TableKey| Self::row_sk(&table, key);
+			let low = match &scan.start {
+				Bound::Included(key) | Bound::Excluded(key) => sk(key),
+				Bound::Unbounded => format!("{}#", table.name),
+			};
+			// `$` follows `#`, so every sort key of the table is below it
+			let high = match &scan.end {
+				Bound::Included(key) | Bound::Excluded(key) => sk(key),
+				Bound::Unbounded => format!("{}$", table.name),
+			};
+			let mut values = json!({":pk": {"S": this.pk()}});
+			values[":low"] = json!({"S": low});
+			values[":high"] = json!({"S": high});
+			let (items, _) = this
+				.query(
+					json!({
+						"KeyConditionExpression": "pk = :pk AND sk BETWEEN :low AND :high",
+						"ExpressionAttributeValues": values,
+						"ScanIndexForward": !scan.reverse,
+						"ConsistentRead": true
+					}),
+					scan.limit.map(|limit| limit + 1),
+					|item| {
+						!Self::is_expired(item)
+							&& Self::string_attr(item, "sk")
+								.and_then(|sk| {
+									sk.strip_prefix(&format!("{}#", table.name))
+								})
+								.is_some_and(|key| {
+									scan.contains(&TableKey::from(key))
+								})
+					},
+				)
+				.await?;
+			let mut rows = items
+				.iter()
+				.map(|item| Self::stored_row(&table, item))
+				.collect::<Result<Vec<_>>>()?;
+			if scan.reverse {
+				rows.reverse();
+			}
+			ScanPage::from_sorted(rows, &scan).xok()
+		})
+	}
+
+	fn apply(&self, writes: Vec<TableWrite>) -> SendBoxedFuture<Result> {
+		let this = self.clone();
+		Box::pin(async move {
+			if writes.len() > Self::MAX_BATCH {
+				return Err(TableError::Limit {
+					backend: this.describe().into(),
+					what: "writes in one batch".into(),
+					limit: Self::MAX_BATCH,
+					found: writes.len(),
+				}
+				.into());
+			}
+			if writes.is_empty() {
+				return Ok(());
+			}
+			let items = writes
+				.iter()
+				.map(|write| this.transact_item(write))
+				.collect::<Result<Vec<_>>>()?;
+			let body = json!({"TransactItems": items});
+			match this.client()?.call_json("TransactWriteItems", &body).await {
+				Ok(_) => Ok(()),
+				Err(err) => {
+					let failed = AwsError::of(&err)
+						.filter(|aws| {
+							aws.error_code() == "TransactionCanceledException"
+						})
+						.and_then(|aws| Self::failed_condition(aws.message()));
+					match failed.and_then(|idx| writes.get(idx)) {
+						Some(write) => Err(this
+							.conflict(
+								write.table(),
+								write.key(),
+								write.precondition(),
+							)
+							.await),
+						None => Err(err),
+					}
+				}
+			}
+		})
+	}
+
+	/// Stamp each row's `ttl` with now, so Dynamo deletes it for free within
+	/// a day or two and every read here skips it from this moment.
+	fn expire_rows(
+		&self,
+		table: &TableSpec,
+		keys: Vec<TableKey>,
+	) -> SendBoxedFuture<Result> {
+		let this = self.clone();
+		let table = table.clone();
+		Box::pin(async move {
+			let now = Timestamp::now().secs();
+			keys.iter()
+				.map(|key| {
+					this.call(
+						"UpdateItem",
+						json!({
+							"Key": this.item_key(&Self::row_sk(&table, key)),
+							"UpdateExpression": "SET #ttl = :ttl",
+							"ConditionExpression": "attribute_exists(pk)",
+							"ExpressionAttributeNames": {"#ttl": Self::TTL_ATTRIBUTE},
+							"ExpressionAttributeValues": {":ttl": {"N": now.to_string()}}
+						}),
+					)
+				})
+				.xmap(|updates| {
+					async_ext::join_all_bounded(BlobStore::GET_ALL_CONCURRENCY, updates)
+				})
+				.await
+				.into_iter()
+				.filter(|result| {
+					!matches!(result, Err(err) if AwsError::is(err, &["ConditionalCheckFailedException"]))
+				})
+				.collect::<Result<Vec<_>>>()?;
+			Ok(())
+		})
+	}
+
+	/// A `Query` of the index's slot: its `<partition>#<table>#<index>`
+	/// partition and a range over the entries' sortable text.
+	fn scan_index(
+		&self,
+		table: &TableSpec,
+		index: &TableIndex,
+		scan: IndexScan,
+	) -> SendBoxedFuture<Result<ScanPage>> {
+		let this = self.clone();
+		let table = table.clone();
+		let index = index.clone();
+		Box::pin(async move {
+			this.check_index_slots(&table)?;
+			let Some(slot) =
+				table.indexes.iter().position(|declared| *declared == index)
+			else {
+				bevybail!(
+					"table `{}` declares no index `{}`",
+					table.name,
+					index.name
+				);
+			};
+			let slot = slot + 1;
+			let range = scan.entry_range()?;
+			let mut values = json!({":pk": {"S": format!("{}#{}#{}", this.pk(), table.name, index.name)}});
+			let mut condition = format!("gsi{slot}pk = :pk");
+			if let Some(sort) = Self::sort_condition(
+				&format!("gsi{slot}sk"),
+				range.0.as_ref().map(IndexKey::to_sortable_text),
+				range.1.as_ref().map(IndexKey::to_sortable_text),
+				&mut values,
+			) {
+				condition.push_str(&format!(" AND {sort}"));
+			}
+			let sk_attr = format!("gsi{slot}sk");
+			let (items, _) = this
+				.query(
+					json!({
+						"IndexName": format!("gsi{slot}"),
+						"KeyConditionExpression": condition,
+						"ExpressionAttributeValues": values,
+						"ScanIndexForward": !scan.reverse
+					}),
+					scan.limit.map(|limit| limit + 1),
+					|item| {
+						!Self::is_expired(item)
+							&& Self::string_attr(item, &sk_attr)
+								.and_then(|text| {
+									IndexKey::from_sortable_text(text).ok()
+								})
+								.is_some_and(|entry| {
+									IndexScan::contains(&range, &entry)
+								})
+					},
+				)
+				.await?;
+			let mut rows = items
+				.iter()
+				.map(|item| Self::stored_row(&table, item))
+				.collect::<Result<Vec<_>>>()?;
+			let more = scan.limit.is_some_and(|limit| rows.len() > limit);
+			if let Some(limit) = scan.limit {
+				rows.truncate(limit);
+			}
+			let cursor = match (more, rows.last()) {
+				(true, Some(last)) => {
+					Some(index.entry(last.key(), last.row())?.to_cursor())
+				}
+				_ => None,
+			};
+			ScanPage { rows, cursor }.xok()
 		})
 	}
 }
@@ -487,23 +1103,23 @@ mod test {
 	/// The store and table suites against AWS, creating and removing their
 	/// tables, so they need an identity holding `dynamodb:*` on
 	/// `beet--test--*`.
-	#[beet_core::test(timeout_ms = 120_000)]
+	#[beet_core::test(timeout_ms = 600_000)]
 	#[ignore = "takes ages"]
 	async fn store() {
 		let provider = DynamoStore::new("beet--test--store", "us-west-2");
 		store_test::run(provider).await;
 	}
-	#[beet_core::test(timeout_ms = 120_000)]
+	#[beet_core::test(timeout_ms = 600_000)]
 	#[ignore = "takes ages"]
 	async fn table() {
 		let provider = DynamoStore::new("beet--test--table", "us-west-2");
-		table_test::run(provider).await;
+		table_test::run(TableStore::new(provider)).await;
 	}
 
 	/// The store and table suites against DynamoDB Local
 	/// (`podman run -p 8000:8000 amazon/dynamodb-local`), which checks every
 	/// request's wire shape and accepts any signature.
-	#[beet_core::test]
+	#[beet_core::test(timeout_ms = 120_000)]
 	#[ignore = "needs DynamoDB Local on 127.0.0.1:8000"]
 	async fn local_store() {
 		store_test::run(
@@ -512,13 +1128,13 @@ mod test {
 		)
 		.await;
 	}
-	#[beet_core::test]
+	#[beet_core::test(timeout_ms = 120_000)]
 	#[ignore = "needs DynamoDB Local on 127.0.0.1:8000"]
 	async fn local_table() {
-		table_test::run(
+		table_test::run(TableStore::new(
 			DynamoStore::new("beet-local-table", "us-west-2")
 				.with_endpoint("http://127.0.0.1:8000"),
-		)
+		))
 		.await;
 	}
 
@@ -544,17 +1160,70 @@ mod test {
 			.xpect_eq("us-east-1");
 	}
 
-	/// The wire json a blob and a row are written as, and the scan that reads
-	/// them back, through the transport seam.
+	/// A row is keyed by its partition and `<table>#<key>`, its index slots
+	/// filled in declaration order.
 	#[beet_core::test]
-	fn items_are_wire_json() {
-		serde_json::to_value(AttributeValue::B(b"hi".to_vec()))
+	fn row_item_layout() {
+		let store = DynamoStore::new("t", "us-west-2");
+		let partition = DynamoStore {
+			partition: Some(PartitionId::parse("did:plc:abc").unwrap()),
+			..store.clone()
+		};
+		let row = StoredRow::new(
+			"k",
+			Row::from_value(value!({ "group": "g", "rank": 1 })).unwrap(),
+		)
+		.unwrap();
+		let item = partition
+			.row_item(&TableSpec::of::<table_test::IndexedRow>(), &row)
+			.unwrap();
+		item["pk"]["S"].as_str().unwrap().xpect_eq("did:plc:abc");
+		item["sk"]["S"].as_str().unwrap().xpect_eq("indexed_row#k");
+		item["gsi1pk"]["S"]
+			.as_str()
 			.unwrap()
-			.xpect_eq(json!({"B": "aGk="}));
-		DynamoStore::item_of(&json!({"id": {"S": "a/b"}, "n": {"N": "3"}}))
+			.xpect_eq("did:plc:abc#indexed_row#by_group");
+		item["gsi2pk"]["S"]
+			.as_str()
 			.unwrap()
-			.get("id")
-			.cloned()
-			.xpect_eq(Some(AttributeValue::S("a/b".into())));
+			.xpect_eq("did:plc:abc#indexed_row#by_rank");
+		store.pk().xpect_eq("@");
+		store
+			.blob_sk(&RelPath::new("a/b.txt"))
+			.xpect_eq("@blob#a/b.txt");
+		// five indexes overflow the four slots
+		let spec = TableSpec::new("t").with_indexes(
+			(0..5).map(|idx| TableIndex::new(format!("i{idx}"), ["f"])),
+		);
+		TableError::of(&store.row_item(&spec, &row).unwrap_err()).xpect_some();
+	}
+
+	/// Markup naming only the table and bucket builds each AWS store, every
+	/// optional field defaulted.
+	#[beet_core::test]
+	fn builds_from_the_name_alone() {
+		use bevy::reflect::structs::DynamicStruct;
+		let mut table = DynamicStruct::default();
+		table.insert("table_name", SmolStr::from("t"));
+		DynamoStore::from_reflect(&table)
+			.unwrap()
+			.root_key()
+			.xpect_eq("dynamo:t");
+		let mut bucket = DynamicStruct::default();
+		bucket.insert("bucket_name", SmolStr::from("b"));
+		S3Store::from_reflect(&bucket)
+			.unwrap()
+			.root_key()
+			.xpect_eq("s3:b");
+	}
+
+	#[beet_core::test]
+	fn reads_a_cancelled_transaction() {
+		DynamoStore::failed_condition(
+			"Transaction cancelled, please refer cancellation reasons for specific reasons [None, ConditionalCheckFailed, None]",
+		)
+		.xpect_eq(Some(1));
+		DynamoStore::failed_condition("Transaction cancelled [None]")
+			.xpect_none();
 	}
 }

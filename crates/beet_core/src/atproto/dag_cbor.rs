@@ -25,9 +25,42 @@
 //! ```
 //!
 //! [`cid`]: AtprotoValue::cid
+//!
+//! A record is the float-free subset of one encoding of any [`Value`]:
+//! [`Value::to_dag_cbor`] writes a float as a CBOR float and a raw byte string
+//! as a byte string, converting links and `$bytes` exactly as a record's are, so
+//! a value already in the data model encodes to the same bytes, and hashes to
+//! the same cid, by either path. A table row's cid is this encoding's.
+//!
+//! ```
+//! # use beet_core::prelude::*;
+//! let row = value!({ "$type": "app.bsky.feed.post", "text": "hi" });
+//! row.dag_cbor_cid()
+//! 	.unwrap()
+//! 	.xpect_eq(AtprotoValue::try_from(row).unwrap().cid());
+//! value!({ "scale": 0.5 }).dag_cbor_cid().unwrap();
+//! ```
 use crate::prelude::*;
 use base64::Engine;
 use ipld_core::ipld::Ipld;
+
+impl Value {
+	/// This value in canonical DAG-CBOR with floats permitted: a float is a
+	/// CBOR float and a raw byte string a CBOR byte string, `$link` and
+	/// `$bytes` objects the link and bytes they stand for. Refused for a
+	/// non-finite float, which DAG-CBOR cannot encode, and a `$link` or
+	/// `$bytes` object that does not parse.
+	pub fn to_dag_cbor(&self) -> Result<Vec<u8>> {
+		serde_ipld_dagcbor::to_vec(&AtprotoValue::to_ipld(self)?)
+			.map_err(|err| bevyhow!("Failed to serialize DAG-CBOR: {err}"))
+	}
+
+	/// The cid of [`to_dag_cbor`](Self::to_dag_cbor)'s bytes, which for a value
+	/// in the data model is exactly its record cid.
+	pub fn dag_cbor_cid(&self) -> Result<Cid> {
+		Cid::new(Cid::DAG_CBOR, &self.to_dag_cbor()?).xok()
+	}
+}
 
 impl AtprotoValue {
 	/// The cid of this value as a record: CIDv1 over its canonical DAG-CBOR,
@@ -38,8 +71,8 @@ impl AtprotoValue {
 	/// Infallible, since construction refused anything the data model cannot
 	/// encode.
 	pub(crate) fn to_dag_cbor(&self) -> Vec<u8> {
-		serde_ipld_dagcbor::to_vec(&Self::to_ipld(self)).expect(
-			"an `Ipld` encodes into a `Vec`, short of allocation failing",
+		(**self).to_dag_cbor().expect(
+			"an `AtprotoValue` holds only what DAG-CBOR encodes, short of allocation failing",
 		)
 	}
 
@@ -52,61 +85,53 @@ impl AtprotoValue {
 			.xmap(Self::from_wire)
 	}
 
-	/// The data model's view of a json form value: `$link` and `$bytes`
-	/// objects become the link and the bytes they stand for. Total over what
-	/// an [`AtprotoValue`] can hold, so each branch it rules out says why.
-	fn to_ipld(value: &Value) -> Ipld {
+	/// The data model's view of a value: `$link` and `$bytes` objects become
+	/// the link and the bytes they stand for, a float and a raw byte string
+	/// pass as themselves. A value in the data model holds neither of the
+	/// latter, which is what makes it the float-free subset.
+	fn to_ipld(value: &Value) -> Result<Ipld> {
 		match value {
 			Value::Null => Ipld::Null,
 			Value::Bool(bool) => Ipld::Bool(*bool),
 			Value::Int(int) => Ipld::Integer(*int as i128),
 			Value::Uint(uint) => Ipld::Integer(*uint as i128),
-			Value::Float(_) | Value::Bytes(_) => unreachable!(
-				"an `AtprotoValue` encodes every float and byte string as an object"
-			),
+			Value::Float(float) => Ipld::Float(*float),
+			Value::Bytes(bytes) => Ipld::Bytes(bytes.clone()),
 			Value::Str(string) => Ipld::String(string.to_string()),
-			Value::List(items) => {
-				Ipld::List(items.iter().map(Self::to_ipld).collect())
-			}
+			Value::List(items) => Ipld::List(
+				items.iter().map(Self::to_ipld).collect::<Result<_>>()?,
+			),
 			Value::Map(map) => {
 				match map.into_iter().collect::<Vec<_>>().as_slice() {
 					[(key, Value::Str(cid))] if key.as_str() == "$link" => {
-						Ipld::Link(
-							Cid::parse(cid)
-								.and_then(|cid| cid.to_binary())
-								.ok()
-								.and_then(|binary| {
-									ipld_core::cid::Cid::try_from(
-										binary.as_slice(),
-									)
-									.ok()
-								})
-								.expect(
-									"an `AtprotoValue` holds only `$link`s that parse",
-								),
-						)
+						let binary = Cid::parse(cid)?.to_binary()?;
+						ipld_core::cid::Cid::try_from(binary.as_slice())
+							.map_err(|err| {
+								bevyhow!("`$link` `{cid}` is not a cid: {err}")
+							})?
+							.xmap(Ipld::Link)
 					}
 					[(key, Value::Str(base64))] if key.as_str() == "$bytes" => {
-						Ipld::Bytes(
-							base64::engine::general_purpose::STANDARD_NO_PAD
-								.decode(base64.trim_end_matches('='))
-								.ok()
-								.expect(
-									"an `AtprotoValue` holds only `$bytes` that decode",
-								),
-						)
+						base64::engine::general_purpose::STANDARD_NO_PAD
+							.decode(base64.trim_end_matches('='))
+							.map_err(|err| {
+								bevyhow!("`$bytes` must be base64: {err}")
+							})?
+							.xmap(Ipld::Bytes)
 					}
 					entries => Ipld::Map(
 						entries
 							.iter()
 							.map(|(key, value)| {
-								(key.to_string(), Self::to_ipld(value))
+								Self::to_ipld(value)
+									.map(|value| (key.to_string(), value))
 							})
-							.collect(),
+							.collect::<Result<_>>()?,
 					),
 				}
 			}
 		}
+		.xok()
 	}
 
 	/// The json form of a decoded block: a link becomes `{"$link": "<cid>"}`
@@ -260,6 +285,36 @@ mod test {
 			.unwrap();
 		// tag 42 is `0xd8 0x2a`, then a byte string of a zero byte and the cid
 		block[..2].to_vec().xpect_eq(vec![0xd8, 0x2a]);
+	}
+
+	/// A float-free value encodes to the same bytes and cid by either path,
+	/// and a float or raw bytes encode where a record refuses them.
+	#[crate::test]
+	fn float_permitting_encoding_shares_the_record_path() {
+		let link = Cid::raw(b"blob");
+		let value = value!({
+			"$type": "com.example.note",
+			"n": (Value::Int(-3)),
+			"l": { "$link": (link.as_str()) },
+			"b": { "$bytes": "aGk" },
+			"list": [true, null, "text"]
+		});
+		let record = AtprotoValue::from_wire(value.clone()).unwrap();
+		value.to_dag_cbor().unwrap().xpect_eq(record.to_dag_cbor());
+		value.dag_cbor_cid().unwrap().xpect_eq(record.cid());
+		// raw bytes encode as the `$bytes` they stand for
+		value!({ "b": (Value::Bytes(b"hi".to_vec())) })
+			.dag_cbor_cid()
+			.unwrap()
+			.xpect_eq(
+				value!({ "b": { "$bytes": "aGk" } }).dag_cbor_cid().unwrap(),
+			);
+		// a float is a CBOR float, so not the record's float object
+		value!({ "x": 0.5 }).dag_cbor_cid().unwrap().xpect_not_eq(
+			AtprotoValue::try_from(value!({ "x": 0.5 })).unwrap().cid(),
+		);
+		Value::Float(f64::NAN).to_dag_cbor().unwrap_err();
+		value!({ "$link": "nope" }).to_dag_cbor().unwrap_err();
 	}
 
 	/// A block holding a float is not in the data model.

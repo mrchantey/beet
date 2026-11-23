@@ -41,11 +41,11 @@ async fn fetch(
 	console_error_panic_hook::set_once();
 
 	// the Worker's config is its `vars`: seed them before the first
-	// `BootstrapConfig::get()` memoizes, then stash the env so any
-	// `R2WorkersStore` resolves its live bucket binding for the duration of this
-	// invocation.
+	// `BootstrapConfig::get()` memoizes, then stash the env so any binding (an
+	// `R2WorkersStore`'s bucket, a `DurableObjectStore`'s namespace) resolves
+	// for the duration of this invocation.
 	seed_env(&env);
-	R2WorkersStore::set_env(env);
+	WorkerEnv::set(env);
 
 	// convert, route, convert back; map any beet error to a 500. `error!` reaches
 	// `wrangler tail`: the site's `LogPlugin` installs a JS-console tracing
@@ -82,7 +82,7 @@ fn seed_env(env: &Env) {
 /// Convert the request, route it through the (lazily built, version-checked)
 /// entry world, and convert the response back.
 async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
-	let request = worker_to_request(req).await?;
+	let request = WorkerEnv::to_request(req).await?;
 	let config = BootstrapConfig::get();
 
 	// the store the deploy baked in, the one kind a Worker serves from: its
@@ -137,7 +137,7 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 		.entity_mut(worker_world.host)
 		.exchange(request)
 		.await;
-	let worker_response = response_to_worker(response).await;
+	let worker_response = WorkerEnv::to_worker_response(response).await;
 
 	// put the world back for the next request.
 	worker_world.put();
@@ -203,40 +203,4 @@ async fn head_version(store: &R2WorkersStore, path: &str) -> Option<String> {
 		.await
 		.ok()
 		.flatten()
-}
-
-/// Convert a [`worker::Request`] into a beet [`Request`]: method, full URL,
-/// headers, and the body bytes.
-async fn worker_to_request(mut req: WorkerRequest) -> Result<Request> {
-	let url = req.url()?;
-	// `worker::Method` displays as its uppercase name, which `HttpMethod` parses.
-	let method = req.method().to_string().parse::<HttpMethod>()?;
-	// read the body bytes up front (the Worker request is consumed once).
-	let body = req.bytes().await.unwrap_or_default();
-
-	let mut parts = RequestParts::new(method, Url::coerce(url.as_str()));
-	for (key, value) in req.headers() {
-		parts.headers.set_raw(key, value);
-	}
-	let body = match body.is_empty() {
-		true => Body::default(),
-		false => Body::Bytes(body.into()),
-	};
-	Request::from_parts(parts, body).xok()
-}
-
-/// Convert a beet [`Response`] into a [`worker::Response`]: collect the body
-/// bytes, then carry the status and headers across.
-async fn response_to_worker(response: Response) -> Result<WorkerResponse> {
-	let (parts, body) = response.into_parts();
-	let bytes = body.into_bytes().await?;
-	let mut worker_response = WorkerResponse::from_bytes(bytes.to_vec())?
-		.with_status(parts.status().as_u16());
-	let headers = worker_response.headers_mut();
-	for (key, values) in parts.headers.iter_all() {
-		for value in values {
-			headers.append(key, value)?;
-		}
-	}
-	worker_response.xok()
 }

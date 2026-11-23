@@ -14,7 +14,11 @@ use crate::prelude::*;
 /// note.len().xpect_eq(2);
 /// note.map(|text| text.len()).xmap(|len| *len).xpect_eq(2);
 /// ```
+///
+/// Serialized as `{rkey, value}`, the pair itself: a repo writes the body
+/// alone at the key, which is the write's business, not the pair's.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rkeyed<T> {
 	rkey: Rkey,
 	#[deref]
