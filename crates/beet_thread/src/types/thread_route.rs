@@ -28,10 +28,11 @@ use beet_router::prelude::*;
 ///    the request's [`ThreadEntryParams`] overriding it; then posts
 ///    `message`, each `{param}` filled from the request, by `actor`, else
 ///    the thread's first User actor by id;
-/// 3. runs the template's behavior to its [`Outcome`], then closes the
-///    session ([`SessionClosed`]), an error closing it as a fail;
+/// 3. runs the template's behavior to its [`Outcome`], writing nothing for
+///    its end;
 /// 4. waits for every completed post to reach its [`ThreadStore`]
-///    ([`ThreadStore::flush`]), then despawns the thread;
+///    ([`ThreadStore::flush`]), however the behavior ended, then despawns
+///    the thread;
 /// 5. answers the last completed text of the thread's acting actors as the
 ///    body on a pass, and a `500` naming the failure on a fail.
 ///
@@ -139,7 +140,7 @@ impl ThreadRoute {
 	}
 
 	/// Enter the threads under the build `root`, run the template's behavior,
-	/// close and flush every thread and answer.
+	/// flush every thread and answer.
 	async fn run(
 		root: &AsyncEntity,
 		template: &str,
@@ -165,7 +166,7 @@ impl ThreadRoute {
 		})?;
 		let outcome =
 			root.world().entity(behavior).call::<(), Outcome>(()).await;
-		RunThread::close_all(&root.world(), &threads, &outcome).await?;
+		RunThread::flush_all(&root.world(), &threads).await?;
 		let outcome = outcome?;
 		let last_text = root
 			.world()
@@ -423,7 +424,7 @@ mod test {
 		ThreadStore::new(TableStore::new(store.clone()), RelPath::new(path))
 	}
 
-	/// The text posts of `posts`, the tool calls and sessions aside.
+	/// The text posts of `posts`, the tool calls and joins aside.
 	fn texts(posts: &[Post]) -> Vec<String> {
 		posts
 			.iter()
@@ -498,7 +499,7 @@ mod test {
 		]);
 	}
 
-	/// A request's message lands once per request, after its session opens,
+	/// A request's message lands once per request, after its entry's joins,
 	/// by the named actor, else the thread's first User actor by id.
 	#[beet_core::test]
 	async fn posts_the_message_by_its_actor() {
@@ -579,11 +580,11 @@ mod test {
 		.xpect_eq(StatusCode::BAD_REQUEST);
 	}
 
-	/// Each request joins every actor of its scene and closes the window, the
-	/// second request's joins naming its own cause while the thread keeps its
-	/// creator, and model input carries neither.
+	/// Each request joins every actor of its scene and nothing marks its
+	/// end, the second request's joins naming its own cause while the thread
+	/// keeps its creator, and usage stays on each response's metadata.
 	#[beet_core::test]
-	async fn sessions_are_bracketed_by_posts() {
+	async fn each_request_joins_its_actors() {
 		let (mut app, router, store) = host();
 		let creator = delegating_post();
 		let second = PostRef::new(ThreadId::from_u128(1), PostId::from_u128(3));
@@ -618,36 +619,30 @@ mod test {
 					})
 					.collect::<Vec<_>>(),
 			);
-		let closed = posts
+		// a join is the only log post: no request wrote one for its end
+		posts
 			.iter()
-			.filter_map(|post| post.log::<SessionClosed>())
-			.collect::<Vec<_>>();
-		closed
-			.iter()
-			.map(|closed| closed.outcome)
-			.collect::<Vec<_>>()
-			.xpect_eq(vec![Outcome::PASS, Outcome::PASS]);
-		// each totals the usage of its own session's two mock responses
-		for closed in &closed {
-			closed.usage.input_tokens.xpect_eq(20);
-		}
-		// the scripted agent answered the review both times, never a session
-		let mut records = ThreadRecords::new();
-		for actor in thread_store(&store, "threads/product")
-			.actors(thread.id())
+			.filter(|post| post.intent() == PostIntent::Log)
+			.all(SessionOpened::opens)
+			.xpect_true();
+		// two mock responses a request, each keeping its own usage
+		let records = thread_store(&store, "threads/product")
+			.load_records(&thread)
 			.await
-			.unwrap()
-		{
-			records.insert_actor(actor);
-		}
-		for post in posts {
-			records.upsert_post(post);
-		}
+			.unwrap();
+		records
+			.metas()
+			.filter_map(|meta| meta.usage)
+			.sum::<Usage>()
+			.input_tokens
+			.xpect_eq(40);
+		// the model reads each request's joins as one note
 		records
 			.model_posts(None)
 			.iter()
-			.any(|view| view.post.intent() == PostIntent::Log)
-			.xpect_false();
+			.filter(|item| matches!(item, ModelPost::Note(_)))
+			.count()
+			.xpect_eq(2);
 	}
 
 	/// A request without `spawned_by`, ie a unit run by hand, records no
@@ -675,10 +670,10 @@ mod test {
 			.xpect_eq(Some(&delegating_post()));
 	}
 
-	/// A session whose behavior errors still closes, as a fail, and its
-	/// records reach the store.
+	/// A thread whose behavior errors still reaches its store, with no post
+	/// for its end.
 	#[beet_core::test]
-	async fn an_erroring_session_still_closes() {
+	async fn an_erroring_thread_still_flushes() {
 		let (mut app, router, store) = host();
 		review(&mut app, router, Request::get("fail"))
 			.await
@@ -688,10 +683,9 @@ mod test {
 			.await
 			.1
 			.iter()
-			.filter_map(|post| post.log::<SessionClosed>())
-			.map(|closed| closed.outcome)
+			.map(|post| (post.author(), SessionOpened::opens(post)))
 			.collect::<Vec<_>>()
-			.xpect_eq(vec![Outcome::FAIL]);
+			.xpect_eq(vec![(ActorId::from_u128(2), true)]);
 	}
 
 	/// A request for a thread whose canonical window is live, a request

@@ -80,7 +80,7 @@ impl CompletionsStreamer {
 	}
 
 	/// Builds a [`CreateChatCompletionRequest`] from the current ECS state.
-	async fn build_request(
+	pub(crate) async fn build_request(
 		&self,
 		caller: AsyncEntity,
 	) -> Result<(CreateChatCompletionRequest, ActorId, ThreadId)> {

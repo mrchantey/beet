@@ -3,11 +3,11 @@ use beet_core::prelude::*;
 
 pub type ThreadId = Uuid7<Thread>;
 
-/// A conversation, for its whole life: the record every session continuing it
-/// adopts, named by its [`ThreadId`].
+/// A conversation, for its whole life: the record every window open onto it
+/// holds, named by its [`ThreadId`].
 ///
 /// Two relations name another thread's post, each by [`PostRef`] and neither
-/// mirrored by an entity relationship, so the navigator reads the tree from
+/// mirrored by an entity relationship, so the tree of threads reads from
 /// records alone:
 ///
 /// - [`Self::spawned_by`]: the post whose action started this thread, ie a

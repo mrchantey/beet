@@ -101,14 +101,42 @@ impl ThreadRecords {
 		}
 	}
 
-	/// The posts a model reads, after an exclusive cursor: every authored
-	/// post but the [`PostIntent::Log`] posts, which stay in the records, the
-	/// record and the view.
-	pub fn model_posts(&self, after: Option<PostId>) -> Vec<AuthoredPost<'_>> {
-		self.posts_after(after)
-			.into_iter()
+	/// Every authored post that is not a [`PostIntent::Log`]: what was said,
+	/// rather than what happened.
+	pub fn content_posts(&self) -> impl Iterator<Item = AuthoredPost<'_>> {
+		self.authored_posts()
 			.filter(|view| view.post.intent() != PostIntent::Log)
-			.collect()
+	}
+
+	/// What a model reads, after an exclusive cursor: every authored post
+	/// that is not a log, and each run of joins between them as one note
+	/// ([`Self::join_note`]). Any other log kind stays out, so it never
+	/// splits a run.
+	pub fn model_posts(&self, after: Option<PostId>) -> Vec<ModelPost<'_>> {
+		let mut items = Vec::new();
+		let mut joins = Vec::new();
+		for view in self.posts_after(after) {
+			if SessionOpened::opens(view.post) {
+				joins.push(view);
+			} else if view.post.intent() != PostIntent::Log {
+				self.push_note(&mut items, &mut joins);
+				items.push(ModelPost::Post(view));
+			}
+		}
+		self.push_note(&mut items, &mut joins);
+		items
+	}
+
+	/// Push the note of `joins` onto `items`, if any joined, leaving none.
+	fn push_note<'a>(
+		&self,
+		items: &mut Vec<ModelPost<'a>>,
+		joins: &mut Vec<AuthoredPost<'a>>,
+	) {
+		if !joins.is_empty() {
+			items.push(ModelPost::Note(self.join_note(joins)));
+			joins.clear();
+		}
 	}
 
 	/// Merge stored records under these: the stored posts and metadata,
@@ -303,6 +331,28 @@ impl AuthoredPost<'_> {
 			self.actor.id(),
 			text
 		)
+	}
+}
+
+/// One item of a model's input ([`ThreadRecords::model_posts`]).
+#[derive(Debug, Clone)]
+pub enum ModelPost<'a> {
+	/// A post that is not a log, sent in the role its author has to the
+	/// reading agent.
+	Post(AuthoredPost<'a>),
+	/// The note of a run of joins ([`ThreadRecords::join_note`]), sent as
+	/// it is in the user role whoever joined, the reading agent included:
+	/// something that happened, never something the agent said.
+	Note(String),
+}
+
+impl<'a> ModelPost<'a> {
+	/// The post this item is, a note being none.
+	pub fn post(&self) -> Option<AuthoredPost<'a>> {
+		match self {
+			Self::Post(post) => Some(*post),
+			Self::Note(_) => None,
+		}
 	}
 }
 

@@ -577,8 +577,7 @@ mod test {
 	/// The text of each message post of `records`, the joins aside.
 	fn texts(records: &ThreadRecords) -> Vec<String> {
 		records
-			.model_posts(None)
-			.into_iter()
+			.content_posts()
 			.map(|view| view.post.to_string())
 			.collect()
 	}

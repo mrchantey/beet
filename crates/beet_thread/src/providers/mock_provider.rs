@@ -203,8 +203,7 @@ impl PostStreamer for MockPostStreamer {
 
 						// Extract last user text
 						let last_text = records
-							.model_posts(None)
-							.into_iter()
+							.content_posts()
 							.filter(|view| view.actor.kind() == ActorKind::User)
 							.last()
 							.and_then(|view| view.post.body_str().ok())

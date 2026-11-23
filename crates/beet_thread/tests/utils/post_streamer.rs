@@ -1,7 +1,9 @@
 // Test cases for validating PostStreamer implementations via the declarative
 // `Post::run_oneshot` helper: a thread is authored as an author scene of actors with
 // seed posts, the agent runs, and its reply is collected.
+use beet_action::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use beet_router::prelude::Router;
 use beet_thread::prelude::*;
 
@@ -226,4 +228,104 @@ pub async fn image_roundtrip(streamer: impl Component + PostStreamer + Clone) {
 	.to_string()
 	.to_lowercase()
 	.xpect_contains("blue");
+}
+
+/// A thread opening with a note, the joins of its person and its agent ahead
+/// of the first post, is accepted and answered.
+pub async fn opens_with_a_note(
+	streamer: impl Component + PostStreamer + Clone,
+) {
+	reply_after_joining(streamer, |records, thread, person, _| {
+		records.upsert_post(AgentPost::new_text(
+			person,
+			thread,
+			"complete the sequence: one, two, three, ____",
+			PostStatus::Completed,
+		));
+		Ok(())
+	})
+	.await
+	.xpect_contains("four");
+}
+
+/// A thread holding a note between two turns, the person joining again
+/// after the agent's answer, is accepted and keeps its context.
+pub async fn note_between_turns(
+	streamer: impl Component + PostStreamer + Clone,
+) {
+	reply_after_joining(streamer, |records, thread, person, agent| {
+		for (author, text) in [
+			(person, "My name is Alice."),
+			(agent, "Hello Alice! Nice to meet you."),
+		] {
+			records.upsert_post(AgentPost::new_text(
+				author,
+				thread,
+				text,
+				PostStatus::Completed,
+			));
+		}
+		records.join(thread, [person], &default())?;
+		records.upsert_post(AgentPost::new_text(
+			person,
+			thread,
+			"What is my name?",
+			PostStatus::Completed,
+		));
+		Ok(())
+	})
+	.await
+	.xpect_contains("Alice");
+}
+
+/// Enter a thread of a person and `streamer`'s agent, so both join, let
+/// `script` post into its records, given the thread, the person and the
+/// agent, then run the agent's turn: what it said.
+async fn reply_after_joining(
+	streamer: impl Component + PostStreamer + Clone,
+	script: impl 'static
+	+ Send
+	+ FnOnce(&mut ThreadRecords, ThreadId, ActorId, ActorId) -> Result,
+) -> String {
+	let mut app = App::new();
+	app.add_plugins(MinimalPlugins)
+		.install_type::<ThreadPlugin>();
+	let (person, agent) = (Actor::user(), Actor::agent());
+	let (person_id, agent_id) = (person.id(), agent.id());
+	let thread = app
+		.world_mut()
+		.spawn((
+			Thread::default(),
+			Sequence::new(),
+			BypassErrors(ChildError::NO_ACTION),
+			children![person, (agent, streamer)],
+		))
+		.id();
+	app.world_mut()
+		.run_async_local_then(async move |world: AsyncWorld| -> Result {
+			Thread::enter(
+				world.clone(),
+				thread,
+				ThreadEntry::parse(Request::get("chat").parts().clone())?,
+			)
+			.await
+		})
+		.await
+		.unwrap();
+	let mut window = app.world_mut().entity_mut(thread);
+	let id = window.get::<Thread>().unwrap().id();
+	script(
+		&mut window.get_mut::<ThreadRecords>().unwrap(),
+		id,
+		person_id,
+		agent_id,
+	)
+	.unwrap();
+	let asked = window.get::<ThreadRecords>().unwrap().posts().len();
+	window.call::<(), Outcome>(()).await.unwrap();
+	app.world().get::<ThreadRecords>(thread).unwrap().posts()[asked..]
+		.iter()
+		.filter(|post| post.intent().is_display())
+		.map(|post| post.to_string())
+		.collect()
 }

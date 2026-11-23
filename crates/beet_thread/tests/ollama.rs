@@ -57,6 +57,18 @@ async fn multi_turn_conversation() {
 	post_streamer::multi_turn_conversation(streamer_non_streaming()).await;
 }
 
+#[ignore = "requires Ollama running locally"]
+#[beet_core::test(timeout_ms = 60_000)]
+async fn opens_with_a_note() {
+	post_streamer::opens_with_a_note(streamer_non_streaming()).await;
+}
+
+#[ignore = "requires Ollama running locally"]
+#[beet_core::test(timeout_ms = 60_000)]
+async fn note_between_turns() {
+	post_streamer::note_between_turns(streamer_non_streaming()).await;
+}
+
 // === PostStreamer (Completions) tests ===
 
 #[ignore = "requires Ollama running locally"]
@@ -97,6 +109,20 @@ async fn cs_multi_turn_conversation() {
 		completions_streamer_non_streaming(),
 	)
 	.await;
+}
+
+#[ignore = "requires Ollama running locally"]
+#[beet_core::test(timeout_ms = 60_000)]
+async fn cs_opens_with_a_note() {
+	post_streamer::opens_with_a_note(completions_streamer_non_streaming())
+		.await;
+}
+
+#[ignore = "requires Ollama running locally"]
+#[beet_core::test(timeout_ms = 60_000)]
+async fn cs_note_between_turns() {
+	post_streamer::note_between_turns(completions_streamer_non_streaming())
+		.await;
 }
 
 // === Image Roundtrip tests ===

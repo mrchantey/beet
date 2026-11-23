@@ -121,13 +121,15 @@
 //!   nothing depends on a graceful exit. Usage stays where it is measured, on
 //!   each response's [`ResponseMeta`], and a session's duration is the span
 //!   of its posts.
-//! - **Note.** How a model reads a join, one convention for every provider:
+//! - **Note.** How a model reads a join, one convention for every provider
+//!   ([`ThreadRecords::join_note`]):
 //!   `<system>Coach joined at 2026-11-22T09:10Z, 2 days 3 hours after the last post.</system>`.
 //!   The gap is measured from the last post that is not a log, and omitted
 //!   when there is none or it is under a minute. Consecutive joins are one
 //!   message, a line each inside one `<system>`. A note is sent in the user
-//!   role whoever joined, the reading agent's own join included: it is
-//!   something that happened, never something the agent said.
+//!   role whoever joined, the reading agent's own join included
+//!   ([`ModelPost::Note`]): it is something that happened, never something
+//!   the agent said. No other log reaches a model.
 //!
 //! # Posting and turns
 //!

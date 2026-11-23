@@ -119,8 +119,8 @@ where
 			.await??;
 	}
 
-	// the response's usage lands on its last post's meta, so a session's
-	// total counts each response once; log the prompt-cache hit rate, for
+	// the response's usage lands on its last post's meta, so a total over
+	// the records counts each response once; log the prompt-cache hit rate, for
 	// tuning the append-only records (see perceive-act).
 	if let Some(usage) = stream.token_usage().map(Usage::from) {
 		let pct = if usage.input_tokens > 0 {

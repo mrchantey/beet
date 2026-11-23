@@ -24,8 +24,8 @@ use beet_net::prelude::*;
 /// - the thread's **entry point**, an [`ActionOverload<Request, Outcome>`]
 ///   adapting the entity's behavior (its `Sequence`, or the loop wrapping it) to
 ///   a start request. Calling it enters every thread under it
-///   ([`Thread::enter`]) *before* running the behavior, and closes their
-///   sessions once it ends, so every caller (the start verb, a test, a
+///   ([`Thread::enter`]) *before* running the behavior, and flushes their
+///   records once it ends, so every caller (the start verb, a test, a
 ///   serverless scene) gets a correct thread. It claims no action slot, so
 ///   the behavior keeps its own.
 /// - a [`CallOnStart`], which is what calls that entry point when the ancestral
@@ -35,8 +35,7 @@ use beet_net::prelude::*;
 ///
 /// The call is detached, so a finite loop ([`RepeatTimes`],
 /// [`RepeatWhileFunctionCallOutput`]) completes and leaves the servers serving
-/// the final transcript, while an endless [`Repeat`] simply never returns, its
-/// session never closing.
+/// the final transcript, while an endless [`Repeat`] simply never returns.
 /// Calling the **thread**, never an "agent", is the whole point: the `Sequence`
 /// is the behavior and runs its actors in order.
 ///
@@ -53,7 +52,7 @@ pub struct RunThread;
 impl RunThread {
 	/// The thread's entry point: enter every thread at or under the entity
 	/// ([`Thread::enter`], with the request's [`ThreadEntryParams`]), run
-	/// the behavior to completion, then close each session.
+	/// the behavior to completion, then flush each thread to its store.
 	///
 	/// An [`ActionOverload`] rather than a free function, so the entity's
 	/// [`ActionMeta`] advertises the whole thread as `Request -> Outcome` and no
@@ -71,7 +70,7 @@ impl RunThread {
 				// `Repeat` never returns, a finite loop completes while the servers
 				// stay parked.
 				let outcome = entity.call::<(), Outcome>(()).await;
-				Self::close_all(&entity.world(), &threads, &outcome).await?;
+				Self::flush_all(&entity.world(), &threads).await?;
 				outcome
 			},
 		))
@@ -102,20 +101,14 @@ impl RunThread {
 		threads.xok()
 	}
 
-	/// Close every session `threads` opened with the behavior's `outcome`, an
-	/// error closing as a fail, then wait for each thread's records to reach
-	/// its store.
-	pub(crate) async fn close_all(
+	/// Wait for the records of each of `threads` to reach its store
+	/// ([`ThreadStore::flush`]). Nothing is posted: a session has no end to
+	/// record.
+	pub(crate) async fn flush_all(
 		world: &AsyncWorld,
 		threads: &[Entity],
-		outcome: &Result<Outcome>,
 	) -> Result {
-		let outcome = match outcome {
-			Ok(outcome) => *outcome,
-			Err(_) => Outcome::FAIL,
-		};
 		for thread in threads {
-			Thread::close(world, *thread, outcome).await?;
 			ThreadStore::flush(&world.entity(*thread)).await?;
 		}
 		Ok(())
@@ -249,7 +242,7 @@ mod test {
 
 		// .. then re-run it by calling the entity itself. An un-adopted thread
 		// would run its seed alone, ending on two posts rather than continuing the
-		// stored conversation, its sessions aside.
+		// stored conversation, its joins aside.
 		let mut app = app();
 		let root = app
 			.world_mut()

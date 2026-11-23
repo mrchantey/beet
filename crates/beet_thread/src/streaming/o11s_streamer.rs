@@ -90,7 +90,8 @@ impl O11sStreamer {
 		self
 	}
 
-	async fn build_request(
+	/// Builds an [`o11s::RequestBody`] from the current ECS state.
+	pub(crate) async fn build_request(
 		&self,
 		caller: AsyncEntity,
 	) -> Result<(o11s::RequestBody, ActorId, ThreadId)> {

@@ -2,7 +2,6 @@
 //! [`Document`] and rendered as a scrollable, keyed list of posts.
 
 use crate::prelude::*;
-use beet_action::prelude::Outcome;
 use beet_core::prelude::*;
 // `ScrollPosition` is beet_ui's renderer-agnostic type; pin it explicitly so it wins
 // over bevy's same-named ui type (reached via `beet_core::prelude` under
@@ -37,7 +36,7 @@ use beet_ui::prelude::style;
 /// <ThreadView {OfThread($thread)}/>
 /// ```
 ///
-/// Log posts render as dividers.
+/// Log posts render as dividers, a join naming its actor.
 #[derive(Debug, Default, Clone, Copy, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(Document)]
@@ -158,7 +157,7 @@ fn post_row(_index: usize, item: &Value) -> OnSpawn {
 	})
 }
 
-/// A log post: a dim, centered rule, ie between sessions.
+/// A log post: a dim, centered rule, ie an actor joining.
 fn divider_style() -> OnSpawn {
 	inline_class![
 		(style::common_props::TextAlignProp, style::TextAlign::Center),
@@ -433,25 +432,11 @@ fn project_records(records: &ThreadRecords) -> Value {
 	Value::Map([("posts".into(), Value::List(posts))].into_iter().collect())
 }
 
-/// The text a row shows: a log post as a divider line, a session's opened
-/// and closed posts in their own words and any other kind by its name, and
-/// any other post as its body.
+/// The text a row shows: a log post as a divider line, a join naming its
+/// actor and any other kind by its name, and any other post as its body.
 fn post_text(view: &AuthoredPost) -> String {
-	if let Some(opened) = view.post.log::<SessionOpened>() {
-		return match opened.spawned_by {
-			Some(cause) => format!("── session opened by {cause} ──"),
-			None => "── session opened ──".to_string(),
-		};
-	}
-	if let Some(closed) = view.post.log::<SessionClosed>() {
-		let outcome = match closed.outcome {
-			Outcome::Pass(_) => "pass",
-			Outcome::Fail(_) => "fail",
-		};
-		return format!(
-			"── session closed: {outcome} in {}s ──",
-			closed.duration.as_secs()
-		);
+	if SessionOpened::opens(view.post) {
+		return format!("── {} joined ──", view.actor.name());
 	}
 	if let Some(kind) = view.post.log_kind() {
 		return format!("── {kind} ──");
@@ -531,7 +516,7 @@ mod test {
 		rows("kind").xpect_eq(vec!["user".to_string(), "log".to_string()]);
 		rows("text").xpect_eq(vec![
 			"hello".to_string(),
-			"── session opened ──".to_string(),
+			"── User joined ──".to_string(),
 		]);
 	}
 

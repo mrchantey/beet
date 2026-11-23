@@ -5,8 +5,9 @@
 //! fields. The intent is closed and the kinds are open: any crate adds one by
 //! implementing [`LogKind`], and model input skips every log post by its
 //! intent alone ([`ThreadRecords::model_posts`]), so a kind needs no
-//! registration to stay out of it. A view renders a kind it knows its own way
-//! and any other by its name ([`Post::log_kind`]).
+//! registration to stay out of it. The one kind a model reads is a join
+//! ([`SessionOpened`]), as a note. A view renders a kind it knows its own
+//! way and any other by its name ([`Post::log_kind`]).
 use crate::prelude::*;
 use beet_core::prelude::*;
 

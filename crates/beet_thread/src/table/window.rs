@@ -220,8 +220,7 @@ mod test {
 		app.world()
 			.get::<ThreadRecords>(window)
 			.unwrap()
-			.model_posts(None)
-			.iter()
+			.content_posts()
 			.map(|view| view.post.to_string())
 			.collect()
 	}

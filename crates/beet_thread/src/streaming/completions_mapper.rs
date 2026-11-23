@@ -33,16 +33,30 @@ use async_openai::types::chat::ToolChoiceOptions;
 use beet_core::prelude::*;
 
 // ═══════════════════════════════════════════════════════════════════════
-// Request Mapping: AuthoredPost -> ChatCompletionRequestMessage
+// Request Mapping: ModelPost -> ChatCompletionRequestMessage
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Maps an [`AuthoredPost`] into a [`ChatCompletionRequestMessage`].
-/// The `agent_id` determines which agent posts become `Assistant`
-/// messages vs `User` messages.
+/// Maps a [`ModelPost`] into a [`ChatCompletionRequestMessage`]: a note as
+/// it is in the user role, a post by its author. The `agent_id` determines
+/// which agent posts become `Assistant` messages vs `User` messages.
 pub fn post_to_completions_message(
 	agent_id: ActorId,
-	post: AuthoredPost,
+	post: ModelPost,
 ) -> Result<ChatCompletionRequestMessage> {
+	let post = match post {
+		ModelPost::Post(post) => post,
+		ModelPost::Note(note) => {
+			return ChatCompletionRequestMessage::User(
+				ChatCompletionRequestUserMessage {
+					content: ChatCompletionRequestUserMessageContent::Text(
+						note,
+					),
+					name: None,
+				},
+			)
+			.xok();
+		}
+	};
 	let is_self = post.actor_id() == agent_id;
 	let kind = post.actor.kind();
 	let agent_post = post.post.as_agent_post().ok_or_else(|| {

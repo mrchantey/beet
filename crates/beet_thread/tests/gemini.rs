@@ -57,6 +57,20 @@ async fn multi_turn_conversation() {
 	.await;
 }
 
+#[ignore = "requires Gemini API key"]
+#[beet_core::test(timeout_ms = 15_000)]
+async fn opens_with_a_note() {
+	post_streamer::opens_with_a_note(completions_streamer_non_streaming())
+		.await;
+}
+
+#[ignore = "requires Gemini API key"]
+#[beet_core::test(timeout_ms = 15_000)]
+async fn note_between_turns() {
+	post_streamer::note_between_turns(completions_streamer_non_streaming())
+		.await;
+}
+
 // === Image Roundtrip tests ===
 
 #[ignore = "requires Gemini API key"]

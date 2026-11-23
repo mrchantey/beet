@@ -145,7 +145,7 @@ fn record_counts(app: &mut App) -> (usize, usize) {
 	let mut threads = app.world_mut().query_filtered::<Entity, With<Thread>>();
 	let thread = threads.iter(app.world()).next().unwrap();
 	let records = app.world().get::<ThreadRecords>(thread).unwrap();
-	(records.actors().len(), records.model_posts(None).len())
+	(records.actors().len(), records.content_posts().count())
 }
 
 /// Enter every thread mounting a store, over a temp store, as its start

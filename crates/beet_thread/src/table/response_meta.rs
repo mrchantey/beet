@@ -34,8 +34,8 @@ impl ResponseMeta {
 	pub fn response_id(&self) -> &str { &self.response_id }
 }
 
-/// Tokens as a provider reports them, summed over a session by
-/// [`SessionClosed`].
+/// Tokens as a provider reports them, kept per response on its
+/// [`ResponseMeta`].
 #[derive(
 	Debug,
 	Default,
