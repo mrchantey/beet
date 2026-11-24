@@ -42,8 +42,8 @@ use beet_net::prelude::*;
 /// Calling the **thread**, never an "agent", is the whole point: the `Sequence`
 /// is the behavior and runs its actors in order.
 ///
-/// Holding only windows with no behavior, ie a thread of people alone, it
-/// enters them and runs nothing; two windows onto one stored thread sit under one
+/// Holding only windows with no behavior, ie a group chat, it enters them and
+/// runs nothing; two windows onto one stored thread sit under one
 /// `RunThread`, which enters them in order, so the second finds the thread the
 /// first created.
 ///

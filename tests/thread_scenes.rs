@@ -286,9 +286,9 @@ async fn persistent_chat_scene_reduces() {
 /// over one store at the scene's root, so the second window finds the thread
 /// the first created.
 #[beet::test]
-async fn people_chat_scene_opens_two_windows() {
+async fn group_chat_scene_opens_two_windows() {
 	let mut app =
-		reduce(include_str!("../examples/thread/people_chat.bsx")).await;
+		reduce(include_str!("../examples/thread/group_chat.bsx")).await;
 	let root = app
 		.world_mut()
 		.query_filtered_once::<Entity, With<TuiServer>>()[0];

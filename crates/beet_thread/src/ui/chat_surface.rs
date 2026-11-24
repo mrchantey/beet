@@ -473,16 +473,17 @@ mod test {
 			.xpect_contains("Agent");
 	}
 
-	/// A thread of people alone, with no behavior: its composer posts at once, an empty submit is ignored, and the posts persist.
+	/// A group chat, with no agent and no behavior: its composer posts at
+	/// once, an empty submit is ignored, and the posts persist.
 	#[beet_core::test]
-	async fn a_thread_of_people_persists_its_posts() {
+	async fn a_group_chat_persists_its_posts() {
 		let (mut app, surface, thread) = serve_thread(
 			UVec2::new(40, 12),
 			(
 				Thread::default(),
 				InMemoryStore::new(),
 				MountThreadStore {
-					path: RelPath::new("people"),
+					path: RelPath::new("group_chat"),
 					new: false,
 				},
 				children![Actor::user()],
@@ -494,7 +495,9 @@ mod test {
 				Thread::enter(
 					world.clone(),
 					thread,
-					ThreadEntry::parse(Request::get("people").parts().clone())?,
+					ThreadEntry::parse(
+						Request::get("group_chat").parts().clone(),
+					)?,
 				)
 				.await
 			})
