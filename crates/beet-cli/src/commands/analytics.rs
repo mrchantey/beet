@@ -66,54 +66,6 @@ impl AnalyticsReport {
 	}
 }
 
-/// Import the analytics history kept as zstd JSONL objects before events were
-/// rows, once: every `analytics/raw/**.jsonl.zst` daily archive and unrolled
-/// segment in each `--from` store becomes an `analytics_event` row of the
-/// analytics store (`--store`, else the entry's), deduplicated, under keys its
-/// events determine, so a rerun rewrites the same rows. The old objects are
-/// left in place; remove them once the import is checked, then run the rollup
-/// with `--full` to rebuild the aggregates.
-///
-/// ```sh
-/// beet --entry=site --stage=prod --service-access=remote analytics import \
-/// 	--from s3://beet-site--prod--archive --from s3://beet-site--prod--analytics
-/// ```
-#[cfg(feature = "legacy_analytics")]
-#[action(route = "analytics/import")]
-#[derive(Component, Reflect)]
-#[reflect(Component)]
-pub async fn ImportAnalytics(
-	/// A store holding legacy `analytics/raw/` objects, repeatable.
-	#[param]
-	from: Vec<StoreUri>,
-	/// The analytics store to import into, absent the one the entry's
-	/// `AnalyticsConfig` writes to.
-	#[param]
-	store: Option<StoreUri>,
-	cx: ActionContext<Request>,
-) -> Result<Response> {
-	if from.is_empty() {
-		bevybail!(
-			"name the stores holding the legacy objects with `--from <uri>`, ie \
-			 `--from s3://my-app--prod--archive`"
-		);
-	}
-	let world = cx.caller.world().clone();
-	let sources = from
-		.iter()
-		.map(BlobStore::from_uri)
-		.collect::<Result<Vec<_>>>()?;
-	AnalyticsImport::new(
-		sources,
-		AnalyticsReport::resolve(&world, store.as_ref()).await?,
-	)
-	.run()
-	.await?
-	.to_string()
-	.xmap(Response::ok_text)
-	.xok()
-}
-
 /// The one [`AnalyticsConfig`] in the world, whose writer the report reads.
 /// Several are ambiguous, so the error lists each with the store it has
 /// landed, for `--store` to pick from.
@@ -185,43 +137,6 @@ mod test {
 			.id();
 		world.spawn((AnalyticsConfig::default(), StoreRef(declared)));
 		world
-	}
-
-	/// The report and the import mount beside each other, as the site entry
-	/// declares them: a history kept as legacy objects imports through the
-	/// verb, and the summary then counts it.
-	///
-	/// REGRESSION: the report took every path under `analytics`, which no
-	/// sibling verb can share, so an entry mounting both panicked on boot.
-	#[cfg(feature = "legacy_analytics")]
-	#[beet::test]
-	async fn imports_beside_the_report() {
-		let temp = TempDir::new().unwrap();
-		let dir = AbsPath::new(temp.path()).unwrap();
-		let mut world = crate::commands::render_world();
-		let host = world
-			.spawn((Router, children![AnalyticsReport, ImportAnalytics]))
-			.id();
-		let mut run = async |args: String| {
-			world
-				.entity_mut(host)
-				.call::<Request, Response>(
-					Request::from_cli_args(CliArgs::parse(&args))
-						.with_header::<header::Accept>(vec![MediaType::Text]),
-				)
-				.await
-				.unwrap()
-				.unwrap_str()
-				.await
-		};
-		run(format!(
-			"analytics import --from=fs:{dir}/old --from=fs:{dir}/older --store=fs:{dir}/new"
-		))
-		.await
-		.xpect_contains("0 events from 0 objects");
-		run(format!("analytics summary --store=fs:{dir}/new"))
-			.await
-			.xpect_contains("0 events");
 	}
 
 	/// Summarizing an empty store reports zero events rather than erroring, so

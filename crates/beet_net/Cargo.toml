@@ -69,9 +69,6 @@ sockets = ["action", "dep:sha1", "dep:base64"]
 # Tables ride `json`: rows are canonical json, hashed through `dag_cbor`, keyed
 # by default by a TID `rand` mints.
 json = ["serde", "dep:serde_json", "beet_core/json", "beet_action?/json", "dag_cbor", "beet_core/rand"]
-# `AnalyticsImport`, the one-time import of the zstd JSONL analytics history
-# kept before events were rows, decoded by the pure-rust `ruzstd`.
-legacy_analytics = ["json", "dep:ruzstd"]
 # The `atproto` module's data model half: the `Pds` family, `EmulatorPds`, the
 # converge and the `<AtprotoAccount/>` declaration, every record crossing
 # through `MediaType::DagCbor`. No network.
@@ -257,8 +254,6 @@ tracing.workspace = true
 uuid = { workspace = true, optional = true }
 send_wrapper = { workspace = true, optional = true }
 bytes.workspace = true
-# the legacy analytics import's zstd decoder, pure rust on every target
-ruzstd = { workspace = true, optional = true }
 # async (no_std core stream trait)
 futures-core.workspace = true
 # async (std-only)

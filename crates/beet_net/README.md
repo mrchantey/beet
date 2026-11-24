@@ -104,7 +104,6 @@ App::new()
 | `json` | Tables (`TableStore`, the wire, `DurableObjectStore`), rows hashed through `dag_cbor` |
 | `sqlite` | `SqliteStore`, `PartitionHost` and `TableArchive`, every target |
 | `cloudflare` | The Worker runtime's stores: `R2WorkersStore` and `DurableObjectStore`'s objects (wasm only) |
-| `legacy_analytics` | `AnalyticsImport`, the one-time import of the zstd JSONL analytics history |
 | `aws` | AWS over signed requests (`AwsClient`), the S3 and DynamoDB stores, STS and Identity Center, see AWS above |
 | `oauth` | The reusable pieces of an OAuth client: PKCE, state, the loopback redirect, the device grant, the token set |
 | `reqwest` | Use reqwest as the HTTP client backend |

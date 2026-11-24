@@ -157,23 +157,24 @@ impl DeployGate {
 		for note in assessed.iter().flat_map(Assessed::remarks) {
 			info!("{note}");
 		}
+		let relay = Self::relay(
+			Self::program(cx.caller.world()).await,
+			&cx.input,
+			&declared,
+		);
 		if params.dry_run {
 			return Response::ok_text(
-				Self::dry_run(
-					&cx.caller, &cx.input, &declared, &stacks, &assessed,
-				)
-				.await?,
+				Self::dry_run(&cx.caller, &relay, &stacks, &assessed).await?,
 			)
 			.xok();
 		}
 		let blocking = assessed.iter().any(Assessed::blocks);
 		match (params.elevated, blocking) {
 			(false, false) => GatePass::run(cx).await,
-			(false, true) => {
-				Err(Self::refusal(&cx.input, &declared, &assessed))
-			}
+			(false, true) => Err(Self::refusal(&relay, &assessed)),
 			(true, _) => {
-				Self::run_elevated(cx, &declared, assessed, params.roll).await
+				Self::run_elevated(cx, &declared, relay, assessed, params.roll)
+					.await
 			}
 		}
 	}
@@ -475,11 +476,7 @@ impl DeployGate {
 
 	/// The refusal of a plain deploy that cannot proceed: every reason, the
 	/// human factors an elevated deploy will ask for, and the command.
-	fn refusal(
-		input: &Request,
-		declared: &ParamsPattern,
-		assessed: &[Assessed],
-	) -> BevyError {
+	fn refusal(relay: &str, assessed: &[Assessed]) -> BevyError {
 		let blocking = assessed
 			.iter()
 			.filter(|one| one.blocks())
@@ -500,7 +497,7 @@ impl DeployGate {
 				.map(|one| one.credential.human_factor())
 				.collect::<Vec<_>>()
 				.join(" and "),
-			Self::relay(input, declared)
+			relay
 		)
 	}
 
@@ -509,8 +506,7 @@ impl DeployGate {
 	/// `--elevated`.
 	async fn dry_run(
 		caller: &AsyncEntity,
-		input: &Request,
-		declared: &ParamsPattern,
+		relay: &str,
 		stacks: &[(Option<SmolStr>, AsyncEntity)],
 		assessed: &[Assessed],
 	) -> Result<String> {
@@ -550,8 +546,7 @@ impl DeployGate {
 		}
 		if assessed.iter().any(Assessed::blocks) {
 			out.push_str(&format!(
-				"this deploy needs `--elevated`:\n\n\t{}\n",
-				Self::relay(input, declared)
+				"this deploy needs `--elevated`:\n\n\t{relay}\n"
 			));
 		}
 		out.xok()
@@ -565,6 +560,7 @@ impl DeployGate {
 	async fn run_elevated(
 		cx: ActionContext<Request>,
 		declared: &ParamsPattern,
+		relay: String,
 		assessed: Vec<Assessed>,
 		roll: bool,
 	) -> Result<Response> {
@@ -579,7 +575,6 @@ impl DeployGate {
 			);
 			return GatePass::run(cx).await;
 		}
-		let relay = Self::relay(&cx.input, declared);
 		let mut report = Vec::new();
 		let mut cleanups = Vec::new();
 		let mut child = ElevatedChild {
@@ -669,12 +664,48 @@ impl DeployGate {
 			.collect()
 	}
 
-	/// The command a person runs in a terminal to deploy this elevated: this
-	/// launch's knobs and the request's recognised params, its gate params
-	/// replaced by `--elevated`. Composed from what was parsed rather than the
-	/// raw argv, which may hold the very typo that led here.
-	fn relay(input: &Request, declared: &ParamsPattern) -> String {
-		env_ext::program()
+	/// What a person types to run this binary again: the `cargo run` that
+	/// builds it, when cargo did ([`CrateRegistration::cargo_run`]), since any
+	/// later build may have replaced the file at the program's path with one
+	/// of other features, else the program itself.
+	async fn program(world: &AsyncWorld) -> Vec<SmolStr> {
+		let program = env_ext::program();
+		let cargo_run = match program
+			.as_ref()
+			.and_then(|program| AbsPath::new(program.as_str()).ok())
+		{
+			Some(program) => {
+				world
+					.with_state::<Query<&CrateRegistration>, _>(
+						move |registrations| {
+							registrations
+								.iter()
+								.find(|one| one.skip_prefix())
+								.and_then(|one| {
+									one.cargo_run(
+										&AbsPath::workspace_root(),
+										&program,
+									)
+								})
+						},
+					)
+					.await
+			}
+			None => None,
+		};
+		cargo_run.unwrap_or_else(|| program.into_iter().collect())
+	}
+
+	/// The command a person runs in a terminal to deploy this elevated:
+	/// `program`, this launch's knobs and the request's recognised params, its
+	/// gate params replaced by `--elevated`. Composed from what was parsed
+	/// rather than the raw argv, which may hold the very typo that led here.
+	fn relay(
+		program: Vec<SmolStr>,
+		input: &Request,
+		declared: &ParamsPattern,
+	) -> String {
+		program
 			.into_iter()
 			.chain(
 				BootstrapConfig::get()
@@ -1445,8 +1476,11 @@ mod test {
 	#[beet_core::test]
 	fn refuses_naming_every_reason() {
 		super::DeployGate::refusal(
-			&Request::from_cli_str("mail/deploy"),
-			&declared(),
+			&super::DeployGate::relay(
+				vec!["beet".into()],
+				&Request::from_cli_str("mail/deploy"),
+				&declared(),
+			),
 			&[
 				assessed(&["cloudflare: needs `Zone > DNS Write on a.b`"], &[]),
 				assessed(&[], &["this deploy would update `x.lock`"]),
@@ -1525,7 +1559,8 @@ mod test {
 		args.iter()
 			.any(|arg| arg.starts_with("--dry") || arg == "--roll")
 			.xpect_false();
-		super::DeployGate::relay(&request, &declared())
+		super::DeployGate::relay(vec!["beet".into()], &request, &declared())
+			.xpect_starts_with("beet ")
 			.xpect_contains("mail/deploy")
 			.xpect_contains("'--note=a b'")
 			.xpect_ends_with("--elevated");
@@ -1583,10 +1618,14 @@ mod test {
 		let request = Request::from_cli_str("deploy --elevate --note=ship");
 		super::DeployGate::request_args(&request, &declared())
 			.xpect_eq(vec!["deploy".to_string(), "--note=ship".to_string()]);
-		super::DeployGate::refusal(&request, &declared(), &[assessed(
-			&["cloudflare: stale"],
-			&[],
-		)])
+		super::DeployGate::refusal(
+			&super::DeployGate::relay(
+				vec!["beet".into()],
+				&request,
+				&declared(),
+			),
+			&[assessed(&["cloudflare: stale"], &[])],
+		)
 		.to_string()
 		.xpect_contains("deploy --note=ship --elevated")
 		.xnot()

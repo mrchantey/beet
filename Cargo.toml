@@ -256,9 +256,6 @@ hmac = { version = "0.13", default-features = false }
 # `links = "wsqlite3"`, so exactly one version may be in the graph: never depend
 # on it directly, let rusqlite pick it.
 rusqlite = { version = "0.40", default-features = false, features = ["bundled", "ffi-sqlite-wasm-rs"] }
-# the legacy analytics import's zstd decoder (`AnalyticsImport`), pure rust on
-# every target.
-ruzstd = { version = "0.9", default-features = false, features = ["std", "hash"] }
 # Office Open XML (`beet_ui`'s `ooxml`): the package of a Word file, a workbook
 # or a slide deck, its parts and relationships, round-trip tested across
 # thousands of files. Pinned exactly, since the crate is pre-1.0 and its
@@ -431,8 +428,6 @@ geoip = ["beet_net?/geoip"]
 # The `SqliteStore` backend (`sqlite:<path>`), every target (`sqlite-wasm-rs`
 # on wasm).
 sqlite = ["net", "beet_net?/sqlite"]
-# `AnalyticsImport`, the one-time import of the zstd JSONL analytics history.
-legacy_analytics = ["net", "beet_net?/legacy_analytics"]
 postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
 # RON text format for `MediaType::Ron` and `template_serde` loading.
 ron = ["serde", "beet_core/ron"]

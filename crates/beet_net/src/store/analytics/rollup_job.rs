@@ -142,19 +142,30 @@ impl AnalyticsRollupRun {
 		date: Date,
 		archived: bool,
 	) -> Result<Vec<AnalyticsEvent>> {
-		let mut events = self.store.day(date).await?;
-		#[cfg(feature = "sqlite")]
-		if let (true, Some(archive)) = (archived, &self.archive) {
-			let cold =
-				TableArchive::open(archive, &Self::archive_path(date)).await?;
-			events.extend(
-				Table::<AnalyticsEvent>::new(cold.clone()).get_all().await?,
-			);
-			cold.store_remove().await?;
-			events = AnalyticsEvent::dedupe(events);
+		let events = self.store.day(date).await?;
+		let Some(archive) = self.archive.as_ref().filter(|_| archived) else {
+			return events.xok();
+		};
+		cfg_if! {
+			if #[cfg(feature = "sqlite")] {
+				let cold =
+					TableArchive::open(archive, &Self::archive_path(date))
+						.await?;
+				let mut all = events;
+				all.extend(
+					Table::<AnalyticsEvent>::new(cold.clone()).get_all().await?,
+				);
+				cold.store_remove().await?;
+				AnalyticsEvent::dedupe(all).xok()
+			} else {
+				// the table alone would rebuild the day short of its history
+				bevybail!(
+					"rebuilding {date} needs the `sqlite` feature: its events \
+					 are archived as a SQLite file in {}",
+					archive.describe()
+				);
+			}
 		}
-		let _ = archived;
-		events.xok()
 	}
 
 	/// Every day the archive bucket holds a file for.

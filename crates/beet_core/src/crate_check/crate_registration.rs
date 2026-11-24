@@ -62,6 +62,44 @@ impl CrateRegistration {
 		self.features.contains(feature)
 	}
 
+	/// The `cargo run` that builds this crate at these features and runs it,
+	/// for a `program` cargo built into `workspace`'s `target` directory: its
+	/// path names whichever build wrote it last, this names the build. `None`
+	/// for a program installed anywhere else.
+	///
+	/// The arguments end in `--`, so the program's own follow.
+	#[cfg(feature = "std")]
+	pub fn cargo_run(
+		&self,
+		workspace: &AbsPath,
+		program: &AbsPath,
+	) -> Option<Vec<SmolStr>> {
+		// `<profile>/<binary>`, deeper is a cross build or a test binary
+		let relative = program.strip_prefix(&workspace.join("target"))?;
+		let (profile, binary) = relative.as_str().split_once('/')?;
+		if binary.contains('/') {
+			return None;
+		}
+		let mut args = ["cargo", "run", "-p", self.crate_name()]
+			.map(SmolStr::from)
+			.to_vec();
+		match profile {
+			"debug" => {}
+			profile => args.push(format!("--profile={profile}").into()),
+		}
+		let mut features = self
+			.features
+			.iter()
+			.map(SmolStr::as_str)
+			.collect::<Vec<_>>();
+		features.sort();
+		if !features.is_empty() {
+			args.push(format!("--features={}", features.join(",")).into());
+		}
+		args.push("--".into());
+		Some(args)
+	}
+
 	/// Whether a `feature:` requirement item holds across `registrations`, ie
 	/// `infra` (the primary crate) or `beet_esp/alvik` (a named one).
 	///
@@ -167,5 +205,28 @@ mod test {
 		registration.version().xpect_eq(env!("CARGO_PKG_VERSION"));
 		registration.has_feature("std").xpect_true();
 		registration.has_feature("not-a-feature").xpect_false();
+	}
+
+	/// A program in the workspace's `target` is named by its build, any other
+	/// by its path.
+	#[crate::test]
+	fn names_its_cargo_run() {
+		let registration = CrateRegistration::new("beet-cli", "0.0.1")
+			.with_feature("infra")
+			.with_feature("extra");
+		let workspace = AbsPath::new_unchecked("/beet");
+		let run = |program: &str| {
+			registration
+				.cargo_run(&workspace, &AbsPath::new_unchecked(program))
+				.map(|args| args.join(" "))
+		};
+		run("/beet/target/debug/beet")
+			.unwrap()
+			.xpect_eq("cargo run -p beet-cli --features=extra,infra --");
+		run("/beet/target/release/beet").unwrap().xpect_eq(
+			"cargo run -p beet-cli --profile=release --features=extra,infra --",
+		);
+		run("/beet/target/debug/deps/beet").xpect_none();
+		run("/usr/bin/beet").xpect_none();
 	}
 }

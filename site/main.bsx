@@ -422,9 +422,6 @@ binary serves the records and the comments (`atproto`).
 	     writes to, so `beet --entry=site analytics summary` reads exactly what
 	     the served site wrote, locally or (`--service-access=remote`) deployed,
 	     with no binding of its own. -->
-	<!-- the one-time import of the history kept as zstd JSONL objects before
-	     events were rows, an operator's verb -->
-	<ImportAnalytics bx:cfg="feature:legacy_analytics"/>
 	<AnalyticsReport/>
 	<!-- the deploy credentials this entry deploys with, one per provider,
 	     `beet-site-deploy` at each, sealed in this entry's own document:
@@ -455,11 +452,6 @@ binary serves the records and the comments (`atproto`).
 			     layout. Granted to the box that records and the job that rolls up
 			     and archives, the two computes of this stack. -->
 			<DynamoTableBlock bx:ref="analytics" label="events"/>
-			<!-- the zstd JSONL history recorded before events were rows, held
-			     until `beet analytics import --from` has moved it into the table
-			     and the summary agrees, and writable until then: the process a
-			     deploy replaces flushes its last events here as it stops. -->
-			<S3BucketBlock label="analytics" deploy_versioned=false runtime_write=true object_versioning=true/>
 			<!-- the REPO STORE, marked so the deploy publishes the site into it and
 			     the ledger names it; deploy-versioned by taking the default. The box
 			     does not bake the prefix into its `user_data` (that would rebuild it

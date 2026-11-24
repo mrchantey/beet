@@ -40,11 +40,6 @@ mod store;
 use beet_core::prelude::*;
 #[cfg(feature = "json")]
 pub use store::*;
-// the one-time import of the zstd JSONL history kept before events were rows
-#[cfg(feature = "legacy_analytics")]
-mod legacy_import;
-#[cfg(feature = "legacy_analytics")]
-pub use legacy_import::*;
 
 /// Plugin that wires analytics: the storage backend, the persistence observer,
 /// and the geoip country database.

@@ -230,7 +230,7 @@ impl AnalyticsEvent {
 	/// When the event was recorded, to the millisecond: its key's instant.
 	pub fn timestamp(&self) -> Timestamp { self.key.timestamp() }
 
-	/// The same event recorded at `timestamp`, ie one imported or backdated.
+	/// The same event recorded at `timestamp`, ie one backdated.
 	pub fn with_timestamp(mut self, timestamp: Timestamp) -> Self {
 		self.key = Tid::random_at(timestamp);
 		self
