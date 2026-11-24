@@ -141,6 +141,19 @@ impl ThreadRecords {
 			.find(|post| post.intent() != PostIntent::Log)
 	}
 
+	/// The thread's last word: the newest post that is neither a
+	/// [`PostIntent::Log`] nor the output of a call an interrupt closed, which
+	/// nobody said. A note that cut a tool call is the last word, though the
+	/// output closing that call was written after it.
+	pub fn last_word(&self) -> Option<&Post> {
+		self.posts.iter().rev().find(|post| {
+			let closed_call = post.status() == PostStatus::Interrupted
+				&& AgentPost::new(post)
+					.is_some_and(|post| post.is_function_call_output());
+			post.intent() != PostIntent::Log && !closed_call
+		})
+	}
+
 	/// What a model reads, after an exclusive cursor, in model order (a
 	/// function call followed at once by its output): every authored post that is not a log, and
 	/// each run of joins between them as one note ([`Self::join_note`]). Any

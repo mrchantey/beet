@@ -138,10 +138,13 @@
 //! posting never requires holding a turn: a composer appends its post the
 //! moment it is submitted.
 //!
+//! - **Last word.** The newest post that is neither a log nor the output
+//!   closing an interrupted call, which nobody said
+//!   ([`ThreadRecords::last_word`]).
 //! - **Turn.** An action. A thread's behavior decides when each actor's
 //!   action runs, and that is the whole of turn taking; a thread with no
-//!   behavior is a room people post in. A person's turn ([`UserInput`](crate::prelude::UserInput)) is a
-//!   wait on the records, passing once the newest post that is not a log is
+//!   behavior takes posts from whoever is present. A person's turn
+//!   ([`UserInput`](crate::prelude::UserInput)) is a wait on the records, passing once the last word is
 //!   its actor's.
 //! - **Interrupt.** A running turn cut short ([`InterruptTurn`](crate::prelude::InterruptTurn)), beet's own
 //!   and the same for every provider, since no request API takes input

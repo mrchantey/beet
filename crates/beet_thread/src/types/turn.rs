@@ -33,8 +33,8 @@ impl InterruptTurn {
 #[reflect(Component, Default)]
 pub struct InterruptOnPost;
 
-/// A person's turn: a wait on the records, passing once the newest post that
-/// is not a log is its actor's.
+/// A person's turn: a wait on the records, passing once the last word
+/// ([`ThreadRecords::last_word`]) is its actor's.
 ///
 /// It reads no composer: any post by its actor passes it, from whichever
 /// window, so a post made while another actor works passes it the moment it
@@ -51,7 +51,7 @@ pub async fn UserInput(cx: ActionContext) -> Result<Outcome> {
 }
 
 /// A [`UserInput`] turn waiting, signalled and removed by [`pass_person_turns`]
-/// once its actor's post is the newest that is not a log.
+/// once the last word is its actor's.
 #[derive(Component)]
 pub(crate) struct PersonTurn(Option<OnceValue<()>>);
 
@@ -273,8 +273,7 @@ pub(crate) fn interrupt_on_post(
 	}
 }
 
-/// Pass each [`UserInput`] turn whose actor's post is the newest that is not
-/// a log.
+/// Pass each [`UserInput`] turn whose actor had the last word.
 pub(crate) fn pass_person_turns(
 	mut turns: Populated<(Entity, &ActorRef, &mut PersonTurn)>,
 	query: ThreadRecordsQuery,
@@ -283,7 +282,7 @@ pub(crate) fn pass_person_turns(
 	for (entity, actor, mut turn) in turns.iter_mut() {
 		let passed = query.records(entity).is_ok_and(|records| {
 			records
-				.last_content_post()
+				.last_word()
 				.is_some_and(|post| post.author() == **actor)
 		});
 		if passed && let Some(signal) = turn.0.take() {
@@ -599,6 +598,74 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect_contains("Function call interrupted 'wait'");
+	}
+
+	/// A chat whose agent, carrying [`InterruptOnPost`] in a tool loop, plays
+	/// `script` over a tool held by `gate`.
+	fn tool_chat(
+		gate: &MockGate,
+		landed: Store<bool>,
+		script: impl IntoIterator<Item = MockTurn>,
+	) -> impl Bundle {
+		chat((RepeatWhileFunctionCallOutput, children![(
+			agent(2, gate, script),
+			InterruptOnPost,
+			children![wait_tool(gate, landed)]
+		)]))
+	}
+
+	/// Semi duplex: a note cutting a tool call is the last word, though the
+	/// output closing the call comes after it, so it is answered next.
+	#[beet_core::test]
+	async fn semi_duplex_cuts_a_tool_call_and_answers_next() {
+		let gate = MockGate::default();
+		let landed = Store::default();
+		let (mut app, ..) = run(tool_chat(&gate, landed, [
+			call_wait(),
+			MockTurn::Text("answered".into()),
+		]));
+		pump_until(&mut app, "called the tool", |world| holds(world, "call"));
+		let thread = thread_entity(&mut app);
+		post(&mut app, thread, "by the way");
+		pump_until(&mut app, "answered", |world| holds(world, "answered"));
+		gate.release();
+		pump(&mut app);
+		landed.get().xpect_false();
+		said(app.world()).xpect_eq(
+			[
+				"go",
+				"call",
+				"by the way",
+				"output (Interrupted)",
+				"answered",
+			]
+			.map(String::from)
+			.to_vec(),
+		);
+	}
+
+	/// A stop with no note leaves the cut call the last word, so the agent's
+	/// loop ends and the person's turn waits.
+	#[beet_core::test]
+	async fn a_stopped_tool_call_waits_for_the_person() {
+		let gate = MockGate::default();
+		let landed = Store::default();
+		let (mut app, ..) = run(tool_chat(&gate, landed, [
+			call_wait(),
+			MockTurn::Text("answered".into()),
+		]));
+		pump_until(&mut app, "called the tool", |world| holds(world, "call"));
+		let agent = actor_entity(&mut app, 2);
+		app.world_mut().trigger(InterruptTurn::new(agent));
+		pump_until(&mut app, "cut the call", |world| {
+			holds(world, "output (Interrupted)")
+		});
+		pump(&mut app);
+		said(app.world()).xpect_eq(
+			["go", "call", "output (Interrupted)"]
+				.map(String::from)
+				.to_vec(),
+		);
 	}
 
 	/// Full duplex: two agents under a `Parallel` both stream into the

@@ -1,14 +1,14 @@
 <!--
-A room: a thread with no agent and no behavior, open in two windows at once. Run
-it through the one binary, serving the local terminal and ssh:
+Two people chatting: a thread with no agent and no behavior, open in two windows at
+once. Run it through the one binary, serving the local terminal and ssh:
 
-    beet --entry=examples/thread/room.bsx --server=tui,ssh
+    beet --entry=examples/thread/people_chat.bsx --server=tui,ssh
     ssh -t -p 8339 localhost /guest   # from another terminal
 
-Each `<Thread>` is a window onto the one thread stored under `room`, with its own
-view and composer, Ann's at `/` and Bob's at `/guest`. A post in either shows in
-both at once (window sync) and is stored once, so a re-run continues the room. Press Tab to reach a composer that
-has no focus, since two pages each ask for it.
+Each `<Thread>` is a window onto the one thread stored under `people_chat`, with its
+own view and composer, Ann's at `/` and Bob's at `/guest`. A post in either shows in
+both at once (window sync) and is stored once, so a re-run continues the chat. Press
+Tab to reach a composer that has no focus, since two pages each ask for it.
 
 Adding `http` to the servers serves the same pages to a browser, to read: each load
 renders the window as it stands, and a served page's composer posts nothing.
@@ -29,10 +29,10 @@ like. The actor ids are pinned so each run's actors are the stored thread's.
 			<CreatePostForm actor=2 {OfThread($guest)}/>
 		</Route>
 		<Fragment {RunThread}>
-			<Thread bx:ref="home" {MountThreadStore{path:"room"}}>
+			<Thread bx:ref="home" {MountThreadStore{path:"people_chat"}}>
 				<CreateActor id=1 name="Ann" kind="User"/>
 			</Thread>
-			<Thread bx:ref="guest" {MountThreadStore{path:"room"}}>
+			<Thread bx:ref="guest" {MountThreadStore{path:"people_chat"}}>
 				<CreateActor id=2 name="Bob" kind="User"/>
 			</Thread>
 		</Fragment>

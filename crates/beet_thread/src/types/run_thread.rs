@@ -42,8 +42,8 @@ use beet_net::prelude::*;
 /// Calling the **thread**, never an "agent", is the whole point: the `Sequence`
 /// is the behavior and runs its actors in order.
 ///
-/// Holding only windows with no behavior, ie a room people post in, it enters
-/// them and runs nothing; two windows onto one stored thread sit under one
+/// Holding only windows with no behavior, ie a thread of people alone, it
+/// enters them and runs nothing; two windows onto one stored thread sit under one
 /// `RunThread`, which enters them in order, so the second finds the thread the
 /// first created.
 ///
@@ -76,10 +76,11 @@ impl RunThread {
 				// the canonical action, resolved by its own signature: an endless
 				// `Repeat` never returns, a finite loop completes while the servers
 				// stay parked.
-				let outcome = match Self::is_room(&entity, &threads).await? {
-					true => Outcome::PASS.xok(),
-					false => entity.call::<(), Outcome>(()).await,
-				};
+				let outcome =
+					match Self::holds_no_behavior(&entity, &threads).await? {
+						true => Outcome::PASS.xok(),
+						false => entity.call::<(), Outcome>(()).await,
+					};
 				Self::flush_all(&entity.world(), &threads).await?;
 				outcome
 			},
@@ -89,8 +90,11 @@ impl RunThread {
 	/// Whether there is nothing to run: `entity` serves no `() -> Outcome`
 	/// and no window of `threads` holds behavior, so people post whenever they
 	/// like. An entity with no action over a window that does hold behavior is
-	/// no room but a mistake, left to the call to report.
-	async fn is_room(entity: &AsyncEntity, threads: &[Entity]) -> Result<bool> {
+	/// a mistake, left to the call to report.
+	async fn holds_no_behavior(
+		entity: &AsyncEntity,
+		threads: &[Entity],
+	) -> Result<bool> {
 		let threads = threads.to_vec();
 		entity
 			.with_state::<(Query<&ActionMeta>, ThreadWindows), _>(
@@ -214,9 +218,9 @@ mod test {
 	}
 
 	/// Started over two windows onto one path, neither holding behavior, it
-	/// opens both onto one thread and runs nothing: a room.
+	/// opens both onto one thread and runs nothing.
 	#[beet_core::test]
-	fn holds_a_room_open_in_two_windows() {
+	fn holds_two_windows_with_no_behavior() {
 		let store = BlobStore::temp();
 		let window = |id: u128, name: &str| {
 			(

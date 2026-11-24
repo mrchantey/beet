@@ -15,8 +15,8 @@ What to try:
   closed as interrupted and the note is answered now;
 - ask for a survey of the field, and press Escape or `Stop` within its ten seconds:
   the call is cut, its output says so, and the agent waits for you;
-- type a note during the survey instead: the call is cut the same way, and the agent
-  waits for your next post to answer both.
+- type a note during the survey instead: the call is cut the same way, and the note is
+  answered now.
 
 Delete `InterruptOnPost` and the same note is queued: the agent finishes, then
 answers it.

@@ -473,17 +473,16 @@ mod test {
 			.xpect_contains("Agent");
 	}
 
-	/// A thread with no behavior and no agent is a room: its composer posts
-	/// whoever's turn it is, an empty submit is ignored, and the posts persist.
+	/// A thread of people alone, with no behavior: its composer posts at once, an empty submit is ignored, and the posts persist.
 	#[beet_core::test]
-	async fn a_room_persists_its_composers_posts() {
+	async fn a_thread_of_people_persists_its_posts() {
 		let (mut app, surface, thread) = serve_thread(
 			UVec2::new(40, 12),
 			(
 				Thread::default(),
 				InMemoryStore::new(),
 				MountThreadStore {
-					path: RelPath::new("room"),
+					path: RelPath::new("people"),
 					new: false,
 				},
 				children![Actor::user()],
@@ -495,7 +494,7 @@ mod test {
 				Thread::enter(
 					world.clone(),
 					thread,
-					ThreadEntry::parse(Request::get("room").parts().clone())?,
+					ThreadEntry::parse(Request::get("people").parts().clone())?,
 				)
 				.await
 			})
@@ -503,9 +502,9 @@ mod test {
 			.unwrap();
 		drive_until(&mut app, surface, "Send");
 		submit(&mut app, "  ");
-		submit(&mut app, "hello room");
-		drive_until(&mut app, surface, "hello room");
-		said(&app, thread).xpect_eq(vec!["hello room".to_string()]);
+		submit(&mut app, "hello all");
+		drive_until(&mut app, surface, "hello all");
+		said(&app, thread).xpect_eq(vec!["hello all".to_string()]);
 
 		let id = app.world().get::<Thread>(thread).unwrap().id();
 		let store = app.world().get::<ThreadStore>(thread).unwrap().clone();
@@ -523,7 +522,7 @@ mod test {
 			.filter(|post| post.intent() != PostIntent::Log)
 			.map(|post| post.to_string())
 			.collect::<Vec<_>>()
-			.xpect_eq(vec!["hello room".to_string()]);
+			.xpect_eq(vec!["hello all".to_string()]);
 	}
 
 	/// A chat whose agent thinks until stopped: `Repeat[Sequence[person,
