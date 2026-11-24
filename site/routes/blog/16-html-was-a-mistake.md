@@ -1,6 +1,12 @@
 +++
 title = "HTML was a mistake"
 description = "HTML was designed for documents, not software, and we've been paying the price for that ever since."
+created = "2026-09-26"
+tags = ["malleable-software", "atproto"]
+authors = ["Pete Hayman"]
+
+[RouteMeta]
+slug = "html-was-a-mistake"
 +++
 
 This is part three in what has become a mini series on standardizing malleable software in the Atmosphere. In [ATProto isn't malleable yet](./atproto-isnt-malleable-yet) I described the protocol as *swappable but not yet malleable* in the sense of making arbitrary fine-grained tweaks to apps and infra. In [Bevy standardizes malleable software](./bevy-standardizes-malleable-software) I proposed the Bevy Engine and its scene format as a great fit for this, standardizing malleable software in three layers. In this post I'd like to reflect on the current state of things and how we got here.

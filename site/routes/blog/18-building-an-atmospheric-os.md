@@ -1,7 +1,14 @@
 +++
-title = "Whats an OS Anyway"
-description = "The ATProto endgame is a malleable operating system"
+title = "Building an Atmospheric OS"
+description = "The endgame for the ATProto application layer is a malleable operating system"
+tags = ["malleable-software", "atproto"]
+created = "2026-10-21"
+authors = ["Pete Hayman"]
+
+[RouteMeta]
+slug = "building-an-atmospheric-os"
 +++
+
 
 In this post I want to elaborate on exactly what the problem is, how Bevy and ATProto intersect meaningfully, and why combining them produces a new kind of operating system.
 
