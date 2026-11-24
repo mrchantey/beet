@@ -30,9 +30,10 @@ use beet::prelude::*;
 async fn boot_until(page: String, needle: &str) -> (String, Browser) {
 	let port = serve_wasm_page(page).await.unwrap();
 	let url = format!("http://127.0.0.1:{port}/");
-	let mut browser = Browser::new_with_opts(driver().unwrap(), default())
-		.await
-		.unwrap();
+	let mut browser =
+		Browser::new_with_opts(Client::unique().unwrap(), default())
+			.await
+			.unwrap();
 	let console = browser.console().await.unwrap();
 	browser.navigate(&url).await.unwrap();
 	// the module fetch, the entry's reads over http, the boot

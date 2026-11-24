@@ -107,7 +107,7 @@ pub(crate) async fn run(
 		.with_disable_gpu(chrome_args.is_empty())
 		.with_extra_args(chrome_args);
 	let mut browser =
-		Browser::new_with_opts(Client::unique(), session_opts).await?;
+		Browser::new_with_opts(Client::unique()?, session_opts).await?;
 	let console = browser.console().await?;
 	browser.navigate(&url).await?;
 

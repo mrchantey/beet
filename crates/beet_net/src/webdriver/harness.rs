@@ -31,7 +31,8 @@
 //! layout needs (eg `RouterPlugin`, a style plugin, an
 //! `|app: &mut App|` closure seeding resources). The listener is pre-bound to
 //! port 0 (no port race, parallel-test safe) and the driver rides
-//! [`Client::unique`], so harnesses stack freely within one test binary.
+//! [`Client::unique`] (OS-assigned ports), so harnesses stack freely within
+//! one test binary and across concurrently running ones.
 //!
 //! A tree that boots its own listener (a no-code entry declaring
 //! `<HttpServer>`) goes through [`PageHarness::serve_app`] instead: the harness
@@ -70,16 +71,29 @@ impl PageHarness {
 		plugins: impl 'static + Send + Plugins<M>,
 		host: impl Bundle,
 	) -> Result<Self> {
+		Self::serve_with_opts(plugins, host, default()).await
+	}
+
+	/// [`Self::serve`] with custom browser session options, eg chrome's fake
+	/// camera flags via [`NewSessionOptions::with_extra_args`].
+	pub async fn serve_with_opts<M>(
+		plugins: impl 'static + Send + Plugins<M>,
+		host: impl Bundle,
+		opts: NewSessionOptions,
+	) -> Result<Self> {
 		let (mut server, on_spawn) =
 			HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
 		// leave the process-global loopback port to the app under test: several
 		// harnesses may serve concurrently in one test binary.
 		server.canonical = false;
-		Self::serve_app(move |app| {
-			app.add_plugins(plugins);
-			// the server owns the boot, its dispatch host is the child
-			app.world_mut().spawn((server, on_spawn, children![host]));
-		})
+		Self::serve_app_with_opts(
+			move |app| {
+				app.add_plugins(plugins);
+				// the server owns the boot, its dispatch host is the child
+				app.world_mut().spawn((server, on_spawn, children![host]));
+			},
+			opts,
+		)
 		.await
 	}
 
@@ -91,6 +105,14 @@ impl PageHarness {
 	/// its own server, eg a no-code entry declaring `<HttpServer port=0>`.
 	pub async fn serve_app(
 		setup: impl 'static + Send + FnOnce(&mut App),
+	) -> Result<Self> {
+		Self::serve_app_with_opts(setup, default()).await
+	}
+
+	/// [`Self::serve_app`] with custom browser session options.
+	pub async fn serve_app_with_opts(
+		setup: impl 'static + Send + FnOnce(&mut App),
+		opts: NewSessionOptions,
 	) -> Result<Self> {
 		let exit = Store::new(false);
 		let listening = Store::<Option<SocketAddr>>::default();
@@ -130,7 +152,7 @@ impl PageHarness {
 			}
 		});
 		let url = Self::await_listening(&listening).await?.local_url();
-		let browser = Browser::new_with(Client::unique()).await?;
+		let browser = Browser::new_with_opts(Client::unique()?, opts).await?;
 		Self {
 			browser,
 			url,
@@ -253,5 +275,35 @@ mod test {
 		page.kill().await.unwrap();
 		// the served app is down: a fresh request is refused
 		Request::get(&url).send().await.xpect_err();
+	}
+
+	/// Session options reach the harness browser: chrome's fake media flags
+	/// grant a live camera track on the loopback origin with no prompt.
+	#[beet_core::test(timeout_ms = 30_000)]
+	#[ignore = "smoketest"]
+	async fn serves_with_session_opts() {
+		let mut page = PageHarness::serve_with_opts(
+			(),
+			exchange_ext::handler(|_| {
+				Response::ok_body("<html><body></body></html>", MediaType::Html)
+			}),
+			NewSessionOptions::default().with_extra_args(vec![
+				"--use-fake-device-for-media-stream".into(),
+				"--use-fake-ui-for-media-stream".into(),
+			]),
+		)
+		.await
+		.unwrap();
+		page.goto("/").await.unwrap();
+
+		page.evaluate_value(
+			"navigator.mediaDevices.getUserMedia({ video: true })
+				.then(stream => stream.getVideoTracks()[0].readyState)",
+		)
+		.await
+		.unwrap()
+		.xpect_eq(serde_json::json!("live"));
+
+		page.kill().await.unwrap();
 	}
 }

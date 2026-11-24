@@ -18,7 +18,7 @@ pub(crate) fn page_url(name: &str, html: &str) -> String {
 
 /// A uniquely-ported [`Client`], so concurrently running tests each own their
 /// driver process.
-pub(crate) fn client() -> Client { Client::unique() }
+pub(crate) fn client() -> Client { Client::unique().unwrap() }
 
 /// Spawn a uniquely-ported chromedriver and visit `url`.
 pub(crate) async fn visit(url: &str) -> Browser {

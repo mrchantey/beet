@@ -88,14 +88,6 @@ pub(crate) async fn serve_wasm_page(page: String) -> Result<u16> {
 	port.xok()
 }
 
-/// A uniquely-ported chromium driver, so a check never fights another suite's.
-pub(crate) fn driver() -> Result<Client> {
-	Client::default()
-		.with_driver_port(HttpServer::free_port()?)
-		.with_websocket_port(HttpServer::free_port()?)
-		.xok()
-}
-
 /// Drain the console into `log`, streaming each entry for the person watching.
 pub(crate) fn drain(console: &Collector<ConsoleEntry>, log: &mut String) {
 	for entry in console.drain() {

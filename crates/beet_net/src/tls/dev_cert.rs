@@ -24,21 +24,25 @@ pub struct DevCert;
 
 impl DevCert {
 	/// The cache directory: `--tls-dir` / `BEET_TLS_DIR`, falling back to
-	/// `target/tls` under the workspace root.
-	pub fn dir() -> PathBuf {
-		BootstrapConfig::get()
-			.tls_dir
-			.as_ref()
-			.map(|dir| PathBuf::from(dir.as_str()))
-			.unwrap_or_else(|| fs_ext::workspace_root().join("target/tls"))
+	/// `~/.config/beet/cache/tls`. Per user rather than per project: the cert
+	/// is bound to the machine's addresses, so one browser exception covers
+	/// every beet project, and the key never sits inside a served directory.
+	pub fn dir() -> Result<PathBuf> {
+		match BootstrapConfig::get().tls_dir.as_ref() {
+			Some(dir) => PathBuf::from(dir.as_str()).xok(),
+			None => fs_ext::config_dir()
+				.map(|dir| dir.join("beet").join("cache").join("tls")),
+		}
 	}
 
 	/// The cached PEM certificate. Also the file to import on a device that
 	/// should trust the cert outright instead of clicking through warnings.
-	pub fn cert_path() -> PathBuf { Self::dir().join("cert.pem") }
+	pub fn cert_path() -> Result<PathBuf> {
+		Self::dir()?.join("cert.pem").xok()
+	}
 
 	/// The cached PEM private key.
-	pub fn key_path() -> PathBuf { Self::dir().join("key.pem") }
+	pub fn key_path() -> Result<PathBuf> { Self::dir()?.join("key.pem").xok() }
 
 	/// The subject-alt-names the cached cert was generated for, one per line;
 	/// a mismatch with [`Self::subject_alt_names`] triggers regeneration.
@@ -67,7 +71,7 @@ impl DevCert {
 	/// missing, unparsable, or the subject-alt-names changed.
 	pub fn load_or_generate()
 	-> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)> {
-		Self::load_or_generate_in(&Self::dir())
+		Self::load_or_generate_in(Self::dir()?)
 	}
 
 	/// [`Self::load_or_generate`] against an explicit cache directory (tests).
@@ -142,7 +146,7 @@ impl DevCert {
 	/// A [`rustls::ClientConfig`] trusting exactly the cached dev cert: how a
 	/// native client (or test) connects to a locally served `https`/`wss`.
 	pub fn client_config() -> Result<rustls::ClientConfig> {
-		let cert_pem = fs_ext::read(Self::cert_path())?;
+		let cert_pem = fs_ext::read(Self::cert_path()?)?;
 		let mut root_store = rustls::RootCertStore::empty();
 		for cert in CertificateDer::pem_slice_iter(&cert_pem) {
 			root_store.add(cert?)?;

@@ -71,7 +71,7 @@ async fn browser_render_boot() {
 
 	// -- the WebGPU boot claims a canvas and draws --
 	let mut browser = Browser::new_with_opts(
-		Client::unique(),
+		Client::unique().unwrap(),
 		NewSessionOptions::default()
 			.with_disable_gpu(false)
 			// `--use-angle=gl` is load-bearing: chrome's headless Vulkan path
@@ -122,9 +122,10 @@ async fn browser_render_boot() {
 	browser.kill().await.unwrap();
 
 	// -- the GPU-less boot runs but stays surfaceless --
-	let mut browser = Browser::new_with_opts(Client::unique(), default())
-		.await
-		.unwrap();
+	let mut browser =
+		Browser::new_with_opts(Client::unique().unwrap(), default())
+			.await
+			.unwrap();
 	let console = browser.console().await.unwrap();
 	browser.navigate(&url).await.unwrap();
 	// boot evidence: the render stack logs on the way up (GPU-less warnings at
