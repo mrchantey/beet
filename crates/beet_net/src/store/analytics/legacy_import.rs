@@ -10,7 +10,7 @@ use std::io::Read;
 ///
 /// Each event's key is a pure function of its id and timestamp (its TID's
 /// sub-millisecond digits and clock id drawn from the id), and a page view's
-/// heartbeats are reduced to its last first, so a rerun rewrites the same
+/// heartbeats are reduced to its last of each day first, so a rerun rewrites the same
 /// rows and an archive overlapping a segment imports each event once. The old
 /// objects are never touched: removing them is the operator's, once the
 /// import is checked.
@@ -69,7 +69,16 @@ impl AnalyticsImport {
 				events.extend(decoded);
 			}
 		}
-		let rows = AnalyticsEvent::dedupe(events);
+		// per day, as the job that rolled these days up deduplicated them: a
+		// view whose heartbeats cross midnight counts on both
+		let mut days = HashMap::<SmolStr, Vec<AnalyticsEvent>>::default();
+		for event in events {
+			days.entry(event.date()).or_default().push(event);
+		}
+		let rows = days
+			.into_values()
+			.flat_map(AnalyticsEvent::dedupe)
+			.collect::<Vec<_>>();
 		report.written = rows.len();
 		let table = self.to.events();
 		rows.into_iter()
@@ -221,6 +230,22 @@ mod test {
 			)
 			.await
 			.unwrap();
+		// a heartbeat past midnight is the next day's view too, so not merged
+		// into the day before's
+		let mut crossing = recent
+			.clone()
+			.with_timestamp(recent.timestamp() - Duration::from_secs(86_400));
+		crossing.path = "/crossing".into();
+		analytics
+			.insert(
+				&RelPath::new(format!(
+					"analytics/raw/segments/{}/w/3-1.jsonl.zst",
+					crossing.date()
+				)),
+				legacy(&[crossing]),
+			)
+			.await
+			.unwrap();
 		// another writer's object is not read
 		analytics
 			.insert(&RelPath::new("analytics/other.jsonl"), "{}")
@@ -229,21 +254,21 @@ mod test {
 		let to = AnalyticsStore::new(TableStore::temp());
 		let import = AnalyticsImport::new(vec![archive, analytics], to.clone());
 		let report = import.run().await.unwrap();
-		report.objects.xpect_eq(3);
-		report.read.xpect_eq(3);
-		report.written.xpect_eq(2);
+		report.objects.xpect_eq(4);
+		report.read.xpect_eq(4);
+		report.written.xpect_eq(3);
 		let date = Date::parse(&old.date()).unwrap();
 		let day = to.day(date).await.unwrap();
 		day.len().xpect_eq(1);
 		day[0].path.as_str().xpect_eq("/old-later");
 		// idempotent
 		import.run().await.unwrap();
-		to.events().list().await.unwrap().len().xpect_eq(2);
+		to.events().list().await.unwrap().len().xpect_eq(3);
 		// the rollup then reads the imported history
 		AnalyticsRollupRun::new(to.clone(), None)
 			.call()
 			.await
 			.unwrap();
-		to.summary(false).await.unwrap().page_views.xpect_eq(2);
+		to.summary(false).await.unwrap().page_views.xpect_eq(3);
 	}
 }

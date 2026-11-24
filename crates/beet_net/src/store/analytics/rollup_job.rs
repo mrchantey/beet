@@ -10,8 +10,8 @@ use serde::Serialize;
 /// Each complete UTC day after the last one rolled up is scanned (one key
 /// range of `analytics_event`), reduced to [`AnalyticsRollup`] rows, and each
 /// row written and read back. The rows are keyed by day and scope, so a rerun
-/// rewrites the same rows: idempotent, and `full` rebuilds every day still
-/// holding raw events. Then every day older than `keep_days` is moved to the
+/// rewrites the same rows: idempotent, and `full` rebuilds every day from its
+/// rows and its archive both, for a new aggregate schema. Then every day older than `keep_days` is moved to the
 /// archive bucket as one SQLite file, `analytics/events/<date>.db`
 /// ([`TableArchive`]), and its rows retired from the table, so the hot table
 /// holds a bounded window while the aggregates and the archives hold
@@ -37,7 +37,7 @@ impl AnalyticsRollupRun {
 		}
 	}
 
-	/// Rebuild every day still holding raw events, not only the new ones.
+	/// Rebuild every day, archived ones included, not only the new ones.
 	pub fn with_full(mut self, full: bool) -> Self {
 		self.full = full;
 		self
@@ -61,42 +61,36 @@ impl AnalyticsRollupRun {
 			full: self.full,
 			..default()
 		};
-		let Some(first) = self.store.first_day().await? else {
+		let first = self.store.first_day().await?;
+		let archived = match self.full {
+			true => self.archived_days().await?,
+			false => Vec::new(),
+		};
+		let Some(start) =
+			first.into_iter().chain(archived.iter().copied()).min()
+		else {
 			return report.xok();
 		};
 		let start = match (self.full, self.store.last_rolled_day().await?) {
-			(false, Some(last)) => last.add_days(1).max(first),
-			_ => first,
+			(false, Some(last)) => last.add_days(1).max(start),
+			_ => start,
 		};
-		// roll up each complete day, writing and reading back every row
-		let rollups = self.store.rollups();
 		let mut date = start;
 		while date < today {
-			let events = self.store.day(date).await?;
+			let events = self.day(date, archived.contains(&date)).await?;
 			report.scanned += events.len() as u32;
-			for row in AnalyticsRollup::from_events(&events) {
-				rollups.put(row.clone()).await?;
-				if rollups.get(row.key()).await?.as_ref() != Some(&row) {
-					bevybail!(
-						"analytics rollup row {} for {} was written to {} but failed read-back verification",
-						row.id,
-						row.date,
-						rollups.describe()
-					);
-				}
-				report.rollups += 1;
-			}
+			report.rollups += self.roll_up(&events).await?;
 			if !events.is_empty() {
 				report.dates.push(date.to_string().into());
 			}
 			date = date.add_days(1);
 		}
-		if let Some(archive) = &self.archive {
+		if let (Some(archive), Some(first)) = (&self.archive, first) {
 			cfg_if! {
 				if #[cfg(feature = "sqlite")] {
 					self.archive(archive, first, today, &mut report).await?;
 				} else {
-					let _ = archive;
+					let _ = (archive, first);
 					bevybail!(
 						"archiving analytics needs the `sqlite` feature: each cold \
 						 day is archived as a SQLite file"
@@ -105,6 +99,81 @@ impl AnalyticsRollupRun {
 			}
 		}
 		report.xok()
+	}
+
+	/// Write one day's aggregates and read each back, answering how many. The
+	/// site-wide row goes last, alone: its presence is what marks the day
+	/// complete ([`AnalyticsStore::last_rolled_day`]), so a run that dies
+	/// partway leaves a day the next run redoes.
+	async fn roll_up(&self, events: &[AnalyticsEvent]) -> Result<u32> {
+		let table = self.store.rollups();
+		let write = async |row: AnalyticsRollup| -> Result {
+			table.put(row.clone()).await?;
+			if table.get(row.key()).await?.as_ref() != Some(&row) {
+				bevybail!(
+					"analytics rollup row {} for {} was written to {} but failed read-back verification",
+					row.id,
+					row.date,
+					table.describe()
+				);
+			}
+			Ok(())
+		};
+		let (site, paths): (Vec<_>, Vec<_>) =
+			AnalyticsRollup::from_events(events)
+				.into_iter()
+				.partition(|row| row.scope == AnalyticsScope::Site);
+		let written = site.len() + paths.len();
+		async_ext::try_join_all_bounded(
+			BlobStore::GET_ALL_CONCURRENCY,
+			paths.into_iter().map(&write),
+		)
+		.await?;
+		for row in site {
+			write(row).await?;
+		}
+		(written as u32).xok()
+	}
+
+	/// The events of `date`: the table's, and its archive's when it has one,
+	/// so a rebuild never sees a day some of whose rows were retired.
+	async fn day(
+		&self,
+		date: Date,
+		archived: bool,
+	) -> Result<Vec<AnalyticsEvent>> {
+		let mut events = self.store.day(date).await?;
+		#[cfg(feature = "sqlite")]
+		if let (true, Some(archive)) = (archived, &self.archive) {
+			let cold =
+				TableArchive::open(archive, &Self::archive_path(date)).await?;
+			events.extend(
+				Table::<AnalyticsEvent>::new(cold.clone()).get_all().await?,
+			);
+			cold.store_remove().await?;
+			events = AnalyticsEvent::dedupe(events);
+		}
+		let _ = archived;
+		events.xok()
+	}
+
+	/// Every day the archive bucket holds a file for.
+	async fn archived_days(&self) -> Result<Vec<Date>> {
+		let Some(archive) = &self.archive else {
+			return Vec::new().xok();
+		};
+		archive
+			.list()
+			.await?
+			.into_iter()
+			.filter_map(|path| {
+				path.as_str()
+					.strip_prefix("analytics/events/")?
+					.strip_suffix(".db")
+					.and_then(|date| Date::parse(date).ok())
+			})
+			.collect::<Vec<_>>()
+			.xok()
 	}
 
 	/// Archive each day from `first` past the window whose aggregate is
@@ -141,7 +210,7 @@ impl AnalyticsRollupRun {
 /// The verified work of one [`AnalyticsRollupRun`].
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AnalyticsRollupReport {
-	/// Whether the run rebuilt every day still holding raw events.
+	/// Whether the run rebuilt every day, archived ones included.
 	pub full: bool,
 	/// Raw events reduced, heartbeats deduplicated.
 	pub scanned: u32,
@@ -198,7 +267,7 @@ pub async fn AnalyticsRollupJob(
 	#[field(required)]
 	#[entities]
 	archive: Entity,
-	/// Rebuilds every day still holding raw events, not only new days.
+	/// Rebuilds every day, archived ones included, not only new days.
 	#[param]
 	full: bool,
 	/// Complete days of raw events kept in the table before archiving.
@@ -379,6 +448,61 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_empty();
+	}
+
+	/// A full run rebuilds an archived day from its archive, so a straggler
+	/// left in the table never overwrites the day's aggregate with itself.
+	#[cfg(feature = "sqlite")]
+	#[beet_core::test]
+	async fn full_rebuilds_from_the_archive() {
+		let store =
+			recorded(&[page_view(40, "/a", 1), page_view(40, "/b", 2)]).await;
+		let archive = BlobStore::temp();
+		AnalyticsRollupRun::new(store.clone(), Some(archive.clone()))
+			.call()
+			.await
+			.unwrap()
+			.retired
+			.xpect_eq(2);
+		store.record(page_view(40, "/late", 3)).await.unwrap();
+		AnalyticsRollupRun::new(store.clone(), Some(archive))
+			.with_full(true)
+			.call()
+			.await
+			.unwrap()
+			.scanned
+			.xpect_eq(3);
+		store.summary(false).await.unwrap().page_views.xpect_eq(3);
+	}
+
+	/// A day whose run died before its site-wide row is not complete: the
+	/// summary reads its raw events, and the next run redoes it.
+	#[beet_core::test]
+	async fn redoes_a_day_cut_short() {
+		let events = [
+			page_view(2, "/a", 1),
+			page_view(1, "/a", 2),
+			page_view(1, "/b", 3),
+		];
+		let store = recorded(&events).await;
+		for row in
+			AnalyticsRollup::from_events(&events)
+				.into_iter()
+				.filter(|row| {
+					row.date == events[0].date()
+						|| row.scope == AnalyticsScope::Path("/a".into())
+				}) {
+			store.rollups().put(row).await.unwrap();
+		}
+		store.summary(false).await.unwrap().page_views.xpect_eq(3);
+		AnalyticsRollupRun::new(store.clone(), None)
+			.call()
+			.await
+			.unwrap()
+			.dates
+			.xpect_eq(vec![events[1].date()]);
+		store.summary(false).await.unwrap().page_views.xpect_eq(3);
+		store.visits().await.unwrap().xpect_eq(3);
 	}
 
 	/// The job resolves its two stores by field and reports.

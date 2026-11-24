@@ -81,41 +81,98 @@ impl AnalyticsStore {
 			.xok()
 	}
 
-	/// The latest day an aggregate covers, `None` before the first rollup.
+	/// The latest day rolled up whole, `None` before the first rollup: the
+	/// last day with aggregates when its site-wide row, written last, is
+	/// among them, else the day before it, the last one having been cut short.
 	pub async fn last_rolled_day(&self) -> Result<Option<Date>> {
-		match self
-			.rollups()
-			.scan(Scan::default().reverse().limit(1))
-			.await?
-			.rows
-			.first()
-		{
-			Some(rollup) => Some(Date::parse(&rollup.date)?),
-			None => None,
+		let rollups = self.rollups();
+		let page = rollups.scan(Scan::default().reverse().limit(1)).await?;
+		let Some(last) = page.rows.first() else {
+			return None.xok();
+		};
+		let date = Date::parse(&last.date)?;
+		match rollups.exists(Self::site_key(date)).await? {
+			true => date,
+			false => date.add_days(-1),
 		}
+		.xsome()
 		.xok()
 	}
 
 	/// Compose the [`AnalyticsSummary`] of everything recorded: the daily
-	/// aggregates for the days they cover, and the raw events of the days
-	/// after the last of them. `raw_only` reads the raw events alone. An
+	/// aggregates for the days they cover whole, and the raw events of the
+	/// days after the last of them. `raw_only` reads the raw events alone. An
 	/// unreadable row is skipped with a warning rather than failing the
 	/// summary, and a store never written to summarizes as empty.
 	pub async fn summary(&self, raw_only: bool) -> Result<AnalyticsSummary> {
-		let rollups = match raw_only {
-			true => Vec::new(),
-			false => self.rollups().get_all_lossy().await?,
-		};
-		let since = match raw_only {
+		let last = match raw_only {
 			true => None,
-			false => self.last_rolled_day().await?.map(|day| day.add_days(1)),
+			false => self.last_rolled_day().await?,
 		};
-		let scan = match since {
-			Some(day) => Scan::default().from(Tid::from(day.timestamp())),
+		let rollups = match last {
+			Some(last) => self
+				.rollups()
+				.get_all_lossy()
+				.await?
+				.into_iter()
+				.filter(|row| {
+					Date::parse(&row.date).is_ok_and(|date| date <= last)
+				})
+				.collect(),
+			None => Vec::new(),
+		};
+		let events = self.events_after(last).await?;
+		AnalyticsSummary::compose(&rollups, &events).xok()
+	}
+
+	/// The visits of everything recorded, [`summary`](Self::summary)'s count
+	/// read from the site-wide aggregates alone, one key a day: what a page
+	/// showing it can afford on every render.
+	pub async fn visits(&self) -> Result<usize> {
+		let last = self.last_rolled_day().await?;
+		let rollups = self.rollups();
+		let first = rollups.scan(Scan::default().limit(1)).await?;
+		let days = match (first.rows.first(), last) {
+			(Some(first), Some(last)) => {
+				let first = Date::parse(&first.date)?;
+				(0..=first.days_until(last))
+					.map(|days| first.add_days(days))
+					.collect()
+			}
+			_ => Vec::new(),
+		};
+		let sites = async_ext::try_join_all_bounded(
+			BlobStore::GET_ALL_CONCURRENCY,
+			days.into_iter()
+				.map(|date| rollups.get(Self::site_key(date))),
+		)
+		.await?
+		.into_iter()
+		.flatten()
+		.collect::<Vec<_>>();
+		let events = self.events_after(last).await?;
+		AnalyticsSummary::compose(&sites, &events).visits.xok()
+	}
+
+	/// The key of `date`'s site-wide aggregate.
+	fn site_key(date: Date) -> TableKey {
+		AnalyticsRollup::new(date.to_string(), AnalyticsScope::Site).key()
+	}
+
+	/// Every event after `last`, all of them without one, a page view's
+	/// heartbeats reduced to its last and an unreadable row skipped with a
+	/// warning.
+	async fn events_after(
+		&self,
+		last: Option<Date>,
+	) -> Result<Vec<AnalyticsEvent>> {
+		let scan = match last {
+			Some(last) => {
+				Scan::default().from(Tid::from(last.add_days(1).timestamp()))
+			}
 			None => Scan::default(),
 		};
-		let events = self
-			.events()
+		self.events()
 			.scan_stored(scan)
 			.await?
 			.into_iter()
@@ -129,8 +186,8 @@ impl AnalyticsStore {
 					})
 					.ok()
 			})
-			.xmap(AnalyticsEvent::dedupe);
-		AnalyticsSummary::compose(&rollups, &events).xok()
+			.xmap(AnalyticsEvent::dedupe)
+			.xok()
 	}
 }
 

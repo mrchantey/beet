@@ -9,9 +9,8 @@ use beet_net::prelude::*;
 /// Counts visits (distinct sessions) and says so, never visitors: a session
 /// is never linked across visits ([`AnalyticsSummary::visits`]). The store is
 /// the one the nearest [`AnalyticsConfig`] above the page's route records to,
-/// and the count composes its aggregates and raw tail as `beet analytics`
-/// does ([`AnalyticsStore::summary`]), so every render reads the aggregates
-/// and the days after them:
+/// and the count is `beet analytics`' own, read from the site-wide aggregate
+/// of each day and the raw events after them ([`AnalyticsStore::visits`]), a read per day kept, so
 /// place it in a [`ServerIsland`] behind a short edge cache, never in a page
 /// cached whole.
 ///
@@ -58,9 +57,8 @@ impl VisitCount {
 		let visits = async {
 			StoreRef::resolve::<AnalyticsStore>(&world, config)
 				.await?
-				.summary(false)
+				.visits()
 				.await
-				.map(|summary| summary.visits)
 		}
 		.await;
 		let parent = entity.id();

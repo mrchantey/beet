@@ -457,10 +457,9 @@ binary serves the records and the comments (`atproto`).
 			<DynamoTableBlock bx:ref="analytics" label="events"/>
 			<!-- the zstd JSONL history recorded before events were rows, held
 			     until `beet analytics import --from` has moved it into the table
-			     and the summary agrees: dropping this declaration first would
-			     destroy the bucket at the next apply. Removing it, then the bucket,
-			     is the operator's. -->
-			<S3BucketBlock label="analytics" deploy_versioned=false object_versioning=true force_destroy=false/>
+			     and the summary agrees, and writable until then: the process a
+			     deploy replaces flushes its last events here as it stops. -->
+			<S3BucketBlock label="analytics" deploy_versioned=false runtime_write=true object_versioning=true/>
 			<!-- the REPO STORE, marked so the deploy publishes the site into it and
 			     the ledger names it; deploy-versioned by taking the default. The box
 			     does not bake the prefix into its `user_data` (that would rebuild it
@@ -471,7 +470,7 @@ binary serves the records and the comments (`atproto`).
 			     bucket by lifecycle. Never touched by a deploy sync, which would prune
 			     it. Analytics owns the `analytics/` prefix: each cold day's events as
 			     one SQLite file, the primary raw history, so nothing here expires. -->
-			<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true force_destroy=false/>
+			<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
 			<!-- the box's ssh host key, so every start presents one fingerprint: the
 			     `BEET_SSH_HOST_KEY` record, written by the full apply into this
 			     stack's parameter `/beet-site/<stage>/ssh-host-key` as a write-only

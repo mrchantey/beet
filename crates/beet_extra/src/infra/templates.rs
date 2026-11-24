@@ -864,7 +864,7 @@ mod test {
 				</Route>
 				<Stack>
 					<DynamoTableBlock bx:ref="analytics" label="events"/>
-					<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true force_destroy=false/>
+					<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
 					<!-- the repo store the job boots from, deploy-versioned like
 					     every served store: the job dispatches a route of the same
 					     document the site serves -->
@@ -874,8 +874,7 @@ mod test {
 				</Stack>
 			</Fragment>"#,
 		);
-		// the archive is stable across deploys, runtime-writable, versioned and
-		// never destroyed with its objects: it is the sole raw history
+		// the archive is stable across deploys, runtime-writable, versioned: it is the sole raw history
 		let mut buckets = world
 			.query::<&S3BucketBlock>()
 			.iter(&world)
@@ -961,13 +960,12 @@ mod test {
 			.xpect_contains("aws_scheduler_schedule")
 			.xpect_contains("cron(0 3 * * ? *)")
 			// the job writes the table, its index slots included, and the
-			// archive, which is versioned and never destroyed with objects
+			// archive, which is versioned
 			.xpect_contains(r#""name":"beet-site--dev--events""#)
 			.xpect_contains("table/beet-site--dev--events/index/*")
 			.xpect_contains("beet-site--dev--archive")
 			.xpect_contains("s3:PutObject")
 			.xpect_contains("aws_s3_bucket_versioning")
-			.xpect_contains(r#""force_destroy":false"#)
 			// a job sweeps a store rather than answering a request, so it takes
 			// the long timeout a served function has no use for
 			.xpect_contains(r#""timeout":900"#)
