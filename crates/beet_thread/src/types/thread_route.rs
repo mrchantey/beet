@@ -38,7 +38,7 @@ use beet_router::prelude::*;
 ///
 /// A failed build, a refused entry or a behavior that errors fail the
 /// request the same way, the thread despawned all the same. A template
-/// holding a `UserInput` is refused, naming it: a thread a person sits in is
+/// holding a [`UserInput`] is refused, naming it: a thread a person sits in is
 /// held by a [`RunThread`].
 #[action]
 #[derive(Debug, Default, Clone, Component, Reflect)]
@@ -146,7 +146,6 @@ impl ThreadRoute {
 		template: &str,
 		entry: ThreadEntry,
 	) -> Result<Response> {
-		#[cfg(feature = "ui")]
 		Self::assert_unattended(root, template).await?;
 		let threads = RunThread::enter_all(root, &entry).await?;
 		let behavior = root
@@ -192,7 +191,6 @@ impl ThreadRoute {
 
 	/// Refuse a template holding a [`UserInput`], naming its actor: nobody
 	/// types into a thread run as a function.
-	#[cfg(feature = "ui")]
 	async fn assert_unattended(root: &AsyncEntity, template: &str) -> Result {
 		let typing = root
 			.with_state::<(Query<&Children>, Query<Option<&Actor>, With<UserInput>>), _>(
@@ -328,7 +326,6 @@ mod test {
 "#;
 
 	/// A thread a person types into.
-	#[cfg(feature = "ui")]
 	const SITTING_THREAD: &str = r#"
 <Thread {Sequence}>
 	<CreateActor name="Owner" kind="User" {UserInput}/>
@@ -371,8 +368,6 @@ mod test {
 			.install_type::<ThreadPlugin>()
 			.register_type::<Bail>()
 			.register_type::<Hold>();
-		#[cfg(feature = "ui")]
-		app.register_type::<UserInput>();
 		let mut registry = app
 			.world_mut()
 			.get_resource_or_init::<BsxTemplateRegistry>();
@@ -381,7 +376,6 @@ mod test {
 			("DelegateThread", DELEGATE_THREAD),
 			("FailingThread", FAILING_THREAD),
 			("HoldingThread", HOLDING_THREAD),
-			#[cfg(feature = "ui")]
 			("SittingThread", SITTING_THREAD),
 		] {
 			registry.insert_source(name, source).unwrap();
@@ -734,7 +728,6 @@ mod test {
 	}
 
 	/// A template a person types into is refused, naming the actor.
-	#[cfg(feature = "ui")]
 	#[beet_core::test]
 	async fn refuses_a_person_typing() {
 		let (mut app, router, _) = host();

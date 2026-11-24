@@ -2,7 +2,8 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// Checks whether the last post in the thread is a function call output.
+/// Whether the newest post of the thread that is not a log is a function
+/// call output its call answered, rather than one an interrupt closed.
 /// The `thread_entity` should be an entity within a thread tree
 /// (the Thread entity itself or any descendant).
 async fn has_pending_function_call_output(
@@ -12,10 +13,12 @@ async fn has_pending_function_call_output(
 		.with_state::<ThreadQuery, _>(|entity, query| -> Result<bool> {
 			query
 				.records(entity)?
-				.last_post()
-				.and_then(AgentPost::new)
-				.map(|post| post.is_function_call_output())
-				.unwrap_or(false)
+				.last_content_post()
+				.is_some_and(|post| {
+					post.status() == PostStatus::Completed
+						&& AgentPost::new(post)
+							.is_some_and(|post| post.is_function_call_output())
+				})
 				.xok()
 		})
 		.await
@@ -25,12 +28,14 @@ async fn has_pending_function_call_output(
 /// Repeat control-flow component for agent tool-call loops.
 ///
 /// Calls its single child in a loop, continuing as long as the
-/// thread's most recent post is a [`AgentPost::FunctionCallOutput`].
+/// thread's newest post that is not a log is a completed
+/// [`AgentPost::FunctionCallOutput`].
 /// This drives the standard agent loop: stream response → call tools →
 /// check if the agent needs another turn.
 ///
-/// Returns [`Outcome::Pass`] when the agent's final post is not a
-/// function call output (ie a text response).
+/// Returns [`Outcome::Pass`] when that post is anything else, ie a text
+/// response, a person's post, or the output of a call an [`InterruptTurn`]
+/// cut short, so an interrupted turn ends its loop.
 /// Returns [`Outcome::Fail`] immediately if the child fails.
 #[action]
 #[derive(Debug, Clone, Copy, Default, Component, Reflect)]

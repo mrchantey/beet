@@ -61,7 +61,7 @@
 //!   every window. Only a completed post is written to the store, once, by
 //!   the window that authored it; a window never writes a post it received.
 //! - **Behavior.** A scene holding an action on an actor, ie a `Sequence`
-//!   over an agent's streamer and a person's `UserInput`.
+//!   over an agent's streamer and a person's [`UserInput`](crate::prelude::UserInput).
 //! - **Canonical window.** The window holding a thread's behavior; a thread
 //!   has at most one in a runtime ([`ThreadWindows`]), and every other window
 //!   is a view and a composer with no behavior. Entering a thread with behavior while another
@@ -77,7 +77,7 @@
 //!
 //! - **Thread route.** A thread run as a function (`ThreadRoute`): built for
 //!   one request, run to its outcome, answered and despawned, nobody typing.
-//!   It refuses a template holding a `UserInput`, and a request for a thread
+//!   It refuses a template holding a [`UserInput`](crate::prelude::UserInput), and a request for a thread
 //!   whose canonical window is live answers `409`.
 //!
 //! # Entering
@@ -139,15 +139,21 @@
 //!
 //! - **Turn.** An action. A thread's behavior decides when each actor's
 //!   action runs, and that is the whole of turn taking; a thread with no
-//!   behavior is a room people post in. A person's turn (`UserInput`) is a
+//!   behavior is a room people post in. A person's turn ([`UserInput`](crate::prelude::UserInput)) is a
 //!   wait on the records, passing once the newest post that is not a log is
 //!   its actor's.
-//! - **Interrupt.** A running turn cut short (`InterruptTurn`), beet's own and
-//!   the same for every provider, since no request API takes input during a
-//!   response: the model's stream is dropped, the post in progress closed as
-//!   interrupted, the turn's tool calls cancelled, each given an output
-//!   saying so, and the turn passes. `InterruptOnPost` on an agent is that
-//!   agent's manners: any post by another actor interrupts it.
+//! - **Interrupt.** A running turn cut short ([`InterruptTurn`](crate::prelude::InterruptTurn)), beet's own
+//!   and the same for every provider, since no request API takes input
+//!   during a response: the model's stream is dropped, the post in progress
+//!   closed as interrupted, the turn's tool calls cancelled, each given an
+//!   output saying so, and the turn passes. [`InterruptOnPost`](crate::prelude::InterruptOnPost) on an agent is
+//!   that agent's manners: any post by another actor that is not a log
+//!   interrupts it, so a join interrupts nobody.
+//!
+//! A model reads the records in model order ([`ThreadRecords::model_posts`]):
+//! a function call is followed at once by its output, and a post landing
+//! between them is read after the output, so a post made mid tool call never
+//! breaks a provider's pairing of the two.
 //!
 //! A thread has one of three **shapes**, each the shape of its behavior and
 //! its actors, never a mode of the thread, and each independent of whether an

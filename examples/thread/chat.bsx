@@ -5,7 +5,7 @@ one binary:
     beet --entry=examples/thread/chat.bsx
 
 The behavior is `Repeat[Sequence[agent, user]]`: the agent greets from the system
-prompt, the user's turn (`{UserInput}`) waits for the composer, looped forever.
+prompt, the user's turn (`{UserInput}`) waits for their post, looped forever.
 `{RunThread}` runs it on the servers' start notification.
 
 The entry is a server root with a router child, like every other beet entry: a

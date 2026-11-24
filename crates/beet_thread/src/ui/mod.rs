@@ -46,15 +46,15 @@ impl Plugin for ThreadUiPlugin {
 			// the thread<->UI relationship binding views/forms to their thread
 			.register_type::<OfThread>()
 			.register_type::<ThreadItems>()
-			.register_type::<UserInput>();
+			// the composer posts on submit and stops on Escape, which reads
+			// the keyboard
+			.install_type::<bevy::input::InputPlugin>()
+			.add_observer(input::post_on_submit)
+			.add_systems(Update, input::stop_on_escape);
 		// project each thread's records into its views' documents, then pin to the bottom
 		app.add_systems(
 			Update,
 			(project_records_to_document, follow_thread_scroll).chain(),
 		);
-		// The form's empty-on-submit (`ClearOnSubmit`) and initial focus
-		// (`FocusOnAdd`) are generic `beet_ui` markers spread by the form's rust
-		// template (see `input.rs`); surface scoping is the host's job (it
-		// carries `RenderSurface(self)`).
 	}
 }

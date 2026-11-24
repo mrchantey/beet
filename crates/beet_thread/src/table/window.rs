@@ -62,6 +62,17 @@ impl ThreadWindows<'_, '_> {
 			.any(|child| self.behaviors.contains(child))
 	}
 
+	/// The behavior entity of every actor in every window of the stored
+	/// thread `id`.
+	#[cfg(feature = "action")]
+	pub fn actors(&self, id: ThreadId) -> impl Iterator<Item = Entity> {
+		self.windows
+			.iter()
+			.filter(move |(_, thread, _)| thread.id() == id)
+			.flat_map(|(window, ..)| self.children.iter_descendants(window))
+			.filter(|child| self.behaviors.contains(*child))
+	}
+
 	/// The canonical window of the stored thread `id`, the one holding its
 	/// behavior, other than `except`.
 	#[cfg(feature = "action")]

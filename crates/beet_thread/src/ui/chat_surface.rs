@@ -12,6 +12,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 	use beet_router::prelude::*;
 	use beet_ui::prelude::*;
 	// explicit: bevy_ui ships its own `ScrollPosition`, which reaches this module
@@ -406,11 +407,34 @@ mod test {
 		])
 	}
 
-	/// The user's turn is a Sequence action: calling the thread reaches the
-	/// `User` actor's [`UserInput`], which waits for the composer's [`Submit`],
-	/// appends the typed post, then passes so the agent replies to it. The
-	/// `Submit` is fired directly here (the focus/typing path is `beet_ui`'s); a
-	/// full keystroke run is `keyboard_submit_drives_reply`.
+	/// Submit `text` on the composer's `<form>`.
+	fn submit(app: &mut App, text: &str) {
+		let form = element_by_tag(app, "form").unwrap();
+		let values = Value::Map(
+			[("message".into(), Value::new(text))].into_iter().collect(),
+		);
+		app.world_mut().trigger(Submit { form, values });
+	}
+
+	/// The thread's posts that are not logs, as `text` or `text (status)`
+	/// when not completed.
+	fn said(app: &App, thread: Entity) -> Vec<String> {
+		app.world()
+			.get::<ThreadRecords>(thread)
+			.unwrap()
+			.content_posts()
+			.map(|view| match view.post.status() {
+				PostStatus::Completed => view.post.to_string(),
+				status => format!("{} ({status:?})", view.post),
+			})
+			.collect()
+	}
+
+	/// The person's turn is a wait on the records: calling the thread reaches
+	/// the `User` actor's [`UserInput`], the composer's submit posts, and the
+	/// post passes the turn so the agent replies to it. The `Submit` is fired
+	/// directly here (the focus/typing path is `beet_ui`'s); a full keystroke
+	/// run is `keyboard_submit_drives_reply`.
 	#[beet_core::test]
 	async fn user_input_advances_on_submit() {
 		let (mut app, surface, thread) =
@@ -418,30 +442,18 @@ mod test {
 		app.world_mut()
 			.entity_mut(thread)
 			.insert(CallOnSpawn::<(), Outcome>::new(()));
-		// the composer renders, then the user turn installs its Submit observer
 		drive_until(&mut app, surface, "Send");
-		for _ in 0..25 {
-			app.update();
-		}
-
-		// the user ends their turn by submitting "hello" on the composer's <form>
-		let form = element_by_tag(&mut app, "form").unwrap();
-		let values = Value::Map(
-			[("message".into(), Value::new("hello"))]
-				.into_iter()
-				.collect(),
-		);
-		app.world_mut().trigger(Submit { form, values });
-
+		submit(&mut app, "hello");
 		drive_until(&mut app, surface, "you said: hello")
 			.xpect_contains("User")
 			.xpect_contains("Agent");
 	}
 
 	/// The full deterministic interaction: real keystrokes through the terminal
-	/// input bridge type into the focused form and Enter submits, advancing the
-	/// user turn so the mock agent replies. The bytes arrive on the surface's own
-	/// channel, exactly as a `StdioTerminal` or an SSH session delivers them.
+	/// input bridge type into the focused form and Enter submits, posting and
+	/// so passing the user turn, and the mock agent replies. The bytes arrive
+	/// on the surface's own channel, exactly as a `StdioTerminal` or an SSH
+	/// session delivers them.
 	#[beet_core::test]
 	async fn keyboard_submit_drives_reply() {
 		let (mut app, surface, thread) =
@@ -449,20 +461,142 @@ mod test {
 		app.world_mut()
 			.entity_mut(thread)
 			.insert(CallOnSpawn::<(), Outcome>::new(()));
-		// the composer builds + focuses, then the user turn installs its observer
 		drive_until(&mut app, surface, "Send");
-		for _ in 0..25 {
-			app.update();
-		}
-
 		app.world_mut()
 			.get_mut::<ChannelTerminal>(surface)
 			.unwrap()
 			.send_input(b"hello\r")
 			.unwrap();
-
 		drive_until(&mut app, surface, "you said: hello")
 			.xpect_contains("User")
 			.xpect_contains("Agent");
+	}
+
+	/// A thread with no behavior and no agent is a room: its composer posts
+	/// whoever's turn it is, an empty submit is ignored, and the posts persist.
+	#[beet_core::test]
+	async fn a_room_persists_its_composers_posts() {
+		let (mut app, surface, thread) = serve_thread(
+			UVec2::new(40, 12),
+			(
+				Thread::default(),
+				InMemoryStore::new(),
+				MountThreadStore {
+					path: RelPath::new("room"),
+					new: false,
+				},
+				children![Actor::user()],
+			),
+		)
+		.await;
+		app.world_mut()
+			.run_async_local_then(async move |world: AsyncWorld| -> Result {
+				Thread::enter(
+					world.clone(),
+					thread,
+					ThreadEntry::parse(Request::get("room").parts().clone())?,
+				)
+				.await
+			})
+			.await
+			.unwrap();
+		drive_until(&mut app, surface, "Send");
+		submit(&mut app, "  ");
+		submit(&mut app, "hello room");
+		drive_until(&mut app, surface, "hello room");
+		said(&app, thread).xpect_eq(vec!["hello room".to_string()]);
+
+		let id = app.world().get::<Thread>(thread).unwrap().id();
+		let store = app.world().get::<ThreadStore>(thread).unwrap().clone();
+		app.world_mut()
+			.run_async_local_then(async move |world: AsyncWorld| {
+				ThreadStore::flush(&world.entity(thread)).await
+			})
+			.await
+			.unwrap();
+		store
+			.posts(id)
+			.await
+			.unwrap()
+			.into_iter()
+			.filter(|post| post.intent() != PostIntent::Log)
+			.map(|post| post.to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["hello room".to_string()]);
+	}
+
+	/// A chat whose agent thinks until stopped: `Repeat[Sequence[person,
+	/// agent]]`, the person having said `go`.
+	fn thinking_chat() -> impl Bundle {
+		(Thread::default(), Repeat::new(), children![(
+			Sequence::new(),
+			children![
+				(Actor::user(), UserInput, children![Post::spawn("go")]),
+				(
+					Actor::agent(),
+					MockPostStreamer::with_script([MockTurn::Hold(
+						"thinking".into()
+					)])
+				),
+			]
+		)])
+	}
+
+	/// Stop the thinking chat with `stop`: the agent's post is closed as
+	/// interrupted, the person's turn waits for their next post, and the agent
+	/// answers that.
+	async fn stops_the_thinking_chat(stop: impl FnOnce(&mut App, Entity)) {
+		let (mut app, surface, thread) =
+			serve_thread(UVec2::new(48, 16), thinking_chat()).await;
+		app.world_mut()
+			.entity_mut(thread)
+			.insert(CallOnSpawn::<(), Outcome>::new(()));
+		drive_until(&mut app, surface, "thinking");
+		stop(&mut app, surface);
+		for _ in 0..30 {
+			app.update();
+		}
+		// the person's turn waits: nothing more is said
+		said(&app, thread).xpect_eq(
+			["go", "thinking (Interrupted)"].map(String::from).to_vec(),
+		);
+		submit(&mut app, "next");
+		drive_until(&mut app, surface, "you said: next");
+	}
+
+	/// The composer's `Stop` button interrupts every actor of its thread.
+	#[beet_core::test]
+	async fn stop_button_interrupts_the_thread() {
+		stops_the_thinking_chat(|app, _| {
+			let stop =
+				app.world_mut().with_state::<ElementQuery, _>(|elements| {
+					elements
+						.iter()
+						.find(|view| {
+							view.tag() == "button"
+								&& view.attribute_string("type") == "button"
+						})
+						.map(|view| view.entity)
+						.unwrap()
+				});
+			app.world_mut()
+				.entity_mut(stop)
+				.trigger(PointerUp::new(stop));
+		})
+		.await;
+	}
+
+	/// Escape in the composer's focused input interrupts every actor of its
+	/// thread.
+	#[beet_core::test]
+	async fn escape_interrupts_the_thread() {
+		stops_the_thinking_chat(|app, surface| {
+			app.world_mut()
+				.get_mut::<ChannelTerminal>(surface)
+				.unwrap()
+				.send_input(b"\x1b")
+				.unwrap();
+		})
+		.await;
 	}
 }

@@ -45,6 +45,15 @@ impl Plugin for ThreadPlugin {
 			.install_type::<RoutePost>()
 			// the OpenResponses streamer is an action
 			.register_type::<O11sStreamer>()
+			// turns: a person's waits on the records, an agent's may be cut
+			// short
+			.register_type::<UserInput>()
+			.register_type::<InterruptOnPost>()
+			.add_observer(interrupt_turn)
+			.add_systems(
+				PostUpdate,
+				(interrupt_on_post, pass_person_turns).after(sync_windows),
+			)
 			.add_observer(insert_tool_definition);
 
 		// the async-openai-backed completions streamer, plus the model selection

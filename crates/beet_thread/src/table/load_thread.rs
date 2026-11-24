@@ -314,20 +314,7 @@ impl ThreadEntry {
 		let Some(message) = &self.message else {
 			return Ok(());
 		};
-		let author = match self.actor {
-			Some(actor) => records.actor(actor)?.id(),
-			None => records
-				.actors()
-				.values()
-				.filter(|actor| actor.kind() == ActorKind::User)
-				.map(Actor::id)
-				.min()
-				.ok_or_else(|| {
-					bevyhow!(
-						"the request's message `{message}` names no actor, and the thread holds no User actor to post it"
-					)
-				})?,
-		};
+		let author = records.author(self.actor)?;
 		records.upsert_post(AgentPost::new_text(
 			author,
 			thread,

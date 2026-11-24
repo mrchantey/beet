@@ -1,13 +1,17 @@
 //! Mock post streamer for testing.
 //!
 //! [`MockPostStreamer`] simulates an AI model for testing via the [`PostStreamer`] API:
-//! - With a [`script`](MockPostStreamer::script), it plays one [`MockTurn`] per call
+//! - With a [`script`](MockPostStreamer::script), it plays one [`MockTurn`] per call,
+//!   a [`MockTurn::Hold`] holding its stream open until its [`MockGate`] is
+//!   released, so a test decides when a reply completes
 //! - Without one, it calls its first tool with default argument values, or with
 //!   no tools echoes the input prefixed with "you said:"
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
+use futures::StreamExt;
+use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
@@ -34,12 +38,13 @@ fn next_id(prefix: &str) -> String {
 ///
 /// - **With a script**: plays its turns in order, one per call: a
 ///   [`MockTurn::Call`] calls the tool at its route path, a [`MockTurn::Text`]
-///   answers.
+///   answers and a [`MockTurn::Hold`] streams its text in progress, completing
+///   it once its [`gate`](Self::gate) is released.
 ///   Once the script is spent it answers with text, so a
 ///   [`RepeatWhileFunctionCallOutput`] loop ends, unless it
 ///   [`cycles`](Self::cycle), playing it again from the start
 /// - **Without a script, with tools**: calls the first tool with the zero of
-///   its parameter schema ([`default_arguments`](Self::default_arguments)): a
+///   its parameter schema (`default_arguments`): a
 ///   required string becomes `""`, a required integer `0`, an optional field
 ///   is absent
 /// - **Without tools**: returns the user's input prefixed with "you said:"
@@ -63,6 +68,9 @@ pub struct MockPostStreamer {
 	/// The next turn of the script, advanced on every call.
 	#[reflect(ignore)]
 	cursor: usize,
+	/// Released once for each [`MockTurn::Hold`] to complete.
+	#[reflect(ignore)]
+	gate: MockGate,
 }
 
 /// One response of a scripted [`MockPostStreamer`].
@@ -77,6 +85,32 @@ pub enum MockTurn {
 	},
 	/// Answers with this text.
 	Text(String),
+	/// Streams this text in progress and holds the stream open until the
+	/// streamer's [`MockGate`] is released, then completes it, ie a reply
+	/// still being written.
+	Hold(String),
+}
+
+/// Releases the [`MockTurn::Hold`] steps of a [`MockPostStreamer`], one per
+/// [`release`](Self::release), in order. Clones share their releases.
+#[derive(Debug, Clone)]
+pub struct MockGate(Arc<async_lock::Semaphore>);
+
+impl Default for MockGate {
+	fn default() -> Self { Self(Arc::new(async_lock::Semaphore::new(0))) }
+}
+
+impl PartialEq for MockGate {
+	fn eq(&self, other: &Self) -> bool { Arc::ptr_eq(&self.0, &other.0) }
+}
+
+impl MockGate {
+	/// Let the next held step complete, or the one after if none is held.
+	pub fn release(&self) { self.0.add_permits(1); }
+
+	/// Wait for a release, consuming it, ie a test tool held until its test
+	/// lets it answer.
+	pub async fn wait(&self) { self.0.acquire().await.forget(); }
 }
 
 impl MockTurn {
@@ -121,6 +155,12 @@ impl MockPostStreamer {
 			..Self::with_script(script)
 		}
 	}
+
+	/// Hold its [`MockTurn::Hold`] steps for `gate` to release.
+	pub fn with_gate(self, gate: MockGate) -> Self { Self { gate, ..self } }
+
+	/// The gate releasing its [`MockTurn::Hold`] steps.
+	pub fn gate(&self) -> &MockGate { &self.gate }
 
 	/// The scripted turn for this call, advancing the cursor on `caller`:
 	/// `None` with no script, or once it is spent and does not cycle.
@@ -184,6 +224,7 @@ impl PostStreamer for MockPostStreamer {
 	) -> BoxedFuture<'_, Result<PostStream>> {
 		let custom_response = self.custom_response.clone();
 		let scripted = !self.script.is_empty();
+		let gate = self.gate.clone();
 
 		Box::pin(async move {
 			let turn = Self::next_turn(&caller).await?;
@@ -245,6 +286,16 @@ impl PostStreamer for MockPostStreamer {
 						text,
 					);
 				}
+				Some(MockTurn::Hold(text)) => {
+					return Self::stream_held(
+						agent_id,
+						thread_id,
+						response_id,
+						text,
+						gate,
+					)
+					.xok();
+				}
 				None if scripted => None,
 				None => first_tool
 					.map(|(path, params)| -> Result<(String, String)> {
@@ -289,30 +340,68 @@ impl MockPostStreamer {
 		response_id: String,
 		text: String,
 	) -> Result<PostStream> {
-		Self::stream_partials(agent_id, thread_id, response_id.clone(), vec![
-			PostPartial {
-				key: PostPartialKey::Content {
-					responses_id: response_id,
-					content_index: 0,
-				},
-				status: PostStatus::Completed,
-				content: PartialContent::TextDone {
-					text,
-					logprobs: Vec::new(),
-				},
-			},
-		])
+		let partial =
+			Self::text_partial(response_id, text, PostStatus::Completed);
+		Self::stream_partials(
+			agent_id,
+			thread_id,
+			partial.response_id.clone(),
+			partial.posts,
+		)
 	}
 
-	/// A stream of one completed response carrying `posts`.
-	fn stream_partials(
+	/// A stream of `text` in progress, completed once `gate` is released.
+	fn stream_held(
 		agent_id: ActorId,
 		thread_id: ThreadId,
 		response_id: String,
+		text: String,
+		gate: MockGate,
+	) -> PostStream {
+		let mut held = Self::text_partial(
+			response_id.clone(),
+			text.clone(),
+			PostStatus::InProgress,
+		);
+		held.status = ResponseStatus::InProgress;
+		held.token_usage = None;
+		let done = Self::text_partial(response_id, text, PostStatus::Completed);
+		let stream: ResPartialStream =
+			Box::pin(futures::stream::once(async move { Ok(held) }).chain(
+				futures::stream::once(async move {
+					gate.wait().await;
+					Ok(done)
+				}),
+			));
+		PostStream::new("mock", "mock-model", agent_id, thread_id, stream)
+	}
+
+	/// A response carrying `text` as its one post, with `status`.
+	fn text_partial(
+		response_id: String,
+		text: String,
+		status: PostStatus,
+	) -> ResponsePartial {
+		Self::response(response_id.clone(), vec![PostPartial {
+			key: PostPartialKey::Content {
+				responses_id: response_id,
+				content_index: 0,
+			},
+			status,
+			content: PartialContent::TextDone {
+				text,
+				logprobs: Vec::new(),
+			},
+		}])
+	}
+
+	/// A completed response carrying `posts`.
+	fn response(
+		response_id: String,
 		posts: Vec<PostPartial>,
-	) -> Result<PostStream> {
-		let partial = ResponsePartial {
-			response_id: response_id.clone(),
+	) -> ResponsePartial {
+		ResponsePartial {
+			response_id,
 			response_stored: false,
 			status: ResponseStatus::Completed,
 			token_usage: Some(TokenUsage {
@@ -323,11 +412,19 @@ impl MockPostStreamer {
 				reasoning_tokens: None,
 			}),
 			posts,
-		};
+		}
+	}
 
+	/// A stream of one completed response carrying `posts`.
+	fn stream_partials(
+		agent_id: ActorId,
+		thread_id: ThreadId,
+		response_id: String,
+		posts: Vec<PostPartial>,
+	) -> Result<PostStream> {
+		let partial = Self::response(response_id, posts);
 		let stream: ResPartialStream =
 			Box::pin(futures::stream::once(async move { Ok(partial) }));
-
 		PostStream::new("mock", "mock-model", agent_id, thread_id, stream).xok()
 	}
 }

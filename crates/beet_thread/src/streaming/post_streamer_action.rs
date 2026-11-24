@@ -1,6 +1,9 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
+use core::pin::pin;
+use futures::future;
+use futures::future::Either;
 
 /// often added alongside streamers, ie `O11sStreamer`
 pub async fn post_streamer_action<T>(cx: ActionContext) -> Result<Outcome>
@@ -15,13 +18,18 @@ where
 	.await
 }
 
-/// Stream a model response into the thread's [`ThreadRecords`], surfacing a
-/// failure as an error post rather than a swallowed error.
+/// Stream a model response into the thread's [`ThreadRecords`] as the turn of
+/// the agent at `cx.caller`, surfacing a failure as an error post rather than
+/// a swallowed error.
 ///
 /// On any streaming failure (missing/invalid key, network error, or a mid-stream
 /// error event) the message is appended to the records as a [`PostIntent::Error`] post, so it
 /// renders in the thread view as an `Error` node (TUI mode hides stderr), and the
 /// turn [`Pass`]es so a finite program still completes instead of hanging.
+///
+/// The turn honours [`InterruptTurn`]: the stream is dropped with the tool
+/// calls in flight, the turn closed as interrupted and passed. A turn whose
+/// call is dropped, ie the loser of a `Race`, is closed the same way.
 pub async fn post_streamer_action_stateful<T>(
 	cx: ActionContext<T>,
 ) -> Result<Outcome>
@@ -29,34 +37,41 @@ where
 	T: Clone + Component + PostStreamer,
 {
 	let caller = cx.caller.clone();
-	if let Err(err) = stream_into_records(cx).await {
-		let message = err.to_string();
-		// also log for headless/non-TUI runs where the thread view isn't visible
-		error!("model streaming failed: {message}");
-		let (actor_id, thread_id) = caller
-			.with_state::<ThreadRecordsQuery, _>(
-				|entity, records| -> Result<(ActorId, ThreadId)> {
-					Ok((records.actor_id(entity)?, records.thread_id(entity)?))
-				},
-			)
-			.await??;
-		caller
-			.with_state::<ThreadRecordsQuery, _>(
-				move |entity, mut records| -> Result {
-					records.push_post(
-						entity,
-						AgentPost::new_error(
-							actor_id,
-							thread_id,
-							message,
-							PostStatus::Completed,
-						),
-					)
-				},
-			)
-			.await??;
-	}
+	let (turn, interrupted) = TurnGuard::begin(caller.clone()).await?;
+	let streamed = pin!(stream_into_records(cx));
+	let interrupted = pin!(interrupted);
+	// the losing future drops with the match, the stream and its tool calls
+	// with it
+	let interrupted = match future::select(streamed, interrupted).await {
+		Either::Left((Ok(()), _)) => false,
+		Either::Left((Err(err), _)) => {
+			push_error_post(&caller, err).await?;
+			false
+		}
+		Either::Right(_) => true,
+	};
+	turn.close(interrupted).await?;
 	Ok(Pass(()))
+}
+
+/// Append `err` to the records as an error post by the agent at `caller`.
+async fn push_error_post(caller: &AsyncEntity, err: BevyError) -> Result {
+	let message = err.to_string();
+	// also log for headless/non-TUI runs where the thread view isn't visible
+	error!("model streaming failed: {message}");
+	caller
+		.with_state::<ThreadRecordsQuery, _>(
+			move |entity, mut records| -> Result {
+				let post = AgentPost::new_error(
+					records.actor_id(entity)?,
+					records.thread_id(entity)?,
+					message,
+					PostStatus::Completed,
+				);
+				records.push_post(entity, post)
+			},
+		)
+		.await?
 }
 
 /// The streaming core: drive the model response into `records.posts` (the live

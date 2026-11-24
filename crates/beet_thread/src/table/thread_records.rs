@@ -48,6 +48,30 @@ impl ThreadRecords {
 		id
 	}
 
+	/// The author of a post naming `actor` or none: the named actor, else the
+	/// thread's first actor of kind User by id.
+	///
+	/// ## Errors
+	///
+	/// Errors when the named actor is not in the records, or none is named
+	/// and the records hold no User actor.
+	pub fn author(&self, actor: Option<ActorId>) -> Result<ActorId> {
+		match actor {
+			Some(actor) => self.actor(actor)?.id().xok(),
+			None => self
+				.actors
+				.values()
+				.filter(|actor| actor.kind() == ActorKind::User)
+				.map(Actor::id)
+				.min()
+				.ok_or_else(|| {
+					bevyhow!(
+						"no actor is named to author the post, and the thread holds no User actor"
+					)
+				}),
+		}
+	}
+
 	// ── posts ───────────────────────────────────────────────────────────
 
 	pub fn posts(&self) -> &[Post] { &self.posts }
@@ -108,14 +132,28 @@ impl ThreadRecords {
 			.filter(|view| view.post.intent() != PostIntent::Log)
 	}
 
-	/// What a model reads, after an exclusive cursor: every authored post
-	/// that is not a log, and each run of joins between them as one note
-	/// ([`Self::join_note`]). Any other log kind stays out, so it never
-	/// splits a run.
+	/// The newest post that is not a [`PostIntent::Log`].
+	pub fn last_content_post(&self) -> Option<&Post> {
+		self.posts
+			.iter()
+			.rev()
+			.find(|post| post.intent() != PostIntent::Log)
+	}
+
+	/// What a model reads, after an exclusive cursor, in model order (a
+	/// function call followed at once by its output): every authored post that is not a log, and
+	/// each run of joins between them as one note ([`Self::join_note`]). Any
+	/// other log kind stays out, so it never splits a run.
 	pub fn model_posts(&self, after: Option<PostId>) -> Vec<ModelPost<'_>> {
+		let ordered = self.model_order();
+		let start = after
+			.and_then(|after| {
+				ordered.iter().position(|view| view.post.id() == after)
+			})
+			.map_or(0, |index| index + 1);
 		let mut items = Vec::new();
 		let mut joins = Vec::new();
-		for view in self.posts_after(after) {
+		for view in ordered.into_iter().skip(start) {
 			if SessionOpened::opens(view.post) {
 				joins.push(view);
 			} else if view.post.intent() != PostIntent::Log {
@@ -125,6 +163,48 @@ impl ThreadRecords {
 		}
 		self.push_note(&mut items, &mut joins);
 		items
+	}
+
+	/// The authored posts in the order a model reads them: by [`PostId`],
+	/// except that a function call is followed at once by its output, so a
+	/// post landing between the two, ie a person's note typed mid tool call,
+	/// is read after the output and never breaks a provider's pairing of
+	/// call and output. A call with no output yet holds nothing back.
+	fn model_order(&self) -> Vec<AuthoredPost<'_>> {
+		let answered = self
+			.posts
+			.iter()
+			.filter_map(|post| match AgentPost::new(post)? {
+				AgentPost::FunctionCallOutput(output) => {
+					output.call_id().to_string().xsome()
+				}
+				_ => None,
+			})
+			.collect::<HashSet<_>>();
+		let mut ordered = Vec::with_capacity(self.posts.len());
+		let mut held = Vec::new();
+		let mut pending = HashSet::<String>::default();
+		for view in self.authored_posts() {
+			match AgentPost::new(view.post) {
+				Some(AgentPost::FunctionCall(call)) => {
+					if answered.contains(call.call_id()) {
+						pending.insert(call.call_id().to_string());
+					}
+					ordered.push(view);
+				}
+				Some(AgentPost::FunctionCallOutput(output)) => {
+					pending.remove(output.call_id());
+					ordered.push(view);
+					if pending.is_empty() {
+						ordered.append(&mut held);
+					}
+				}
+				_ if pending.is_empty() => ordered.push(view),
+				_ => held.push(view),
+			}
+		}
+		ordered.append(&mut held);
+		ordered
 	}
 
 	/// Push the note of `joins` onto `items`, if any joined, leaving none.
@@ -423,7 +503,7 @@ impl ThreadRecords {
 	///
 	/// A thread mounting a store ([`MountThreadStore`]) or holding a
 	/// [`SeedSource`] waits for its entry, the one place that knows whether
-	/// its seed is kept ([`Self::reduce_entered`]).
+	/// its seed is kept ([`Thread::enter`]).
 	///
 	/// Idempotent: gated on `Without<ThreadRecords>`, so it runs once per thread.
 	pub fn reduce(
@@ -631,6 +711,12 @@ impl ThreadRecordsQuery<'_, '_> {
 		Ok(self.thread_records.get(thread_entity)?.0.id())
 	}
 
+	/// The thread's records.
+	pub fn records(&self, entity: Entity) -> Result<&ThreadRecords> {
+		let thread_entity = self.thread_entity(entity)?;
+		Ok(self.thread_records.get(thread_entity)?.1)
+	}
+
 	/// Mutable access to the thread's records.
 	pub fn records_mut(
 		&mut self,
@@ -795,5 +881,122 @@ mod test {
 			.to_string()
 			.xpect_eq("hello".to_string());
 		records.last_post().unwrap().in_progress().xpect_false();
+	}
+
+	/// A function call is followed at once by its output in what a model
+	/// reads: a post and a join landing between them are read after the
+	/// output, a call without an output holds nothing back, and a cursor
+	/// reads on from its place in that order.
+	#[beet_core::test]
+	fn model_order_pairs_each_call_with_its_output() {
+		let thread = ThreadId::new_now();
+		let person = ActorId::new_now();
+		let agent = ActorId::new_now();
+		let mut records = ThreadRecords::new();
+		records.insert_actor(Actor::new_with_id(
+			person,
+			"Cam",
+			ActorKind::User,
+		));
+		records.insert_actor(Actor::new_with_id(
+			agent,
+			"Bot",
+			ActorKind::Agent,
+		));
+		let text = |author, text: &str| {
+			AgentPost::new_text(author, thread, text, PostStatus::Completed)
+		};
+		let call = |call_id: &str| {
+			AgentPost::new_function_call(
+				agent,
+				thread,
+				"wait",
+				call_id,
+				"{}",
+				PostStatus::Completed,
+			)
+		};
+		let output = |call_id: &str| {
+			AgentPost::new_function_call_output(
+				agent,
+				thread,
+				call_id.to_string(),
+				"done".to_string(),
+				None,
+				PostStatus::Completed,
+			)
+		};
+		let first_call = call("first");
+		let cursor = first_call.id();
+		for post in [
+			text(person, "go"),
+			first_call,
+			text(person, "by the way"),
+			Post::new_log(person, thread, &SessionOpened::default()).unwrap(),
+			output("first"),
+			call("unanswered"),
+			text(person, "still there?"),
+		] {
+			records.upsert_post(post);
+		}
+		let read = |after| {
+			records
+				.model_posts(after)
+				.into_iter()
+				.map(|item| match item {
+					ModelPost::Note(_) => "note".to_string(),
+					ModelPost::Post(view) => match AgentPost::new(view.post) {
+						Some(AgentPost::FunctionCall(_)) => "call".into(),
+						Some(AgentPost::FunctionCallOutput(_)) => {
+							"output".into()
+						}
+						_ => view.post.to_string(),
+					},
+				})
+				.collect::<Vec<_>>()
+		};
+		read(None).xpect_eq(
+			[
+				"go",
+				"call",
+				"output",
+				"by the way",
+				"note",
+				"call",
+				"still there?",
+			]
+			.map(String::from)
+			.to_vec(),
+		);
+		read(Some(cursor)).xpect_eq(
+			["output", "by the way", "note", "call", "still there?"]
+				.map(String::from)
+				.to_vec(),
+		);
+	}
+
+	/// A post's author is the named actor, else the first User actor by id,
+	/// and with neither there is none.
+	#[beet_core::test]
+	fn author_falls_back_to_the_first_user() {
+		let first = ActorId::from_u128(1);
+		let second = ActorId::from_u128(2);
+		let agent = ActorId::from_u128(3);
+		let mut records = ThreadRecords::new();
+		records.insert_actor(Actor::new_with_id(
+			agent,
+			"Bot",
+			ActorKind::Agent,
+		));
+		records
+			.author(None)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("holds no User actor");
+		records.insert_actor(Actor::new_with_id(second, "B", ActorKind::User));
+		records.insert_actor(Actor::new_with_id(first, "A", ActorKind::User));
+		records.author(None).unwrap().xpect_eq(first);
+		records.author(Some(agent)).unwrap().xpect_eq(agent);
+		records.author(Some(ActorId::from_u128(4))).unwrap_err();
 	}
 }
