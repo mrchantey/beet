@@ -54,6 +54,30 @@ impl Tid {
 		Self::from_parts(micros, clock_id)
 	}
 
+	/// A TID within the millisecond of `timestamp`, its sub-millisecond
+	/// digits and clock id random: a key for something that happened at a
+	/// known instant (a backdated event), unique across writers by chance
+	/// rather than by a minter, so a writer retries a collision with another.
+	#[cfg(feature = "rand")]
+	pub fn random_at(timestamp: Timestamp) -> Self {
+		let mut random = FastRandom::default();
+		Self::from_parts(
+			timestamp.millis().max(0) as u64 * 1000
+				+ random.random_range(0..1000u64),
+			random.random::<u16>(),
+		)
+	}
+
+	/// A TID within the millisecond of `timestamp`, its sub-millisecond
+	/// digits and clock id drawn from `seed`: the same key every time for the
+	/// same instant and seed, ie a record imported again overwriting itself.
+	pub fn seeded_at(timestamp: Timestamp, seed: u64) -> Self {
+		Self::from_parts(
+			timestamp.millis().max(0) as u64 * 1000 + seed % 1000,
+			((seed / 1000) & Self::CLOCK_MASK) as u16,
+		)
+	}
+
 	/// The TID of `micros` since the epoch under `clock_id`, its top bits
 	/// discarded so the result keeps the zero high bit.
 	pub fn from_parts(micros: u64, clock_id: u16) -> Self {
@@ -166,6 +190,23 @@ mod test {
 		let tid = Tid::from(Timestamp::from_millis(1_759_000_000_123));
 		tid.clock_id().xpect_eq(0);
 		tid.timestamp().millis().xpect_eq(1_759_000_000_123);
+	}
+
+	/// Both keep the instant's millisecond; a seed always lands on the same
+	/// key, randomness almost never.
+	#[crate::test]
+	fn at_an_instant() {
+		let instant = Timestamp::from_millis(1_759_000_000_123);
+		let seeded = Tid::seeded_at(instant, 123_456_789);
+		seeded.timestamp().xpect_eq(instant);
+		seeded.xpect_eq(Tid::seeded_at(instant, 123_456_789));
+		Tid::seeded_at(instant, 7).xpect_not_eq(seeded);
+		#[cfg(feature = "rand")]
+		{
+			let random = Tid::random_at(instant);
+			random.timestamp().xpect_eq(instant);
+			random.xpect_not_eq(Tid::random_at(instant));
+		}
 	}
 
 	#[crate::test]

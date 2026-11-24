@@ -1,4 +1,4 @@
-//! Tables: beet's one database dialect, see [`TableStore`].
+//! Tables: beet's one dialect for table-shaped data, see [`TableStore`].
 mod blob_table;
 mod row;
 // the SQL every SQLite table backend runs, whatever engine runs it
@@ -13,12 +13,17 @@ mod partition_host;
 mod table_wire;
 // partitions as Durable Objects, natively a partition host
 mod durable_object_store;
+// the Worker side: the object client, and the object over its own storage
+#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
+mod durable_object_worker;
 mod table_index;
 mod table_provider;
 mod table_store;
 #[cfg(test)]
 pub mod table_test;
 pub use durable_object_store::*;
+#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
+pub use durable_object_worker::*;
 #[cfg(feature = "sqlite")]
 pub use partition_host::*;
 pub use row::*;

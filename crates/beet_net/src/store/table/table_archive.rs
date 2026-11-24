@@ -110,14 +110,19 @@ impl TableArchive {
 		.xok()
 	}
 
-	/// The archive at `path` in `bucket` as a read-only [`SqliteStore`].
+	/// The archive at `path` in `bucket` as a read-only [`SqliteStore`], a
+	/// copy in memory of its own, so two opens never share one;
+	/// [`store_remove`](BlobStoreProvider::store_remove) frees it.
 	pub async fn open(
 		bucket: &BlobStore,
 		path: &RelPath,
 	) -> Result<SqliteStore> {
 		let bytes = bucket.get(path).await?;
 		SqliteStore::from_bytes(
-			format!("archive/{}/{path}", bucket.root_key()),
+			format!(
+				"table-archive-open-{}/{path}",
+				FastRandom::default().random::<u64>()
+			),
 			bytes.to_vec(),
 		)
 		.await

@@ -77,9 +77,7 @@ impl AnalyticsStore {
 			.await?
 			.rows
 			.first()
-			.map(|event| {
-				Date::from(Timestamp::from_millis(event.timestamp as i64))
-			})
+			.map(|event| Date::from(event.timestamp()))
 			.xok()
 	}
 
@@ -249,8 +247,9 @@ mod test {
 	async fn heartbeats_dedupe() {
 		let analytics = AnalyticsStore::new(TableStore::temp());
 		let first = request("/view");
-		let mut later = first.clone().with_fresh_key();
-		later.timestamp += 1;
+		let mut later = first
+			.clone()
+			.with_timestamp(first.timestamp() + Duration::from_millis(1));
 		later.path = "/view-later".into();
 		analytics.record(first).await.unwrap();
 		analytics.record(later).await.unwrap();
@@ -265,9 +264,8 @@ mod test {
 	async fn summary_composes_rollups_and_events() {
 		let analytics = AnalyticsStore::new(TableStore::temp());
 		analytics.record(request("/today")).await.unwrap();
-		let mut old = request("/old");
-		old.timestamp -= 2 * 86_400_000;
-		let old = old.with_fresh_key();
+		let old = request("/old")
+			.with_timestamp(Timestamp::now() - Duration::from_secs(2 * 86_400));
 		for row in AnalyticsRollup::from_events(&[old.clone()]) {
 			analytics.rollups().put(row).await.unwrap();
 		}

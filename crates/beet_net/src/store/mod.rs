@@ -100,7 +100,7 @@ mod store_ref;
 // the uri -> concrete component seam every store construction goes through.
 #[cfg(feature = "std")]
 mod store_provider;
-// tables, beet's one database dialect: rows as canonical json, keyed and
+// tables, beet's one dialect for table-shaped data: rows as canonical json, keyed and
 // hashed through DAG-CBOR, so `json` (which brings `dag_cbor`).
 #[cfg(feature = "json")]
 mod table;

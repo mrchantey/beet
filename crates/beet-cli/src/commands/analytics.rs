@@ -255,15 +255,15 @@ mod test {
 			.unwrap(),
 		);
 		let view = |path: &str, days: u64| {
-			let mut event =
-				AnalyticsEvent::new(path, AnalyticsEventData::PageView {
-					duration_ms: 1_000,
-					referrer: None,
-					title: None,
-					client: default(),
-				});
-			event.timestamp -= days * 86_400_000;
-			event.with_fresh_key()
+			AnalyticsEvent::new(path, AnalyticsEventData::PageView {
+				duration_ms: 1_000,
+				referrer: None,
+				title: None,
+				client: default(),
+			})
+			.with_timestamp(
+				Timestamp::now() - Duration::from_secs(days * 86_400),
+			)
 		};
 		store.record(view("/recent", 0)).await.unwrap();
 		for row in AnalyticsRollup::from_events(&[view("/old", 2)]) {

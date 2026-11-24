@@ -98,16 +98,16 @@ mod test {
 
 	/// A page event in session `session`, `days_ago` days back.
 	fn view(session: Uuid, days_ago: u64) -> AnalyticsEvent {
-		let mut event =
-			AnalyticsEvent::new("/", AnalyticsEventData::PageView {
-				duration_ms: 1_000,
-				referrer: None,
-				title: None,
-				client: default(),
-			})
-			.with_session(Some(session));
-		event.timestamp -= days_ago * 86_400_000;
-		event.with_fresh_key()
+		AnalyticsEvent::new("/", AnalyticsEventData::PageView {
+			duration_ms: 1_000,
+			referrer: None,
+			title: None,
+			client: default(),
+		})
+		.with_session(Some(session))
+		.with_timestamp(
+			Timestamp::now() - Duration::from_secs(days_ago * 86_400),
+		)
 	}
 
 	/// A router recording analytics to `store`, its home page holding the

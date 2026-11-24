@@ -85,18 +85,22 @@ impl PartitionHost {
 		TableWire::answer(&self.database(id.as_ref()), &path, request).await
 	}
 
-	/// A client speaking to this host in process, its capabilities fetched.
-	pub async fn client(&self) -> Result<TableWireClient> {
+	/// The transport answering requests with this host in process.
+	pub fn transport(&self) -> TableWireTransport {
 		let host = self.clone();
-		TableWireClient::connect(TableWireTransport::new(
+		TableWireTransport::new(
 			format!("partition-host:{}", self.root.path()),
 			move |request| {
 				let host = host.clone();
 				Box::pin(async move { host.serve(request).await.xok() })
 					as SendBoxedFuture<Result<Response>>
 			},
-		))
-		.await
+		)
+	}
+
+	/// A client speaking to this host in process, its capabilities fetched.
+	pub async fn client(&self) -> Result<TableWireClient> {
+		TableWireClient::connect(self.transport()).await
 	}
 }
 

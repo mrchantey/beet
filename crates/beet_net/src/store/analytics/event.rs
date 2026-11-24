@@ -1,5 +1,4 @@
 //! The [`AnalyticsEvent`] wire type: common fields plus typed event data.
-use super::analytics_ext;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
@@ -183,16 +182,14 @@ pub enum ClientKind {
 /// id, so a reader keeps only its newest heartbeat ([`Self::dedupe`]).
 #[derive(Debug, Clone, Serialize, Deserialize, Event)]
 pub struct AnalyticsEvent {
-	/// The row key: a TID of [`Self::timestamp`], its sub-millisecond digits
-	/// and clock id random, so a day's events are one key range of the table
-	/// and two writers in one millisecond collide only by chance (a write
-	/// retries a collision with a fresh key, [`Self::with_fresh_key`]).
-	#[serde(default)]
+	/// The row key, and the event's one clock: a TID of the instant it was
+	/// recorded ([`Self::timestamp`]), so a day's events are one key range of
+	/// the table and its date can never disagree with where it is stored. Two
+	/// writers collide only by chance, a write retrying a collision with a
+	/// fresh key ([`Self::with_fresh_key`]).
 	pub key: Tid,
 	/// UUIDv7 event ID, time-sortable and stable across page-view heartbeats.
 	pub id: Uuid,
-	/// Server wall-clock time the event was recorded, ms since the unix epoch.
-	pub timestamp: u64,
 	/// The kind discriminant, mirroring [`Self::data`]'s variant.
 	pub event_kind: AnalyticsEventKind,
 	/// The coarse client kind.
@@ -214,14 +211,12 @@ pub struct AnalyticsEvent {
 }
 
 impl AnalyticsEvent {
-	/// A fresh event for `path` carrying `data`, stamped with a new UUIDv7 and the
-	/// current server time. [`Self::event_kind`] is taken from `data`.
+	/// A fresh event for `path` carrying `data`, stamped with a new UUIDv7 and
+	/// keyed by a TID of now. [`Self::event_kind`] is taken from `data`.
 	pub fn new(path: impl Into<SmolStr>, data: AnalyticsEventData) -> Self {
-		let timestamp = analytics_ext::now_ms();
 		Self {
-			key: Self::mint_key(timestamp),
+			key: Tid::now(),
 			id: uuid_ext::now_v7(),
-			timestamp,
 			event_kind: data.kind(),
 			client_kind: ClientKind::Unknown,
 			session: None,
@@ -232,45 +227,43 @@ impl AnalyticsEvent {
 		}
 	}
 
-	/// The UTC day this event was recorded on, `YYYY-MM-DD`: the key its
-	/// aggregate row and its archive object are both named by.
-	pub fn date(&self) -> SmolStr {
-		Date::from(Timestamp::from_millis(self.timestamp as i64))
-			.to_string()
-			.into()
-	}
+	/// When the event was recorded, to the millisecond: its key's instant.
+	pub fn timestamp(&self) -> Timestamp { self.key.timestamp() }
 
-	/// A key for an event at `timestamp`: that millisecond, then random
-	/// sub-millisecond digits and clock id.
-	pub fn mint_key(timestamp: u64) -> Tid {
-		let mut random = FastRandom::default();
-		Tid::from_parts(
-			timestamp * 1000 + random.random::<u16>() as u64 % 1000,
-			random.random::<u16>(),
-		)
-	}
-
-	/// The same event under a fresh key, for a write whose key another
-	/// writer took first.
-	pub fn with_fresh_key(mut self) -> Self {
-		self.key = Self::mint_key(self.timestamp);
+	/// The same event recorded at `timestamp`, ie one imported or backdated.
+	pub fn with_timestamp(mut self, timestamp: Timestamp) -> Self {
+		self.key = Tid::random_at(timestamp);
 		self
 	}
 
+	/// The UTC day this event was recorded on, `YYYY-MM-DD`: the key its
+	/// aggregate row and its archive object are both named by.
+	pub fn date(&self) -> SmolStr {
+		Date::from(self.timestamp()).to_string().into()
+	}
+
+	/// The same event under a fresh key at the same instant, for a write
+	/// whose key another writer took first.
+	pub fn with_fresh_key(self) -> Self {
+		let timestamp = self.timestamp();
+		self.with_timestamp(timestamp)
+	}
+
 	/// The key range of `date`'s events, from its midnight to the next.
+	#[cfg(feature = "json")]
 	pub fn day_scan(date: Date) -> Scan {
 		Scan::default()
 			.from(Tid::from(date.timestamp()))
 			.before(Tid::from(date.add_days(1).timestamp()))
 	}
 
-	/// Keep the newest occurrence of each event id, a page view's heartbeats
+	/// Keep the latest occurrence of each event id, a page view's heartbeats
 	/// reduced to its last, sorted by id.
 	pub fn dedupe(events: impl IntoIterator<Item = Self>) -> Vec<Self> {
 		let mut by_id = HashMap::<Uuid, Self>::default();
 		for event in events {
 			match by_id.get(&event.id) {
-				Some(existing) if existing.timestamp > event.timestamp => {}
+				Some(existing) if existing.key > event.key => {}
 				_ => {
 					by_id.insert(event.id, event);
 				}
@@ -280,7 +273,6 @@ impl AnalyticsEvent {
 		events.sort_by_key(|event| event.id);
 		events
 	}
-
 
 	/// Builder-style setter for the client kind.
 	pub fn with_client_kind(mut self, client_kind: ClientKind) -> Self {

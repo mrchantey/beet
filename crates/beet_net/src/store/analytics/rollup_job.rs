@@ -229,16 +229,14 @@ mod test {
 	const DAY_MS: u64 = 86_400_000;
 
 	fn page_view(days: u64, path: &str, session: u128) -> AnalyticsEvent {
-		let mut event =
-			AnalyticsEvent::new(path, AnalyticsEventData::PageView {
-				duration_ms: 12_000,
-				referrer: None,
-				title: None,
-				client: default(),
-			})
-			.with_session(Some(Uuid::from_u128(session)));
-		event.timestamp -= days * DAY_MS;
-		event.with_fresh_key()
+		AnalyticsEvent::new(path, AnalyticsEventData::PageView {
+			duration_ms: 12_000,
+			referrer: None,
+			title: None,
+			client: default(),
+		})
+		.with_session(Some(Uuid::from_u128(session)))
+		.with_timestamp(Timestamp::now() - Duration::from_millis(days * DAY_MS))
 	}
 
 	async fn recorded(events: &[AnalyticsEvent]) -> AnalyticsStore {

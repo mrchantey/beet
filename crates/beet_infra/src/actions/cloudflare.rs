@@ -742,7 +742,12 @@ pub async fn CloudflareBench(
 	let block =
 		CloudflareWorkerBlock::new(name.clone()).with_bucket(bucket.clone());
 	let dir = wrangler_ext::project_dir(&name)?;
-	write_worker_wrangler(&dir, &block, &worker_vars(&cx, &block).await?)?;
+	write_worker_wrangler(
+		&dir,
+		&block,
+		&worker_vars(&cx, &block).await?,
+		&table_object_bindings(&cx).await?,
+	)?;
 	wrangler_ext::deploy(&access, &dir, None).await?;
 	let redeploy_elapsed = redeploy_start.elapsed();
 

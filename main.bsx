@@ -155,5 +155,25 @@ stays, an inert tag in a lean build.
 			</Route>
 		</Stack>
 	</Route>
+	<!-- the stores the live store suites run against, as this entry's own
+	     deploy credential (`cargo test -p beet_net --features
+	     aws,ureq,rustls-tls --lib -- --ignored`): provisioned once rather
+	     than made by each test, so the credential never needs to create or
+	     remove a store, only to hold the service. -->
+	<Route path="test" bx:cfg="feature:infra && feature:extra">
+		<Stack stage="test" {AwsRegion("us-west-2")}>
+			<DynamoTableBlock label="dynamo"/>
+			<S3BucketBlock label="store" deploy_versioned=false runtime_write=true accept_data_loss=true/>
+			<S3BucketBlock label="table" deploy_versioned=false runtime_write=true accept_data_loss=true/>
+			<Group bx:ref="test_up">
+				<TofuApply/>
+			</Group>
+			<Group bx:ref="test_down">
+				<StackTeardown/>
+				<TofuDestroy/>
+			</Group>
+			<DeployRoutes deploy={$test_up} destroy={$test_down}/>
+		</Stack>
+	</Route>
 </Router>
 </CliServer>

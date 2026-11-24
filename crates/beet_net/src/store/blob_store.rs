@@ -548,11 +548,21 @@ pub mod store_test {
 	/// Runs the standard store provider test suite.
 	pub async fn run(provider: impl BlobStoreProvider) {
 		let store = BlobStore::new(provider);
-		let path = RelPath::from("test_path");
-		let body = bytes::Bytes::from("test_body");
 		store.store_remove().await.ok();
 		store.store_exists().await.unwrap().xpect_false();
 		store.store_try_create().await.unwrap();
+		run_objects(&store).await;
+		store.store_remove().await.unwrap();
+		store.store_exists().await.unwrap().xpect_false();
+	}
+
+	/// Runs every case but the store's lifecycle, for a store provisioned
+	/// rather than made by its test (a deployed bucket or table), leaving it
+	/// as empty as it found it.
+	pub async fn run_objects(store: &BlobStore) {
+		let store = store.clone();
+		let path = RelPath::from("test_path");
+		let body = bytes::Bytes::from("test_body");
 		store.exists(&path).await.unwrap().xpect_false();
 		store.remove(&path).await.xpect_err();
 		store.insert(&path, body.clone()).await.unwrap();
@@ -629,8 +639,5 @@ pub mod store_test {
 			fs_ext::exists(&file).unwrap().xpect_true();
 			store.remove(&path).await.unwrap();
 		}
-
-		store.store_remove().await.unwrap();
-		store.store_exists().await.unwrap().xpect_false();
 	}
 }

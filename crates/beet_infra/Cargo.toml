@@ -23,8 +23,9 @@ tokens = ["proc-macro2", "quote", "syn"]
 # reached through `S3Store`. The client itself is always on.
 aws = ["bindings_aws_common"]
 # A deployer renders every always-compiled declaration, so it carries the
-# binding `<SecretBlock/>`'s parameter renders through.
-deploy = ["beet_router", "dep:base64", "base64/std", "vault", "bindings_aws_ssm", "dep:ssh-key", "beet_core/rand"]
+# binding `<SecretBlock/>`'s parameter renders through, and signs a person in to
+# Identity Center through a loopback redirect (`beet_net/server`).
+deploy = ["beet_router", "dep:base64", "base64/std", "vault", "bindings_aws_ssm", "dep:ssh-key", "beet_core/rand", "beet_net/server"]
 # A secrets document as a stack's secret store (`<DocumentSecrets/>`) and the
 # store's export, restore and revoke verbs, on the secrets document in
 # `beet_net/secrets`. The seam, parameter store and `<SecretBlock/>` need none

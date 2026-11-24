@@ -413,8 +413,8 @@ mod test {
 	) -> AnalyticsEvent {
 		let mut event = AnalyticsEvent::new(path, data)
 			.with_client_kind(ClientKind::Web)
-			.with_session(Some(Uuid::from_u128(session)));
-		event.timestamp = at(date, 12);
+			.with_session(Some(Uuid::from_u128(session)))
+			.with_timestamp(Timestamp::from_millis(at(date, 12) as i64));
 		event.country = Some("AU".into());
 		event
 	}

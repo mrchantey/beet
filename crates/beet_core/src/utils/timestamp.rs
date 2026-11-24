@@ -212,6 +212,16 @@ impl core::ops::Add<Duration> for Timestamp {
 	}
 }
 
+/// The instant `duration` earlier, saturating at the far past.
+impl core::ops::Sub<Duration> for Timestamp {
+	type Output = Self;
+	fn sub(self, duration: Duration) -> Self {
+		Self(self.0.saturating_sub(
+			duration.as_millis().try_into().unwrap_or(i64::MAX),
+		))
+	}
+}
+
 /// Serde for a [`Timestamp`] as ISO 8601 text rather than an epoch integer,
 /// for a field a person reads (`modified = "2026-09-18T06:00:00.000Z"`) or a
 /// wire that names its format (an atproto `datetime`). Use via

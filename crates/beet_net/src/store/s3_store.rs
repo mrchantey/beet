@@ -845,13 +845,17 @@ mod test {
 			.xpect_contains("hunter2");
 	}
 
-	/// The store suite against AWS, creating and removing the bucket itself,
-	/// so it needs an identity holding `s3:*` on `beet--test--*`.
+	/// The store suite against AWS, in the bucket the root entry's `test`
+	/// stage provisions (`beet --entry=. test/deploy`), as the `beet` app's
+	/// deploy credential.
 	#[beet_core::test(timeout_ms = 120_000)]
 	#[ignore = "hits remote s3"]
 	async fn works() {
-		let provider = S3Store::new("beet--test--store", "us-west-2");
-		store_test::run(provider).await;
+		store_test::run_objects(&BlobStore::new(S3Store::new(
+			"beet--test--store",
+			"us-west-2",
+		)))
+		.await;
 	}
 
 	/// The store suite against a local S3 server (SeaweedFS's gateway on
@@ -871,11 +875,11 @@ mod test {
 	}
 
 	/// The table suite over a bucket, every precondition an S3 conditional
-	/// write, so it needs an identity holding `s3:*` on `beet--test--*`.
+	/// write, in the bucket the root entry's `test` stage provisions.
 	#[beet_core::test(timeout_ms = 600_000)]
 	#[ignore = "hits remote s3"]
 	async fn table() {
-		table_test::run(TableStore::new(BlobStore::new(S3Store::new(
+		table_test::run_rows(&TableStore::new(BlobStore::new(S3Store::new(
 			"beet--test--table",
 			"us-west-2",
 		))))

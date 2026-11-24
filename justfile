@@ -120,6 +120,11 @@ beet-roll-state *args:
 # entry, since these assets belong to the repo rather than to the website.
 beet-shared *args:
   cargo run -p beet-cli --features infra,extra -- shared "$@"
+# The stores the live store suites run against (`beet--test--dynamo`,
+# `beet--test--store`, `beet--test--table`): `just beet-test deploy` once, then
+# `cargo test -p beet_net --features aws,ureq,rustls-tls --lib -- --ignored`.
+beet-test *args:
+  cargo run -p beet-cli --features infra,extra -- test "$@"
 # A person's IAM Identity Center sign in: `just sso login` (`--no-browser`
 # from an ssh session), `just sso status|logout`, and `just sso invite <email>`
 # as `beet admin`. The routes link with the deploy crates, hence `infra,extra`.

@@ -1,12 +1,16 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bytes::Bytes;
 
-/// A store representing both local filesystem and remote S3 storage.
-/// Uses [`ServiceAccess`] at runtime to determine which backing
-/// store to delegate to.
+/// One store over two ends, a local directory and an S3 bucket: what a
+/// directory sync declares, its ends read by the sync itself
+/// ([`fs_store`](Self::fs_store), [`s3_store`](Self::s3_store)).
+///
+/// A selector resolved once, when it is inserted: the erased [`BlobStore`]
+/// and [`TableStore`] land beside it over the end its [`ServiceAccess`]
+/// picks, the local one by default, so the selected store answers every
+/// method itself and nothing forwards one method at a time.
 #[derive(Debug, Clone, Get, SetWith, Component)]
-#[component(on_insert = BlobStore::on_insert::<Self>)]
+#[component(on_insert = S3FsStore::on_insert)]
 pub struct S3FsStore {
 	/// Local filesystem store.
 	#[set_with(skip)]
@@ -14,7 +18,7 @@ pub struct S3FsStore {
 	/// Remote S3 store.
 	#[set_with(skip)]
 	s3_store: S3Store,
-	/// Runtime flag used to determine which store to use.
+	/// Which end the erased handles are, decided at insertion.
 	service_access: ServiceAccess,
 }
 
@@ -28,73 +32,63 @@ impl S3FsStore {
 		}
 	}
 
-	/// Returns a reference to the active store provider based on
-	/// the current [`ServiceAccess`] mode.
-	fn active(&self) -> &dyn BlobStoreProvider {
+	/// The end `service_access` picks, erased.
+	pub fn active(&self) -> BlobStore {
 		match self.service_access {
-			ServiceAccess::Local => &self.fs_store,
-			ServiceAccess::Remote => &self.s3_store,
+			ServiceAccess::Local => BlobStore::new(self.fs_store.clone()),
+			ServiceAccess::Remote => BlobStore::new(self.s3_store.clone()),
+		}
+	}
+
+	/// Land the erased handles of the active end.
+	fn on_insert(mut world: DeferredWorld, cx: HookContext) {
+		if let Some(store) = world.entity(cx.entity).get::<Self>() {
+			let blobs = store.active();
+			world
+				.commands()
+				.entity(cx.entity)
+				.insert((TableStore::new(blobs.clone()), blobs));
 		}
 	}
 }
 
-impl BlobStoreProvider for S3FsStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
-		self.active().with_subdir(path)
-	}
-	fn base(&self) -> Box<dyn BlobStoreProvider> { self.active().base() }
-	fn rebase(
-		&self,
-		entry_name: &RelPath,
-		root: &SmolPath,
-	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
-		self.active().rebase(entry_name, root)
-	}
-	fn id(&self) -> &'static str { self.active().id() }
-	fn root_key(&self) -> SmolStr { self.active().root_key() }
-	fn subdir(&self) -> RelPath { self.active().subdir() }
-	fn did_change(&self, event: &BlobEvent) -> bool {
-		self.active().did_change(event)
-	}
-	fn region(&self) -> Option<String> { self.active().region() }
-	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
-		self.active().store_exists()
-	}
-	fn store_create(&self) -> SendBoxedFuture<Result> {
-		self.active().store_create()
-	}
-	fn store_remove(&self) -> SendBoxedFuture<Result> {
-		self.active().store_remove()
-	}
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
-		self.active().insert(path, body)
-	}
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
-		self.active().list()
-	}
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
-		self.active().get(path)
-	}
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
-		self.active().exists(path)
-	}
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
-		self.active().remove(path)
-	}
-	fn stat(
-		&self,
-		path: &RelPath,
-	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
-		self.active().stat(path)
-	}
-	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
-		self.active().list_stats()
-	}
-	fn public_url(
-		&self,
-		path: &RelPath,
-	) -> SendBoxedFuture<Result<Option<String>>> {
-		self.active().public_url(path)
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// The erased handles are the selected end itself, its conditional writes
+	/// included, which a forwarding selector once missed.
+	#[beet_core::test]
+	async fn resolves_to_the_selected_end() {
+		let dir = TempDir::new_ws().unwrap();
+		let mut world = World::new();
+		let entity = world
+			.spawn(S3FsStore::new(
+				FsStore::new(dir.path().clone()),
+				S3Store::new("bucket", "us-west-2"),
+			))
+			.id();
+		world.flush();
+		let blobs = world.entity(entity).get::<BlobStore>().unwrap().clone();
+		blobs.id().xpect_eq("fs");
+		blobs
+			.insert_if(&RelPath::new("a"), "a".into(), BlobCondition::Absent)
+			.await
+			.unwrap();
+		world
+			.entity(entity)
+			.get::<TableStore>()
+			.unwrap()
+			.table::<table_test::NamedRow>()
+			.push(table_test::NamedRow::new("k", 1))
+			.await
+			.unwrap();
+		let remote = S3FsStore::new(
+			FsStore::new(dir.path().clone()),
+			S3Store::new("bucket", "us-west-2"),
+		)
+		.with_service_access(ServiceAccess::Remote);
+		remote.active().id().xpect_eq("s3");
 	}
 }

@@ -1,14 +1,11 @@
 //! Free helpers shared across the analytics emitters: reading the session and
-//! client address from request headers, and the current server time.
+//! client address from request headers, and the aggregates' orderings.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// The session cookie the web client sets; read from a request to attribute it
 /// to a session (the same id the client sends in its page-view beacons).
 pub const SESSION_COOKIE: &str = "beet_session";
-
-/// Milliseconds since the unix epoch, cross-platform via [`time_ext`].
-pub fn now_ms() -> u64 { time_ext::now_millis() as u64 }
 
 /// The coarse class of a response status, ie `404` -> `4xx`. What an aggregate
 /// keeps instead of every distinct code: the class is what a daily trend is read

@@ -68,19 +68,23 @@ pub fn now() -> Duration {
 	)
 }
 
-/// Formats a duration as a human-readable string with appropriate units.
-///
-/// Automatically selects the most appropriate unit (minutes, seconds,
-/// milliseconds, microseconds, or nanoseconds) based on the duration's magnitude.
+/// Formats a duration in its largest unit, ie `2 d 3 h`, `8 h 42 m`,
+/// `1:05.250 m`, `5.007 s`, `12 ms`, `40 µs` or `9 ns`.
 pub fn pretty_print_duration(dur: Duration) -> String {
 	let total_secs = dur.as_secs();
-	let minutes = total_secs / 60;
+	let days = total_secs / 86_400;
+	let hours = total_secs / 3600 % 24;
+	let minutes = total_secs / 60 % 60;
 	let secs = total_secs % 60;
 	let millis = dur.subsec_millis();
-	if minutes > 0 {
+	if days > 0 {
+		format!("{} d {} h", days, hours)
+	} else if hours > 0 {
+		format!("{} h {} m", hours, minutes)
+	} else if minutes > 0 {
 		format!("{}:{:02}.{:03} m", minutes, secs, millis)
 	} else if secs > 0 {
-		format!("{}.{:02} s", secs, millis)
+		format!("{}.{:03} s", secs, millis)
 	} else if millis > 0 {
 		format!("{} ms", millis)
 	} else {
@@ -219,9 +223,17 @@ mod test {
 		now.elapsed().as_millis().xpect_greater_or_equal_to(100);
 	}
 
-
-
-
+	#[crate::test]
+	fn pretty_prints_duration() {
+		let print = |dur| time_ext::pretty_print_duration(dur);
+		print(Duration::from_secs(2 * 86_400 + 3 * 3600 + 59))
+			.xpect_eq("2 d 3 h");
+		print(Duration::from_secs(522 * 60 + 10)).xpect_eq("8 h 42 m");
+		print(Duration::from_millis(65_250)).xpect_eq("1:05.250 m");
+		print(Duration::from_millis(5_007)).xpect_eq("5.007 s");
+		print(Duration::from_micros(12_400)).xpect_eq("12 ms");
+		print(Duration::from_nanos(9)).xpect_eq("9 ns");
+	}
 
 	#[cfg(not(target_arch = "wasm32"))]
 	#[crate::test]

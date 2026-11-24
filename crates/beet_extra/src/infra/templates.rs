@@ -838,15 +838,9 @@ mod test {
 			.xpect_eq(ServiceAccess::local_store_dir(&expected).into_abs());
 	}
 
-	/// The analytics compaction stack the site entry declares end to end: the
-	/// analytics and archive buckets, the invoke-only function, and the timer
-	/// that drives it — plus the job naming its three stores.
-	///
-	/// TWO buckets, not three: segments and aggregate rows share the
-	/// `analytics` bucket under disjoint prefixes, because a bucket is the unit
-	/// of IAM grant and those two have the same writer, the same grant, and
-	/// neither is a sole copy for long. The archive is separate because it IS
-	/// the sole copy and lives where nothing expires.
+	/// The analytics rollup stack the site entry declares end to end: the
+	/// events table, the archive bucket, the invoke-only function, and the
+	/// timer that drives it, plus the job naming its two stores.
 	///
 	/// The deploy has to RENDER, not just spawn: an unpointed schedule and a
 	/// hostname on a gateway-less function are both render-time failures, and a
@@ -865,12 +859,12 @@ mod test {
 			r#"<Fragment>
 				<Route path="jobs" {HttpServer}>
 					<Router>
-						<Route path="rollup" {AnalyticsRollupJob{raw: $analytics, rollups: $analytics, archive: $archive}}/>
+						<Route path="rollup" {AnalyticsRollupJob{analytics: $analytics, archive: $archive}}/>
 					</Router>
 				</Route>
 				<Stack>
-					<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true object_versioning=true/>
-					<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
+					<DynamoTableBlock bx:ref="analytics" label="events"/>
+					<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true force_destroy=false/>
 					<!-- the repo store the job boots from, deploy-versioned like
 					     every served store: the job dispatches a route of the same
 					     document the site serves -->
@@ -880,9 +874,8 @@ mod test {
 				</Stack>
 			</Fragment>"#,
 		);
-		// Every analytics store is stable across deploys, runtime-writable and
-		// versioned: a segment is the only copy of its events until the nightly
-		// rollup, and the archive is the sole raw history.
+		// the archive is stable across deploys, runtime-writable, versioned and
+		// never destroyed with its objects: it is the sole raw history
 		let mut buckets = world
 			.query::<&S3BucketBlock>()
 			.iter(&world)
@@ -897,7 +890,6 @@ mod test {
 			.collect::<Vec<_>>();
 		buckets.sort();
 		buckets.xpect_eq(vec![
-			("analytics".to_string(), true, false, true),
 			("archive".to_string(), true, false, true),
 			// the repo store, versioned per deploy
 			("repo".to_string(), false, true, false),
@@ -910,20 +902,13 @@ mod test {
 			.http()
 			.xpect_false();
 
-		// the job names its three stores as its own fields, and each resolves
-		// to the declaration whose name the deploy provisions — raw and
-		// rollups at the same one, which is what collapsing to two buckets
-		// means
-		let (job, events, rollups, archive) = world
+		// the job names its two stores as its own fields, and each resolves to
+		// the declaration whose name the deploy provisions
+		let (job, events, archive) = world
 			.query::<(Entity, &AnalyticsRollupJob)>()
 			.single(&world)
 			.map(|(job, refs)| {
-				(
-					job,
-					refs.raw.unwrap(),
-					refs.rollups.unwrap(),
-					refs.archive.unwrap(),
-				)
+				(job, refs.analytics.unwrap(), refs.archive.unwrap())
 			})
 			.unwrap();
 		world
@@ -947,17 +932,10 @@ mod test {
 		});
 		world
 			.entity(events)
-			.get::<S3BucketBlock>()
+			.get::<DynamoTableBlock>()
 			.unwrap()
-			.bucket_name(&stack)
-			.xpect_eq("beet-site--dev--analytics");
-		rollups.xpect_eq(events);
-		world
-			.entity(rollups)
-			.get::<S3BucketBlock>()
-			.unwrap()
-			.bucket_name(&stack)
-			.xpect_eq("beet-site--dev--analytics");
+			.table_name(&stack)
+			.xpect_eq("beet-site--dev--events");
 		world
 			.entity(archive)
 			.get::<S3BucketBlock>()
@@ -982,20 +960,23 @@ mod test {
 			.as_str()
 			.xpect_contains("aws_scheduler_schedule")
 			.xpect_contains("cron(0 3 * * ? *)")
-			// both stores are writable buckets; only archive is versioned
-			.xpect_contains("beet-site--dev--analytics")
+			// the job writes the table, its index slots included, and the
+			// archive, which is versioned and never destroyed with objects
+			.xpect_contains(r#""name":"beet-site--dev--events""#)
+			.xpect_contains("table/beet-site--dev--events/index/*")
 			.xpect_contains("beet-site--dev--archive")
 			.xpect_contains("s3:PutObject")
 			.xpect_contains("aws_s3_bucket_versioning")
+			.xpect_contains(r#""force_destroy":false"#)
 			// a job sweeps a store rather than answering a request, so it takes
 			// the long timeout a served function has no use for
 			.xpect_contains(r#""timeout":900"#)
 			// an invoke-only function publishes nothing
 			.xnot()
 			.xpect_contains("aws_apigatewayv2")
-			// ..and the collapsed third bucket is provisioned by nothing
+			// ..and no bucket holds analytics any more
 			.xnot()
-			.xpect_contains("beet-site--dev--analytics-rollup");
+			.xpect_contains("beet-site--dev--analytics");
 	}
 
 	/// The `shared`-stage stack, the shape the site entry declares: its verb

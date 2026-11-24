@@ -135,8 +135,18 @@ impl DynamoTableBlock {
 						.map(|slot| {
 							AwsDynamodbTableResourceBlockTypeGlobalSecondaryIndex {
 								name: format!("gsi{slot}").into(),
-								hash_key: Some(format!("gsi{slot}pk").into()),
-								range_key: Some(format!("gsi{slot}sk").into()),
+								// `key_schema`, which the provider's 6.x reads
+								// in place of the index's `hash_key`/`range_key`
+								key_schema: Some(vec![
+									GlobalSecondaryIndexResourceBlockTypeKeySchema {
+										attribute_name: format!("gsi{slot}pk").into(),
+										key_type: "HASH".into(),
+									},
+									GlobalSecondaryIndexResourceBlockTypeKeySchema {
+										attribute_name: format!("gsi{slot}sk").into(),
+										key_type: "RANGE".into(),
+									},
+								]),
 								projection_type: "ALL".into(),
 								..default()
 							}
@@ -225,8 +235,12 @@ mod test {
 		for slot in 1..=4 {
 			json.as_str()
 				.xpect_contains(&format!(r#""name":"gsi{slot}""#))
-				.xpect_contains(&format!(r#""hash_key":"gsi{slot}pk""#))
-				.xpect_contains(&format!(r#""range_key":"gsi{slot}sk""#));
+				.xpect_contains(&format!(
+					r#"{{"attribute_name":"gsi{slot}pk","key_type":"HASH"}}"#
+				))
+				.xpect_contains(&format!(
+					r#"{{"attribute_name":"gsi{slot}sk","key_type":"RANGE"}}"#
+				));
 		}
 	}
 }

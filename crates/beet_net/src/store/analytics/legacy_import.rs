@@ -69,10 +69,7 @@ impl AnalyticsImport {
 				events.extend(decoded);
 			}
 		}
-		let rows = AnalyticsEvent::dedupe(events)
-			.into_iter()
-			.map(Self::keyed)
-			.collect::<Vec<_>>();
+		let rows = AnalyticsEvent::dedupe(events);
 		report.written = rows.len();
 		let table = self.to.events();
 		rows.into_iter()
@@ -105,7 +102,7 @@ impl AnalyticsImport {
 		paths.xok()
 	}
 
-	/// The events of one zstd JSONL object, one json event a line.
+	/// The events of one zstd JSONL object, one legacy json event a line.
 	pub fn decode(bytes: &[u8]) -> Result<Vec<AnalyticsEvent>> {
 		let mut text = String::new();
 		ruzstd::decoding::StreamingDecoder::new(bytes)
@@ -113,21 +110,34 @@ impl AnalyticsImport {
 			.read_to_string(&mut text)?;
 		text.lines()
 			.filter(|line| !line.trim().is_empty())
-			.map(|line| {
-				serde_json::from_str::<AnalyticsEvent>(line)
-					.map_err(BevyError::from)
-			})
+			.map(|line| Self::event(serde_json::from_str(line)?))
 			.collect()
 	}
 
-	/// The event under the key its id and timestamp determine.
-	fn keyed(mut event: AnalyticsEvent) -> AnalyticsEvent {
-		let id = event.id.as_u128();
-		event.key = Tid::from_parts(
-			event.timestamp * 1000 + (id % 1000) as u64,
-			((id / 1000) % 1024) as u16,
+	/// A legacy event, which carried its instant as `timestamp` (milliseconds
+	/// since the epoch) beside its id, under the key those two determine.
+	fn event(mut json: serde_json::Value) -> Result<AnalyticsEvent> {
+		let Some(fields) = json.as_object_mut() else {
+			bevybail!("a legacy analytics event is a json object");
+		};
+		let Some(millis) =
+			fields.remove("timestamp").and_then(|ms| ms.as_u64())
+		else {
+			bevybail!("a legacy analytics event carries no `timestamp`");
+		};
+		let id = fields
+			.get("id")
+			.and_then(|id| id.as_str())
+			.and_then(|id| id.parse::<Uuid>().ok())
+			.ok_or_else(|| {
+				bevyhow!("a legacy analytics event carries no `id`")
+			})?;
+		let key = Tid::seeded_at(
+			Timestamp::from_millis(millis as i64),
+			id.as_u128() as u64,
 		);
-		event
+		fields.insert("key".into(), serde_json::to_value(key)?);
+		serde_json::from_value::<AnalyticsEvent>(json)?.xok()
 	}
 }
 
@@ -135,11 +145,21 @@ impl AnalyticsImport {
 mod test {
 	use super::*;
 
-	/// A fixture object, compressed as the legacy writer did.
-	fn object(events: &[AnalyticsEvent]) -> bytes::Bytes {
+	/// A fixture object as the legacy writer wrote it: zstd JSONL, each
+	/// event its instant as `timestamp` and no key.
+	fn legacy(events: &[AnalyticsEvent]) -> bytes::Bytes {
 		let lines = events
 			.iter()
-			.map(|event| serde_json::to_string(event).unwrap())
+			.map(|event| {
+				let mut json = serde_json::to_value(event).unwrap();
+				let fields = json.as_object_mut().unwrap();
+				fields.remove("key");
+				fields.insert(
+					"timestamp".into(),
+					(event.timestamp().millis() as u64).into(),
+				);
+				json.to_string()
+			})
 			.collect::<Vec<_>>()
 			.join("\n");
 		ruzstd::encoding::compress_to_vec(
@@ -150,22 +170,13 @@ mod test {
 	}
 
 	fn view(path: &str, days: u64) -> AnalyticsEvent {
-		let mut event =
-			AnalyticsEvent::new(path, AnalyticsEventData::PageView {
-				duration_ms: 1_000,
-				referrer: None,
-				title: None,
-				client: default(),
-			});
-		event.timestamp -= days * 86_400_000;
-		event
-	}
-
-	/// A legacy event as the old writer wrote it, with no key.
-	fn legacy_json(event: &AnalyticsEvent) -> serde_json::Value {
-		let mut json = serde_json::to_value(event).unwrap();
-		json.as_object_mut().unwrap().remove("key");
-		json
+		AnalyticsEvent::new(path, AnalyticsEventData::PageView {
+			duration_ms: 1_000,
+			referrer: None,
+			title: None,
+			client: default(),
+		})
+		.with_timestamp(Timestamp::now() - Duration::from_secs(days * 86_400))
 	}
 
 	/// Archives and segments import once each event, heartbeats reduced to
@@ -175,22 +186,11 @@ mod test {
 		let archive = BlobStore::temp();
 		let analytics = BlobStore::temp();
 		let old = view("/old", 3);
-		let mut heartbeat = old.clone();
-		heartbeat.timestamp += 5_000;
+		let mut heartbeat = old
+			.clone()
+			.with_timestamp(old.timestamp() + Duration::from_secs(5));
 		heartbeat.path = "/old-later".into();
 		let recent = view("/recent", 1);
-		// keyless json, as the legacy writer wrote it
-		let legacy = |events: &[AnalyticsEvent]| {
-			let lines = events
-				.iter()
-				.map(|event| legacy_json(event).to_string())
-				.collect::<Vec<_>>()
-				.join("\n");
-			bytes::Bytes::from(ruzstd::encoding::compress_to_vec(
-				lines.as_bytes(),
-				ruzstd::encoding::CompressionLevel::Fastest,
-			))
-		};
 		archive
 			.insert(
 				&RelPath::new(format!(
@@ -217,7 +217,7 @@ mod test {
 					"analytics/raw/segments/{}/w/2-1.jsonl.zst",
 					recent.date()
 				)),
-				object(&[recent.clone()]),
+				legacy(&[recent.clone()]),
 			)
 			.await
 			.unwrap();

@@ -1100,20 +1100,27 @@ impl TableProvider for DynamoStore {
 mod test {
 	use super::*;
 
-	/// The store and table suites against AWS, creating and removing their
-	/// tables, so they need an identity holding `dynamodb:*` on
-	/// `beet--test--*`.
+	/// The store and table suites against AWS, in the one table the root
+	/// entry's `test` stage provisions (`beet --entry=. test/deploy`), as the
+	/// `beet` app's deploy credential: blobs and rows share it, as they do any
+	/// store's.
 	#[beet_core::test(timeout_ms = 600_000)]
-	#[ignore = "takes ages"]
+	#[ignore = "hits remote dynamo"]
 	async fn store() {
-		let provider = DynamoStore::new("beet--test--store", "us-west-2");
-		store_test::run(provider).await;
+		store_test::run_objects(&BlobStore::new(DynamoStore::new(
+			"beet--test--dynamo",
+			"us-west-2",
+		)))
+		.await;
 	}
 	#[beet_core::test(timeout_ms = 600_000)]
-	#[ignore = "takes ages"]
+	#[ignore = "hits remote dynamo"]
 	async fn table() {
-		let provider = DynamoStore::new("beet--test--table", "us-west-2");
-		table_test::run(TableStore::new(provider)).await;
+		table_test::run_rows(&TableStore::new(DynamoStore::new(
+			"beet--test--dynamo",
+			"us-west-2",
+		)))
+		.await;
 	}
 
 	/// The store and table suites against DynamoDB Local
