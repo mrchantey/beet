@@ -239,7 +239,7 @@ mod test {
 	#[beet_core::test]
 	async fn a_handler_survives_a_save_and_a_reload() {
 		for markup in [
-			r#"<button>+<script {OnEvent{event:"click"}}>target.with_field('count', count => count + 1)</script></button>"#,
+			r#"<button>+<script bx:event="click">target.with_field('count', count => count + 1)</script></button>"#,
 			r#"<button bx:onclick="target.with_field('count', count => count + 1)">+</button>"#,
 		] {
 			let mut world = world_ext::ui_world();

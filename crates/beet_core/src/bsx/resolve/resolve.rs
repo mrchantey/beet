@@ -21,7 +21,7 @@
 //!   in the sync pass via [`BindingTarget::Reserved`];
 //! - a `$`reference resolves to a `bx:ref`-named entity through the one entity
 //!   model;
-//! - `<Slot>` and `slot` lower to their slot-marker components, every other
+//! - `<slot>` and `slot` lower to their slot-marker components, every other
 //!   directive having been rewritten into explicit BSX ([`BsxDirectives`]).
 //!
 //! Entity references resolve through `cx.entity_references` with a two-pass walk

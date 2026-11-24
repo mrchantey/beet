@@ -2,7 +2,7 @@
 # World Scripting - a sandboxed script acting on the live world
 
 `<DynamicComponent>` mints a component type with no rust definition behind it,
-and `<script {RunScript}>` runs a sandboxed script with a `world` API installed. Every
+and `<script bx:run>` runs a sandboxed script with a `world` API installed. Every
 `world` method is served the moment it is awaited, so a script reads what it
 just wrote, a `spawn` hands back a real entity id the next line can use, and a
 refused call is an error the script can catch.
@@ -21,7 +21,7 @@ reports it.
 	word means: every write to it is validated before it lands -->
 	<DynamicComponent name="game.Health" schema="u64"/>
 	<Sequence {CallOnReady}>
-		<script {RunScript} {ScriptConfig{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}>{
+		<script bx:run {ScriptConfig{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}>{
 			// muster: each fighter is spawned with a registered rust component,
 			// addressed by its full type path, beside the minted one
 			await world.spawn({ 'bevy_ecs::name::Name': 'ada', 'game.Health': 3 });
@@ -32,7 +32,7 @@ reports it.
 			const health = await world.get(cleo, 'game.Health');
 			console.log('cleo mustered with ' + health + ' health');
 			}</script>
-		<script {RunScript} {ScriptConfig{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}>{
+		<script bx:run {ScriptConfig{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}>{
 			// the roll call is named but carries no health, so it is no fighter
 			let report = null;
 			for (const id of await world.entities('bevy_ecs::name::Name')) {
@@ -57,7 +57,7 @@ reports it.
 			await world.insert(weakest.id, 'bevy_ecs::name::Name', weakest.name + ' (wounded)');
 			await world.insert(report, 'bevy_ecs::name::Name', 'roll call ' + roster.join(', '));
 			}</script>
-		<script {RunScript} {ScriptConfig{read:["bevy_ecs::name::Name","game.Health"],write:["game.Health"]}}>{
+		<script bx:run {ScriptConfig{read:["bevy_ecs::name::Name","game.Health"],write:["game.Health"]}}>{
 			// this script may read a name but not write one, and the refusal
 			// arrives as an error where the call was made
 			const [named] = await world.entities('bevy_ecs::name::Name');

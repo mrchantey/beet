@@ -444,7 +444,7 @@ pub(super) mod test {
 				.get_resource_or_init::<BsxTemplateRegistry>()
 				.insert_source(
 					"HeadLayout",
-					"<html><RouteHead/><body><Slot/></body></html>",
+					"<html><RouteHead/><body><slot/></body></html>",
 				)
 				.unwrap();
 			let root = spawn_syndication_router_with(

@@ -195,7 +195,6 @@ impl Plugin for RouterPlugin {
 					Robots,
 					Sitemap,
 					RssFeed,
-					SearchIndex,
 					// the island route, declared once at a router's root, and the
 					// live region of a page it answers
 					ServerIslands,
@@ -207,6 +206,10 @@ impl Plugin for RouterPlugin {
 					// plain `{FsStore{path:..}}`.
 					StoreToolset,
 				)>();
+			// the search index is a json document, so it rides the format's
+			// feature; a build without it holds `<SearchIndex/>` unregistered
+			#[cfg(feature = "json")]
+			app.install_type::<SearchIndex>();
 			// the markup-resolved `<RoutesDir src=".."/>`, registered on every std
 			// target so a no-code site loads. Its discovery observer scans the store
 			// asynchronously (off the runtime, see `RoutesDir::spawn_on_insert`), so it

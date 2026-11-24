@@ -8,6 +8,15 @@ impl Value {
 	/// Converts into a [`serde_json::Value`].
 	pub fn into_json(self) -> serde_json::Value { value_to_json(self) }
 
+	/// This value as compact JSON text: map entries written sorted by key, so
+	/// one value always writes one document, and a non-finite float `null`.
+	pub fn to_json_string(&self) -> Result<String> {
+		MediaType::Json
+			.serialize(self)?
+			.xmap(String::from_utf8)?
+			.xok()
+	}
+
 	/// Converts into a pretty-printed JSON string.
 	pub fn to_string_pretty(&self) -> Result<String> {
 		MediaType::Json
@@ -105,5 +114,19 @@ mod test {
 		}));
 		value.get("negative").unwrap().xpect_eq(Value::Int(-1));
 		value.get("positive").unwrap().xpect_eq(Value::Uint(1));
+	}
+
+	/// Map entries are sorted by key, so the same value always writes the same
+	/// document, which is what a snapshot, a cache key and a diff all need.
+	#[crate::test]
+	fn writes_sorted_compact_text() {
+		let mut map = Map::default();
+		map.insert("url", Value::str("/a"));
+		map.insert("count", Value::Uint(2));
+		map.insert("ratio", Value::Float(f64::INFINITY));
+		Value::new_list([Value::Map(map)])
+			.to_json_string()
+			.unwrap()
+			.xpect_eq(r#"[{"count":2,"ratio":null,"url":"/a"}]"#);
 	}
 }

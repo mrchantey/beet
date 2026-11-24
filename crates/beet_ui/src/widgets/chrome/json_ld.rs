@@ -38,7 +38,7 @@ impl JsonLd {
 	/// A dated page is an `Article`, anything else a `WebPage`: the same fact
 	/// the `og:type` tag reports, read from the same field, so the two cannot
 	/// disagree.
-	pub fn to_json(&self) -> String {
+	pub fn to_json(&self) -> Result<String> {
 		let kind = match self.published.is_some() {
 			true => "Article",
 			false => "WebPage",
@@ -78,7 +78,10 @@ impl JsonLd {
 		// value would close the block early and spill the rest into the page as
 		// markup. Inside json text a `<` only ever appears within a string
 		// literal, so escaping every one is both safe and sufficient.
-		Value::Map(map).to_json_string().replace('<', "\\u003c")
+		Value::Map(map)
+			.to_json_string()?
+			.replace('<', "\\u003c")
+			.xok()
 	}
 }
 
@@ -108,6 +111,7 @@ mod test {
 			publisher: "Beet".into(),
 		}
 		.to_json()
+		.unwrap()
 		.xpect_eq(
 			r#"{"@context":"https://schema.org","@type":"Article","author":{"@type":"Person","name":"Pete Hayman"},"dateModified":"2025-09-01T00:00:00.000Z","datePublished":"2025-08-09T00:00:00.000Z","headline":"ECS Router","image":"https://beet.org/card.png","publisher":{"@type":"Organization","name":"Beet"},"url":"https://beet.org/blog/ecs-router"}"#,
 		);
@@ -124,6 +128,7 @@ mod test {
 			..default()
 		}
 		.to_json()
+		.unwrap()
 		.xpect_contains(
 			r#""author":[{"@type":"Person","name":"Pete Hayman"},{"@type":"Person","name":"Ada Lovelace"}]"#,
 		);
@@ -139,6 +144,7 @@ mod test {
 			..default()
 		}
 		.to_json()
+		.unwrap()
 		.xpect_eq(
 			r#"{"@context":"https://schema.org","@type":"WebPage","headline":"Beet","publisher":{"@type":"Organization","name":"Beet"}}"#,
 		);
@@ -154,6 +160,7 @@ mod test {
 			..default()
 		}
 		.to_json()
+		.unwrap()
 		.xpect_contains(
 			r#""headline":"\u003c/script>\u003cimg onerror=alert(1)>""#,
 		)

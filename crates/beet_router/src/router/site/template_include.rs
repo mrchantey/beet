@@ -270,7 +270,7 @@ mod test {
 	}
 
 	/// Slot content *inside* an included entry resolves once the include settles:
-	/// the included `<Fragment slot="x">` collapses into the included `<Slot
+	/// the included `<Fragment slot="x">` collapses into the included `<slot
 	/// name="x"/>`, leaving no routing markers behind. The resolution cannot run
 	/// mid-`build_root` (the include has not built yet), so it must run when the
 	/// pending set drains, just before the deferred [`Ready`].
@@ -284,7 +284,7 @@ mod test {
 		store
 			.insert(
 				&RelPath::from("card.bsx"),
-				"<main><Slot name=\"x\"/><Fragment slot=\"x\"><b/></Fragment></main>",
+				"<main><slot name=\"x\"/><Fragment slot=\"x\"><b/></Fragment></main>",
 			)
 			.await
 			.unwrap();
@@ -412,7 +412,7 @@ mod test {
 
 		let root = BsxTemplate::parse_entry(
 			&world,
-			"<main><Slot name=\"x\"/><Fragment slot=\"x\"><b/><i/></Fragment></main>",
+			"<main><slot name=\"x\"/><Fragment slot=\"x\"><b/><i/></Fragment></main>",
 		)
 		.unwrap()
 		.spawn(&mut world)

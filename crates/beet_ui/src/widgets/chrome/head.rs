@@ -140,7 +140,7 @@ pub fn Head(
 		image: social_image.clone(),
 		publisher: title.clone(),
 	}
-	.to_json();
+	.to_json()?;
 	// a card only fills the large preview when there is a card to fill it with.
 	let twitter_card = if social_image.is_some() {
 		"summary_large_image"
@@ -202,7 +202,7 @@ pub fn Head(
 			<meta name="mobile-web-app-capable" content="yes"/>
 			// Microsoft tile
 			{tints.as_ref().map(|tints| rsx!{ <meta name="msapplication-TileColor" content={&tints.light}/> })}
-			<Slot/>
+			<slot/>
 		</head>
 	}
 	.xok()

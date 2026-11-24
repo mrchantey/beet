@@ -25,7 +25,7 @@ pub fn Footer(pkg_config: Res<PackageConfig>) -> impl Bundle {
 	// ie markdown, where adjacent spans run together
 	rsx! {
 		<footer id="page-footer" {Classes::new([classes::PRINT_HIDDEN])}>
-			<span {Classes::new([classes::FOOTER_SIDE])}><Slot/></span>" "
+			<span {Classes::new([classes::FOOTER_SIDE])}><slot/></span>" "
 			<span>{footer_text}</span>" "
 			<span {Classes::new([classes::FOOTER_SIDE, classes::TEXT_RIGHT])}>{build_text}</span>
 		</footer>

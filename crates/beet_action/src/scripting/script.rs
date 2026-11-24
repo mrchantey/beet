@@ -278,7 +278,7 @@ where
 	///
 	/// A `()` output discards whatever the body evaluated to, the way any
 	/// language discards a statement's value: an expression body always produces
-	/// one, and a `<script {RunScript}>` is run for its effects, not its answer.
+	/// one, and a `<script bx:run>` is run for its effects, not its answer.
 	///
 	/// For any other output a missing value is a `null`, which only a block body
 	/// that chose not to return can produce, so the error says that rather than

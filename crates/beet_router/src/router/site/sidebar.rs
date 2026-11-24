@@ -94,7 +94,7 @@ pub fn RouteHead(
 			<title>{title}</title>
 			{icons}
 			{records}
-			<Slot/>
+			<slot/>
 		</Head>
 	}
 	.xok()

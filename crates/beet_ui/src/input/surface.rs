@@ -15,7 +15,7 @@ use bevy::ecs::system::SystemParam;
 /// hand-rolling the ancestor walk, so the scoping rule lives in one place.
 ///
 /// Crossing the portal is what lets transcluded route content resolve its
-/// surface: the live page layouts the route content into a `<Slot>` by reference
+/// surface: the live page layouts the route content into a `<slot>` by reference
 /// (a `Portal`), so a link/field deep in the content has no `ChildOf` path to the
 /// page root's `RenderSurface`. Following the holder bridges that gap, exactly as
 /// the scroll input does for its scroll-container walk.
@@ -129,7 +129,7 @@ mod test {
 	/// `surface_of` resolves the surface for content transcluded by a [`Portal`]:
 	/// the content has no `ChildOf` link to the page root, so the walk must cross
 	/// the holder. This is the markdown-link regression — a route's content is
-	/// layouted into a `<Slot>` by reference, so a link inside it could not reach
+	/// layouted into a `<slot>` by reference, so a link inside it could not reach
 	/// the page root's [`RenderSurface`] and never navigated.
 	#[beet_core::test]
 	fn surface_resolves_across_portal() {

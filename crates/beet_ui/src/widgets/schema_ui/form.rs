@@ -119,7 +119,7 @@ pub fn DynamicForm(
 	rsx! {
 		<Form>
 			{SchemaRebuild::new(resolver, source, controls).holder(resolver)}
-			<Slot/>
+			<slot/>
 		</Form>
 	}
 }

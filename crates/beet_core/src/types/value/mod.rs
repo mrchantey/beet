@@ -18,6 +18,3 @@ pub use serde::ValueDeserializer;
 pub use serde::ValueSerializer;
 mod value;
 pub use value::*;
-// writing a `Value` as json text without serde, so a generator whose output
-// must exist in every build does not ride the `json` feature.
-mod write_json;

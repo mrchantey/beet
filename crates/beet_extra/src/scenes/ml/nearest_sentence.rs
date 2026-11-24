@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 /// A sentence-matching agent: a prompt [`Sentence`] plus a [`BertHandle`] over a
 /// [`Bert`] model, eg `<NearestSentenceAgent prompt="please kill the baddies"
 /// src="ml/default.bert.json"><SentenceOption text="heal"/><SentenceOption text="attack"/>
-/// </NearestSentenceAgent>`. The candidate sentences are children (via `<Slot/>`);
+/// </NearestSentenceAgent>`. The candidate sentences are children (via `<slot/>`);
 /// `Handle<Bert>` is minted through the deferred [`BuildAssets`] path because a handle
 /// is not a markup value, so `Ready` waits for the model. [`CallOnReady`] then
 /// fires [`choose_nearest`] once, which logs the winning [`Sentence`] and exits.
@@ -22,7 +22,7 @@ pub fn NearestSentenceAgent(
 			BertHandle(assets.load::<Bert>(src)),
 			CallOnReady,
 			Action::<(), Outcome>::new_system(choose_nearest),
-		)}><Slot/></span>
+		)}><slot/></span>
 	}
 }
 
@@ -38,7 +38,7 @@ pub fn SentenceOption(#[prop] text: String) -> impl Bundle {
 /// time the user submits a sentence in the terminal. A [`TriggerWithUserSentence`]
 /// overwrites the agent's prompt [`Sentence`] with the typed text and calls
 /// [`chat_nearest_sentence`], which logs the closest child [`Sentence`] back to the
-/// terminal. Candidate sentences are children (via `<Slot/>`); `Handle<Bert>` is
+/// terminal. Candidate sentences are children (via `<slot/>`); `Handle<Bert>` is
 /// minted through the deferred [`BuildAssets`] path because a handle is not a markup
 /// value.
 #[template(system)]
@@ -51,7 +51,7 @@ pub fn ChatSentenceAgent(
 			TriggerWithUserSentence,
 			BertHandle(assets.load::<Bert>(src)),
 			Action::<(), Outcome>::new_system(chat_nearest_sentence),
-		)}><Slot/></span>
+		)}><slot/></span>
 	}
 }
 
@@ -123,7 +123,7 @@ fn choose_nearest(
 }
 
 /// Match `prompt` against the candidate [`Sentence`]s in `agent`'s descendants and
-/// return the winner's text. The `<Slot/>` nests the candidates below the agent, so
+/// return the winner's text. The `<slot/>` nests the candidates below the agent, so
 /// the search walks all descendants (not just direct children). Shared by the load
 /// ([`choose_nearest`]) and chat ([`chat_nearest_sentence`]) choosers.
 fn closest_descendant_sentence(

@@ -48,7 +48,7 @@ impl SchemaSource {
 /// The holder is **element-less**, so it adds a transparent node rather than a
 /// wrapper: both renderers pass through a node with no `Element`. Its children
 /// are one generation and nothing else, so a rebuild despawns all of them,
-/// while a `<Slot/>`'s authored children (a form's submit button) are its
+/// while a `<slot/>`'s authored children (a form's submit button) are its
 /// siblings and survive untouched.
 ///
 /// A rebuild fires exactly when the schema the subtree renders *changed*: the

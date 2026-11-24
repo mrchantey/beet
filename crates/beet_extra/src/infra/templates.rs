@@ -650,6 +650,7 @@ mod test {
 				.and_then(|resource| resource.get("aws_lightsail_instance"))
 				.unwrap()
 				.to_json_string()
+				.unwrap()
 				.xpect_contains(&format!(
 					"aws_ssm_parameter.{}",
 					stack.resource_ident("ssh-host-key").label()

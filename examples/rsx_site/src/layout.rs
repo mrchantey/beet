@@ -4,7 +4,7 @@ use beet::prelude::*;
 /// The global document layout wrapping every route's body.
 ///
 /// Composes the library [`Header`]/[`Footer`] around the route content (the
-/// default `<Slot/>`, transcluded in place by the [`Layout`] middleware). The
+/// default `<slot/>`, transcluded in place by the [`Layout`] middleware). The
 /// shared [`RouteHead`] carries the web-only stylesheet/color-scheme/preflight,
 /// sourcing the title/description from the matched route's [`DocMeta`]. The
 /// `<head>` is non-visual, so the same layout renders in the terminal.
@@ -59,7 +59,7 @@ pub fn BeetLayout(
 				</Header>
 				<div {Classes::new([classes::CONTAINER])}>
 					<main>
-						<Slot/>
+						<slot/>
 					</main>
 				</div>
 				<Footer/>

@@ -1045,7 +1045,7 @@ mod test {
 		registry
 			.insert_source(
 				"Layout",
-				"<html><body><main><Slot/></main></body></html>",
+				"<html><body><main><slot/></main></body></html>",
 			)
 			.unwrap();
 		app.world_mut().insert_resource(registry);
@@ -1171,7 +1171,7 @@ mod test {
 			<body>
 				<button aria-controls="sidebar">"M"</button>
 				<nav id="sidebar">"NAV"</nav>
-				<main><Slot/></main>
+				<main><slot/></main>
 			</body>
 		}
 	}
@@ -1369,7 +1369,7 @@ mod test {
 		registry
 			.insert_source(
 				"Layout",
-				"<html><body><main><Slot/></main></body></html>",
+				"<html><body><main><slot/></main></body></html>",
 			)
 			.unwrap();
 		app.world_mut().insert_resource(registry);

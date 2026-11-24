@@ -280,11 +280,11 @@ pub(crate) mod test_fixtures {
 			.insert_source(
 				"FixtureLayout",
 				"<html><head><title>Beet</title><style>main { margin: 0 }</style></head>\
-				 <body><nav>Home</nav><main><Slot/></main><footer>Bye</footer></body></html>",
+				 <body><nav>Home</nav><main><slot/></main><footer>Bye</footer></body></html>",
 			)
 			.unwrap();
 		registry
-			.insert_source("ArticleLayout", "<ArticleHeader/><Slot/>")
+			.insert_source("ArticleLayout", "<ArticleHeader/><slot/>")
 			.unwrap();
 		world
 			.spawn((Router, Layout::new("FixtureLayout"), children![

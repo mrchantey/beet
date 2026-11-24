@@ -25,7 +25,7 @@ const LAYOUT_BSX: &str = r#"
 	<RouteHead/>
 	<body>
 		<RouteSidebar/>
-		<main><Slot/></main>
+		<main><slot/></main>
 	</body>
 </html>
 "#;
@@ -33,7 +33,7 @@ const LAYOUT_BSX: &str = r#"
 const CARD_BSX: &str = r#"
 <section class="card-filled">
 	<h2>{@prop:title}</h2>
-	<Slot/>
+	<slot/>
 </section>
 "#;
 

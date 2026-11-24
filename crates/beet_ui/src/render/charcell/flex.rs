@@ -1683,7 +1683,7 @@ mod tests {
 	}
 
 	/// A tag-less node kept in the flow (here by matching its element's
-	/// background, as a layout's `<Slot>` under the page body does) lays its
+	/// background, as a layout's `<slot>` under the page body does) lays its
 	/// children out with that element's container props, yet takes none of the
 	/// element's own place in its parent's line.
 	#[beet_core::test]

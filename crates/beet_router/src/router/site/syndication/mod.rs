@@ -17,6 +17,8 @@
 
 mod robots;
 mod rss;
+// a json document, written through the format's own feature
+#[cfg(feature = "json")]
 mod search_index;
 mod sitemap;
 // the standard.site records: plain data in the protocol's model, beside the
@@ -29,6 +31,7 @@ mod xml;
 
 pub use robots::*;
 pub use rss::*;
+#[cfg(feature = "json")]
 pub use search_index::*;
 pub use sitemap::*;
 #[cfg(feature = "dag_cbor")]

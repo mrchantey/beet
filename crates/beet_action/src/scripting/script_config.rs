@@ -27,7 +27,7 @@ use serde::Serialize;
 /// components and an exclude carves one out of an otherwise open grant:
 ///
 /// ```ignore
-/// <script {RunScript} {ScriptConfig{read:["guestbook.*","Text"], write:["guestbook.*"]}}>
+/// <script bx:run {ScriptConfig{read:["guestbook.*","Text"], write:["guestbook.*"]}}>
 ///   ..
 /// </script>
 /// ```

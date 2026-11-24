@@ -194,7 +194,7 @@ pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// Lowercase tags become elements, uppercase tags resolve to a component
 /// (reflect-patched) or a `#[template]` (built with input props), bare `{..}`
 /// attributes spread components/templates onto the entity, attribute/text
-/// `{..}` are Rust expressions, `<Slot>`/`slot` lower to slot markers, and
+/// `{..}` are Rust expressions, `<slot>`/`slot` lower to slot markers, and
 /// `on*` handlers lower to observers.
 ///
 /// The lowered [`Snippet`] is both a [`Template`] and a [`Bundle`], so a helper
@@ -248,7 +248,7 @@ pub fn rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// ```rust ignore
 /// #[template]
 /// fn Button(label: String, variant: ButtonVariant) -> impl Bundle {
-///     rsx! { <button>{label} <Slot/></button> }
+///     rsx! { <button>{label} <slot/></button> }
 /// }
 /// ```
 #[cfg(feature = "rsx")]

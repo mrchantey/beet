@@ -184,7 +184,7 @@ fn build_root(
 			Ok(())
 		} else {
 			// anchor the pre-build slot children onto the built layout's content
-			// root, so the layout's `<Slot>`s receive them regardless of how the
+			// root, so the layout's `<slot>`s receive them regardless of how the
 			// root template built (clobbering the root's `Children`, or nesting
 			// the content under a tag-less wrapper when the document is
 			// multi-root), then resolve.
@@ -227,7 +227,7 @@ fn root_slot_children(world: &World, root: Entity) -> Vec<Entity> {
 }
 
 /// Anchor the layout's pre-build [`SlotChild`] content (the transcluded portal)
-/// onto the built layout's *content root*, so the layout's `<Slot>`s receive it.
+/// onto the built layout's *content root*, so the layout's `<slot>`s receive it.
 /// Crate-visible so the deferred path ([`TemplatePending::drain_dependencies`]) runs the
 /// same anchoring once an async include settles.
 ///
@@ -238,7 +238,7 @@ fn root_slot_children(world: &World, root: Entity) -> Vec<Entity> {
 /// - a multi-root document (eg a leading `<!-- comment -->` before `<SiteLayout>`)
 ///   builds the content under a tag-less wrapper below the root (one level per
 ///   multi-root layer, which can nest), so a child of the root sits in a
-///   *different composition scope* than the content's `<Slot>`s and never matches.
+///   *different composition scope* than the content's `<slot>`s and never matches.
 ///
 /// Both are fixed by re-homing each pre-added slot child onto the content root
 /// resolved by [`content_root`] (the built [`Element`], however many tag-less
@@ -262,7 +262,7 @@ pub(crate) fn anchor_pre_slot_children(
 	}
 }
 
-/// The entity a layout's `<Slot>`s live under: the root if it built an
+/// The entity a layout's `<slot>`s live under: the root if it built an
 /// [`Element`] or declares the slots itself, else the content [`Element`] nested
 /// below it, else the root unchanged.
 ///
@@ -271,12 +271,12 @@ pub(crate) fn anchor_pre_slot_children(
 /// whose `<Layout>` template *itself* returns `<!DOCTYPE html><html>` builds the
 /// `<html>` two wrappers below the root. Anchoring the transcluded body on the
 /// wrong level widens its composition scope so the default body matches a nested
-/// widget's default `<Slot>` (eg `RouteHead`'s, first in document order) instead
+/// widget's default `<slot>` (eg `RouteHead`'s, first in document order) instead
 /// of the layout's own, so the descent must reach the real content element.
 ///
 /// The descent stops at a level that declares slots of its own, since those ARE
-/// the layout's: a chrome-only layout (`<ArticleHeader/><Slot/>`) puts its
-/// `<Slot>` beside an element rather than inside one, and descending would anchor
+/// the layout's: a chrome-only layout (`<ArticleHeader/><slot/>`) puts its
+/// `<slot>` beside an element rather than inside one, and descending would anchor
 /// the body inside that element — a SIBLING of the slot it belongs in.
 fn content_root(world: &World, root: Entity) -> Entity {
 	if world.entity(root).contains::<Element>()

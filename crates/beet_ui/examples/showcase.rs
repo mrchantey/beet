@@ -12,8 +12,8 @@
 //! then open <http://localhost:8337>.
 //!
 //! `<Select>`/`<Table>` options and rows are passed as slotted children: caller
-//! content written between the tags lands in the widget's default `<Slot>`, and
-//! `slot="head"` rows route to the named `head` slot (see `<Slot>`).
+//! content written between the tags lands in the widget's default `<slot>`, and
+//! `slot="head"` rows route to the named `head` slot (see `<slot>`).
 use beet_core::prelude::*;
 use beet_net::prelude::DEFAULT_HTTP_PORT;
 use beet_net::prelude::HttpServer;

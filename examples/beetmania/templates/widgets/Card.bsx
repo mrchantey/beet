@@ -3,5 +3,5 @@
      routes into the default slot. -->
 <section class="card-filled">
 	<h2>{@prop:title}</h2>
-	<Slot/>
+	<slot/>
 </section>

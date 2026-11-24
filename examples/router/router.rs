@@ -84,7 +84,7 @@ fn servers() -> impl Bundle {
 fn routes() -> impl Bundle {
 	(
 		// render middleware wrapping every descendant route's content in the
-		// `RouterLayout` document, transcluded in place at its `<Slot/>`
+		// `RouterLayout` document, transcluded in place at its `<slot/>`
 		Layout::of::<RouterLayout>(),
 		children![
 			route::new("", BlobPage::new("content/home.md")),
@@ -142,9 +142,9 @@ fn sequence() -> impl Bundle {
 
 /// The document layout wrapping every route's content.
 ///
-/// An ordinary `#[template]` widget with a `<Slot/>`: the [`Layout`] render
+/// An ordinary `#[template]` widget with a `<slot/>`: the [`Layout`] render
 /// middleware runs each route, then transcludes the resulting content in place
-/// at the `<Slot/>`. The `<head>` is non-visual, so the same layout renders in
+/// at the `<slot/>`. The `<head>` is non-visual, so the same layout renders in
 /// the terminal and over HTTP.
 #[template]
 fn RouterLayout() -> impl Bundle {
@@ -159,7 +159,7 @@ fn RouterLayout() -> impl Bundle {
 						<li><a href="/counter">"Counter"</a></li>
 					</ul>
 				</nav>
-				<main><Slot/></main>
+				<main><slot/></main>
 			</body>
 		</html>
 	}

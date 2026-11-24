@@ -19,7 +19,7 @@ pub(super) fn build_element(
 	refs: &RefBindings,
 	cx: &mut TemplateContext,
 ) -> Result<()> {
-	if el.tag == "Slot" {
+	if el.tag == "slot" {
 		return build_slot(el, cx.entity);
 	}
 	// a `<Fragment>` is a neutral host: it carries spreads, directives and slot
@@ -77,9 +77,9 @@ fn build_fragment(
 	build_children(el, registry, refs, cx)
 }
 
-/// Build a `<Slot>` placeholder into `entity` as a [`SlotTarget`] marker, with
+/// Build a `<slot>` placeholder into `entity` as a [`SlotTarget`] marker, with
 /// its children as fallback content. A named slot targets by name; a transfer
-/// `<Slot name slot=..>` also carries a [`SlotChild`].
+/// `<slot name slot=..>` also carries a [`SlotChild`].
 fn build_slot(el: &BsxElement, entity: &mut EntityWorldMut) -> Result<()> {
 	let name = string_attr(el, "name");
 	match &name {

@@ -165,7 +165,7 @@ mod test {
 	async fn survives_its_layout() {
 		#[template]
 		fn FixedShell() -> impl Bundle {
-			rsx! { <html><body><main><Slot/></main></body></html> }
+			rsx! { <html><body><main><slot/></main></body></html> }
 		}
 		let mut app = App::new().with_plugins((AsyncPlugin, RouterPlugin));
 		app.install_type::<FixedShell>();

@@ -792,7 +792,7 @@ impl Config {
 	/// Serialize [`Self::to_json`] to a compact JSON string, entries sorted
 	/// by key.
 	pub fn to_json_string(&self) -> Result<String> {
-		self.to_json().to_json_string().xok()
+		self.to_json().to_json_string()
 	}
 
 	// =====================================================================

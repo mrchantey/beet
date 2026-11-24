@@ -40,7 +40,7 @@ pub fn Mermaid(
 		<figure
 			{Classes::new([DIAGRAM])}
 			{MermaidSource::new(src, render)}
-		><Slot/></figure>
+		><slot/></figure>
 	}
 }
 

@@ -406,7 +406,7 @@ fn spread_on_bsx_template_tag() {
 	register::<Marker>(&mut world);
 	let mut registry = BsxTemplateRegistry::default();
 	registry
-		.insert_source("Card", "<section><Slot/></section>")
+		.insert_source("Card", "<section><slot/></section>")
 		.unwrap();
 	world.insert_resource(registry);
 	let root = spawn_bsx(&mut world, "<Card {Marker}>Body</Card>");
@@ -671,7 +671,7 @@ fn a_run_script_is_not_rendered() {
 	let mut world = world();
 	let root = spawn_bsx(
 		&mut world,
-		r#"<div><p>hi<script {RunScript}>secret()</script></p><script>page()</script></div>"#,
+		r#"<div><p>hi<script bx:run>secret()</script></p><script>page()</script></div>"#,
 	);
 	render_html(&mut world, root)
 		.xref()
@@ -724,7 +724,7 @@ fn template_props_store_literal() {
 	let mut world = world();
 	let mut registry = BsxTemplateRegistry::default();
 	registry
-		.insert_source("Card", "<section><Slot/></section>")
+		.insert_source("Card", "<section><slot/></section>")
 		.unwrap();
 	world.insert_resource(registry);
 
@@ -751,7 +751,7 @@ fn template_props_bound_reactively() {
 	let mut world = world();
 	let mut registry = BsxTemplateRegistry::default();
 	registry
-		.insert_source("Card", "<section><Slot/></section>")
+		.insert_source("Card", "<section><slot/></section>")
 		.unwrap();
 	world.insert_resource(registry);
 
@@ -843,7 +843,7 @@ fn slots_via_registered_template() {
 	registry
 		.insert_source(
 			"Card",
-			"<section><Slot name=\"header\">Fallback</Slot><Slot/></section>",
+			"<section><slot name=\"header\">Fallback</slot><slot/></section>",
 		)
 		.unwrap();
 	world.insert_resource(registry);
@@ -866,7 +866,7 @@ fn slot_fallback_when_no_content() {
 	registry
 		.insert_source(
 			"Card",
-			"<section><Slot name=\"header\">Fallback</Slot></section>",
+			"<section><slot name=\"header\">Fallback</slot></section>",
 		)
 		.unwrap();
 	world.insert_resource(registry);
@@ -882,7 +882,7 @@ fn fragment_forwards_children_into_slot() {
 	registry
 		.insert_source(
 			"Host",
-			"<html><head><Slot name=\"head\"/></head><body><Slot/></body></html>",
+			"<html><head><slot name=\"head\"/></head><body><slot/></body></html>",
 		)
 		.unwrap();
 	world.insert_resource(registry);
@@ -1042,7 +1042,7 @@ async fn counter_bsx_repaints_in_live_tui() {
 		.resource_mut::<BsxTemplateRegistry>()
 		.insert_source(
 			"widgets::Card",
-			"<section><h2>{@prop:title}</h2><Slot/></section>",
+			"<section><h2>{@prop:title}</h2><slot/></section>",
 		)
 		.unwrap();
 	// the host buffer the charcell pipeline paints into, plus a channel terminal

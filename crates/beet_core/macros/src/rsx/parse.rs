@@ -481,13 +481,13 @@ mod test {
 
 	#[test]
 	fn slot_arms() {
-		assert!(lower(quote! { <Slot/> }).contains("SlotTarget :: new"));
+		assert!(lower(quote! { <slot/> }).contains("SlotTarget :: new"));
 		assert!(
-			lower(quote! { <Slot name="x"/> })
+			lower(quote! { <slot name="x"/> })
 				.contains("SlotTarget :: named (\"x\")")
 		);
 		// a slot transfer carries both a target and a child marker.
-		let transfer = lower(quote! { <Slot name="x" slot="y"/> });
+		let transfer = lower(quote! { <slot name="x" slot="y"/> });
 		assert!(transfer.contains("SlotTarget :: named (\"x\")"));
 		assert!(transfer.contains("SlotChild :: named (\"y\")"));
 		// `slot=` routes an element into a parent slot.

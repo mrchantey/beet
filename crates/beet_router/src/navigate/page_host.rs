@@ -619,7 +619,7 @@ mod test {
 	/// [`Layout`]. The chrome carries no link of its own.
 	#[template]
 	fn SlotLayout() -> impl Bundle {
-		rsx! { <body><main><Slot/></main></body> }
+		rsx! { <body><main><slot/></main></body> }
 	}
 
 	/// The first `<a>` element anywhere in the world (these tests spawn one link).

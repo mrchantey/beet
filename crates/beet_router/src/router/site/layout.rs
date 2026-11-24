@@ -5,7 +5,7 @@
 //! [`Layout`] is a render-middleware component (registered like any other
 //! middleware, eg [`RequestLogger`]). For every descendant render route it runs
 //! the inner handler to obtain the content render root, then builds the named
-//! layout with that content routed into its default `<Slot>` as a [`Portal`]
+//! layout with that content routed into its default `<slot>` as a [`Portal`]
 //! transclusion. The content is rendered *in place, by reference*: it is never
 //! reparented under the layout nor re-resolved, so a persistent fixed route
 //! survives request after request.
@@ -49,7 +49,7 @@ use beet_net::prelude::*;
 
 /// Render middleware wrapping every descendant render route in the named
 /// layout template, with the route's content transcluded into the template's
-/// default `<Slot/>` by reference.
+/// default `<slot/>` by reference.
 ///
 /// Add it to an ancestor of the routes it should wrap, typically the router
 /// entity, exactly like any other middleware ([`RequestLogger`], [`HelpHandler`]):
@@ -77,7 +77,7 @@ use beet_net::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_ui::prelude::*;
 /// #[template]
-/// fn PageShell() -> impl Bundle { rsx! { <html><body><Slot/></body></html> } }
+/// fn PageShell() -> impl Bundle { rsx! { <html><body><slot/></body></html> } }
 /// let bundle = (Router, Layout::of::<PageShell>());
 /// ```
 #[derive(Debug, Clone, Component, Reflect)]
@@ -247,7 +247,7 @@ fn wrap_content(
 /// Spawn the named template as the layout around `rendered`: the slot child
 /// carrying the content [`Portal`] spawns first, then the template builds below
 /// the same entity, whose slot-resolution pass routes the content into the
-/// template's default `<Slot/>`.
+/// template's default `<slot/>`.
 ///
 /// The name resolves as the same name in tag position does
 /// ([`BsxTemplate::named`]), and an unresolvable one is rejected there rather
@@ -266,7 +266,7 @@ fn build_layout(
 		.id();
 	// a container, since a layout is a DOCUMENT: its body hangs below the
 	// layout entity rather than building onto it. A passthrough layout whose
-	// whole body is `<Slot/>` would otherwise land its `SlotTarget` on the very
+	// whole body is `<slot/>` would otherwise land its `SlotTarget` on the very
 	// entity holding the transcluded content, where slot resolution cannot see
 	// it.
 	world.entity_mut(layout).insert_template(template)?;
@@ -291,7 +291,7 @@ mod test {
 		rsx! {
 			<html>
 				<head><meta charset="utf-8"/></head>
-				<body><main><Slot/></main></body>
+				<body><main><slot/></main></body>
 			</html>
 		}
 	}
@@ -299,7 +299,7 @@ mod test {
 	/// A layout that places the content inside `<nav>`.
 	#[template]
 	fn NavLayout() -> impl Bundle {
-		rsx! { <body><nav><Slot/></nav></body> }
+		rsx! { <body><nav><slot/></nav></body> }
 	}
 
 	/// A world whose rust test layouts resolve by name, the registration a
@@ -323,7 +323,7 @@ mod test {
 
 	/// The plain document shell as a `.bsx` document, the no-code counterpart of
 	/// [`PageShell`].
-	const LAYOUT_BSX: &str = "<html><head><meta charset=\"utf-8\"/></head><body><main><Slot/></main></body></html>";
+	const LAYOUT_BSX: &str = "<html><head><meta charset=\"utf-8\"/></head><body><main><slot/></main></body></html>";
 
 	/// Request `path`, negotiating HTML, and return the rendered body.
 	async fn get(world: &mut World, root: Entity, path: &str) -> String {
@@ -498,9 +498,9 @@ mod test {
 
 	/// The shipped `<SiteLayout>` shell, used as a no-code site's layout template,
 	/// lands the transcluded route body inside its `<main>` (below the header
-	/// chrome) with no relay `<Slot/>`: the middleware routes the body as
+	/// chrome) with no relay `<slot/>`: the middleware routes the body as
 	/// SiteLayout's default-slot child, which forwards into its own default slot.
-	/// Regression for a bare-`<Slot/>` relay that leaked the body above the header.
+	/// Regression for a bare-`<slot/>` relay that leaked the body above the header.
 	#[beet_core::test]
 	async fn site_layout_routes_body_into_main() {
 		let mut world = bsx_world("<SiteLayout/>");
@@ -529,7 +529,7 @@ mod test {
 	/// body must still reach SiteLayout's default `<main>` slot (the wrapper
 	/// forwards its default content into its lone template-invocation child) *and*
 	/// the slotted children fill their named slots, all in one resolution pass.
-	/// Regression for the body leaking into the head widget's default `<Slot/>` (or
+	/// Regression for the body leaking into the head widget's default `<slot/>` (or
 	/// going unconsumed) when a nested widget exposed a competing default slot.
 	const SLOTTED_LAYOUT_BSX: &str = "<!-- layout -->\n<SiteLayout>\n\t<meta slot=\"head\" name=\"x-custom\"/>\n\t<div slot=\"sidebar\">\"custom rail\"</div>\n</SiteLayout>";
 
@@ -592,11 +592,11 @@ mod test {
 		registry
 			.insert_source(
 				"Outer",
-				"<html><body><main data-outer><Slot/></main></body></html>",
+				"<html><body><main data-outer><slot/></main></body></html>",
 			)
 			.unwrap();
 		registry
-			.insert_source("Inner", "<article data-inner><Slot/></article>")
+			.insert_source("Inner", "<article data-inner><slot/></article>")
 			.unwrap();
 		world.insert_resource(registry);
 		let root = world
@@ -622,29 +622,29 @@ mod test {
 		body.xpect_greater_than(inner);
 	}
 
-	/// The shapes a layout document may take: the `<Slot/>` is not always inside
+	/// The shapes a layout document may take: the `<slot/>` is not always inside
 	/// an element, and the body must reach it in every one.
 	///
-	/// A chrome-only layout (`<ArticleHeader/><Slot/>`) is the regression this
+	/// A chrome-only layout (`<ArticleHeader/><slot/>`) is the regression this
 	/// covers: a multi-root document anchored its transcluded body inside the
 	/// FIRST element it found, a sibling of the slot the body belonged in, and a
-	/// bare `<Slot/>` passthrough built its target onto the very entity holding
+	/// bare `<slot/>` passthrough built its target onto the very entity holding
 	/// the content, where slot resolution could not see it.
 	#[beet_core::test]
 	async fn layout_shapes_all_receive_the_body() {
 		for source in [
 			// the whole layout is the passthrough
-			"<Slot/>",
+			"<slot/>",
 			// chrome beside the slot, at the document root
-			"<p>chrome</p><Slot/>",
-			"<Slot/><p>chrome</p>",
+			"<p>chrome</p><slot/>",
+			"<slot/><p>chrome</p>",
 			// ..and under a tag-less host
-			"<Fragment><p>chrome</p><Slot/></Fragment>",
+			"<Fragment><p>chrome</p><slot/></Fragment>",
 			// the ordinary element-wrapped shapes
-			"<main><p>chrome</p><Slot/></main>",
-			"<html><body><main><Slot/></main></body></html>",
+			"<main><p>chrome</p><slot/></main>",
+			"<html><body><main><slot/></main></body></html>",
 			// a leading comment nests the content element below the root
-			"<!-- c --><html><body><main><Slot/></main></body></html>",
+			"<!-- c --><html><body><main><slot/></main></body></html>",
 		] {
 			let mut world = bsx_world(source);
 			let root = layout_root(&mut world, Layout::default());
@@ -659,13 +659,13 @@ mod test {
 		let mut world = router_world();
 		let mut registry = BsxTemplateRegistry::default();
 		registry
-			.insert_source("Outer", "<main data-outer><Slot/></main>")
+			.insert_source("Outer", "<main data-outer><slot/></main>")
 			.unwrap();
 		registry
-			.insert_source("Blog", "<article data-blog><Slot/></article>")
+			.insert_source("Blog", "<article data-blog><slot/></article>")
 			.unwrap();
 		registry
-			.insert_source("Docs", "<section data-docs><Slot/></section>")
+			.insert_source("Docs", "<section data-docs><slot/></section>")
 			.unwrap();
 		world.insert_resource(registry);
 		let page = || {
@@ -708,7 +708,7 @@ mod test {
 	/// (installed by `wrap_content`) across the transclusion boundary.
 	fn meta_layout_world() -> World {
 		bsx_world(
-			"<html><head><title>{@entity:PageRoot::DocMeta.title}</title></head><body><main><Slot/></main></body></html>",
+			"<html><head><title>{@entity:PageRoot::DocMeta.title}</title></head><body><main><slot/></main></body></html>",
 		)
 	}
 
@@ -755,7 +755,7 @@ mod test {
 		let mut world = meta_layout_world();
 		world
 			.resource_mut::<BsxTemplateRegistry>()
-			.insert_source("ArticleLayout", "<article><Slot/></article>")
+			.insert_source("ArticleLayout", "<article><slot/></article>")
 			.unwrap();
 		let root = world
 			.spawn((Router, Layout::default(), children![(
@@ -778,7 +778,7 @@ mod test {
 		rsx! {
 			<html>
 				<RouteHead/>
-				<body><Header/><main><Slot/></main></body>
+				<body><Header/><main><slot/></main></body>
 			</html>
 		}
 	}
@@ -893,7 +893,7 @@ mod test {
 		world.init_resource::<PackageConfig>();
 		let mut registry = BsxTemplateRegistry::default();
 		registry
-			.insert_source("ArticleLayout", "<article><Slot/></article>")
+			.insert_source("ArticleLayout", "<article><slot/></article>")
 			.unwrap();
 		world.insert_resource(registry);
 		let root = world

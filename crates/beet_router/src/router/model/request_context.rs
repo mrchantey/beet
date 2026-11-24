@@ -4,7 +4,7 @@
 //! [`route::new`](RequestContext::route), the [`router`](RequestContext::router) that
 //! owns its [`RouteTree`](crate::prelude::RouteTree), and the
 //! [`content`](RequestContext::content) entity holding the rendered body. The
-//! layout is built *detached* (the content is transcluded into a `<Slot>` by a
+//! layout is built *detached* (the content is transcluded into a `<slot>` by a
 //! `Portal`, never reparented), so a layout widget has no `ChildOf` path back to
 //! any of them. The layout middleware resolves them once and threads them here,
 //! letting each widget do a direct read instead of re-deriving facts by a walk.

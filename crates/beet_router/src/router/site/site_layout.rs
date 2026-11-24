@@ -48,7 +48,7 @@ use beet_ui::prelude::Reset;
 ///   so a site adds links without restating the header.
 /// - `sidebar`: defaults to the route-tree [`RouteSidebar`] (`home=false`).
 /// - `footer`: defaults to the library [`Footer`].
-/// - the default `<Slot/>` inside `<main>` holds the page body, transcluded by
+/// - the default `<slot/>` inside `<main>` holds the page body, transcluded by
 ///   the layout middleware.
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so a
@@ -94,27 +94,27 @@ pub fn SiteLayout(
 			<RouteHead>
 				{html_head}
 				{live_reload}
-				<Slot name="head"/>
+				<slot name="head"/>
 			</RouteHead>
 			<body {body_classes}>
-				<Slot name="header">
+				<slot name="header">
 					<Header>
 						<MenuButton slot="leading"/>
-						<Slot name="nav" slot="nav"/>
+						<slot name="nav" slot="nav"/>
 						<RepositoryLink slot="nav"/>
 					</Header>
-				</Slot>
+				</slot>
 				<div {Classes::new([classes::CONTAINER])}>
-					<Slot name="sidebar">
+					<slot name="sidebar">
 						<RouteSidebar home=false/>
-					</Slot>
+					</slot>
 					<main>
-						<Slot/>
+						<slot/>
 					</main>
 				</div>
-				<Slot name="footer">
+				<slot name="footer">
 					<Footer/>
-				</Slot>
+				</slot>
 			</body>
 		</html>
 	}
@@ -284,7 +284,7 @@ mod test {
 			.get_resource_or_init::<BsxTemplateRegistry>()
 			.insert_source(
 				"HeadLayout",
-				"<html><RouteHead/><body><Slot/></body></html>",
+				"<html><RouteHead/><body><slot/></body></html>",
 			)
 			.unwrap();
 		let root = spawn_syndication_router(&mut world, rsx! {

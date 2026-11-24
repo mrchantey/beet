@@ -1131,7 +1131,7 @@ mod test {
 			rsx! {
 				<html>
 					<head><meta charset="utf-8"/></head>
-					<body><main><Slot/></main></body>
+					<body><main><slot/></main></body>
 				</html>
 			}
 		}

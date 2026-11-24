@@ -26,14 +26,14 @@ pub fn Header(
 	rsx! {
 		<header {Classes::new([classes::APP_BAR, classes::PRINT_HIDDEN])}>
 			<div {Classes::new([classes::APP_BAR_LEADING])}>
-				<Slot name="leading"/>
+				<slot name="leading"/>
 				<a {Classes::new(["app-bar-title"])} href={home_route}>
 					{site_title(&title)}
 				</a>
 			</div>
-			<Slot/>
+			<slot/>
 			<nav {Classes::new([classes::APP_BAR_NAV])}>
-				<Slot name="nav"/>
+				<slot name="nav"/>
 			</nav>
 		</header>
 	}

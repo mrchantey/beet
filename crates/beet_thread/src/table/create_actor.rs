@@ -27,8 +27,8 @@ pub fn CreateActor(
 		}
 		None => Actor::new(name, kind),
 	};
-	// forward seed posts / tools as children of the actor entity via `<Slot/>`
-	rsx! { <span {actor}><Slot/></span> }
+	// forward seed posts / tools as children of the actor entity via `<slot/>`
+	rsx! { <span {actor}><slot/></span> }
 }
 
 #[cfg(test)]
@@ -221,7 +221,7 @@ line three'/>
 
 		// the root carries `Thread` via a spread on a lowercase element (which
 		// nests children natively); actors are `<CreateActor>` tags that forward
-		// their seed/tool children through a `<Slot/>`.
+		// their seed/tool children through a `<slot/>`.
 		let source = r#"
 <Thread>
 	<CreateActor name="System" kind="System">

@@ -78,19 +78,24 @@
 //! (`{(Slider{value:3}, @comp:Slider.value)}`), pairing a component insert with
 //! a binding on the same entity.
 //!
-//! ## Scripts and templates, in HTML's words
+//! ## HTML's words and beet's
 //!
 //! Beet's powers ride HTML's own vocabulary or a component, never a parallel
-//! tag. A script beet runs is `<script {RunScript}>`, against the world under
-//! the grant a sibling spread gives it (`beet_action`'s `ScriptConfig`); a
-//! bare `<script>` stays page content the HTML renderer emits for the browser.
-//! An event handler is `<script {OnEvent{event:"click"}}>`, a child of the
-//! element it answers for, which the plugin owning the event runs with the
-//! event target bound to `target`: no mirror is lowered onto the host, the
-//! script writing the real document through the same ancestor-document walk a
-//! display binding reads through. A prefab is `<template>`: an element
-//! carrying [`Prefab`], its subtree held inert as the item a
-//! [`ReactiveChildren`] clones per row.
+//! tag, and one rule tells the two apart: a bare attribute or tag means what
+//! HTML means by it, and `bx:` marks beet's own meaning. A prefab is
+//! `<template>`, an element carrying [`Prefab`] whose subtree is held inert
+//! as the item a [`ReactiveChildren`] clones per row. A slot is HTML's
+//! `<slot>` and `slot="name"` (`<Slot>` is refused with the spelling to use):
+//! a child's `slot` routes it into a `<slot>` in its parent's subtree, and one
+//! whose parent offers no slots at all stays HTML's attribute. A script beet
+//! runs is `<script bx:run>`, run by beet rather than by the browser on load,
+//! under the grant a sibling spread gives it (`beet_action`'s
+//! `ScriptConfig`); a bare `<script>` stays page content the HTML renderer
+//! emits for the browser. An event handler is `<script bx:event="click">`, a
+//! child of the element it answers for, which the plugin owning the event
+//! runs with the event target bound to `target`: no mirror is lowered onto the
+//! host, the script writing the real document through the same
+//! ancestor-document walk a display binding reads through.
 //!
 //! ## Directives
 //!
@@ -98,22 +103,26 @@
 //! between parsing and the build ([`BsxDirectives`]), so the scene, a save and
 //! the runtime never learn it existed. The line between the two kinds of
 //! shorthand is the world: a directive needs none and runs as a document
-//! lowers, where a `#[template]` needs one and runs at spawn. The standard set:
+//! lowers, where a `#[template]` needs one and runs at spawn. A rewrite's
+//! output is rewritten in turn, so sugar may stand on sugar. The standard
+//! set:
 //!
 //! ```text
 //! bx:scope="user"                    {DocumentScope{path:"user"}}
 //! bx:for="entries" bx:key="name"     {(ReactiveChildren{key:"name"}, @doc:entries)}
 //!                                    with the children wrapped in a <template>
-//! bx:onclick="src"                   <script {OnEvent{event:"click"}}>src</script>,
-//!                                    one `bx:on<event>` directive for every event
 //! bx:style="decls"                   {InlineStyle{declarations:"decls"}}
+//! <script bx:run>                    <script {RunScript}>
+//! <script bx:event="click">          <script {OnEvent{event:"click"}}>
+//! bx:onclick="src"                   a child <script bx:event="click">src</script>,
+//!                                    one `bx:on<event>` directive for every event
 //! ```
 //!
 //! A downstream directive is a [`BsxDirective`] installed like any registry
 //! entry, `app.install(MyDirective)`, landing in the set [`DocParsers`]
 //! carries and shadowing an earlier one for the keys it matches. A `bx:` key
 //! nothing matches refuses the document. `bx:ref`, `bx:cfg` and `bx:schema`
-//! are still read by the build walk itself, and `slot` is HTML's own.
+//! are still read by the build walk itself.
 //!
 //! ```
 //! use beet_core::prelude::*;
@@ -150,7 +159,7 @@
 //! patches the live resource's named fields, producing no markup), or a
 //! `<path::to::X>` `.bsx` template from the [`BsxTemplateRegistry`]. A `.bsx`
 //! template's tag attributes materialize into its props store (bound in the
-//! body via `@prop:`), caller content composes through its `<Slot/>`, and the
+//! body via `@prop:`), caller content composes through its `<slot/>`, and the
 //! entity it builds into records its key as a [`TemplateInstance`]:
 //!
 //! ```
@@ -159,7 +168,7 @@
 //! let mut world = (TemplatePlugin, DocumentPlugin).into_world();
 //! let mut registry = BsxTemplateRegistry::default();
 //! registry
-//!     .insert_source("Card", "<section><h2>{@prop:title}</h2><Slot/></section>")
+//!     .insert_source("Card", "<section><h2>{@prop:title}</h2><slot/></section>")
 //!     .unwrap();
 //!
 //! let nodes = BsxNode::parse_document(

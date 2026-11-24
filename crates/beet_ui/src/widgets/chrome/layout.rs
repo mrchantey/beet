@@ -14,10 +14,10 @@ pub fn HtmlDocument() -> impl Bundle {
 	rsx! {
 		<html lang="en">
 			<Head>
-				<Slot name="head"/>
+				<slot name="head"/>
 			</Head>
 			<body>
-				<Slot/>
+				<slot/>
 			</body>
 		</html>
 	}
@@ -31,15 +31,15 @@ pub fn HtmlDocument() -> impl Bundle {
 pub fn PageLayout() -> impl Bundle {
 	rsx! {
 		<HtmlDocument>
-			<Slot name="head" slot="head"/>
+			<slot name="head" slot="head"/>
 			<div {Classes::new([classes::PAGE])}>
 				<Header>
-					<Slot name="header"/>
-					<Slot name="header-nav" slot="nav"/>
+					<slot name="header"/>
+					<slot name="header-nav" slot="nav"/>
 				</Header>
-				<Slot/>
+				<slot/>
 				<Footer>
-					<Slot name="footer"/>
+					<slot name="footer"/>
 				</Footer>
 			</div>
 		</HtmlDocument>
@@ -61,12 +61,12 @@ pub fn PageBreak() -> impl Bundle {
 pub fn ContentLayout() -> impl Bundle {
 	rsx! {
 		<PageLayout>
-			<Slot name="head" slot="head"/>
-			<Slot name="header" slot="header"/>
-			<Slot name="header-nav" slot="header-nav"/>
-			<Slot name="footer" slot="footer"/>
+			<slot name="head" slot="head"/>
+			<slot name="header" slot="header"/>
+			<slot name="header-nav" slot="header-nav"/>
+			<slot name="footer" slot="footer"/>
 			<main {Classes::new(["content-main"])}>
-				<Slot/>
+				<slot/>
 			</main>
 		</PageLayout>
 	}

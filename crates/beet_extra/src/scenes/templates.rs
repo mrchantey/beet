@@ -114,7 +114,7 @@ pub fn UiTerminal(
 /// The animated fox agent: loads `misc/fox.glb` and its idle (`Animation0`) + walk
 /// (`Animation1`) `AnimationGraph` through the deferred [`BuildAssets`] path, so
 /// `Ready` waits for every clip and the glb scene before the tree runs.
-/// Hosts the behaviour tree as children via `<Slot/>` and carries the
+/// Hosts the behaviour tree as children via `<slot/>` and carries the
 /// [`AnimationGraphClips`] those children resolve clips against
 /// (`<PlayAnimation clip="misc/fox.glb#Animation1"/>`). A `.bsx` authors
 /// `<Foxie scale=0.1>`; the scene supplies the steer target as a spread
@@ -129,7 +129,7 @@ pub fn Foxie(
 		"misc/fox.glb#Animation0".to_string(),
 		"misc/fox.glb#Animation1".to_string(),
 	];
-	// the `<span>` hosts the behaviour-tree `<Slot/>` children; a Rust `#[template]`
+	// the `<span>` hosts the behaviour-tree `<slot/>` children; a Rust `#[template]`
 	// has no neutral host element (`<Fragment>` is `.bsx`-only), and the inert
 	// `Element` is harmless on a render entity.
 	rsx! {
@@ -137,7 +137,7 @@ pub fn Foxie(
 			WorldAssetRoot(assets.load::<WorldAsset>("misc/fox.glb#Scene0")),
 			Transform::from_scale(Vec3::splat(scale)),
 			AnimationGraphClips::build(&clips, &mut graphs, &mut assets),
-		)}><Slot/></span>
+		)}><slot/></span>
 	}
 }
 
@@ -148,7 +148,7 @@ pub fn Foxie(
 /// alongside the slot, so it emits no wrapper element.
 #[template]
 pub fn Scene3d() -> impl Bundle {
-	rsx! { <span {(Transform::default(), Visibility::default())}><Slot/></span> }
+	rsx! { <span {(Transform::default(), Visibility::default())}><slot/></span> }
 }
 
 /// A `Camera3d` placed at `x`/`y`/`z` looking at the origin, eg
@@ -195,7 +195,7 @@ pub fn IkTarget(
 /// lacks), kept separate so a 2d `.bsx` reads in its own dimension.
 #[template]
 pub fn Scene2d() -> impl Bundle {
-	rsx! { <span {(Transform::default(), Visibility::default())}><Slot/></span> }
+	rsx! { <span {(Transform::default(), Visibility::default())}><slot/></span> }
 }
 
 /// Loads an image by path into a [`Sprite`], the 2d counterpart of [`WorldScene`],

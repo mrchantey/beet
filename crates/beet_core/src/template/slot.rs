@@ -1,6 +1,6 @@
 //! Marker-based slot resolution, run synchronously inside the build walk.
 //!
-//! A `<Slot>` placeholder lowers to a [`SlotTarget`] marker; content routed to
+//! A `<slot>` placeholder lowers to a [`SlotTarget`] marker; content routed to
 //! a slot lowers to a [`SlotChild`] marker. [`resolve_slots`] matches children
 //! to targets positionally over an already-built subtree, identically for the
 //! `rsx!` macro, the BSX parser, and serde, because all three produce the same
@@ -16,8 +16,10 @@
 //!   among its parent's children and the placeholder entity is despawned.
 //! - Fallback children are used when no content is supplied, removed otherwise.
 //! - Unconsumed children are a [`TemplateError`], naming the missing slot and
-//!   listing available targets.
-//! - Astro-style transfers compose through levels: a [`SlotTarget`] that is also
+//!   listing available targets, except a named element whose scope offers no
+//!   slots at all: it keeps `slot="name"` as HTML's attribute, as a browser
+//!   leaves the light content of a host with no shadow root.
+//! - Transfers compose through levels: a [`SlotTarget`] that is also
 //!   a [`SlotChild`] re-opens as a target once filled, persisting (rather than
 //!   collapsing) so deeper content flows.
 //! - Resolution recurses into nested templates.
@@ -27,7 +29,7 @@ use crate::prelude::*;
 /// The default slot name, used when a [`SlotTarget`] or [`SlotChild`] is unnamed.
 pub(crate) const DEFAULT_SLOT: &str = "default";
 
-/// A `<Slot>` placeholder in a built subtree.
+/// A `<slot>` placeholder in a built subtree.
 ///
 /// Carries an optional slot name (the default slot when unnamed). Its children
 /// are fallback content, used only when no [`SlotChild`] is routed to it.
@@ -102,8 +104,9 @@ pub(crate) fn resolve_slots(world: &mut World, root: Entity) -> Result {
 	loop {
 		let plan = world.run_system_cached_with(plan_slots, root)?;
 		// nothing matched this pass: the resolution is stable, so leftover content
-		// is genuinely unconsumed.
+		// is genuinely unconsumed, unless its scope offered no slots at all
 		if plan.wirings.is_empty() {
+			pass_through(world, &plan.passthrough);
 			return report_unmatched(plan);
 		}
 		apply_wirings(world, plan.wirings);
@@ -119,6 +122,22 @@ fn apply_wirings(world: &mut World, wirings: Vec<SlotWiring>) {
 	} in wirings
 	{
 		splice_into_target(world, target, content, is_relay);
+	}
+}
+
+/// Returns each named `slot` whose scope offered no slots at all to HTML: the
+/// marker is dropped and the element carries `slot="name"` as the attribute it
+/// was written as, as a browser leaves light content of a host with no shadow
+/// root. Within a scope that has slots, an unmatched name stays an error, so a
+/// typo is still caught.
+fn pass_through(world: &mut World, passthrough: &[(Entity, SmolStr)]) {
+	for (content, name) in passthrough {
+		world.entity_mut(*content).remove::<SlotChild>();
+		world.spawn((
+			AttributeOf::new(*content),
+			Attribute::new("slot"),
+			Value::Str(name.clone()),
+		));
 	}
 }
 
@@ -151,6 +170,9 @@ struct SlotWiring {
 #[derive(Default)]
 struct SlotPlan {
 	wirings: Vec<SlotWiring>,
+	/// Named elements whose scope offered no slots, returned to HTML as their
+	/// `slot` attribute ([`pass_through`]).
+	passthrough: Vec<(Entity, SmolStr)>,
 	/// Unconsumed `(slot_name, available_targets)` per composition scope.
 	unmatched: Vec<UnmatchedSlot>,
 }
@@ -170,6 +192,7 @@ fn plan_slots(
 	parents: Query<&ChildOf>,
 	slot_children: Query<&SlotChild>,
 	slot_targets: Query<&SlotTarget>,
+	elements: Query<(), With<Element>>,
 ) -> SlotPlan {
 	// composition scopes: the distinct parents of routed `SlotChild` content.
 	let scopes: HashSet<Entity> = children
@@ -186,6 +209,7 @@ fn plan_slots(
 			&children,
 			&slot_children,
 			&slot_targets,
+			&elements,
 			&mut plan,
 		);
 	}
@@ -199,6 +223,7 @@ fn plan_scope(
 	children: &Query<&Children>,
 	slot_children: &Query<&SlotChild>,
 	slot_targets: &Query<&SlotTarget>,
+	elements: &Query<(), With<Element>>,
 	plan: &mut SlotPlan,
 ) {
 	// sources: this scope's own direct content, in document order.
@@ -287,9 +312,17 @@ fn plan_scope(
 
 	// any content left over is an error, except a forwarding relay (a `SlotChild`
 	// that is itself a `SlotTarget`): its target resolves in a deeper scope, so an
-	// unmatched relay is a pass-through, not unconsumed content.
+	// unmatched relay is a pass-through, not unconsumed content. A named element
+	// in a scope offering no slots at all is HTML's `slot` attribute, not beet's.
 	for (name, content) in sources {
 		if slot_targets.contains(content) {
+			continue;
+		}
+		let named = slot_children
+			.get(content)
+			.is_ok_and(|slot| slot.name.is_some());
+		if targets.is_empty() && named && elements.contains(content) {
+			plan.passthrough.push((content, name));
 			continue;
 		}
 		plan.unmatched.push(UnmatchedSlot {
@@ -339,7 +372,7 @@ fn collect_targets(
 /// The fallback children are dropped and each content entity loses its
 /// [`SlotChild`] marker. For a structural target (`is_relay` false) the content
 /// takes the target's exact slot among its parent's children and the target
-/// entity is despawned, so a `<Slot>` leaves no wrapper. A relay target
+/// entity is despawned, so a `<slot>` leaves no wrapper. A relay target
 /// (`is_relay` true, a [`SlotTarget`] that is also a [`SlotChild`]) instead keeps
 /// its identity and adopts the content as children, losing only its
 /// [`SlotTarget`] marker, so its [`SlotChild`] side forwards the content into a
@@ -566,6 +599,34 @@ mod test {
 		err.to_string().xpect_contains("default");
 	}
 
+	/// A named element whose scope offers no slots at all is HTML's `slot`,
+	/// left on it as the attribute it was written as.
+	#[crate::test]
+	fn a_scope_with_no_slots_keeps_the_attribute() {
+		let mut world = World::new();
+		let scope = node(&mut world, "scope");
+		let span = world
+			.spawn((
+				Element::new("span"),
+				SlotChild::named("header"),
+				ChildOf(scope),
+			))
+			.id();
+		resolve_slots(&mut world, scope).unwrap();
+		world.entity(span).contains::<SlotChild>().xpect_false();
+		let attribute = world.entity(span).get::<Attributes>().unwrap()[0];
+		world
+			.get::<Attribute>(attribute)
+			.unwrap()
+			.clone()
+			.xpect_eq(Attribute::new("slot"));
+		world
+			.get::<Value>(attribute)
+			.cloned()
+			.unwrap()
+			.xpect_eq(Value::Str("header".into()));
+	}
+
 	#[crate::test]
 	fn no_slot_stealing_between_siblings() {
 		let mut world = World::new();
@@ -597,7 +658,7 @@ mod test {
 
 	#[crate::test]
 	fn slot_child_of_root_lands_as_direct_children() {
-		// the `<Route path="x"><Foo/></Route>` shape: a `<Slot>` as a direct child
+		// the `<Route path="x"><Foo/></Route>` shape: a `<slot>` as a direct child
 		// of a root must place the caller content as direct children of that root,
 		// so a child-sequenced consumer reads them without an intervening fragment.
 		let mut world = World::new();

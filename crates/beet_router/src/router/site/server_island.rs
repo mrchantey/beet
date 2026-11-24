@@ -304,7 +304,7 @@ mod test {
 	fn IslandShell() -> impl Bundle {
 		rsx! {
 			<html><body>
-				<main><Slot/></main>
+				<main><slot/></main>
 				<ServerIsland name="where" content={|| rsx! { <PagePath/> }}/>
 			</body></html>
 		}

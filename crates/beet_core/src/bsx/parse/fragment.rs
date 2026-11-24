@@ -11,6 +11,7 @@ use super::cursor::Cursor;
 use super::parse::VOID_ELEMENTS;
 use super::parse::is_attr_key_char;
 use super::parse::is_tag_char;
+use super::parse::refuse_slot_tag;
 use super::parse::take_braced;
 use super::value::*;
 use crate::prelude::*;
@@ -203,6 +204,7 @@ fn parse_fragment_open<'a>(
 	if tag.is_empty() {
 		bevybail!("expected a tag name after `<`");
 	}
+	refuse_slot_tag(tag)?;
 	let attributes = parse_fragment_attributes(cursor)?;
 	cursor.skip_ws();
 	// a `<br/>` self-closes; otherwise consume `>` and let the caller treat void

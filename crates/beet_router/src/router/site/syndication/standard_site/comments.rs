@@ -321,7 +321,7 @@ mod test {
 			.get_resource_or_init::<BsxTemplateRegistry>()
 			.insert_source(
 				"CommentsLayout",
-				r#"<html><body><main><Slot/></main>
+				r#"<html><body><main><slot/></main>
 				<ServerIsland name="comments">
 					<StandardSiteComments/>
 					<StandardSiteReplyLink slot="fallback"/>

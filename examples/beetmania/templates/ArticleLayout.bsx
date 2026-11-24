@@ -10,7 +10,7 @@ stays cacheable; its fallback, shown until the island swaps in, is the link to
 reply. A post with no announcement renders neither.
 -->
 <ArticleHeader/>
-<Slot/>
+<slot/>
 <ServerIsland name="comments" {CacheHeaders{edge_max_age: "60s"}}>
 	<StandardSiteComments/>
 	<StandardSiteReplyLink slot="fallback"/>

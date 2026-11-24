@@ -185,7 +185,7 @@ pub(crate) fn clean_site() -> TempDir {
 		),
 		(
 			"templates/Layout.bsx",
-			"<html lang=\"en\"><RouteHead/><body><main><Slot/></main></body></html>",
+			"<html lang=\"en\"><RouteHead/><body><main><slot/></main></body></html>",
 		),
 		(
 			"routes/index.md",

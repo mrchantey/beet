@@ -166,7 +166,7 @@ pub fn Select(
 	let class = variant.class();
 	rsx! {
 		<select {Classes::new([classes::SELECT, class])} {field} {write} {Attribute::bundle_option("name", name)}>
-			<Slot/>
+			<slot/>
 		</select>
 	}
 }
@@ -180,7 +180,7 @@ pub fn Select(
 pub fn Form(name: Option<String>, field: Option<FieldRef>) -> impl Bundle {
 	rsx! {
 		<form {field} {Attribute::bundle_option("name", name)}>
-			<Slot/>
+			<slot/>
 		</form>
 	}
 }

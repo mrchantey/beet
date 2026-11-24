@@ -63,10 +63,10 @@ pub fn AppShell(
 		<html lang="en">
 			<head>
 				{html_head}
-				<Slot name="head"/>
+				<slot name="head"/>
 			</head>
 			<body {(body_classes, page_column())}>
-				<Slot/>
+				<slot/>
 			</body>
 		</html>
 	}

@@ -20,7 +20,7 @@ swaps in and for good with scripts off, is the link to reply on Bluesky. A post
 with no announcement renders neither.
 -->
 <ArticleHeader/>
-<Slot/>
+<slot/>
 <ServerIsland name="comments" {CacheHeaders{edge_max_age: "60s"}}>
 	<StandardSiteComments/>
 	<StandardSiteReplyLink slot="fallback"/>

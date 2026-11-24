@@ -267,8 +267,8 @@ fn template_event_attaches_observer() {
 fn LayoutPanel() -> impl Bundle {
 	rsx! {
 		<section>
-			<header><Slot name="header"/></header>
-			<div><Slot/></div>
+			<header><slot name="header"/></header>
+			<div><slot/></div>
 		</section>
 	}
 }
@@ -297,8 +297,8 @@ fn named_and_default_slots() {
 fn FallbackPanel() -> impl Bundle {
 	rsx! {
 		<section>
-			<header><Slot name="header">"Default Title"</Slot></header>
-			<div><Slot>"Default Body"</Slot></div>
+			<header><slot name="header">"Default Title"</slot></header>
+			<div><slot>"Default Body"</slot></div>
 		</section>
 	}
 }
@@ -358,7 +358,7 @@ fn slot_children_preserve_order() {
 // another widget's named slot.
 #[template]
 fn Span() -> impl Bundle {
-	rsx! { <span><Slot/></span> }
+	rsx! { <span><slot/></span> }
 }
 
 #[beet_core::test]

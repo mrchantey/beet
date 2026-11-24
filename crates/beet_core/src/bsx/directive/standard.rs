@@ -8,8 +8,10 @@
 //! bx:scope="user"                      {DocumentScope{path:"user"}}
 //! bx:for="entries" bx:key="name"       {(ReactiveChildren{key:"name"}, @doc:entries)},
 //!                                      the children wrapped in a <template>
-//! bx:onclick="src"                     a child <script {OnEvent{event:"click"}}>src</script>
 //! bx:style="decls"                     {InlineStyle{declarations:"decls"}}
+//! <script bx:run>                      <script {RunScript}>
+//! <script bx:event="click">            <script {OnEvent{event:"click"}}>
+//! bx:onclick="src"                     a child <script bx:event="click">src</script>
 //! ```
 use crate::prelude::*;
 
@@ -98,10 +100,74 @@ impl Installer for ForDirective {
 	fn install(self, app: &mut App) { BsxDirectives::register_on(app, self); }
 }
 
-/// `bx:on<event>="src"` is a child `<script {OnEvent{event:"<event>"}}>`
-/// holding `src`, one directive for every event: the event name is data, so
-/// a new event needs no rebuild, and the plugin owning the event runs the
-/// script when it reaches the element.
+/// `<script bx:run>` is `<script {RunScript}>`: a script run by beet, under
+/// the grant a sibling `ScriptConfig` spread gives it, as opposed to a bare
+/// `<script>` the browser runs on load. Only a `<script>` carries it, the one
+/// element whose body is raw text.
+#[derive(Debug, Default, Clone)]
+pub struct RunDirective;
+
+impl BsxDirective for RunDirective {
+	fn pattern(&self) -> SmolStr { "bx:run".into() }
+
+	fn matches(&self, key: &str) -> bool { key == "bx:run" }
+
+	fn rewrite(&self, key: &str, element: &mut BsxElement) -> Result {
+		require_script(key, element)?;
+		match element.take_attribute(key) {
+			Some(AttrValue::Flag) => {}
+			_ => bevybail!("`{key}` is a flag, ie `<script {key}>`"),
+		}
+		element.push_spread(SpreadItem::component("RunScript", []));
+		Ok(())
+	}
+}
+
+impl Installer for RunDirective {
+	fn install(self, app: &mut App) { BsxDirectives::register_on(app, self); }
+}
+
+/// `<script bx:event="click">` is `<script {OnEvent{event:"click"}}>`: a
+/// script beet runs when the event reaches the element it is a child of.
+/// `OnEvent` requires `RunScript`, so no `bx:run` is needed beside it.
+#[derive(Debug, Default, Clone)]
+pub struct EventDirective;
+
+impl BsxDirective for EventDirective {
+	fn pattern(&self) -> SmolStr { "bx:event".into() }
+
+	fn matches(&self, key: &str) -> bool { key == "bx:event" }
+
+	fn rewrite(&self, key: &str, element: &mut BsxElement) -> Result {
+		require_script(key, element)?;
+		let event = element.take_str_attribute(key)?;
+		element.push_spread(SpreadItem::component("OnEvent", [(
+			"event",
+			DataLiteral::Scalar(Value::new(event)),
+		)]));
+		Ok(())
+	}
+}
+
+impl Installer for EventDirective {
+	fn install(self, app: &mut App) { BsxDirectives::register_on(app, self); }
+}
+
+/// Refuse a script directive on any element but `<script>`, the one whose
+/// body reads as raw text, so a script's braces never parse as BSX.
+fn require_script(key: &str, element: &BsxElement) -> Result {
+	match element.tag.as_str() {
+		"script" => Ok(()),
+		tag => bevybail!(
+			"`{key}` declares a `<script>` beet runs, and is on `<{tag}>`"
+		),
+	}
+}
+
+/// `bx:on<event>="src"` is a child `<script bx:event="<event>">` holding
+/// `src`, one directive for every event: the event name is data, so a new
+/// event needs no rebuild, and the plugin owning the event runs the script
+/// when it reaches the element.
 #[derive(Debug, Default, Clone)]
 pub struct OnEventDirective;
 
@@ -128,12 +194,10 @@ impl BsxDirective for OnEventDirective {
 		element.self_closing = false;
 		element.children.push(BsxNode::Element(BsxElement::new(
 			"script",
-			vec![BsxAttribute::spread(SpreadExpr::Named(
-				NamedLiteral::component("OnEvent", [(
-					"event",
-					DataLiteral::Scalar(Value::new(event)),
-				)]),
-			))],
+			vec![BsxAttribute {
+				key: "bx:event".into(),
+				value: AttrValue::Str(event.into()),
+			}],
 			vec![BsxNode::Text(source)],
 		)));
 		Ok(())
@@ -209,6 +273,32 @@ mod test {
 		rewritten(r#"<button bx:onclick="go()">+</button>"#).xpect_eq(parsed(
 			r#"<button>+<script {OnEvent{event:"click"}}>go()</script></button>"#,
 		));
+	}
+
+	#[crate::test]
+	fn run_is_a_run_script() {
+		rewritten(r#"<script bx:run>go()</script>"#)
+			.xpect_eq(parsed(r#"<script {RunScript}>go()</script>"#));
+	}
+
+	#[crate::test]
+	fn event_is_an_on_event() {
+		rewritten(r#"<script bx:event="click">go()</script>"#).xpect_eq(
+			parsed(r#"<script {OnEvent{event:"click"}}>go()</script>"#),
+		);
+	}
+
+	/// A script directive is refused on any element but `<script>`.
+	#[crate::test]
+	fn script_directives_need_a_script() {
+		for markup in [r#"<div bx:run/>"#, r#"<div bx:event="click"/>"#] {
+			let mut nodes = parsed(markup);
+			BsxDirectives::default()
+				.rewrite(&mut nodes)
+				.unwrap_err()
+				.to_string()
+				.xpect_contains("is on `<div>`");
+		}
 	}
 
 	#[crate::test]

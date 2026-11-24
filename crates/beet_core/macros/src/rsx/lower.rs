@@ -12,7 +12,7 @@
 //!   inserted onto the entity, also through `IntoSnippetBundle`.
 //! - An attribute or text `{..}` is a **value**: a Rust expression, lifted via
 //!   `IntoSnippet`.
-//! - `<Slot/>` lowers to a `SlotTarget` marker; `slot="x"` on a
+//! - `<slot/>` lowers to a `SlotTarget` marker; `slot="x"` on a
 //!   node lowers to a `SlotChild` marker. The walker resolves them.
 //! - `on*` events lower to observers, taking a rust handler expression. A
 //!   `bx:on<event>` is the BSX seam's JavaScript half and is not lowered here; in
@@ -62,12 +62,19 @@ fn tokenize_node(node: &RsxNode) -> TokenStream {
 	}
 }
 
-/// Tokenize an element, dispatching on tag kind: `<Slot>` -> slot target,
-/// uppercase -> component/template, lowercase -> HTML element.
+/// Tokenize an element, dispatching on tag kind: `<slot>` -> slot target,
+/// uppercase -> component/template, lowercase -> HTML element. `<Slot>` is
+/// refused with the spelling to use, as the BSX parser refuses it.
 fn tokenize_element(el: &RsxElement) -> TokenStream {
 	let tag = el.name.value();
-	if tag == "Slot" {
+	if tag == "slot" {
 		tokenize_slot(el)
+	} else if tag == "Slot" {
+		syn::Error::new(
+			el.name.span(),
+			"`<Slot>` is spelled `<slot>`, HTML's own element",
+		)
+		.into_compile_error()
 	} else if tag.starts_with(|ch: char| ch.is_uppercase()) {
 		tokenize_component(el, &tag)
 	} else {
@@ -75,11 +82,11 @@ fn tokenize_element(el: &RsxElement) -> TokenStream {
 	}
 }
 
-/// Lower a `<Slot/>` placeholder to a `SlotTarget` marker. `<Slot name="x"/>`
+/// Lower a `<slot/>` placeholder to a `SlotTarget` marker. `<slot name="x"/>`
 /// targets the named slot; children are the fallback rendered when the caller
 /// supplies no matching content (the walker drops them otherwise).
 ///
-/// An Astro-style transfer `<Slot name="x" slot="y"/>`
+/// An Astro-style transfer `<slot name="x" slot="y"/>`
 /// forwards content received in this template's `x` slot into the `y` slot of
 /// the enclosing template: it lowers to both a `SlotTarget` and a `SlotChild`,
 /// which the walker re-opens as it composes.
@@ -110,7 +117,7 @@ fn tokenize_slot(el: &RsxElement) -> TokenStream {
 	}
 }
 
-/// Read a `<Slot name="x"/>`'s `name` attribute (string literals only).
+/// Read a `<slot name="x"/>`'s `name` attribute (string literals only).
 fn slot_name_attr(el: &RsxElement) -> Option<alloc::string::String> {
 	el.attributes.iter().find_map(|attr| {
 		let RsxAttr::Keyed(attr) = attr else {

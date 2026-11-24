@@ -1184,7 +1184,7 @@ mod test {
 			("templates/Styles.bsx", "<widgets::Swatch/>"),
 			("templates/widgets/Swatch.bsx", "<i class=\"a\"/>"),
 			("templates/widgets/Badge.bsx", "<b/>"),
-			("templates/Layout.bsx", "<html><Slot/></html>"),
+			("templates/Layout.bsx", "<html><slot/></html>"),
 			("routes/index.md", "# Home"),
 		];
 		for (path, source) in files {

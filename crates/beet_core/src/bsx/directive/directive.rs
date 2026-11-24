@@ -51,7 +51,9 @@ impl Default for BsxDirectives {
 			.register(ScopeDirective)
 			.register(ForDirective)
 			.register(OnEventDirective)
-			.register(StyleDirective);
+			.register(StyleDirective)
+			.register(RunDirective)
+			.register(EventDirective);
 		directives
 	}
 }

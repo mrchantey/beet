@@ -25,13 +25,13 @@ pub fn Table(#[prop] vertical_lines: bool) -> impl Bundle {
 		<div {Classes::new([classes::TABLE_SCROLL])}>
 			<table {class_set}>
 				<thead>
-					<Slot name="head"/>
+					<slot name="head"/>
 				</thead>
 				<tbody>
-					<Slot/>
+					<slot/>
 				</tbody>
 				<tfoot>
-					<Slot name="foot"/>
+					<slot name="foot"/>
 				</tfoot>
 			</table>
 		</div>

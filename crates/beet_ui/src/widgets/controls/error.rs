@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 #[template]
 pub fn Error() -> impl Bundle {
 	rsx! {
-		<div {Classes::new([classes::ERROR_BOX])}><Slot/></div>
+		<div {Classes::new([classes::ERROR_BOX])}><slot/></div>
 	}
 }
 

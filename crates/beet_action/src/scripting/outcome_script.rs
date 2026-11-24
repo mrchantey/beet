@@ -23,7 +23,7 @@ use serde::de::DeserializeOwned;
 /// places it in a larger behaviour:
 ///
 /// ```bsx
-/// <script {RunScript}>
+/// <script bx:run>
 ///   const [entry] = await world.entities('bevy_ecs::name::Name');
 ///   const name = await world.get(entry, 'bevy_ecs::name::Name');
 ///   await world.spawn({ 'bevy_ecs::name::Name': name + ' (copy)' });
@@ -35,7 +35,7 @@ use serde::de::DeserializeOwned;
 /// order, a `spawn` resolves to a real entity id usable by the next line, and a
 /// refused call rejects the promise where it was made, catchable in the script.
 /// What the script is granted rides alongside as a [`ScriptConfig`] spread,
-/// `<script {RunScript} {ScriptConfig{read:["Name"]}}>..</script>`, or
+/// `<script bx:run {ScriptConfig{read:["Name"]}}>..</script>`, or
 /// `{ScriptConfig{world:false}}` for a provably pure one.
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
@@ -138,7 +138,7 @@ mod test {
 	}
 
 	/// A `RunScript` with its source as a child is the same leaf, the shape a
-	/// markup `<script {RunScript}>` body and a javascript document take.
+	/// markup `<script bx:run>` body and a javascript document take.
 	#[beet_core::test]
 	async fn a_run_script_is_a_leaf() {
 		let mut world = test_world();
@@ -551,7 +551,7 @@ mod test {
 	/// [`AsyncPlugin`]'s `max_async_ticks_per_sync_point` drives up to 100
 	/// request/wake/poll rounds per sync point, and a bridged call is one
 	/// round, so a script making a dozen of them settles inside a single
-	/// update. Without that a `<Repeat>` over a `<script {RunScript}>` would silently
+	/// update. Without that a `<Repeat>` over a `<script bx:run>` would silently
 	/// become one world call per frame.
 	///
 	/// Embedded engine only: an out-of-process backend is bounded by its

@@ -64,7 +64,7 @@ A command line rebuilt from a request, like the one a refused deploy suggests ru
 
 ## Render geometry
 
-Rendering deliberately severs the `ChildOf` hierarchy: the document layout is built **detached** and **ephemeral** (rebuilt per request), and the route's content is spliced into the layout's `<Slot>` *by reference* (a `Portal`), never reparented. So a widget living in the layout (the sidebar, the head) has no parent path back to the route, its tree, or its content. The two trees are connected only by the explicit edges below.
+Rendering deliberately severs the `ChildOf` hierarchy: the document layout is built **detached** and **ephemeral** (rebuilt per request), and the route's content is spliced into the layout's `<slot>` *by reference* (a `Portal`), never reparented. So a widget living in the layout (the sidebar, the head) has no parent path back to the route, its tree, or its content. The two trees are connected only by the explicit edges below.
 
 ```text
 ROUTE TREE  (persistent; RouteTree component lives on the root ancestor)

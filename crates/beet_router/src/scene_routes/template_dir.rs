@@ -405,7 +405,7 @@ mod test {
 		let mut world = router_world();
 		let store = memory_fixture(&[(
 			"templates/widgets/Card.bsx",
-			"<section class=\"card\"><Slot/></section>",
+			"<section class=\"card\"><slot/></section>",
 		)])
 		.await;
 		let root = world

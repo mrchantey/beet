@@ -228,7 +228,7 @@ impl CharcellNodeData<'_> {
 /// node a resolved style: it leaves a non-element's [`BoxStyle`] at the default
 /// (the box model is element-only), and a non-element matches its nearest
 /// element's rules, so it carries a `background` only when that element
-/// declares one. A wrapper under such an element (a layout's `<Slot>` under the
+/// declares one. A wrapper under such an element (a layout's `<slot>` under the
 /// page body) therefore stays in the flow, laying its children out with the
 /// element's container props (see `LayoutBox` in `resolve_styles`). The
 /// resolved [`LayoutStyle`] is *not* a usable signal: a tag-less node resolves

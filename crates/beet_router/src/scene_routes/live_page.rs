@@ -775,7 +775,7 @@ mod test {
 		let mut world = syndication_world(Some("https://beet.org"));
 		world
 			.get_resource_or_init::<BsxTemplateRegistry>()
-			.insert_source("BareLayout", "<header>Chrome</header><Slot/>")
+			.insert_source("BareLayout", "<header>Chrome</header><slot/>")
 			.unwrap();
 		let meta = post("Rungs", "2025-07-11");
 		let route = |path: &str, body: fn() -> Snippet| {

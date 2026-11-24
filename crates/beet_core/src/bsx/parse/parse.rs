@@ -81,8 +81,21 @@ pub(super) const VOID_ELEMENTS: &[&str] = &[
 	"param", "source", "track", "wbr",
 ];
 
+/// A slot placeholder is HTML's lowercase `<slot>`: `<Slot>` would read as a
+/// type named `Slot`, which there is none of, so it is refused with the
+/// spelling to use rather than held as an unregistered tag.
+pub(super) fn refuse_slot_tag(tag: &str) -> Result {
+	match tag {
+		"Slot" => bevybail!(
+			"`<Slot>` is spelled `<slot>`, HTML's own element: `<slot/>` for \
+			 the default slot, `<slot name=\"..\"/>` for a named one"
+		),
+		_ => Ok(()),
+	}
+}
+
 /// Elements whose content is raw text up to their closing tag, HTML's own:
-/// a `<script {RunScript}>`'s body is its source.
+/// a `<script bx:run>`'s body is its source.
 const RAW_TEXT_ELEMENTS: &[&str] = &["script", "style"];
 
 impl BsxNode {
@@ -346,6 +359,9 @@ fn parse_element(
 	// building the component from the literal. The element's `tag` becomes the base
 	// segment so the registry classifies the component; the close tag matches it.
 	let (tag, tag_literal) = parse_tag_literal(cursor, tag, config)?;
+	if config.is_bsx() {
+		refuse_slot_tag(&tag)?;
+	}
 	let attributes = parse_attributes(cursor, config)?;
 	cursor.skip_ws();
 	let self_closing = cursor.eat("/>");

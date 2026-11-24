@@ -57,7 +57,7 @@ pub fn Button(variant: ButtonVariant, #[prop] action: bool) -> impl Bundle {
 		<button
 			{Classes::new([classes::BTN, variant.class()])}
 			{Attribute::bundle_option("type", action.then_some("button"))}
-		><Slot/></button>
+		><slot/></button>
 	}
 }
 
@@ -66,7 +66,7 @@ pub fn Button(variant: ButtonVariant, #[prop] action: bool) -> impl Bundle {
 pub fn IconButton(variant: ButtonVariant) -> impl Bundle {
 	rsx! {
 		<button {Classes::new([classes::BTN, classes::BTN_ICON, variant.class()])}>
-			<Slot/>
+			<slot/>
 		</button>
 	}
 }
@@ -76,7 +76,7 @@ pub fn IconButton(variant: ButtonVariant) -> impl Bundle {
 pub fn Link(#[prop] href: String, variant: ButtonVariant) -> impl Bundle {
 	rsx! {
 		<a {Classes::new([classes::BTN, variant.class()])} href={href}>
-			<Slot/>
+			<slot/>
 		</a>
 	}
 }
