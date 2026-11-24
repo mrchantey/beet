@@ -6,7 +6,7 @@ mod action_overload;
 mod agent;
 mod async_action;
 mod call_action;
-mod caller_gone;
+mod cancel_token;
 mod chain_action;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 mod command;
@@ -47,7 +47,7 @@ pub use action_context::*;
 pub use action_meta::*;
 pub use action_overload::*;
 pub use call_action::*;
-pub use caller_gone::*;
+pub use cancel_token::*;
 pub use chain_action::*;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 pub use command::*;

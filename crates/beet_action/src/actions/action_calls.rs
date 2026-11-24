@@ -11,7 +11,7 @@ use core::task::Poll;
 ///
 /// Each async call is its own entry, a task cancelled when the entry drops, so
 /// a despawn ends every call with the entity and a caller dropping its future
-/// ends its own call alone (see [`CallerGone`]). A parked call is the entity's
+/// cancels its own call alone (see [`CancelToken`]). A parked call is the entity's
 /// [`Running`], registered here by its output type so [`InterruptRun`]
 /// resolves it whatever that type is. Finished entries are pruned on each
 /// push, as [`EntityTasks`] prunes its own.
@@ -83,7 +83,7 @@ impl ActionCalls {
 	}
 
 	/// One call's work: run `fut` and deliver its output to `out_handler`,
-	/// unless the caller leaves first, which ends it at its next await.
+	/// unless the call is cancelled first, which ends it at its next await.
 	pub(crate) async fn run<Out>(
 		world: AsyncWorld,
 		fut: impl Future<Output: IntoResult<Out>>,
@@ -92,14 +92,14 @@ impl ActionCalls {
 	where
 		Out: 'static + Send,
 	{
-		let mut gone = pin!(out_handler.caller_gone().wait());
+		let mut cancelled = pin!(out_handler.cancel_token().cancelled());
 		let mut call = pin!(async move {
 			let result = fut.await.into_result();
 			out_handler.call_async(world, result).await
 		});
 		core::future::poll_fn(move |cx| {
-			// the caller leaving is checked first, so a stopped call never resumes
-			if gone.as_mut().poll(cx).is_ready() {
+			// cancellation is checked first, so a cancelled call never resumes
+			if cancelled.as_mut().poll(cx).is_ready() {
 				return Poll::Ready(Ok(()));
 			}
 			call.as_mut().poll(cx)

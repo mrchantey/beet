@@ -338,7 +338,7 @@ pub struct NoInterrupt;
 /// Descendants carrying [`NoInterrupt`] are skipped, and the target entity
 /// itself is left alone, being the one interrupting or only just started.
 /// The descendants' other tasks ([`EntityTasks`], ie a server's connections)
-/// keep running; [`all`](Self::all) cancels those too, as [`CancelTasks`]
+/// keep running; [`all`](Self::all) stops those too, as [`StopTasks`]
 /// alone does, [`NoInterrupt`] guarding actions only.
 ///
 /// Queue on an entity whose subtree should stop, ie before re-running a
@@ -354,7 +354,7 @@ pub struct NoInterrupt;
 /// ```
 #[derive(Debug, Default, Clone)]
 pub struct InterruptRun {
-	/// Whether the descendants' other tasks are cancelled too.
+	/// Whether the descendants' other tasks are stopped too.
 	tasks: bool,
 }
 
@@ -362,7 +362,7 @@ impl InterruptRun {
 	/// Interrupt the actions beneath the entity, leaving its other tasks.
 	pub fn new() -> Self { Self::default() }
 
-	/// Interrupt the actions beneath the entity and cancel its other tasks.
+	/// Interrupt the actions beneath the entity and stop its other tasks.
 	pub fn all() -> Self { Self { tasks: true } }
 }
 
@@ -387,7 +387,7 @@ impl EntityCommand for InterruptRun {
 		if self.tasks
 			&& let Ok(entity) = world.get_entity_mut(target)
 		{
-			CancelTasks.apply(entity);
+			StopTasks.apply(entity);
 		}
 		Ok(())
 	}
@@ -675,11 +675,11 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn cancel_tasks_leaves_actions() {
+	async fn stop_tasks_leaves_actions() {
 		let mut world = AsyncPlugin::world();
 		Subtree::spawn(&mut world)
 			.stop(&mut world, |entity: EntityWorldMut| -> Result {
-				CancelTasks.apply(entity);
+				StopTasks.apply(entity);
 				Ok(())
 			})
 			.await

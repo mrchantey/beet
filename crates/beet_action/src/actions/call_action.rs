@@ -93,22 +93,22 @@ where
 	Out: 'static + Send + Sync,
 {
 	let (send, recv) = OnceValue::<Result<Out>>::oneshot();
-	let (guard, caller_gone) = CallerGuard::new();
+	let (guard, cancel_token) = CancelGuard::new();
 	let mut send = InterruptOnDrop(Some(send));
 	let out_handler = OutHandler::new(move |_commands, result: Result<Out>| {
 		send.signal(result);
 		Ok(())
 	})
-	.with_caller_gone(caller_gone);
+	.with_cancel_token(cancel_token);
 	(out_handler, CallRx { recv, guard })
 }
 
 /// The caller's half of a call: awaiting it yields the output, and dropping it
-/// unresolved stops the call, its [`CallerGuard`] resolving the
-/// [`CallerGone`] the callee races against.
+/// unresolved cancels the call, its [`CancelGuard`] cancelling the
+/// [`CancelToken`] the callee races against.
 struct CallRx<Out> {
 	recv: OnceValueRx<Result<Out>>,
-	guard: CallerGuard,
+	guard: CancelGuard,
 }
 
 impl<Out> CallRx<Out> {

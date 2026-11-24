@@ -24,7 +24,7 @@
 //! twins (`queue_task` from commands) return the [`AsyncTask`] instead, for a
 //! caller that owns the task itself: a component holding it cancels the task
 //! when removed or replaced, and `detach` releases it. An entity's tasks are
-//! its [`EntityTasks`], and [`CancelTasks`] cancels a subtree's without
+//! its [`EntityTasks`], and [`StopTasks`] stops a subtree's without
 //! despawning it.
 //!
 //! # Example
@@ -661,7 +661,7 @@ impl Drop for InFlight {
 /// long-lived entity never accumulates one per task it ran. A `run_task` spawn
 /// bypasses this: its caller owns the handle.
 ///
-/// [`CancelTasks`] cancels a subtree's tasks and leaves the entities standing.
+/// [`StopTasks`] stops a subtree's tasks and leaves the entities standing.
 #[derive(Default, Component)]
 #[component(clone_behavior = Ignore)]
 pub struct EntityTasks(Vec<AsyncTask>);
@@ -688,19 +688,19 @@ impl EntityTasks {
 	/// Whether no task is still running.
 	pub fn is_empty(&self) -> bool { self.len() == 0 }
 
-	/// Cancel every task, each at its next await.
-	pub fn cancel(&mut self) { self.0.clear(); }
+	/// Stop every task, each at its next await.
+	pub fn stop(&mut self) { self.0.clear(); }
 }
 
-/// Cancels the [`EntityTasks`] of every descendant of an entity, leaving the
+/// Stops the [`EntityTasks`] of every descendant of an entity, leaving the
 /// entities and anything else they run in place.
 ///
-/// The target's own tasks are left alone, so a task may cancel the work
+/// The target's own tasks are left alone, so a task may stop the work
 /// beneath its entity without ending itself.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct CancelTasks;
+pub struct StopTasks;
 
-impl EntityCommand for CancelTasks {
+impl EntityCommand for StopTasks {
 	type Out = ();
 
 	fn apply(self, entity: EntityWorldMut) {
@@ -717,7 +717,7 @@ impl EntityCommand for CancelTasks {
 			);
 		for owner in owners {
 			if let Some(mut tasks) = world.get_mut::<EntityTasks>(owner) {
-				tasks.cancel();
+				tasks.stop();
 			}
 		}
 	}
@@ -2129,10 +2129,10 @@ mod test {
 			.xpect_eq(0);
 	}
 
-	/// [`CancelTasks`] cancels the tasks beneath an entity and leaves its own
+	/// [`StopTasks`] stops the tasks beneath an entity and leaves its own
 	/// and the entities standing.
 	#[crate::test]
-	async fn cancel_tasks_reaches_descendants() {
+	async fn stop_tasks_reaches_descendants() {
 		let mut app = test_app();
 		let (_gate_send, gate_recv) = OnceValue::<()>::oneshot();
 		let (_own_send, own_recv) = OnceValue::<()>::oneshot();
@@ -2145,7 +2145,7 @@ mod test {
 			.entity_mut(parent)
 			.run_async_local(move |_| async move { own_recv.wait().await });
 		AsyncRunner::tick(app.world()).await;
-		CancelTasks.apply(app.world_mut().entity_mut(parent));
+		StopTasks.apply(app.world_mut().entity_mut(parent));
 		AsyncRunner::tick(app.world()).await;
 		app.world()
 			.get::<EntityTasks>(child)

@@ -269,11 +269,11 @@ impl<'w, 's, In, Out> ActionCall<'w, 's, In, Out> {}
 ///
 /// Wraps a closure so that different delivery mechanisms (channels,
 /// pipe chains, etc.) share a uniform interface, and carries the
-/// [`CallerGone`] an async action races its work against. A handler made
-/// here has nobody to leave; `entity.call(..)` builds one whose future's drop
-/// is the caller leaving, and a handler forwarding another passes its
-/// [`caller_gone`](Self::caller_gone) on through
-/// [`with_caller_gone`](Self::with_caller_gone).
+/// [`CancelToken`] an async action races its work against. A handler made
+/// here is never cancelled; `entity.call(..)` builds one its future's drop
+/// cancels, and a handler forwarding another passes its
+/// [`cancel_token`](Self::cancel_token) on through
+/// [`with_cancel_token`](Self::with_cancel_token).
 pub struct OutHandler<Out = ()> {
 	func: Box<
 		dyn 'static
@@ -281,7 +281,7 @@ pub struct OutHandler<Out = ()> {
 			+ Sync
 			+ FnOnce(AsyncCommands, Result<Out>) -> Result,
 	>,
-	caller_gone: CallerGone,
+	cancel_token: CancelToken,
 }
 
 impl<Out> Default for OutHandler<Out> {
@@ -311,24 +311,24 @@ impl<Out> OutHandler<Out> {
 
 impl<Out> OutHandler<Out> {
 	/// Create an [`OutHandler`] from any compatible closure, its caller
-	/// [`never`](CallerGone::never) gone.
+	/// [`never`](CancelToken::never) cancelled.
 	pub fn new<F>(func: F) -> Self
 	where
 		F: 'static + Send + Sync + FnOnce(AsyncCommands, Result<Out>) -> Result,
 	{
 		Self {
 			func: Box::new(func),
-			caller_gone: CallerGone::never(),
+			cancel_token: CancelToken::never(),
 		}
 	}
 
-	/// Resolves once the caller awaiting this output is gone.
-	pub fn caller_gone(&self) -> CallerGone { self.caller_gone.clone() }
+	/// The token cancelled when the future awaiting this output is dropped.
+	pub fn cancel_token(&self) -> CancelToken { self.cancel_token.clone() }
 
-	/// Tie this handler to another's caller, so a handler forwarding to it
-	/// stops when that caller leaves.
-	pub fn with_caller_gone(mut self, caller_gone: CallerGone) -> Self {
-		self.caller_gone = caller_gone;
+	/// Share another handler's token, so a handler forwarding to it is
+	/// cancelled with that call.
+	pub fn with_cancel_token(mut self, cancel_token: CancelToken) -> Self {
+		self.cancel_token = cancel_token;
 		self
 	}
 

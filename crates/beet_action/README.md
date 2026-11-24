@@ -129,7 +129,7 @@ Servers (`HttpServer`, `CliServer`, `TuiServer`, ...) are just facets, with no e
 
 ## Stopping work: a dropped future
 
-Stopping work is one idea, a dropped future, as it already is for every other task in beet (an [`AsyncTask`] cancels on drop). The future of `entity.call(..)` owns the work it asked for: dropped before it resolves, the callee's task for that call ends at its next await, and so do the calls that task was awaiting, so a `timeout` around a call, a [`Race`] or a failing [`Parallel`] stops what it gave up on. A stopped call's awaiting caller, if any, reads [`ControlFlowError::Interrupted`].
+Stopping work is one idea, a dropped future, as it already is for every other task in beet (an [`AsyncTask`] cancels on drop). The future of `entity.call(..)` owns the work it asked for: dropped before it resolves, it cancels the call's [`CancelToken`], the callee's task for that call ends at its next await, and so do the calls that task was awaiting, so a `timeout` around a call, a [`Race`] or a failing [`Parallel`] stops what it gave up on. A stopped call's awaiting caller, if any, reads [`ControlFlowError::Interrupted`].
 
 Each async call in flight is its own entry in the callee's [`ActionCalls`], held apart from the entity's other tasks ([`EntityTasks`], ie a server's connections), and a despawn ends both. A parked [`Running`] is a call in flight too, registered there by type. A call made with a handler of its own, `commands.entity(entity).call(input, OutHandler::default())`, has no caller to leave, so it runs until it resolves or is stopped from above: that is how work outlives whoever started it, ie `CallOnStart`'s behavior.
 
@@ -138,7 +138,7 @@ Stopping a subtree takes one of three scopes, each queued on the entity whose de
 | stops | leaves | way in |
 | --- | --- | --- |
 | actions | other tasks | `InterruptRun::new()` |
-| other tasks | actions | `CancelTasks` |
+| other tasks | actions | `StopTasks` |
 | both | nothing | `InterruptRun::all()` |
 
 [`NoInterrupt`] on a descendant keeps its actions running through either `InterruptRun`.

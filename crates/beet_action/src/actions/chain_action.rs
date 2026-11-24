@@ -31,7 +31,7 @@ where
 			      }: ActionCall<In, T2::Out>| {
 				let handler2 = handler2.clone();
 				// the first handler stops when the chain's caller leaves
-				let caller_gone = out_handler.caller_gone();
+				let cancel_token = out_handler.cancel_token();
 				handler1.call(ActionCall {
 					commands,
 					caller,
@@ -49,7 +49,7 @@ where
 							Err(err) => out_handler.call(commands, Err(err)),
 						},
 					)
-					.with_caller_gone(caller_gone),
+					.with_cancel_token(cancel_token),
 				})
 			},
 		)
