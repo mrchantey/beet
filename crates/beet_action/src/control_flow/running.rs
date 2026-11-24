@@ -430,7 +430,7 @@ where
 #[derive(Default, Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct RunTimer {
-	/// Time since [`Running`] was last added.
+	/// Time since [`Running`] was last inserted.
 	pub last_run: Stopwatch,
 	/// Time since [`Running`] was last removed.
 	pub last_end: Stopwatch,
@@ -447,9 +447,10 @@ pub(crate) fn tick_run_timers(
 	}
 }
 
-/// Resets `last_run` when [`Running`] is added.
+/// Resets `last_run` when a [`Running`] is inserted, one replacing a run whose
+/// caller dropped its call included, so the new run gets its whole duration.
 pub(crate) fn reset_run_time_started<T>(
-	ev: On<Add<Running<T>>>,
+	ev: On<Insert<Running<T>>>,
 	mut query: Populated<&mut RunTimer>,
 ) -> Result
 where

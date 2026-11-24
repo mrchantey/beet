@@ -388,8 +388,9 @@ pub async fn read_sources(
 	.xok()
 }
 
-/// Build read [`EntrySources`] into a root carrying `store` (resolved by ancestry for
-/// `<TemplateDir>`, `<RoutesDir>` and `<Template src>`), with `extra` riding onto the
+/// Build read [`EntrySources`] into a root carrying `repo_store` and the [`TableStore`]
+/// over it ([`BlobStore::into_bundle`], resolved by ancestry for `<TemplateDir>`,
+/// `<RoutesDir>`, `<Template src>` and a thread's mount), with `extra` riding onto the
 /// root. The entry runs itself: its own `CallOnReady` verbs act on their `Ready`, so
 /// a render-only command (`check`, `export-static`, the Worker) passes
 /// [`DisableCallOnReady`] in `extra` to build the tree disarmed. Registers the
@@ -425,7 +426,7 @@ pub fn build_root(
 	// app's one canonical store: a command loading a foreign entry into the same
 	// world builds a second rooted store, which is that sub-app's, not this
 	// process's.
-	let root = world.spawn((extra, repo_store)).id();
+	let root = world.spawn((extra, repo_store.into_bundle())).id();
 	// the pre-scanned `<RequireCfg>`s, asserted before the tree builds: an unmet
 	// one refuses the load, so nothing in the tree (a `CallOnReady` action) runs
 	// in a binary that cannot support it, and the report holds even when the
@@ -729,6 +730,8 @@ mod test {
 			build_source(&mut world, "<Router><DefaultAppRoutes/></Router>")
 				.await
 				.unwrap();
+		// its store backs tables, ie a thread's records, for every descendant
+		world.entity(root).contains::<TableStore>().xpect_true();
 		// the entry built into a router root carrying the default app routes
 		world.entity(root).contains::<Router>().xpect_true();
 		world

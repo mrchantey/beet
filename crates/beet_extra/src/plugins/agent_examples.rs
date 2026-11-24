@@ -3,26 +3,18 @@
 //!
 //! ```bsx
 //! <RepeatWhileFunctionCallOutput {RunThread}>
-//!   <Thread bx:ref="thread" {Behavior}>
+//!   <Thread {Sequence}>
 //!     <CreateActor name="System" kind="System">
 //!       <CreatePost text="You are great at using a calculator.."/>
 //!     </CreateActor>
 //!     <CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama, size:Large}}>
-//!       <CalculatorToolset/>
+//!       <Router><CalculatorToolset/></Router>
 //!     </CreateActor>
 //!   </Thread>
 //! </RepeatWhileFunctionCallOutput>
 //! ```
 use crate::beet::prelude::*;
 use beet_core::prelude::*;
-
-/// Markup-resolvable alias for a `Sequence<(), Outcome>` behaviour: runs its
-/// children in order. A bare generic `{Sequence}` tag does not resolve by name,
-/// so this non-generic marker stands in (it `#[require]`s the sequence).
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(Sequence<(), ()>)]
-pub struct Behavior;
 
 /// The two operands a calculator tool takes.
 #[derive(Reflect, serde::Deserialize, serde::Serialize)]
@@ -63,21 +55,20 @@ fn CalcDivide(cx: ActionContext<BinaryOp>) -> String {
 	format!("{}", cx.a / cx.b)
 }
 
-/// `<CalculatorToolset/>` — equips the enclosing agent with the four calculator
-/// tools, nested as children so the thread query discovers them.
+/// `<CalculatorToolset/>` — equips an agent with the four calculator tools,
+/// authored in the agent's own [`Router`], whose routes are its tools.
 #[template]
 pub fn CalculatorToolset() -> impl Bundle {
 	children![CalcAdd, CalcSubtract, CalcMultiply, CalcDivide]
 }
 
-/// Registers the `Behavior` marker and the calculator toolset, so a thread
+/// Registers the calculator toolset, so a thread
 /// `main.bsx` declaring `<CalculatorToolset/>` resolves.
 pub struct AgentExamplesPlugin;
 
 impl Plugin for AgentExamplesPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<Behavior>()
-			.register_type::<CalcAdd>()
+		app.register_type::<CalcAdd>()
 			.register_type::<CalcSubtract>()
 			.register_type::<CalcMultiply>()
 			.register_type::<CalcDivide>()

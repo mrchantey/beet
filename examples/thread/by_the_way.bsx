@@ -1,0 +1,48 @@
+<!--
+A semi duplex chat: a person's post cuts the agent short rather than waiting for
+it. Run it through the one binary:
+
+    beet --entry=examples/thread/by_the_way.bsx
+
+It is the turn based chat, `Repeat[Sequence[person, agent]]`, and nothing here
+names a mode: `{InterruptOnPost}` on the agent is the whole difference. The agent's
+tool is slow, `survey`, a route of this url space made its tool by `<RouteTool/>`,
+and `<RepeatWhileFunctionCallOutput>` calls the model again after each tool call.
+
+What to try:
+
+- ask for a long story, and type a note while it is being written: the story is
+  closed as interrupted and the note is answered now;
+- ask for a survey of the field, and press Escape or `Stop` within its ten seconds:
+  the call is cut, its output says so, and the agent waits for you;
+- type a note during the survey instead: the call is cut the same way, and the agent
+  waits for your next post to answer both.
+
+Delete `InterruptOnPost` and the same note is queued: the agent finishes, then
+answers it.
+-->
+<CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
+	<RequireCfg cfg="feature:thread && feature:tui && feature:ssh"/>
+	<Router {Layout{template:"AppShell"}}>
+		<Route path="/" {FixedPage}>
+			<ThreadView {OfThread($thread)}/>
+			<CreatePostForm {OfThread($thread)}/>
+		</Route>
+		<Route path="survey" {(ExchangeSequence, RouteDescription("Survey the beet field. Takes ten seconds, and an empty answer means every beet is healthy."))}>
+			<EndInDuration duration="10s" {OutcomeOverload}/>
+		</Route>
+		<Repeat {RunThread}>
+			<Thread bx:ref="thread" {Sequence}>
+				<CreateActor name="System" kind="System">
+					<CreatePost text="You look after a beet field. Survey it with your survey tool only when asked to. Text posted while you were working is a note: answer the newest one."/>
+				</CreateActor>
+				<CreateActor name="Farmer" kind="User" {UserInput}/>
+				<RepeatWhileFunctionCallOutput>
+					<CreateActor name="Agent" kind="Agent" {(ModelStreamer{provider:OpenAi}, InterruptOnPost)}>
+						<Router><RouteTool path="survey"/></Router>
+					</CreateActor>
+				</RepeatWhileFunctionCallOutput>
+			</Thread>
+		</Repeat>
+	</Router>
+</CallOnReady>

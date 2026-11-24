@@ -17,7 +17,7 @@ terminal holds it until Ctrl+C.
 			<ThreadView {OfThread($thread)}/>
 		</Route>
 		<RepeatWhileFunctionCallOutput {RunThread}>
-			<Thread bx:ref="thread" {(Sequence, FsStore{path:".beet/coding_agent"})}>
+			<Thread bx:ref="thread" {(Sequence, FsStore{path:"target/examples/coding_agent"})}>
 				<CreateActor name="System" kind="System">
 					<CreatePost text='
 You are a coding agent with access to a file store.

@@ -3,10 +3,10 @@ A chat whose conversation persists to disk across runs. Run it through the one
 binary:
 
     beet --entry=examples/thread/persistent_chat.bsx
-    beet --entry=examples/thread/persistent_chat.bsx -- --new   # start fresh
+    beet --entry=examples/thread/persistent_chat.bsx --new   # start fresh
 
-`{MountThreadStore}` persists the thread's records under its path, in the
-entry's own store, so beside this file; `{RunThread}` continues the newest
+`{MountThreadStore}` persists the thread's records as rows keyed under its path, in
+the entry's own store, so the `thread*` directories beside this file; `{RunThread}` continues the newest
 thread stored there before the first turn, so a re-run resumes where it left
 off. `--new` starts a fresh thread, which the next run continues. The system
 prompt is the seed, written once when a thread is created, so an edited prompt

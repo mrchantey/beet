@@ -31,7 +31,7 @@ mod character_drive;
 #[cfg(feature = "bevy_default")]
 pub use self::character_drive::*;
 
-// the agent calculator toolset + the `Behavior` sequence marker.
+// the agent calculator toolset.
 #[cfg(feature = "thread")]
 mod agent_examples;
 #[cfg(feature = "thread")]

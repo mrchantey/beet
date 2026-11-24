@@ -91,6 +91,32 @@ pub(crate) fn end_in_duration<In, Out>(
 mod tests {
 	use super::*;
 
+	/// A call replacing a run whose caller dropped its call runs its whole
+	/// duration, never the rest of the dropped one's.
+	#[beet_core::test]
+	async fn a_replaced_run_restarts_its_timer() {
+		let mut world =
+			(MinimalPlugins, AsyncPlugin, ActionPlugin).into_world();
+		let entity = world
+			.spawn(EndInDuration::pass(Duration::from_secs(10)))
+			.insert(Running::<Outcome>::new(OutHandler::default()))
+			.id();
+		world
+			.get_mut::<RunTimer>(entity)
+			.unwrap()
+			.last_run
+			.tick(Duration::from_secs(9));
+		world
+			.entity_mut(entity)
+			.insert(Running::<Outcome>::new(OutHandler::default()));
+		world
+			.get::<RunTimer>(entity)
+			.unwrap()
+			.last_run
+			.elapsed()
+			.xpect_eq(Duration::ZERO);
+	}
+
 	#[beet_core::test]
 	async fn returns_after_delay() {
 		(MinimalPlugins, AsyncPlugin, ActionPlugin)

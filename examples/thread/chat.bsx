@@ -9,9 +9,9 @@ prompt, the user's turn (`{UserInput}`) waits for their post, looped forever.
 `{RunThread}` runs it on the servers' start notification.
 
 The entry is a server root with a router child, like every other beet entry: a
-bare run boots the local `TuiServer` only, `--server=http` serves the same page
-as html and `--server=ssh` over a terminal per connection (structure only, not
-verified). `--color-scheme=light|dark` seeds the session theme, which the layout
+bare run boots the local `TuiServer` only, `--server=ssh` serves the same page over
+a terminal per connection and `--server=http` as html, to read, since a served
+page's composer posts nothing. `--color-scheme=light|dark` seeds the session theme, which the layout
 pins per request.
 
 The page is a `{FixedPage}` route: its children are one live tree served by every

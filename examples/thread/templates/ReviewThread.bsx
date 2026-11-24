@@ -1,0 +1,17 @@
+<!--
+The thread `function.bsx` builds for each request. It mounts a store path naming
+the document, so a second review of one document continues its thread, and the
+message that asks for the review is the route's, never the template's. The agent
+loop is `{RepeatWhileFunctionCallOutput}`: read through the tool, then answer.
+-->
+<RepeatWhileFunctionCallOutput>
+	<Thread {(Sequence, MountThreadStore{path:"reviews/{document}"})}>
+		<CreateActor id=1 name="System" kind="System">
+			<CreatePost text="You review documents. Read the document you are asked about with the read-blob tool, then answer with one thing it does well and one thing to improve, in under sixty words."/>
+		</CreateActor>
+		<CreateActor id=2 name="Reader" kind="User"/>
+		<CreateActor id=3 name="Reviewer" kind="Agent" {ModelStreamer{provider:OpenAi}}>
+			<Router><RouteTool path="read-blob"/></Router>
+		</CreateActor>
+	</Thread>
+</RepeatWhileFunctionCallOutput>

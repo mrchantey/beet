@@ -42,6 +42,11 @@ use beet_net::prelude::*;
 /// Calling the **thread**, never an "agent", is the whole point: the `Sequence`
 /// is the behavior and runs its actors in order.
 ///
+/// Holding only windows with no behavior, ie a room people post in, it enters
+/// them and runs nothing; two windows onto one stored thread sit under one
+/// `RunThread`, which enters them in order, so the second finds the thread the
+/// first created.
+///
 /// A thread under it declaring a [`MountThreadStore`] continues the newest
 /// thread in the mount's path, filled from the start request, so a restart
 /// resumes; declaring none, it starts a thread every run.
@@ -71,11 +76,34 @@ impl RunThread {
 				// the canonical action, resolved by its own signature: an endless
 				// `Repeat` never returns, a finite loop completes while the servers
 				// stay parked.
-				let outcome = entity.call::<(), Outcome>(()).await;
+				let outcome = match Self::is_room(&entity, &threads).await? {
+					true => Outcome::PASS.xok(),
+					false => entity.call::<(), Outcome>(()).await,
+				};
 				Self::flush_all(&entity.world(), &threads).await?;
 				outcome
 			},
 		))
+	}
+
+	/// Whether there is nothing to run: `entity` serves no `() -> Outcome`
+	/// and no window of `threads` holds behavior, so people post whenever they
+	/// like. An entity with no action over a window that does hold behavior is
+	/// no room but a mistake, left to the call to report.
+	async fn is_room(entity: &AsyncEntity, threads: &[Entity]) -> Result<bool> {
+		let threads = threads.to_vec();
+		entity
+			.with_state::<(Query<&ActionMeta>, ThreadWindows), _>(
+				move |entity, (metas, windows)| {
+					!metas
+						.get(entity)
+						.is_ok_and(|meta| meta.matches::<(), Outcome>())
+						&& !threads
+							.iter()
+							.any(|thread| windows.holds_behavior(*thread))
+				},
+			)
+			.await
 	}
 
 	/// Enter every [`Thread`] at or under `root` with `entry`, in tree order
@@ -183,6 +211,51 @@ mod test {
 			))
 			.trigger(|entity| StartRunning::new(entity, Request::default()));
 		pump(&mut app, 120);
+	}
+
+	/// Started over two windows onto one path, neither holding behavior, it
+	/// opens both onto one thread and runs nothing: a room.
+	#[beet_core::test]
+	fn holds_a_room_open_in_two_windows() {
+		let store = BlobStore::temp();
+		let window = |id: u128, name: &str| {
+			(
+				Thread::default(),
+				MountThreadStore {
+					path: RelPath::new(RECORDS),
+					new: false,
+				},
+				children![Actor::new_with_id(
+					ActorId::from_u128(id),
+					name,
+					ActorKind::User,
+				)],
+			)
+		};
+		let mut app = app();
+		app.world_mut()
+			.spawn((
+				sweep(),
+				store.clone(),
+				TableStore::new(store.clone()),
+				children![(RunThread, children![
+					window(1, "Ann"),
+					window(2, "Bob")
+				])],
+			))
+			.trigger(|entity| StartRunning::new(entity, Request::default()));
+		pump(&mut app, 120);
+		let threads = app.world_mut().query_once::<(&Thread, &ThreadRecords)>();
+		threads.len().xpect_eq(2);
+		threads[0].0.id().xpect_eq(threads[1].0.id());
+		for (_, records) in threads {
+			records
+				.posts()
+				.iter()
+				.map(Post::author)
+				.collect::<Vec<_>>()
+				.xpect_eq(vec![ActorId::from_u128(1), ActorId::from_u128(2)]);
+		}
 	}
 
 	/// Call `entity` as `In -> Outcome` and pump the app until it settles.

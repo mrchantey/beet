@@ -281,3 +281,86 @@ async fn persistent_chat_scene_reduces() {
 	kinds.contains(&ActorKind::User).xpect_true();
 	kinds.contains(&ActorKind::System).xpect_true();
 }
+
+/// Enter every mounted thread one after the other, as one `RunThread` would,
+/// over one store at the scene's root, so the second window finds the thread
+/// the first created.
+#[beet::test]
+async fn room_scene_opens_two_windows() {
+	let mut app = reduce(include_str!("../examples/thread/room.bsx")).await;
+	let root = app
+		.world_mut()
+		.query_filtered_once::<Entity, With<TuiServer>>()[0];
+	app.world_mut()
+		.entity_mut(root)
+		.insert(InMemoryStore::new());
+	let holder = app
+		.world_mut()
+		.query_filtered_once::<Entity, With<RunThread>>()[0];
+	app.world_mut()
+		.entity_mut(holder)
+		.call::<Request, Outcome>(Request::default())
+		.await
+		.unwrap()
+		.xpect_eq(Outcome::PASS);
+	assert_crate_check_passed(&mut app);
+	agent_count(&mut app).xpect_eq(0);
+	let windows = app.world_mut().query_once::<(Entity, &Thread)>();
+	windows.len().xpect_eq(2);
+	windows[0].1.id().xpect_eq(windows[1].1.id());
+	let windows = windows
+		.into_iter()
+		.map(|(entity, _)| entity)
+		.collect::<HashSet<_>>();
+	// a view and a composer each, the composer posting as its own person
+	app.world_mut()
+		.query_filtered_once::<&OfThread, With<ThreadView>>()
+		.into_iter()
+		.map(OfThread::thread)
+		.collect::<HashSet<_>>()
+		.xpect_eq(windows);
+	app.world_mut()
+		.query_once::<&CreatePostForm>()
+		.into_iter()
+		.filter_map(|form| form.actor)
+		.collect::<HashSet<_>>()
+		.len()
+		.xpect_eq(2);
+}
+
+#[beet::test]
+async fn by_the_way_scene_reduces() {
+	let mut app =
+		reduce(include_str!("../examples/thread/by_the_way.bsx")).await;
+	assert_crate_check_passed(&mut app);
+	app.world_mut()
+		.query_filtered_once::<Entity, (With<ActorRef>, With<InterruptOnPost>)>(
+		)
+		.len()
+		.xpect_eq(1);
+	record_counts(&mut app).xpect_eq((3, 1));
+	agent_count(&mut app).xpect_eq(1);
+	// the `<RouteTool/>` resolved the surrounding `survey` route
+	tool_count(&mut app).xpect_eq(1);
+}
+
+/// The function example's route names the template beside it, whose agent's
+/// one tool is a route.
+#[beet::test]
+async fn function_scene_declares_its_route() {
+	let mut app = reduce(include_str!("../examples/thread/function.bsx")).await;
+	assert_crate_check_passed(&mut app);
+	let routes = app.world_mut().query_once::<&ThreadRoute>();
+	routes.len().xpect_eq(1);
+	routes[0].template.as_str().xpect_eq("ReviewThread");
+	routes[0].message.is_some().xpect_true();
+	let mut app = reduce(include_str!(
+		"../examples/thread/templates/ReviewThread.bsx"
+	))
+	.await;
+	agent_count(&mut app).xpect_eq(0);
+	app.world_mut()
+		.query_once::<&RouteToolCall>()
+		.len()
+		.xpect_eq(1);
+}

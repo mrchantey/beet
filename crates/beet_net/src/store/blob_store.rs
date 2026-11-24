@@ -186,6 +186,17 @@ impl BlobStore {
 	/// ```
 	pub fn blob(&self, path: RelPath) -> Blob { Blob::new(self.clone(), path) }
 
+	/// The erased currencies a store entity carries: this store and, since any
+	/// blob store backs a table (json rows keyed by id), the [`TableStore`]
+	/// over it.
+	pub fn into_bundle(self) -> impl Bundle {
+		(
+			#[cfg(all(feature = "json", feature = "std"))]
+			TableStore::new(self.clone()),
+			self,
+		)
+	}
+
 	/// Component hook that reads a concrete store component from
 	/// the entity and inserts a [`BlobStore`] wrapping it.
 	/// Use with `#[component(on_insert = BlobStore::on_insert::<MyStore>)]`.
@@ -196,16 +207,12 @@ impl BlobStore {
 		match world.entity(cx.entity).get_or_else::<T>().cloned() {
 			Ok(provider) => {
 				let store = BlobStore::new(provider);
-				// any blob store backs a table (json rows keyed by id), so the
-				// erased [`TableStore`] currency lands on every store entity; a
-				// table-native provider's own [`TableStore::on_insert`] runs after
-				// and overrides it.
-				#[cfg(all(feature = "json", feature = "std"))]
+				// a table-native provider's own [`TableStore::on_insert`] runs
+				// after and overrides the table.
 				world
 					.commands()
 					.entity(cx.entity)
-					.insert(TableStore::new(store.clone()));
-				world.commands().entity(cx.entity).insert(store);
+					.insert(store.into_bundle());
 			}
 			Err(err) => {
 				world.fallback_error_handler()(err, ErrorContext::Command {
