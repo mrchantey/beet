@@ -1,10 +1,10 @@
 //! One-way document-source binding: mirrors a field of another document into
 //! this entity's [`Value`], the source half of a props binding chain.
 //!
-//! A binding-valued prop (`<Card title=@doc:field/>`) spawns a binding entity
+//! A binding-valued prop (`props={{title:@doc:field}}`) lowers to a binding entity
 //! carrying `(Value, SourceFieldRef, FieldRef)`: this component pulls the
 //! caller's document field into the [`Value`], and the co-located [`FieldRef`]
-//! syncs the `Value` with the props store, so the full chain is
+//! syncs the `Value` with the use site's props, so the full chain is
 //! `source field -> Value <-> props.title -> body bindings`. The document sync
 //! handles the fan-out from the store to the body.
 //!
@@ -210,8 +210,8 @@ pub(crate) fn component_id_by_short_path(
 /// The [`document`](Self::document) resolves from the [`subject`](Self::subject)
 /// entity rather than the binding entity, since a props binding entity lives
 /// outside the `ChildOf` hierarchy (related to its template via `AttributeOf`):
-/// the subject is the props store at the tag site, so [`DocumentPath::Ancestor`]
-/// finds the caller's document (props stores are skipped, including the subject
+/// the subject is the use site, so [`DocumentPath::Ancestor`]
+/// finds the caller's document (a use site's props are skipped, including the subject
 /// itself).
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect, MapEntities)]
 #[reflect(Component, MapEntities)]
@@ -240,8 +240,8 @@ impl SourceFieldRef {
 		}
 	}
 
-	/// Resolve the source document from another entity, eg the props store at
-	/// the template's tag site.
+	/// Resolve the source document from another entity, eg the use site a
+	/// prop is passed at.
 	pub fn with_subject(mut self, subject: Entity) -> Self {
 		self.subject = BindingTarget::Entity(subject);
 		self
@@ -275,9 +275,9 @@ pub(super) fn sync_source_field_refs(
 		let Some(subject) = source.subject.fixed(entity) else {
 			continue;
 		};
-		// a tag-site `@prop` source reads the *caller's* store: the subject is
-		// the template entity carrying its own props store, which must not
-		// shadow the one the tag was authored under.
+		// a use's `@prop` source reads the *caller's* props: the subject is the
+		// use site carrying its own, which must not shadow the ones it was
+		// authored under.
 		let doc_entity = match (&source.document, &source.subject) {
 			(DocumentPath::Props, BindingTarget::Entity(_)) => {
 				resolver.entity_above(subject, &source.document)
@@ -370,7 +370,7 @@ mod test {
 	#[crate::test]
 	fn subject_resolves_from_props_store() {
 		let mut world = DocumentPlugin::world();
-		// user doc -> props store; the binding entity is outside the hierarchy
+		// user doc -> use site's props; the binding entity is outside the hierarchy
 		let doc = world.spawn(Document::new(value!({ "name": "Alice" }))).id();
 		let store = world
 			.spawn((ChildOf(doc), Document::default(), PropsDocument))
@@ -433,7 +433,7 @@ mod test {
 	}
 
 	/// The full props chain at the document level:
-	/// `user doc -> binding Value <-> props store -> body field`.
+	/// `user doc -> binding Value <-> use site's props -> body field`.
 	#[crate::test]
 	fn source_chains_into_props_store() {
 		let mut world = DocumentPlugin::world();

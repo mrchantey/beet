@@ -2,17 +2,17 @@
 //!
 //! A [`SchemaRef::Name`] names another schema rather than inlining it, so
 //! schemas form a graph mirroring the template graph. [`SchemaRegistry`] is the
-//! index that resolves those names, and it holds authored schemas (a `bx:schema`
-//! block, a schema document) beside reflect-derived ones: one namespace, because
+//! index that resolves those names, and it holds authored schemas (a schema
+//! document) beside reflect-derived ones: one namespace, because
 //! an authored schema and a reflect-derived one are the same kind of thing.
 //!
-//! Identity is the **full** key: a Rust type path, a template module path, an
-//! authored name, or the store path of a schema document that declares no name. A short name is display and authoring sugar, indexed as an
+//! Identity is the **full** key: a Rust type path, an authored name, or the
+//! package path of a schema document that declares no name. A short name is display and authoring sugar, indexed as an
 //! alias; a short name several full keys share is ambiguous, diagnosed where the
 //! collision is created and resolving to nothing rather than to whichever
 //! registered first.
 //!
-//! References may resolve asynchronously (a remote `bx:schema`, a schema
+//! References may resolve asynchronously (a schema
 //! document still being read), so a name that is not yet registered defers to
 //! [`ValueSchema::Any`] rather than erroring.
 
@@ -22,19 +22,16 @@ use bevy::reflect::Typed;
 /// A by-name index of authored and type schemas, the manifest a reactive client
 /// layer reads and the resolver for [`SchemaRef::Name`].
 ///
-/// Registered before any template is loaded (so a tag resolves to a known
-/// schema), it is the schema-side companion of the template-by-name registry.
 /// [`SchemaRegistry::located`] is the by-*location* index beside it, which a
 /// schema document read out of a store registers into.
 #[derive(Debug, Clone, Resource)]
 pub struct SchemaRegistry {
-	/// Keyed by full identity: a Rust type path, a template module path, or an
-	/// authored name.
+	/// Keyed by full identity: a Rust type path or an authored name.
 	schemas: HashMap<SmolStr, ValueSchema>,
 	/// Short name to every full key ending in it. One key resolves, several are
 	/// a collision.
 	aliases: HashMap<SmolStr, Vec<SmolStr>>,
-	/// A schema document's store path, to the key its schema is stored under.
+	/// A schema document's package absolute path, to the key its schema is stored under.
 	/// A pointer into `schemas` rather than a second copy, so the by-name and
 	/// by-location views of one schema can never disagree.
 	located: HashMap<RelPath, SmolStr>,
@@ -73,8 +70,8 @@ impl SchemaRegistry {
 
 	/// Register `schema` under `name`, its full identity key.
 	///
-	/// Re-registering a key replaces it, which is how a reloaded template dir or
-	/// an edited schema document updates in place.
+	/// Re-registering a key replaces it, which is how an edited schema document
+	/// updates in place.
 	pub fn insert(
 		&mut self,
 		name: impl Into<SmolStr>,
@@ -104,8 +101,8 @@ impl SchemaRegistry {
 		self.insert(T::type_path(), ValueSchema::of::<T>());
 	}
 
-	/// Register the schema of the schema document at `path`, the by-location
-	/// index a [`SchemaRef::Document`] resolves through.
+	/// Register the schema of the schema document at `path` of its package, the
+	/// by-location index a [`SchemaRef::Document`] resolves through.
 	///
 	/// The schema is stored **once**, in the one by-name namespace, under the
 	/// name it declares for itself or, declaring none, under `path`; the

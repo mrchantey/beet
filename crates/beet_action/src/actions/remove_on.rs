@@ -18,6 +18,7 @@ use beet_core::prelude::*;
 pub async fn RemoveOn<B>(
 	/// Which entity to remove the bundle from.
 	#[field]
+	#[entities]
 	target_entity: TargetEntity,
 	cx: ActionContext,
 ) -> Result<Outcome>

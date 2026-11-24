@@ -90,10 +90,7 @@ mod test {
 	</CreateActor>
 </div>
 "#;
-		let root = BsxTemplate::parse_entry(app.world(), source)
-			.unwrap()
-			.spawn(app.world_mut())
-			.unwrap();
+		let root = SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
 		ThreadRecords::reduce_now(app.world_mut());
 		// every remaining direct child of the Sequence must carry ActionMeta, else
 		// `Sequence::valid_children` bails "sequence child has no action".
@@ -122,10 +119,7 @@ mod test {
 	<CreateActor name="Person" kind="User"/>
 </div>
 "#;
-		BsxTemplate::parse_entry(app.world(), source)
-			.unwrap()
-			.spawn(app.world_mut())
-			.unwrap();
+		SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
 		ThreadRecords::reduce_now(app.world_mut());
 
 		let thread = app
@@ -166,8 +160,7 @@ mod test {
 	</CreateActor>
 </div>
 "#;
-		let template = BsxTemplate::parse_entry(app.world(), source).unwrap();
-		template.spawn(app.world_mut()).unwrap();
+		SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
 		app.world_mut().flush();
 
 		// the tool entity gained its routed requires + the derived tool definition
@@ -198,10 +191,7 @@ line three'/>
 	</CreateActor>
 </div>
 ";
-		let thread = BsxTemplate::parse_entry(app.world(), source)
-			.unwrap()
-			.spawn(app.world_mut())
-			.unwrap();
+		let thread = SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
 		ThreadRecords::reduce_now(app.world_mut());
 
 		let records = app.world().get::<ThreadRecords>(thread).unwrap();
@@ -230,8 +220,7 @@ line three'/>
 	<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama}}/>
 </div>
 "#;
-		let template = BsxTemplate::parse_entry(app.world(), source).unwrap();
-		let thread = template.spawn(app.world_mut()).unwrap();
+		let thread = SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
 		ThreadRecords::reduce_now(app.world_mut());
 
 		// the records hold both actors and the seed post

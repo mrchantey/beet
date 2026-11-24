@@ -39,7 +39,7 @@ pub fn VisitCount(
 		);
 	};
 	OnSpawn::new(move |entity| {
-		TemplatePending::register_fetch(
+		TemplatePending::park_task(
 			entity,
 			PendingKind::Structural,
 			"<VisitCount/>",

@@ -20,7 +20,7 @@ impl DocumentResolver<'_, '_> {
 	pub fn entity(&self, subject: Entity, path: &DocumentPath) -> Entity {
 		match path {
 			DocumentPath::Root => self.traverse.root(subject),
-			// nearest ancestor document, skipping props stores so user document
+			// nearest ancestor document, skipping use sites' props so user document
 			// scoping inside a template body is unaffected. A `DocRef` ends the
 			// walk at the document it targets, and wins over a `Document` on the
 			// same entity: the redirect is deliberate, the storage incidental.
@@ -34,7 +34,7 @@ impl DocumentResolver<'_, '_> {
 					.then_some(entity),
 				})
 				.unwrap_or_else(|| self.traverse.root(subject)),
-			// nearest ancestor props store, ie a template's materialized props
+			// nearest use site above, ie what its [`Instance`] passed
 			DocumentPath::Props => self
 				.traverse
 				.ancestors_inclusive(subject)

@@ -549,9 +549,9 @@ mod test {
 	const POST: &str = "/blog/full-stack-bevy";
 
 	/// The layout fixture site's world and router.
-	fn site() -> (World, Entity) {
+	async fn site() -> (World, Entity) {
 		let mut world = syndication_world(Some("https://beet.org"));
-		let router = spawn_layout_router(&mut world);
+		let router = spawn_layout_router(&mut world).await;
 		(world, router)
 	}
 
@@ -617,7 +617,7 @@ mod test {
 	/// a fragment with no head, no description and no stylesheet.
 	#[beet_core::test]
 	async fn html_at_each_root() {
-		let (mut world, router) = site();
+		let (mut world, router) = site().await;
 		get(&mut world, router, Request::get(POST), MediaType::Html)
 			.await
 			.xpect_contains("<html>")
@@ -646,7 +646,7 @@ mod test {
 	/// source it was parsed from.
 	#[beet_core::test]
 	async fn text_formats_at_each_root() {
-		let (mut world, router) = site();
+		let (mut world, router) = site().await;
 		get(&mut world, router, at(POST, "main"), MediaType::Markdown)
 			.await
 			.xpect_contains("# Full Stack Bevy")
@@ -691,7 +691,7 @@ mod test {
 	#[cfg(all(feature = "template_serde", feature = "json"))]
 	#[beet_core::test]
 	async fn scene_root_carries_the_doc_meta() {
-		let (mut world, router) = site();
+		let (mut world, router) = site().await;
 		for root in ROOTS {
 			get(&mut world, router, post_at(root), MediaType::Json)
 				.await
@@ -773,9 +773,13 @@ mod test {
 	#[beet_core::test]
 	async fn every_target_at_every_rung() {
 		let mut world = syndication_world(Some("https://beet.org"));
-		world
-			.get_resource_or_init::<BsxTemplateRegistry>()
-			.insert_source("BareLayout", "<header>Chrome</header><slot/>")
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&RelPath::new("BareLayout.bsx"),
+				"<header>Chrome</header><slot/>",
+			)
+			.await
 			.unwrap();
 		let meta = post("Rungs", "2025-07-11");
 		let route = |path: &str, body: fn() -> Snippet| {
@@ -785,10 +789,12 @@ mod test {
 			})
 		};
 		let router = world
-			.spawn((Router, children![
-				(PathPartial::new("bare"), Layout::new("BareLayout"), children![
-					route("post", || rsx! { <p>"page"</p> })
-				]),
+			.spawn((store, Router, children![
+				(
+					PathPartial::new("bare"),
+					Layout::document("BareLayout.bsx"),
+					children![route("post", || rsx! { <p>"page"</p> })]
+				),
 				route("mains", || {
 					rsx! { <div><header>"Chrome"</header><div><main>"deep"</main></div><main>"page"</main></div> }
 				}),
@@ -833,7 +839,7 @@ mod test {
 	/// for that media type answers.
 	#[beet_core::test]
 	async fn scope_equals_the_request() {
-		let (mut world, router) = site();
+		let (mut world, router) = site().await;
 		for root in ROOTS {
 			for media_type in
 				[MediaType::Html, MediaType::Markdown, MediaType::Text]
@@ -855,7 +861,7 @@ mod test {
 	/// A type no target renders answers `406 Not Acceptable`, building nothing.
 	#[beet_core::test]
 	async fn unrenderable_type_is_not_acceptable() {
-		let (mut world, router) = site();
+		let (mut world, router) = site().await;
 		// the first render spawns the cached systems and observers it runs on
 		get(&mut world, router, Request::get(POST), MediaType::Html).await;
 		let baseline = entities(&mut world);
@@ -872,7 +878,7 @@ mod test {
 	/// a request for that type answers.
 	#[beet_core::test]
 	async fn renders_one_page_as_two_types() {
-		let (mut world, router) = site();
+		let (mut world, router) = site().await;
 		let (html, markdown) = world
 			.run_async_then(async move |world| {
 				LivePage::scoped(
@@ -906,7 +912,7 @@ mod test {
 	/// a request leaves nothing behind either.
 	#[beet_core::test]
 	async fn releases_the_page() {
-		let (mut world, router) = site();
+		let (mut world, router) = site().await;
 		// the first render down each path spawns the cached systems and
 		// observers it runs on
 		get(&mut world, router, Request::get(POST), MediaType::Html).await;
@@ -968,7 +974,7 @@ mod test {
 				DocRenderers::register_on(app, self);
 			}
 		}
-		let (mut world, router) = site();
+		let (mut world, router) = site().await;
 		world.resource_mut::<DocRenderers>().register(Shout);
 		get(
 			&mut world,

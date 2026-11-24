@@ -20,9 +20,9 @@ pub(crate) const RELOAD_MESSAGE: &str = "reload";
 /// Dev-mode live reload for a no-code site, placed on the site root (which carries
 /// the site [`BlobStore`]). Any change to that store surfaces as a [`BlobEvent`]
 /// (emitted by the store's watcher). The change itself is applied by the blob
-/// reactions the event's propagation fires (an edited page's route or a
-/// template's file re-reads itself, a created or removed file rescans its dir,
-/// see [`BlobReactions`]); this component adds the dev loop around them: once
+/// reactions the event's propagation fires (an edited page's route re-reads
+/// itself, a created or removed file rescans its dir, see [`BlobReactions`], and
+/// an instantiated document is forgotten, so its next use reads it again); this component adds the dev loop around them: once
 /// they settle, broadcast `RELOAD_MESSAGE` over the world's [`ClientIo`]
 /// channel (spawned as a child if none exists), run the render diagnostics and
 /// repaint the in-world navigators. The
@@ -57,14 +57,13 @@ impl LiveReload {
 
 /// Marks a [`LiveReload`] root with a change pending: the debounce latch (a
 /// burst of `BlobEvent`s folds into one reload), carrying whether any change was
-/// *structural* (the entry document, a `<Template src>` include or an
-/// entry-instantiated template per the installed [`EntryReloader`]), which
-/// upgrades the reload to a full teardown+rebuild.
+/// *structural* (the entry document or one it instantiates per the installed
+/// [`EntryReloader`]), which upgrades the reload to a full teardown+rebuild.
 ///
 /// This is the only bespoke reload state: "a reload is in flight" is not a
 /// second marker but the pending/settle primitive itself. The reactions a
 /// change fires park [`TemplatePending`] dependencies under the root (a route
-/// or template file re-read, a dir rescan each hold a [`PendingGuard`]), and
+/// re-read, a dir rescan each hold a [`PendingGuard`]), and
 /// [`process_live_reloads`] defers dispatch while any set under the root is
 /// non-empty, so a change landing mid-reload only re-latches here and drives
 /// exactly one follow-up once the tree settles.
@@ -148,7 +147,7 @@ pub(crate) fn reload_site_on_change(
 /// follow-up rather than a bespoke in-flight marker. A request being served
 /// defers nothing: a content reload swaps routes under it and the route it
 /// holds answers before it retires (see [`Retired`]). A structural change (the
-/// entry document or an included `<Template src>`) takes the full
+/// entry document or one it instantiates) takes the full
 /// teardown+rebuild; a content change re-fires in place.
 pub(crate) fn process_live_reloads(world: &mut World) {
 	let latched = world
@@ -237,7 +236,7 @@ pub(crate) fn reload_site(
 
 /// The [`BlobPage`] routes serving exactly the `changed` store paths, ie the
 /// pages a content reload needs to re-check; `None` (check everything) when any
-/// change backs no page directly, eg a template every page may use, or when
+/// change backs no page directly, eg a layout every page wears, or when
 /// nothing specific changed.
 fn changed_routes(
 	world: &mut World,
@@ -321,6 +320,11 @@ mod test {
 		.unwrap();
 		fs_ext::write(root.join("routes/index.md"), "# Home\n\nwelcome")
 			.unwrap();
+		fs_ext::write(
+			root.join("routes/card.bsx"),
+			r#"<main><Instance document="../templates/Card"/></main>"#,
+		)
+		.unwrap();
 		root
 	}
 
@@ -333,10 +337,7 @@ mod test {
 				store,
 				Router::with_defaults(),
 				LiveReload::new(),
-				children![
-					TemplateDir::new("templates"),
-					RoutesDir::new("routes")
-				],
+				children![RoutesDir::new("routes")],
 			))
 			.flush()
 	}
@@ -360,12 +361,11 @@ mod test {
 		AsyncRunner::settle_async_tasks(world).await;
 	}
 
-	/// Editing templates and adding a route re-registers the edited sources
-	/// through the store and swaps the routes, each change through its own
-	/// reaction. Reads the edits back through the `FsStore`, so nothing here
-	/// touches the filesystem after the writes.
+	/// Editing a document a page instantiates and adding a route each reach the
+	/// next request, the routes swapped. Reads the edits back through the
+	/// `FsStore`, so nothing here touches the filesystem after the writes.
 	#[beet_core::test]
-	async fn reload_reregisters_templates_and_swaps_routes() {
+	async fn reload_forgets_documents_and_swaps_routes() {
 		let mut world = reload_world();
 		let site_dir = site_fixture();
 		let store = BlobStore::new(FsStore::new(site_dir.clone()));
@@ -383,24 +383,17 @@ mod test {
 			.find(&["docs"])
 			.xpect_none();
 
-		// seed a template the mutation below deletes, registered by the dir
-		// rescan its creation fires
-		fs_ext::write(site_dir.join("templates/Gone.bsx"), "<i>gone</i>")
-			.unwrap();
-		touch(
-			&mut world,
-			&store,
-			"templates/Gone.bsx",
-			BlobEventKind::Created,
-		);
-		react(&mut world).await;
-		world
-			.resource::<BsxTemplateRegistry>()
-			.contains("Gone")
-			.xpect_true();
+		let card = async |world: &mut World| {
+			world
+				.entity_mut(root)
+				.exchange(Request::get("card").with_accept(MediaType::Html))
+				.await
+				.unwrap_str()
+				.await
+		};
+		card(&mut world).await.xpect_contains("first card");
 
-		// mutate the site: a new route, an edited template, a new template, a
-		// deleted template
+		// mutate the site: a new route and an edited document
 		fs_ext::write(site_dir.join("routes/docs/intro.md"), "# Intro")
 			.unwrap();
 		fs_ext::write(
@@ -408,9 +401,6 @@ mod test {
 			"<section>second card</section>",
 		)
 		.unwrap();
-		fs_ext::write(site_dir.join("templates/Hero.bsx"), "<h1>hero</h1>")
-			.unwrap();
-		fs_ext::remove(site_dir.join("templates/Gone.bsx")).unwrap();
 		touch(
 			&mut world,
 			&store,
@@ -422,18 +412,6 @@ mod test {
 			&store,
 			"templates/Card.bsx",
 			BlobEventKind::Changed,
-		);
-		touch(
-			&mut world,
-			&store,
-			"templates/Hero.bsx",
-			BlobEventKind::Created,
-		);
-		touch(
-			&mut world,
-			&store,
-			"templates/Gone.bsx",
-			BlobEventKind::Removed,
 		);
 		react(&mut world).await;
 
@@ -450,20 +428,10 @@ mod test {
 			.get::<Children>()
 			.unwrap()
 			.len()
-			.xpect_eq(2);
+			.xpect_eq(3);
 		world.query_once::<&Retired>().len().xpect_eq(0);
-		// the registry serves the edited and the new template sources, and the
-		// deleted one unregistered (the owner diff, not an additive re-register)
-		let registry = world.resource::<BsxTemplateRegistry>();
-		registry.contains("Hero").xpect_true();
-		registry.contains("Gone").xpect_false();
-		registry
-			.get("Card")
-			.unwrap()
-			.nodes
-			.xref()
-			.xmap(|nodes| format!("{nodes:?}"))
-			.xpect_contains("second card");
+		// the edited document is read again
+		card(&mut world).await.xpect_contains("second card");
 	}
 
 	/// Drive the world frame by frame until `done` answers true, panicking if

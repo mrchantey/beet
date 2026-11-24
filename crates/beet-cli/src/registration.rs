@@ -24,6 +24,7 @@ pub fn cli() -> CrateRegistration {
 			"ooxml",
 			"pdf",
 			"qrcode",
+			"scene",
 			"secure",
 			"sockets",
 			"sqlite",

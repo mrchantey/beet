@@ -7,7 +7,6 @@ pub type NodeView<'a> = (
 	Option<&'a Comment>,
 	Option<&'a Element>,
 	Option<&'a Value>,
-	Option<&'a Expression>,
 	Option<&'a CData>,
 	Option<&'a ProcessingInstruction>,
 );
@@ -58,8 +57,7 @@ impl NodeWalker<'_, '_> {
 			return;
 		}
 
-		let (doctype, comment, element, value, expression, cdata, instruction) =
-			node;
+		let (doctype, comment, element, value, cdata, instruction) = node;
 
 		// 1. Doctype
 		if let Some(doctype) = doctype {
@@ -91,11 +89,7 @@ impl NodeWalker<'_, '_> {
 		{
 			visitor.visit_value(&cx, value);
 		}
-		// 5. Expression
-		if let Some(expression) = expression {
-			visitor.visit_expression(&cx, expression);
-		}
-		// 6. Children
+		// 5. Children
 		for child in self.tree.children(cx.entity) {
 			let child_cx = VisitContext {
 				entity: child,
@@ -158,10 +152,4 @@ pub trait NodeVisitor {
 	fn visit_element(&mut self, _cx: &VisitContext, _view: ElementView) {}
 	fn leave_element(&mut self, _cx: &VisitContext, _element: &Element) {}
 	fn visit_value(&mut self, _cx: &VisitContext, _value: &Value) {}
-	fn visit_expression(
-		&mut self,
-		_cx: &VisitContext,
-		_expression: &Expression,
-	) {
-	}
 }

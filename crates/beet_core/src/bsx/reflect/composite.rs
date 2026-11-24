@@ -227,7 +227,11 @@ pub(super) fn enum_to_reflect(
 		// error for a name the enum lacks, which a unit `DynamicEnum` would have
 		// let `from_reflect` miss and leave the field's DEFAULT in place
 		(NamedFields::Unit, Some(enum_info)) => {
-			return reflect_ext::unit_variant_value(enum_info, variant_name);
+			let mut unit =
+				reflect_ext::unit_variant_value(enum_info, variant_name)?;
+			// what tells an option's `None` from a string, written as null
+			unit.set_represented_type(field_info);
+			return Ok(Box::new(unit));
 		}
 		(NamedFields::Unit, None) => DynamicVariant::Unit,
 		(NamedFields::Tuple(items), _) => {

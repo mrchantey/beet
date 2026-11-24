@@ -255,10 +255,8 @@ mod bsx_test {
 	fn build(markup: &str) -> (World, Entity) {
 		let mut world =
 			(TemplatePlugin, DocumentPlugin, MinimalTypesPlugin).into_world();
-		let root = world
-			.spawn_template(BsxTemplate::parse_document(markup).unwrap())
-			.unwrap()
-			.id();
+		let body = SceneBody::parse_bsx(&world, markup).unwrap();
+		let root = world.spawn_template(body).unwrap().id();
 		world.flush();
 		(world, root)
 	}
@@ -274,8 +272,7 @@ mod bsx_test {
 				<Group bx:ref="later"/>
 			</div>"#,
 		);
-		let host = world.entity(root).get::<Children>().unwrap()[0];
-		let children = world.entity(host).get::<Children>().unwrap();
+		let children = world.entity(root).get::<Children>().unwrap();
 		let (first, second, group) = (children[0], children[1], children[2]);
 		world
 			.entity(group)

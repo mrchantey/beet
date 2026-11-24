@@ -475,15 +475,12 @@ mod test {
 	async fn resolves_the_content_format_when_publishing() {
 		let (mut world, router) = site().await;
 		let unknown = Nsid::new_static("com.example.unknown");
-		world
-			.spawn(ChildOf(router))
-			.insert_template(
-				BsxTemplate::parse_document(
-					r#"<StandardSitePub path="blog" name="Harvest" content="com.example.unknown"/>"#,
-				)
-				.unwrap(),
-			)
-			.unwrap();
+		let body = SceneBody::parse_bsx(
+			&world,
+			r#"<StandardSitePub path="blog" name="Harvest" content="com.example.unknown"/>"#,
+		)
+		.unwrap();
+		world.spawn(ChildOf(router)).insert_template(body).unwrap();
 		world.flush();
 		world
 			.query::<&StandardSitePub>()

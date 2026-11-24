@@ -1,10 +1,6 @@
-//! Tests for Task 5: schemas, the registry, and references.
-//!
-//! Covers the gate: schema seed/assert, a missing required prop surfacing a
-//! graceful `TemplateError` (macro and loader paths), file-path module
-//! resolution (`<path::to::X>` from `path/to/X.bsx`), a composable schema
-//! spanning two templates, `Ready` draining on async schema resolution,
-//! and the remote-template stub wired into the pending set.
+//! Tests for a template's prop schema: registered from its typed signature,
+//! held to as a document lowers, with the attributes beyond its props
+//! forwarded.
 beet_core::test_main!();
 
 use beet_core::prelude::*;
@@ -14,28 +10,15 @@ use beet_ui::prelude::*;
 /// A spawn-capable template world.
 fn world() -> World { world_ext::ui_world() }
 
-/// Parse a `.bsx` source into a freshly spawned container, returning the root.
-fn parse_bsx(world: &mut World, source: &str) -> Entity {
+/// Parse a `.bsx` source into a freshly spawned root.
+fn parse_bsx(
+	world: &mut World,
+	source: &str,
+) -> core::result::Result<Entity, ParseError> {
 	let bytes = MediaBytes::new_bsx(source);
 	let mut entity = world.spawn_empty();
-	BsxParser
-		.parse_into(ParseContext::new(&mut entity, &bytes))
-		.unwrap();
-	entity.id()
-}
-
-/// Whether any entity beneath `root` (inclusive) carries a [`TemplateError`].
-fn has_template_error(world: &World, root: Entity) -> bool {
-	let mut stack = vec![root];
-	while let Some(entity) = stack.pop() {
-		if world.entity(entity).contains::<TemplateError>() {
-			return true;
-		}
-		if let Some(children) = world.entity(entity).get::<Children>() {
-			stack.extend(children.iter());
-		}
-	}
-	false
+	DocParsers::parse(ParseContext::new(&mut entity, &bytes))?;
+	entity.id().xok()
 }
 
 // ---- schema typing: a Rust template registers its prop schema ----------------
@@ -74,17 +57,20 @@ fn rust_template_registers_schema() {
 	count.required.xpect_false();
 }
 
-// ---- missing required prop -> graceful TemplateError (macro path) ------------
+// ---- missing required prop -> an error of the document ------------------------
 
+/// A required prop left out, or a prop of the wrong type, refuses the document
+/// as it lowers, naming the tag.
 #[beet_core::test]
-fn macro_missing_required_rides_template_error() {
+fn missing_required_is_refused() {
 	let mut app = world_ext::ui_app();
 	app.install_type::<Badge>();
-	let world = app.world_mut();
-	// `<Badge/>` without `label` builds with the required prop unset.
-	let root = parse_bsx(world, "<Badge count=1/>");
-	// never panicked; the missing required prop rode a TemplateError.
-	has_template_error(world, root).xpect_true();
+	for source in ["<Badge count=1/>", "<Badge label=\"hi\" count=\"lots\"/>"] {
+		parse_bsx(app.world_mut(), source)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("Badge");
+	}
 }
 
 #[beet_core::test]
@@ -92,8 +78,7 @@ fn macro_required_prop_present_ok() {
 	let mut app = world_ext::ui_app();
 	app.install_type::<Badge>();
 	let world = app.world_mut();
-	let root = parse_bsx(world, "<Badge label=\"hi\" count=1/>");
-	has_template_error(world, root).xpect_false();
+	parse_bsx(world, "<Badge label=\"hi\" count=1/>").unwrap();
 }
 
 // ---- attributes beyond the props forward to the root element -----------------
@@ -118,149 +103,13 @@ fn rust_template_forwards_attributes() {
 	let mut app = world_ext::ui_app();
 	app.install_type::<Badge>();
 	let world = app.world_mut();
-	let root = parse_bsx(world, r#"<Badge label="hi" class="extra" hidden/>"#);
-	has_template_error(world, root).xpect_false();
+	let root = parse_bsx(world, r#"<Badge label="hi" class="extra" hidden/>"#)
+		.unwrap();
 	render_html(world, root)
 		.xpect_contains(" hidden")
 		.xpect_contains(r#"class="extra""#)
 		.xnot()
 		.xpect_contains("label=");
-}
-
-/// A BSX template declaring its props forwards the rest, replacing the root's
-/// own value; with two roots there is no element to take them, an error rather
-/// than a silent drop.
-#[beet_core::test]
-fn bsx_template_forwards_attributes() {
-	let mut world = world();
-	let schema = r#"<script type="json" bx:schema>{ "title": { "type": "string" } }</script>"#;
-	let mut registry = BsxTemplateRegistry::default();
-	registry
-		.insert_source("Card", &format!(r#"{schema}<section id="card"/>"#))
-		.unwrap();
-	registry
-		.insert_source("Pair", &format!("{schema}<a/><b/>"))
-		.unwrap();
-	world.insert_resource(registry);
-
-	let card = parse_bsx(&mut world, r#"<Card title="hi" id="main"/>"#);
-	render_html(&mut world, card)
-		.xpect_contains(r#"<section id="main""#)
-		.xnot()
-		.xpect_contains("title=");
-	let pair = parse_bsx(&mut world, r#"<Pair id="main"/>"#);
-	has_template_error(&world, pair).xpect_true();
-}
-
-// ---- missing required prop -> graceful TemplateError (loader path) -----------
-
-#[beet_core::test]
-fn loader_missing_required_rides_template_error() {
-	let mut world = world();
-	// a BSX template declaring a required `title` prop via a `bx:schema` block.
-	let mut registry = BsxTemplateRegistry::default();
-	registry
-		.insert_source(
-			"Card",
-			"<script type=\"json\" bx:schema>{ \"title\": { \"type\": \"string\", \"required\": true } }</script><section><h1>{@doc:title}</h1></section>",
-		)
-		.unwrap();
-	world.insert_resource(registry);
-
-	// `<Card/>` without `title` violates the schema -> graceful error.
-	let root = parse_bsx(&mut world, "<Card/>");
-	has_template_error(&world, root).xpect_true();
-
-	// providing the required prop validates.
-	let ok = parse_bsx(&mut world, "<Card title=\"hello\"/>");
-	has_template_error(&world, ok).xpect_false();
-}
-
-/// A declared `bx:schema` block that does not parse fails registration, rather
-/// than silently registering an unschema'd template whose props then validate
-/// against nothing.
-#[beet_core::test]
-fn malformed_schema_block_fails_registration() {
-	BsxTemplateRegistry::default()
-		.insert_source(
-			"Card",
-			"<script type=\"json\" bx:schema>not json</script><section/>",
-		)
-		.xpect_err();
-	// a template declaring no block registers with no schema, as before
-	BsxTemplateRegistry::default()
-		.insert_source("Card", "<section/>")
-		.unwrap();
-}
-
-// ---- module-path resolution: <path::to::X> from path/to/X.bsx ----------------
-
-#[beet_core::test]
-fn module_path_resolution_from_path() {
-	let mut world = world();
-	// register a template by its store-relative path, so its module path derives
-	// `path::to::X` and `<path::to::X>` resolves (the store-backed loader hands each
-	// `(path, source)` pair here).
-	let mut registry = BsxTemplateRegistry::default();
-	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-	registry
-		.insert_source_from_path(
-			&formats,
-			&RelPath::from("path/to/X.bsx"),
-			"<strong>indexed</strong>",
-		)
-		.unwrap();
-	world.insert_resource(registry);
-	world
-		.resource::<BsxTemplateRegistry>()
-		.contains("path::to::X")
-		.xpect_true();
-
-	let root = parse_bsx(&mut world, "<path::to::X/>");
-	let html = HtmlRenderer::new()
-		.render(&mut RenderContext::new(
-			&mut world,
-			root,
-			&RequestParts::default(),
-		))
-		.unwrap()
-		.to_string();
-	html.xpect_contains("indexed");
-}
-
-// ---- composable schema spanning two templates --------------------------------
-
-#[beet_core::test]
-fn composable_schema_validates_recursively() {
-	let mut world = world();
-	// register two BSX templates: `TodoItem` (a struct) and `TodoList` whose
-	// `items` is a list of `TodoItem` (a composable reference).
-	let mut registry = BsxTemplateRegistry::default();
-	registry
-		.insert_source(
-			"TodoItem",
-			"<script type=\"json\" bx:schema>{ \"label\": { \"type\": \"string\", \"required\": true } }</script><li>{@doc:label}</li>",
-		)
-		.unwrap();
-	registry
-		.insert_source(
-			"TodoList",
-			"<script type=\"json\" bx:schema>{ \"items\": { \"items\": \"TodoItem\", \"required\": true } }</script><ul>x</ul>",
-		)
-		.unwrap();
-	world.insert_resource(registry);
-	// mirror the BSX schemas into the shared schema registry so the `TodoItem`
-	// reference resolves.
-	BsxTemplateRegistry::refresh_schemas(&mut world);
-
-	// a valid list of todo items passes recursive validation.
-	let ok =
-		parse_bsx(&mut world, "<TodoList items={[{label:\"buy milk\"}]}/>");
-	has_template_error(&world, ok).xpect_false();
-
-	// a todo item missing its required `label` fails recursively.
-	let bad = parse_bsx(&mut world, "<TodoList items={[{}]}/>");
-	has_template_error(&world, bad).xpect_true();
 }
 
 // ---- reflect-field binding: <MyComponent value=@doc:path> --------------------
@@ -283,16 +132,14 @@ fn component_field_binds_document() {
 	let bytes = MediaBytes::new_bsx("<Slider value=@doc:level/>");
 	let root = {
 		let mut entity = world.spawn(ChildOf(doc));
-		BsxParser
-			.parse_into(ParseContext::new(&mut entity, &bytes))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(&mut entity, &bytes)).unwrap();
 		entity.id()
 	};
 	world.update_local();
 	world.update_local();
 
 	// the document value reached the component field.
-	let slider = world.entity(root).get::<Children>().unwrap()[0];
+	let slider = root;
 	world
 		.entity(slider)
 		.get::<Slider>()
@@ -305,111 +152,4 @@ fn component_field_binds_document() {
 		.entity(slider)
 		.contains::<ReflectFieldRef>()
 		.xpect_true();
-}
-
-// ---- async schema resolution drains Ready -----------------------------
-
-#[beet_core::test(timeout_ms = 5000)]
-async fn async_remote_schema_defers_load() {
-	let mut app = App::new();
-	app.add_plugins(MinimalPlugins.set(TaskPoolPlugin {
-		task_pool_options: TaskPoolOptions::with_num_threads(2),
-	}));
-	app.add_plugins((AsyncPlugin, TemplatePlugin, DocumentPlugin));
-
-	// a BSX template whose schema is fetched remotely (stubbed), deferring load.
-	let mut registry = BsxTemplateRegistry::default();
-	registry
-		.insert_source(
-			"Remote",
-			"<script bx:schema src=\"https://example.com/schema.json\"></script><div>remote</div>",
-		)
-		.unwrap();
-	app.world_mut().insert_resource(registry);
-
-	let load_state = Store::new(None);
-	let ls = load_state.clone();
-	app.world_mut().add_observer(
-		move |ev: On<Ready>, errors: Query<(), With<TemplateError>>| {
-			ls.set(Some(errors.contains(ev.entity)))
-		},
-	);
-
-	// spawn the template; the remote schema parks a pending dependency.
-	let bytes = MediaBytes::new_bsx("<Remote/>");
-	let root = {
-		let world = app.world_mut();
-		let mut entity = world.spawn_empty();
-		BsxParser
-			.parse_into(ParseContext::new(&mut entity, &bytes))
-			.unwrap();
-		entity.id()
-	};
-
-	// Ready has not fired: the remote schema is still pending.
-	load_state.get().xpect_none();
-	let pending = app.world().entity(root).get::<TemplatePending>();
-	pending
-		.map(|pending| pending.is_empty())
-		.xpect_eq(Some(false));
-
-	// pump frames until the async fetch resolves and the pending set drains.
-	for _ in 0..200 {
-		app.update();
-		if load_state.get().is_some() {
-			break;
-		}
-		time_ext::sleep_millis(5).await;
-	}
-	// Ready fired once the remote schema resolved.
-	load_state.get().xpect_eq(Some(false));
-}
-
-// ---- remote-template stub wired into the pending set -------------------------
-
-#[beet_core::test(timeout_ms = 5000)]
-async fn remote_template_stub_defers_load() {
-	let mut app = App::new();
-	app.add_plugins(MinimalPlugins.set(TaskPoolPlugin {
-		task_pool_options: TaskPoolOptions::with_num_threads(2),
-	}));
-	app.add_plugins((AsyncPlugin, TemplatePlugin, DocumentPlugin));
-
-	let load_state = Store::new(None);
-	let ls = load_state.clone();
-	app.world_mut().add_observer(
-		move |ev: On<Ready>, errors: Query<(), With<TemplateError>>| {
-			ls.set(Some(errors.contains(ev.entity)))
-		},
-	);
-
-	// `<Template src="..">` registers a pending fetch into the root's pending set.
-	let bytes =
-		MediaBytes::new_bsx("<Template src=\"https://example.com/Todo.bsx\"/>");
-	let root = {
-		let world = app.world_mut();
-		let mut entity = world.spawn_empty();
-		BsxParser
-			.parse_into(ParseContext::new(&mut entity, &bytes))
-			.unwrap();
-		entity.id()
-	};
-
-	// the fetch is pending, so Ready is deferred.
-	load_state.get().xpect_none();
-	app.world()
-		.entity(root)
-		.get::<TemplatePending>()
-		.map(|pending| pending.is_empty())
-		.xpect_eq(Some(false));
-
-	// pump frames until the stubbed fetch resolves and the pending set drains.
-	for _ in 0..200 {
-		app.update();
-		if load_state.get().is_some() {
-			break;
-		}
-		time_ext::sleep_millis(5).await;
-	}
-	load_state.get().xpect_eq(Some(false));
 }

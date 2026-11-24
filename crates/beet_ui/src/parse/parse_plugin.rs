@@ -1,11 +1,11 @@
 //! The markup formats, and scheduling for the post-parse pipeline.
 //!
 //! The format registry is `beet_core`'s [`DocParsers`], where a parser returns
-//! a scene body and the base formats (plain text, the structured ones) are
-//! always present; [`ParsePlugin`] adds the markup formats this crate reads,
-//! BSX, HTML and XML (`bsx`) and markdown (`markdown_parser`). The Office
-//! formats (`ooxml`) are `OoxmlPlugin`'s, which a router installs: their
-//! writers resolve looks through the style plugin, itself built over this one.
+//! a scene body and the base formats (plain text, the structured ones, BSX,
+//! HTML and XML) are always present; [`ParsePlugin`] adds the formats this
+//! crate reads, markdown and mdx (`markdown_parser`). The Office formats
+//! (`ooxml`) are `OoxmlPlugin`'s, which a router installs: their writers
+//! resolve looks through the style plugin, itself built over this one.
 //!
 //! [`PostParseTree`] is the single schedule where a parsed entity tree is
 //! styled, decorated, laid out, and painted. Every render path runs it
@@ -45,14 +45,14 @@ impl ParsePlugin {
 	/// with no markdown parser.
 	fn register_markup(parsers: &mut DocParsers) {
 		#[cfg(feature = "bsx")]
-		parsers
-			.register(
-				PlainTextParser::default()
-					.with_declarations(Frontmatter::root_declarations),
-			)
-			.register(BsxParser);
+		parsers.register(
+			PlainTextParser::default()
+				.with_root_components(Frontmatter::root_components),
+		);
 		#[cfg(feature = "markdown_parser")]
-		parsers.register(MarkdownParser::new());
+		parsers
+			.register(MarkdownParser::new())
+			.register(MarkdownParser::mdx());
 		#[cfg(not(any(feature = "bsx", feature = "markdown_parser")))]
 		let _ = parsers;
 	}
@@ -147,17 +147,9 @@ mod test {
 		(world, entity)
 	}
 
-	/// The tag of `entity`'s first child.
-	#[cfg(feature = "bsx")]
-	fn first_tag(world: &mut World, entity: Entity) -> String {
-		world
-			.entity_mut(entity)
-			.child(0)
-			.unwrap()
-			.get::<Element>()
-			.unwrap()
-			.tag()
-			.to_string()
+	/// The tag of `entity`.
+	fn tag(world: &World, entity: Entity) -> &str {
+		world.get::<Element>(entity).unwrap().tag()
 	}
 
 	/// Plain text lands on the entity it parses onto, the body's one entity.
@@ -176,35 +168,23 @@ mod test {
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn parse_html() {
-		let (mut world, entity) =
-			parse(&MediaBytes::new_html("<div>hello</div>"));
-		first_tag(&mut world, entity).xpect_eq("div".to_string());
+		let (world, entity) = parse(&MediaBytes::new_html("<div>hello</div>"));
+		tag(&world, entity).xpect_eq("div");
 	}
 
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn parse_bsx() {
-		let (mut world, entity) =
-			parse(&MediaBytes::new_bsx("<div>hello</div>"));
-		first_tag(&mut world, entity).xpect_eq("div".to_string());
+		let (world, entity) = parse(&MediaBytes::new_bsx("<div>hello</div>"));
+		tag(&world, entity).xpect_eq("div");
 	}
 
 	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
 	fn parse_markdown() {
-		let (mut world, entity) = parse(&MediaBytes::new_markdown("# Title"));
-		first_tag(&mut world, entity).xpect_eq("h1".to_string());
-	}
-
-	/// A markup parser builds into a world, so it has no body to return.
-	#[cfg(feature = "bsx")]
-	#[beet_core::test]
-	fn markup_has_no_body_yet() {
-		ParsePlugin::parsers()
-			.body(&MediaBytes::new_bsx("<div/>"))
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("parses into a world");
+		let (world, entity) = parse(&MediaBytes::new_markdown("# Title"));
+		let heading = world.get::<Children>(entity).unwrap()[0];
+		tag(&world, heading).xpect_eq("h1");
 	}
 
 	/// Frontmatter is a property of the markdown format: with only the plain
@@ -215,30 +195,67 @@ mod test {
 		let mut parsers = DocParsers::default();
 		parsers.register(
 			PlainTextParser::default()
-				.with_declarations(Frontmatter::root_declarations),
+				.with_root_components(Frontmatter::root_components),
 		);
-		let declarations = parsers
-			.declarations(
-				&MediaBytes::new_markdown(
-					"+++\ntitle = \"Post\"\n[RouteMeta]\norder = 2\n+++\n\n# Post",
-				),
-				"DocMeta",
-			)
-			.unwrap();
-		declarations
-			.0
-			.iter()
-			.map(|literal| literal.name.as_str())
+		parsers
+			.root_components(&MediaBytes::new_markdown(
+				"+++\ntitle = \"Post\"\n[RouteMeta]\norder = 2\n+++\n\n# Post",
+			))
+			.unwrap()
+			.keys()
+			.map(|name| name.as_str())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["DocMeta", "RouteMeta"]);
 		// a plain text document leading with a fence declares nothing
 		parsers
-			.declarations(
-				&MediaBytes::new_text("+++\ntitle = \"x\"\n+++"),
-				"DocMeta",
-			)
+			.root_components(&MediaBytes::new_text("+++\ntitle = \"x\"\n+++"))
 			.unwrap()
 			.is_empty()
 			.xpect_true();
+	}
+
+	/// A root carries its document's metadata, whichever markup declares it:
+	/// frontmatter and a root spread read alike off the body's first entity.
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn metadata_is_the_roots_components() {
+		let world = world_ext::ui_world();
+		let parsers = DocParsers::of(&world);
+		let registry = world.resource::<AppTypeRegistry>().read();
+		let title = |bytes: MediaBytes| {
+			parsers
+				.root_components(&bytes)
+				.unwrap()
+				.get_reflect::<DocMeta>(&registry)
+				.unwrap()
+				.unwrap()
+				.title
+		};
+		let expected =
+			title(MediaBytes::new_markdown("---\ntitle: Post\n---\n# Hi"));
+		expected.as_deref().xpect_eq(Some("Post"));
+		title(MediaBytes::new_bsx(
+			r#"<main {DocMeta{title:"Post"}}><h1>Hi</h1></main>"#,
+		))
+		.xpect_eq(expected);
+	}
+
+	/// Mdx is markdown whose text holds expressions, its embedded BSX one tree
+	/// with the prose around it.
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn mdx_embeds_bsx() {
+		let (mut world, entity) = parse(&MediaBytes::new_str(
+			MediaType::Mdx,
+			"# Hi {@doc:name}\n\n<section bx:scope=\"user\" {Name(\"Card\")}><p>a</p></section>",
+		));
+		let children = world.get::<Children>(entity).unwrap().to_vec();
+		tag(&world, children[0]).xpect_eq("h1");
+		tag(&world, children[1]).xpect_eq("section");
+		world
+			.entity(children[1])
+			.contains::<DocumentScope>()
+			.xpect_true();
+		world.query::<&FieldRef>().iter(&world).count().xpect_eq(1);
 	}
 }

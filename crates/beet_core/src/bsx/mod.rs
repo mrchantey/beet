@@ -1,28 +1,21 @@
-//! The BSX parser: one hand-written recursive-descent cursor parser whose
-//! disabled-surface configuration is exactly HTML.
+//! BSX: one hand-written recursive-descent cursor parser whose
+//! disabled-surface configuration is exactly HTML, and the lowering of its
+//! syntax tree to a [`SceneBody`].
 //!
 //! BSX is the full grammar (uppercase resolution, the value grammar, `bx:`
 //! directives); HTML is BSX with that surface disabled. The parser is
 //! XML-inspired markup, not "an HTML subset": one grammar, with HTML the markup
-//! it accepts when the extra surface is switched off. It builds a
-//! [`BsxNode`] syntax tree, resolved into a document-wired entity
-//! tree through the template substrate by [`BsxTemplate`], so a `.bsx` file
-//! produces trees identical to what `rsx!` lowers to.
-//!
-//! Author + parse + build live here in `beet_core`, beside the format registry
-//! [`DocParsers`]; rendering the built tree to HTML or charcell lives in
-//! `beet_ui`, as do its BSX parser, which delegates to
-//! [`BsxNode::parse_document`] + [`BsxTemplate`], and the `DocRenderers`
-//! registry.
+//! it accepts when the extra surface is switched off. A document becomes a
+//! [`BsxNode`] syntax tree ([`BsxNode::parse_document`], where a tool that edits
+//! markup stops), its directives are rewritten, and the result lowers to the
+//! scene body every other format reads to. No world is touched until that body
+//! spawns: [`BsxParser`] is a [`DocParser`] like any other.
 //!
 //! Internal split, one directory per stage: source text to syntax tree in
-//! `parse` (the cursor, the markup parser, the value grammar, the
-//! source-format registry), syntax tree to explicit syntax tree in
-//! `directive` (every `bx:` directive rewritten away, touching no world),
-//! literal to reflected value in `reflect` (with the root declaration block
-//! and prop-schema verification), and syntax tree to world in `resolve` (the
-//! build walk and the resolver hooks a host installs into it). Alongside them sit the BSX-template registry
-//! ([`BsxTemplateRegistry`]) and the entry-document front-end.
+//! `parse` (the cursor, the markup parser, the value grammar), syntax tree to
+//! explicit syntax tree in `directive` (every `bx:` directive rewritten away),
+//! syntax tree to scene body in `lower`, and authored literal to reflected value
+//! in `reflect` (with prop-schema verification).
 //!
 //! # Syntax
 //!
@@ -37,15 +30,25 @@
 //! shape a full one does and only its behavior is missing.
 //!
 //! [`bx:cfg`](BuildCondition) is the one directive that breaks that last
-//! sentence, deliberately: it removes its node and subtree from the syntax tree
-//! before the build walk, so an excluded branch has no shape to load. Structure
-//! stays universal by default because an inert entity costs nothing; a node that
-//! performs a build-time EFFECT (`<Template src>` reading a file) has no inert
-//! form, and `bx:cfg` is how such a branch is kept out of a build that must not
-//! run it. It leaves a [`CfgExcluded`] tombstone,
+//! sentence, deliberately: it lowers to a [`Cfg`], and a subtree whose condition
+//! is unmet is pruned from the body as it spawns, so an excluded branch has no
+//! shape to load. Structure stays universal by default because an inert entity
+//! costs nothing; a node that performs an EFFECT as it builds (an [`Instance`]
+//! reading a file) has no inert form, and `bx:cfg` is how such a branch is kept
+//! out of a build that must not run it. It leaves a [`CfgExcluded`] tombstone,
 //! so an excluded route still reports why it is missing rather than 404ing.
 //! Asserting the same condition instead of applying it is
 //! [`RequireCfg`](crate::prelude::RequireCfg), which refuses the whole load.
+//!
+//! ## Entities and keys
+//!
+//! A document whose one root is an element is that element: its components are
+//! the spawned root's, and its spreads the document's metadata. Any other
+//! document (several roots, text beside an element) is a bare root holding them.
+//! Each entity of the body is keyed by where it sits (`0/section.0/p.1`, minted as
+//! the `lower` module docs state), so the same markup always keys the same.
+//! `bx:ref="name"` replaces the key with `name`, which `$name` then references
+//! from anywhere in the document, before or after.
 //!
 //! ## Bindings
 //!
@@ -70,8 +73,8 @@
 //!   the names `BuildRoot`, `SnippetRoot`, `PageRoot` and `Router` are reserved
 //!   (`ReservedRef`) for well-known entities (the latter two resolved lazily
 //!   each sync pass) and may not be shadowed
-//! - `@prop:` the enclosing `.bsx` template's props store, materialized from
-//!   the caller's tag attributes (a binding-valued prop chains reactively)
+//! - `@prop:` the props of the nearest use of a document above, what its
+//!   [`Instance`] passed (a bound prop chains reactively)
 //!
 //! Bindings work in attribute position (`value=@res:Theme.contrast`), text
 //! position (`{@doc:name}`), and as spread-tuple items
@@ -100,7 +103,7 @@
 //! ## Directives
 //!
 //! A `bx:` directive is sugar for explicit BSX and nothing else, rewritten
-//! between parsing and the build ([`BsxDirectives`]), so the scene, a save and
+//! between parsing and the lowering ([`BsxDirectives`]), so the scene, a save and
 //! the runtime never learn it existed. The line between the two kinds of
 //! shorthand is the world: a directive needs none and runs as a document
 //! lowers, where a `#[template]` needs one and runs at spawn. A rewrite's
@@ -108,6 +111,8 @@
 //! set:
 //!
 //! ```text
+//! bx:ref="name"                      the entity's key
+//! bx:cfg="feature:infra"             {Cfg{cfg:"feature:infra"}}
 //! bx:scope="user"                    {DocumentScope{path:"user"}}
 //! bx:for="entries" bx:key="name"     {(ReactiveChildren{key:"name"}, @doc:entries)}
 //!                                    with the children wrapped in a <template>
@@ -121,27 +126,21 @@
 //! A downstream directive is a [`BsxDirective`] installed like any registry
 //! entry, `app.install(MyDirective)`, landing in the set [`DocParsers`]
 //! carries and shadowing an earlier one for the keys it matches. A `bx:` key
-//! nothing matches refuses the document. `bx:ref`, `bx:cfg` and `bx:schema`
-//! are still read by the build walk itself.
+//! nothing matches refuses the document.
 //!
 //! ```
 //! use beet_core::prelude::*;
 //!
 //! let mut world = (TemplatePlugin, DocumentPlugin).into_world();
-//! let nodes = BsxNode::parse_document(
+//! let section = SceneBody::spawn_bsx(
+//!     &mut world,
 //!     r#"<section bx:scope="user"><p>{@doc:name="Ada"}</p><button bx:onclick="target.with_field('clicks', clicks => clicks + 1)">+</button></section>"#,
-//!     &BsxParseConfig::bsx(),
 //! )
 //! .unwrap();
-//! let root = world
-//!     .spawn_template(BsxTemplate::container(nodes, BsxTemplateRegistry::default()))
-//!     .unwrap()
-//!     .id();
 //! world.update_local();
 //!
 //! // the `bx:scope` directive is a `DocumentScope`, so the text binding
 //! // resolves `user.name`, initialized from the binding's `=init`
-//! let section = world.entity(root).get::<Children>().unwrap()[0];
 //! assert!(world.entity(section).contains::<DocumentScope>());
 //! let paragraph = world.entity(section).get::<Children>().unwrap()[0];
 //! let text = world.entity(paragraph).get::<Children>().unwrap()[0];
@@ -152,57 +151,44 @@
 //! assert!(!world.entity(button).contains::<FieldRef>());
 //! ```
 //!
-//! ## Templates
+//! ## Templates and documents
 //!
-//! An uppercase tag resolves by name: a Rust component/template via the type
-//! registry, a `#[reflect(Resource)]` type (`<PackageConfig title=".."/>`
-//! patches the live resource's named fields, producing no markup), or a
-//! `<path::to::X>` `.bsx` template from the [`BsxTemplateRegistry`]. A `.bsx`
-//! template's tag attributes materialize into its props store (bound in the
-//! body via `@prop:`), caller content composes through its `<slot/>`, and the
-//! entity it builds into records its key as a [`TemplateInstance`]:
+//! An uppercase tag resolves by name against the type registry: a component, a
+//! `#[template]`, or a `#[reflect(Resource)]` type (`<PackageConfig title=".."/>`
+//! patches the live resource's named fields, producing no markup). Another
+//! *document* is never a tag: it is an [`Instance`], naming it by a [`DocPath`],
+//! relative to the document it is written in when it starts with `./` or `../`
+//! and to the package (the directory the entry is in) otherwise, the extension
+//! optional where one file matches.
 //!
-//! ```
-//! use beet_core::prelude::*;
+//! ```text
+//! <!-- widgets/Card.bsx -->
+//! <Prop name="title" kind="string" default="Untitled"/>
+//! <section><h2>{@prop:title}</h2><slot/></section>
 //!
-//! let mut world = (TemplatePlugin, DocumentPlugin).into_world();
-//! let mut registry = BsxTemplateRegistry::default();
-//! registry
-//!     .insert_source("Card", "<section><h2>{@prop:title}</h2><slot/></section>")
-//!     .unwrap();
-//!
-//! let nodes = BsxNode::parse_document(
-//!     r#"<Card title="Intro"><p>hi</p></Card>"#,
-//!     &BsxParseConfig::bsx(),
-//! )
-//! .unwrap();
-//! let root =
-//!     world.spawn_template(BsxTemplate::container(nodes, registry)).unwrap().id();
-//! world.update_local();
-//!
-//! // `<Card>` built its `<section>` body into the entity, the caller's `<p>`
-//! // routed into the slot, and `@prop:title` synced the caller's prop
-//! let card = world.entity(root).get::<Children>().unwrap()[0];
-//! assert_eq!(world.entity(card).get::<Element>().unwrap().tag(), "section");
-//! assert_eq!(world.entity(card).get::<TemplateInstance>().unwrap().0, vec![SmolStr::from("Card")]);
-//! let heading = world.entity(card).get::<Children>().unwrap()[0];
-//! let title = world.entity(heading).get::<Children>().unwrap()[0];
-//! assert_eq!(world.entity(title).get::<Value>().unwrap(), &Value::Str("Intro".into()));
+//! <!-- a page -->
+//! <Instance document="widgets/Card" props={{title:"Intro"}}><p>hi</p></Instance>
 //! ```
 //!
-//! A template's root element is the tag's own entity (comments beside it
-//! document the file and build nothing, as beside an entry's root), so an
-//! attribute beyond its declared props (a Rust template's fields, a `.bsx` template's
-//! `bx:schema`) falls through to that element: `<Link href="/docs" hidden>`
+//! The document is read once and held as data, and each use builds it under the
+//! use site with entities of its own: `props` fill its `@prop:` bindings, bound
+//! or literal, a [`Prop`] declares one with its default, and the use's children
+//! fill its `<slot>`s. A document instantiating itself, however indirectly, is
+//! refused; recursion over data is a list's. Activation is `beet_scene`'s.
+//!
+//! A template's root element is the tag's own entity, so an attribute beyond its
+//! declared props falls through to that element: `<Link href="/docs" hidden>`
 //! renders `<a href="/docs" hidden class="btn ..">`. A `class` joins the
 //! element's own, any other key replaces its value, and a template with no
-//! single root element refuses the attribute rather than dropping it. A `.bsx`
-//! template declaring no schema, like `<Card>` above, takes every attribute as
-//! a prop.
+//! single root element refuses the attribute rather than dropping it.
+//!
+//! A component may hold its children unbuilt, as content it builds when it
+//! chooses, by implementing [`HoldChildren`]: each child lowers into the field
+//! its `slot` names, a scene body within the body.
 //!
 //! The remaining surface (bare-position component spreads `{(A, B)}`, the `$ref`
 //! entity references, enum/struct/list literals) lives in the value grammar
-//! (`parse`) and AST-to-world resolution (`resolve`).
+//! (`parse`) and its reflection (`reflect`).
 //!
 //! [`Document`]: crate::prelude::Document
 //! [`Element`]: crate::prelude::Element
@@ -228,8 +214,7 @@
 //! as a tag exactly as in a spread, so `<Repeat>`, `<Sequence>` and
 //! `<RepeatTimes total_times=2>` all author directly. For a plain grouping use
 //! `<Fragment>`, not `<div>`: it carries spreads, directives and children but
-//! emits no element (`<Template>` is the *include* front-end,
-//! `<Template src="..">`; with no `src` a directives-only no-op).
+//! emits no element.
 //!
 //! `<Tag/>` resolves a component or template by short type path and spawns its
 //! own entity; `{Spread}` / `{(A, B)}` adds components to the *current* entity.
@@ -241,8 +226,8 @@
 //! `<Route path="deploy" {ExchangeSequence}><MyBlock/><MyAction/></Route>`.
 //!
 //! An entry document has a single root element. Beside it may sit only the
-//! declarations its launch pre-scans (`<RepoRoot>`, `<TemplateDir>`,
-//! `<RequireCfg>`, `<Secrets>`, and whatever prescan type `app.install_type::<T>()`
+//! declarations its launch pre-scans (`<RepoRoot>`, `<RequireCfg>`,
+//! `<Secrets>`, and whatever prescan type `app.install_type::<T>()`
 //! adds), with string attributes and no `bx:cfg`: each acts before the build
 //! and is consumed rather than built, so a root admitting no such child still
 //! states what it needs. Anything else there is a second root, an error
@@ -254,24 +239,22 @@
 //! ```
 //!
 //! A sequence route that skipped every child fails naming its unregistered
-//! tags, and `beet check` elevates [`Unregistered`] to an error;
-//! `Unregistered::allow` opts out a tag whose whole content is the missing
-//! behavior (`<LiveReloadScript/>`). `bx:cfg` atoms are `namespace:argument`
+//! tags, and `beet check` elevates [`Unregistered`] to an error. `bx:cfg` atoms are `namespace:argument`
 //! resolved through the `BsxConditions` seam (`feature:`, `version:`, `env:` in
 //! core, downstream registers its own) with Rust's `#[cfg]` operators and
 //! precedence, and an unknown namespace is a hard error, never a silent false.
 
+mod bsx_parser;
 mod bsx_plugin;
+mod build_cfg;
 mod directive;
-mod entry;
+mod lower;
 mod parse;
 mod reflect;
-mod registry;
-mod resolve;
 
+pub use bsx_parser::*;
 pub use bsx_plugin::*;
+pub use build_cfg::*;
 pub use directive::*;
+pub use lower::*;
 pub use parse::*;
-pub use reflect::*;
-pub use registry::*;
-pub use resolve::*;

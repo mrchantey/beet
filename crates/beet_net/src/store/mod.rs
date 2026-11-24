@@ -70,12 +70,14 @@ pub use loading::*;
 // core.
 mod store_fork;
 // the one canonical store an app runs from, and the singleton it enforces.
+mod package_store;
 mod repo_store;
 mod store_path;
 pub use blob::*;
 pub use blob_store::*;
 pub use blob_sync::*;
 pub use in_memory_store::*;
+pub use package_store::*;
 pub use repo_store::*;
 pub use store_fork::*;
 pub use store_path::*;

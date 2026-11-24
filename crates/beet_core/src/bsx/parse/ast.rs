@@ -1,14 +1,15 @@
-//! The BSX syntax tree the cursor parser produces, before resolution into a
-//! [`DynamicTemplate`](beet_core::prelude::DynamicTemplate).
+//! The BSX syntax tree the cursor parser produces, before it lowers to a
+//! [`SceneBody`].
 //!
 //! The tree is deliberately close to the markup surface: an element carries its
 //! raw tag, its attributes (each a key plus an [`AttrValue`]), and its children.
 //! The value grammar ([`DataLiteral`], [`ValueExpr`]) is shared by attribute
-//! values, text-position `{..}` blocks, and bare-position spreads. Resolution
-//! ([`crate::bsx::resolve`]) walks this tree; type inference happens there, against
+//! values, text-position `{..}` blocks, and bare-position spreads. The lowering
+//! ([`BsxParser::lower`]) walks this tree; type inference happens there, against
 //! the target's `TypeInfo`, not here.
 
 use crate::prelude::*;
+use alloc::boxed::Box;
 
 /// A single node in the BSX tree.
 #[derive(Debug, Clone, PartialEq)]
@@ -33,7 +34,7 @@ pub enum BsxNode {
 /// An element: a tag, its attributes, and its children.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BsxElement {
-	/// The raw tag text, ie `div`, `MyTemplate`, `path::to::X`, `Slot`. For a
+	/// The raw tag text, ie `div`, `MyTemplate`. For a
 	/// tag-position literal (`<Name("x")/>`, `<LogLike::Message("hi")/>`) this is the
 	/// base component name (`Name`, `Log`), with the full literal in
 	/// [`tag_literal`](Self::tag_literal).
@@ -44,6 +45,8 @@ pub struct BsxElement {
 	/// rather than over `Default::default()`. `None` for a bare tag like
 	/// `<Sequence>`.
 	pub tag_literal: Option<NamedLiteral>,
+	/// The name its `bx:ref` gives the entity, which keys it in the body.
+	pub key: Option<SmolStr>,
 	/// The attributes in source order.
 	pub attributes: Vec<BsxAttribute>,
 	/// The child nodes in source order.
@@ -160,6 +163,42 @@ impl BsxElement {
 	}
 }
 
+/// Reading an element whose directives are rewritten.
+impl BsxElement {
+	/// The slot routing attribute, HTML's own.
+	const SLOT: &'static str = "slot";
+
+	/// Whether the tag resolves by name (a component, template or resource)
+	/// rather than as an HTML element: a capitalized tag, or a path whose
+	/// final segment is capitalized.
+	pub fn is_named(&self) -> bool {
+		self.tag
+			.rsplit("::")
+			.next()
+			.unwrap_or(&self.tag)
+			.starts_with(|ch: char| ch.is_uppercase())
+	}
+
+	/// The attributes that are values of the element's own: neither a spread
+	/// nor the `slot` routing it.
+	pub fn plain_attributes(&self) -> impl Iterator<Item = &BsxAttribute> {
+		self.attributes
+			.iter()
+			.filter(|attr| !attr.key.is_empty() && attr.key != Self::SLOT)
+	}
+
+	/// The [`SlotChild`] its `slot` routes it by, if any.
+	pub fn slot_routing(&self) -> Option<SlotChild> {
+		self.attributes
+			.iter()
+			.find(|attr| attr.key == Self::SLOT)
+			.map(|attr| match &attr.value {
+				AttrValue::Str(name) => SlotChild::named(name.clone()),
+				_ => SlotChild::new(),
+			})
+	}
+}
+
 /// Edits a directive's rewrite makes.
 impl BsxElement {
 	/// An element as a rewrite authors it, self closing when it has no
@@ -172,6 +211,7 @@ impl BsxElement {
 		Self {
 			tag: tag.into(),
 			tag_literal: None,
+			key: None,
 			attributes,
 			self_closing: children.is_empty(),
 			children,
@@ -259,6 +299,11 @@ pub struct BsxAttribute {
 }
 
 impl BsxAttribute {
+	/// Whether the value is an `@` binding.
+	pub fn is_binding(&self) -> bool {
+		matches!(self.value, AttrValue::Expr(ValueExpr::Binding(_)))
+	}
+
 	/// A bare-position spread, `<el {..}>`, which has no key.
 	pub fn spread(spread: SpreadExpr) -> Self {
 		Self {
@@ -354,7 +399,7 @@ pub enum BindingSource {
 	Res,
 	/// `@comp:` a reflected component field.
 	Comp,
-	/// `@prop:` the nearest ancestor template props store.
+	/// `@prop:` the nearest use site above, what its [`Instance`] passed.
 	Prop,
 }
 
@@ -405,6 +450,9 @@ pub enum DataLiteral {
 	/// field of a spread component (`Linked{to:$target}`). Resolved against the
 	/// one entity model at build time.
 	EntityRef(SmolStr),
+	/// An `@` binding nested inside a literal, ie a binding valued prop of an
+	/// [`Instance`], `props={{title:@doc:title}}`, and nowhere else.
+	Binding(Box<BindingExpr>),
 }
 
 impl DataLiteral {
@@ -432,7 +480,9 @@ impl DataLiteral {
 			{
 				Some(Value::Str(named.name.clone()))
 			}
-			DataLiteral::Enum(_) | DataLiteral::EntityRef(_) => None,
+			DataLiteral::Enum(_)
+			| DataLiteral::EntityRef(_)
+			| DataLiteral::Binding(_) => None,
 		}
 	}
 }
@@ -464,7 +514,6 @@ impl From<Value> for DataLiteral {
 /// bare enum variant from a typed component only at resolution, against the
 /// target's `TypeInfo`.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct NamedLiteral {
 	/// The variant or type name, eg `Center`, `Rgb`, `MyComponent`.
 	pub name: SmolStr,
@@ -502,67 +551,4 @@ pub enum NamedFields {
 	Tuple(Vec<DataLiteral>),
 	/// Named fields, ie a struct variant `Point { x: 1, y: 2 }`.
 	Struct(Vec<(SmolStr, DataLiteral)>),
-}
-
-/// The named-field literals are hand-tokenized: a `(key, value)` pair has no
-/// blanket [`TokenizeSelf`], since the component tokenizer's blanket impl
-/// already claims every tuple.
-#[cfg(feature = "tokens")]
-impl NamedFields {
-	/// The `vec![(key, value), ..]` tokens of a named-field list.
-	fn field_tokens(
-		fields: &[(SmolStr, DataLiteral)],
-	) -> proc_macro2::TokenStream {
-		let fields = fields.iter().map(|(key, value)| {
-			let key = key.self_token_stream();
-			let value = value.self_token_stream();
-			quote::quote! { (#key, #value) }
-		});
-		quote::quote! { vec![#(#fields),*] }
-	}
-}
-
-#[cfg(feature = "tokens")]
-impl TokenizeSelf for NamedFields {
-	fn self_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-		match self {
-			Self::Unit => tokens.extend(quote::quote! { NamedFields::Unit }),
-			Self::Tuple(items) => {
-				let items = items.self_token_stream();
-				tokens.extend(quote::quote! { NamedFields::Tuple(#items) });
-			}
-			Self::Struct(fields) => {
-				let fields = Self::field_tokens(fields);
-				tokens.extend(quote::quote! { NamedFields::Struct(#fields) });
-			}
-		}
-	}
-}
-
-#[cfg(feature = "tokens")]
-impl TokenizeSelf for DataLiteral {
-	fn self_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-		match self {
-			Self::Scalar(value) => {
-				let value = value.self_token_stream();
-				tokens.extend(quote::quote! { DataLiteral::Scalar(#value) });
-			}
-			Self::List(items) => {
-				let items = items.self_token_stream();
-				tokens.extend(quote::quote! { DataLiteral::List(#items) });
-			}
-			Self::Struct(fields) => {
-				let fields = NamedFields::field_tokens(fields);
-				tokens.extend(quote::quote! { DataLiteral::Struct(#fields) });
-			}
-			Self::Enum(named) => {
-				let named = named.self_token_stream();
-				tokens.extend(quote::quote! { DataLiteral::Enum(#named) });
-			}
-			Self::EntityRef(name) => {
-				let name = name.self_token_stream();
-				tokens.extend(quote::quote! { DataLiteral::EntityRef(#name) });
-			}
-		}
-	}
 }

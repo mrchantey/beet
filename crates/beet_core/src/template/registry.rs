@@ -82,8 +82,7 @@ impl ReflectTemplate {
 
 	/// Builds the template registered under short type path `tag` from `value`
 	/// into `cx`, the build-side companion of [`ValueSchema::template_by_name`].
-	/// Errors if no template is registered under that tag, unless the tag is
-	/// [allowed unregistered](AllowedUnregistered), which builds nothing.
+	/// Errors if no template is registered under that tag.
 	pub fn build_named(
 		registry: &AppTypeRegistry,
 		tag: &str,
@@ -91,15 +90,10 @@ impl ReflectTemplate {
 		cx: &mut TemplateContext,
 	) -> Result {
 		let guard = registry.read();
-		let Some(registration) = Self::registration_named(&guard, tag) else {
-			drop(guard);
-			// a known featured-out tag resolves to nothing instead of erroring.
-			return AllowedUnregistered::allows(cx, tag)
-				.then_some(())
-				.ok_or_else(|| {
-					bevyhow!("no type registered for template tag `{tag}`")
-				});
-		};
+		let registration =
+			Self::registration_named(&guard, tag).ok_or_else(|| {
+				bevyhow!("no type registered for template tag `{tag}`")
+			})?;
 		let reflect_template =
 			registration.data::<ReflectTemplate>().ok_or_else(|| {
 				bevyhow!("type `{tag}` is registered but is not a template")
@@ -237,9 +231,6 @@ where
 /// features, a failed sequence route appends its unregistered children's names
 /// at the reporting edge, and a strict caller refuses through
 /// [`UnregisteredQuery`].
-///
-/// The narrower [`AllowedUnregistered`] opts a name out of even this: it
-/// resolves to nothing at all, a tag's children included.
 #[derive(
 	Debug, Default, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
@@ -287,18 +278,6 @@ impl Unregistered {
 		unregistered.remove(name);
 		if unregistered.is_empty() {
 			entity.remove::<Self>();
-		}
-	}
-
-	/// Allow `name`, a component's short type path, to resolve to nothing,
-	/// see [`AllowedUnregistered`]:
-	/// `app.install(Unregistered::allow("LiveReloadScript"))`.
-	pub fn allow(name: impl Into<SmolStr>) -> impl Installer {
-		let name = name.into();
-		move |app: &mut App| {
-			app.world_mut()
-				.get_resource_or_init::<AllowedUnregistered>()
-				.insert(name);
 		}
 	}
 }
@@ -366,40 +345,6 @@ impl UnregisteredQuery<'_, '_> {
 					.join(", ")
 			),
 		}
-	}
-}
-
-/// Names allowed to resolve to nothing when nothing is registered under them.
-///
-/// The narrow opt-out from [`Unregistered`]: a featured-out widget (eg
-/// `<LiveReloadScript/>` when `client_io` is compiled out) marks its name here via
-/// [`Unregistered::allow`] and the
-/// loader resolves it to nothing at all, silently and, for a tag, without its
-/// children. Only a name whose whole *content* is the missing behavior belongs
-/// here; anything else takes the inert-entity path so its children survive.
-/// Uniform over components, resources and templates: the check sits on the
-/// shared not-found path of every lookup.
-#[derive(Debug, Default, Clone, Resource)]
-pub struct AllowedUnregistered {
-	names: HashSet<SmolStr>,
-}
-
-impl AllowedUnregistered {
-	/// Allow `name` to resolve to a no-op when nothing is registered under it.
-	pub fn insert(&mut self, name: impl Into<SmolStr>) {
-		self.names.insert(name.into());
-	}
-	/// Whether `name` is allowed to be unregistered.
-	pub fn contains(&self, name: &str) -> bool { self.names.contains(name) }
-	/// Whether `tag` was [allowed](Unregistered::allow) in `cx`'s world, ie a
-	/// known featured-out name the loader resolves to nothing rather than
-	/// error. Consulted by both lookup paths on a missing registration.
-	pub fn allows(cx: &mut TemplateContext, tag: &str) -> bool {
-		cx.entity.world_scope(|world| {
-			world
-				.get_resource::<AllowedUnregistered>()
-				.is_some_and(|allowed| allowed.contains(tag))
-		})
 	}
 }
 
@@ -548,24 +493,6 @@ mod test {
 		ReflectTemplate::registration_named(&registry, "Sphere")
 			.is_none()
 			.xpect_true();
-	}
-
-	/// A tag [allowed](Unregistered::allow) builds to nothing instead of erroring (the featured-out widget contract).
-	#[crate::test]
-	fn allowed_unregistered_tag_is_noop() {
-		let world = TemplatePlugin::world();
-		let registry = world.resource::<AppTypeRegistry>().clone();
-		let patch = DynamicStruct::default();
-		let mut app = App::new();
-		app.install(Unregistered::allow("Nope"));
-		let other = app.world_mut();
-		let root = other.spawn_empty().id();
-		other
-			.entity_mut(root)
-			.template_context(|cx| {
-				ReflectTemplate::build_named(&registry, "Nope", &patch, cx)
-			})
-			.unwrap();
 	}
 
 	/// The query walks an entity, its attributes, then its children, and a

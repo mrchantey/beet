@@ -11,11 +11,19 @@ use bevy::ecs::entity::EntityGeneration;
 use bevy::ecs::entity::EntityIndex;
 use bevy::ecs::entity::EntityMapper;
 use bevy::ecs::reflect::ReflectComponent;
+use bevy::ecs::reflect::ReflectResource;
 use bevy_reflect::PartialReflect;
+use bevy_reflect::Reflect;
+use bevy_reflect::ReflectDeserialize;
 use bevy_reflect::ReflectFromReflect;
+use bevy_reflect::TypeInfo;
 use bevy_reflect::TypeRegistration;
 use bevy_reflect::TypeRegistry;
+use bevy_reflect::Typed;
+use bevy_reflect::serde::SerializationData;
 use bevy_reflect::serde::TypedReflectDeserializer;
+use bevy_reflect::structs::DynamicStruct;
+use core::any::TypeId;
 use core::cell::RefCell;
 use indexmap::IndexSet;
 use serde::de::DeserializeSeed;
@@ -26,13 +34,36 @@ impl SceneBody {
 	///
 	/// A key resolves as a full type path, else a short one. A key naming a
 	/// template is its invocation, a deferred slot expanded when the entity
-	/// builds. A component key that resolves as neither is left off its entity
+	/// builds, and one naming a resource patches the live resource where it
+	/// stands. A component key that resolves as neither is left off its entity
 	/// with a warning and held, value and all, in the entity's
-	/// [`Unregistered`], unless its short name is
-	/// [allowed](AllowedUnregistered), which skips it silently. A resource has
-	/// no entity to hold it, so an unresolved one is an error, as is any
-	/// registered type whose value does not read.
+	/// [`Unregistered`]. One of the body's own resources has no entity to hold
+	/// it, so an unresolved one is an error, as is any registered type whose
+	/// value does not read.
+	///
+	/// A branch whose [`Cfg`] this binary does not meet is left out, its
+	/// tombstone in its place. A value reads in its type's serde form, else as
+	/// markup would have authored it, so what a lean binary held by name
+	/// resolves in a full one.
 	pub fn reflect(&self, world: &World) -> Result<DynamicTemplate> {
+		self.reflect_document(world, None)
+	}
+
+	/// [`reflect`](Self::reflect) this body as the document at `path` of its
+	/// package: every [`DocPath`] it holds is rewritten package absolute.
+	pub fn reflect_at(
+		&self,
+		world: &World,
+		path: &RelPath,
+	) -> Result<DynamicTemplate> {
+		self.reflect_document(world, Some(path))
+	}
+
+	fn reflect_document(
+		&self,
+		world: &World,
+		path: Option<&RelPath>,
+	) -> Result<DynamicTemplate> {
 		let app_registry = world
 			.get_resource::<AppTypeRegistry>()
 			.ok_or_else(|| {
@@ -40,10 +71,17 @@ impl SceneBody {
 			})?
 			.clone();
 		let registry = app_registry.read();
-		let allowed = world.get_resource::<AllowedUnregistered>();
-		let keys = EntityKeys::new(self.entities.keys().cloned());
+		#[cfg(feature = "bsx")]
+		let (body, excluded) = self.prune_cfg(world)?;
+		#[cfg(not(feature = "bsx"))]
+		let (body, excluded) = (
+			alloc::borrow::Cow::Borrowed(self),
+			HashMap::<EntityKey, SmolStr>::default(),
+		);
+		let keys = EntityKeys::new(body.entities.keys().cloned())
+			.with_excluded(excluded);
 
-		let resources = self
+		let resources = body
 			.resources
 			.iter()
 			.map(|(name, value)| {
@@ -57,61 +95,83 @@ impl SceneBody {
 			})
 			.collect::<Result<Vec<_>>>()?;
 
-		let entities = self
+		let entities = body
 			.entities
 			.iter()
 			.map(|(key, body)| {
-				Self::reflect_entity(key, body, &keys, &registry, allowed)
+				Self::reflect_entity(key, body, &keys, &registry)
 					.map_err(|err| bevyhow!("entity `{key}`: {err}"))
 			})
 			.collect::<Result<Vec<_>>>()?;
 
-		DynamicTemplate {
+		let mut template = DynamicTemplate {
 			resources,
 			entities,
+		};
+		if let Some(path) = path {
+			template.resolve_paths(path);
 		}
-		.xok()
+		template.xok()
 	}
 
 	/// One entity's components as slots, the unresolved ones held.
+	///
+	/// The slots' order is the build's: the entity's owner first, so whatever
+	/// a component does as it lands finds its ancestors, then templates, so
+	/// what was authored beside one wins over what it built, then the rest. A
+	/// body's components are a map, and within each group the order is their
+	/// keys', which every format keeps.
 	fn reflect_entity(
 		key: &EntityKey,
 		body: &EntityBody,
 		keys: &EntityKeys,
 		registry: &TypeRegistry,
-		allowed: Option<&AllowedUnregistered>,
 	) -> Result<DynamicTemplateEntity> {
 		let mut components = Vec::new();
 		let mut unregistered = Unregistered::default();
-		for (name, value) in body.iter() {
-			match Self::registration(registry, name) {
-				Some(registration)
-					if registration.data::<ReflectComponent>().is_none()
-						&& registration.data::<ReflectTemplate>().is_some() =>
+		let mut entries = body.iter().collect::<Vec<_>>();
+		entries.sort_by_key(|(name, _)| name.as_str());
+		for (name, value) in entries {
+			let Some(registration) = Self::registration(registry, name) else {
+				warn!(
+					"entity `{key}`: no type registered for `{name}`, left off and held unregistered"
+				);
+				unregistered.insert(name.clone(), value.clone());
+				continue;
+			};
+			let read = || {
+				keys.deserialize(registration, registry, value)
+					.map_err(|err| bevyhow!("`{name}`: {err}"))
+			};
+			// a resource is entity backed, so reflects a component too
+			let (order, slot) =
+				if registration.data::<ReflectResource>().is_some() {
+					let patch = keys.read(registration, registry, value)?;
+					(2, ComponentSlot::Resource(patch))
+				} else if registration.data::<ReflectTemplate>().is_some()
+					&& registration.data::<ReflectComponent>().is_none()
 				{
-					components.push(ComponentSlot::Template(DeferredTemplate {
-						name: registration.type_info().type_path().into(),
-						patch: keys.deserialize(
-							registration,
-							registry,
-							value,
-						)?,
-					}))
-				}
-				Some(registration) => components.push(ComponentSlot::Value(
-					keys.deserialize(registration, registry, value)?,
-				)),
-				None if allowed.is_some_and(|allowed| {
-					allowed.contains(&TypeName::new(name.as_str()).short())
-				}) => {}
-				None => {
-					warn!(
-						"entity `{key}`: no type registered for `{name}`, left off and held unregistered"
-					);
-					unregistered.insert(name.clone(), value.clone());
-				}
-			}
+					(
+						1,
+						ComponentSlot::Template(DeferredTemplate {
+							name: registration.type_info().type_path().into(),
+							patch: read()?,
+						}),
+					)
+				} else if registration.type_info().is::<ChildOf>()
+					|| registration.type_info().is::<AttributeOf>()
+				{
+					(0, ComponentSlot::Value(read()?))
+				} else {
+					(2, ComponentSlot::Value(read()?))
+				};
+			components.push((order, slot));
 		}
+		components.sort_by_key(|(order, _)| *order);
+		let mut components = components
+			.into_iter()
+			.map(|(_, slot)| slot)
+			.collect::<Vec<_>>();
 		if !unregistered.is_empty() {
 			components.push(ComponentSlot::Value(Box::new(unregistered)));
 		}
@@ -125,13 +185,168 @@ impl SceneBody {
 	/// The type a body key names: its full type path, else its short one, so a
 	/// key a lean binary held by the name its markup wrote resolves in a full
 	/// one.
-	pub(super) fn registration<'a>(
+	pub(crate) fn registration<'a>(
 		registry: &'a TypeRegistry,
 		name: &str,
 	) -> Option<&'a TypeRegistration> {
 		registry
 			.get_with_type_path(name)
-			.or_else(|| registry.get_with_short_type_path(name))
+			.or_else(|| reflect_ext::registration_by_name(registry, name))
+	}
+}
+
+/// The components a document declares at its root, read without spawning it.
+impl EntityBody {
+	/// What markup writes of an entity rather than of the document: its node,
+	/// its place and its bindings.
+	const CONTENT: &'static [&'static str] = &[
+		"Attribute",
+		"AttributeOf",
+		"CData",
+		"Cfg",
+		"ChildOf",
+		"Comment",
+		"Doctype",
+		"DocumentScope",
+		"Element",
+		"FieldRef",
+		"Instance",
+		"OnEvent",
+		"Prefab",
+		"ProcessingInstruction",
+		"ReactiveChildren",
+		"ReflectFieldRef",
+		"ResourceFieldRef",
+		"RunScript",
+		"SlotChild",
+		"SlotTarget",
+		"Value",
+	];
+
+	/// The components this body declares rather than is, a document root's
+	/// metadata: everything but its content. A document's metadata is so
+	/// *whatever components its root declares*, never one blessed type.
+	pub fn declarations(&self) -> Self {
+		self.iter()
+			.filter(|(name, _)| {
+				let short = TypeName::new(name.as_str()).short();
+				!Self::CONTENT.contains(&short.as_str())
+			})
+			.map(|(name, value)| (name.clone(), value.clone()))
+			.collect::<Map>()
+			.into()
+	}
+
+	/// The value keyed by `T`, its full type path or its short one.
+	fn named<T: TypePath>(&self) -> Option<&Value> {
+		self.get(T::type_path())
+			.or_else(|_| self.get(TypeName::of::<T>().short().as_str()))
+			.ok()
+	}
+
+	/// The component `T` this body holds, patched over its default, read as
+	/// its type's serde form or as markup authors it.
+	///
+	/// `Ok(None)` only when no key names `T`. One that does and will not read
+	/// is an error, never a silent default.
+	pub fn get_reflect<T: Default + Reflect + Typed>(
+		&self,
+		registry: &TypeRegistry,
+	) -> Result<Option<T>> {
+		let Some(value) = self.named::<T>() else {
+			return Ok(None);
+		};
+		let registration =
+			registry.get(TypeId::of::<T>()).ok_or_else(|| {
+				bevyhow!(
+					"a document declares `{}`, which is absent from the registry",
+					T::short_type_path()
+				)
+			})?;
+		let patch = EntityKeys::new([]).read(registration, registry, value)?;
+		let mut component = T::default();
+		component.try_apply(patch.as_ref())?;
+		Some(component).xok()
+	}
+
+	/// Declare `field` of the component short named `component` when this
+	/// body holds that component without it: a default something other than
+	/// the document implies, ie a content file's numbered filename. Never adds
+	/// the component, since a document naming none declared none.
+	pub fn declare_default(
+		&mut self,
+		component: &str,
+		field: &str,
+		default: Value,
+	) {
+		let name = self
+			.keys()
+			.find(|name| TypeName::new(name.as_str()).short() == component)
+			.cloned();
+		if let Some(Value::Map(fields)) =
+			name.and_then(|name| self.0.get_mut(&name))
+			&& !fields.contains(field)
+		{
+			fields.insert(field, default);
+		}
+	}
+
+	/// Insert every component this body holds onto `entity`, patched over each
+	/// type's default, as the document at `document` where it has one
+	/// ([`DocPath`]).
+	///
+	/// A template or a resource is skipped, belonging to the document's build
+	/// rather than its metadata. A name nothing registers warns and is
+	/// skipped, so a lean binary hoists the subset it links.
+	pub fn insert_onto(
+		&self,
+		entity: &mut EntityWorldMut,
+		document: Option<&RelPath>,
+	) -> Result {
+		if self.is_empty() {
+			return OK;
+		}
+		let app_registry = entity
+			.world()
+			.get_resource::<AppTypeRegistry>()
+			.cloned()
+			.ok_or_else(|| {
+				bevyhow!("a body's components require an `AppTypeRegistry`")
+			})?;
+		let registry = app_registry.read();
+		let keys = EntityKeys::new([]);
+		for (name, value) in self.iter() {
+			let Some(registration) = SceneBody::registration(&registry, name)
+			else {
+				warn!(
+					"skipping `{name}`: no component of that name is registered in this binary"
+				);
+				continue;
+			};
+			let Some(reflect_component) = registration
+				.data::<ReflectComponent>()
+				.filter(|_| registration.data::<ReflectResource>().is_none())
+			else {
+				continue;
+			};
+			let mut component =
+				keys.deserialize(registration, &registry, value)?;
+			if let Some(document) = document {
+				super::dynamic_template::DocPathResolver { document }
+					.visit(component.as_mut());
+			}
+			reflect_component.insert(entity, component.as_ref(), &registry);
+		}
+		OK
+	}
+
+	/// A bundle [inserting](Self::insert_onto) every component this body holds
+	/// as the entity spawns, for a caller composing a route rather than
+	/// holding the world.
+	pub fn hoist(self) -> impl Bundle {
+		OnSpawn::new(move |entity: &mut EntityWorldMut| {
+			self.insert_onto(entity, None)
+		})
 	}
 }
 
@@ -141,23 +356,46 @@ impl SceneBody {
 /// A body's own keys take their file positions, which is how a
 /// [`DynamicTemplate`] names its entities; a key the body does not hold takes
 /// the next position past them, a reference to an entity outside it.
-pub(super) struct EntityKeys(RefCell<IndexSet<EntityKey, FixedHasher>>);
+pub(super) struct EntityKeys {
+	keys: RefCell<IndexSet<EntityKey, FixedHasher>>,
+	/// The keys an exclusion took with it, each to its condition.
+	excluded: HashMap<EntityKey, SmolStr>,
+}
 
 impl EntityKeys {
 	/// The positions of `keys`, in order.
 	pub fn new(keys: impl IntoIterator<Item = EntityKey>) -> Self {
-		Self(RefCell::new(keys.into_iter().collect()))
+		Self {
+			keys: RefCell::new(keys.into_iter().collect()),
+			excluded: default(),
+		}
+	}
+
+	/// Warn of a reference to any key of `excluded`, which binds to an entity
+	/// nothing builds: a consumer waiting on its components (a `StoreRef`)
+	/// fails far from the cause, or never.
+	pub fn with_excluded(
+		mut self,
+		excluded: HashMap<EntityKey, SmolStr>,
+	) -> Self {
+		self.excluded = excluded;
+		self
 	}
 
 	/// The in-template entity standing for `key`.
 	fn entity(&self, key: EntityKey) -> Option<Entity> {
-		let (position, _) = self.0.borrow_mut().insert_full(key);
+		if let Some(condition) = self.excluded.get(&key) {
+			warn!(
+				"a reference names `{key}`, which `bx:cfg=\"{condition}\"` excluded from this binary: it binds to nothing"
+			);
+		}
+		let (position, _) = self.keys.borrow_mut().insert_full(key);
 		Entity::from_raw_u32(position as u32)
 	}
 
 	/// The key an in-template entity stands for.
 	pub fn key(&self, entity: Entity) -> Option<EntityKey> {
-		self.0
+		self.keys
 			.borrow()
 			.get_index(entity.index_u32() as usize)
 			.cloned()
@@ -173,20 +411,7 @@ impl EntityKeys {
 		registry: &TypeRegistry,
 		value: &Value,
 	) -> Result<Box<dyn PartialReflect>> {
-		let reference = |key: &str| {
-			EntityKey::parse(key)
-				.ok()
-				.and_then(|key| self.entity(key))
-				.map(Entity::to_bits)
-		};
-		let reflected = TypedReflectDeserializer::new(registration, registry)
-			.deserialize(
-				ValueDeserializer::new(value.clone())
-					.with_references(&reference),
-			)
-			.map_err(|err| {
-				bevyhow!("`{}`: {err}", registration.type_info().type_path())
-			})?;
+		let reflected = self.read(registration, registry, value)?;
 		registration
 			.data::<ReflectFromReflect>()
 			.and_then(|from_reflect| {
@@ -196,15 +421,225 @@ impl EntityKeys {
 			.unwrap_or(reflected)
 			.xok()
 	}
+
+	/// [`deserialize`](Self::deserialize) holding only the fields `value` does,
+	/// so a partial value stays a patch.
+	///
+	/// Reflect serde completes every value it reads over its type's default,
+	/// so a struct is read here field by field, each in its own serde form or
+	/// as markup would have authored it: what a lean binary held by name, or a
+	/// type no serde form can write.
+	pub fn read(
+		&self,
+		registration: &TypeRegistration,
+		registry: &TypeRegistry,
+		value: &Value,
+	) -> Result<Box<dyn PartialReflect>> {
+		let (TypeInfo::Struct(info), Value::Map(fields), None) = (
+			registration.type_info(),
+			value,
+			registration.data::<ReflectDeserialize>(),
+		) else {
+			return self.read_whole(registration, registry, value);
+		};
+		let skipped = registration.data::<SerializationData>();
+		let mut patch = DynamicStruct::default();
+		for (name, value) in fields {
+			let index = info.index_of(name).ok_or_else(|| {
+				bevyhow!(
+					"`{}` has no field `{name}`: {}",
+					registration.type_info().type_path(),
+					match info.field_names() {
+						[] => "it has none".to_string(),
+						names => format!("its fields are {}", names.join(", ")),
+					}
+				)
+			})?;
+			let field = info.field_at(index).expect("indexed above");
+			if skipped.is_some_and(|data| data.is_field_skipped(index)) {
+				continue;
+			}
+			let registration =
+				registry.get(field.type_id()).ok_or_else(|| {
+					bevyhow!(
+						"`{}` is not registered",
+						field.type_path_table().path()
+					)
+				})?;
+			patch.insert_boxed(
+				name.as_str(),
+				self.read_whole(registration, registry, value)
+					.map_err(|err| bevyhow!("field `{name}`: {err}"))?,
+			);
+		}
+		patch.set_represented_type(Some(registration.type_info()));
+		Ok(Box::new(patch))
+	}
+
+	/// Read `value` as a whole value of the registered type, in its serde form
+	/// or as markup would have authored it.
+	fn read_whole(
+		&self,
+		registration: &TypeRegistration,
+		registry: &TypeRegistry,
+		value: &Value,
+	) -> Result<Box<dyn PartialReflect>> {
+		let reference = |key: &str| {
+			EntityKey::parse(key)
+				.ok()
+				.and_then(|key| self.entity(key))
+				.map(Entity::to_bits)
+		};
+		TypedReflectDeserializer::new(registration, registry)
+			.deserialize(
+				ValueDeserializer::new(value.clone())
+					.with_references(&reference),
+			)
+			.map_err(|err| {
+				bevyhow!("`{}`: {err}", registration.type_info().type_path())
+			})
+			.or_else(|err| {
+				self.read_authored(registration, registry, value)
+					.map_err(|_| err)
+			})
+	}
+
+	/// Read `value` as a literal markup authored.
+	#[cfg(feature = "bsx")]
+	fn read_authored(
+		&self,
+		registration: &TypeRegistration,
+		registry: &TypeRegistry,
+		value: &Value,
+	) -> Result<Box<dyn PartialReflect>> {
+		DataLiteral::to_reflect(
+			&DataLiteral::from(value.clone()),
+			Some(registration.type_info()),
+			registry,
+			&mut |key: &str| {
+				EntityKey::parse(key)
+					.ok()
+					.and_then(|key| self.entity(key))
+					.unwrap_or(Entity::PLACEHOLDER)
+			},
+		)
+	}
+
+	#[cfg(not(feature = "bsx"))]
+	fn read_authored(
+		&self,
+		_registration: &TypeRegistration,
+		_registry: &TypeRegistry,
+		_value: &Value,
+	) -> Result<Box<dyn PartialReflect>> {
+		bevybail!("a value reads in its type's serde form alone")
+	}
+}
+
+/// The entities standing for references while a value serializes.
+///
+/// A component's serde form writes an [`Entity`] as opaque bits, and a type
+/// with its own `Serialize` hides where. So each entity a value references is
+/// a sentinel no world holds, and after serializing every sentinel found in
+/// the result is replaced by the key it stands for.
+struct Sentinel;
+
+impl Sentinel {
+	/// A generation no entity reaches in practice, so a sentinel's bits are
+	/// not a number real data holds.
+	const GENERATION: u32 = 0xBEE7_5CE0;
+
+	/// The sentinel standing for the `ordinal`th target.
+	fn entity(ordinal: usize) -> Entity {
+		Entity::from_index_and_generation(
+			EntityIndex::from_raw_u32(ordinal as u32).expect(
+				"a component references fewer than `u32::MAX` entities",
+			),
+			EntityGeneration::from_bits(Self::GENERATION),
+		)
+	}
+
+	/// The target a sentinel's bits stand for, among `count`.
+	fn ordinal(bits: u64, count: usize) -> Option<usize> {
+		Entity::try_from_bits(bits)
+			.filter(|entity| entity.generation().to_bits() == Self::GENERATION)
+			.map(|entity| entity.index_u32() as usize)
+			.filter(|ordinal| *ordinal < count)
+	}
+
+	/// `value` with every sentinel among `count` replaced by its `reference`.
+	fn replace(
+		value: Value,
+		count: usize,
+		reference: &mut dyn FnMut(usize) -> Value,
+	) -> Result<Value> {
+		match value {
+			Value::Uint(bits) => match Self::ordinal(bits, count) {
+				Some(ordinal) => reference(ordinal),
+				None => Value::Uint(bits),
+			},
+			Value::List(items) => items
+				.into_iter()
+				.map(|item| Self::replace(item, count, reference))
+				.collect::<Result<Vec<_>>>()?
+				.xmap(Value::List),
+			Value::Map(map) => map
+				.into_iter()
+				.map(|(key, item)| {
+					// a map key is a string either way, so a reference there
+					// could not be told from a number on the way back in
+					if key
+						.parse::<u64>()
+						.ok()
+						.and_then(|bits| Self::ordinal(bits, count))
+						.is_some()
+					{
+						bevybail!(
+							"a map keyed by an entity reference cannot be saved"
+						);
+					}
+					(key, Self::replace(item, count, reference)?).xok()
+				})
+				.collect::<Result<Map>>()?
+				.xmap(Value::Map),
+			other => other,
+		}
+		.xok()
+	}
+}
+
+/// The keys a value being written references, each standing as an entity
+/// until it has serialized.
+#[derive(Default)]
+pub(crate) struct KeySentinels(Vec<EntityKey>);
+
+impl KeySentinels {
+	/// The entity standing for `key`.
+	pub fn entity(&mut self, key: EntityKey) -> Entity {
+		let ordinal = self
+			.0
+			.iter()
+			.position(|target| *target == key)
+			.unwrap_or_else(|| {
+				self.0.push(key);
+				self.0.len() - 1
+			});
+		Sentinel::entity(ordinal)
+	}
+
+	/// `value` with every reference written as its key.
+	pub fn keyed(&self, value: Value) -> Result<Value> {
+		match self.0.is_empty() {
+			true => value.xok(),
+			false => Sentinel::replace(value, self.0.len(), &mut |ordinal| {
+				self.0[ordinal].reference()
+			}),
+		}
+	}
 }
 
 /// Finds the entity references in a component's serialized value, so each is
-/// written as its target's key.
-///
-/// A component's serde form writes an [`Entity`] as opaque bits, and a type
-/// with its own `Serialize` hides where. So the save maps each entity the
-/// component references to a sentinel no world holds, serializes, and replaces
-/// every sentinel it finds in the result. A value that only looks like one is
+/// written as its target's key. A value that only looks like a [`Sentinel`] is
 /// told apart by count: the component's own `map_entities` says how many
 /// references it holds.
 #[derive(Default)]
@@ -216,28 +651,6 @@ pub(super) struct ReferenceSentinels {
 }
 
 impl ReferenceSentinels {
-	/// A generation no entity reaches in practice, so a sentinel's bits are
-	/// not a number real data holds.
-	const GENERATION: u32 = 0xBEE7_5CE0;
-
-	/// The sentinel standing for the `ordinal`th target.
-	fn sentinel(ordinal: usize) -> Entity {
-		Entity::from_index_and_generation(
-			EntityIndex::from_raw_u32(ordinal as u32).expect(
-				"a component references fewer than `u32::MAX` entities",
-			),
-			EntityGeneration::from_bits(Self::GENERATION),
-		)
-	}
-
-	/// The target a sentinel's bits stand for.
-	fn ordinal(&self, bits: u64) -> Option<usize> {
-		Entity::try_from_bits(bits)
-			.filter(|entity| entity.generation().to_bits() == Self::GENERATION)
-			.map(|entity| entity.index_u32() as usize)
-			.filter(|ordinal| *ordinal < self.targets.len())
-	}
-
 	/// `value`, a component serialized after its entities were mapped through
 	/// this, with every reference replaced by its target's key in
 	/// `entity_map`, minting one for a target the document has not keyed.
@@ -250,7 +663,11 @@ impl ReferenceSentinels {
 			return value.xok();
 		}
 		let mut found = vec![0; self.targets.len()];
-		let value = self.key_value(value, entity_map, &mut found)?;
+		let value =
+			Sentinel::replace(value, self.targets.len(), &mut |ordinal| {
+				found[ordinal] += 1;
+				entity_map.file_key(self.targets[ordinal]).reference()
+			})?;
 		if found
 			.iter()
 			.zip(&self.visits)
@@ -262,49 +679,6 @@ impl ReferenceSentinels {
 			);
 		}
 		value.xok()
-	}
-
-	fn key_value(
-		&self,
-		value: Value,
-		entity_map: &mut TemplateEntityMap,
-		found: &mut [usize],
-	) -> Result<Value> {
-		match value {
-			Value::Uint(bits) => match self.ordinal(bits) {
-				Some(ordinal) => {
-					found[ordinal] += 1;
-					entity_map.file_key(self.targets[ordinal]).reference()
-				}
-				None => Value::Uint(bits),
-			},
-			Value::List(items) => items
-				.into_iter()
-				.map(|item| self.key_value(item, entity_map, found))
-				.collect::<Result<Vec<_>>>()?
-				.xmap(Value::List),
-			Value::Map(map) => map
-				.into_iter()
-				.map(|(key, item)| {
-					// a map key is a string either way, so a reference there
-					// could not be told from a number on the way back in
-					if key
-						.parse::<u64>()
-						.ok()
-						.and_then(|bits| self.ordinal(bits))
-						.is_some()
-					{
-						bevybail!(
-							"a map keyed by an entity reference cannot be saved"
-						);
-					}
-					(key, self.key_value(item, entity_map, found)?).xok()
-				})
-				.collect::<Result<Map>>()?
-				.xmap(Value::Map),
-			other => other,
-		}
-		.xok()
 	}
 }
 
@@ -324,7 +698,7 @@ impl EntityMapper for ReferenceSentinels {
 				self.targets.len() - 1
 			});
 		self.visits[ordinal] += 1;
-		Self::sentinel(ordinal)
+		Sentinel::entity(ordinal)
 	}
 
 	fn set_mapped(&mut self, _source: Entity, _target: Entity) {}
@@ -636,24 +1010,17 @@ mod test {
 			.unwrap();
 	}
 
-	/// A key held by the short name markup wrote resolves by it, and an
-	/// allowed name is skipped without a trace.
+	/// A key held by the short name markup wrote resolves by it.
 	#[crate::test]
-	fn a_short_name_resolves_and_an_allowed_one_is_skipped() {
-		let body = |name: &str| {
-			MediaBytes::new_json(format!(
-				r#"{{"$type":"org.beet.scene#body","entities":{{"0":{{"{name}":4}}}}}}"#
-			))
-		};
+	fn a_short_name_resolves() {
 		let mut world = world(false);
-		let root = load(&mut world, &body("Health"));
+		let root = load(
+			&mut world,
+			&MediaBytes::new_json(
+				r#"{"$type":"org.beet.scene#body","entities":{"0":{"Health":4}}}"#,
+			),
+		);
 		world.get::<Health>(root).unwrap().xpect_eq(Health(4));
-
-		let mut app = App::new();
-		app.add_plugins((TemplatePlugin, MinimalTypesPlugin))
-			.install(Unregistered::allow("Shield"));
-		let root = load(app.world_mut(), &body(SHIELD));
-		app.world().get::<Unregistered>(root).xpect_none();
 	}
 
 	/// A registered type whose value does not read is an error naming the
@@ -669,5 +1036,165 @@ mod test {
 			.to_string()
 			.xpect_contains("entity `main`")
 			.xpect_contains(HEALTH);
+	}
+}
+
+#[cfg(all(test, feature = "bsx"))]
+mod declaration_test {
+	use crate::prelude::*;
+
+	/// A nested struct field, so the read covers a declaration that is not
+	/// flat.
+	#[derive(Debug, Default, Clone, PartialEq, Reflect)]
+	struct Nested {
+		label: Option<String>,
+		order: Option<u32>,
+	}
+
+	/// A page-metadata shaped component.
+	#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+	#[reflect(Component, Default)]
+	struct Meta {
+		title: Option<String>,
+		draft: bool,
+		order: Option<u32>,
+		nested: Nested,
+		created: Option<Date>,
+		at: Option<Timestamp>,
+	}
+
+	/// A type the test world never registers.
+	#[derive(Debug, Default, Clone, PartialEq, Reflect)]
+	struct Foreign {
+		note: Option<String>,
+	}
+
+	/// A second root component, proving a root declares whatever it holds
+	/// rather than one blessed type.
+	#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+	#[reflect(Component, Default)]
+	struct Extra {
+		note: Option<String>,
+	}
+
+	fn world() -> World {
+		let world = TemplatePlugin::world();
+		let mut registry = world.resource::<AppTypeRegistry>().write();
+		registry.register::<Meta>();
+		registry.register::<Extra>();
+		drop(registry);
+		world
+	}
+
+	/// The root components `markup` declares, lowered against `parsers`.
+	fn declared(parsers: &DocParsers, markup: &str) -> Result<EntityBody> {
+		parsers.root_components(&MediaBytes::new_bsx(markup))
+	}
+
+	/// A root spread reads without spawning, whether the document lowered
+	/// against the types or against none, as a codegen scan does.
+	#[crate::test]
+	fn reads_root_spreads() {
+		let world = world();
+		let registry = world.resource::<AppTypeRegistry>().read();
+		for parsers in [DocParsers::of(&world), DocParsers::default()] {
+			let get = |markup: &str| {
+				declared(&parsers, markup)?.get_reflect::<Meta>(&registry)
+			};
+			// the declared fields land, the rest fill from `Default`
+			get(r#"<Fragment {Meta{title:"Blog", nested: Nested{order: 1}}}><h1>hi</h1></Fragment>"#)
+				.unwrap()
+				.unwrap()
+				.xpect_eq(Meta {
+					title: Some("Blog".into()),
+					nested: Nested {
+						label: None,
+						order: Some(1),
+					},
+					..default()
+				});
+			// a `YYYY-MM-DD` string coerces to the day it names
+			get(r#"<Fragment {Meta{created:"2025-09-06"}}/>"#)
+				.unwrap()
+				.unwrap()
+				.created
+				.unwrap()
+				.to_string()
+				.xpect_eq("2025-09-06");
+			// ..while an instant takes no string at all
+			get(r#"<Fragment {Meta{at:"2025-09-06"}}/>"#).xpect_err();
+			// a tuple spread names it alongside others
+			get(r#"<Fragment {(Meta{draft: true}, Extra)}/>"#)
+				.unwrap()
+				.unwrap()
+				.draft
+				.xpect_true();
+			// only the root declares; a nested spread is content, and so is
+			// the root's own element
+			get(r#"<main><div {Meta{title:"nested"}}/></main>"#)
+				.unwrap()
+				.xpect_none();
+			declared(&parsers, r#"<main class="a"/>"#)
+				.unwrap()
+				.is_empty()
+				.xpect_true();
+			get(r#"<Fragment {Meta{order:"not-a-number"}}/>"#).xpect_err();
+			// a declaration that cannot resolve is loud, never a default
+			declared(&parsers, r#"<Fragment {Foreign{note:"hi"}}/>"#)
+				.unwrap()
+				.get_reflect::<Foreign>(&registry)
+				.unwrap_err()
+				.to_string()
+				.xpect_contains("absent from the registry");
+		}
+	}
+
+	#[crate::test]
+	fn inserts_every_declaration() {
+		let mut world = world();
+		let declared = declared(
+			&DocParsers::of(&world),
+			r#"<Fragment {(Meta{title:"Blog"}, Extra{note:"hi"}, Missing)}/>"#,
+		)
+		.unwrap();
+		let entity = world.spawn_empty().id();
+		declared
+			.insert_onto(&mut world.entity_mut(entity), None)
+			.unwrap();
+		world
+			.get::<Meta>(entity)
+			.unwrap()
+			.title
+			.as_deref()
+			.xpect_eq(Some("Blog"));
+		world
+			.get::<Extra>(entity)
+			.unwrap()
+			.note
+			.as_deref()
+			.xpect_eq(Some("hi"));
+	}
+
+	/// A filename-implied default fills a field the document left out, and never
+	/// invents a declaration the document never made.
+	#[crate::test]
+	fn declare_default_fills_undeclared_fields() {
+		let world = world();
+		let registry = world.resource::<AppTypeRegistry>().read();
+		let mut body = declared(
+			&DocParsers::of(&world),
+			r#"<Fragment {Meta{title:"Blog"}}/>"#,
+		)
+		.unwrap();
+		body.declare_default("Meta", "order", Value::Uint(3));
+		// an explicitly declared field wins over the default
+		body.declare_default("Meta", "title", Value::str("other"));
+		let meta = body.get_reflect::<Meta>(&registry).unwrap().unwrap();
+		meta.order.unwrap().xpect_eq(3);
+		meta.title.as_deref().unwrap().xpect_eq("Blog");
+		// an undeclared component stays undeclared
+		let mut none = EntityBody::default();
+		none.declare_default("Meta", "order", Value::Uint(3));
+		none.get_reflect::<Meta>(&registry).unwrap().xpect_none();
 	}
 }

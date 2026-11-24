@@ -125,6 +125,146 @@ pub fn reflect_to_value(
 	Value::from_serde(serializer).ok()
 }
 
+/// A reflect patch as the [`Value`] its type's serde form writes, only the
+/// fields the patch holds: what a document records of a component whose other
+/// fields fill from its default.
+///
+/// Reflect serde writes a partial struct's fields by position, so a patch is
+/// walked here and only its concrete values reach the serializer. A type with
+/// a serde of its own is whole or nothing, so a partial struct of one is
+/// refused, its other fields the default's to mint and no document's.
+#[cfg(feature = "serde")]
+pub fn patch_to_value(
+	patch: &dyn bevy::reflect::PartialReflect,
+	registry: &bevy::reflect::TypeRegistry,
+) -> Result<Value> {
+	use bevy::reflect::ReflectDeserialize;
+	use bevy::reflect::ReflectFromReflect;
+	use bevy::reflect::ReflectRef;
+	use bevy::reflect::ReflectSerialize;
+	use bevy::reflect::TypeInfo;
+	use bevy::reflect::enums::VariantType;
+
+	let concrete = |value: &dyn bevy::reflect::PartialReflect| {
+		Value::from_serde(bevy::reflect::serde::TypedReflectSerializer::new(
+			value, registry,
+		))
+	};
+	if !patch.is_dynamic() {
+		return concrete(patch);
+	}
+	let info = patch.get_represented_type_info();
+	if let Some(registration) =
+		info.and_then(|info| registry.get(info.type_id()))
+		&& (registration.data::<ReflectSerialize>().is_some()
+			|| registration.data::<ReflectDeserialize>().is_some())
+	{
+		// its own serde form has no partial: completing one here would write
+		// down a default minted for each value, ie an id
+		if let (ReflectRef::Struct(patch), TypeInfo::Struct(info)) =
+			(patch.reflect_ref(), registration.type_info())
+			&& patch.field_len() < info.field_len()
+		{
+			bevybail!(
+				"`{}` has no partial serde form",
+				registration.type_info().type_path()
+			);
+		}
+		return registration
+			.data::<ReflectFromReflect>()
+			.and_then(|from_reflect| from_reflect.from_reflect(patch))
+			.ok_or_else(|| {
+				bevyhow!(
+					"`{}` cannot be completed from its fields",
+					registration.type_info().type_path()
+				)
+			})
+			.and_then(|value| concrete(value.as_partial_reflect()));
+	}
+	let each = |value: &dyn bevy::reflect::PartialReflect| {
+		patch_to_value(value, registry)
+	};
+	match patch.reflect_ref() {
+		ReflectRef::Struct(value) => (0..value.field_len())
+			.filter_map(|index| value.name_at(index).zip(value.field_at(index)))
+			.map(|(name, field)| (SmolStr::new(name), each(field)?).xok())
+			.collect::<Result<Map>>()?
+			.xmap(Value::Map),
+		// a newtype is its field
+		ReflectRef::TupleStruct(value)
+			if value.field_len() == 1
+				&& matches!(
+					info,
+					Some(TypeInfo::TupleStruct(info)) if info.field_len() == 1
+				) =>
+		{
+			each(value.field(0).expect("one field"))?
+		}
+		ReflectRef::TupleStruct(value) => value
+			.iter_fields()
+			.map(each)
+			.collect::<Result<Vec<_>>>()?
+			.xmap(Value::List),
+		ReflectRef::Tuple(value) => value
+			.iter_fields()
+			.map(each)
+			.collect::<Result<Vec<_>>>()?
+			.xmap(Value::List),
+		ReflectRef::List(value) => value
+			.iter()
+			.map(each)
+			.collect::<Result<Vec<_>>>()?
+			.xmap(Value::List),
+		ReflectRef::Array(value) => value
+			.iter()
+			.map(each)
+			.collect::<Result<Vec<_>>>()?
+			.xmap(Value::List),
+		ReflectRef::Enum(value) => {
+			let fields = value.iter_fields().collect::<Vec<_>>();
+			// an option is its value or null, as serde writes one
+			if info.is_some_and(|info| {
+				reflect_ext::option_some_inner(info).is_some()
+			}) {
+				return match fields.first() {
+					Some(field) => each(field.value()),
+					None => Value::Null.xok(),
+				};
+			}
+			let fields = match value.variant_type() {
+				VariantType::Unit => {
+					return Value::str(value.variant_name()).xok();
+				}
+				VariantType::Struct => fields
+					.iter()
+					.map(|field| {
+						(
+							SmolStr::new(field.name().unwrap_or_default()),
+							each(field.value())?,
+						)
+							.xok()
+					})
+					.collect::<Result<Map>>()?
+					.xmap(Value::Map),
+				VariantType::Tuple => match fields.as_slice() {
+					[field] => each(field.value())?,
+					fields => fields
+						.iter()
+						.map(|field| each(field.value()))
+						.collect::<Result<Vec<_>>>()?
+						.xmap(Value::List),
+				},
+			};
+			Value::Map(Map::new([(SmolStr::new(value.variant_name()), fields)]))
+		}
+		_ => bevybail!(
+			"`{}` has no partial serde form",
+			patch.reflect_type_path()
+		),
+	}
+	.xok()
+}
+
 /// Deserialize a [`Value`] into a reflected value of `type_id`, taking the
 /// type's authored spelling first and its reflect serde otherwise.
 ///

@@ -96,12 +96,13 @@ impl<'a> SchemaResolver<'a> {
 			SchemaRef::Name(name) | SchemaRef::TypePath(name) => {
 				self.schema(name)
 			}
-			SchemaRef::Document(path) => self.located(path),
+			SchemaRef::Document(path) => self.located(&path.rel_path()),
 			SchemaRef::AtField(_) => None,
 		}
 	}
 
-	/// The schema of the schema document at `path`, once it has arrived.
+	/// The schema of the schema document at `path` of its package, once it has
+	/// arrived.
 	///
 	/// Resolution by *location*: a second way in to the one stored schema, not
 	/// a second copy of it.
@@ -145,7 +146,7 @@ impl ValueSchema {
 				.unwrap_or(ValueSchema::Any)
 				.xok(),
 			Self::Ref(SchemaRef::Document(path)) => resolver
-				.located(path)
+				.located(&path.rel_path())
 				.cloned()
 				.unwrap_or(ValueSchema::Any)
 				.xok(),

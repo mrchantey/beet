@@ -38,6 +38,8 @@ use bevy::ecs::template::SceneEntityReferences;
 use bevy::ecs::template::Template;
 use bevy::ecs::template::TemplateContext;
 use bevy_reflect::PartialReflect;
+use bevy_reflect::ReflectMut;
+use bevy_reflect::ReflectRef;
 use bevy_reflect::TypeRegistration;
 use bevy_reflect::TypeRegistry;
 
@@ -45,20 +47,18 @@ use bevy_reflect::TypeRegistry;
 /// list of entities, each slot a reflectable value or a named deferred
 /// template. What a [`SceneBody`] spawns through ([`SceneBody::reflect`]).
 ///
-/// This is the IR for the serde formats (json, postcard, toml), not for markup: BSX
-/// is its own syntax-tree IR ([`BsxTemplate`](crate::prelude::BsxTemplate))
-/// resolved against live registries, with no serializable value form. Both
-/// implement [`Template`] and the unified
-/// [`TemplateLoader`](crate::prelude::TemplateLoader) dispatches between them by
-/// [`MediaType`](crate::prelude::MediaType) (see
-/// [`EntryTemplate`](crate::prelude::EntryTemplate)); they are not merged.
+/// Every document spawns through one: a parser of any format returns a
+/// [`SceneBody`], and building it reflects it here. Each build reflects its
+/// own, since a default is minted as a value is reflected (a thread's id) and
+/// every build's is its own.
 ///
 /// It builds a subtree into the world, so it is a [`Template`]. The first entity
 /// builds into the context entity (the root); the rest spawn. See the module
 /// docs for the entity model and the children-order contract.
 #[derive(Default)]
 pub struct DynamicTemplate {
-	/// Resources to write into the world, applied after all entities are built.
+	/// Resources to write into the world, before any entity builds, so what an
+	/// entity does as it lands reads them.
 	pub resources: Vec<Box<dyn PartialReflect>>,
 	/// Entities in build order. The first entity becomes the root, building into the
 	/// context entity; the rest spawn.
@@ -103,6 +103,11 @@ pub enum ComponentSlot {
 	/// a function component or any world-context value is carried before it is
 	/// built.
 	Template(DeferredTemplate),
+	/// A patch over a live resource, which a document declares where it
+	/// stands: the fields it holds are written and the rest keep their values,
+	/// an absent resource inserting over its type's default. The entity holds
+	/// nothing of it.
+	Resource(Box<dyn PartialReflect>),
 }
 
 /// A deferred template slot: a template invocation, the registered
@@ -161,8 +166,80 @@ impl DynamicTemplate {
 			.expect("a template holds fewer than `u32::MAX` entities")
 	}
 
-	/// Builds every entity onto its mapped real entity, in order, then writes
-	/// resources.
+	/// The documents this instantiates, as its [`Instance`]s name them: what
+	/// must be loaded for it to build whole. A held template's count, since
+	/// its holder builds it when it likes.
+	pub fn instances(&self) -> Vec<RelPath> {
+		let mut found = Vec::new();
+		for slot in self.slots() {
+			InstanceVisitor { found: &mut found }.visit(slot.value());
+		}
+		found.dedup();
+		found
+	}
+
+	/// The props the document declares, its [`Prop`] entities.
+	pub fn props(&self) -> Vec<Prop> {
+		self.slots()
+			.filter_map(|slot| match slot {
+				ComponentSlot::Value(value) => value
+					.try_as_reflect()
+					.and_then(|value| value.downcast_ref::<Prop>())
+					.cloned(),
+				_ => None,
+			})
+			.collect()
+	}
+
+	fn slots(&self) -> impl Iterator<Item = &ComponentSlot> {
+		self.entities
+			.iter()
+			.flat_map(|entity| entity.components.iter())
+	}
+
+	/// Build into `entity`, its root, answering the key of every entity it
+	/// built: one use of a scene held as data, each use its own entities.
+	pub fn build_keyed(
+		&self,
+		entity: &mut EntityWorldMut,
+	) -> Result<TemplateEntityMap> {
+		let outer = entity.world_scope(|world| {
+			let outer = world.remove_resource::<TemplateBuildSink>();
+			world.insert_resource(TemplateBuildSink::default());
+			outer
+		});
+		let result = entity.build_template(self);
+		let pairs = entity.world_scope(|world| {
+			let pairs = world
+				.remove_resource::<TemplateBuildSink>()
+				.map(|sink| sink.0)
+				.unwrap_or_default();
+			if let Some(outer) = outer {
+				world.insert_resource(outer);
+			}
+			pairs
+		});
+		result?;
+		TemplateEntityMap::from_pairs(pairs).xok()
+	}
+
+	/// Rewrite every [`DocPath`] this holds package absolute, as the document
+	/// at `document`.
+	pub(super) fn resolve_paths(&mut self, document: &RelPath) {
+		for entity in &mut self.entities {
+			for slot in &mut entity.components {
+				let value = match slot {
+					ComponentSlot::Value(value)
+					| ComponentSlot::Resource(value) => value,
+					ComponentSlot::Template(template) => &mut template.patch,
+				};
+				DocPathResolver { document }.visit(value.as_mut());
+			}
+		}
+	}
+
+	/// Writes resources, then builds every entity onto its mapped real entity,
+	/// in order.
 	///
 	/// File order plus in-order `ChildOf` application (relationship hooks run) is
 	/// what preserves `Children` order across a round-trip.
@@ -172,30 +249,239 @@ impl DynamicTemplate {
 		app_registry: &AppTypeRegistry,
 		cx: &mut TemplateContext,
 	) -> Result<()> {
+		{
+			// SAFETY: only used to write resources into the world.
+			let world = unsafe { cx.entity.world_mut() };
+			let (world, mut mapper) =
+				ReferenceMapper::split(world, cx.entity_references);
+			for resource in &self.resources {
+				write_resource(
+					world,
+					resource.as_ref(),
+					&mut mapper,
+					registry,
+				)?;
+			}
+		}
+		// this build's own, so what it nests (a template building a document)
+		// records nothing in it
+		// SAFETY: only used to take the sink resource.
+		let sink = unsafe { cx.entity.world_mut() }
+			.remove_resource::<TemplateBuildSink>();
+		let mut built = Vec::with_capacity(self.entities.len());
 		for (position, entity) in self.entities.iter().enumerate() {
 			// SAFETY: only used to spawn-or-fetch the mapped placeholder entity.
 			let world = unsafe { cx.entity.world_mut() };
 			let entity_id = cx
 				.entity_references
 				.get(scene_reference(Self::reference(position)), world);
-			// record the real entity for the loader, if it installed a sink.
-			if let Some(mut sink) =
-				world.get_resource_mut::<TemplateBuildSink>()
-			{
-				sink.0.push((entity.key.clone(), entity_id));
-			}
 			build_entity(entity, entity_id, registry, app_registry, cx)?;
+			built.push(entity_id);
 		}
-
-		// resources last, so they are available for any reference resolution.
-		// SAFETY: only used to write resources into the world.
+		// SAFETY: only used to finish the entities just built.
 		let world = unsafe { cx.entity.world_mut() };
-		let (world, mut mapper) =
-			ReferenceMapper::split(world, cx.entity_references);
-		for resource in &self.resources {
-			write_resource(world, resource.as_ref(), &mut mapper, registry)?;
+		// record the real entities for the loader, if it installed a sink
+		if let Some(mut sink) = sink {
+			sink.0.extend(
+				self.entities
+					.iter()
+					.map(|entity| entity.key.clone())
+					.zip(built.iter().copied()),
+			);
+			world.insert_resource(sink);
+		}
+		self.forward_attributes(world, &built)?;
+		hold_prefabs(world, &built)
+	}
+
+	/// Settle the attributes this document wrote on an entity a template
+	/// built: each belongs to the root element the template built there, a
+	/// `class` joining the element's own and any other key replacing its
+	/// value. A template that built no element there has nowhere to put one,
+	/// an error naming it.
+	fn forward_attributes(
+		&self,
+		world: &mut World,
+		built: &[Entity],
+	) -> Result {
+		let templates = self
+			.entities
+			.iter()
+			.zip(built)
+			.filter_map(|(entity, id)| {
+				entity.components.iter().find_map(|slot| match slot {
+					ComponentSlot::Template(template) => {
+						Some((*id, &template.name))
+					}
+					_ => None,
+				})
+			})
+			.collect::<HashMap<_, _>>();
+		if templates.is_empty() {
+			return OK;
+		}
+		for attribute in built {
+			let Some((owner, template)) = world
+				.get::<AttributeOf>(*attribute)
+				.and_then(|owner| templates.get_key_value(&owner.get()))
+			else {
+				continue;
+			};
+			let Some(key) = world.get::<Attribute>(*attribute).cloned() else {
+				continue;
+			};
+			if !world.entity(*owner).contains::<Element>() {
+				bevybail!(
+					"`<{}>` has no prop `{}` and builds no single root element to forward it to",
+					TypeName::new((*template).clone()).short(),
+					key.as_str()
+				);
+			}
+			if key.as_str() == "class" {
+				continue;
+			}
+			let replaced = world
+				.get::<Attributes>(*owner)
+				.into_iter()
+				.flat_map(|attributes| attributes.iter())
+				.filter(|other| {
+					!built.contains(other)
+						&& world.get::<Attribute>(*other) == Some(&key)
+				})
+				.collect::<Vec<_>>();
+			for other in replaced {
+				world.despawn(other);
+			}
 		}
 		OK
+	}
+}
+
+/// Hold every prefab among `built`, its own content's slots filled first, so
+/// nothing of it shows or runs where it is held.
+fn hold_prefabs(world: &mut World, built: &[Entity]) -> Result {
+	let prefabs = built
+		.iter()
+		.copied()
+		.filter(|entity| {
+			world
+				.get_entity(*entity)
+				.is_ok_and(|entity| entity.contains::<Prefab>())
+		})
+		.collect::<Vec<_>>();
+	for prefab in prefabs {
+		resolve_slots(world, prefab)?;
+		Prefab::hold(world, prefab);
+	}
+	OK
+}
+
+impl ComponentSlot {
+	/// The value the slot builds from.
+	fn value(&self) -> &dyn PartialReflect {
+		match self {
+			Self::Value(value) | Self::Resource(value) => value.as_ref(),
+			Self::Template(template) => template.patch.as_ref(),
+		}
+	}
+}
+
+/// Collects the documents a reflected value's [`Instance`]s name.
+struct InstanceVisitor<'a> {
+	found: &'a mut Vec<RelPath>,
+}
+
+impl InstanceVisitor<'_> {
+	fn visit(&mut self, value: &dyn PartialReflect) {
+		if let Some(value) = value.try_as_reflect() {
+			if let Some(instance) = value.downcast_ref::<Instance>() {
+				self.found.push(instance.document.rel_path());
+				return;
+			}
+			if let Some(held) = value.downcast_ref::<HeldTemplate>() {
+				self.found.extend(held.instances());
+				return;
+			}
+		}
+		match value.reflect_ref() {
+			ReflectRef::Struct(value) => {
+				for field in (0..value.field_len())
+					.filter_map(|index| value.field_at(index))
+				{
+					self.visit(field);
+				}
+			}
+			ReflectRef::TupleStruct(value) => {
+				for field in value.iter_fields() {
+					self.visit(field);
+				}
+			}
+			ReflectRef::List(value) => {
+				for item in value.iter() {
+					self.visit(item);
+				}
+			}
+			ReflectRef::Enum(value) => {
+				for field in value.iter_fields() {
+					self.visit(field.value());
+				}
+			}
+			_ => {}
+		}
+	}
+}
+
+/// Rewrites every [`DocPath`] of a reflected value package absolute.
+pub(super) struct DocPathResolver<'a> {
+	pub(super) document: &'a RelPath,
+}
+
+impl DocPathResolver<'_> {
+	pub(super) fn visit(&self, value: &mut dyn PartialReflect) {
+		if let Some(value) = value.try_as_reflect_mut() {
+			if let Some(path) = value.downcast_mut::<DocPath>() {
+				*path = path.resolve(self.document).into();
+				return;
+			}
+			// a held template is a document of its own, resolved as it builds
+			if let Some(held) = value.downcast_mut::<HeldTemplate>() {
+				held.set_document(self.document);
+				return;
+			}
+		}
+		match value.reflect_mut() {
+			ReflectMut::Struct(value) => {
+				for index in 0..value.field_len() {
+					value.field_at_mut(index).map(|field| self.visit(field));
+				}
+			}
+			ReflectMut::TupleStruct(value) => {
+				for index in 0..value.field_len() {
+					value.field_mut(index).map(|field| self.visit(field));
+				}
+			}
+			ReflectMut::Tuple(value) => {
+				for index in 0..value.field_len() {
+					value.field_mut(index).map(|field| self.visit(field));
+				}
+			}
+			ReflectMut::List(value) => {
+				for index in 0..value.len() {
+					value.get_mut(index).map(|item| self.visit(item));
+				}
+			}
+			ReflectMut::Array(value) => {
+				for index in 0..value.len() {
+					value.get_mut(index).map(|item| self.visit(item));
+				}
+			}
+			ReflectMut::Enum(value) => {
+				for index in 0..value.field_len() {
+					value.field_at_mut(index).map(|field| self.visit(field));
+				}
+			}
+			_ => {}
+		}
 	}
 }
 
@@ -232,13 +518,19 @@ fn build_entity(
 				}
 				let (world, mut mapper) =
 					ReferenceMapper::split(world, cx.entity_references);
-				apply_value(
+				insert_value(
 					world,
 					entity_id,
 					value.as_ref(),
 					&mut mapper,
 					registry,
 				)?;
+			}
+			ComponentSlot::Resource(patch) => {
+				// SAFETY: only used to patch the resource, entity backed
+				// itself, never the entity being built.
+				let world = unsafe { cx.entity.world_mut() };
+				patch_resource(world, patch.as_ref(), registry)?;
 			}
 			ComponentSlot::Template(deferred) => {
 				// build the deferred template into a context scoped to this
@@ -310,6 +602,159 @@ impl EntityMapper for ReferenceMapper<'_> {
 	}
 }
 
+/// Inserts a reflected component value onto `entity` as it builds, remapping
+/// `Entity`-typed fields through `mapper`. An insert rather than a patch: a
+/// component a template built or another requires is replaced, and whatever
+/// watches its insertion sees the value the document wrote.
+fn insert_value(
+	world: &mut World,
+	entity: Entity,
+	value: &dyn PartialReflect,
+	mapper: &mut dyn EntityMapper,
+	registry: &TypeRegistry,
+) -> Result<()> {
+	let registration = type_registration(registry, value)?;
+	let reflect_component = reflect_component(registry, value)?;
+	// a value that clones to its own type is mapped and inserted whole; one
+	// that cannot is applied as a load does
+	let Ok(mut owned) = reflect_ext::clone_reflect_value(value, registration)
+	else {
+		return apply_value(world, entity, value, mapper, registry);
+	};
+	let Some(reflect) = owned.try_as_reflect_mut() else {
+		return apply_value(world, entity, value, mapper, registry);
+	};
+	if is_clone_ignored(world, reflect_component) {
+		return OK;
+	}
+	let references = references(reflect.as_partial_reflect());
+	let mut mapper = CountingMapper { mapper, mapped: 0 };
+	reflect_component.map_entities(reflect, &mut mapper);
+	if mapper.mapped < references {
+		bevybail!(
+			"`{}` holds an entity its `map_entities` never visits, so a reference in it binds to nothing: mark the field `#[entities]`",
+			registration.type_info().type_path()
+		);
+	}
+	reflect_component.insert(
+		&mut world.entity_mut(entity),
+		owned.as_ref(),
+		registry,
+	);
+	OK
+}
+
+/// How many entities a reflected value references.
+fn references(value: &dyn PartialReflect) -> usize {
+	if let Some(entity) = value.try_downcast_ref::<Entity>() {
+		return usize::from(*entity != Entity::PLACEHOLDER);
+	}
+	match value.reflect_ref() {
+		ReflectRef::Struct(value) => value
+			.iter_fields()
+			.map(|(_, field)| references(field))
+			.sum(),
+		ReflectRef::TupleStruct(value) => {
+			value.iter_fields().map(references).sum()
+		}
+		ReflectRef::Tuple(value) => value.iter_fields().map(references).sum(),
+		ReflectRef::List(value) => value.iter().map(references).sum(),
+		ReflectRef::Array(value) => value.iter().map(references).sum(),
+		ReflectRef::Map(value) => value
+			.iter()
+			.map(|(key, value)| references(key) + references(value))
+			.sum(),
+		ReflectRef::Set(value) => value.iter().map(references).sum(),
+		ReflectRef::Enum(value) => value
+			.iter_fields()
+			.map(|field| references(field.value()))
+			.sum(),
+		_ => 0,
+	}
+}
+
+/// An [`EntityMapper`] counting what it is asked to map, so a component's own
+/// `map_entities` is held to every reference it holds.
+struct CountingMapper<'a> {
+	mapper: &'a mut dyn EntityMapper,
+	mapped: usize,
+}
+
+impl EntityMapper for CountingMapper<'_> {
+	fn get_mapped(&mut self, source: Entity) -> Entity {
+		self.mapped += 1;
+		self.mapper.get_mapped(source)
+	}
+
+	fn set_mapped(&mut self, source: Entity, target: Entity) {
+		self.mapper.set_mapped(source, target);
+	}
+}
+
+/// Writes a reflected patch over the live resource of its type, the fields it
+/// lacks keeping their values, or inserts it over the type's default, tied to
+/// the build root creating it ([`SceneResource`]).
+fn patch_resource(
+	world: &mut World,
+	patch: &dyn PartialReflect,
+	registry: &TypeRegistry,
+) -> Result {
+	use bevy::ecs::reflect::ReflectFromWorld;
+	use bevy_reflect::ReflectFromReflect;
+	use bevy_reflect::std_traits::ReflectDefault;
+	let registration = type_registration(registry, patch)?;
+	let reflect_resource = reflect_resource(registry, patch)?;
+	let component_id = reflect_resource.register_component(world);
+	if let Some(entity) = world.resource_entities().get(component_id) {
+		reflect_resource.apply(&mut world.entity_mut(entity), patch);
+		return OK;
+	}
+	// inserting an unconstructible type panics, so it is refused here
+	let constructible = registration.data::<ReflectDefault>().is_some()
+		|| registration.data::<ReflectFromWorld>().is_some()
+		|| registration.data::<ReflectFromReflect>().is_some_and(
+			|from_reflect| from_reflect.from_reflect(patch).is_some(),
+		);
+	if !constructible {
+		let type_path = registration.type_info().type_path();
+		bevybail!(
+			"the resource `{type_path}` is not in the world and cannot be constructed from its fields, add `#[reflect(Default)]` or insert the resource first"
+		);
+	}
+	// created by the document: its scene's teardown, and only that scene's,
+	// removes the resource with it
+	let root = world.get_resource::<TemplateBuildRoot>().map(|root| **root);
+	let entity = world.spawn_empty().id();
+	reflect_resource.insert(&mut world.entity_mut(entity), patch, registry);
+	if let Some(root) = root {
+		world.entity_mut(entity).insert(SceneResource { root });
+	}
+	OK
+}
+
+/// Marks the backing entity of a resource a document declared, recording the
+/// template build root that created it, so scene teardown (`despawn_scene`)
+/// removes the resource *with that scene* and a rebuild reinserts it fresh from
+/// markup rather than patching stale live state.
+///
+/// The root is carried rather than implied so teardown is scoped: with two scenes
+/// loaded, despawning one must not take the other's resources with it. A
+/// teardown removes only the resources whose root is among the roots it is
+/// despawning, and treats a resource whose root has already gone as orphaned (it
+/// goes too, since nothing can rebuild it).
+///
+/// Only set when the document *creates* the resource inside a template build; a
+/// resource that pre-existed (a plugin default) keeps its own lifetime and the
+/// document only patches it. Edge case: two scenes declaring the same resource
+/// share one backing entity (the first creates and owns it, the second only
+/// patches), so tearing down the creating scene removes the resource for both.
+#[derive(Debug, Component, Reflect)]
+#[reflect(Component)]
+pub struct SceneResource {
+	/// The template build root whose scene created this resource.
+	pub root: Entity,
+}
+
 /// Applies a reflected component value onto `entity`, remapping `Entity`-typed
 /// fields through `mapper` and running relationship hooks so `Children` and
 /// other relationship mirrors rebuild in order.
@@ -326,23 +771,9 @@ pub(super) fn apply_value(
 ) -> Result<()> {
 	let reflect_component = reflect_component(registry, value)?;
 
-	// honour clone-ignored components (eg observers), which must not be written.
-	let component_id = reflect_component.register_component(world);
-	// SAFETY: registered immediately above, so the info exists.
-	#[expect(unsafe_code, reason = "avoids a redundant lookup")]
-	let is_ignored = unsafe {
-		matches!(
-			world
-				.components()
-				.get_info_unchecked(component_id)
-				.clone_behavior(),
-			ComponentCloneBehavior::Ignore
-		)
-	};
-	if is_ignored {
-		return Ok(());
+	if is_clone_ignored(world, reflect_component) {
+		return OK;
 	}
-
 	// `RelationshipHookMode::Run` so applying `ChildOf` rebuilds the parent's
 	// ordered `Children`, the children-order contract.
 	reflect_component.apply_or_insert_mapped(
@@ -353,6 +784,20 @@ pub(super) fn apply_value(
 		RelationshipHookMode::Run,
 	);
 	Ok(())
+}
+
+/// Whether a component is never cloned (eg observers), so must not be written.
+fn is_clone_ignored(
+	world: &mut World,
+	reflect_component: &ReflectComponent,
+) -> bool {
+	let component_id = reflect_component.register_component(world);
+	world
+		.components()
+		.get_info(component_id)
+		.is_some_and(|info| {
+			matches!(info.clone_behavior(), ComponentCloneBehavior::Ignore)
+		})
 }
 
 /// Writes a reflected resource value into the world, remapping `Entity`-typed

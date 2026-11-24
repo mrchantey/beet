@@ -58,21 +58,14 @@ pub(crate) use media_resolve::test_fixtures::*;
 pub use media_resolve::*;
 mod route_query;
 pub use route_query::*;
-// reactive template registration: a `<TemplateDir src="templates"/>` reads its
-// dir through the store its derived `DirPath` scoped and registers each
-// template, like `RoutesDir`.
-#[cfg(feature = "bsx")]
-mod template_dir;
-#[cfg(feature = "bsx")]
-pub use template_dir::*;
 // the entry-declared store root (`<RepoRoot src="../.."/>`), pre-scanned by
-// entry resolution like an entry's own `<TemplateDir>`s.
+// entry resolution.
 #[cfg(feature = "bsx")]
 mod repo_root;
 #[cfg(feature = "bsx")]
 pub use repo_root::*;
 // the registered set of declarations that act before the entry builds, and the
-// one registry-free walk entry resolution reads them (and `<Template src>`) from.
+// one registry-free walk entry resolution reads them from.
 #[cfg(feature = "bsx")]
 mod prescan;
 #[cfg(feature = "bsx")]
@@ -95,15 +88,14 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// The systems reacting to a changed [`Blob`] or [`BlobStore`] under a
-/// [`RoutesDir`]/[`TemplateDir`]: a route or template file re-read, a dir
-/// rescan. A reload dispatcher orders after this set, so the pending guards
+/// [`RoutesDir`]: a route re-read, a dir rescan. A reload dispatcher orders after this set, so the pending guards
 /// the reactions park are seen before it decides the subtree has settled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, SystemSet)]
 pub struct BlobReactions;
 
 /// Rescan each `D` dir whose scoped store changed, ie a file was created or
-/// removed under it: re-inserting the dir re-fires its scan (a swap for a
-/// [`RoutesDir`], a child diff for a [`TemplateDir`]). The store's own arrival
+/// removed under it: re-inserting the dir re-fires its scan, a swap for a
+/// [`RoutesDir`]. The store's own arrival
 /// is skipped, the dir's insert having fired the first scan.
 pub(crate) fn rescan_changed_dirs<D: Component + Clone>(
 	dirs: Query<(Entity, &D, Ref<BlobStore>), Changed<BlobStore>>,

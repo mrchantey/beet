@@ -392,15 +392,12 @@ mod tests {
 		let mut world = infra_world();
 		let (root, _, alice, _) = revocable_stack(&mut world).await;
 		let router = world.entity(root).get::<Children>().unwrap()[1];
-		world
-			.spawn(ChildOf(router))
-			.insert_template(
-				BsxTemplate::parse_document(
-					r#"<Route path="secrets/revoke" {SecretsRevoke}/>"#,
-				)
-				.unwrap(),
-			)
-			.unwrap();
+		let body = SceneBody::parse_bsx(
+			&world,
+			r#"<Route path="secrets/revoke" {SecretsRevoke}/>"#,
+		)
+		.unwrap();
+		world.spawn(ChildOf(router)).insert_template(body).unwrap();
 		world.flush();
 		world
 			.entity_mut(router)

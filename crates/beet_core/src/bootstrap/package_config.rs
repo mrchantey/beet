@@ -205,14 +205,10 @@ mod test {
 			.resource_mut::<AppTypeRegistry>()
 			.write()
 			.register::<PackageConfig>();
-		world
-			.spawn_template(
-				BsxTemplate::parse_document(
-					r#"<PackageConfig title="Patched"/>"#,
-				)
-				.unwrap(),
-			)
-			.unwrap();
+		let body =
+			SceneBody::parse_bsx(&world, r#"<PackageConfig title="Patched"/>"#)
+				.unwrap();
+		world.spawn_template(body).unwrap();
 
 		let config = world.resource::<PackageConfig>();
 		// the set field overrides the default

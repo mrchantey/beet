@@ -166,7 +166,7 @@ impl TypedDocument {
 		let mut overlay = resolver.registry().cloned().unwrap_or_default();
 		match &self.schema {
 			ValueSchema::Ref(SchemaRef::Document(path)) => {
-				overlay.insert_located(path.clone(), schema.clone())
+				overlay.insert_located(path.rel_path(), schema.clone())
 			}
 			// anything else reaches the declaration by name, if it has one
 			_ => {

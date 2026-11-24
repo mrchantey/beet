@@ -30,7 +30,11 @@ impl DocParser for StructuredParser {
 		.collect()
 	}
 
-	fn parse(&mut self, bytes: &MediaBytes) -> Result<SceneBody, ParseError> {
+	fn parse(
+		&mut self,
+		bytes: &MediaBytes,
+		_parsers: &DocParsers,
+	) -> Result<SceneBody, ParseError> {
 		if *bytes.media_type() == MediaType::Postcard {
 			return match bytes.deserialize::<SceneBody>() {
 				Ok(body) => body.xok(),

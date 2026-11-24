@@ -565,10 +565,7 @@ mod test {
 		let mut world =
 			(AsyncPlugin, TemplatePlugin, DocumentPlugin, InfraPlugin)
 				.into_world();
-		world
-			.spawn(())
-			.insert_template(BsxTemplate::parse_document(markup).unwrap())
-			.unwrap();
+		SceneBody::spawn_bsx(&mut world, markup).unwrap();
 		world.flush();
 		world
 	}

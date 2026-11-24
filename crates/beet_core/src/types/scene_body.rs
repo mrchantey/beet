@@ -28,6 +28,7 @@
 //! type registry: reflection happens on the way to and from a world, in
 //! `template_serde` (`SceneBody::reflect` and `TemplateBuilder`).
 use crate::prelude::*;
+use bevy::reflect::TypePath;
 use indexmap::IndexMap;
 
 /// A scene as data: its resources and its entities, each an [`EntityBody`] of
@@ -191,6 +192,23 @@ impl SceneBody {
 				.cmp(&(right.as_str().len(), right.as_str()))
 		});
 		self
+	}
+
+	/// The documents its [`Instance`]s name, as authored.
+	pub fn instances(&self) -> impl Iterator<Item = DocPath> + '_ {
+		self.entities.values().filter_map(|components| {
+			components
+				.get(Instance::type_path())
+				.or_else(|_| components.get("Instance"))
+				.ok()?
+				.as_map()
+				.ok()?
+				.get("document")
+				.ok()?
+				.as_str()
+				.ok()
+				.and_then(|document| DocPath::parse(document).ok())
+		})
 	}
 
 	/// Read a body from the [`Value`] a document holds it as.

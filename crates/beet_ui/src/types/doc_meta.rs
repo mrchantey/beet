@@ -3,7 +3,7 @@
 //!
 //! [`DocMeta`] is inserted on a document's root entity, hoisted there by
 //! whichever scan read the document (see
-//! [`RootDeclarations`](beet_core::prelude::RootDeclarations)). Its
+//! [`EntityBody::declarations`](beet_core::prelude::EntityBody::declarations)). Its
 //! `title`/`description` override the
 //! [`PackageConfig`](beet_core::prelude::PackageConfig) defaults in the document
 //! [`Head`](crate::prelude::Head), and its `created` and `authors` are read by
@@ -331,14 +331,15 @@ mod test {
 	use bevy::reflect::TypeRegistry;
 
 	/// Resolve a frontmatter block exactly as a scan does: lower it to root
-	/// declarations, then reflect-build this one component out of them.
+	/// components, then reflect-build this one out of them.
 	fn parse(content: &str, media_type: MediaType) -> DocMeta {
 		let mut registry = TypeRegistry::default();
 		registry.register::<DocMeta>();
 		Frontmatter::parse(content, media_type)
 			.unwrap()
-			.declarations(&TypeName::of::<DocMeta>().short())
-			.get::<DocMeta>(&registry)
+			.components(&DocParsers::default())
+			.unwrap()
+			.get_reflect::<DocMeta>(&registry)
 			.unwrap()
 			.unwrap_or_default()
 	}

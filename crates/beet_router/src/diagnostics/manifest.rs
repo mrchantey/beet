@@ -43,33 +43,30 @@ pub struct DiagnosticsManifest {
 /// One tag in the [`DiagnosticsManifest`] catalog: its author-facing name and,
 /// where a schema is registered, the props it accepts and their types.
 ///
-/// A tag with no registered schema (a bare `#[reflect(Component)]`/resource, or a
-/// handler tag like `<Rule>`) is listed name-only — a future editor still offers
-/// it, just without prop completion.
+/// A tag with no registered schema (a bare `#[reflect(Component)]`/resource) is
+/// listed name-only: a future editor still offers it, just without prop completion.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TagManifest {
 	/// The tag name as written in markup, eg `Header` or `path::to::Widget`.
 	pub name: SmolStr,
 	/// How the tag resolves, so a consumer can group widgets vs effects.
 	pub kind: TagKind,
-	/// The tag's prop schema, when one is registered (a `#[template]` signature or
-	/// a `bx:schema` block). `None` when the tag is listed name-only.
+	/// The tag's prop schema, when one is registered (a `#[template]`
+	/// signature). `None` when the tag is listed name-only.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub schema: Option<ValueSchema>,
 }
 
-/// How a manifest [`TagManifest`] resolves at build time, mirroring the BSX
-/// resolver's resolution order.
+/// How a manifest [`TagManifest`] resolves at build time, in the order markup
+/// resolves a name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum TagKind {
-	/// A `#[template]` (or `.bsx` file): builds an entity subtree.
+	/// A `#[template]`: builds an entity subtree.
 	Template,
 	/// A `#[reflect(Component)]` inserted onto the element.
 	Component,
 	/// A `#[reflect(Resource)]` patched at build time, rendering nothing.
 	Resource,
-	/// A [`BsxTagResolvers`] handler tag (eg `Rule`), a build-time effect.
-	Handler,
 }
 
 impl DiagnosticsManifest {
@@ -93,14 +90,11 @@ impl DiagnosticsManifest {
 	}
 }
 /// Every uppercase tag a BSX author can write, sorted by name: registered Rust
-/// types (template/component/resource via [`AppTypeRegistry`]), `.bsx` templates
-/// ([`BsxTemplateRegistry`]) and handler tags ([`BsxTagResolvers`]), each with its
-/// schema where one is registered. Names are de-duplicated, type-registry-first.
+/// types (template/component/resource via [`AppTypeRegistry`]), each with its
+/// schema where one is registered.
 fn manifest_tags(world: &mut World) -> Vec<TagManifest> {
 	let mut tags = HashMap::<SmolStr, TagManifest>::default();
 	collect_type_registry_tags(world, &mut tags);
-	collect_bsx_template_tags(world, &mut tags);
-	collect_handler_tags(world, &mut tags);
 	let mut tags = tags.into_values().collect::<Vec<_>>();
 	tags.sort_by(|left, right| left.name.cmp(&right.name));
 	tags
@@ -148,42 +142,6 @@ fn collect_type_registry_tags(
 			name: SmolStr::from(name),
 			kind,
 			schema,
-		});
-	}
-}
-
-/// Collect every `.bsx`-authored template ([`BsxTemplateRegistry`]) by its module
-/// path, with the prop schema from its `bx:schema` block when declared.
-fn collect_bsx_template_tags(
-	world: &World,
-	tags: &mut HashMap<SmolStr, TagManifest>,
-) {
-	let Some(registry) = world.get_resource::<BsxTemplateRegistry>() else {
-		return;
-	};
-	for (name, schema) in registry.manifest() {
-		tags.entry(name.clone()).or_insert_with(|| TagManifest {
-			name: name.clone(),
-			kind: TagKind::Template,
-			schema: schema.cloned(),
-		});
-	}
-}
-
-/// Collect every [`BsxTagResolvers`] handler tag (eg `Rule`), a build-time effect
-/// with no prop schema.
-fn collect_handler_tags(
-	world: &World,
-	tags: &mut HashMap<SmolStr, TagManifest>,
-) {
-	let Some(resolvers) = world.get_resource::<BsxTagResolvers>() else {
-		return;
-	};
-	for name in resolvers.keys() {
-		tags.entry(name.clone()).or_insert_with(|| TagManifest {
-			name: name.clone(),
-			kind: TagKind::Handler,
-			schema: None,
 		});
 	}
 }
@@ -242,16 +200,15 @@ fn is_uppercase_tag(tag: &str) -> bool {
 mod test {
 	use super::*;
 
-	/// A loaded-site world: the router substrate plus the Material style plugin —
-	/// which transitively registers the widget tag set (`Header`, ..) and the
-	/// `<Rule>` handler — and a couple of routes, the four manifest sources in
-	/// miniature.
+	/// A loaded-site world: the router substrate plus the Material style plugin
+	/// (which transitively registers the widget tag set (`Header`, ..) and the
+	/// `<Rule>`) and a couple of routes, the four manifest sources in miniature.
 	fn manifest_world() -> (World, Entity) {
 		let mut world = (
 			AsyncPlugin,
 			RouterPlugin,
 			// the Material rule set + (via `BsxDefaultsPlugin`/`CssPlugin`) the widget
-			// tags and the `<Rule>` handler tag.
+			// tags and `<Rule>`.
 			material::MaterialStylePlugin::default(),
 		)
 			.into_world();
@@ -287,11 +244,11 @@ mod test {
 			.contains(&SmolStr::from("page"))
 			.xpect_true();
 
-		// tags: a known widget (`Header`) and the `<Rule>` handler.
+		// tags: a known widget (`Header`) and the declared `<Rule>`.
 		let tag =
 			|name: &str| manifest.tags.iter().find(|tag| tag.name == name);
 		tag("Header").xpect_some();
-		(tag("Rule").unwrap().kind == TagKind::Handler).xpect_true();
+		tag("Rule").xpect_some();
 
 		// style props: A3's kebab vocabulary.
 		manifest

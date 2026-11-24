@@ -4,9 +4,9 @@
 //! declares its named rules in markup (eg a `styles.bsx` it includes) and they
 //! land in the live [`RuleSet`] at build time, resolving on both the web and
 //! terminal targets like any other rule. The tag renders nothing: it is a
-//! build-time effect (a [`BsxTagResolvers`] handler) that leaves a
-//! [`DeclaredRule`] on its element, so the rule lives exactly as long as the
-//! scene declaring it.
+//! [`DeclaredRule`], read off the whole element ([`FromElement`]) since its
+//! attributes are declarations rather than fields, so the rule is data a scene
+//! holds and lives exactly as long as that scene.
 //!
 //! ```html
 //! <Rule class="design-row"
@@ -34,9 +34,21 @@ use bevy::ecs::world::DeferredWorld;
 /// despawning it removes the rule again. So a torn-down scene (a live-reload
 /// rebuild) or a despawned per-request layout takes its rules with it, rather
 /// than appending a stale copy on every build.
-#[derive(Debug, Clone, Component)]
+///
+/// Reflected under the name it is authored by, `<Rule>`.
+#[derive(Debug, Clone, Component, Reflect, Serialize, Deserialize)]
+#[reflect(Component, FromElement, Serialize, Deserialize)]
+#[reflect(opaque)]
+#[type_path = "beet_ui"]
+#[type_name = "Rule"]
 #[component(on_insert = DeclaredRule::on_insert(), on_discard = DeclaredRule::on_discard())]
 pub struct DeclaredRule(pub Rule);
+
+impl FromElement for DeclaredRule {
+	fn from_element(element: &BsxElement) -> Result<Self> {
+		parse_rule(element).map(Self)
+	}
+}
 
 impl DeclaredRule {
 	fn on_insert() -> impl FnOnce(DeferredWorld, HookContext) {
@@ -69,19 +81,6 @@ impl DeclaredRule {
 	}
 }
 
-/// Register the `<Rule>` custom-tag handler into the [`BsxTagResolvers`] seam, so
-/// a `<Rule>` element declares a named rule into the [`RuleSet`] at build time,
-/// owned by the element via [`DeclaredRule`].
-pub(crate) fn register_rule_tag(world: &mut World) {
-	world.get_resource_or_init::<BsxTagResolvers>().insert(
-		"Rule",
-		|el, entity| {
-			entity.insert(DeclaredRule(parse_rule(el)?));
-			Ok(())
-		},
-	);
-}
-
 /// Build a [`Rule`] from a `<Rule>` element's attributes: the selector from
 /// `class`/`tag`/`state`/`media`, one declaration per remaining attribute.
 fn parse_rule(el: &BsxElement) -> Result<Rule> {
@@ -93,8 +92,7 @@ fn parse_rule(el: &BsxElement) -> Result<Rule> {
 		rule = rule.with_media(media);
 	}
 	let declarations = el
-		.attributes
-		.iter()
+		.plain_attributes()
 		.filter(|attr| !is_selector_attr(&attr.key))
 		.map(|attr| (attr.key.as_str(), &attr.value));
 	apply_declarations(rule, "<Rule>", declarations)
@@ -306,19 +304,12 @@ mod test {
 	use crate::style::material::MaterialStylePlugin;
 
 	/// Build a `<Rule>` markup string and return the single rule it inserted into
-	/// the live [`RuleSet`] of a Material world (`register_rule_tag` runs via
-	/// `BsxDefaultsPlugin`, pulled in by `MaterialStylePlugin`).
+	/// the live [`RuleSet`] of a Material world.
 	fn rule_from(markup: &str) -> Rule {
 		let mut world = MaterialStylePlugin::world();
 		let before = world.resource::<RuleSet>().rules().count();
-		let nodes =
-			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
-		world
-			.spawn_template(BsxTemplate::container(
-				nodes,
-				BsxTemplateRegistry::default(),
-			))
-			.unwrap();
+		let body = SceneBody::parse_bsx(&world, markup).unwrap();
+		world.spawn_template(body).unwrap();
 		world
 			.resource::<RuleSet>()
 			.rules()
@@ -336,15 +327,8 @@ mod test {
 		let before = world.resource::<RuleSet>().rules().count();
 		let markup = r#"<Rule class="probe" display=Flex/>"#;
 		let spawn = |world: &mut World| {
-			let nodes = BsxNode::parse_document(markup, &BsxParseConfig::bsx())
-				.unwrap();
-			world
-				.spawn_template(BsxTemplate::container(
-					nodes,
-					BsxTemplateRegistry::default(),
-				))
-				.unwrap()
-				.id()
+			let body = SceneBody::parse_bsx(world, markup).unwrap();
+			world.spawn_template(body).unwrap().id()
 		};
 		let first = spawn(&mut world);
 		world

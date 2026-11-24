@@ -11,6 +11,7 @@
 use super::ast::*;
 use super::cursor::Cursor;
 use crate::prelude::*;
+use alloc::boxed::Box;
 
 impl ValueExpr {
 	/// Parse an attribute-value or text-position value expression from a string,
@@ -68,6 +69,10 @@ pub(crate) fn parse_literal(cursor: &mut Cursor) -> Result<DataLiteral> {
 		Some('"') => Ok(DataLiteral::Scalar(Value::Str(parse_string(cursor)?))),
 		Some('[') => parse_list(cursor),
 		Some('{') => parse_struct(cursor).map(DataLiteral::Struct),
+		// a binding nested in a literal, an `Instance`'s bound prop
+		Some('@') => parse_binding(cursor)
+			.map(Box::new)
+			.map(DataLiteral::Binding),
 		Some('$') => {
 			// a `$name` entity reference nested in a literal (eg a spread field).
 			cursor.eat("$");

@@ -34,7 +34,8 @@ pub(crate) const DEFAULT_SLOT: &str = "default";
 /// Carries an optional slot name (the default slot when unnamed). Its children
 /// are fallback content, used only when no [`SlotChild`] is routed to it.
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SlotTarget {
 	/// The slot name, or `None` for the default slot.
 	pub name: Option<SmolStr>,
@@ -61,7 +62,8 @@ impl SlotTarget {
 ///
 /// Carries the target slot name, defaulting to the default slot when unnamed.
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SlotChild {
 	/// The target slot name, or `None` for the default slot.
 	pub name: Option<SmolStr>,

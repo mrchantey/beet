@@ -20,6 +20,7 @@ pub fn SentenceSteerTarget<F>(
 	/// commonly the agent itself; the indirection lets the prompt live
 	/// on a sibling entity.
 	#[field]
+	#[entities]
 	target_entity: TargetEntity,
 	cx: In<ActionContext>,
 	mut commands: Commands,

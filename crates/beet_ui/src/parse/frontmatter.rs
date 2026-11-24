@@ -22,18 +22,11 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 #[cfg(feature = "serde")]
 use bevy::reflect::CreateTypeData;
-use bevy::reflect::PartialReflect;
 #[cfg(feature = "serde")]
 use bevy::reflect::TypeRegistry;
-use bevy::reflect::list::DynamicList;
-use bevy::reflect::structs::DynamicStruct;
 
-/// Parsed frontmatter metadata from a YAML or TOML block.
-///
-/// Inserted on the root entity when frontmatter is present in the markdown
-/// source. The `value` field is a [`DynamicStruct`] built from the unsectioned
-/// key-value pairs, for reflection-based access by a document's own systems; the
-/// route-metadata path instead reads [`declarations`](Self::declarations).
+/// Parsed frontmatter metadata from a YAML or TOML block, the root components
+/// of the document it leads ([`components`](Self::components)).
 ///
 /// ## Example
 /// ```rust
@@ -42,10 +35,8 @@ use bevy::reflect::structs::DynamicStruct;
 /// let fm = Frontmatter::parse("title: Hello\nauthor: World", MediaType::Yaml).unwrap();
 /// fm.media_type.xpect_eq(MediaType::Yaml);
 /// ```
-#[derive(Debug, Component)]
+#[derive(Debug)]
 pub struct Frontmatter {
-	/// The parsed metadata as a dynamic struct for reflection.
-	pub value: DynamicStruct,
 	/// The format the block was written in, one [`Frontmatter::fence`] knows.
 	pub media_type: MediaType,
 	/// The parsed pairs grouped by the component their section names, in source
@@ -167,25 +158,23 @@ impl Frontmatter {
 		Self::parse(&body[..end], media_type.clone()).map(Some)
 	}
 
-	/// The components a markdown document's leading block declares, its
-	/// unsectioned keys naming `frontmatter_type`, and none for any other
-	/// media type or a document with no block.
+	/// The components a markdown document's leading block declares, and none
+	/// for any other media type or a document with no block.
 	///
-	/// A format property rather than a content parser's: every [`DocParser`]
-	/// reading markdown answers [`DocParser::declarations`] through this, so a
-	/// scan reads the same declarations whether or not the markdown content
-	/// parser is built in.
-	pub fn root_declarations(
+	/// A format property rather than a content parser's: the plain text
+	/// fallback reads it too, so a scan knows a page's metadata whether or not
+	/// the markdown content parser is built in.
+	pub fn root_components(
 		bytes: &MediaBytes,
-		frontmatter_type: &str,
-	) -> Result<RootDeclarations> {
-		if *bytes.media_type() != MediaType::Markdown {
-			return RootDeclarations::default().xok();
+		parsers: &DocParsers,
+	) -> Result<EntityBody> {
+		if !matches!(bytes.media_type(), MediaType::Markdown | MediaType::Mdx) {
+			return EntityBody::default().xok();
 		}
-		Self::extract(core::str::from_utf8(bytes)?)?
-			.map(|frontmatter| frontmatter.declarations(frontmatter_type))
-			.unwrap_or_default()
-			.xok()
+		match Self::extract(core::str::from_utf8(bytes)?)? {
+			Some(frontmatter) => frontmatter.components(parsers),
+			None => EntityBody::default().xok(),
+		}
 	}
 
 	/// Parse a raw frontmatter block, the text between its fences, through
@@ -217,11 +206,7 @@ impl Frontmatter {
 				value => sections[0].pairs.push((key.to_string(), value)),
 			}
 		}
-		// the reflect surface mirrors the default component's keys, ie the
-		// unsectioned ones; a section is read through `declarations`.
-		let value = sections[0].pairs.clone().xmap(build_dynamic_struct)?;
 		Ok(Self {
-			value,
 			media_type,
 			sections,
 		})
@@ -251,41 +236,38 @@ impl Frontmatter {
 		}
 	}
 
-	/// This block as document root declarations: each section names its own
-	/// component by short type path, and every unsectioned key declares
-	/// `default_component` (the document's [`FrontmatterType`]).
+	/// This block as its document's root components: each section names its
+	/// own by short type path, and every unsectioned key declares the
+	/// registry's [metadata type](DocParsers::metadata_type), the document's
+	/// [`FrontmatterType`].
 	///
-	/// The one lowering, so a frontmatter key coerces to its field type through
-	/// the same [`DataLiteral`] rules a BSX spread does — `created = "2025-07-11"`
-	/// becomes a [`Date`], `order = 2` a `u32`. A key with no value declares
-	/// nothing and is dropped rather than resolving to null.
-	pub fn declarations(&self, default_component: &str) -> RootDeclarations {
-		self.sections
-			.iter()
-			.filter_map(|section| {
-				let fields = section
-					.pairs
-					.iter()
-					.filter(|(_, value)| !matches!(value, Value::Null))
-					.map(|(key, value)| {
-						(SmolStr::new(key), DataLiteral::from(value.clone()))
-					})
-					.collect::<Vec<_>>();
-				(!fields.is_empty()).then(|| NamedLiteral {
-					name: section
-						.component
-						.clone()
-						.unwrap_or_else(|| SmolStr::new(default_component)),
-					fields: NamedFields::Struct(fields),
+	/// The one lowering a root spread takes, so a frontmatter key coerces to
+	/// its field type as a markup literal does, `created = "2025-07-11"` a
+	/// [`Date`]. A key with no value declares nothing.
+	pub fn components(&self, parsers: &DocParsers) -> Result<EntityBody> {
+		let declarations = self.sections.iter().filter_map(|section| {
+			let fields = section
+				.pairs
+				.iter()
+				.filter(|(_, value)| !matches!(value, Value::Null))
+				.map(|(key, value)| {
+					(SmolStr::new(key), DataLiteral::from(value.clone()))
 				})
+				.collect::<Vec<_>>();
+			(!fields.is_empty()).then(|| NamedLiteral {
+				name: section
+					.component
+					.clone()
+					.unwrap_or_else(|| parsers.metadata_type().into()),
+				fields: NamedFields::Struct(fields),
 			})
-			.collect::<Vec<_>>()
-			.xmap(RootDeclarations)
+		});
+		BsxParser::lower_declarations(declarations, parsers)
 	}
 
 	/// The block declaring every frontmatter component `entity` carries, in
 	/// `media_type` between its fences, the inverse of
-	/// [`extract`](Self::extract) and [`declarations`](Self::declarations):
+	/// [`extract`](Self::extract) and [`components`](Self::components):
 	/// `default_component`, the document's [`FrontmatterType`], unsectioned,
 	/// every other as its own section in name order, each with only the
 	/// fields its default does not hold, in field order. `None` when no field
@@ -370,37 +352,6 @@ impl Frontmatter {
 			.collect::<Vec<_>>()
 			.xok()
 	}
-
-	/// Get a string field from the frontmatter by name.
-	///
-	/// Returns `None` if the field does not exist or is not a string.
-	pub fn get_str(&self, key: &str) -> Option<&str> {
-		self.value
-			.field(key)
-			.and_then(|field| field.try_downcast_ref::<String>())
-			.map(|s| s.as_str())
-	}
-
-	/// Get a boolean field from the frontmatter by name.
-	///
-	/// Returns `None` if the field does not exist or is not a bool.
-	pub fn get_bool(&self, key: &str) -> Option<bool> {
-		self.value
-			.field(key)
-			.and_then(|field| field.try_downcast_ref::<bool>())
-			.copied()
-	}
-
-	/// Get an unsigned-integer field from the frontmatter by name.
-	///
-	/// Unsigned scalars parse to [`Value::Uint`](beet_core::prelude::Value::Uint)
-	/// (stored as `u64`); returns `None` if the field is missing or non-uint.
-	pub fn get_uint(&self, key: &str) -> Option<u64> {
-		self.value
-			.field(key)
-			.and_then(|field| field.try_downcast_ref::<u64>())
-			.copied()
-	}
 }
 
 /// A block as [`Frontmatter::write`] writes it, its entries in their own
@@ -449,42 +400,6 @@ impl serde::Serialize for WrittenBlock {
 		}
 		map.end()
 	}
-}
-
-/// Build a [`DynamicStruct`] from a list of key-value pairs.
-fn build_dynamic_struct(pairs: Vec<(String, Value)>) -> Result<DynamicStruct> {
-	let mut dynamic = DynamicStruct::default();
-	for (key, value) in pairs {
-		let field = reflect_value(&key, value)?;
-		dynamic.insert_boxed(key, field);
-	}
-	dynamic.xok()
-}
-
-/// One frontmatter value as a reflect value: a scalar as its rust type, a list
-/// as a [`DynamicList`] of them. A map belongs to a section.
-fn reflect_value(key: &str, value: Value) -> Result<Box<dyn PartialReflect>> {
-	match value {
-		Value::Null => Box::new(()) as Box<dyn PartialReflect>,
-		Value::Bool(val) => Box::new(val),
-		Value::Int(val) => Box::new(val),
-		Value::Uint(val) => Box::new(val),
-		Value::Float(val) => Box::new(val),
-		Value::Str(val) => Box::new(val.to_string()),
-		Value::Bytes(val) => Box::new(val),
-		Value::List(items) => Box::new(
-			items
-				.into_iter()
-				.map(|item| reflect_value(key, item))
-				.collect::<Result<Vec<_>>>()?
-				.into_iter()
-				.collect::<DynamicList>(),
-		),
-		Value::Map(_) => {
-			bevybail!("Unsupported map value for frontmatter key '{key}'")
-		}
-	}
-	.xok()
 }
 
 #[cfg(test)]
@@ -542,7 +457,12 @@ mod test {
 		Frontmatter::parse("title = Hello", MediaType::Toml).xpect_err();
 	}
 
-	/// Every key lowers to a literal against the default component, so nothing
+	/// The components `frontmatter` declares against no types.
+	fn components(frontmatter: &Frontmatter) -> EntityBody {
+		frontmatter.components(&DocParsers::default()).unwrap()
+	}
+
+	/// Every key declares a field of the default component, so nothing
 	/// hand-maps frontmatter to a struct.
 	#[beet_core::test]
 	fn declares_the_default_component() {
@@ -551,16 +471,14 @@ mod test {
 			MediaType::Yaml,
 		)
 		.unwrap();
-		let RootDeclarations(declarations) = fm.declarations("DocMeta");
-		declarations.len().xpect_eq(1);
-		declarations[0].name.as_str().xpect_eq("DocMeta");
-		let NamedFields::Struct(fields) = &declarations[0].fields else {
-			panic!("expected named fields")
-		};
 		// the valueless key declares nothing
-		fields.len().xpect_eq(2);
-		fields[0].0.as_str().xpect_eq("title");
-		fields[1].1.xpect_eq(DataLiteral::Scalar(Value::Uint(2)));
+		components(&fm).xpect_eq(
+			Map::new([(
+				"DocMeta",
+				value!({ "title": "Hello", "order": 2u64 }),
+			)])
+			.into(),
+		);
 	}
 
 	/// A section declares its own component alongside the default, a TOML
@@ -572,15 +490,13 @@ mod test {
 			("title: Hello\nExtra:\n  note: hi", MediaType::Yaml),
 		] {
 			let fm = Frontmatter::parse(content, media_type).unwrap();
-			fm.declarations("DocMeta")
-				.0
-				.iter()
-				.map(|named| named.name.to_string())
-				.collect::<Vec<_>>()
-				.xpect_eq(vec!["DocMeta".to_string(), "Extra".to_string()]);
-			// only the default component's keys reach the reflect surface
-			fm.get_str("title").unwrap().xpect_eq("Hello");
-			fm.get_str("note").is_none().xpect_true();
+			components(&fm).xpect_eq(
+				Map::new([
+					("DocMeta", value!({ "title": "Hello" })),
+					("Extra", value!({ "note": "hi" })),
+				])
+				.into(),
+			);
 		}
 	}
 
@@ -639,17 +555,18 @@ mod test {
 					.unwrap()
 					.unwrap();
 			block.clone().xpect_eq(expected);
+			let components = Frontmatter::extract(&block)
+				.unwrap()
+				.unwrap()
+				.components(&DocParsers::of(world))
+				.unwrap();
 			let registry = world.resource::<AppTypeRegistry>().read();
-			let declarations = Frontmatter::extract(&block)
-				.unwrap()
-				.unwrap()
-				.declarations("DocMeta");
-			declarations
-				.get::<DocMeta>(&registry)
+			components
+				.get_reflect::<DocMeta>(&registry)
 				.unwrap()
 				.xpect_eq(Some(meta.clone()));
-			declarations
-				.get::<Course>(&registry)
+			components
+				.get_reflect::<Course>(&registry)
 				.unwrap()
 				.xpect_eq(Some(course.clone()));
 		}
@@ -676,8 +593,13 @@ mod test {
 		.unwrap()
 		.unwrap();
 		fm.media_type.xpect_eq(MediaType::Toml);
-		fm.get_str("title").unwrap().xpect_eq("Hello");
-		fm.get_uint("order").unwrap().xpect_eq(2);
+		components(&fm).xpect_eq(
+			Map::new([(
+				"DocMeta",
+				value!({ "title": "Hello", "order": 2u64 }),
+			)])
+			.into(),
+		);
 	}
 
 	#[beet_core::test]
@@ -686,7 +608,9 @@ mod test {
 			.unwrap()
 			.unwrap();
 		fm.media_type.xpect_eq(MediaType::Yaml);
-		fm.get_str("title").unwrap().xpect_eq("Hello");
+		components(&fm).xpect_eq(
+			Map::new([("DocMeta", value!({ "title": "Hello" }))]).into(),
+		);
 	}
 
 	#[beet_core::test]
@@ -708,26 +632,11 @@ mod test {
 			.xpect_true();
 	}
 
-	// -- Frontmatter component --
-
+	/// An empty block declares nothing.
 	#[beet_core::test]
 	fn frontmatter_empty() {
-		let fm = Frontmatter::parse("", MediaType::Yaml).unwrap();
-		fm.value.field_len().xpect_eq(0);
-	}
-
-	#[beet_core::test]
-	fn dynamic_struct_fields_accessible() {
-		let fm = Frontmatter::parse(
-			"title: Hello\ncount: 42\ndraft: true",
-			MediaType::Yaml,
-		)
-		.unwrap();
-		fm.value.field_len().xpect_eq(3);
-		fm.get_str("title").unwrap().xpect_eq("Hello");
-		fm.get_str("count").is_none().xpect_true();
-		fm.get_uint("count").unwrap().xpect_eq(42);
-		fm.get_bool("draft").unwrap().xpect_true();
-		fm.get_str("missing").is_none().xpect_true();
+		components(&Frontmatter::parse("", MediaType::Yaml).unwrap())
+			.is_empty()
+			.xpect_true();
 	}
 }

@@ -11,11 +11,13 @@ use crate::prelude::*;
 pub struct PlainTextParser {
 	/// Require an explicit [`MediaType::Text`].
 	plaintext_only: bool,
-	/// The root declarations a text document carries, ie markdown's
-	/// frontmatter, read by a route scan with no content parser registered.
-	#[cfg(feature = "bsx")]
-	declarations: Option<fn(&MediaBytes, &str) -> Result<RootDeclarations>>,
+	/// The components a text document declares at its root, ie markdown's
+	/// frontmatter, read with no content parser registered.
+	root_components: Option<RootComponentsFn>,
 }
+
+/// Reads the components a text document declares at its root.
+type RootComponentsFn = fn(&MediaBytes, &DocParsers) -> Result<EntityBody>;
 
 impl PlainTextParser {
 	/// Read any text type.
@@ -28,15 +30,14 @@ impl PlainTextParser {
 		self
 	}
 
-	/// Answer [`DocParser::declarations`] with `declarations`, ie a markdown
+	/// Declare what `root_components` reads beside the text, ie a markdown
 	/// frontmatter reader, so a route scan reads a page's metadata through
 	/// the fallback.
-	#[cfg(feature = "bsx")]
-	pub fn with_declarations(
+	pub fn with_root_components(
 		mut self,
-		declarations: fn(&MediaBytes, &str) -> Result<RootDeclarations>,
+		root_components: RootComponentsFn,
 	) -> Self {
-		self.declarations = Some(declarations);
+		self.root_components = Some(root_components);
 		self
 	}
 }
@@ -44,7 +45,11 @@ impl PlainTextParser {
 impl DocParser for PlainTextParser {
 	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Text] }
 
-	fn parse(&mut self, bytes: &MediaBytes) -> Result<SceneBody, ParseError> {
+	fn parse(
+		&mut self,
+		bytes: &MediaBytes,
+		parsers: &DocParsers,
+	) -> Result<SceneBody, ParseError> {
 		let media_type = bytes.media_type();
 		let accepted = match self.plaintext_only {
 			true => *media_type == MediaType::Text,
@@ -56,20 +61,12 @@ impl DocParser for PlainTextParser {
 				supported: vec![MediaType::Text],
 			});
 		}
+		let root = match self.root_components {
+			Some(root_components) => root_components(bytes, parsers)?,
+			None => EntityBody::default(),
+		};
 		let text = Value::new(bytes.as_utf8()?.to_string());
-		SceneBody::root(EntityBody::default().with_typed(&text)?).xok()
-	}
-
-	#[cfg(feature = "bsx")]
-	fn declarations(
-		&self,
-		bytes: &MediaBytes,
-		frontmatter_type: &str,
-	) -> Result<RootDeclarations> {
-		match self.declarations {
-			Some(declarations) => declarations(bytes, frontmatter_type),
-			None => RootDeclarations::default().xok(),
-		}
+		SceneBody::root(root.with_typed(&text)?).xok()
 	}
 }
 
@@ -85,7 +82,7 @@ mod test {
 	fn plaintext_only_refuses_other_text() {
 		PlainTextParser::new()
 			.plaintext_only()
-			.parse(&MediaBytes::new_css("a {}"))
+			.parse(&MediaBytes::new_css("a {}"), &DocParsers::default())
 			.unwrap_err();
 	}
 }

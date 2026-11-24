@@ -129,7 +129,7 @@ async fn build_entry(world: &AsyncWorld) -> Result {
 	let book = load_book(&store).await?;
 	world
 		.with(move |world: &mut World| -> Result {
-			let template = BsxTemplate::parse_entry(world, &source)?;
+			let template = SceneBody::parse_bsx(world, &source)?;
 			let root = world.spawn((store, book)).id();
 			world.entity_mut(root).insert_template(template)?;
 			Ok(())

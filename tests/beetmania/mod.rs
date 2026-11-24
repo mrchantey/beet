@@ -7,12 +7,10 @@
 use beet::prelude::*;
 
 /// Build the on-disk `examples/beetmania` site into a router root on `world`,
-/// returning it. The store-backed load the `beet` binary's `build_entry_root`
-/// runs, in miniature: pre-scan the entry's declared `<TemplateDir>`s and register
-/// their templates (so entry-level tags like `<Styles/>` resolve), parse the
-/// `main.bsx` entry, build it onto a root carrying the store (so `<RoutesDir>`/
-/// `<Template src>` resolve it by ancestry), then settle the async `<RoutesDir>` /
-/// `<TemplateDir>` scans so every route/template exists before the first request.
+/// returning it. The store-backed load the `beet` binary runs, in miniature:
+/// pre-scan the entry, build its body onto a root carrying the store (so
+/// `<RoutesDir>` and the documents the site instantiates resolve it by ancestry),
+/// then settle so every route and document is there before the first request.
 ///
 /// The load declares no run, so the entry's declared servers stay
 /// dormant: callers render or navigate the site rather than boot it.
@@ -24,29 +22,14 @@ pub async fn build_site(world: &mut World) -> Entity {
 	let store = BlobStore::new(FsStore::new(
 		AbsPath::new_workspace_rel("examples/beetmania").unwrap(),
 	));
-	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
 	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();
-	// the entry is always `.bsx`, so parse it through the core BSX engine (the
-	// `.bsx` arm of the binary's format-dispatching `EntryTemplate::from_bytes`).
-	let source = entry.as_utf8().unwrap();
-	// pre-scan: register the entry's declared `<TemplateDir>`s before parsing, so
-	// entry-level tags resolve against them.
-	let prescan =
+	let template =
 		EntryPrescan::parse(&entry, world.resource::<PrescanRegistry>())
+			.unwrap()
+			.body(&DocParsers::of(world))
+			.unwrap()
 			.unwrap();
-	// the root is spawned first so it owns the entry-level registrations, as the
-	// binary's entry build does.
 	let root = world.spawn_empty().id();
-	for dir in prescan.iter::<TemplateDir>() {
-		let sources = TemplateDir::read_sources(
-			&store.with_subdir(dir.src.clone()),
-			&formats,
-		)
-		.await
-		.unwrap();
-		TemplateDir::register_sources(world, root, &formats, sources).unwrap();
-	}
-	let template = BsxTemplate::parse_entry(world, source).unwrap();
 	world
 		.entity_mut(root)
 		.insert(store)

@@ -61,7 +61,8 @@ impl Prefab {
 	/// Clone the prefab rooted at `prefab` under `target`, its root the
 	/// clone's root and every entity reference within it remapped to the
 	/// clone, so two clones share nothing. The clone carries neither
-	/// [`Prefab`] nor [`Held`], and lands after `target`'s existing children.
+	/// [`Prefab`] nor [`Held`], save a prefab within it, which stays one, and
+	/// lands after `target`'s existing children.
 	///
 	/// `use_site` is inserted on the clone's root before anything is cloned,
 	/// so every hook the clone runs already sees it, ie a row's
@@ -100,16 +101,33 @@ impl Prefab {
 			}
 		}
 		let derived = Self::derived_components(world);
-		let mut cloner = {
+		let mut cloner = |nested: bool| {
 			let mut builder = EntityCloner::build_opt_out(world);
 			// the hierarchy rebuilds from each clone's `ChildOf`, in tree order
 			builder
-				.deny::<(Self, Held, Children, TemplateEntityMap)>()
-				.deny_by_ids(derived);
+				.deny::<(Children, TemplateEntityMap)>()
+				.deny_by_ids(derived.iter().copied());
+			if !nested {
+				builder.deny::<(Self, Held)>();
+			}
 			builder.finish()
 		};
+		let (mut content, mut held) = (cloner(false), cloner(true));
+		// a prefab within this one, the item of a list in a row, is content of
+		// the clone and held there in turn
+		let mut nested = HashSet::<Entity>::default();
 		for source in &sources {
-			cloner.clone_entity_mapped(world, *source, &mut map);
+			let under_nested = world
+				.get::<ChildOf>(*source)
+				.is_some_and(|child| nested.contains(&child.parent()));
+			let is_prefab =
+				*source != prefab && world.get::<Self>(*source).is_some();
+			if under_nested || is_prefab {
+				nested.insert(*source);
+				held.clone_entity_mapped(world, *source, &mut map);
+			} else {
+				content.clone_entity_mapped(world, *source, &mut map);
+			}
 		}
 		let keys = match world.get::<TemplateEntityMap>(prefab) {
 			Some(loaded) => TemplateEntityMap::from_pairs(

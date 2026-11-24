@@ -6,7 +6,7 @@
 //!
 //! - a `schema="u64"` markup attribute (`bsx::reflect`), where an unknown word is
 //!   an authoring typo and the error lists what is accepted;
-//! - a JSON Schema descriptor ([`ValueSchema::from_json_schema`]), where an
+//! - a JSON Schema descriptor ([`ValueSchema::from_json_value`]), where an
 //!   unknown word is a [`SchemaRef::Name`] to another schema.
 use crate::prelude::*;
 

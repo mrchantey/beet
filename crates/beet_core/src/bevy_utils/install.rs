@@ -3,7 +3,7 @@
 //! would grow it into a mega type.
 //!
 //! - [`Installer`], installed by value:
-//!   `app.install(Unregistered::allow("Foo"))`. Consumed rather than
+//!   `app.install(PlainTextParser::default())`. Consumed rather than
 //!   borrowed, never unique and needing no `'static`, `Send` or `Sync`, so it
 //!   can capture whatever the call site holds. Any `FnOnce(&mut App)` is one,
 //!   which a constructor returns as `impl Installer`.
@@ -123,7 +123,7 @@ all_tuples!(impl_installer_tuple, 1, 15, I, M);
 /// The marker sits on the trait rather than each method so a call infers it:
 /// `app.install_type::<Route>()` needs no turbofish beyond the type.
 pub trait AppInstallExt<M> {
-	/// Install `installer`, ie `app.install(Unregistered::allow("Foo"))`.
+	/// Install `installer`, ie `app.install(PlainTextParser::default())`.
 	fn install(&mut self, installer: impl Installer<M>) -> &mut Self;
 	/// Install `T`, ie `app.install_type::<Route>()`.
 	fn install_type<T: TypeInstaller<M>>(&mut self) -> &mut Self;

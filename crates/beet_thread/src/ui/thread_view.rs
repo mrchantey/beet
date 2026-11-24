@@ -688,10 +688,7 @@ mod test {
 	<ThreadView {OfThread($thread)}/>
 </Fragment>
 "#;
-		BsxTemplate::parse_entry(app.world(), source)
-			.unwrap()
-			.spawn(app.world_mut())
-			.unwrap();
+		SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
 		app.world_mut().flush();
 
 		let thread = app

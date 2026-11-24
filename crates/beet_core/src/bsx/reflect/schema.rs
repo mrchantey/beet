@@ -1,45 +1,27 @@
-//! Schema typing and runtime prop verification for BSX templates.
+//! Verifying the props a template tag passes against its registered schema.
 //!
-//! A schema types a template's props (and a document's state). Two authoring
-//! forms produce the same [`ValueSchema`]:
-//!
-//! - the Rust-type form: a `#[template]`'s typed signature, registered alongside
-//!   its build bridge (see `beet_core`'s `ReflectTemplateSchema`);
-//! - the JSON form: a `<script type="json" bx:schema>` block in a `.bsx`,
-//!   parsed here into a [`ValueSchema`].
-//!
-//! Verification is always at runtime: [`verify_props`] gathers a tag's prop
-//! attributes into a [`Value`], resolves the template's schema (substituting
-//! composable [`SchemaRef::Name`]s against the [`SchemaRegistry`]), and
-//! validates, surfacing a missing required field or a type mismatch as a graceful
-//! error that rides [`TemplateError`](beet_core::prelude::TemplateError) on the
-//! root rather than panicking.
+//! A schema types a template's props: the `#[template]`'s typed signature,
+//! registered alongside its build bridge ([`ReflectTemplateSchema`]). The
+//! check runs as a document lowers, so a missing required prop or a type
+//! mismatch is an error of the document, naming the tag, before anything
+//! spawns.
 
-use crate::bsx::resolve::is_directive;
 use crate::prelude::*;
-use bevy::ecs::template::TemplateContext;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::TypeRegistration;
-use bevy::reflect::TypeRegistry;
 use core::any::TypeId;
 
-/// Verify the props supplied to `tag` against its registered prop schema.
+/// Verify the props supplied to a template tag against its registered schema.
 ///
-/// Builds a [`Value::Map`] from the element's literal prop attributes, resolves
-/// the template's [`ValueSchema`] against the world's [`SchemaRegistry`] (so a
-/// composable [`SchemaRef::Name`] is substituted), and validates. Returns
-/// an `Err` describing the failures, which rides the root's `TemplateError`.
-///
-/// A tag with no registered schema, or props that are not plain values (an entity
-/// reference, a field binding), is left unverified, since those resolve by other
+/// Builds a [`Value::Map`] from the element's literal prop attributes and
+/// validates it. A template with no schema, or props that are not plain values
+/// (an entity reference), is left unverified, since those resolve by other
 /// means.
 pub(in crate::bsx) fn verify_props(
 	el: &BsxElement,
-	tag: &str,
-	app_registry: &AppTypeRegistry,
-	cx: &mut TemplateContext,
+	registration: &TypeRegistration,
 ) -> Result<()> {
-	let Some(schema) = ValueSchema::template_by_name(app_registry, tag) else {
+	let Some(schema) = registration.data::<ReflectTemplateSchema>() else {
 		return Ok(());
 	};
 	let mut props = props_value(el);
@@ -48,34 +30,9 @@ pub(in crate::bsx) fn verify_props(
 	// before the structural validation below, which only knows the type's
 	// STRUCTURE and would reject the very form the coercion layer was written
 	// to accept.
-	let mut settled =
-		parse_literal_props(&app_registry.read(), tag, &mut props)?;
+	let mut settled = parse_literal_props(registration, &el.tag, &mut props)?;
 	settled.extend(props_resolved_elsewhere(el));
-	validate_props(tag, &schema, props, &settled, cx)
-}
-
-/// Verify a tag's props against an explicit `schema`, the shared path for both a
-/// Rust template (schema looked up via [`ValueSchema::template_by_name`]) and a BSX
-/// template (schema from its `bx:schema` block).
-///
-/// Resolves composable [`SchemaRef::Name`]s against the world's
-/// [`SchemaRegistry`], then validates. A missing required field or type mismatch
-/// is an `Err` that rides the root's `TemplateError`.
-pub(in crate::bsx) fn verify_props_against(
-	el: &BsxElement,
-	tag: &str,
-	schema: &ValueSchema,
-	cx: &mut TemplateContext,
-) -> Result<()> {
-	// a BSX-authored template is typed by its `bx:schema` block alone, so there
-	// are no Rust prop types to parse an authored spelling into.
-	validate_props(
-		tag,
-		schema,
-		props_value(el),
-		&props_resolved_elsewhere(el),
-		cx,
-	)
+	validate_props(&el.tag, schema.schema(), props, &settled)
 }
 
 /// Validate `props` against `schema`, skipping the keys that are already
@@ -86,17 +43,11 @@ fn validate_props(
 	schema: &ValueSchema,
 	mut props: Value,
 	settled: &HashSet<SmolStr>,
-	cx: &mut TemplateContext,
 ) -> Result<()> {
-	// resolve composable references against the schema registry snapshot.
-	let mut resolved = cx
-		.entity
-		.world_scope(|world| world.get_resource::<SchemaRegistry>().cloned())
-		.map(|registry| registry.resolve(schema))
-		.unwrap_or_else(|| schema.clone());
+	let mut schema = schema.clone();
 	// a tag may carry attributes beyond its declared props (eg `class`), which are
 	// forwarded rather than rejected, so prop validation permits extra keys.
-	if let ValueSchema::Struct(struct_schema) = &mut resolved {
+	if let ValueSchema::Struct(struct_schema) = &mut schema {
 		struct_schema.allow_additional = true;
 		// a prop its type's parser already accepted is settled: its authored
 		// spelling is not its structure, so the structural field would reject
@@ -110,7 +61,7 @@ fn validate_props(
 	}
 	// `validate` is async-shaped but resolves in one poll without an executor, so
 	// `try_block_on` drives it on both std and no_std.
-	let errors = async_ext::try_block_on(resolved.validate(&mut props))?;
+	let errors = async_ext::try_block_on(schema.validate(&mut props))?;
 	if errors.is_empty() {
 		Ok(())
 	} else {
@@ -132,16 +83,14 @@ fn validate_props(
 /// prop to structural validation, so a `GlobFilter` struct literal still
 /// validates the old way.
 fn parse_literal_props(
-	registry: &TypeRegistry,
+	registration: &TypeRegistration,
 	tag: &str,
 	props: &mut Value,
 ) -> Result<HashSet<SmolStr>> {
 	let mut parsed = HashSet::default();
-	let (Value::Map(map), Some(TypeInfo::Struct(info))) = (
-		props,
-		ReflectTemplate::registration_named(registry, tag)
-			.map(TypeRegistration::type_info),
-	) else {
+	let (Value::Map(map), TypeInfo::Struct(info)) =
+		(props, registration.type_info())
+	else {
 		return Ok(parsed);
 	};
 	for (key, value) in map.0.iter() {
@@ -175,44 +124,34 @@ fn prop_target(mut info: &'static TypeInfo) -> TypeId {
 	info.type_id()
 }
 
-/// Build a [`Value::Map`] of a tag's literal prop attributes, for schema
-/// validation and as a props store's initial document (see
-/// `resolve.rs::apply_props_store`). Directives, spreads, references and entity
-/// refs are skipped, as they are not plain prop values.
-pub(in crate::bsx) fn props_value(el: &BsxElement) -> Value {
-	let mut map = Map::default();
-	for attr in &el.attributes {
-		if is_directive(&attr.key) || attr.key.is_empty() {
-			continue;
-		}
-		if let Some(value) = attr_prop_value(&attr.value) {
-			map.insert(SmolStr::from(attr.key.as_str()), value);
-		}
-	}
-	Value::Map(map)
+/// Build a [`Value::Map`] of a tag's literal prop attributes. References are
+/// skipped, as they are not plain prop values.
+fn props_value(el: &BsxElement) -> Value {
+	el.plain_attributes()
+		.filter_map(|attr| {
+			attr_prop_value(&attr.value)
+				.map(|value| (SmolStr::from(attr.key.as_str()), value))
+		})
+		.collect::<Map>()
+		.xmap(Value::Map)
 }
 
-/// The props a tag supplied that carry no inline value to verify: an entity ref
-/// (`deploy={$up}`) or a field binding.
+/// The props a tag supplied that carry no inline value to verify, ie an entity
+/// ref (`deploy={$up}`).
 ///
 /// They ARE supplied, and the reflect patch resolves each through its own
 /// machinery, so validation must treat them as settled rather than as absent.
 /// Without this a `#[prop(required)]` field fed an entity ref reports as
 /// missing, which is the one failure a required prop exists to prevent and the
 /// one it cannot itself be at fault for.
-pub(in crate::bsx) fn props_resolved_elsewhere(
-	el: &BsxElement,
-) -> HashSet<SmolStr> {
-	el.attributes
-		.iter()
-		.filter(|attr| !is_directive(&attr.key) && !attr.key.is_empty())
+fn props_resolved_elsewhere(el: &BsxElement) -> HashSet<SmolStr> {
+	el.plain_attributes()
 		.filter(|attr| attr_prop_value(&attr.value).is_none())
 		.map(|attr| SmolStr::from(attr.key.as_str()))
 		.collect()
 }
 
-/// The plain [`Value`] of a prop attribute, or `None` when it is not a literal
-/// (a `#`reference or `$`entity ref carries no inline value to verify).
+/// The plain [`Value`] of a prop attribute, or `None` when it is not a literal.
 fn attr_prop_value(value: &AttrValue) -> Option<Value> {
 	match value {
 		AttrValue::Flag => Some(Value::Bool(true)),
@@ -247,7 +186,7 @@ fn literal_prop_value(literal: &DataLiteral) -> Option<Value> {
 		}
 		DataLiteral::Enum(named) => named_prop_value(named),
 		// an entity reference is not a plain value
-		DataLiteral::EntityRef(_) => None,
+		DataLiteral::EntityRef(_) | DataLiteral::Binding(_) => None,
 	}
 }
 
@@ -290,87 +229,6 @@ fn named_prop_value(named: &NamedLiteral) -> Option<Value> {
 /// the last `::`, eg `ButtonVariant::Outlined` -> `Outlined`.
 fn variant_name(name: &str) -> &str { name.rsplit("::").next().unwrap_or(name) }
 
-/// A template's `bx:schema` declaration: an inline JSON schema, a remote schema
-/// referenced by `src` (resolved asynchronously), or none.
-#[derive(Debug, Clone, Default)]
-pub(in crate::bsx) enum SchemaDirective {
-	/// No `bx:schema` block.
-	#[default]
-	None,
-	/// An inline JSON schema, parsed at registration.
-	Inline(ValueSchema),
-	/// A remote schema URL, fetched asynchronously and awaited by `Ready`.
-	Remote(SmolStr),
-}
-
-/// Extract the `bx:schema` directive declared among `nodes`: the first
-/// `<script bx:schema>` block, inline (a JSON body) or remote (a `src` url).
-///
-/// A template declaring no block declares no schema; a block that IS declared
-/// and does not parse is an error, never a silently unschema'd template whose
-/// props then validate against nothing.
-pub(in crate::bsx) fn extract_schema_directive(
-	nodes: &[BsxNode],
-) -> Result<SchemaDirective> {
-	let Some(el) = nodes
-		.iter()
-		.filter_map(|node| match node {
-			BsxNode::Element(el) => Some(el),
-			_ => None,
-		})
-		.find(|el| is_schema_block(el))
-	else {
-		return SchemaDirective::None.xok();
-	};
-	// a `src` makes it remote; otherwise the raw-text body is inline JSON.
-	if let Some(src) = string_attr(el, "src") {
-		return SchemaDirective::Remote(SmolStr::from(src.as_str())).xok();
-	}
-	schema_block_body(el)
-		.ok_or_else(|| bevyhow!("`bx:schema` block declares no schema body"))?
-		.xmap(|json| ValueSchema::from_json_schema(&json))?
-		.xmap(SchemaDirective::Inline)
-		.xok()
-}
-
-/// The string value of a literal-string attribute on `el`, if present.
-fn string_attr(el: &BsxElement, key: &str) -> Option<String> {
-	el.attributes.iter().find_map(|attr| {
-		if attr.key != key {
-			return None;
-		}
-		match &attr.value {
-			AttrValue::Str(string) => Some(string.clone()),
-			_ => None,
-		}
-	})
-}
-
-/// Remove every `<script bx:schema>` block from `nodes`, so a template's body
-/// does not render its schema declaration.
-pub(in crate::bsx) fn strip_schema_blocks(nodes: Vec<BsxNode>) -> Vec<BsxNode> {
-	nodes
-		.into_iter()
-		.filter(
-			|node| !matches!(node, BsxNode::Element(el) if is_schema_block(el)),
-		)
-		.collect()
-}
-
-/// Whether `el` is a `<script ... bx:schema>` block.
-fn is_schema_block(el: &BsxElement) -> bool {
-	el.tag == "script"
-		&& el.attributes.iter().any(|attr| attr.key == "bx:schema")
-}
-
-/// The raw-text body of a `<script>` schema block.
-fn schema_block_body(el: &BsxElement) -> Option<String> {
-	el.children.iter().find_map(|child| match child {
-		BsxNode::Text(text) => Some(text.clone()),
-		_ => None,
-	})
-}
-
 #[cfg(all(test, feature = "json"))]
 mod test {
 	use super::*;
@@ -379,6 +237,7 @@ mod test {
 		BsxElement {
 			tag: "Foo".into(),
 			tag_literal: None,
+			key: None,
 			attributes: attrs
 				.iter()
 				.map(|(key, value)| BsxAttribute {
@@ -401,12 +260,12 @@ mod test {
 					Value::Int(3),
 				))),
 			),
-			("bx:scope", AttrValue::Str("x".into())),
+			("slot", AttrValue::Str("x".into())),
 		]);
 		let Value::Map(map) = props_value(&el) else {
 			panic!("expected map");
 		};
-		// the two literal props are collected, the directive is skipped
+		// the two literal props are collected, the slot routing is skipped
 		map.0.len().xpect_eq(2);
 		map.0
 			.get("label")
@@ -416,8 +275,7 @@ mod test {
 		map.0.get("count").unwrap().clone().xpect_eq(Value::Int(3));
 	}
 
-	/// A template's prop types, registered by short path exactly as
-	/// `registration_named` resolves them.
+	/// A template's prop types.
 	#[derive(Reflect, Default)]
 	struct Widget {
 		home: bool,
@@ -427,18 +285,12 @@ mod test {
 		duration: Option<core::time::Duration>,
 	}
 
-	fn prop_registry() -> TypeRegistry {
-		let mut registry = TypeRegistry::default();
-		registry.register::<Widget>();
-		registry
-	}
-
 	/// Parse the props of a `<Widget ..>` element through the pre-pass.
 	fn parse_widget_props(
 		attrs: &[(&str, AttrValue)],
 	) -> Result<HashSet<SmolStr>> {
 		parse_literal_props(
-			&prop_registry(),
+			&TypeRegistration::of::<Widget>(),
 			"Widget",
 			&mut props_value(&element(attrs)),
 		)

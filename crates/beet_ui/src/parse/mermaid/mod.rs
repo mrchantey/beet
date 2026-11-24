@@ -55,9 +55,7 @@
 //!   `KittyGraphicsSupport`. The form built is recorded (`DiagramForm`) so a
 //!   tree built for the web and later painted for a terminal (a served page
 //!   under the one-shot ansi renderer, which has no graphics and gets text)
-//!   or a session gaining or losing graphics rebuilds it, and a reparse of
-//!   the fence (the collector drops the form) builds the new source. A
-//!   render error keeps the source visible under a material error box, and
+//!   or a session gaining or losing graphics rebuilds it. A render error keeps the source visible under a material error box, and
 //!   warns; a raster failure is the `<img>`'s alt marker beside the error box.
 //! - The charcell pipeline fits the art after layout
 //!   (`render/charcell/reflow.rs`): nothing before layout knows the columns

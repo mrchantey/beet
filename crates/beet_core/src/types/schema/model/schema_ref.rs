@@ -17,7 +17,7 @@ use crate::prelude::*;
 ///   by-name registry first so a hand-authored schema can stand in for what
 ///   reflection would derive
 /// - [`Document`](Self::Document), a schema document in this document's own
-///   store, resolved by **location** in the by-location index
+///   package, resolved by **location** in the by-location index
 ///
 /// The fourth resolves against the *value* instead.
 ///
@@ -67,8 +67,8 @@ pub enum SchemaRef {
 	Name(SmolStr),
 	/// A registered Rust type, ie `bevy_color::color::Color`.
 	TypePath(SmolStr),
-	/// A schema document in this document's own store, resolved by location.
-	Document(RelPath),
+	/// A schema document in this document's own package, resolved by location.
+	Document(DocPath),
 	/// The schema described by the value at this key of the nearest enclosing
 	/// struct.
 	AtField(SmolStr),
@@ -121,10 +121,51 @@ impl ValueSchema {
 		Self::Ref(SchemaRef::TypePath(SmolStr::new_static(T::type_path())))
 	}
 
-	/// The schema held by the schema document at `path`, resolved by location in
-	/// this document's own store.
+	/// The schema held by the schema document at `path` of this document's own
+	/// package, resolved by location.
 	pub fn document(path: impl Into<RelPath>) -> Self {
-		Self::Ref(SchemaRef::Document(path.into()))
+		Self::Ref(SchemaRef::Document(path.into().into()))
+	}
+
+	/// This schema as the document at `document` holds it, every
+	/// [`SchemaRef::Document`] in it package absolute ([`DocPath::resolve`]),
+	/// which is how the by-location index is keyed.
+	pub fn resolve_documents(mut self, document: &RelPath) -> Self {
+		self.resolve_documents_mut(document);
+		self
+	}
+
+	fn resolve_documents_mut(&mut self, document: &RelPath) {
+		match self {
+			Self::Ref(SchemaRef::Document(path)) => {
+				*path = path.resolve(document).into();
+			}
+			Self::Optional(inner) => inner.resolve_documents_mut(document),
+			Self::List(list) => list.item.resolve_documents_mut(document),
+			Self::Map(MapSchema::Uniform { value }) => {
+				value.resolve_documents_mut(document)
+			}
+			Self::Struct(schema) => {
+				for field in &mut schema.fields {
+					field.schema.resolve_documents_mut(document);
+				}
+			}
+			Self::Tuple(schema) => {
+				for field in &mut schema.fields {
+					field.schema.resolve_documents_mut(document);
+				}
+			}
+			Self::Enum(schema) => {
+				for payload in schema
+					.variants
+					.iter_mut()
+					.filter_map(|variant| variant.payload.as_mut())
+				{
+					payload.resolve_documents_mut(document);
+				}
+			}
+			_ => {}
+		}
 	}
 
 	/// The schema described by the value at `key` of the nearest enclosing

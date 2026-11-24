@@ -45,6 +45,8 @@ pub enum MediaType {
 	DagCbor,
 	/// `text/markdown`
 	Markdown,
+	/// `text/mdx`, markdown whose text holds BSX expressions.
+	Mdx,
 	/// `application/vnd.beet.bsx`, Beet Scripting XML, the `.bsx` template
 	/// format.
 	Bsx,
@@ -171,6 +173,7 @@ impl MediaType {
 	const HTML: &'static str = "text/html";
 	const XML: &'static str = "application/xml";
 	const MARKDOWN: &'static str = "text/markdown";
+	const MDX: &'static str = "text/mdx";
 	const BSX: &'static str = "application/vnd.beet.bsx";
 	const BYTES: &'static str = "application/octet-stream";
 	const EVENT_STREAM: &'static str = "text/event-stream";
@@ -258,6 +261,7 @@ impl MediaType {
 			val if val.contains(Self::HTML) => MediaType::Html,
 			val if val.contains(Self::BSX) => MediaType::Bsx,
 			val if val.contains(Self::MARKDOWN) => MediaType::Markdown,
+			val if val.contains(Self::MDX) => MediaType::Mdx,
 			val if val.contains(Self::EVENT_STREAM) => MediaType::EventStream,
 			val if val.contains("text/xml") || val.contains(Self::XML) => {
 				MediaType::Xml
@@ -338,9 +342,8 @@ impl MediaType {
 		match ext.to_ascii_lowercase().as_str() {
 			// text
 			"txt" | "text" | "log" => MediaType::Text,
-			// `mdx` is markdown with embedded components, which the markdown
-			// parser already lowers (it parses embedded markup fragments).
-			"md" | "markdown" | "mdx" => MediaType::Markdown,
+			"md" | "markdown" => MediaType::Markdown,
+			"mdx" => MediaType::Mdx,
 			"bsx" => MediaType::Bsx,
 			"html" | "htm" => MediaType::Html,
 			"css" => MediaType::Css,
@@ -419,6 +422,7 @@ impl MediaType {
 			MediaType::WebManifest => Some("webmanifest"),
 			MediaType::Xml => Some("xml"),
 			MediaType::Markdown => Some("md"),
+			MediaType::Mdx => Some("mdx"),
 			MediaType::Bsx => Some("bsx"),
 			MediaType::Csv => Some("csv"),
 			MediaType::Url => Some("url"),
@@ -503,6 +507,7 @@ impl MediaType {
 			MediaType::Postcard => Self::POSTCARD,
 			MediaType::DagCbor => Self::DAG_CBOR,
 			MediaType::Markdown => Self::MARKDOWN,
+			MediaType::Mdx => Self::MDX,
 			MediaType::Bsx => Self::BSX,
 			MediaType::EventStream => Self::EVENT_STREAM,
 			MediaType::Css => Self::CSS,
@@ -595,6 +600,7 @@ impl MediaType {
 				| MediaType::Json
 				| MediaType::WebManifest
 				| MediaType::Markdown
+				| MediaType::Mdx
 				| MediaType::Bsx
 				| MediaType::EventStream
 				| MediaType::Css

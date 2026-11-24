@@ -81,11 +81,17 @@ pub(super) const VOID_ELEMENTS: &[&str] = &[
 	"param", "source", "track", "wbr",
 ];
 
-/// A slot placeholder is HTML's lowercase `<slot>`: `<Slot>` would read as a
-/// type named `Slot`, which there is none of, so it is refused with the
-/// spelling to use rather than held as an unregistered tag.
-pub(super) fn refuse_slot_tag(tag: &str) -> Result {
+/// Refuse a tag naming a reserved word in another's spelling, with the
+/// spelling to use, rather than hold it as an unregistered tag: a slot
+/// placeholder is HTML's lowercase `<slot>`, and another document is an
+/// [`Instance`].
+pub(super) fn refuse_reserved_tag(tag: &str) -> Result {
 	match tag {
+		"Template" => bevybail!(
+			"`<Template>` is no tag: another document is \
+			 `<Instance document=\"./other.bsx\"/>`, and a prefab is HTML's \
+			 `<template>`"
+		),
 		"Slot" => bevybail!(
 			"`<Slot>` is spelled `<slot>`, HTML's own element: `<slot/>` for \
 			 the default slot, `<slot name=\"..\"/>` for a named one"
@@ -360,7 +366,7 @@ fn parse_element(
 	// segment so the registry classifies the component; the close tag matches it.
 	let (tag, tag_literal) = parse_tag_literal(cursor, tag, config)?;
 	if config.is_bsx() {
-		refuse_slot_tag(&tag)?;
+		refuse_reserved_tag(&tag)?;
 	}
 	let attributes = parse_attributes(cursor, config)?;
 	cursor.skip_ws();
@@ -375,6 +381,7 @@ fn parse_element(
 		return Ok(BsxNode::Element(BsxElement {
 			tag,
 			tag_literal,
+			key: None,
 			attributes,
 			children: Vec::new(),
 			self_closing: true,
@@ -413,6 +420,7 @@ fn parse_element(
 	Ok(BsxNode::Element(BsxElement {
 		tag,
 		tag_literal,
+		key: None,
 		attributes,
 		children,
 		self_closing: false,
@@ -708,9 +716,8 @@ mod test {
 		let bare = element("<Sequence>x</Sequence>");
 		bare.tag.clone().xpect_eq("Sequence".to_string());
 		bare.tag_literal.xpect_none();
-		// a lowercase or `path::to::X` tag is never a tag-position literal.
+		// a lowercase tag is never a tag-position literal.
 		element("<div/>").tag_literal.xpect_none();
-		element("<path::to::X/>").tag_literal.xpect_none();
 	}
 
 	#[crate::test]

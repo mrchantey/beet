@@ -64,6 +64,7 @@ members = [
 	"crates/beet_infra",
 	"crates/beet_net",
 	"crates/beet_ui",
+	"crates/beet_scene",
 	"crates/beet_router",
 	"crates/beet_thread",
 	"crates/beet_action",
@@ -95,6 +96,7 @@ beet_infra = { path = "crates/beet_infra", version = "0.0.9-dev.16" }
 # `features = ["std", "serde", "fs", "http"]`.
 beet_net = { path = "crates/beet_net", version = "0.0.9-dev.16", default-features = false }
 beet_ui = { path = "crates/beet_ui", version = "0.0.9-dev.16" }
+beet_scene = { path = "crates/beet_scene", version = "0.0.9-dev.16" }
 beet_router = { path = "crates/beet_router", version = "0.0.9-dev.16" }
 beet_action = { path = "crates/beet_action", version = "0.0.9-dev.16", default-features = false }
 
@@ -498,17 +500,20 @@ udp = ["net", "beet_net/udp"]
 native-tls = [
 "net", "beet_net/native-tls",
 ]
+# Documents instantiated in one another (`<Instance document=".."/>`), which every
+# std router links.
+scene = ["net", "beet_net/std", "dep:beet_scene"]
 # beet_net is a hard dependency of beet_router. The facade pins beet_router to
 # `default-features = false`, so the std router must re-enable the std + http
 # surface it relied on (previously supplied by default features + net).
 # `beet_router/native` adds the filesystem store + http transport + browser opener.
-router = ["template", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/native", "beet_router/http", "beet_infra?/beet_router"]
+router = ["template", "action", "net", "scene", "dep:beet_router", "beet_router/std", "beet_router/native", "beet_router/http", "beet_infra?/beet_router"]
 # The portable render router: the route tree, scene rendering, media negotiation
 # and the runtime BSX parser (`beet_router/std`, which is now wasm-safe), without
 # the native-only `beet_router/native` surface (filesystem store, http transport,
 # server). Builds on wasm — the basis of the Cloudflare Worker target. Native
 # consumers use the full `router` instead.
-router_render = ["template", "action", "net", "dep:beet_router", "beet_router/std"]
+router_render = ["template", "action", "net", "scene", "dep:beet_router", "beet_router/std"]
 # no_std router for bare-metal targets (e.g. esp32 firmware): the route tree,
 # dispatch and middleware core from beet_router, without the std scene/help
 # rendering pipeline. See `beet_router`'s `embedded` module.
@@ -666,6 +671,7 @@ bevy = { workspace = true }
 
 beet_core = { workspace = true }
 beet_infra = { workspace = true, optional = true }
+beet_scene = { workspace = true, optional = true }
 beet_thread = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 beet_ui = { workspace = true, optional = true }

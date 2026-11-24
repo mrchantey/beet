@@ -124,12 +124,11 @@ mod test {
 		app.add_plugins(CharcellPlugin);
 		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_markdown(md);
-		MarkdownParser::new()
-			.parse_into(ParseContext::new(
-				&mut app.world_mut().entity_mut(entity),
-				&bytes,
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut app.world_mut().entity_mut(entity),
+			&bytes,
+		))
+		.unwrap();
 		ansi(app.world_mut(), entity)
 	}
 
@@ -291,12 +290,11 @@ mod test {
 		app.add_plugins((TemplatePlugin, DocumentPlugin, CharcellPlugin));
 		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_html("<p>a &amp; b</p>");
-		BsxParser
-			.parse_into(ParseContext::new(
-				&mut app.world_mut().entity_mut(entity),
-				&bytes,
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut app.world_mut().entity_mut(entity),
+			&bytes,
+		))
+		.unwrap();
 		ansi(app.world_mut(), entity)
 			.xmap(strip_ansi)
 			.xpect_contains("a & b");

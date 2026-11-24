@@ -38,13 +38,13 @@
 //! A body is read as values and needs no type registry; reflection happens
 //! when it spawns. A component whose type path this binary never registered is
 //! left off its entity with a warning and its value held in the entity's
-//! [`Unregistered`], the marker the BSX loader writes for an unknown tag or
-//! spread, so the entity and its children survive, `beet check`, which
+//! [`Unregistered`], which is also how markup's unknown tag or
+//! spread arrives, so the entity and its children survive, `beet check`, which
 //! registers everything, elevates it to an error, and a strict caller refuses
 //! through [`UnregisteredQuery`]. A saver writes each held component back as
 //! one of the entity's own keys, so a round trip through a binary lacking a
 //! plugin loses nothing, and a binary with it reads the component on the next
-//! load. A name [allowed](AllowedUnregistered) is skipped silently.
+//! load.
 //!
 //! # High-level API
 //!
@@ -74,7 +74,6 @@
 //! [`SceneBody::reflect`]: crate::prelude::SceneBody::reflect
 //! [`Unregistered`]: crate::prelude::Unregistered
 //! [`UnregisteredQuery`]: crate::prelude::UnregisteredQuery
-//! [`AllowedUnregistered`]: crate::prelude::AllowedUnregistered
 //! [`Document`]: crate::prelude::Document
 
 #[cfg(feature = "bevy_asset")]
@@ -92,11 +91,11 @@ mod template_filter;
 #[cfg(feature = "bevy_asset")]
 pub use asset::*;
 pub use dynamic_template::*;
-pub use loader::EntryTemplate;
 pub use loader::LoadTemplateSerde;
 pub(self) use loader::Placement;
 pub use loader::TemplateLoader;
 pub use saver::*;
 pub use scene_document::*;
+pub(crate) use scene_reflect::KeySentinels;
 pub use template_builder::*;
 pub use template_filter::*;

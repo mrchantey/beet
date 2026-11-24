@@ -224,7 +224,7 @@ fn server_cfg(collection: &RouteCollection) -> Option<syn::Attribute> {
 fn emit_blob_route(
 	file: &RouteFile,
 	store_path: &RelPath,
-	declarations: &RootDeclarations,
+	declarations: &EntityBody,
 ) -> TokenStream {
 	let path = file.route_path.to_string();
 	let store_path = store_path.to_string();

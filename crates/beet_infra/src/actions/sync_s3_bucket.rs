@@ -271,21 +271,17 @@ mod test {
 			(AsyncPlugin, TemplatePlugin, DocumentPlugin, InfraPlugin)
 				.into_world();
 		world.init_resource::<PackageConfig>();
-		let root = world
-			.spawn(())
-			.insert_template(
-				BsxTemplate::parse_document(&format!(
-					r#"<Stack stage="prod" {{AwsRegion("eu-west-1")}}>
+		let stack = SceneBody::spawn_bsx(
+			&mut world,
+			&format!(
+				r#"<Stack stage="prod" {{AwsRegion("eu-west-1")}}>
 					<S3BucketBlock label="assets" deploy_versioned=false/>
 					{markup}
 				</Stack>"#
-				))
-				.unwrap(),
-			)
-			.unwrap()
-			.id();
+			),
+		)
+		.unwrap();
 		world.flush();
-		let stack = world.entity(root).get::<Children>().unwrap()[0];
 		let sync = *world
 			.entity(stack)
 			.get::<Children>()

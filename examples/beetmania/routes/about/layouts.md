@@ -7,9 +7,9 @@ order = 2
 
 # Layouts
 
-`Layout{template:"Layout"}` is render middleware: every page's body is transcluded into the default `<slot/>` of the named template, registered from the site's `templates/` directory. The name is resolved as a tag would be, so it is either a `.bsx` file or a rust `#[template]` registered by name.
+`Layout{document:"templates/Layout.bsx"}` is render middleware: every page's body is transcluded into the default `<slot/>` of that document, instantiated around the page per request. `Layout{template:"SiteLayout"}` names a rust `#[template]` instead.
 
-Declare one on any route, not just the router, and they nest: an ancestor's layout is the outer one, so `<Route path="blog" {Layout{template:"ArticleLayout"}}>` gives the blog its own chrome inside the site shell. An inner layout is chrome only, never a second `<html>` document.
+Declare one on any route, not just the router, and they nest: an ancestor's layout is the outer one, so `<Route path="blog" {Layout{document:"templates/ArticleLayout.bsx"}}>` gives the blog its own chrome inside the site shell. An inner layout is chrome only, never a second `<html>` document.
 
 The layout composes beet's widget set by name:
 

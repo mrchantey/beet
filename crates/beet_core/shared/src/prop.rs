@@ -26,7 +26,7 @@ use quote::quote;
 
 /// A macro parameter lowered to a data-struct field.
 #[derive(Debug)]
-pub struct Prop {
+pub struct PropArg {
 	/// parameter name (also the field name)
 	pub ident: syn::Ident,
 	/// type as written by the author, what the body binds
@@ -48,13 +48,13 @@ pub struct Prop {
 	pub other_attrs: Vec<syn::Attribute>,
 }
 
-impl Prop {
+impl PropArg {
 	/// Whether a parameter carries the `attr_name` attribute, ie `#[prop]`.
 	pub fn is_param(pt: &syn::PatType, attr_name: &str) -> bool {
 		pt.attrs.iter().any(|attr| attr.path().is_ident(attr_name))
 	}
 
-	/// Parse one parameter into a [`Prop`], reading the `attr_name` attribute
+	/// Parse one parameter into a [`PropArg`], reading the `attr_name` attribute
 	/// (`prop` for templates, `field` for actions).
 	pub fn parse(pt: &syn::PatType, attr_name: &str) -> syn::Result<Self> {
 		let ident = Self::param_ident(pt, attr_name)?;
@@ -265,8 +265,8 @@ mod test {
 		}
 	}
 
-	fn parse(arg: syn::FnArg) -> Prop {
-		Prop::parse(&pat_type(arg), "field").unwrap()
+	fn parse(arg: syn::FnArg) -> PropArg {
+		PropArg::parse(&pat_type(arg), "field").unwrap()
 	}
 
 	#[test]
@@ -303,7 +303,7 @@ mod test {
 
 	#[test]
 	fn into_is_rejected() {
-		Prop::parse(
+		PropArg::parse(
 			&pat_type(syn::parse_quote! { #[field(into)] name: String }),
 			"field",
 		)
@@ -316,7 +316,7 @@ mod test {
 
 	#[test]
 	fn unknown_key_errors() {
-		let err = Prop::parse(
+		let err = PropArg::parse(
 			&pat_type(syn::parse_quote! { #[field(bogus)] name: String }),
 			"field",
 		)
@@ -344,7 +344,7 @@ mod test {
 
 	#[test]
 	fn short_is_parsed() {
-		let prop = Prop::parse(
+		let prop = PropArg::parse(
 			&pat_type(syn::parse_quote! { #[param(short = 'f')] fix: bool }),
 			"param",
 		)

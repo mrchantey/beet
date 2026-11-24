@@ -9,7 +9,11 @@ pub struct ScriptParser;
 impl DocParser for ScriptParser {
 	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Javascript] }
 
-	fn parse(&mut self, bytes: &MediaBytes) -> Result<SceneBody, ParseError> {
+	fn parse(
+		&mut self,
+		bytes: &MediaBytes,
+		_parsers: &DocParsers,
+	) -> Result<SceneBody, ParseError> {
 		let source = Value::new(bytes.as_utf8()?.to_string());
 		SceneBody::root(
 			EntityBody::default()

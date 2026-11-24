@@ -466,10 +466,6 @@ fn value_schema(source: &str) -> Result<ValueSchema> {
 }
 
 /// A [`ValueSchema`] from one JSON Schema descriptor.
-///
-/// Not [`ValueSchema::from_json_schema`], which reads its top level as a
-/// template's *prop block*: a component's schema is one descriptor, so
-/// `{"type":"integer"}` must mean an integer rather than a prop named `type`.
 #[cfg(all(feature = "bsx", feature = "json"))]
 fn json_schema(source: &str) -> Result<ValueSchema> {
 	ValueSchema::from_json_value(&serde_json::from_str(source)?)

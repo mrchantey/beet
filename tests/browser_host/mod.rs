@@ -244,10 +244,6 @@ async fn serve_entry(
 			crate_registration!({ features: ["tui", "web"] })
 				.with_skip_prefix(),
 		);
-		let formats = app
-			.world_mut()
-			.get_resource_or_init::<TemplateFormats>()
-			.clone();
 		let prescans = app
 			.world_mut()
 			.get_resource_or_init::<PrescanRegistry>()
@@ -260,13 +256,9 @@ async fn serve_entry(
 				..
 			} = entry_build::resolve_in_repo_store(store, &prescans, entry)
 				.await?;
-			let sources = entry_build::read_sources(
-				&repo_store,
-				formats,
-				entry_name,
-				prescan,
-			)
-			.await?;
+			let sources =
+				entry_build::read_sources(&repo_store, entry_name, prescan)
+					.await?;
 			let root = world
 				.with(move |world: &mut World| {
 					entry_build::build_root(

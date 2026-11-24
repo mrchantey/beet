@@ -10,21 +10,7 @@
 //!   `maxItems`, and `uniqueItems`.
 //! - **Compact shorthand**: an object mapping each prop name directly to a
 //!   descriptor (a primitive name string, or an object with per-field
-//!   `required`/`optional`/`items`/`type`). This is the `<script bx:schema>`
-//!   authoring form.
-#[cfg(not(feature = "json"))]
-use crate::prelude::*;
-
-/// Fallback when the `json` feature is off: schema blocks are treated as absent
-/// by callers that use `.ok()`.
-#[cfg(not(feature = "json"))]
-impl ValueSchema {
-	/// Returns an error because JSON Schema parsing requires the `json` feature.
-	pub fn from_json_schema(_json: &str) -> Result<ValueSchema> {
-		bevybail!("parsing a JSON schema requires the `json` feature")
-	}
-}
-
+//!   `required`/`optional`/`items`/`type`).
 #[cfg(feature = "json")]
 mod enabled {
 	use crate::prelude::*;
@@ -32,27 +18,6 @@ mod enabled {
 	use serde_json::Value as Json;
 
 	impl ValueSchema {
-		/// Parse a JSON Schema string into a [`ValueSchema`].
-		///
-		/// The top-level body of a `bx:schema` block is always a template's prop
-		/// schema (a struct of named props), so an object without an explicit
-		/// `type`/`properties`/`$ref` is read as the compact prop-map shorthand. This
-		/// avoids misreading a prop literally named `items` as a JSON-Schema array
-		/// (the structural `items` keyword is only honored on nested descriptors).
-		pub fn from_json_schema(json: &str) -> Result<ValueSchema> {
-			let value: Json = serde_json::from_str(json)?;
-			match &value {
-				Json::Object(map)
-					if map.get("type").and_then(Json::as_str)
-						!= Some("object") && !map.contains_key("properties")
-						&& !map.contains_key("$ref") =>
-				{
-					shorthand_schema(map)
-				}
-				_ => Self::from_json_value(&value),
-			}
-		}
-
 		/// Build a [`ValueSchema`] from a parsed JSON Schema [`Json`] value.
 		pub fn from_json_value(value: &Json) -> Result<ValueSchema> {
 			match value {
@@ -245,9 +210,13 @@ mod enabled {
 	mod test {
 		use crate::prelude::*;
 
+		fn parse(json: &str) -> Result<ValueSchema> {
+			ValueSchema::from_json_value(&serde_json::from_str(json)?)
+		}
+
 		#[crate::test]
 		fn shorthand_struct() {
-			let ValueSchema::Struct(schema) = ValueSchema::from_json_schema(
+			let ValueSchema::Struct(schema) = parse(
 				r#"{ "label": "string", "count": { "type": "i64", "required": true } }"#,
 			)
 			.unwrap() else {
@@ -267,7 +236,7 @@ mod enabled {
 		/// default applies at the control.
 		#[crate::test]
 		fn write_keyword() {
-			let ValueSchema::Struct(schema) = ValueSchema::from_json_schema(
+			let ValueSchema::Struct(schema) = parse(
 				r#"{ "label": { "type": "string", "write": "Blur" }, "note": "string" }"#,
 			)
 			.unwrap() else {
@@ -279,7 +248,7 @@ mod enabled {
 
 		#[crate::test]
 		fn standard_object() {
-			let ValueSchema::Struct(schema) = ValueSchema::from_json_schema(
+			let ValueSchema::Struct(schema) = parse(
 				r#"{
 				"type": "object",
 				"required": ["name"],
@@ -309,30 +278,9 @@ mod enabled {
 
 		#[crate::test]
 		fn reference_via_ref() {
-			ValueSchema::from_json_schema(
-				r##"{ "$ref": "#/$defs/TodoItem" }"##,
-			)
-			.unwrap()
-			.xpect_eq(ValueSchema::reference("TodoItem"));
-		}
-
-		// a top-level shorthand prop literally named `items` is a struct field, not a
-		// JSON-Schema array node (the `items` keyword only applies to descriptors).
-		#[crate::test]
-		fn shorthand_prop_named_items() {
-			let ValueSchema::Struct(schema) = ValueSchema::from_json_schema(
-				r#"{ "items": { "items": "TodoItem", "required": true } }"#,
-			)
-			.unwrap() else {
-				panic!("expected struct");
-			};
-			let items = schema
-				.fields
-				.iter()
-				.find(|field| field.key == "items")
-				.unwrap();
-			items.required.xpect_true();
-			matches!(items.schema, ValueSchema::List(_)).xpect_true();
+			parse(r##"{ "$ref": "#/$defs/TodoItem" }"##)
+				.unwrap()
+				.xpect_eq(ValueSchema::reference("TodoItem"));
 		}
 	}
 }

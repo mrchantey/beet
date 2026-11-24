@@ -22,6 +22,7 @@ pub async fn InsertOn<B>(
 	bundle: B,
 	/// Which entity to insert the bundle on.
 	#[field]
+	#[entities]
 	target_entity: TargetEntity,
 	cx: ActionContext,
 ) -> Result<Outcome>

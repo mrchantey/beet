@@ -29,7 +29,7 @@
 //!   time, surfacing [`MissingProps`] through the build channel (never a panic)
 //!
 //! The grammar itself lives in
-//! [`beet_core_shared::prelude::Prop`], shared with the `#[action]` macro's
+//! [`beet_core_shared::prelude::PropArg`], shared with the `#[action]` macro's
 //! `#[field]` spelling so the two cannot drift.
 extern crate alloc;
 use alloc::string::ToString;
@@ -74,9 +74,12 @@ fn is_entity_param(pt: &syn::PatType) -> bool {
 
 /// Build the data struct + `Template` impl + registration for a pure template.
 fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
-	let mut props: Vec<Prop> = Vec::new();
+	let mut props: Vec<PropArg> = Vec::new();
 	for arg in &item.sig.inputs {
-		props.push(Prop::parse(Prop::typed_arg(arg, "template")?, "prop")?);
+		props.push(PropArg::parse(
+			PropArg::typed_arg(arg, "template")?,
+			"prop",
+		)?);
 	}
 	emit(&item, &props, /* system */ None)
 }
@@ -86,24 +89,24 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 /// `#[prop]` params are fields; every other param is a Bevy `SystemParam`
 /// fetched synchronously at build time via [`SystemTemplate`].
 fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
-	let mut props: Vec<Prop> = Vec::new();
+	let mut props: Vec<PropArg> = Vec::new();
 	let mut sys_types: Vec<TokenStream> = Vec::new();
 	let mut sys_pats: Vec<syn::PatIdent> = Vec::new();
 	let mut entity_pat: Option<syn::PatIdent> = None;
 	for arg in &item.sig.inputs {
-		let pt = Prop::typed_arg(arg, "template")?;
-		if Prop::is_param(pt, "prop") {
-			props.push(Prop::parse(pt, "prop")?);
+		let pt = PropArg::typed_arg(arg, "template")?;
+		if PropArg::is_param(pt, "prop") {
+			props.push(PropArg::parse(pt, "prop")?);
 		} else if is_entity_param(pt) {
 			// the entity being built, so the body can read self/ancestor context
 			// (`<LightsailBeetSiteBlock/>` resolving its deploy scope by ancestry).
-			entity_pat = Some(Prop::param_pat_ident(pt, "template")?);
+			entity_pat = Some(PropArg::param_pat_ident(pt, "template")?);
 		} else {
 			let ty = &pt.ty;
 			sys_types.push(quote! { #ty });
 			// keep the full `PatIdent` so a `mut` binding (eg `mut meshes:
 			// ResMut<..>`) stays mutable in the build closure pattern.
-			sys_pats.push(Prop::param_pat_ident(pt, "template")?);
+			sys_pats.push(PropArg::param_pat_ident(pt, "template")?);
 		}
 	}
 	emit(
@@ -149,7 +152,7 @@ struct System {
 /// shared by the pure and system paths.
 fn emit(
 	item: &ItemFn,
-	props: &[Prop],
+	props: &[PropArg],
 	system: Option<System>,
 ) -> syn::Result<TokenStream> {
 	let vis = &item.vis;
@@ -351,10 +354,10 @@ fn data_struct(
 	vis: &syn::Visibility,
 	name: &syn::Ident,
 	generics: &syn::Generics,
-	props: &[Prop],
+	props: &[PropArg],
 ) -> TokenStream {
 	let field_defs: Vec<TokenStream> =
-		props.iter().map(Prop::field_def).collect();
+		props.iter().map(PropArg::field_def).collect();
 	let needs_manual_default =
 		props.iter().any(|prop| prop.default_expr.is_some());
 
@@ -367,7 +370,7 @@ fn data_struct(
 
 	if needs_manual_default {
 		let field_idents = props.iter().map(|prop| &prop.ident);
-		let defaults = props.iter().map(Prop::default_value);
+		let defaults = props.iter().map(PropArg::default_value);
 		quote! {
 			#struct_def
 
@@ -385,7 +388,10 @@ fn data_struct(
 }
 
 /// `if <field>.is_none() { missing.push("<field>"); }` for each required prop.
-fn required_checks(props: &[Prop], beet_core: &syn::Path) -> Vec<TokenStream> {
+fn required_checks(
+	props: &[PropArg],
+	beet_core: &syn::Path,
+) -> Vec<TokenStream> {
 	props
 		.iter()
 		.filter(|prop| prop.required)
@@ -405,7 +411,7 @@ fn required_checks(props: &[Prop], beet_core: &syn::Path) -> Vec<TokenStream> {
 
 /// `let <field> = <field>.unwrap();` for each required prop: after validation
 /// each binding matches its originally declared type.
-fn required_unwraps(props: &[Prop]) -> Vec<TokenStream> {
+fn required_unwraps(props: &[PropArg]) -> Vec<TokenStream> {
 	props
 		.iter()
 		.filter(|prop| prop.required)

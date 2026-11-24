@@ -19,7 +19,7 @@ mod diagnostics;
 mod extra;
 // finding, building and running an entry document: the half of a beet binary
 // that is not its capabilities. Store-backed (`std`) and document-building
-// (`template_serde`, for the `EntryTemplate` sources and the `BeetSceneRoot` a
+// (`template_serde`, for the entry's body and the `BeetSceneRoot` a
 // watched rebuild swaps), so gated on both.
 #[cfg(all(feature = "std", feature = "template_serde"))]
 pub mod launch;

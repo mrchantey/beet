@@ -1,14 +1,14 @@
-//! `bx:cfg`: the one mechanism for excluding a region of a document from a
-//! build, and the condition grammar it and its two siblings share.
+//! [`Cfg`]: the one mechanism for excluding a region of a document from a
+//! binary, and the condition grammar it and its two siblings share.
 //!
 //! This is the markup twin of Rust's `#[cfg]`, and the analogy is exact enough
 //! to lean on: `rsx!` needs nothing here because it is compiled and real
-//! `#[cfg]` already applies, while a `.bsx` document is parsed at runtime and
-//! has no compiler to do it. Same concept, same operators, two front ends.
+//! `#[cfg]` already applies, while a document is spawned at runtime and has no
+//! compiler to do it. Same concept, same operators, two front ends.
 //!
 //! ```html
 //! <Route path="site" bx:cfg="feature:infra && feature:extra">
-//!     <Template src="infra/site.bsx"/>
+//!     <Instance document="infra/site.bsx"/>
 //! </Route>
 //! ```
 //!
@@ -21,15 +21,17 @@
 //! costs nothing.
 //!
 //! It has exactly one boundary it cannot cross: **some nodes are effects, not
-//! structure.** `<Template src>` reads a file. A node that DOES something while
-//! the tree is being built has no inert form, so "build it anyway, just without
-//! behavior" is not available to it. Either it runs or it does not exist.
+//! structure.** An [`Instance`] reads a document. A node that DOES something
+//! while the tree is being built has no inert form, so "build it anyway, just
+//! without behavior" is not available to it. Either it runs or it does not
+//! exist.
 //!
-//! `bx:cfg` is how such a branch is kept out of a build that must not run it.
-//! An excluded branch is removed from the syntax tree *before* the build walk,
-//! so nothing downstream can observe it: no entity, no tag resolution, no
-//! directive, no `bx:ref` pin, no include read. Not skipped, not inert, not
-//! spawned-then-emptied. Absent.
+//! `bx:cfg` is how such a branch is kept out of a binary that must not run it.
+//! The body keeps the branch whole, a `Cfg` component on its root, so one body
+//! is valid for every target; a binary answering it false leaves the branch
+//! out as the body spawns ([`SceneBody::reflect`]), so nothing downstream can
+//! observe it: no entity, no template expanded, no document read. Not
+//! skipped, not inert, not spawned-then-emptied. Absent.
 //!
 //! # What is left behind, and why
 //!
@@ -75,9 +77,8 @@
 //!
 //! # Namespaces are a seam
 //!
-//! An atom's namespace resolves through [`BsxConditions`], the same
-//! register-a-handler shape as [`BsxTagResolvers`]. Core registers the facts
-//! every build has:
+//! An atom's namespace resolves through [`BsxConditions`]. Core registers the
+//! facts every build has:
 //!
 //! - `feature:<name>` / `feature:<crate>/<name>` — a compiled cargo feature,
 //!   checked against the spawned [`CrateRegistration`] set.
@@ -107,8 +108,10 @@
 //! ([`RequireCfg`](crate::prelude::RequireCfg)).
 
 use crate::prelude::*;
+use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
+use bevy::reflect::TypePath;
 
 /// A parsed `bx:cfg` condition. See the [module docs](self) for the grammar.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -291,8 +294,7 @@ pub type BuildConditionFn =
 /// Maps a cfg atom namespace to its [`BuildConditionFn`].
 ///
 /// Core registers `feature`, `version` and `env` (see the [module docs](self));
-/// a downstream crate adds its own facts here, the same seam shape as
-/// [`BsxTagResolvers`].
+/// a downstream crate adds its own facts here.
 #[derive(Resource)]
 pub struct BsxConditions(HashMap<SmolStr, BuildConditionFn>);
 
@@ -366,7 +368,9 @@ impl BsxConditions {
 /// answer "why is this not here?" rather than leaving a hole: `beet_router`
 /// turns a tombstone with a path into a route that exists and refuses, naming
 /// the condition.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, Component, Reflect, Serialize,
+)]
 #[reflect(Component, Default)]
 pub struct CfgExcluded {
 	/// The condition source that evaluated false, ie `feature:infra`.
@@ -390,215 +394,226 @@ impl CfgExcluded {
 	}
 }
 
-/// The `bx:cfg` attribute key.
-const BUILD_CFG_KEY: &str = "bx:cfg";
+/// Excludes the entity and everything under it from a binary that does not
+/// meet a condition, `bx:cfg="feature:infra"` in markup. Kept in the body and
+/// answered when it spawns, where a false condition leaves a [`CfgExcluded`]
+/// in the branch's place.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct Cfg {
+	/// The condition, ie `feature:infra && !env:CI`.
+	pub cfg: SmolStr,
+	/// The tag it was authored on, which a tombstone reports.
+	#[reflect(default)]
+	pub tag: SmolStr,
+}
 
-/// The synthetic tag the prune pass emits in an excluded element's place,
-/// resolving to [`CfgExcluded`] through the ordinary uppercase-tag path.
-const TOMBSTONE_TAG: &str = "CfgExcluded";
+impl Cfg {
+	/// The directive it is authored as.
+	pub const DIRECTIVE: &'static str = "bx:cfg";
 
-/// Whether any node in the tree carries a `bx:cfg`, so a document that declares
-/// none skips the prune walk (and its clone) entirely.
-pub(super) fn contains_build_cfg(nodes: &[BsxNode]) -> bool {
-	nodes.iter().any(|node| match node {
-		BsxNode::Element(el) => {
-			el.attributes.iter().any(|attr| attr.key == BUILD_CFG_KEY)
-				|| contains_build_cfg(&el.children)
+	/// The condition an entity's components carry, by type path or the name a
+	/// document lowered with no registry wrote.
+	fn of(components: &EntityBody) -> Option<Self> {
+		let value = components
+			.get(Self::type_path())
+			.or_else(|_| components.get("Cfg"))
+			.ok()?;
+		Self {
+			cfg: SceneBody::str_field(value, "cfg").unwrap_or_default(),
+			tag: SceneBody::str_field(value, "tag").unwrap_or_default(),
 		}
-		_ => false,
-	})
+		.xsome()
+	}
 }
 
-/// The syntax tree with every `bx:cfg`-excluded branch replaced by its
-/// tombstone, evaluated against `world`'s registered conditions and crate
-/// registrations.
-///
-/// Runs before the build walk, so exclusion is a property of the DOCUMENT
-/// rather than of any entity: nothing downstream (ref collection, tag
-/// resolution, includes) ever sees an excluded node's content.
-pub(super) fn prune_build_cfg(
-	nodes: &[BsxNode],
-	world: &mut World,
-) -> Result<(Vec<BsxNode>, ExcludedRefs)> {
-	// clone the seam out of the resource so the handlers may borrow the world.
-	let conditions = world.get_resource_or_init::<BsxConditions>().clone_seam();
-	let registrations =
-		world.with_state::<Query<&CrateRegistration>, _>(|query| {
-			query.iter().cloned().collect::<Vec<_>>()
-		});
-	let cx = ConditionCx {
-		world,
-		registrations: &registrations,
-	};
-	let mut excluded = ExcludedRefs::default();
-	let pruned = prune_nodes(nodes, &conditions, &cx, &mut excluded)?;
-	Ok((pruned, excluded))
-}
-
-/// The `bx:ref` names an exclusion took with it, each to the condition that
-/// excluded it. A `$name` reaching for one binds to a placeholder nothing
-/// builds, which is the one SILENT outcome of exclusion: the site's analytics
-/// store was declared under an excluded `<Stack>`, so the served binary bound
-/// `StoreRef($analytics)` to nothing and dropped every event with no error
-/// anywhere. The reference pass names it instead (`RefBindings::reference_for`).
-pub(super) type ExcludedRefs = HashMap<SmolStr, SmolStr>;
-
-fn prune_nodes(
-	nodes: &[BsxNode],
-	conditions: &BsxConditions,
-	cx: &ConditionCx,
-	excluded: &mut ExcludedRefs,
-) -> Result<Vec<BsxNode>> {
-	let mut kept = Vec::with_capacity(nodes.len());
-	for node in nodes {
-		let BsxNode::Element(el) = node else {
-			kept.push(node.clone());
-			continue;
+impl SceneBody {
+	/// This body for `world`'s binary: every branch whose [`Cfg`] is false
+	/// replaced by its tombstones, evaluated against the registered
+	/// conditions and the crate registrations, with the keys left out. A body
+	/// declaring no condition is answered as it stands.
+	pub(crate) fn prune_cfg<'a>(
+		&'a self,
+		world: &World,
+	) -> Result<(Cow<'a, Self>, ExcludedKeys)> {
+		if !self
+			.entities
+			.values()
+			.any(|components| Cfg::of(components).is_some())
+		{
+			return Ok((Cow::Borrowed(self), default()));
+		}
+		// cloned out so the handlers may borrow the world
+		let conditions = world
+			.get_resource::<BsxConditions>()
+			.map(BsxConditions::clone_seam)
+			.unwrap_or_default();
+		let registrations = world
+			.try_query::<&CrateRegistration>()
+			.map(|mut query| query.iter(world).cloned().collect::<Vec<_>>())
+			.unwrap_or_default();
+		let cx = ConditionCx {
+			world,
+			registrations: &registrations,
 		};
-		if let Some(source) = build_cfg_attr(el)? {
-			let condition = BuildCondition::parse(source)
-				.map_err(|err| bevyhow!("in `<{} bx:cfg>`: {err}", el.tag))?;
-			if !condition.evaluate(conditions, cx)? {
-				debug!(
-					"`bx:cfg` excluded `<{}>`: `{source}` is false in this build",
-					el.tag
-				);
-				collect_excluded_refs(el, source, excluded);
-				kept.extend(tombstones(el, source));
+		let children = self.owned();
+		let mut body = Self {
+			resources: self.resources.clone(),
+			entities: default(),
+		};
+		let mut excluded = ExcludedKeys::default();
+		// in document order, so a branch is left out before anything in it is
+		// answered
+		for (key, components) in &self.entities {
+			if excluded.contains_key(key) {
 				continue;
 			}
+			let Some(cfg) = Cfg::of(components) else {
+				body.entities.insert(key.clone(), components.clone());
+				continue;
+			};
+			let condition = BuildCondition::parse(&cfg.cfg)
+				.map_err(|err| bevyhow!("in `<{} bx:cfg>`: {err}", cfg.tag))?;
+			if condition.evaluate(&conditions, &cx)? {
+				body.entities.insert(key.clone(), components.clone());
+				continue;
+			}
+			debug!(
+				"`bx:cfg` excluded `<{}>`: `{}` is false in this binary",
+				cfg.tag, cfg.cfg
+			);
+			for key in Self::branch(key, &children) {
+				excluded.insert(key, cfg.cfg.clone());
+			}
+			// a branch's first tombstone stands at its root, the rest beside it
+			let parent = components
+				.get(ChildOf::type_path())
+				.ok()
+				.cloned()
+				.unwrap_or_else(|| key.reference());
+			for (index, tombstone) in self
+				.tombstones(key, &cfg, &children)
+				.into_iter()
+				.enumerate()
+			{
+				let standing = match index {
+					0 => key.clone(),
+					index => EntityKey::parse(&format!("{key}/#cfg.{index}"))?,
+				};
+				let mut entity =
+					EntityBody::default().with_typed(&tombstone)?;
+				if index > 0 || components.contains(ChildOf::type_path()) {
+					entity.insert(ChildOf::type_path(), parent.clone());
+				}
+				body.entities.insert(standing, entity);
+			}
 		}
-		let mut el = el.clone();
-		el.children = prune_nodes(&el.children, conditions, cx, excluded)?;
-		kept.push(BsxNode::Element(el));
+		Ok((Cow::Owned(body), excluded))
 	}
-	Ok(kept)
-}
 
-/// Every `bx:ref` declared on or under an excluded element, recorded against
-/// the condition that excluded it (see [`ExcludedRefs`]).
-fn collect_excluded_refs(
-	el: &BsxElement,
-	condition: &str,
-	out: &mut ExcludedRefs,
-) {
-	let name = el.attributes.iter().find_map(|attr| match &attr.value {
-		AttrValue::Str(name) if attr.key == "bx:ref" => Some(name.as_str()),
-		_ => None,
-	});
-	if let Some(name) = name {
-		out.insert(name.into(), condition.into());
-	}
-	for child in &el.children {
-		if let BsxNode::Element(child) = child {
-			collect_excluded_refs(child, condition, out);
+	/// The tombstones a branch leaves: one per addressable entity on its
+	/// frontier, the outermost ones holding a `path`, each ending its own
+	/// descent, else one for the branch itself.
+	///
+	/// A tombstone is only useful to a host if it can be addressed, which for
+	/// `beet_router` means the entity declared a `path`. Excluding a `<Route>`
+	/// directly gives one; excluding a `<Fragment>` that groups several routes
+	/// would give a pathless one and lose every route under it. Reading the
+	/// body to find the frontier runs no effect: it is spawning an excluded
+	/// entity that must not happen, and none is.
+	fn tombstones(
+		&self,
+		key: &EntityKey,
+		cfg: &Cfg,
+		children: &HashMap<EntityKey, Vec<EntityKey>>,
+	) -> Vec<CfgExcluded> {
+		let mut found = Vec::new();
+		let mut stack = vec![key.clone()];
+		while let Some(next) = stack.pop() {
+			match self.addressed(&next) {
+				Some((tag, path)) => found.push(CfgExcluded {
+					condition: cfg.cfg.clone(),
+					tag: match next == *key && !cfg.tag.is_empty() {
+						true => cfg.tag.clone(),
+						false => tag,
+					},
+					path,
+				}),
+				None => stack.extend(
+					children
+						.get(&next)
+						.into_iter()
+						.flat_map(|children| children.iter().rev().cloned()),
+				),
+			}
 		}
-	}
-}
-
-/// The nodes an excluded element is replaced by: one childless
-/// `<CfgExcluded condition=".." tag=".." path=".."/>` per ADDRESSABLE node on
-/// the excluded branch's frontier.
-///
-/// Emitted as synthetic elements rather than spawned directly so they resolve
-/// through the same uppercase-tag path as any other component, which keeps the
-/// build walk unaware that exclusion exists.
-///
-/// # Why the frontier rather than just the excluded node
-///
-/// A tombstone is only useful to a host if it can be addressed, which for
-/// `beet_router` means the element declared a `path`. Excluding a `<Route>`
-/// directly gives one; excluding a `<Fragment>` that GROUPS several routes
-/// would give a pathless one and lose every route under it.
-///
-/// That would make the grouping form strictly worse than repeating the
-/// condition on each route, which is a bad reason to write markup one way. So
-/// the walk descends through the pathless nodes of an excluded branch and
-/// leaves a tombstone at each addressable one it meets, stopping there rather
-/// than going deeper. Both forms then behave identically and the author picks
-/// on readability, which is the only thing that should decide it.
-///
-/// Reading attributes to find the frontier costs nothing and runs no effect:
-/// this walk touches the syntax tree only. It is BUILDING an excluded node that
-/// must not happen, and none of them is built.
-fn tombstones(el: &BsxElement, condition: &str) -> Vec<BsxNode> {
-	let mut out = Vec::new();
-	collect_tombstones(el, condition, &mut out);
-	// nothing addressable underneath: record the exclusion at the node itself,
-	// so it is still visible as data even though no route can report it
-	if out.is_empty() {
-		out.push(tombstone(el, condition, None));
-	}
-	out
-}
-
-/// Walk an excluded branch collecting its addressable frontier: the outermost
-/// `path`-declaring elements, each terminating its own descent.
-fn collect_tombstones(
-	el: &BsxElement,
-	condition: &str,
-	out: &mut Vec<BsxNode>,
-) {
-	if let Some(path) = path_attr(el) {
-		out.push(tombstone(el, condition, Some(path)));
-		return;
-	}
-	for child in &el.children {
-		if let BsxNode::Element(child) = child {
-			collect_tombstones(child, condition, out);
+		if found.is_empty() {
+			found.push(CfgExcluded {
+				condition: cfg.cfg.clone(),
+				tag: cfg.tag.clone(),
+				path: default(),
+			});
 		}
+		found
+	}
+
+	/// The component of the entity keyed `key` declaring a `path`, by its
+	/// short name, and the path, if any does.
+	fn addressed(&self, key: &EntityKey) -> Option<(SmolStr, SmolStr)> {
+		self.entities.get(key)?.iter().find_map(|(name, value)| {
+			Self::str_field(value, "path")
+				.map(|path| (TypeName::new(name.as_str()).short(), path))
+		})
+	}
+
+	/// The children of each entity, in document order.
+	fn owned(&self) -> HashMap<EntityKey, Vec<EntityKey>> {
+		let mut children = HashMap::<EntityKey, Vec<EntityKey>>::default();
+		for (key, components) in &self.entities {
+			for owner in [ChildOf::type_path(), AttributeOf::type_path()] {
+				if let Some(owner) =
+					components.get(owner).ok().and_then(EntityKey::of_reference)
+				{
+					children.entry(owner).or_default().push(key.clone());
+				}
+			}
+		}
+		children
+	}
+
+	/// The key `root` and every key under it.
+	fn branch(
+		root: &EntityKey,
+		children: &HashMap<EntityKey, Vec<EntityKey>>,
+	) -> Vec<EntityKey> {
+		let mut found = Vec::new();
+		let mut stack = vec![root.clone()];
+		while let Some(key) = stack.pop() {
+			stack.extend(children.get(&key).into_iter().flatten().cloned());
+			found.push(key);
+		}
+		found
+	}
+
+	/// The string `field` of a component's value.
+	fn str_field(value: &Value, field: &str) -> Option<SmolStr> {
+		value
+			.as_map()
+			.ok()?
+			.get(field)
+			.ok()?
+			.as_str()
+			.ok()
+			.map(SmolStr::new)
 	}
 }
 
-/// One tombstone node.
-fn tombstone(el: &BsxElement, condition: &str, path: Option<&str>) -> BsxNode {
-	let mut attributes = vec![
-		string_attribute("condition", condition),
-		string_attribute("tag", &el.tag),
-	];
-	if let Some(path) = path {
-		attributes.push(string_attribute("path", path));
-	}
-	BsxNode::Element(BsxElement {
-		tag: TOMBSTONE_TAG.into(),
-		tag_literal: None,
-		attributes,
-		children: Vec::new(),
-		self_closing: true,
-	})
-}
-
-/// An element's `path` string attribute, if it declares one.
-fn path_attr(el: &BsxElement) -> Option<&str> {
-	el.attributes.iter().find_map(|attr| match &attr.value {
-		AttrValue::Str(value) if attr.key == "path" => Some(value.as_str()),
-		_ => None,
-	})
-}
-
-fn string_attribute(key: &str, value: &str) -> BsxAttribute {
-	BsxAttribute {
-		key: key.into(),
-		value: AttrValue::Str(value.into()),
-	}
-}
-
-/// An element's `bx:cfg` condition text, if it declares one.
-fn build_cfg_attr(el: &BsxElement) -> Result<Option<&str>> {
-	let Some(attr) =
-		el.attributes.iter().find(|attr| attr.key == BUILD_CFG_KEY)
-	else {
-		return Ok(None);
-	};
-	match &attr.value {
-		AttrValue::Str(source) => Ok(Some(source.as_str())),
-		// a condition is answered from the build's facts, never from document
-		// state, so there is nothing an expression could usefully say here.
-		_ => bevybail!(
-			"`bx:cfg` expects a quoted condition, ie `bx:cfg=\"feature:infra\"`"
-		),
-	}
-}
+/// The keys an exclusion took with it, each to the condition that excluded it.
+/// A reference to one binds to an entity nothing builds, the one SILENT outcome
+/// of exclusion: the site's analytics store was declared under an excluded
+/// `<Stack>`, so the served binary bound `StoreRef($analytics)` to nothing and
+/// dropped every event with no error anywhere. The reflection names it instead.
+pub(crate) type ExcludedKeys = HashMap<EntityKey, SmolStr>;
 
 // 💡 the condition grammar: a tokenizer and a three-level recursive descent.
 
@@ -771,7 +786,6 @@ fn parse_atom(word: &str) -> Result<BuildCondition> {
 
 #[cfg(test)]
 mod test {
-	use super::prune_build_cfg;
 	use crate::prelude::*;
 
 	fn parse(source: &str) -> BuildCondition {
@@ -785,28 +799,33 @@ mod test {
 		}
 	}
 
-	/// An exclusion reports the `bx:ref` names it removed, so a `$name` that
+	/// An exclusion reports the keys it took with it, so a `$name` that
 	/// reaches for one can be named rather than silently binding to nothing.
 	#[crate::test]
-	fn prune_records_the_refs_it_excludes() {
+	fn prune_records_the_keys_it_excludes() {
 		let mut world = World::new();
 		world.init_resource::<BsxConditions>();
-		let nodes = BsxNode::parse_document(
+		let body = SceneBody::parse_bsx(
+			&world,
 			r#"<div>
 				<Stack bx:cfg="feature:nope">
 					<Store bx:ref="analytics"/>
 				</Stack>
 				<Store bx:ref="kept"/>
 			</div>"#,
-			&BsxParseConfig::bsx(),
 		)
 		.unwrap();
-		let (_pruned, excluded) = prune_build_cfg(&nodes, &mut world).unwrap();
+		let (pruned, excluded) = body.prune_cfg(&world).unwrap();
+		excluded[&EntityKey::parse("analytics").unwrap()]
+			.as_str()
+			.xpect_eq("feature:nope");
 		excluded
-			.get("analytics")
-			.map(|condition| condition.as_str())
-			.xpect_eq(Some("feature:nope"));
-		excluded.contains_key("kept").xpect_false();
+			.contains_key(&EntityKey::parse("kept").unwrap())
+			.xpect_false();
+		pruned
+			.entities
+			.contains_key(&EntityKey::parse("kept").unwrap())
+			.xpect_true();
 	}
 
 	#[crate::test]
@@ -878,18 +897,16 @@ mod test {
 				.with_feature("infra")
 				.with_skip_prefix(),
 		);
-		let nodes = BsxNode::parse_document(markup, &BsxParseConfig::bsx())?;
-		let root = world
-			.spawn_template(BsxTemplate::container(
-				nodes,
-				BsxTemplateRegistry::default(),
-			))?
-			.id();
+		let body = SceneBody::parse_bsx(&world, markup)?;
+		let root = world.spawn_template(body)?.id();
 		world.flush();
 		Ok((world, root))
 	}
 
-	fn build(markup: &str) -> (World, Entity) { try_build(markup).unwrap() }
+	/// Build `markup` as the children of a root element.
+	fn build(markup: &str) -> (World, Entity) {
+		try_build(&format!("<main>{markup}</main>")).unwrap()
+	}
 
 	/// The child element tags directly under the built root.
 	fn child_tags(world: &World, root: Entity) -> Vec<String> {
@@ -1003,13 +1020,13 @@ mod test {
 		};
 		let grouped = paths(
 			r#"<Fragment bx:cfg="feature:lambda">
-				<Route path="site"><Template src="infra/site.bsx"/></Route>
-				<Route path="mail"><Template src="infra/mail.bsx"/></Route>
+				<Route path="site"><Instance document="infra/site.bsx"/></Route>
+				<Route path="mail"><Instance document="infra/mail.bsx"/></Route>
 			</Fragment>"#,
 		);
 		let each = paths(
-			r#"<Route path="site" bx:cfg="feature:lambda"><Template src="infra/site.bsx"/></Route>
-			   <Route path="mail" bx:cfg="feature:lambda"><Template src="infra/mail.bsx"/></Route>"#,
+			r#"<Route path="site" bx:cfg="feature:lambda"><Instance document="infra/site.bsx"/></Route>
+			   <Route path="mail" bx:cfg="feature:lambda"><Instance document="infra/mail.bsx"/></Route>"#,
 		);
 		grouped.xpect_eq(vec!["mail".to_string(), "site".to_string()]);
 		grouped.xpect_eq(each);

@@ -116,10 +116,10 @@ impl RouteCollection {
 		// through and the one type it reads out of those declarations (a `slug`
 		// renaming the emitted route) are built here; the rest resolve against
 		// the app registry when the emitted route spawns.
-		let parsers = ParsePlugin::parsers();
+		let parsers = ParsePlugin::parsers()
+			.with_metadata_type(FrontmatterType::default().component);
 		let mut registry = TypeRegistry::default();
 		registry.register::<RouteMeta>();
-		let frontmatter_type = FrontmatterType::default();
 
 		let mut files = Vec::new();
 		for store_path in paths {
@@ -152,9 +152,8 @@ impl RouteCollection {
 					// a content file's root declarations are read at scan time so
 					// the emitted route hoists them eagerly (sidebar labels,
 					// drafts), through the same parsers `RoutesDir` discovery reads
-					let mut declarations = parsers.declarations(
+					let mut declarations = parsers.root_components(
 						&store.get_media(&store_path).await?,
-						&frontmatter_type.component,
 					)?;
 					RouteMeta::declare_file_defaults(
 						&mut declarations,
@@ -162,11 +161,12 @@ impl RouteCollection {
 					);
 					// the frontmatter has the last word on the url, exactly as it
 					// does in `RoutesDir` discovery
-					let route_path =
-						match declarations.get::<RouteMeta>(&registry)? {
-							Some(meta) => meta.apply_slug(&route_path)?,
-							None => route_path,
-						};
+					let route_path = match declarations
+						.get_reflect::<RouteMeta>(&registry)?
+					{
+						Some(meta) => meta.apply_slug(&route_path)?,
+						None => route_path,
+					};
 					files.push(RouteFile {
 						route_path,
 						kind: RouteFileKind::Blob {
@@ -219,7 +219,7 @@ pub enum RouteFileKind {
 		store_path: RelPath,
 		/// The components the file declares at its root, emitted as literals and
 		/// hoisted when the route spawns.
-		declarations: RootDeclarations,
+		declarations: EntityBody,
 	},
 }
 

@@ -40,13 +40,11 @@ const WORLD_SERDE_FILE: &str = "examples/router/router_serde.json";
 fn main() -> AppExit {
 	App::new()
 		.add_plugins(BeetPlugins)
-		// every `Script`/`ExchangeScript` instantiation this example names: the
+		// every `ExchangeScript` instantiation this example names: the
 		// plugins register only the `Value`/`Value` pair `<ScriptRoute>` authors,
 		// and an unregistered component is skipped by the fork, so a route whose
 		// script type is missing here would vanish on the second run.
-		.register_type::<Script<(), String>>()
 		.register_type::<ExchangeScript<(), String>>()
-		.register_type::<Script<Params<GreetRequest>, String>>()
 		.register_type::<ExchangeScript<Params<GreetRequest>, String, _, _>>()
 		.register_type::<ForkFlag>()
 		.add_systems(Startup, setup)

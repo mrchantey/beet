@@ -53,16 +53,16 @@ impl Default for BsxDirectives {
 			.register(OnEventDirective)
 			.register(StyleDirective)
 			.register(RunDirective)
-			.register(EventDirective);
+			.register(EventDirective)
+			.register(RefDirective)
+			.register(CfgDirective);
 		directives
 	}
 }
 
 impl BsxDirectives {
-	/// The `bx:` keys the build walk still reads itself, which the rewrite
-	/// passes over.
-	const WALK_KEYS: &'static [&'static str] =
-		&["bx:cfg", "bx:ref", "bx:schema"];
+	/// What every directive's key starts with.
+	const PREFIX: &'static str = "bx:";
 
 	/// Register `directive`, matching ahead of any registered before it.
 	pub fn register(&mut self, directive: impl BsxDirective) -> &mut Self {
@@ -105,33 +105,12 @@ impl BsxDirectives {
 		Ok(())
 	}
 
-	/// Whether `nodes` carry a key the rewrite answers, so a caller holding
-	/// borrowed nodes clones only when there is something to rewrite.
-	pub fn any_in(nodes: &[BsxNode]) -> bool {
-		nodes.iter().any(|node| match node {
-			BsxNode::Element(element) => {
-				element
-					.attributes
-					.iter()
-					.any(|attr| Self::is_rewritten(&attr.key))
-					|| Self::any_in(&element.children)
-			}
-			_ => false,
-		})
-	}
-
-	/// Whether `key` is a directive the rewrite answers rather than one the
-	/// build walk reads.
-	fn is_rewritten(key: &str) -> bool {
-		key.starts_with("bx:") && !Self::WALK_KEYS.contains(&key)
-	}
-
 	fn rewrite_element(&self, element: &mut BsxElement) -> Result {
 		while let Some(key) = element
 			.attributes
 			.iter()
 			.map(|attr| attr.key.as_str())
-			.find(|key| Self::is_rewritten(key))
+			.find(|key| key.starts_with(Self::PREFIX))
 			.map(String::from)
 		{
 			let directive = self
@@ -142,8 +121,7 @@ impl BsxDirectives {
 				.ok_or_else(|| {
 					bevyhow!(
 						"`{key}` on `<{tag}>` is no directive this build knows: \
-						 the directives are {available}, and `bx:cfg`, `bx:ref` \
-						 and `bx:schema`",
+						 the directives are {available}",
 						tag = element.tag,
 						available = self
 							.available()

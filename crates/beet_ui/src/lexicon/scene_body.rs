@@ -102,12 +102,11 @@ fn main() { println!("hello"); }
 	fn post(world: &mut World) -> Entity {
 		let layout = world.spawn(Element::new("main")).id();
 		let post = world.spawn(ChildOf(layout)).id();
-		MarkdownParser::new()
-			.parse_into(ParseContext::new(
-				&mut world.entity_mut(post),
-				&MediaBytes::new_markdown(POST),
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(post),
+			&MediaBytes::new_markdown(POST),
+		))
+		.unwrap();
 		post
 	}
 

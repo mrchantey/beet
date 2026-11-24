@@ -157,6 +157,14 @@ impl TokenizeSelf for Map {
 	}
 }
 
+/// Emitted as the map of its components.
+impl TokenizeSelf for EntityBody {
+	fn self_tokens(&self, tokens: &mut TokenStream) {
+		let components = (**self).self_token_stream();
+		tokens.extend(quote! { EntityBody::from(#components) });
+	}
+}
+
 impl TokenizeSelf for Span {
 	fn self_tokens(&self, tokens: &mut TokenStream) {
 		tokens.extend(quote! { proc_macro2::Span::call_site() });

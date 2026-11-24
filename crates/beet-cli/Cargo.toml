@@ -17,7 +17,10 @@ path = "src/main.rs"
 
 [features]
 ## All features added/removed here must be reflected in `crates/beet-cli/src/registration.rs crate_registration!`
-default = ["qrcode", "net", "tui", "ssh", "thread", "pdf", "vault"]
+default = ["qrcode", "net", "scene", "tui", "ssh", "thread", "pdf", "vault"]
+# Documents instantiated in one another, the entry's `<Instance document=".."/>`.
+# Every runtime carries it, so an entry can say so (`feature:scene`).
+scene = ["beet/scene"]
 qrcode = ["dep:qrcode", "dep:image", "beet/qrcode"]
 # Offline geoip country lookup for analytics, so a served/deployed site derives a
 # visitor country (needs a `country.mmdb` in `assets/databases/`). Opt-in, so a
@@ -133,7 +136,7 @@ aws = ["beet/aws", "net"]
 # The AWS Lambda backend: builds the generic `beet` binary as a `provided.al2023`
 # function (the lambda runtime loop wins server selection over the mini server).
 # Pulls `aws` so the deployed function loads its site from S3 at request time.
-lambda = ["beet/lambda", "aws"]
+lambda = ["scene", "beet/lambda", "aws"]
 # The Cloudflare Worker target (wasm32-only): builds the `beet-cli` lib as a
 # `cdylib` Worker that loads its site from an R2 bucket and serves it through the
 # render router. Pulls `beet/cloudflare` (the portable render router + the R2
@@ -144,7 +147,7 @@ lambda = ["beet/lambda", "aws"]
 # uses it too), so it is not a `dep:` activation here. `aws` signs AWS calls
 # through fetch, so a Worker reaches S3, DynamoDB and the rest as its secret
 # bindings' credential.
-cloudflare = ["beet/cloudflare", "dep:worker", "aws"]
+cloudflare = ["scene", "beet/cloudflare", "dep:worker", "aws"]
 # The browser-wasm target (wasm32-only): builds the standalone `beet` binary for
 # the browser, which boots the launch its page's `<Wasm repo entry server>`
 # describes (an http repo forked into IndexedDB, resolved through the one
@@ -153,7 +156,7 @@ cloudflare = ["beet/cloudflare", "dep:worker", "aws"]
 # defaults to this.
 # Build with: `cargo build --target wasm32-unknown-unknown -p beet-cli --bin beet \
 # --no-default-features --features web --profile wasm-release`.
-web = ["beet/web"]
+web = ["scene", "beet/web"]
 # The browser-wasm target plus the wasm-safe action/behaviour/utility-AI example
 # types (`ActionExamplesPlugin` via `extra`), so the browser binary runs the
 # richer `examples/action/*.bsx` programs (eg malenia.bsx), not just the

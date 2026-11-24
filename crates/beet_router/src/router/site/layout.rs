@@ -47,30 +47,26 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Render middleware wrapping every descendant render route in the named
-/// layout template, with the route's content transcluded into the template's
-/// default `<slot/>` by reference.
+/// Render middleware wrapping every descendant render route in a layout, with
+/// the route's content transcluded into its default `<slot/>` by reference.
 ///
 /// Add it to an ancestor of the routes it should wrap, typically the router
 /// entity, exactly like any other middleware ([`RequestLogger`], [`HelpHandler`]):
 ///
 /// ```bsx
-/// <Router {Layout{template:"Layout"}}>
+/// <Router {Layout{document:"templates/Layout.bsx"}}>
 ///     <RoutesDir src="routes"/>
-///     <Route path="blog" {Layout{template:"ArticleLayout"}}>..</Route>
+///     <Route path="blog" {Layout{document:"templates/ArticleLayout.bsx"}}>..</Route>
 /// </Router>
 /// ```
 ///
-/// The name resolves exactly as the same name would in tag position: a `.bsx`
-/// document in the [`BsxTemplateRegistry`] first (eg `Layout` for a `Layout.bsx`
-/// registered via `<TemplateDir src="templates"/>`), else a rust `#[template]`
-/// registered by short type path (eg [`SiteLayout`], via
-/// `app.install_type::<SiteLayout>()`).
-/// A name resolving to neither fails the request rather than serving an
-/// unwrapped page.
+/// A layout is a document of the package the declaration is in, activated
+/// around each page, or a rust `#[template]` by its short type
+/// path: exactly one of the two. One naming neither, or nothing, fails the
+/// request rather than serving an unwrapped page.
 ///
-/// From rust the name comes from the type ([`Layout::of`]), so it is a symbol
-/// the compiler checks:
+/// From rust a template's name comes from the type ([`Layout::of`]), so it is a
+/// symbol the compiler checks:
 ///
 /// ```
 /// # use beet_router::prelude::*;
@@ -80,39 +76,38 @@ use beet_net::prelude::*;
 /// fn PageShell() -> impl Bundle { rsx! { <html><body><slot/></body></html> } }
 /// let bundle = (Router, Layout::of::<PageShell>());
 /// ```
-#[derive(Debug, Clone, Component, Reflect)]
+#[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_add = push_layout_middleware)]
 pub struct Layout {
-	/// The template name, eg `Layout`, `ArticleLayout` or `path::to::Layout`.
-	pub template: SmolStr,
-}
-
-impl Default for Layout {
-	fn default() -> Self {
-		Self {
-			template: "Layout".into(),
-		}
-	}
+	/// The document, ie `templates/Layout.bsx`.
+	pub document: Option<DocPath>,
+	/// The rust template, ie `SiteLayout` or `path::to::SiteLayout`, registered
+	/// with `app.install_type::<SiteLayout>()`.
+	pub template: Option<SmolStr>,
 }
 
 impl Layout {
 	/// Wrap descendant routes in the rust template `T`, named by its short type
 	/// path, the name `app.install_type::<T>()` registers it under.
-	///
-	/// The rust-side spelling of [`new`](Self::new): a symbol the compiler
-	/// checks and a rename follows, where a `.bsx` layout has no type to name
-	/// and takes its filename.
 	pub fn of<T: BuildTemplate>() -> Self {
-		Self::new(TypeName::of::<T>().short())
+		Self::template(TypeName::of::<T>().short())
 	}
 
-	/// Wrap descendant routes in the named layout template, ie a `.bsx`
-	/// document's filename. For a rust template prefer [`of`](Self::of), which
-	/// derives the same name from the type.
-	pub fn new(template: impl Into<SmolStr>) -> Self {
+	/// Wrap descendant routes in the rust template named `template`. Prefer
+	/// [`of`](Self::of), which derives the name from the type.
+	pub fn template(template: impl Into<SmolStr>) -> Self {
 		Self {
-			template: template.into(),
+			template: Some(template.into()),
+			..default()
+		}
+	}
+
+	/// Wrap descendant routes in the document at `document` of their package.
+	pub fn document(document: impl Into<RelPath>) -> Self {
+		Self {
+			document: Some(document.into().into()),
+			..default()
 		}
 	}
 }
@@ -123,9 +118,7 @@ impl Layout {
 ///
 /// The pushed closure captures the DECLARING entity rather than resolving a
 /// [`Layout`] by ancestry at render time: two nested declarations produce two
-/// wrappers, and each must build the template *it* names. Reading the component
-/// back off that entity per request (rather than capturing the name) keeps a
-/// live edit to `template` effective without respawning the middleware.
+/// wrappers, and each must build the layout *it* names.
 fn push_layout_middleware(mut world: DeferredWorld, cx: HookContext) {
 	let declarer = cx.entity;
 	world.commands().entity(declarer).queue(
@@ -142,24 +135,23 @@ fn push_layout_middleware(mut world: DeferredWorld, cx: HookContext) {
 							// reliable in-tree anchor for tree-scoped widgets (the
 							// rendered content may be detached)
 							let route = next.id();
+							// read per request, so a live edit to the declaration
+							// or its document is the next request's
+							let declarer = next.world().entity(declarer);
+							let layout = declarer
+								.get::<Layout, _>(Layout::clone)
+								.await?;
+							let source = TemplateSource::load(
+								&declarer,
+								layout.document,
+								layout.template,
+							)
+							.await?;
 							next.world()
 								.clone()
 								.with(move |world: &mut World| {
-									let template = world
-										.get_entity(declarer)
-										.ok()
-										.and_then(|entity| {
-											entity.get::<Layout>()
-										})
-										.map(|layout| layout.template.clone())
-										.ok_or_else(|| {
-											bevyhow!(
-												"the entity declaring this layout \
-												 middleware no longer holds a `Layout`"
-											)
-										})?;
 									wrap_content(
-										world, parts, route, content, &template,
+										world, parts, route, content, source,
 									)
 								})
 								.await
@@ -170,7 +162,7 @@ fn push_layout_middleware(mut world: DeferredWorld, cx: HookContext) {
 	);
 }
 
-/// Wrap the inner render root `content` in `template`: push the request-scoped
+/// Wrap the inner render root `content` in `source`: push the request-scoped
 /// [`RequestContext`] onto the [`RequestContextStack`] around the layout build
 /// (which spawns the layout with the content transcluded into its default slot),
 /// then mark the layout as the new render root.
@@ -183,7 +175,7 @@ fn wrap_content(
 	parts: RequestParts,
 	route: Entity,
 	content: Entity,
-	template: &str,
+	source: TemplateSource,
 ) -> Result<Entity> {
 	// the inner render root names the entity to render and its ephemerals
 	let (rendered, content_despawn) = {
@@ -227,7 +219,7 @@ fn wrap_content(
 	let layout = RequestContextStack::scoped(
 		world,
 		RequestContext::new(parts, page_content, route, router),
-		|world| build_layout(world, template, rendered),
+		|world| build_layout(world, source, rendered),
 	)?;
 
 	// link the layout root to the transcluded content, distinct from the
@@ -244,32 +236,25 @@ fn wrap_content(
 	layout.xok()
 }
 
-/// Spawn the named template as the layout around `rendered`: the slot child
-/// carrying the content [`Portal`] spawns first, then the template builds below
-/// the same entity, whose slot-resolution pass routes the content into the
-/// template's default `<slot/>`.
+/// Build `source` around `rendered`: the slot child carrying the content
+/// [`Portal`] spawns first, then the layout builds below the same entity, whose
+/// slot-resolution pass routes the content into the layout's default `<slot/>`.
 ///
-/// The name resolves as the same name in tag position does
-/// ([`BsxTemplate::named`]), and an unresolvable one is rejected there rather
-/// than quietly serving the page with no chrome at all.
+/// Below it always, since a layout is a DOCUMENT: a passthrough whose whole body
+/// is `<slot/>` would otherwise land its `SlotTarget` on the very entity holding
+/// the transcluded content, where slot resolution cannot see it.
 fn build_layout(
 	world: &mut World,
-	template: &str,
+	source: TemplateSource,
 	rendered: Entity,
 ) -> Result<Entity> {
-	let template = BsxTemplate::named(world, template)?;
 	let layout = world
 		.spawn(children![(
 			beet_ui::prelude::Portal::new(rendered),
 			SlotChild::new()
 		)])
 		.id();
-	// a container, since a layout is a DOCUMENT: its body hangs below the
-	// layout entity rather than building onto it. A passthrough layout whose
-	// whole body is `<slot/>` would otherwise land its `SlotTarget` on the very
-	// entity holding the transcluded content, where slot resolution cannot see
-	// it.
-	world.entity_mut(layout).insert_template(template)?;
+	source.build(&mut world.entity_mut(layout))?;
 	layout.xok()
 }
 
@@ -312,13 +297,24 @@ mod test {
 		core::mem::take(app.world_mut())
 	}
 
-	/// A [`router_world`] whose `Layout` is the named `.bsx` document `source`.
-	fn bsx_world(source: &str) -> World {
-		let mut world = router_world();
-		let mut registry = BsxTemplateRegistry::default();
-		registry.insert_source("Layout", source).unwrap();
-		world.insert_resource(registry);
-		world
+	/// A store of `documents`, each a layout by its path.
+	async fn documents(documents: &[(&str, &str)]) -> BlobStore {
+		let store = BlobStore::temp();
+		for (path, source) in documents {
+			store
+				.insert(&RelPath::new(path), source.to_string())
+				.await
+				.unwrap();
+		}
+		store
+	}
+
+	/// A single route serving one page body under the `Layout.bsx` `source`.
+	async fn document_root(world: &mut World, source: &str) -> Entity {
+		let store = documents(&[("Layout.bsx", source)]).await;
+		let root = layout_root(world, Layout::document("Layout.bsx"));
+		world.entity_mut(root).insert(store);
+		root
 	}
 
 	/// The plain document shell as a `.bsx` document, the no-code counterpart of
@@ -350,8 +346,7 @@ mod test {
 			.flush()
 	}
 
-	/// A rust `#[template]` and a `.bsx` document are the same layout as far as a
-	/// [`Layout`] declaration is concerned: one name, resolved as a tag would be.
+	/// A rust `#[template]` and a document wrap a page alike.
 	#[beet_core::test]
 	async fn wraps_route_in_a_rust_template() {
 		let mut world = router_world();
@@ -364,9 +359,9 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn wraps_route_in_a_bsx_template() {
-		let mut world = bsx_world(LAYOUT_BSX);
-		let root = layout_root(&mut world, Layout::new("Layout"));
+	async fn wraps_route_in_a_document() {
+		let mut world = router_world();
+		let root = document_root(&mut world, LAYOUT_BSX).await;
 		get(&mut world, root, "")
 			.await
 			.as_str()
@@ -485,15 +480,22 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn missing_template_errors() {
-		let mut world = router_world();
-		let root = layout_root(&mut world, Layout::new("Nope"));
-		world
-			.entity_mut(root)
-			.exchange(Request::get(""))
-			.await
-			.status()
-			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
+	async fn missing_layout_errors() {
+		for layout in [
+			Layout::template("Nope"),
+			Layout::document("Nope.bsx"),
+			Layout::default(),
+		] {
+			let mut world = router_world();
+			let root = layout_root(&mut world, layout);
+			world.entity_mut(root).insert(BlobStore::temp());
+			world
+				.entity_mut(root)
+				.exchange(Request::get(""))
+				.await
+				.status()
+				.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
+		}
 	}
 
 	/// The shipped `<SiteLayout>` shell, used as a no-code site's layout template,
@@ -503,10 +505,10 @@ mod test {
 	/// Regression for a bare-`<slot/>` relay that leaked the body above the header.
 	#[beet_core::test]
 	async fn site_layout_routes_body_into_main() {
-		let mut world = bsx_world("<SiteLayout/>");
+		let mut world = router_world();
 		// SiteLayout's Header/RouteHead read the site name off PackageConfig.
 		world.init_resource::<PackageConfig>();
-		let root = layout_root(&mut world, Layout::new("Layout"));
+		let root = document_root(&mut world, "<SiteLayout/>").await;
 
 		let html = get(&mut world, root, "").await;
 		// the body sits inside <main>, not leaked above the header.
@@ -535,9 +537,9 @@ mod test {
 
 	#[beet_core::test]
 	async fn site_layout_slotted_idiom_routes_body_and_slots() {
-		let mut world = bsx_world(SLOTTED_LAYOUT_BSX);
+		let mut world = router_world();
 		world.init_resource::<PackageConfig>();
-		let root = layout_root(&mut world, Layout::new("Layout"));
+		let root = document_root(&mut world, SLOTTED_LAYOUT_BSX).await;
 
 		let html = get(&mut world, root, "").await;
 		// the named-slot overrides filled their slots.
@@ -561,9 +563,9 @@ mod test {
 	/// multi-root.
 	#[beet_core::test]
 	async fn site_layout_nested_multiroot_routes_body_into_main() {
-		let mut world = bsx_world(SLOTTED_LAYOUT_BSX);
+		let mut world = router_world();
 		world.init_resource::<PackageConfig>();
-		let root = layout_root(&mut world, Layout::new("Layout"));
+		let root = document_root(&mut world, SLOTTED_LAYOUT_BSX).await;
 		// the web lands the body inside <main>, not leaked up into the <head>.
 		assert_within_main(&get(&mut world, root, "").await, "page body");
 		// the terminal must keep the body too: a body misrouted into the non-visual
@@ -588,21 +590,18 @@ mod test {
 	#[beet_core::test]
 	async fn nested_layouts_wrap_outer_then_inner() {
 		let mut world = router_world();
-		let mut registry = BsxTemplateRegistry::default();
-		registry
-			.insert_source(
-				"Outer",
+		let store = documents(&[
+			(
+				"Outer.bsx",
 				"<html><body><main data-outer><slot/></main></body></html>",
-			)
-			.unwrap();
-		registry
-			.insert_source("Inner", "<article data-inner><slot/></article>")
-			.unwrap();
-		world.insert_resource(registry);
+			),
+			("Inner.bsx", "<article data-inner><slot/></article>"),
+		])
+		.await;
 		let root = world
-			.spawn((Router, Layout::new("Outer"), children![(
+			.spawn((store, Router, Layout::document("Outer.bsx"), children![(
 				PathPartial::new("nested"),
-				Layout::new("Inner"),
+				Layout::document("Inner.bsx"),
 				children![render_action::fixed_func_route(
 					"page",
 					|| rsx! { <p>"page body"</p> }
@@ -646,8 +645,8 @@ mod test {
 			// a leading comment nests the content element below the root
 			"<!-- c --><html><body><main><slot/></main></body></html>",
 		] {
-			let mut world = bsx_world(source);
-			let root = layout_root(&mut world, Layout::default());
+			let mut world = router_world();
+			let root = document_root(&mut world, source).await;
 			get(&mut world, root, "").await.xpect_contains("page body");
 		}
 	}
@@ -657,28 +656,27 @@ mod test {
 	#[beet_core::test]
 	async fn sibling_subtrees_get_their_own_layouts() {
 		let mut world = router_world();
-		let mut registry = BsxTemplateRegistry::default();
-		registry
-			.insert_source("Outer", "<main data-outer><slot/></main>")
-			.unwrap();
-		registry
-			.insert_source("Blog", "<article data-blog><slot/></article>")
-			.unwrap();
-		registry
-			.insert_source("Docs", "<section data-docs><slot/></section>")
-			.unwrap();
-		world.insert_resource(registry);
+		let store = documents(&[
+			("Outer.bsx", "<main data-outer><slot/></main>"),
+			("Blog.bsx", "<article data-blog><slot/></article>"),
+			("Docs.bsx", "<section data-docs><slot/></section>"),
+		])
+		.await;
 		let page = || {
 			render_action::fixed_func_route("page", || rsx! { <p>"body"</p> })
 		};
 		let root = world
-			.spawn((Router, Layout::new("Outer"), children![
-				(PathPartial::new("blog"), Layout::new("Blog"), children![
-					page()
-				]),
-				(PathPartial::new("docs"), Layout::new("Docs"), children![
-					page()
-				]),
+			.spawn((store, Router, Layout::document("Outer.bsx"), children![
+				(
+					PathPartial::new("blog"),
+					Layout::document("Blog.bsx"),
+					children![page()]
+				),
+				(
+					PathPartial::new("docs"),
+					Layout::document("Docs.bsx"),
+					children![page()]
+				),
 				page(),
 			]))
 			.flush();
@@ -701,15 +699,20 @@ mod test {
 			.xpect_contains("data-blog");
 	}
 
-	/// A world whose `Layout` binds its `<title>` from the transcluded route's
-	/// `DocMeta` via the reserved `@entity:PageRoot::` selector. This is the
-	/// in-markup replacement for the Rust `RouteHead` title lookup: the layout
-	/// builds detached and the binding follows the `LayoutContent` link
+	/// A store whose `Layout.bsx` binds its `<title>` from the transcluded
+	/// route's `DocMeta` via the reserved `@entity:PageRoot::` selector. This is
+	/// the in-markup replacement for the Rust `RouteHead` title lookup: the
+	/// layout builds detached and the binding follows the `LayoutContent` link
 	/// (installed by `wrap_content`) across the transclusion boundary.
-	fn meta_layout_world() -> World {
-		bsx_world(
-			"<html><head><title>{@entity:PageRoot::DocMeta.title}</title></head><body><main><slot/></main></body></html>",
-		)
+	async fn meta_layout_store() -> BlobStore {
+		documents(&[
+			(
+				"Layout.bsx",
+				"<html><head><title>{@entity:PageRoot::DocMeta.title}</title></head><body><main><slot/></main></body></html>",
+			),
+			("ArticleLayout.bsx", "<article><slot/></article>"),
+		])
+		.await
 	}
 
 	/// A route whose rendered content carries the given frontmatter title.
@@ -729,9 +732,10 @@ mod test {
 	/// so the walk must follow the distinct content link).
 	#[beet_core::test]
 	async fn layout_title_binds_transcluded_route_meta() {
-		let mut world = meta_layout_world();
+		let mut world = router_world();
+		let store = meta_layout_store().await;
 		let root = world
-			.spawn((Router, Layout::default(), children![
+			.spawn((store, Router, Layout::document("Layout.bsx"), children![
 				meta_route("alpha", "Alpha"),
 				meta_route("beta", "Beta"),
 			]))
@@ -752,17 +756,16 @@ mod test {
 	/// (which carries no `DocMeta`, so the title would go blank).
 	#[beet_core::test]
 	async fn layout_title_binds_through_a_nested_layout() {
-		let mut world = meta_layout_world();
-		world
-			.resource_mut::<BsxTemplateRegistry>()
-			.insert_source("ArticleLayout", "<article><slot/></article>")
-			.unwrap();
+		let mut world = router_world();
+		let store = meta_layout_store().await;
 		let root = world
-			.spawn((Router, Layout::default(), children![(
-				PathPartial::new("blog"),
-				Layout::new("ArticleLayout"),
-				children![meta_route("post", "Post")]
-			)]))
+			.spawn((store, Router, Layout::document("Layout.bsx"), children![
+				(
+					PathPartial::new("blog"),
+					Layout::document("ArticleLayout.bsx"),
+					children![meta_route("post", "Post")]
+				)
+			]))
 			.flush();
 
 		get(&mut world, root, "blog/post")
@@ -891,15 +894,11 @@ mod test {
 	async fn nested_layout_seeds_the_route_title() {
 		let mut world = router_world();
 		world.init_resource::<PackageConfig>();
-		let mut registry = BsxTemplateRegistry::default();
-		registry
-			.insert_source("ArticleLayout", "<article><slot/></article>")
-			.unwrap();
-		world.insert_resource(registry);
+		let store = meta_layout_store().await;
 		let root = world
-			.spawn((Router, Layout::of::<MetaLayout>(), children![(
+			.spawn((store, Router, Layout::of::<MetaLayout>(), children![(
 				PathPartial::new("blog"),
-				Layout::new("ArticleLayout"),
+				Layout::document("ArticleLayout.bsx"),
 				children![meta_route("post", "Post")]
 			)]))
 			.flush();

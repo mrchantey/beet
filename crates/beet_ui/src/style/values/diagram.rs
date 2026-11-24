@@ -223,19 +223,13 @@ mod test {
 	#[beet_core::test]
 	fn inherits_from_the_page_root() {
 		let mut world = MaterialStylePlugin::world();
-		let container = world
-			.spawn_template(BsxTemplate::container(
-				BsxNode::parse_document(
-					r#"<div bx:style="diagram-render=Text"><figure/><div bx:style="diagram-render=Svg"><figure/></div></div>"#,
-					&BsxParseConfig::bsx(),
-				)
-				.unwrap(),
-				BsxTemplateRegistry::default(),
-			))
-			.unwrap()
-			.id();
+		let body = SceneBody::parse_bsx(
+			&world,
+			r#"<div bx:style="diagram-render=Text"><figure/><div bx:style="diagram-render=Svg"><figure/></div></div>"#,
+		)
+		.unwrap();
+		let page = world.spawn_template(body).unwrap().id();
 		world.flush();
-		let page = world.entity(container).get::<Children>().unwrap()[0];
 		let page_children =
 			world.entity(page).get::<Children>().unwrap().to_vec();
 		let nested_figure =

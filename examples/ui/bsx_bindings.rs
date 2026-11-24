@@ -26,9 +26,7 @@ fn main() {
 	let container = {
 		let bytes = MediaBytes::new_bsx(GREETING_BSX);
 		let mut entity = world.spawn(ChildOf(doc));
-		BsxParser
-			.parse_into(ParseContext::new(&mut entity, &bytes))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(&mut entity, &bytes)).unwrap();
 		entity.id()
 	};
 	// 3. Flush the document machinery: bindings sync and the seed writes back.

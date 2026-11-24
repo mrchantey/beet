@@ -18,6 +18,7 @@
 mod entity_map;
 // templates held unbuilt, built on demand by their holder
 mod held;
+mod instance;
 mod lifecycle;
 mod prefab;
 mod registry;
@@ -27,6 +28,7 @@ mod template_plugin;
 
 pub use entity_map::*;
 pub use held::*;
+pub use instance::*;
 pub use lifecycle::*;
 pub use prefab::*;
 pub use registry::*;

@@ -6,7 +6,7 @@
 //! # Field grammar
 //!
 //! A `#[field]` parameter becomes a struct field, sharing
-//! [`beet_core_shared::prelude::Prop`] with `#[template]`'s `#[prop]`. Fields
+//! [`beet_core_shared::prelude::PropArg`] with `#[template]`'s `#[prop]`. Fields
 //! are read live off the caller entity at call time, so a value edited between
 //! calls is observed; a missing component is a loud error naming the type.
 //!
@@ -32,7 +32,7 @@
 //! # Params
 //!
 //! An extractor declares a request param by taking it. A `#[param]` parameter
-//! (the [`Prop`] grammar: a doc comment and an optional `short = 'x'`) becomes
+//! (the [`PropArg`] grammar: a doc comment and an optional `short = 'x'`) becomes
 //! a field of a hidden `{Action}Params` struct, a `Params<T>` parameter takes
 //! a whole params group, and an `AnyParams` every param. All are parsed off
 //! the request before the body runs, through `?`, so an action taking params
@@ -118,14 +118,14 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	}
 
 	// ── 3. Partition parameters into `#[field]`s, params and the rest ──
-	let mut fields: Vec<Prop> = Vec::new();
+	let mut fields: Vec<PropArg> = Vec::new();
 	let mut params = ActionParams::default();
 	let mut rest: Vec<&syn::PatType> = Vec::new();
 	for arg in &item.sig.inputs {
-		let pt = Prop::typed_arg(arg, "action")?;
-		if Prop::is_param(pt, "field") {
-			fields.push(Prop::parse(pt, "field")?);
-		} else if Prop::is_param(pt, "param") {
+		let pt = PropArg::typed_arg(arg, "action")?;
+		if PropArg::is_param(pt, "field") {
+			fields.push(PropArg::parse(pt, "field")?);
+		} else if PropArg::is_param(pt, "param") {
 			params.inline.push(ActionParams::parse_inline(pt)?);
 		} else if let Some(group) = ParamsGroup::parse(pt) {
 			params.groups.push(group);
@@ -346,7 +346,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	};
 	// a `no_clone` field is on the struct but never bound: the body reaches it
 	// through the caller itself rather than paying a clone per call.
-	let bound: Vec<&Prop> =
+	let bound: Vec<&PropArg> =
 		fields.iter().filter(|field| !field.no_clone).collect();
 	let field_idents: Vec<&syn::Ident> =
 		bound.iter().map(|field| &field.ident).collect();
@@ -751,7 +751,7 @@ struct ActionParams {
 /// One `#[param]` parameter.
 struct InlineParam {
 	/// The field the hidden struct declares.
-	prop: Prop,
+	prop: PropArg,
 	/// The author's binding, preserving `mut`.
 	pat: syn::PatIdent,
 }
@@ -778,7 +778,7 @@ impl ParamsGroup {
 impl ActionParams {
 	/// Parse a `#[param]` parameter, which takes a doc comment and a `short`.
 	fn parse_inline(pt: &syn::PatType) -> syn::Result<InlineParam> {
-		let prop = Prop::parse(pt, "param")?;
+		let prop = PropArg::parse(pt, "param")?;
 		if prop.required
 			|| prop.mutable
 			|| prop.no_clone
@@ -790,7 +790,7 @@ impl ActionParams {
 			);
 		}
 		Ok(InlineParam {
-			pat: Prop::param_pat_ident(pt, "param")?,
+			pat: PropArg::param_pat_ident(pt, "param")?,
 			prop,
 		})
 	}
@@ -812,7 +812,7 @@ impl ActionParams {
 			return None;
 		}
 		let fields = self.inline.iter().map(|InlineParam { prop, .. }| {
-			let Prop {
+			let PropArg {
 				ident,
 				ty,
 				short,
@@ -926,7 +926,7 @@ struct WrapperArgs<'a> {
 	wrapper_fn_name: &'a syn::Ident,
 	generics: &'a syn::Generics,
 	struct_ty: &'a TokenStream,
-	fields: &'a [&'a Prop],
+	fields: &'a [&'a PropArg],
 	field_idents: &'a [&'a syn::Ident],
 	field_checks: &'a [TokenStream],
 	in_type: &'a TokenStream,
@@ -1058,7 +1058,7 @@ fn make_wrapper(args: WrapperArgs) -> TokenStream {
 /// The per-field preamble shared by every binding site: a required field is
 /// unwrapped, erroring loudly by name.
 fn field_checks(
-	fields: &[&Prop],
+	fields: &[&PropArg],
 	struct_ty: &TokenStream,
 	beet_core: &syn::Path,
 ) -> Vec<TokenStream> {
@@ -1287,7 +1287,7 @@ fn make_struct_def(
 	fn_name: &syn::Ident,
 	generics: &syn::Generics,
 	fn_attrs: &[syn::Attribute],
-	fields: &[Prop],
+	fields: &[PropArg],
 	require_action: Option<TokenStream>,
 	on_add_attr: TokenStream,
 	route_expr: Option<&syn::Expr>,
@@ -1310,7 +1310,7 @@ fn make_struct_def(
 
 	let field_defs: Vec<TokenStream> = fields
 		.iter()
-		.map(Prop::field_def)
+		.map(PropArg::field_def)
 		.chain(marker_field(generics, fn_attrs))
 		.collect();
 
@@ -1476,7 +1476,7 @@ fn marker_field(
 /// The struct's field initializers, given one expression per declared field.
 fn struct_init(
 	generics: &syn::Generics,
-	fields: &[Prop],
+	fields: &[PropArg],
 	values: impl Iterator<Item = TokenStream>,
 ) -> TokenStream {
 	let idents = fields.iter().map(|field| &field.ident);
@@ -1494,7 +1494,7 @@ fn struct_init(
 fn make_clone(
 	fn_name: &syn::Ident,
 	generics: &syn::Generics,
-	fields: &[Prop],
+	fields: &[PropArg],
 ) -> TokenStream {
 	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 	let values = fields.iter().map(|field| {
@@ -1514,11 +1514,14 @@ fn make_clone(
 fn make_default(
 	fn_name: &syn::Ident,
 	generics: &syn::Generics,
-	fields: &[Prop],
+	fields: &[PropArg],
 ) -> TokenStream {
 	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-	let init =
-		struct_init(generics, fields, fields.iter().map(Prop::default_value));
+	let init = struct_init(
+		generics,
+		fields,
+		fields.iter().map(PropArg::default_value),
+	);
 	quote! {
 		impl #impl_generics ::core::default::Default for #fn_name #ty_generics #where_clause {
 			fn default() -> Self { #init }

@@ -336,7 +336,7 @@ binary serves the records and the comments (`atproto`).
 	     launch's `secrets.toml` record locally, the stack's secret store on
 	     the box, failing the serve rather than presenting a stranger's key -->
 	<Route path="serve" {(HttpServer, TuiServer, SshTuiServer, SshHostKeyRef($ssh_host_key))}>
-		<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, GeoIpDb, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
+		<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, GeoIpDb, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, Layout{document:"templates/Layout.bsx"})}>
 			<!-- the brand palette, one key colour per Material palette. The neutral
 			     is split per mode: light is the handout cream (print), dark is a
 			     near-neutral ink. See docs/design/beet-branding. -->
@@ -349,8 +349,7 @@ binary serves the records and the comments (`atproto`).
 				neutral_dark="#1b1c1c"
 				neutral_variant="#6a7772"
 				error="#de3730"/>
-			<TemplateDir src="templates"/>
-			<Styles/>
+			<Instance document="templates/Styles.bsx"/>
 			<DefaultAppRoutes/>
 			<!-- the machine-readable faces of the site, each an ordinary static
 			     route scoped to where it sits: these are at the router root, so
@@ -385,7 +384,7 @@ binary serves the records and the comments (`atproto`).
 			     The redirects are the urls the blog served at before its posts were
 			     named: the files stay numbered so they read in order, and every link
 			     ever published keeps resolving, with a 301 to the name. -->
-			<Route path="blog" {Layout{template:"ArticleLayout"}}>
+			<Route path="blog" {Layout{document:"templates/ArticleLayout.bsx"}}>
 				<RoutesDir src="routes/blog"/>
 				<!-- the feed belongs to the blog, so it is declared in the blog:
 				     it serves at /blog/rss.xml and carries these posts alone. -->

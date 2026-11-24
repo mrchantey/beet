@@ -11,7 +11,7 @@ Style is semantic classes and design tokens, never raw CSS, so a page renders th
 
 ## Named rules
 
-`templates/Styles.bsx` is a list of `<Rule>` declarations, included once from `main.bsx` via `<Styles/>`. Each rule is the markup analogue of a typed Rust rule: the selector comes from `class`/`tag`/`state`, every other attribute is a declaration in BSX enum form, and a `"@token:Role"` value binds to a Material colour token.
+`templates/Styles.bsx` is a list of `<Rule>` declarations, instantiated once from `main.bsx` via `<Instance document="templates/Styles.bsx"/>`. Each rule is the markup analogue of a typed Rust rule: the selector comes from `class`/`tag`/`state`, every other attribute is a declaration in BSX enum form, and a `"@token:Role"` value binds to a Material colour token.
 
 ```html
 <Rule class={["swatch", "primary"]}

@@ -106,7 +106,7 @@ fn resolve_dir_path(
 		return;
 	}
 	// watch the scoped subdir for live reload (keyed to its base store), so a
-	// `RoutesDir`/`TemplateDir`/`AssetsDir` mount's dir reloads; inert on a non-fs
+	// `RoutesDir`/`AssetsDir` mount's dir reloads; inert on a non-fs
 	// store / on wasm. `WatchDir` is notify-backed and std-only, so a no_std target
 	// just mounts the scoped store with no live-reload watcher.
 	#[cfg(feature = "std")]

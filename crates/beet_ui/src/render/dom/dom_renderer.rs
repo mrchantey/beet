@@ -1045,12 +1045,11 @@ mod test {
 		let markdown = MediaBytes::new_markdown(
 			"# Routing\n\n`<RoutesDir/>` scans:\n\n| file | route |\n| --- | --- |\n| `a.md` | `/a` |\n| `b/c.md` | `/b/c` |\n\nFrontmatter:\n\n```toml\n+++\ntitle = \"Routing\"\n+++\n```\n\n- one\n- two\n",
 		);
-		MarkdownParser::new()
-			.parse_into(ParseContext::new(
-				&mut app.world_mut().entity_mut(host),
-				&markdown,
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut app.world_mut().entity_mut(host),
+			&markdown,
+		))
+		.unwrap();
 		let target = serve(&mut app, host);
 		adopt(&mut app, host, &target).is_clean().xpect_true();
 		target

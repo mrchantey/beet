@@ -83,7 +83,10 @@ pub(super) fn scalar_to_reflect(
 	if let (Value::Str(string), Some(TypeInfo::Enum(enum_info))) =
 		(value, field_info)
 	{
-		return reflect_ext::unit_variant_value(enum_info, string.as_str());
+		let mut unit =
+			reflect_ext::unit_variant_value(enum_info, string.as_str())?;
+		unit.set_represented_type(field_info);
+		return Ok(Box::new(unit));
 	}
 
 	// a string that reached a struct, tuple-struct or opaque target without

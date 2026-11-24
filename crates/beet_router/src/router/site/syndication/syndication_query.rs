@@ -274,33 +274,38 @@ pub(crate) mod test_fixtures {
 	/// document shell (a head, a nav, a `<main>` around the page, a footer) on
 	/// every page, and inside it the article layout, `<ArticleHeader/>` above
 	/// the post, on the blog's dated post `blog/full-stack-bevy`.
-	pub fn spawn_layout_router(world: &mut World) -> Entity {
-		let mut registry = world.get_resource_or_init::<BsxTemplateRegistry>();
-		registry
-			.insert_source(
-				"FixtureLayout",
+	pub async fn spawn_layout_router(world: &mut World) -> Entity {
+		let store = BlobStore::temp();
+		for (path, source) in [
+			(
+				"FixtureLayout.bsx",
 				"<html><head><title>Beet</title><style>main { margin: 0 }</style></head>\
 				 <body><nav>Home</nav><main><slot/></main><footer>Bye</footer></body></html>",
-			)
-			.unwrap();
-		registry
-			.insert_source("ArticleLayout", "<ArticleHeader/><slot/>")
-			.unwrap();
+			),
+			("ArticleLayout.bsx", "<ArticleHeader/><slot/>"),
+		] {
+			store.insert(&RelPath::new(path), source).await.unwrap();
+		}
 		world
-			.spawn((Router, Layout::new("FixtureLayout"), children![
-				page("", DocMeta {
-					title: Some("Beet".into()),
-					..default()
-				}),
-				(
-					PathPartial::new("blog"),
-					Layout::new("ArticleLayout"),
-					children![page(
-						"full-stack-bevy",
-						post("Full Stack Bevy", "2025-07-11")
-					)]
-				),
-			]))
+			.spawn((
+				store,
+				Router,
+				Layout::document("FixtureLayout.bsx"),
+				children![
+					page("", DocMeta {
+						title: Some("Beet".into()),
+						..default()
+					}),
+					(
+						PathPartial::new("blog"),
+						Layout::document("ArticleLayout.bsx"),
+						children![page(
+							"full-stack-bevy",
+							post("Full Stack Bevy", "2025-07-11")
+						)]
+					),
+				],
+			))
 			.flush()
 	}
 }

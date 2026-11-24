@@ -195,6 +195,8 @@ mermaid-rs-renderer = { version = "0.3", optional = true, default-features = fal
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing", "fs", "rand"] }
 beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "server"] }
+# the documents a page instantiates (`tests/bsx.rs`), below which this crate sits
+beet_scene = { workspace = true }
 
 # the in-browser reactivity test drives the fixture through the webdriver
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

@@ -127,8 +127,7 @@ impl InMemoryStore {
 
 	/// Creates a new already-created provider seeded with `entries`, so a crate
 	/// can ship compile-time bytes (eg `include_str!`) into a store synchronously
-	/// without an async `insert`. The store is then read like any other (eg a
-	/// [`TemplateDir`](beet_core::prelude::TemplateDir) over it).
+	/// without an async `insert`. The store is then read like any other.
 	pub fn new_seeded(
 		entries: impl IntoIterator<Item = (RelPath, Bytes)>,
 	) -> Self {

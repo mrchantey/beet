@@ -7,14 +7,14 @@ beet_core::test_main!();
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
+use beet_scene::prelude::*;
 use beet_ui::prelude::*;
 
 const MAIN_BSX: &str = r#"
 <!-- the whole site: middleware as spreads, routes discovered from disk,
 the package resource patched from markup -->
-<Router {(RequestLogger, Layout{template:"Layout"})}>
+<Router {(RequestLogger, Layout{document:"templates/Layout.bsx"})}>
 	<PackageConfig title="Beet Test Site" description="markup declared"/>
-	<TemplateDir src="templates"/>
 	<RoutesDir src="routes"/>
 	<ServeBlobs prefix="assets" {DirPath("assets")}/>
 </Router>
@@ -39,10 +39,10 @@ const CARD_BSX: &str = r#"
 
 const COUNTER_BSX: &str = r#"
 <article bx:scope="counter">
-	<widgets::Card title="Counter">
+	<Instance document="templates/widgets/Card" props={{title:"Counter"}}>
 		<p>You have clicked {@doc:count=0} times.</p>
 		<button bx:onclick="target.with_field('count', count => count + 1)">More</button>
-	</widgets::Card>
+	</Instance>
 </article>
 "#;
 
@@ -76,23 +76,20 @@ async fn site_store() -> BlobStore {
 
 /// The example's `main.rs` setup in miniature: plugins + the compile-time
 /// package config (the title/description come from `MAIN_BSX`), then build the
-/// entry into a root carrying the repo store so the markup-declared `<TemplateDir>`
-/// and `<RoutesDir>` resolve it by ancestry.
+/// entry into a root carrying the repo store so the markup-declared `<RoutesDir>`
+/// and every document the site instantiates resolve it by ancestry.
 async fn spawn_site(world: &mut World) -> Entity {
 	world.insert_resource(pkg_config!());
 	// the same store-backed load the binary and Worker run: read the entry through
-	// the repo store and build into a root carrying that store, so `<TemplateDir>`
-	// (registering `templates/`), `<RoutesDir>` and `<Template src>` resolve it by
-	// ancestry. None of the entry's own tags are dir-loaded templates, so the
-	// reactive `<TemplateDir>` registration settles below before any route renders.
+	// the repo store and build into a root carrying that store.
 	let store = site_store().await;
 	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();
 	let template =
-		BsxTemplate::parse_entry(world, entry.as_utf8().unwrap()).unwrap();
+		SceneBody::parse_bsx(world, entry.as_utf8().unwrap()).unwrap();
 	let root = world.spawn(store).id();
 	world.entity_mut(root).insert_template(template).unwrap();
-	// the `<TemplateDir>`/`<RoutesDir>` scans are async, so settle them before
-	// reading the route tree or serving requests (else routes 404 / templates miss)
+	// the `<RoutesDir>` scan is async, so settle it before reading the route tree
+	// or serving requests (else routes 404)
 	AsyncRunner::settle_async_tasks(world).await;
 	root
 }
@@ -391,18 +388,16 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 	}
 }
 
-/// An included entry carries its boot onto the root: the included `CliServer`
-/// owns the root with a `<Router/>` dispatch child and declares `{CallOnReady}`,
-/// and a `<Template src=.../>` include builds both onto the entry root, so the
-/// load verb rides the include and the load path finds it. The binary injects no
-/// verb of its own. The regression guard for an include carrying its boot
-/// machinery onto the root.
+/// An entry instantiating a whole server carries its boot: the document's
+/// `CliServer` owns a `<Router/>` dispatch child and declares `{CallOnReady}`,
+/// built under the entry root, so the load verb rides the document and the load
+/// path finds it. The binary injects no verb of its own.
 ///
 /// The root is built disarmed ([`DisableCallOnReady`]): the assertion is that the
 /// machinery *arrived*, and a real boot here would dispatch the test runner's own
 /// argv as its request.
 #[beet_core::test]
-async fn include_carries_boot() {
+async fn an_instance_carries_boot() {
 	let store = BlobStore::temp();
 	store
 		.insert(
@@ -412,24 +407,28 @@ async fn include_carries_boot() {
 		.await
 		.unwrap();
 	store
-		.insert(&RelPath::from("main.bsx"), "<Template src=\"serve.bsx\"/>")
+		.insert(
+			&RelPath::from("main.bsx"),
+			"<Instance document=\"serve.bsx\"/>",
+		)
 		.await
 		.unwrap();
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();
 	let template =
-		BsxTemplate::parse_entry(&world, entry.as_utf8().unwrap()).unwrap();
+		SceneBody::parse_bsx(&world, entry.as_utf8().unwrap()).unwrap();
 	// the binary spawns the root with no load verb of its own (`build_root`'s
 	// empty `extra`), then builds the entry onto it; the server rides the markup.
 	// Disarmed so the assertion is arrival, not a boot with the test argv.
 	let root = world.spawn((store, DisableCallOnReady)).id();
 	world.entity_mut(root).insert_template(template).unwrap();
-	// the include resolves as an async pending dependency, so settle first
+	// the document loads as an async pending dependency, so settle first
 	AsyncRunner::settle_async_tasks(&mut world).await;
-	// the included CliServer lands on the entry root carrying the load verb, so
-	// the load path can resolve, with the Router as its dispatch child.
-	world.entity(root).contains::<CliServer>().xpect_true();
-	world.entity(root).contains::<CallOnReady>().xpect_true();
+	// the CliServer is the document's root, carrying the load verb, with the
+	// Router as its dispatch child.
+	let server = world.get::<Activation>(root).unwrap().root;
+	world.entity(server).contains::<CliServer>().xpect_true();
+	world.entity(server).contains::<CallOnReady>().xpect_true();
 	world
 		.with_state::<Query<(), With<Router>>, _>(|routers| {
 			routers.iter().count()
@@ -450,17 +449,12 @@ async fn home_route_serves_index() {
 
 // ---- reserved ref names against the real markers ------------------------------
 
-/// Parse a `.bsx` source into a container under `parent`, returning the first
-/// content child.
+/// Parse a `.bsx` source under `parent`, returning its root element.
 fn spawn_bsx_under(world: &mut World, parent: Entity, source: &str) -> Entity {
-	use beet_ui::prelude::*;
 	let bytes = MediaBytes::new_bsx(source);
 	let mut entity = world.spawn(ChildOf(parent));
-	BsxParser
-		.parse_into(ParseContext::new(&mut entity, &bytes))
-		.unwrap();
-	let container = entity.id();
-	world.entity(container).get::<Children>().unwrap()[0]
+	DocParsers::parse(ParseContext::new(&mut entity, &bytes)).unwrap();
+	entity.id()
 }
 
 /// The local [`Value`] of the first text child of `entity`.

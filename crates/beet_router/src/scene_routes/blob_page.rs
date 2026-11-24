@@ -1,11 +1,11 @@
 //! A store file served as a page: [`BlobPage`] parses the file's bytes into a
-//! fresh tree per request and seeds that tree with the components the document
-//! declares at its root (see [`RootDeclarations`]), so a widget reading the
-//! render root finds the page's metadata whether or not any scan discovered
-//! the file.
+//! fresh tree per request, its root carrying the components the document
+//! declares there, so a widget reading the render root finds the page's
+//! metadata whether or not any scan discovered the file.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_scene::prelude::*;
 use beet_ui::prelude::*;
 
 /// Serves the file at `path` in the nearest ancestor [`BlobStore`], parsed
@@ -53,6 +53,44 @@ impl BlobPage {
 		// render context the content builds under (below)
 		let route = caller.id();
 		let bytes = blob.get_media().await?;
+		// the package the page's references resolve in, a detached tree carrying
+		// its own, and the component its unsectioned metadata declares
+		let (package, frontmatter_type) = caller
+			.with_state::<(PackageQuery, AncestorQuery<&FrontmatterType>), _>(
+				|entity, (packages, types)| {
+					packages.get(entity).map(|package| {
+						let frontmatter_type = types
+							.get(entity)
+							.cloned()
+							.unwrap_or_default()
+							.component;
+						(package, frontmatter_type)
+					})
+				},
+			)
+			.await??;
+		let path = package.path_of(&blob);
+		let template = caller
+			.world()
+			.with({
+				let path = path.clone();
+				move |world: &mut World| -> Result<DynamicTemplate> {
+					DocParsers::of(world)
+						.with_metadata_type(frontmatter_type)
+						.body(&bytes)?
+						.reflect_at(world, &path)
+				}
+			})
+			.await?;
+		// the documents it instantiates are loaded before it builds, so they
+		// build with it, under the request's context
+		PrefabCache::load_instances(
+			&caller.world(),
+			&package,
+			&path,
+			&template,
+		)
+		.await?;
 		// carry the store onto the render root: the per-request tree is a detached root
 		// (below), so a render-time widget that reads a file (eg `<CodeSnippet src>`)
 		// resolves it by self-or-ancestor lookup rather than walking to the router.
@@ -68,25 +106,7 @@ impl BlobPage {
 		caller
 			.world()
 			.with(move |world: &mut World| -> Result<PageRequest> {
-				// seed the render root with the components this file declares at its
-				// root, read from the same bytes the parse below reads. Serving the
-				// scan here rather than copying the route entity's components covers
-				// the files the discovering scan never saw (a `<Template src>`
-				// include, a codegen blob route), and a widget reading the RENDER
-				// ROOT (the document `<title>` binding) finds them either way.
-				//
-				// The BSX build below re-inserts the same components from the same
-				// root spreads; that duplication is harmless, a binding resolving to
-				// the nearest holder.
-				let frontmatter_type = world
-					.with_state::<AncestorQuery<&FrontmatterType>, _>(|types| {
-						types.get(route).cloned().unwrap_or_default()
-					})
-					.component;
-				let declarations = DocParsers::of(world)
-					.declarations(&bytes, &frontmatter_type)?;
-				let content = world.spawn(render_store).id();
-				declarations.insert(&mut world.entity_mut(content))?;
+				let content = world.spawn((render_store, package)).id();
 				// the entity owning this request's route tree, resolved from the
 				// in-tree route exactly as the layout middleware resolves it
 				let router = world
@@ -103,11 +123,7 @@ impl BlobPage {
 					RequestContext::new(parts, content, route, router),
 					|world| -> Result<PageRequest> {
 						let mut entity = world.entity_mut(content);
-						DocParsers::parse(ParseContext::new(
-							&mut entity,
-							&bytes,
-						))?;
-
+						DocParsers::build(&mut entity, template)?;
 						PageRoot::insert(&mut entity, vec![content]);
 						Ok(PageRequest(content))
 					},

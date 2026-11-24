@@ -157,9 +157,7 @@ mod test {
 		let mut world =
 			(AsyncPlugin, TemplatePlugin, DocumentPlugin, AtprotoPlugin)
 				.into_world();
-		world
-			.spawn(())
-			.insert_template(BsxTemplate::parse_document(markup)?)?;
+		SceneBody::spawn_bsx(&mut world, markup)?;
 		world.flush();
 		world.xok()
 	}

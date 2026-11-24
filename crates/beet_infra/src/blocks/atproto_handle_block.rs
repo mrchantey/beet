@@ -487,21 +487,19 @@ mod test {
 		let mut world =
 			(AsyncPlugin, TemplatePlugin, DocumentPlugin, InfraPlugin)
 				.into_world();
-		world
-			.spawn(())
-			.insert_template(
-				BsxTemplate::parse_document(&format!(
-					r#"<Fragment>
+		SceneBody::spawn_bsx(
+			&mut world,
+			&format!(
+				r#"<Fragment>
 					<AtprotoAccount bx:ref="company" handle="example.com" did="{COMPANY}"/>
 					<AtprotoAccount bx:ref="alice" handle="alice.example.com" did="{ALICE}"/>
 					<AtprotoHandleBlock domain="example.com" dns_stage="prod"
 						accounts={{[$company, $alice]}}/>
 					<AtprotoHandleProbe/>
 				</Fragment>"#
-				))
-				.unwrap(),
-			)
-			.unwrap();
+			),
+		)
+		.unwrap();
 		world.flush();
 		let block = world
 			.query::<&AtprotoHandleBlock>()

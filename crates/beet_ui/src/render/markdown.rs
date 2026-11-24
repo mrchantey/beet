@@ -20,8 +20,8 @@ pub struct MarkdownParams {
 /// Converts HTML-like element trees (as produced by [`MarkdownParser`])
 /// back into CommonMark-compatible markdown. Supports headings, emphasis,
 /// strong, links, images, lists, task list checkboxes, code blocks,
-/// blockquotes, thematic breaks, inline code, GFM tables with their captions,
-/// and optional expression rendering. A `<mark>`, and a `<span>` carrying a
+/// blockquotes, thematic breaks, inline code and GFM tables with their captions.
+/// A `<mark>`, and a `<span>` carrying a
 /// `style`, pass through as inline HTML, since markdown has no syntax for what
 /// they signal. Asked for frontmatter, `--frontmatter=toml` or `=yaml`
 /// ([`MarkdownParams`]), a render leads with the block declaring its root's
@@ -63,8 +63,6 @@ pub struct MarkdownRenderer {
 	html_passthrough: HtmlPassthrough,
 	/// Shared block/inline tracking state and output buffer.
 	state: TextRenderState,
-	/// Render [`Expression`] values verbatim as `{expr}` in output.
-	render_expressions: bool,
 	/// Skip [`Comment`] nodes, the default.
 	strip_comments: bool,
 	/// The inline elements open in the walk, innermost last, each with the
@@ -322,7 +320,6 @@ impl MarkdownRenderer {
 		Self {
 			html_passthrough: HtmlPassthrough::default(),
 			state: TextRenderState::new(),
-			render_expressions: false,
 			strip_comments: true,
 			inline_stack: Vec::new(),
 			pending_opens: Vec::new(),
@@ -336,12 +333,6 @@ impl MarkdownRenderer {
 			after_element: None,
 			at_block_start: false,
 		}
-	}
-
-	/// Enable rendering of [`Expression`] nodes as `{expr}`.
-	pub fn with_expressions(mut self) -> Self {
-		self.render_expressions = true;
-		self
 	}
 
 	/// Keep [`Comment`] nodes (`<!-- note -->`) rather than skipping them, for
@@ -1082,19 +1073,6 @@ impl NodeVisitor for MarkdownRenderer {
 		self.push_words(&text);
 	}
 
-	fn visit_expression(&mut self, cx: &VisitContext, expression: &Expression) {
-		if let Some(passthrough) = &mut self.passthrough {
-			passthrough.html.visit_expression(cx, expression);
-			return;
-		}
-		if self.render_expressions {
-			self.flush_inline();
-			self.push_char('{');
-			self.push_str(&expression.0);
-			self.push_char('}');
-		}
-	}
-
 	fn visit_comment(&mut self, cx: &VisitContext, comment: &Comment) {
 		if self.strip_comments {
 			return;
@@ -1180,35 +1158,15 @@ mod test {
 
 	/// Parse markdown then render it back via [`MarkdownRenderer`].
 	fn roundtrip(md: &str) -> String {
-		let mut world = World::new();
+		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_markdown(md);
-		MarkdownParser::new()
-			.parse_into(ParseContext::new(
-				&mut world.entity_mut(entity),
-				&bytes,
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(entity),
+			&bytes,
+		))
+		.unwrap();
 		render_with(&mut world, entity, MarkdownRenderer::new().with_comments())
-	}
-
-	/// Parse markdown then render with expression support.
-	#[allow(dead_code)]
-	fn roundtrip_expressions(md: &str) -> String {
-		let mut world = World::new();
-		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::new_markdown(md);
-		MarkdownParser::with_expressions()
-			.parse_into(ParseContext::new(
-				&mut world.entity_mut(entity),
-				&bytes,
-			))
-			.unwrap();
-		render_with(
-			&mut world,
-			entity,
-			MarkdownRenderer::new().with_expressions().with_comments(),
-		)
 	}
 
 	#[beet_core::test]
@@ -1305,12 +1263,11 @@ mod test {
 				..default()
 			})
 			.id();
-		MarkdownParser::new()
-			.parse_into(ParseContext::new(
-				&mut world.entity_mut(entity),
-				&MediaBytes::new_markdown("# Plan"),
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(entity),
+			&MediaBytes::new_markdown("# Plan"),
+		))
+		.unwrap();
 		let mut render = |request: RequestParts| {
 			MarkdownRenderer::new()
 				.render(&mut RenderContext::new(&mut world, entity, &request))
@@ -1341,15 +1298,14 @@ mod test {
 	/// A comment is an authoring note, so a page leaves it out.
 	#[beet_core::test]
 	fn strips_comments_by_default() {
-		let mut world = World::new();
+		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_markdown("<!-- note -->\n\n# Title\n");
-		MarkdownParser::new()
-			.parse_into(ParseContext::new(
-				&mut world.entity_mut(entity),
-				&bytes,
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(entity),
+			&bytes,
+		))
+		.unwrap();
 		render_with(&mut world, entity, MarkdownRenderer::new())
 			.xpect_eq("# Title\n");
 	}
@@ -1366,12 +1322,11 @@ mod test {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
-		BsxParser
-			.parse_into(ParseContext::new(
-				&mut world.entity_mut(entity),
-				&bytes,
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(entity),
+			&bytes,
+		))
+		.unwrap();
 		render_with(&mut world, entity, renderer)
 	}
 
@@ -1606,7 +1561,7 @@ mod test {
 		render_unescaped("<p><input type=\"checkbox\"> Surveys</p>")
 			.xpect_eq("[ ] Surveys\n");
 		// the box's value is its state, over the authored `checked`
-		let mut world = World::new();
+		let mut world = world_ext::ui_world();
 		let entity = world
 			.spawn(rsx! {
 				<p><input type="checkbox" checked {Value::Bool(false)}/>" Surveys"</p>

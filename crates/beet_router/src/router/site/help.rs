@@ -914,8 +914,7 @@ mod test {
 			.await
 			.xpect_contains("Before the build")
 			.xpect_contains("&lt;RepoRoot&gt;")
-			.xpect_contains("&lt;RequireCfg&gt;")
-			.xpect_contains("&lt;TemplateDir&gt;");
+			.xpect_contains("&lt;RequireCfg&gt;");
 		help_body(&mut world, root, "about --help")
 			.await
 			.xnot()

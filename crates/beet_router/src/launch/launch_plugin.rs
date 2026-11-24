@@ -54,7 +54,7 @@ impl ArgvPassthrough {
 
 /// `Startup`: resolve the repo store + name and build the entry, all on the async
 /// runtime so discovery (a store walk), template registration, and every store read
-/// (`templates/`, the entry document, `<RoutesDir>`/`<Template src>`) go through the
+/// (the entry document, `<RoutesDir>`, a document it instantiates) go through the
 /// one [`BlobStore`] without ever blocking the runtime (which is single-threaded on
 /// wasm). The app loop drives the task; its build fires `Ready` on the root,
 /// where the `CallOnReady` verb fans the process request out to the entry's servers.
@@ -87,10 +87,7 @@ fn load_entry(world: &mut World) {
 	if let Some(check) = features_self_check(&config, forwards_argv) {
 		world.spawn(check);
 	}
-	// the recognized template formats (`.bsx`, `.js`), read once here so the async
-	// build can both filter the `templates/` read and lower each source by format,
-	// and the declarations that act before the build, which the plugins registered.
-	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
+	// the declarations that act before the build, which the plugins registered.
 	let prescans = world.get_resource_or_init::<PrescanRegistry>().clone();
 	world.run_async_local(async move |world: AsyncWorld| {
 		// the wasm runner forwards the *module's* flags on this same argv, so a
@@ -122,25 +119,22 @@ fn load_entry(world: &mut World) {
 				return;
 			}
 		};
-		if let Err(err) = build_entry(&world, &config, resolved, formats).await
-		{
+		if let Err(err) = build_entry(&world, &config, resolved).await {
 			error!("{err}");
 			world.write_message(AppExit::error()).await;
 		}
 	});
 }
 
-/// Build the resolved entry on the async runtime: register the entry's `templates/`
-/// and read the entry document through the store (awaited, not blocked), then build
-/// it into a root carrying the store so `<RoutesDir>` and `<Template src>` resolve
-/// the store by ancestry. The entry runs itself: its own `CallOnReady` acts on its
+/// Build the resolved entry on the async runtime: read the entry document through
+/// the store (awaited, not blocked), then build it into a root carrying the store
+/// so `<RoutesDir>` and a document it instantiates resolve it by ancestry. The entry runs itself: its own `CallOnReady` acts on its
 /// `Ready` and boots the servers. Target-agnostic; the `--watch` live-reload path
 /// is native-only.
 async fn build_entry(
 	world: &AsyncWorld,
 	config: &BootstrapConfig,
 	resolved: ResolvedEntry,
-	formats: TemplateFormats,
 ) -> Result {
 	let ResolvedEntry {
 		repo_store,
@@ -157,10 +151,7 @@ async fn build_entry(
 	// binary without `client_io` has no reload channel to serve.
 	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	if watch_dir.is_some() && config.watch {
-		return entry_build::build_watched(
-			world, repo_store, entry_name, formats,
-		)
-		.await;
+		return entry_build::build_watched(world, repo_store, entry_name).await;
 	}
 	// otherwise the plain one-shot build. The binary stays unopinionated: it
 	// simply loads, and the entry's own markup decides how it runs by carrying
@@ -169,13 +160,9 @@ async fn build_entry(
 	let _ = config;
 	#[cfg(all(not(feature = "client_io"), not(target_arch = "wasm32")))]
 	let _ = watch_dir;
-	let sources = entry_build::read_sources(
-		&repo_store,
-		formats,
-		entry_name.clone(),
-		prescan,
-	)
-	.await?;
+	let sources =
+		entry_build::read_sources(&repo_store, entry_name.clone(), prescan)
+			.await?;
 	world
 		.with(move |world: &mut World| -> Result {
 			entry_build::build_root(world, repo_store, sources, RepoStore)?;

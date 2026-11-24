@@ -1,5 +1,5 @@
 <!--
-The always-socket perceive-act agent, shared verbatim by every stage (`<Template src>`d
+The always-socket perceive-act agent, shared verbatim by every stage (instantiated
 by main-v1/main-v2/main-v3). It is a socket server whose capability routes forward over
 the socket to whichever client serves them (`take-photo`/`speak-text`/`show-image` to
 the head, `drive` to the body), bound by the `whoami` handshake as each client

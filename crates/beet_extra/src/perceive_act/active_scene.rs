@@ -378,8 +378,7 @@ async fn apply_scene(
 /// Parse a scene's `main.bsx` (a single `<ScenePrompt text=..>` root) and return its
 /// text, using a throwaway entity so nothing lingers in the world.
 fn extract_scene_prompt(world: &mut World, source: &str) -> Result<String> {
-	let entry = BsxTemplate::parse_entry(world, source)?;
-	let root = entry.spawn(world)?;
+	let root = SceneBody::spawn_bsx(world, source)?;
 	let text = world
 		.get::<ScenePrompt>(root)
 		.map(|prompt| prompt.text.clone())

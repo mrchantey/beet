@@ -30,13 +30,13 @@ Because the site is runtime files, edits to `main.bsx`, the templates, and the r
 ```
 beetmania/
   main.bsx       the entrypoint: the commands, the served router and its middleware
-  templates/     the site's BSX templates, eg Layout.bsx and widgets/Card.bsx
+  templates/     the documents others are built from, eg Layout.bsx and widgets/Card.bsx
   routes/        the content: every file is a page, eg recipes/borscht.md
   assets/        the beetroot logo, plus what the `assets` command borrows and derives
   derived/       the blog's standard.site index, written by `social/publish`
 ```
 
-There is no `main.rs`. The `beet` binary discovers `main.bsx`, registers the sibling `templates/` directory, roots the repo store at this directory (which `<RoutesDir/>` resolves against), and loads `main.bsx` as the app root. The root `<CliServer>` then dispatches the command line into its router: `serve` boots the servers, `--server=http` the HTTP listener, `--server=tui` the live terminal, `--server=dom` the page in a browser tab. Static export is a separate dev command, `beet export-static <site-dir>`.
+There is no `main.rs`. The `beet` binary discovers `main.bsx`, roots the repo store at this directory (which `<RoutesDir/>` and every document it names resolve against), and loads `main.bsx` as the app root. The root `<CliServer>` then dispatches the command line into its router: `serve` boots the servers, `--server=http` the HTTP listener, `--server=tui` the live terminal, `--server=dom` the page in a browser tab. Static export is a separate dev command, `beet export-static <site-dir>`.
 
 ## The served site
 
@@ -44,8 +44,8 @@ The site is the router under the `serve` command:
 
 ```html
 <Route path="serve" {(HttpServer, TuiServer, SshTuiServer, DomServer)}>
-	<Router {(RequestLogger, CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
-		<TemplateDir src="templates"/>
+	<Router {(RequestLogger, CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, Layout{document:"templates/Layout.bsx"})}>
+		<Instance document="templates/Styles.bsx"/>
 		<RoutesDir src="routes"/>
 		<ServeBlobs prefix="repo"/>
 		<AssetsDir src="wasm" prefix="wasm" cache="1h"/>
@@ -53,15 +53,16 @@ The site is the router under the `serve` command:
 </Route>
 ```
 
-- The servers own the route: `HttpServer`, `TuiServer`, `SshTuiServer` and `DomServer` are transport components, and `--server` selects which boot, so the same markup serves every target with no host binary. A server a binary lacks (`SshTuiServer` in a lean build, `HttpServer` in the browser) is skipped with a warning and the entry keeps its shape.
+- The servers own the route: `HttpServer`, `TuiServer`, `SshTuiServer` and `DomServer` are transport components, and `--server` selects which boot, so the same markup serves every target with no host binary. A server a binary cannot boot (`SshTuiServer` in a lean build, `HttpServer` in the browser) boots nothing there and the entry keeps its shape.
 - `<Router>` is the `beet_router` dispatch component, the servers' child, and a url space of its own: its pages are rooted at `/` however deep the command, and no request reaches a sibling command.
 - `<ServeBlobs prefix="repo"/>` publishes the site's own directory read-only at `/repo`, the store the browser process reads this entry through; `<AssetsDir>` mounts the wasm binary the page boots, whose `wasm/beet-ui.{wasm,js}` link to the build output in `target/wasm`.
 - `<PackageConfig/>`, beside the commands, is a resource declaration: a capitalized tag naming a `#[reflect(Resource)]` type patches the live resource's named fields (here the site title, description and homepage), leaving the rest, eg the compile-time version, untouched. It produces no markup.
 - The `{(..)}` spread stacks middleware components onto the router entity, exactly as a Rust `world.spawn((Router, RequestLogger, ..))` would: request logging, the cache policy (html edge-cacheable, purged by every deploy and `sync`), `--help`, terminal link navigation, and the layout.
-- `Layout{template:"Layout"}` is render middleware: every page's body transcludes into the default `<slot/>` of the `templates/Layout.bsx` template, resolved by name exactly as the tag `<Layout/>` would be (a `.bsx` file, else a rust `#[template]`). Declared on a child route instead, it nests inside its ancestors', which is how the blog wears `templates/ArticleLayout.bsx`.
+- `<Instance document="templates/Styles.bsx"/>` builds another document in place, named by its path: the site's style rules.
+- `Layout{document:"templates/Layout.bsx"}` is render middleware: every page's body transcludes into the default `<slot/>` of that document, instantiated around it per request. Declared on a child route instead, it nests inside its ancestors', which is how the blog wears `templates/ArticleLayout.bsx`.
 - `<RoutesDir src="routes"/>` scans its directory at spawn time and creates one route per content file (`.md`/`.bsx`/`.html`), served through the shared media-parse pipeline. `index.*` collapses to its directory, and markdown frontmatter is read at scan time so navigation knows every page's title and order.
 
-`templates/Layout.bsx` composes registered widgets (`<RouteHead>`, `<Header>`, `<RouteSidebar/>`, `<Stylesheet/>`) with plain markup. Site-local templates resolve by module path, eg `templates/widgets/Card.bsx` is `<widgets::Card>`, taking props as tag attributes and routing caller content into its `<slot/>` (see `routes/counter.bsx`).
+`templates/Layout.bsx` composes registered widgets (`<RouteHead>`, `<Header>`, `<RouteSidebar/>`, `<Stylesheet/>`) with plain markup. A page instantiates another document by its path, eg `<Instance document="templates/widgets/Card" props={{title:"Today"}}>`, its children filling that document's `<slot/>` (see `routes/counter.bsx`).
 
 ## Bindings
 
@@ -69,7 +70,7 @@ All interpolation is reactive and source-prefixed with `@` (the canonical gramma
 
 - `@doc:` document state: the beet counter binds `{@doc:count=0}` and the buttons mutate it from a one-line event script, `bx:onclick="target.with_field('count', count => count + 1)"`.
 - `@res:` resource fields: the footer pulls `@res:PackageConfig.description` straight from the resource (the default document head emits `og:site_name` from `PackageConfig.title` automatically, so the layout no longer hand-writes it).
-- `@prop:` template props: `widgets::Card` binds its heading to `{@prop:title}`, filled by the caller's `title="Today"` attribute.
+- `@prop:` document props: `Card.bsx` binds its heading to `{@prop:title}`, filled by the use's `props={{title:"Today"}}`.
 
 HTML responses render with the bindings settled, while live targets (the terminal today) keep syncing them continuously.
 

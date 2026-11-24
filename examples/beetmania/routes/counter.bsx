@@ -1,18 +1,18 @@
-<!-- A BSX page: site templates by module path, document state, and event scripts. -->
+<!-- A BSX page: another document instantiated, document state, and event scripts. -->
 <article bx:scope="counter">
 	<h1>The beet counter</h1>
 	<p>
 		Count the beets you eat today, and check the
 		<a href="/guides/moderation">moderation guide</a> before the number gets
-		silly. This page composes the site's own <code>widgets::Card</code>
-		template and changes a document field from a one-line event script, no
+		silly. This page composes the site's own <code>Card.bsx</code>
+		and changes a document field from a one-line event script, no
 		rust required.
 	</p>
-	<widgets::Card title="Today">
+	<Instance document="templates/widgets/Card" props={{title:"Today"}}>
 		<p>Beets eaten today: {@doc:count=0}</p>
 		<div class="design-row">
 			<button class="btn btn-filled" bx:onclick="target.with_field('count', count => count + 1)">Ate one</button>
 			<button class="btn btn-tonal" bx:onclick="target.with_field('count', count => count - 1)">Put one back</button>
 		</div>
-	</widgets::Card>
+	</Instance>
 </article>

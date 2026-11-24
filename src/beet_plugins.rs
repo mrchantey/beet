@@ -67,13 +67,17 @@ impl PluginGroup for BeetPlugins {
 		// the beet_ui widget library, registered as an inert capability: it registers
 		// the `<Button>`/`<Form>`/`<Header>`/`<Sidebar>`/… widget templates by name and
 		// the default `bx:` event/verb vocabulary (`increment`/`decrement`/…), so a
-		// markup-only site that uses live widgets or reactive verbs resolves them. Added
-		// *before* the router so its inner `BsxPlugin` registers once: the router's
-		// charcell stack reaches `BsxDefaultsPlugin` through `install_type` (idempotent),
-		// which then no-ops rather than double-adding `BsxPlugin`.
+		// markup-only site that uses live widgets or reactive verbs resolves them.
 		#[cfg(feature = "ui")]
 		{
 			builder = builder.add(BsxDefaultsPlugin);
+		}
+
+		// documents instantiated in one another, present wherever a router is
+		// (which installs it too, absent)
+		#[cfg(feature = "scene")]
+		{
+			builder = builder.add(beet_scene::prelude::ScenePlugin);
 		}
 
 		// the route tree / document / server / navigation observers (the former

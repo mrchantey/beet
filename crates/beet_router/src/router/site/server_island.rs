@@ -63,28 +63,15 @@ pub struct ServerIsland {
 	/// segment of its address.
 	pub name: SmolStr,
 	/// The content rendered live, built only when the island resolves.
-	#[reflect(ignore)]
 	pub content: HeldTemplate,
 	/// What the placeholder shows until the island swaps in, and for good with
 	/// scripts off. Empty by default.
-	#[reflect(ignore)]
 	pub fallback: HeldTemplate,
 }
 
 impl HoldChildren for ServerIsland {
-	fn hold_children(&mut self, mut children: HeldChildren) -> Result {
-		self.content = children.take_default();
-		self.fallback = children.take(Self::FALLBACK_SLOT);
-		match children.unclaimed().next() {
-			None => Ok(()),
-			Some(slot) => bevybail!(
-				"server island `{}` has no slot `{slot}`: its children are its \
-				 content and a `slot=\"{}\"` child its fallback",
-				self.name,
-				Self::FALLBACK_SLOT
-			),
-		}
-	}
+	const SLOTS: &'static [(Option<&'static str>, &'static str)] =
+		&[(None, "content"), (Some("fallback"), "fallback")];
 }
 
 impl ServerIsland {
@@ -94,9 +81,6 @@ impl ServerIsland {
 	/// The response header naming the island a response renders, which the
 	/// swap script requires before it swaps.
 	pub const HEADER: &str = "beet-island";
-
-	/// The slot a fallback child routes itself to.
-	const FALLBACK_SLOT: &str = "fallback";
 
 	/// The inline script after each placeholder: read the island's name off
 	/// the wrapper before it, fetch the island's html at its address, and swap
@@ -635,7 +619,7 @@ mod test {
 			rsx! {
 				<ServerIsland name="late" content={|| Snippet::from_bundle(OnSpawn::new(
 					|entity: &mut EntityWorldMut| {
-						TemplatePending::register_fetch(
+						TemplatePending::park_task(
 							entity,
 							PendingKind::Passive,
 							"late content",
@@ -704,7 +688,8 @@ mod test {
 					OnSpawn::new(|entity: &mut EntityWorldMut| {
 						entity
 							.insert_template(
-								BsxTemplate::parse_document(MARKUP).unwrap(),
+								SceneBody::parse_bsx(entity.world(), MARKUP)
+									.unwrap(),
 							)
 							.unwrap();
 					})

@@ -13,7 +13,7 @@
 //! Slot resolution rides the same boundary: a build with no outstanding
 //! [`PendingKind::Structural`] dependency resolves slots synchronously (before
 //! [`SpawnTemplate`]); a build whose content is still arriving (an async
-//! `<Template src>` include) defers resolution until the last structural
+//! [`Instance`]) defers resolution until the last structural
 //! dependency resolves, so slots always match over the *settled* tree. Slots are
 //! therefore guaranteed resolved by [`Ready`], but not by [`SpawnTemplate`] on a
 //! deferred build.
@@ -98,19 +98,6 @@ impl TemplateError {
 	}
 }
 
-/// Inserted on an entry root once its declared template sources (its
-/// `<TemplateDir>` directories) are registered into the
-/// [`BsxTemplateRegistry`](crate::prelude::BsxTemplateRegistry) and the schemas
-/// refreshed.
-///
-/// The build registers the entry's own template dirs *before* parsing the entry
-/// (so entry-level tags like `<Styles/>` resolve), then marks the root. A driver
-/// that must not serve before the entry is ready (the wasm Worker) waits for this
-/// marker; the native run loop settles it naturally before the first request.
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
-pub struct TemplatesLoaded;
-
 /// How a pending dependency relates to the tree it parks on.
 ///
 /// The distinction drives deferred slot resolution: slots must wait for every
@@ -119,8 +106,8 @@ pub struct TemplatesLoaded;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Reflect)]
 #[reflect(Default)]
 pub enum PendingKind {
-	/// Resolution builds content into the tree (an async `<Template src>`
-	/// include, a remote template). Slot resolution waits for these.
+	/// Resolution builds content into the tree (an async
+	/// [`Instance`]). Slot resolution waits for these.
 	Structural,
 	/// Resolution only marks readiness (an asset load, a scene spawn, a routes
 	/// scan). Gates [`Ready`], never slot resolution.
@@ -173,7 +160,7 @@ struct PendingEntry {
 /// The template root currently being built, set by the build walker for the
 /// duration of a [`spawn_template`](crate::prelude::WorldTemplateExt) build.
 ///
-/// A deferred dependency (an asset, an include, a remote schema) reads this to
+/// A deferred dependency (an asset, an [`Instance`]) reads this to
 /// know which entity carries the [`TemplatePending`] set its [`PendingId`] must
 /// park on, so [`Ready`] defers until it resolves. Absent outside a
 /// build, in which case a dependency registers on the entity it builds into.
@@ -292,6 +279,66 @@ impl TemplatePending {
 	) -> PendingGuard {
 		let root = TemplateBuildRoot::resolve(world, entity);
 		Self::park_on(world, root, kind, label)
+	}
+
+	/// Parks content still to arrive at `entity`, so slots are resolved once it
+	/// has: on the current build root, else on `entity`, which becomes a root
+	/// of its own, its slots resolved as its set drains.
+	pub fn park_content(
+		world: &mut World,
+		entity: Entity,
+		label: impl Into<SmolStr>,
+	) -> PendingGuard {
+		let built =
+			world.get_resource::<TemplateBuildRoot>().map(|root| **root);
+		let guard = Self::park_on(
+			world,
+			built.unwrap_or(entity),
+			PendingKind::Structural,
+			label,
+		);
+		if built.is_none()
+			&& let Some(mut pending) = world.get_mut::<TemplatePending>(entity)
+			&& pending.deferred_slots.is_none()
+		{
+			pending.defer_slots(Vec::new());
+		}
+		guard
+	}
+
+	/// Park a [`PendingGuard`] on the build root's pending set and run `func`
+	/// as a task of `entity`, handing it the guard to resolve once the
+	/// dependency lands. Errors gracefully if the async runtime is absent.
+	///
+	/// The task ends with the entity, and a guard dropped by a cancelled or dead
+	/// task resolves through the sweep, so the task can never hang the load.
+	/// What async template content (a document instantiated, a store read) is
+	/// built on.
+	#[cfg(feature = "bevy_async")]
+	pub fn park_task<Func, Fut>(
+		entity: &mut EntityWorldMut,
+		kind: PendingKind,
+		label: impl Into<SmolStr>,
+		func: Func,
+	) -> Result
+	where
+		Func: 'static + Send + FnOnce(AsyncEntity, PendingGuard) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = ()>,
+	{
+		let id = entity.id();
+		let guard = entity.world_scope(|world| -> Result<PendingGuard> {
+			if !world.contains_resource::<AsyncWorld>()
+				|| !world.contains_resource::<AsyncSpawner>()
+			{
+				bevybail!(
+					"async template content (a document instantiated, a store \
+					 read) needs the async runtime: add `AsyncPlugin`"
+				);
+			}
+			TemplatePending::park(world, id, kind, label).xok()
+		})?;
+		entity.run_async(move |entity| func(entity, guard));
+		Ok(())
 	}
 
 	/// Parks a dependency directly on `root`, returning the [`PendingGuard`]

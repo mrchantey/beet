@@ -84,7 +84,7 @@ pub fn option_some_inner(info: &TypeInfo) -> Option<&'static TypeInfo> {
 pub fn unit_variant_value(
 	enum_info: &EnumInfo,
 	name: &str,
-) -> Result<Box<dyn PartialReflect>> {
+) -> Result<DynamicEnum> {
 	let is_unit = |variant: &&VariantInfo| match variant {
 		VariantInfo::Unit(_) => true,
 		VariantInfo::Tuple(tuple) => tuple
@@ -94,7 +94,7 @@ pub fn unit_variant_value(
 	};
 	let unit_variants =
 		|| enum_info.iter().filter(is_unit).map(VariantInfo::name);
-	let unit = |name: &str| -> Box<dyn PartialReflect> {
+	let unit = |name: &str| -> DynamicEnum {
 		let variant = match enum_info.variant(name) {
 			Some(VariantInfo::Tuple(tuple)) => {
 				let mut fields = DynamicTuple::default();
@@ -105,7 +105,7 @@ pub fn unit_variant_value(
 			}
 			_ => DynamicVariant::Unit,
 		};
-		Box::new(DynamicEnum::new(name, variant))
+		DynamicEnum::new(name, variant)
 	};
 	if let Some(variant) = enum_info.variant(name)
 		&& is_unit(&variant)

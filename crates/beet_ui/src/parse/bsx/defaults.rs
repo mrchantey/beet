@@ -20,7 +20,7 @@ pub struct BsxDefaultsPlugin;
 
 impl Plugin for BsxDefaultsPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins((BsxPlugin, widget_plugin));
+		app.install_type::<BsxPlugin>().add_plugins(widget_plugin);
 		#[cfg(feature = "scripting")]
 		{
 			// every `world` call an event script makes is served at the async

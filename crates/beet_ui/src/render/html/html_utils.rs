@@ -216,16 +216,6 @@ pub(crate) fn escape_html_attribute(input: &str) -> String {
 	result
 }
 
-/// Unescape HTML entities inside an attribute value.
-///
-/// This is functionally identical to [`unescape_html_text`] since
-/// both contexts use the same entity encoding, but is provided as a
-/// distinct function for clarity at call sites.
-#[cfg(feature = "markdown_parser")]
-pub(crate) fn unescape_html_attribute(input: &str) -> String {
-	unescape_html_text(input)
-}
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -313,17 +303,15 @@ mod test {
 
 		#[beet_core::test]
 		fn attribute_structural() {
-			unescape_html_attribute(
-				"&quot;hello&quot; &amp; &apos;world&apos;",
-			)
-			.xpect_eq("\"hello\" & 'world'".to_string());
+			unescape_html_text("&quot;hello&quot; &amp; &apos;world&apos;")
+				.xpect_eq("\"hello\" & 'world'".to_string());
 		}
 
 		#[beet_core::test]
 		fn roundtrip_attribute_escape_unescape() {
 			let original = r#"font-family: "Helvetica" & 'Arial'"#;
 			let escaped = escape_html_attribute(original);
-			unescape_html_attribute(&escaped).xpect_eq(original.to_string());
+			unescape_html_text(&escaped).xpect_eq(original.to_string());
 		}
 
 		#[beet_core::test]

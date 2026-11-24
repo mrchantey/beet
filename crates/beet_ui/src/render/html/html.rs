@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 /// Renders an entity tree back to an HTML string via [`NodeVisitor`].
 ///
 /// Supports pretty-printing with configurable indentation,
-/// void elements, and optional expression rendering. A tree read from XML
+/// and void elements. A tree read from XML
 /// writes back through the [`XmlRenderer`] instead.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HtmlRenderer {
@@ -17,8 +17,6 @@ pub struct HtmlRenderer {
 	/// If `Some`, creates newlines after open/close tags
 	/// and indents children with the provided indentation.
 	indent: Option<Indent>,
-	/// Render [`Expression`] values verbatim as `{expr}` in output.
-	render_expressions: bool,
 	/// Elements without a closing tag, whose children
 	/// will be popped out to trailing siblings.
 	void_elements: Vec<SmolStr>,
@@ -73,7 +71,6 @@ impl HtmlRenderer {
 			buffer: String::new(),
 			head_hoist: Vec::new(),
 			indent: None,
-			render_expressions: false,
 			void_elements: element_names(VOID_ELEMENTS),
 			current_depth: 0,
 			escape_html: true,
@@ -93,12 +90,6 @@ impl HtmlRenderer {
 	/// Enable pretty-printing with custom indentation.
 	pub fn with_indent(mut self, indent: Indent) -> Self {
 		self.indent = Some(indent);
-		self
-	}
-
-	/// Enable rendering of [`Expression`] nodes as `{expr}`.
-	pub fn with_expressions(mut self) -> Self {
-		self.render_expressions = true;
 		self
 	}
 
@@ -353,24 +344,6 @@ impl NodeVisitor for HtmlRenderer {
 			self.buffer.push('\n');
 		}
 	}
-
-	fn visit_expression(
-		&mut self,
-		_cx: &VisitContext,
-		expression: &Expression,
-	) {
-		if self.render_expressions {
-			if self.is_pretty() {
-				self.write_indent();
-			}
-			self.buffer.push('{');
-			self.buffer.push_str(&expression.0);
-			self.buffer.push('}');
-			if self.is_pretty() {
-				self.buffer.push('\n');
-			}
-		}
-	}
 }
 
 impl DocRenderer for HtmlRenderer {
@@ -427,12 +400,11 @@ mod test {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
-		BsxParser
-			.parse_into(ParseContext::new(
-				&mut world.entity_mut(entity),
-				&bytes,
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(entity),
+			&bytes,
+		))
+		.unwrap();
 		(world, entity)
 	}
 
@@ -447,12 +419,6 @@ mod test {
 	/// Parse HTML then render it back.
 	fn roundtrip(html: &str) -> String {
 		roundtrip_with(html, HtmlRenderer::new())
-	}
-
-	#[cfg(feature = "bsx")]
-	/// Parse then render with expression support.
-	fn roundtrip_expressions(html: &str) -> String {
-		roundtrip_with(html, HtmlRenderer::new().with_expressions())
 	}
 
 	#[cfg(feature = "bsx")]
@@ -511,13 +477,6 @@ mod test {
 	#[beet_core::test]
 	fn render_text_only() {
 		roundtrip("hello world").xpect_eq("hello world".to_string());
-	}
-
-	#[cfg(feature = "bsx")]
-	#[beet_core::test]
-	fn render_expression() {
-		roundtrip_expressions("<p>{name}</p>")
-			.xpect_eq("<p>{name}</p>".to_string());
 	}
 
 	#[cfg(feature = "bsx")]

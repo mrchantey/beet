@@ -64,7 +64,6 @@ impl TuiHost {
 		.insert_resource(pkg_config!());
 
 		let entry = store.get_media(&RelPath::from(entry)).await.unwrap();
-		let source = entry.as_utf8().unwrap();
 		// the entry is built to be *driven*, not to boot: its `<CallOnReady>`
 		// would start the real stdio `TuiServer` inside the test process, giving
 		// the one `FixedPage` tree a second surface. That is not merely noisy —
@@ -73,8 +72,15 @@ impl TuiHost {
 		// *first* portal holder, so scoped input (typing) would be routed to the
 		// stdio terminal rather than to this suite's channel one.
 		let root = app.world_mut().spawn(DisableCallOnReady).id();
-		let template =
-			BsxTemplate::parse_entry(app.world_mut(), source).unwrap();
+		// a sibling declaration is consumed, as the binary's entry build does
+		let template = EntryPrescan::parse(
+			&entry,
+			app.world().resource::<PrescanRegistry>(),
+		)
+		.unwrap()
+		.body(&DocParsers::of(app.world()))
+		.unwrap()
+		.unwrap();
 		app.world_mut()
 			.entity_mut(root)
 			.insert(store.clone())

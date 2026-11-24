@@ -52,6 +52,7 @@ use bevy::ecs::system::SystemParam;
 pub async fn RunGroup<Input = (), Output = ()>(
 	/// The group to run, this entity when absent.
 	#[field]
+	#[entities]
 	group: Option<Entity>,
 	/// Run the flattened member list backwards.
 	#[field]

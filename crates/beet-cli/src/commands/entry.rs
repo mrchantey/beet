@@ -2,8 +2,7 @@
 //! [`ExportStatic`] and [`ExportPdf`] commands.
 //!
 //! An entry is a directory containing an entry document ([`entry_build::ENTRY_NAMES`], eg
-//! `main.bsx`) or the entry file itself, loaded as the app root with its declared
-//! `<TemplateDir>`s registered. The entry declares its own servers and app routes;
+//! `main.bsx`) or the entry file itself, loaded as the app root. The entry declares its own servers and app routes;
 //! these helpers only resolve and load it.
 
 use beet::prelude::*;
@@ -46,12 +45,9 @@ impl EntryParams {
 		caller: &AsyncEntity,
 		entry_path: &str,
 	) -> Result<Entity> {
-		let (formats, prescans) = caller
+		let prescans = caller
 			.with_world(|world, _| {
-				(
-					world.get_resource_or_init::<TemplateFormats>().clone(),
-					world.get_resource_or_init::<PrescanRegistry>().clone(),
-				)
+				world.get_resource_or_init::<PrescanRegistry>().clone()
 			})
 			.await?;
 		let ResolvedEntry {
@@ -66,13 +62,8 @@ impl EntryParams {
 			entry_path,
 		)
 		.await?;
-		let sources = entry_build::read_sources(
-			&repo_store,
-			formats,
-			entry_name,
-			prescan,
-		)
-		.await?;
+		let sources =
+			entry_build::read_sources(&repo_store, entry_name, prescan).await?;
 		let root = caller
 			.with_world(move |world, _| {
 				entry_build::build_root(
@@ -98,8 +89,8 @@ impl EntryParams {
 /// How long a one-shot command (`check`, `export-static`, `export-pdf`) waits on
 /// the entry's dependencies before failing.
 ///
-/// Generous, since it covers a whole `<RoutesDir>` scan or `<TemplateDir>` read
-/// over a large site on a cold cache; it exists to turn a genuinely stuck
+/// Generous, since it covers a whole `<RoutesDir>` scan over a large site on a
+/// cold cache; it exists to turn a genuinely stuck
 /// dependency into a named error rather than a hung command, not to police build
 /// speed.
 const ONE_SHOT_SETTLE_DEADLINE: Duration = Duration::from_secs(60);
@@ -177,9 +168,8 @@ pub(crate) fn clean_site() -> TempDir {
 	for (path, content) in [
 		(
 			"main.bsx",
-			r#"<Router {Layout{template:"Layout"}}>
+			r#"<Router {Layout{document:"templates/Layout.bsx"}}>
 	<PackageConfig title="Clean Site"/>
-	<TemplateDir src="templates"/>
 	<RoutesDir src="routes"/>
 </Router>"#,
 		),
@@ -282,15 +272,10 @@ mod test {
 		)
 		.await
 		.unwrap();
-		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let sources = entry_build::read_sources(
-			&repo_store,
-			formats,
-			entry_name,
-			prescan,
-		)
-		.await
-		.unwrap();
+		let sources =
+			entry_build::read_sources(&repo_store, entry_name, prescan)
+				.await
+				.unwrap();
 		let root = entry_build::build_root(
 			world,
 			repo_store,

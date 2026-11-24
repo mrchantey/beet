@@ -99,7 +99,7 @@ impl StandardSiteComments {
 	/// content.
 	fn fetch(route: Entity, announcement: StrongRef) -> Result<OnSpawn> {
 		OnSpawn::new(move |entity| {
-			TemplatePending::register_fetch(
+			TemplatePending::park_task(
 				entity,
 				PendingKind::Structural,
 				"<StandardSiteComments/>",
@@ -317,10 +317,9 @@ mod test {
 		index.documents[0].bsky_post = Some(announcement());
 		write_index(&store, &index).await;
 		let mut world = syndication_world(Some("https://beet.org"));
-		world
-			.get_resource_or_init::<BsxTemplateRegistry>()
-			.insert_source(
-				"CommentsLayout",
+		store
+			.insert(
+				&RelPath::new("CommentsLayout.bsx"),
 				r#"<html><body><main><slot/></main>
 				<ServerIsland name="comments">
 					<StandardSiteComments/>
@@ -328,10 +327,11 @@ mod test {
 				</ServerIsland>
 				</body></html>"#,
 			)
+			.await
 			.unwrap();
 		let root = spawn_syndication_router_with(
 			&mut world,
-			(store, Layout::new("CommentsLayout"), app_view),
+			(store, Layout::document("CommentsLayout.bsx"), app_view),
 			rsx! {
 				<StandardSitePub path="blog" name="The Full Moon Harvest"/>
 				<ServerIslands/>

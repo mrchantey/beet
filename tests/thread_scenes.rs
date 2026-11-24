@@ -34,18 +34,14 @@ struct ChoiceInput {
 
 /// Parse + spawn + reduce a scene, returning the reduced app.
 ///
-/// Settles async tasks before spawning so `ThreadUiPlugin`'s store-backed
-/// `CreatePostForm` registration (seeded into an in-memory `BlobStore`, loaded by
-/// a `TemplateDir` off the runtime) lands before the interactive chat scenes'
-/// composer resolves it.
 async fn reduce(source: &str) -> App {
 	ensure_auth_env();
 	let mut app = App::new();
 	app.add_plugins(MinimalPlugins)
 		.install_type::<(
 			ThreadPlugin,
-			// registers `{UserInput}` + the store-backed `CreatePostForm` template so
-			// the interactive chat scenes resolve
+			// registers `{UserInput}` and the `CreatePostForm` template so the
+			// interactive chat scenes resolve
 			ThreadUiPlugin,
 			// resolves each scene's `<RequireCfg cfg=".."/>` tag
 			CrateCheckPlugin,
@@ -53,10 +49,7 @@ async fn reduce(source: &str) -> App {
 		.register_type::<AgentChoiceAction>();
 	app.world_mut().spawn(cli_registration());
 	AsyncRunner::settle_async_tasks(app.world_mut()).await;
-	BsxTemplate::parse_entry(app.world(), source)
-		.unwrap()
-		.spawn(app.world_mut())
-		.unwrap();
+	SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
 	ThreadRecords::reduce_now(app.world_mut());
 	app.world_mut().flush();
 	app

@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 
 /// Declares where an entry's repo store begins: `src` names a position relative
 /// to the entry document's own location *in its store*, so its
-/// `<RoutesDir>`/`<TemplateDir>`/`<AssetsDir>` mounts can reach paths outside
+/// `<RoutesDir>`/`<AssetsDir>` mounts can reach paths outside
 /// the entry's own directory.
 ///
 /// The declaration half of the repo store, and the only half an entry document

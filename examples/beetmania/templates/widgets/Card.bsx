@@ -1,6 +1,7 @@
-<!-- A site-local template: resolves as <widgets::Card> from any page.
-     The `title` prop binds into the heading via `@prop:`, caller content
-     routes into the default slot. -->
+<!-- A card any page instantiates, ie
+     <Instance document="templates/widgets/Card" props={{title:"Today"}}/>. The
+     `title` prop binds into the heading via `@prop:`, the use's own children
+     fill the default slot. -->
 <section class="card-filled">
 	<h2>{@prop:title}</h2>
 	<slot/>

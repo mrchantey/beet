@@ -5,12 +5,11 @@
 //! decides when its content builds (a server island resolving per request, a
 //! fallback shown only in one render) holds it as a [`HeldTemplate`]
 //! instead. In markup it implements [`HoldChildren`] and registers
-//! `#[reflect(HoldChildren)]`, and the BSX build hands it its children, grouped
-//! by the slot each names, rather than building them; in `rsx!` the content is
-//! a field, `content={|| rsx!{ .. }}`.
+//! `#[reflect(HoldChildren)]`, and its children lower to a scene body in the
+//! field their slot names, so a scene holding it is data; in `rsx!` the
+//! content is a closure, `content={|| rsx!{ .. }}`.
 use crate::prelude::*;
 use alloc::sync::Arc;
-use bevy::ecs::component::Mutable;
 use bevy::ecs::template::Template;
 use bevy::reflect::CreateTypeData;
 
@@ -20,6 +19,10 @@ type BuildFn = Arc<dyn Fn(&mut EntityWorldMut) -> Result + Send + Sync>;
 /// A template held unbuilt, built into an entity on demand as many times as its
 /// holder likes. The default holds nothing and builds nothing.
 ///
+/// Held as a scene body it serializes as one, and a document's reference in it
+/// resolves from the document it was written in. Held as code it is derived
+/// ui, which no scene can hold, and writes nothing.
+///
 /// ```
 /// # use beet_core::prelude::*;
 /// let content = HeldTemplate::new(|| Snippet::from_bundle(Element::new("p")));
@@ -28,8 +31,23 @@ type BuildFn = Arc<dyn Fn(&mut EntityWorldMut) -> Result + Send + Sync>;
 /// content.build(&mut world.entity_mut(entity)).unwrap();
 /// world.entity(entity).contains::<Element>().xpect_true();
 /// ```
+#[derive(Clone, Default, Reflect)]
+#[reflect(opaque, Default)]
+#[cfg_attr(feature = "template_serde", reflect(Serialize, Deserialize))]
+pub struct HeldTemplate(HeldKind);
+
+/// What is held.
 #[derive(Clone, Default)]
-pub struct HeldTemplate(Option<BuildFn>);
+enum HeldKind {
+	/// Nothing.
+	#[default]
+	Empty,
+	/// Code, from Rust.
+	Build(BuildFn),
+	/// A scene body, from a document, and the package path it was read from.
+	#[cfg(feature = "template_serde")]
+	Body(Arc<SceneBody>, Option<RelPath>),
+}
 
 impl HeldTemplate {
 	/// Build what `func` returns each time this builds, ie
@@ -37,30 +55,63 @@ impl HeldTemplate {
 	pub fn new<T: Template<Output = ()>>(
 		func: impl 'static + Send + Sync + Fn() -> T,
 	) -> Self {
-		Self(Some(Arc::new(move |entity: &mut EntityWorldMut| {
-			entity.insert_template(func()).map(|_| ())
-		})))
+		Self(HeldKind::Build(Arc::new(
+			move |entity: &mut EntityWorldMut| {
+				entity.insert_template(func()).map(|_| ())
+			},
+		)))
 	}
 
-	/// Build a clone of `template` each time this builds, ie a parsed BSX
-	/// subtree.
-	pub fn from_template<T>(template: T) -> Self
-	where
-		T: 'static + Send + Sync + Clone + Template<Output = ()>,
-	{
-		Self::new(move || template.clone())
+	/// Build `body` each time this builds.
+	#[cfg(feature = "template_serde")]
+	pub fn from_body(body: SceneBody) -> Self {
+		Self(match body.entities.is_empty() {
+			true => HeldKind::Empty,
+			false => HeldKind::Body(Arc::new(body), None),
+		})
+	}
+
+	/// Resolve the references of a held body from the document at `document`.
+	#[cfg(feature = "template_serde")]
+	pub(crate) fn set_document(&mut self, document: &RelPath) {
+		if let HeldKind::Body(_, path) = &mut self.0 {
+			*path = Some(document.clone());
+		}
+	}
+
+	/// The documents a held body instantiates, package absolute once its own
+	/// document is known.
+	#[cfg(feature = "template_serde")]
+	pub(crate) fn instances(&self) -> Vec<RelPath> {
+		let HeldKind::Body(body, path) = &self.0 else {
+			return Vec::new();
+		};
+		body.instances()
+			.map(|document| match path {
+				Some(path) => document.resolve(path),
+				None => document.rel_path(),
+			})
+			.collect()
 	}
 
 	/// Whether this holds nothing, so building it builds nothing.
-	pub fn is_empty(&self) -> bool { self.0.is_none() }
+	pub fn is_empty(&self) -> bool { matches!(self.0, HeldKind::Empty) }
 
 	/// Build the held template into `entity`, which becomes its template root,
 	/// so a deferred dependency it parks lands on `entity`'s
 	/// [`TemplatePending`]. Holding nothing builds nothing.
 	pub fn build(&self, entity: &mut EntityWorldMut) -> Result {
 		match &self.0 {
-			Some(func) => func(entity),
-			None => Ok(()),
+			HeldKind::Empty => Ok(()),
+			HeldKind::Build(func) => func(entity),
+			#[cfg(feature = "template_serde")]
+			HeldKind::Body(body, path) => {
+				let template = match path {
+					Some(path) => body.reflect_at(entity.world(), path),
+					None => body.reflect(entity.world()),
+				}?;
+				entity.insert_template(template).map(|_| ())
+			}
 		}
 	}
 }
@@ -68,9 +119,32 @@ impl HeldTemplate {
 impl core::fmt::Debug for HeldTemplate {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self.0 {
-			Some(_) => f.write_str("HeldTemplate(..)"),
-			None => f.write_str("HeldTemplate(empty)"),
+			HeldKind::Empty => f.write_str("HeldTemplate(empty)"),
+			_ => f.write_str("HeldTemplate(..)"),
 		}
+	}
+}
+
+/// A held body as the body it is; code is not data, so writes an empty one.
+#[cfg(feature = "template_serde")]
+impl Serialize for HeldTemplate {
+	fn serialize<S: serde::Serializer>(
+		&self,
+		serializer: S,
+	) -> core::result::Result<S::Ok, S::Error> {
+		match &self.0 {
+			HeldKind::Body(body, _) => body.serialize(serializer),
+			_ => SceneBody::default().serialize(serializer),
+		}
+	}
+}
+
+#[cfg(feature = "template_serde")]
+impl<'de> Deserialize<'de> for HeldTemplate {
+	fn deserialize<D: serde::Deserializer<'de>>(
+		deserializer: D,
+	) -> core::result::Result<Self, D::Error> {
+		SceneBody::deserialize(deserializer).map(Self::from_body)
 	}
 }
 
@@ -84,85 +158,47 @@ where
 	fn into_prop(self) -> HeldTemplate { HeldTemplate::new(self) }
 }
 
-/// Children a tag holds unbuilt, grouped by the slot each names: the unrouted
-/// ones in the default group, a `slot="fallback"` child in the `fallback`
-/// group.
-#[derive(Debug, Clone, Default)]
-pub struct HeldChildren {
-	default: HeldTemplate,
-	named: HashMap<SmolStr, HeldTemplate>,
-}
-
-impl HeldChildren {
-	/// Children held as `default`, the unrouted group, and `named`, one group
-	/// per slot name.
-	pub fn new(
-		default: HeldTemplate,
-		named: HashMap<SmolStr, HeldTemplate>,
-	) -> Self {
-		Self { default, named }
-	}
-
-	/// Take the unrouted children.
-	pub fn take_default(&mut self) -> HeldTemplate {
-		core::mem::take(&mut self.default)
-	}
-
-	/// Take the children routed to slot `name`, empty when none were.
-	pub fn take(&mut self, name: &str) -> HeldTemplate {
-		self.named.remove(name).unwrap_or_default()
-	}
-
-	/// The slot names no [`take`](Self::take) claimed, ie a typo'd
-	/// `slot="fallbak"` a holder refuses.
-	pub fn unclaimed(&self) -> impl Iterator<Item = &SmolStr> {
-		self.named.keys()
-	}
-}
-
 /// A component holding its authored children unbuilt rather than building
-/// them where it sits. Register `#[reflect(HoldChildren)]` and the BSX build
-/// hands it its children as [`HeldChildren`] after inserting it.
+/// them where it sits. Register `#[reflect(HoldChildren)]` and each child
+/// lowers into the [`HeldTemplate`] field its `slot` names.
 pub trait HoldChildren {
-	/// Take the authored `children`, refusing any group it has no use for.
-	fn hold_children(&mut self, children: HeldChildren) -> Result;
+	/// The slots it takes, each with the field holding its children: the
+	/// default slot `None`, ie `[(None, "content"), (Some("fallback"), "fallback")]`.
+	const SLOTS: &'static [(Option<&'static str>, &'static str)];
 }
 
-/// Reflect type data for a [`HoldChildren`] component, so the BSX build hands
+/// Reflect type data for a [`HoldChildren`] component, so a lowering hands
 /// children to a tag known only by name.
 #[derive(Clone)]
 pub struct ReflectHoldChildren {
-	hold: fn(&mut EntityWorldMut, HeldChildren) -> Result,
+	slots: &'static [(Option<&'static str>, &'static str)],
 }
 
 impl ReflectHoldChildren {
-	/// Hand `children` to the component on `entity`.
-	pub fn hold(
-		&self,
-		entity: &mut EntityWorldMut,
-		children: HeldChildren,
-	) -> Result {
-		(self.hold)(entity, children)
+	/// The field holding the children routed to `slot`, `None` being those
+	/// routed nowhere.
+	pub fn field(&self, slot: Option<&str>) -> Option<&'static str> {
+		self.slots
+			.iter()
+			.find(|(name, _)| *name == slot)
+			.map(|(_, field)| *field)
+	}
+
+	/// The slots it takes, for the error naming a slot it does not.
+	pub fn describe(&self) -> String {
+		self.slots
+			.iter()
+			.map(|(slot, field)| match slot {
+				Some(slot) => {
+					format!("a `slot=\"{slot}\"` child is its {field}")
+				}
+				None => format!("its children are its {field}"),
+			})
+			.collect::<Vec<_>>()
+			.join(", ")
 	}
 }
 
-impl<T> CreateTypeData<T> for ReflectHoldChildren
-where
-	T: Component<Mutability = Mutable> + HoldChildren,
-{
-	fn create_type_data(_input: ()) -> Self {
-		Self {
-			hold: |entity, children| {
-				entity
-					.get_mut::<T>()
-					.ok_or_else(|| {
-						bevyhow!(
-							"`{}` holds children but is not on the entity",
-							core::any::type_name::<T>()
-						)
-					})?
-					.hold_children(children)
-			},
-		}
-	}
+impl<T: HoldChildren> CreateTypeData<T> for ReflectHoldChildren {
+	fn create_type_data(_input: ()) -> Self { Self { slots: T::SLOTS } }
 }

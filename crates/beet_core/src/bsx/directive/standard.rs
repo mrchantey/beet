@@ -12,6 +12,8 @@
 //! <script bx:run>                      <script {RunScript}>
 //! <script bx:event="click">            <script {OnEvent{event:"click"}}>
 //! bx:onclick="src"                     a child <script bx:event="click">src</script>
+//! bx:cfg="feature:infra"               {Cfg{cfg:"feature:infra"}}
+//! bx:ref="name"                        the entity's key
 //! ```
 use crate::prelude::*;
 
@@ -97,6 +99,55 @@ impl BsxDirective for ForDirective {
 }
 
 impl Installer for ForDirective {
+	fn install(self, app: &mut App) { BsxDirectives::register_on(app, self); }
+}
+
+/// `bx:ref="name"` is the entity's key: the name `$name` references it by, and
+/// the anchor that survives the markup moving.
+#[derive(Debug, Default, Clone)]
+pub struct RefDirective;
+
+impl BsxDirective for RefDirective {
+	fn pattern(&self) -> SmolStr { "bx:ref".into() }
+
+	fn matches(&self, key: &str) -> bool { key == "bx:ref" }
+
+	fn rewrite(&self, key: &str, element: &mut BsxElement) -> Result {
+		element.key = Some(element.take_str_attribute(key)?.into());
+		Ok(())
+	}
+}
+
+impl Installer for RefDirective {
+	fn install(self, app: &mut App) { BsxDirectives::register_on(app, self); }
+}
+
+/// `bx:cfg="feature:infra"` is `{Cfg{cfg:"feature:infra"}}`: the element and
+/// its subtree stay in the body, and a binary that does not meet the condition
+/// leaves a tombstone in their place when the body spawns, see [`Cfg`].
+#[derive(Debug, Default, Clone)]
+pub struct CfgDirective;
+
+impl BsxDirective for CfgDirective {
+	fn pattern(&self) -> SmolStr { Cfg::DIRECTIVE.into() }
+
+	fn matches(&self, key: &str) -> bool { key == Cfg::DIRECTIVE }
+
+	fn rewrite(&self, key: &str, element: &mut BsxElement) -> Result {
+		let condition = element.take_str_attribute(key)?;
+		// answered when the body spawns, but a malformed one is the
+		// document's own error
+		BuildCondition::parse(&condition)
+			.map_err(|err| bevyhow!("in `<{} {key}>`: {err}", element.tag))?;
+		element.push_spread(SpreadItem::component("Cfg", [
+			("cfg", DataLiteral::Scalar(Value::new(condition))),
+			("tag", DataLiteral::Scalar(Value::new(element.tag.clone()))),
+		]));
+		Ok(())
+	}
+}
+
+impl Installer for CfgDirective {
 	fn install(self, app: &mut App) { BsxDirectives::register_on(app, self); }
 }
 
@@ -340,11 +391,18 @@ mod test {
 			.xpect_contains("there is none");
 	}
 
-	/// The build walk's own keys pass through untouched.
 	#[crate::test]
-	fn walk_keys_pass_through() {
-		rewritten(r#"<div bx:ref="a" bx:cfg="feature:x"/>"#)
-			.xpect_eq(parsed(r#"<div bx:ref="a" bx:cfg="feature:x"/>"#));
+	fn cfg_is_a_component_and_ref_a_key() {
+		let mut explicit =
+			parsed(r#"<div {Cfg{cfg:"feature:x", tag:"div"}}/>"#);
+		if let BsxNode::Element(element) = &mut explicit[0] {
+			element.key = Some("a".into());
+		}
+		rewritten(r#"<div bx:ref="a" bx:cfg="feature:x"/>"#).xpect_eq(explicit);
+		// a malformed condition is the document's own error
+		BsxDirectives::default()
+			.rewrite(&mut parsed(r#"<div bx:cfg="nope"/>"#))
+			.unwrap_err();
 	}
 
 	/// A directive installed last shadows a standard one for the keys it

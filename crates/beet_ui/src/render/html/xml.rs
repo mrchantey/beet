@@ -195,12 +195,12 @@ mod test {
 
 	fn parse(xml: &str) -> (World, Entity) {
 		let mut world = ParsePlugin.into_world();
-		let entity = parse_into(&mut world, xml);
+		let entity = spawn_xml(&mut world, xml);
 		(world, entity)
 	}
 
 	/// `xml` parsed into a fresh entity of `world`.
-	fn parse_into(world: &mut World, xml: &str) -> Entity {
+	fn spawn_xml(world: &mut World, xml: &str) -> Entity {
 		let entity = world.spawn_empty().id();
 		DocParsers::parse(ParseContext::new(
 			&mut world.entity_mut(entity),
@@ -244,7 +244,7 @@ mod test {
 	#[beet_core::test]
 	fn writes_through_a_portal() {
 		let (mut world, entity) = parse("<a/>");
-		let content = parse_into(&mut world, "<b>c</b>");
+		let content = spawn_xml(&mut world, "<b>c</b>");
 		let root = world.entity(entity).get::<Children>().unwrap()[0];
 		world.spawn((Portal::new(content), ChildOf(root)));
 		write(&mut world, entity).xpect_eq("<a><b>c</b></a>");

@@ -369,12 +369,10 @@ mod test {
 	fn authors_aliases_in_markup() {
 		let mut world = InfraPlugin.into_world();
 		world.init_resource::<PackageConfig>();
-		let entity = BsxTemplate::parse_entry(
-			&world,
+		let entity = SceneBody::spawn_bsx(
+			&mut world,
 			r#"<CloudflareApexRedirect aliases=["www"]/>"#,
 		)
-		.unwrap()
-		.spawn(&mut world)
 		.unwrap();
 		world
 			.entity(entity)

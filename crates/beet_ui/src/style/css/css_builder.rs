@@ -10,9 +10,11 @@ impl Plugin for CssPlugin {
 		app.world_mut()
 			.get_resource_or_init::<CssTokenMap>()
 			.extend(common_props::token_map());
+		#[cfg(feature = "bsx")]
+		app.install_type::<BsxPlugin>();
 		// the `<Rule>` markup tag declares a named rule into the `RuleSet` at
 		// build time, the no-code analogue of a typed `Rule` in Rust.
-		register_rule_tag(app.world_mut());
+		app.register_type::<DeclaredRule>();
 		// `bx:style` rewrites to an `InlineStyle`, a one-off rule and its
 		// inline class, the no-code analogue of the `inline_class!` macro.
 		app.register_type::<InlineStyle>();

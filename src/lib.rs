@@ -40,6 +40,8 @@ pub use beet_net as net;
 	feature = "router_embedded"
 ))]
 pub use beet_router as router;
+#[cfg(feature = "scene")]
+pub use beet_scene as scene;
 #[cfg(feature = "thread")]
 pub use beet_thread as thread;
 #[cfg(feature = "ui")]
@@ -93,6 +95,8 @@ pub mod prelude {
 	pub use beet_core::value;
 	// #[cfg(feature = "build")]
 	// pub use crate::build::prelude::*;
+	#[cfg(feature = "scene")]
+	pub use crate::scene::prelude::*;
 	#[cfg(feature = "thread")]
 	pub use crate::thread::prelude::*;
 	// #[cfg(feature = "design")]

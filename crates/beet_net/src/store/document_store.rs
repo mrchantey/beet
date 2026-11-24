@@ -2,8 +2,8 @@
 //! resolution.
 //!
 //! A state document may name its schema by pointing at another document
-//! ([`SchemaRef::Document`]), resolved by default in the naming document's own
-//! store, the `AncestorQuery<&BlobStore>` idiom. The index that answers such a
+//! ([`SchemaRef::Document`]), resolved in the naming document's own package
+//! ([`PackageQuery`]). The index that answers such a
 //! reference is [`SchemaRegistry`]'s by-location one, which sits beside the
 //! by-name namespace rather than inside it; a store sits above the schema layer
 //! in the crate graph, so the reader that fills that index lives here.
@@ -42,14 +42,14 @@ pub(crate) fn document_media_type(path: &RelPath) -> MediaType {
 	path.media_type().unwrap_or(MediaType::Json)
 }
 
-/// The nearest ancestor [`BlobStore`] of `entity`, or `None` while none has
-/// arrived: a store legitimately lands frames after the tree that reads it.
-pub(crate) async fn ancestor_store(
+/// The package of `entity`, or `None` while no store has arrived above it: one
+/// legitimately lands frames after the tree that reads it.
+async fn ancestor_package(
 	entity: &AsyncEntity,
-) -> Result<Option<BlobStore>> {
+) -> Result<Option<PackageStore>> {
 	entity
-		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {
-			query.get(entity).cloned().ok()
+		.with_state::<PackageQuery, _>(|entity, packages| {
+			packages.get(entity).ok()
 		})
 		.await
 }
@@ -64,7 +64,7 @@ pub(crate) fn located_schemas_may_be_readable(
 }
 
 /// Read the schema document each [`SchemaRef::Document`] names out of the
-/// naming document's own store, into [`SchemaRegistry`]'s by-location index.
+/// naming document's own package, into [`SchemaRegistry`]'s by-location index.
 ///
 /// Lazy by decision, as `DocRef` resolution is: a document legitimately arrives
 /// before the store that answers it, so finding no ancestor store is not an
@@ -80,12 +80,13 @@ pub(crate) fn read_located_schemas(
 		let ValueSchema::Ref(SchemaRef::Document(path)) = &schema.0 else {
 			continue;
 		};
-		if registry.located(path).is_some() || !Loading::may_read(loading) {
+		let path = path.rel_path();
+		if registry.located(&path).is_some() || !Loading::may_read(loading) {
 			continue;
 		}
 		// the resolver cannot hold a `Res` across an await, so the task carries
 		// its own snapshot, which is what validates the arriving document.
-		let (path, snapshot) = (path.clone(), registry.clone());
+		let snapshot = registry.clone();
 		commands.entity(entity).insert(Loading::InFlight);
 		async_commands
 			.entity(entity)
@@ -101,20 +102,21 @@ pub(crate) fn read_located_schemas(
 	}
 }
 
-/// The read itself: the nearest ancestor store, the schema document it holds,
+/// The read itself: the naming document's package, the schema document it holds,
 /// and its registration by location.
 async fn read_located_schema(
 	entity: &AsyncEntity,
 	snapshot: SchemaRegistry,
 	path: RelPath,
 ) -> Result<Read> {
-	let Some(store) = ancestor_store(entity).await? else {
+	let Some(package) = ancestor_package(entity).await? else {
 		return Ok(Read::NoStore);
 	};
-	let schema = store
+	let schema = package
 		.get_document(SchemaResolver::default().with_schemas(&snapshot), &path)
 		.await?
-		.to_schema()?;
+		.to_schema()?
+		.resolve_documents(&path);
 	entity
 		.world()
 		.with(move |world: &mut World| {

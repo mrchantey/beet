@@ -31,7 +31,7 @@ use beet_net::prelude::*;
 /// - **On [`Ready`]** each child resolves its `<prefix>/<verb>` targets through
 ///   the ancestor [`RouteTree`] ([`RouteMatrixStep`]). This cannot happen at
 ///   insert time: sibling routes are still registering then, and a target
-///   arriving through a `<Template src>` include has not built yet. `Ready` is
+///   arriving through an instantiated document has not built yet. `Ready` is
 ///   precisely the point at which every level of include has settled, so it is
 ///   both correct and the earliest correct moment. The verb then takes every
 ///   param its targets take, so a strict cli passes `all/destroy --force` on to
@@ -546,15 +546,14 @@ mod test {
 			.xpect_contains("typo/deploy");
 	}
 
-	/// Targets that arrive through a `<Template src>` include resolve fine: the
-	/// include is a structural pending dependency, so `Ready` is deferred until
-	/// it has built. The regression this pins is a slide back to insert-time
+	/// Targets that arrive through an instantiated document resolve fine: the
+	/// use is a structural pending dependency, so `Ready` is deferred until it
+	/// has built. The regression this pins is a slide back to insert-time
 	/// resolution, which would see no `site` route at all.
 	#[cfg(feature = "template_serde")]
 	#[beet_core::test]
-	async fn targets_from_an_include_resolve() {
+	async fn targets_from_an_instance_resolve() {
 		let mut world = router_world();
-		register_template_include(&mut world);
 
 		let store = BlobStore::temp();
 		store
@@ -565,17 +564,16 @@ mod test {
 			.await
 			.unwrap();
 
-		let root = BsxTemplate::parse_entry(
+		let body = SceneBody::parse_bsx(
 			&world,
-			r#"<Router><Template src="site.bsx"/><Route path="all" {RouteMatrix{prefixes:["site"], routes:["deploy"]}}/></Router>"#,
+			r#"<Router><Instance document="site.bsx"/><Route path="all" {RouteMatrix{prefixes:["site"], routes:["deploy"]}}/></Router>"#,
 		)
-		.unwrap()
-		.spawn(&mut world)
 		.unwrap();
+		let root = world.spawn_template(body).unwrap().id();
 		world.entity_mut(root).insert(store);
 		AsyncRunner::settle_async_tasks(&mut world).await;
 
-		// the include built, so the matrix resolved through it rather than
+		// the document built, so the matrix resolved through it rather than
 		// failing the load
 		world.entity(root).get::<TemplateError>().xpect_none();
 		world

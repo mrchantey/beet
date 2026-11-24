@@ -143,16 +143,9 @@ mod test {
 	/// and return the built element entity plus the live [`RuleSet`].
 	fn inline_style_world(markup: &str) -> (World, Entity) {
 		let mut world = MaterialStylePlugin::world();
-		let container = world
-			.spawn_template(BsxTemplate::container(
-				BsxNode::parse_document(markup, &BsxParseConfig::bsx())
-					.unwrap(),
-				BsxTemplateRegistry::default(),
-			))
-			.unwrap()
-			.id();
+		let body = SceneBody::parse_bsx(&world, markup).unwrap();
+		let element = world.spawn_template(body).unwrap().id();
 		world.flush();
-		let element = world.entity(container).get::<Children>().unwrap()[0];
 		(world, element)
 	}
 
@@ -200,14 +193,17 @@ mod test {
 	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
 	fn markdown_bx_style_lowers_to_inline_class() {
-		let mut world = MaterialStylePlugin::world();
+		let mut world =
+			(ParsePlugin, MaterialStylePlugin::default()).into_world();
 		let root = world.spawn_empty().id();
 		let bytes = MediaBytes::new_markdown(
 			"<div bx:style=\"display=Flex max-width=Rem(40.0)\">inner</div>",
 		);
-		MarkdownParser::new()
-			.parse_into(ParseContext::new(&mut world.entity_mut(root), &bytes))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(root),
+			&bytes,
+		))
+		.unwrap();
 		world.flush();
 		// the embedded div gained a source-derived inline class.
 		let div = world.entity(root).get::<Children>().unwrap()[0];
@@ -235,16 +231,19 @@ mod test {
 	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
 	fn markdown_distinct_bx_styles_get_distinct_classes() {
-		let mut world = MaterialStylePlugin::world();
+		let mut world =
+			(ParsePlugin, MaterialStylePlugin::default()).into_world();
 		let root = world.spawn_empty().id();
 		// two HTML blocks, each a `bx:style` div with a different declaration.
 		let bytes = MediaBytes::new_markdown(
 			"<div bx:style=\"max-width=Rem(10.0)\">a</div>\n\n\
 			 <div bx:style=\"max-width=Rem(20.0)\">b</div>",
 		);
-		MarkdownParser::new()
-			.parse_into(ParseContext::new(&mut world.entity_mut(root), &bytes))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(root),
+			&bytes,
+		))
+		.unwrap();
 		world.flush();
 		// each div carries its own distinct inline class.
 		let kids = world.entity(root).get::<Children>().unwrap();

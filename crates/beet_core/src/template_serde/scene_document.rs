@@ -92,7 +92,7 @@ impl SceneDocument {
 		let (spawned, entity_map) = TemplateLoader::build(
 			world,
 			Placement::Under(host),
-			EntryTemplate::Serde(body.reflect(world)?),
+			body.reflect(world)?,
 		)?;
 		Self::land(world, host, value, entity_map);
 		Ok(spawned)

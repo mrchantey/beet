@@ -60,13 +60,12 @@ mod test {
 		world.insert_resource(bevy::ecs::error::FallbackErrorHandler(
 			bevy::ecs::error::warn,
 		));
-		let router = BsxTemplate::parse_entry(
+		let body = SceneBody::parse_bsx(
 			&world,
 			"<Router><StoreToolset/><StoreToolset/></Router>",
 		)
-		.unwrap()
-		.spawn(&mut world)
 		.unwrap();
+		let router = world.spawn_template(body).unwrap().id();
 		world.flush();
 		let err = world
 			.run_system_cached_with::<_, Result, _, _>(

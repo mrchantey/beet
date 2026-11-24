@@ -731,15 +731,12 @@ mod test {
 			]))
 			.flush();
 		// built from markup so the spread takes the real warn-and-skip path.
-		world
-			.spawn(ChildOf(root))
-			.insert_template(
-				BsxTemplate::parse_document(
-					r#"<Route path="deploy" {NotRegistered}/>"#,
-				)
-				.unwrap(),
-			)
-			.unwrap();
+		let body = SceneBody::parse_bsx(
+			&world,
+			r#"<Route path="deploy" {NotRegistered}/>"#,
+		)
+		.unwrap();
+		world.spawn(ChildOf(root)).insert_template(body).unwrap();
 		world.flush();
 		// the sibling route still serves, so the router has a tree..
 		world

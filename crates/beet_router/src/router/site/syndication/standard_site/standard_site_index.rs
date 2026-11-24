@@ -307,16 +307,16 @@ mod test {
 			write_index(&store, &index).await;
 		}
 		let mut world = syndication_world(Some("https://beet.org"));
-		world
-			.get_resource_or_init::<BsxTemplateRegistry>()
-			.insert_source(
-				"HeadLayout",
+		store
+			.insert(
+				&RelPath::new("HeadLayout.bsx"),
 				"<html><RouteHead/><body><slot/></body></html>",
 			)
+			.await
 			.unwrap();
 		let root = spawn_syndication_router_with(
 			&mut world,
-			(store, Layout::new("HeadLayout")),
+			(store, Layout::document("HeadLayout.bsx")),
 			rsx! { <StandardSitePub path="blog" name="The Full Moon Harvest"/> },
 		);
 		TemplatePending::settle_owned(&mut world).await;

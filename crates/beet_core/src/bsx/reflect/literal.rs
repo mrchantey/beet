@@ -62,9 +62,15 @@ impl DataLiteral {
 		if let Some(info) = field_info
 			&& info.type_id() == core::any::TypeId::of::<Value>()
 		{
-			return Ok(Box::new(crate::bsx::resolve::literal_to_value(
-				literal,
-			)?));
+			return Ok(Box::new(crate::bsx::lower::literal_to_value(literal)?));
+		}
+		// a map is data too, ie an `Instance`'s props
+		if let Some(info) = field_info
+			&& info.is::<Map>()
+			&& let Value::Map(map) =
+				crate::bsx::lower::literal_to_value(literal)?
+		{
+			return Ok(Box::new(map));
 		}
 		// a named tuple literal wrapping ONE scalar (`<Name("x")/>`, `{Name("x")}`)
 		// reduces to that scalar for a target whose type carries its own authored
@@ -76,7 +82,15 @@ impl DataLiteral {
 		{
 			return scalar_to_reflect(value, field_info);
 		}
-		match literal {
+		// an entity written by its key, the form a reference takes as data
+		if let Some(info) = field_info
+			&& info.is::<Entity>()
+			&& let DataLiteral::Scalar(Value::Str(key)) = literal
+		{
+			return Ok(Box::new(resolver(key)));
+		}
+		let named = named_shape(literal, field_info);
+		match named.as_ref().unwrap_or(literal) {
 			DataLiteral::Scalar(value) => scalar_to_reflect(value, field_info),
 			DataLiteral::List(items) => {
 				list_to_reflect(items, field_info, registry, resolver)
@@ -88,8 +102,69 @@ impl DataLiteral {
 				enum_to_reflect(named, field_info, registry, resolver)
 			}
 			DataLiteral::EntityRef(name) => Ok(Box::new(resolver(name))),
+			DataLiteral::Binding(_) => bevybail!(
+				"an `@` binding has no value to author a field from: only an \
+				`Instance`'s props take one"
+			),
 		}
 	}
+}
+
+/// A literal read back from a plain [`Value`] as the named literal it was
+/// written from: `{Rem: 1.0}` for an enum is its variant, a list for a tuple
+/// struct its positions, and no fields at all the bare name.
+fn named_shape(
+	literal: &DataLiteral,
+	field_info: Option<&'static TypeInfo>,
+) -> Option<DataLiteral> {
+	let (name, fields) = match (literal, field_info?) {
+		(DataLiteral::Struct(fields), TypeInfo::Enum(info)) => {
+			let [(name, payload)] = fields.as_slice() else {
+				return None;
+			};
+			info.variant(name)?;
+			let fields = match payload {
+				DataLiteral::Struct(fields) => {
+					NamedFields::Struct(fields.clone())
+				}
+				DataLiteral::List(items) => NamedFields::Tuple(items.clone()),
+				payload => NamedFields::Tuple(vec![payload.clone()]),
+			};
+			(name.clone(), fields)
+		}
+		// a type with its own spelling reads a list itself
+		(DataLiteral::List(_), info)
+			if LiteralParser::get(info.type_id()).is_some() =>
+		{
+			return None;
+		}
+		// a struct named as it was authored, `{Nested: {order: 1}}`
+		(DataLiteral::Struct(fields), TypeInfo::Struct(info)) => {
+			let [(name, DataLiteral::Struct(inner))] = fields.as_slice() else {
+				return None;
+			};
+			if info.field(name).is_some()
+				|| info.type_path_table().short_path() != name.as_str()
+			{
+				return None;
+			}
+			return Some(DataLiteral::Struct(inner.clone()));
+		}
+		(DataLiteral::List(items), TypeInfo::TupleStruct(info)) => (
+			info.type_path_table().short_path().into(),
+			NamedFields::Tuple(items.clone()),
+		),
+		(DataLiteral::Struct(fields), TypeInfo::TupleStruct(info))
+			if fields.is_empty() =>
+		{
+			(
+				info.type_path_table().short_path().into(),
+				NamedFields::Unit,
+			)
+		}
+		_ => return None,
+	};
+	Some(DataLiteral::Enum(NamedLiteral { name, fields }))
 }
 
 /// Whether a literal already names an `Option` variant (`Some`/`None`).

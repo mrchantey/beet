@@ -302,12 +302,12 @@ snap:
 #   cargo +nightly test -p beet_core --test test_test --features custom_test_frameworks
 
 # Native test crate sets.
-_core-pkgs := "beet_core_shared beet_core_macros beet_async beet_core beet_infra beet_net beet_ui beet_router beet_thread beet_action"
+_core-pkgs := "beet_core_shared beet_core_macros beet_async beet_core beet_infra beet_net beet_ui beet_scene beet_router beet_thread beet_action"
 
 # Wasm test crate sets. beet_infra runs its config/definition tests under deno
 # like everywhere else: its work-dir test helper has a wasm arm, and only the two
 # `Project::validate` tests (the native tofu cli) are native-gated.
-_core-pkgs-wasm := "beet_core beet_infra beet_net beet_ui beet_router beet_thread beet_action"
+_core-pkgs-wasm := "beet_core beet_infra beet_net beet_ui beet_scene beet_router beet_thread beet_action"
 
 # Crates that enable `bevy_default` — each runs in its own cargo invocation
 # in `test-all` (see comment there). Excluded from `test-core`.

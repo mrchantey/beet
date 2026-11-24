@@ -1077,6 +1077,7 @@ dependencies = [
  "beet_ml",
  "beet_net",
  "beet_router",
+ "beet_scene",
  "beet_spatial",
  "beet_thread",
  "beet_ui",
@@ -1365,6 +1366,7 @@ dependencies = [
  "beet_action",
  "beet_core",
  "beet_net",
+ "beet_scene",
  "beet_ui",
  "bevy",
  "bitflags 2.13.1",
@@ -1383,6 +1385,15 @@ dependencies = [
  "thiserror 2.0.21",
  "variadics_please",
  "webbrowser",
+]
+
+[[package]]
+name = "beet_scene"
+version = "0.0.9-dev.16"
+dependencies = [
+ "beet_core",
+ "beet_net",
+ "bevy",
 ]
 
 [[package]]
@@ -1433,6 +1444,7 @@ dependencies = [
  "beet_action",
  "beet_core",
  "beet_net",
+ "beet_scene",
  "bevy",
  "bitflags 2.13.1",
  "blocking",

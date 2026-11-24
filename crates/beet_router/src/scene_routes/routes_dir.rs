@@ -9,7 +9,7 @@
 //! listed, and each content file (`.md`/`.mdx`/`.bsx`/`.html`) spawns a
 //! [`BlobPage`] route child served through the shared media-parse pipeline,
 //! reading its bytes through that store. Each file's ROOT declarations
-//! ([`RootDeclarations`]: markdown frontmatter or a BSX root
+//! ([`EntityBody::declarations`]: markdown frontmatter or a BSX root
 //! spread) are read at scan time and hoisted onto the route entity, so navigation
 //! (eg [`RouteSidebar`](crate::prelude::RouteSidebar)) knows every page's
 //! title/order without visiting it. The scan knows no metadata type: it hoists
@@ -46,7 +46,7 @@ use beet_ui::prelude::*;
 ///
 /// ```bsx
 /// <RoutesDir src="routes" filter={GlobFilter{exclude:["blog/**"]}}/>
-/// <Route path="blog" {Layout{template:"ArticleLayout"}}>
+/// <Route path="blog" {Layout{document:"templates/ArticleLayout.bsx"}}>
 ///     <RoutesDir src="routes/blog"/>
 /// </Route>
 /// ```
@@ -155,18 +155,23 @@ impl RoutesDir {
 				async move |dir: AsyncEntity| -> Result {
 					// resolved together, inside the task where the whole tree is
 					// built so the ancestor links are reliably present: the store
-					// the files load from, and the component this dir's unsectioned
-					// frontmatter keys declare.
-					let (store, frontmatter_type) = dir
+					// the files load from, the package they are documents of, and the
+					// component this dir's unsectioned frontmatter keys declare.
+					let (store, package, frontmatter_type) = dir
 						.with_state::<(
 							Query<&BlobStore>,
+							PackageQuery,
 							AncestorQuery<&FrontmatterType>,
-						), Result<(BlobStore, FrontmatterType)>>(
-							move |entity, (stores, types)| {
+						), Result<(BlobStore, PackageStore, FrontmatterType)>>(
+							move |entity, (stores, packages, types)| {
 								Ok((
 									scoped_store(
-										&stores, entity, "RoutesDir", &src,
+										&stores,
+										entity,
+										"RoutesDir",
+										&src,
 									)?,
+									packages.get(entity)?,
 									types
 										.get(entity)
 										.cloned()
@@ -179,6 +184,7 @@ impl RoutesDir {
 						dir.world().with(|world| DocParsers::of(world)).await;
 					let specs = Self::discover_routes(
 						&parsers,
+						&package,
 						&store,
 						&filter,
 						&frontmatter_type.component,
@@ -242,6 +248,7 @@ impl RoutesDir {
 		spec: RouteSpec,
 	) -> Result<Entity> {
 		let store_path = spec.store_path.clone();
+		let document = spec.document.clone();
 		let (declarations, route_path) = Self::resolve_spec(world, spec)?;
 		let mut route_entity = world.spawn((
 			ChildOf(parent),
@@ -254,7 +261,9 @@ impl RoutesDir {
 			RouteHidden,
 		));
 		// scan-time page metadata, so navigation knows titles/order up front
-		if let Err(err) = declarations.insert(&mut route_entity) {
+		if let Err(err) =
+			declarations.insert_onto(&mut route_entity, Some(&document))
+		{
 			route_entity.despawn();
 			return Err(err);
 		}
@@ -272,10 +281,10 @@ impl RoutesDir {
 	fn resolve_spec(
 		world: &World,
 		spec: RouteSpec,
-	) -> Result<(RootDeclarations, RelPath)> {
+	) -> Result<(EntityBody, RelPath)> {
 		let mut declarations = spec.declarations?;
 		RouteMeta::declare_file_defaults(&mut declarations, &spec.store_path);
-		let meta = declarations.get::<RouteMeta>(
+		let meta = declarations.get_reflect::<RouteMeta>(
 			&world
 				.get_resource::<AppTypeRegistry>()
 				.ok_or_else(|| {
@@ -303,13 +312,18 @@ impl RoutesDir {
 		// local for the same reason the scan is: the bridge poll is only
 		// guaranteed on the runtime's local executor.
 		entity_mut.run_async_local(async move |route: AsyncEntity| -> Result {
-			let frontmatter_type = route
-				.with_state::<AncestorQuery<&FrontmatterType>, _>(
-					|entity, types| {
-						types.get(entity).cloned().unwrap_or_default()
+			let (package, frontmatter_type) = route
+				.with_state::<(PackageQuery, AncestorQuery<&FrontmatterType>), _>(
+					|entity, (packages, types)| {
+						packages.get(entity).map(|package| {
+							(
+								package,
+								types.get(entity).cloned().unwrap_or_default(),
+							)
+						})
 					},
 				)
-				.await?;
+				.await??;
 			let parsers =
 				route.world().with(|world| DocParsers::of(world)).await;
 			let spec = RouteSpec {
@@ -320,6 +334,7 @@ impl RoutesDir {
 					&frontmatter_type.component,
 				)
 				.await,
+				document: package.path_of(&blob),
 				store_path: blob.path().clone(),
 			};
 			let entity = route.id();
@@ -346,6 +361,7 @@ impl RoutesDir {
 		route: Entity,
 		spec: RouteSpec,
 	) -> Result {
+		let document = spec.document.clone();
 		let (declarations, route_path) = Self::resolve_spec(world, spec)?;
 		let moved = world.get::<PathPartial>(route).is_some_and(|current| {
 			*current != PathPartial::new(route_path.as_str())
@@ -363,7 +379,8 @@ impl RoutesDir {
 				world.entity_mut(dir).insert(rescan);
 				Ok(())
 			}
-			_ => declarations.insert(&mut world.entity_mut(route)),
+			_ => declarations
+				.insert_onto(&mut world.entity_mut(route), Some(&document)),
 		}
 	}
 
@@ -411,6 +428,7 @@ impl RoutesDir {
 	/// frontmatter does not take the whole dir down on live reload.
 	async fn discover_routes(
 		parsers: &DocParsers,
+		package: &PackageStore,
 		store: &BlobStore,
 		filter: &GlobFilter,
 		frontmatter_type: &str,
@@ -428,6 +446,8 @@ impl RoutesDir {
 					frontmatter_type,
 				)
 				.await,
+				document: package
+					.path_of(&Blob::new(store.clone(), path.clone())),
 				store_path: path,
 			})
 			.xmap(async_ext::join_all)
@@ -497,8 +517,11 @@ impl RoutesDir {
 		store: &BlobStore,
 		path: &RelPath,
 		frontmatter_type: &str,
-	) -> Result<RootDeclarations> {
-		parsers.declarations(&store.get_media(path).await?, frontmatter_type)
+	) -> Result<EntityBody> {
+		parsers
+			.clone()
+			.with_metadata_type(frontmatter_type)
+			.root_components(&store.get_media(path).await?)
 	}
 }
 
@@ -565,7 +588,10 @@ impl FailedRoutes {
 /// failures rather than aborting the scan.
 struct RouteSpec {
 	store_path: RelPath,
-	declarations: Result<RootDeclarations>,
+	/// The file's path in its package, which a [`DocPath`] it declares resolves
+	/// from.
+	document: RelPath,
+	declarations: Result<EntityBody>,
 }
 
 /// Refresh each discovered route whose file changed: its root declarations are
@@ -1095,7 +1121,8 @@ mod test {
 			.get::<Layout>()
 			.unwrap()
 			.template
-			.as_str()
+			.as_deref()
+			.unwrap()
 			.xpect_eq("ArticleLayout");
 	}
 
@@ -1124,7 +1151,8 @@ mod test {
 			.get::<Layout>()
 			.unwrap()
 			.template
-			.as_str()
+			.as_deref()
+			.unwrap()
 			.xpect_eq("ArticleLayout");
 		world.entity(entity).get::<DocMeta>().is_none().xpect_true();
 	}

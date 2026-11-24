@@ -42,6 +42,7 @@ use beet_net::prelude::*;
 pub async fn SecretsExport(
 	/// The `<Secrets>` declaration the export is written to.
 	#[field(default = Entity::PLACEHOLDER)]
+	#[entities]
 	document: Entity,
 	/// Write a dated series beside the declared path rather than
 	/// overwriting it.

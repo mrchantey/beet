@@ -35,11 +35,9 @@ mod social_cards;
 // `search-index.json`): ordinary static routes over the `RouteTree`.
 #[cfg(feature = "std")]
 mod syndication;
-// the `<Template src>` include: needs the BSX tag seam + the unified loader. It
-// reads through the store as an async pending dependency, so it relies on the
-// async runtime that `bsx` (→ `std`) pulls in (the same one `RoutesDir` uses).
-#[cfg(all(feature = "bsx", feature = "template_serde"))]
-mod template_include;
+// what a layout, or a thread route, names: a document or a rust template
+#[cfg(feature = "std")]
+mod template_source;
 // the browser-wasm page template `<Wasm>`: serve-side, building a page that
 // boots a wasm `beet` binary with the launch it names. A plain synchronous
 // template, so it renders inside a route's content (std-gated like the rest of
@@ -69,7 +67,7 @@ pub use site_layout::*;
 pub use social_cards::*;
 #[cfg(feature = "std")]
 pub use syndication::*;
-#[cfg(all(feature = "bsx", feature = "template_serde"))]
-pub(crate) use template_include::*;
+#[cfg(feature = "std")]
+pub use template_source::*;
 #[cfg(feature = "std")]
 pub use wasm::*;

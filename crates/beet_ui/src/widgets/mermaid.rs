@@ -146,18 +146,23 @@ mod test {
 		if let Some(store) = store {
 			world.entity_mut(root).insert(store);
 		}
-		BsxParser
-			.parse_into(ParseContext::new(
-				&mut world.entity_mut(root),
-				&MediaBytes::new_bsx(bsx),
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(root),
+			&MediaBytes::new_bsx(bsx),
+		))
+		.unwrap();
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		(world, root)
 	}
 
-	fn figure(world: &World, root: Entity) -> Entity {
-		world.entity(root).get::<Children>().unwrap()[0]
+	/// The figure `root` holds, the diagram's own root.
+	fn figure(world: &mut World, root: Entity) -> Entity {
+		world
+			.query_filtered::<(Entity, &Element), ()>()
+			.iter(world)
+			.find(|(_, element)| element.tag() == "figure")
+			.map(|(entity, _)| entity)
+			.unwrap_or(root)
 	}
 
 	/// The `diagram-render` mode the cascade resolves for `entity`.
@@ -178,7 +183,7 @@ mod test {
 			"<Mermaid render=\"Text\">\ngraph LR\n  A[Parse] --> B[Paint]\n</Mermaid>",
 		)
 		.await;
-		let figure = figure(&world, root);
+		let figure = figure(&mut world, root);
 		world
 			.entity(figure)
 			.get::<MermaidDiagram>()
@@ -213,7 +218,7 @@ mod test {
 			.unwrap();
 		let (mut world, root) =
 			spawn(Some(store), "<Mermaid src=\"flow.mmd\"/>").await;
-		let figure = figure(&world, root);
+		let figure = figure(&mut world, root);
 		world
 			.entity(figure)
 			.get::<MermaidDiagram>()
@@ -324,14 +329,13 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(StylePlugin);
 		let root = app.world_mut().spawn_empty().id();
-		MarkdownParser::new()
-			.parse_into(ParseContext::new(
-				&mut app.world_mut().entity_mut(root),
-				&MediaBytes::new_markdown(
-					"# Flow\n\n<Mermaid render=\"Text\">graph LR; A --> B</Mermaid>\n",
-				),
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut app.world_mut().entity_mut(root),
+			&MediaBytes::new_markdown(
+				"# Flow\n\n<Mermaid render=\"Text\">graph LR; A --> B</Mermaid>\n",
+			),
+		))
+		.unwrap();
 		let world = app.world_mut();
 		let figure = world.entity(root).get::<Children>().unwrap()[1];
 		let art = world.entity(figure).get::<Children>().unwrap().to_vec();

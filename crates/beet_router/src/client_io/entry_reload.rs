@@ -1,11 +1,10 @@
 //! Full entry rebuild on a structural change, the heavy half of [live
 //! reload](super::LiveReload).
 //!
-//! A markdown or per-request template edit is a *content* change: the light
-//! re-fire in [`reload_site`](super::reload_site) re-registers the templates and
-//! swaps the routes in place, leaving the servers and their sockets up. A
-//! change to the entry document itself, an included `<Template src>` or a
-//! template the entry instantiates once at build (a `<Styles/>`) is *structural*
+//! A markdown or layout edit is a *content* change: the light re-fire in
+//! [`reload_site`](super::reload_site) swaps the routes in place, leaving the
+//! servers and their sockets up. A change to the entry document itself or a
+//! document the entry instantiates once at build (its styles) is *structural*
 //! (a route added, a server reconfigured, a rule changed), which the in-place
 //! re-fire cannot express. Such a change instead drives a full teardown+rebuild:
 //! the whole entry scene is despawned (servers close, sockets drop) and rebuilt
@@ -33,13 +32,12 @@ type EntryRebuildFn =
 
 /// Installed by the entry driver (the `beet` cli) on `--watch` so a change to a
 /// *structural* source drives a full teardown+rebuild rather than the light content
-/// re-fire a markdown/template edit gets.
+/// re-fire a markdown/layout edit gets.
 ///
 /// Carries the driver's [rebuild callback](EntryRebuildFn) plus the set of source
-/// paths whose change is structural: the entry document, every transitive
-/// `<Template src>` include and every `<TemplateDir>` template the entry tree
-/// instantiates, each store-root-relative so it matches the [`BlobEvent`] paths
-/// the watcher emits.
+/// paths whose change is structural: the entry document and every document the
+/// entry tree instantiates, each store-root-relative so it matches the
+/// [`BlobEvent`] paths the watcher emits.
 #[derive(Clone, Resource)]
 pub struct EntryReloader {
 	sources: HashSet<RelPath>,
@@ -61,17 +59,21 @@ impl EntryReloader {
 		}
 	}
 
-	/// Whether a change to `path` is structural (the entry document, a
-	/// `<Template src>` include or an entry-instantiated template), so it drives
-	/// a full rebuild rather than the light content re-fire.
+	/// Whether a change to `path` is structural (the entry document or one the
+	/// entry instantiates), so it drives a full rebuild rather than the light
+	/// content re-fire.
 	pub fn is_structural(&self, path: &RelPath) -> bool {
 		self.sources.contains(path)
 	}
 
+	/// Add a structural source known before its build.
+	pub fn add_source(&mut self, source: RelPath) {
+		self.sources.insert(source);
+	}
+
 	/// Replace the structural source set. The driver recomputes it on every
-	/// rebuild (the entry, its includes and the templates it instantiates may
-	/// have changed), so a newly added include or tag becomes structural without
-	/// a restart.
+	/// rebuild (the documents the entry instantiates may have changed), so a
+	/// newly instantiated one becomes structural without a restart.
 	pub fn set_sources(&mut self, sources: HashSet<RelPath>) {
 		self.sources = sources;
 	}

@@ -418,6 +418,7 @@ fn build_field_value(
 		{
 			return match values.as_slice() {
 				[one] => reflect_ext::unit_variant_value(enum_info, one)
+					.map(|unit| -> Box<dyn PartialReflect> { Box::new(unit) })
 					.map_err(|err| {
 						ParamError::invalid(field_name, reason(err))
 					}),

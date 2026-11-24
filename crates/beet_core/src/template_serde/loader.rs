@@ -1,21 +1,19 @@
-//! Deserializing bytes into a [`DynamicTemplate`] and building it through the
+//! Reading bytes into a [`SceneBody`] and building it through the
 //! [`spawn_template`](WorldTemplateExt::spawn_template) path.
 //!
-//! [`TemplateLoader`] reads a serde format's bytes as a [`SceneBody`], reflects
-//! it into a [`DynamicTemplate`], then builds it. Every spawned entity is
-//! collected through the build sink, never a second remapping model. When a
-//! target entity is given, the spawned roots become its children, after any it
-//! already has and before the batch signal fires, so a listener sees the whole
-//! hierarchy; [`TemplateLoader::load_onto`] builds a body's first entity onto
-//! the target itself instead.
+//! [`TemplateLoader`] reads any format's bytes through the world's
+//! [`DocParsers`], reflects the body into a [`DynamicTemplate`], then builds
+//! it. Every spawned entity is collected through the build sink, never a second
+//! remapping model. When a target entity is given, the spawned roots become its
+//! children, after any it already has and before the batch signal fires, so a
+//! listener sees the whole hierarchy; [`TemplateLoader::load_onto`] builds a
+//! body's first entity onto the target itself instead.
 
-#[cfg(feature = "bsx")]
-use crate::prelude::BsxTemplate;
 use crate::prelude::*;
 use bevy::ecs::template::Template;
 use bevy::ecs::template::TemplateContext;
 
-/// Deserializes template bytes into the world and builds the result.
+/// Reads document bytes into the world and builds the result.
 ///
 /// With a target entity (via [`TemplateLoader::with_entity`] or
 /// [`TemplateLoader::new_entity`]) the spawned roots become children of that
@@ -24,6 +22,8 @@ pub struct TemplateLoader<'a> {
 	world: &'a mut World,
 	/// If set, spawned roots are parented under this entity.
 	entity: Option<Entity>,
+	/// The package path the document was read from, if it has one.
+	path: Option<RelPath>,
 }
 
 impl<'a> TemplateLoader<'a> {
@@ -32,6 +32,7 @@ impl<'a> TemplateLoader<'a> {
 		Self {
 			world,
 			entity: None,
+			path: None,
 		}
 	}
 
@@ -39,10 +40,7 @@ impl<'a> TemplateLoader<'a> {
 	/// spawned roots under it.
 	pub fn new_entity(entity: EntityWorldMut<'a>) -> Self {
 		let id = entity.id();
-		Self {
-			world: entity.into_world_mut(),
-			entity: Some(id),
-		}
+		Self::new(entity.into_world_mut()).with_entity(id)
 	}
 
 	/// Parents spawned roots under the given entity.
@@ -51,30 +49,32 @@ impl<'a> TemplateLoader<'a> {
 		self
 	}
 
-	/// Loads an entry from [`MediaBytes`] into the world, dispatching by media
-	/// type: `.bsx`/`.html` parse to the BSX IR, every other format through
-	/// the world's [`DocParsers`] to a [`SceneBody`] and its
-	/// [`DynamicTemplate`]. Both build through the one
-	/// [`spawn_template`](WorldTemplateExt::spawn_template) path.
-	pub fn load(self, bytes: &MediaBytes) -> Result<Vec<Entity>> {
-		let entry = EntryTemplate::from_bytes(self.world, bytes)?;
-		self.load_entry(entry)
+	/// Loads as the document at `path` of its package, so a [`DocPath`] it
+	/// holds resolves from there.
+	pub fn with_path(mut self, path: RelPath) -> Self {
+		self.path = Some(path);
+		self
 	}
 
-	/// Builds a parsed [`EntryTemplate`], retaining a serde document's file keys
-	/// on its first spawned root, so a later save writes every entity back under
-	/// the key it loaded from.
-	pub fn load_entry(self, entry: EntryTemplate) -> Result<Vec<Entity>> {
-		let Self { world, entity } = self;
-		let placement = match entity {
+	/// Loads a document's [`MediaBytes`] into the world through its
+	/// [`DocParsers`].
+	pub fn load(self, bytes: &MediaBytes) -> Result<Vec<Entity>> {
+		let body = DocParsers::of(self.world).body(bytes)?;
+		self.load_body(&body)
+	}
+
+	/// Builds `body`, retaining its file keys on its first spawned root, so a
+	/// later save writes every entity back under the key it loaded from.
+	pub fn load_body(self, body: &SceneBody) -> Result<Vec<Entity>> {
+		let placement = match self.entity {
 			Some(parent) => Placement::Under(parent),
 			None => Placement::Root,
 		};
-		let (spawned, entity_map) = Self::build(world, placement, entry)?;
-		// a markup build feeds no keys: a `.bsx` file is authored original state,
-		// never a document the editor rewrites.
-		if !entity_map.is_empty() {
-			world.entity_mut(spawned[0]).insert(entity_map);
+		let template = self.reflect(body)?;
+		let (spawned, entity_map) =
+			Self::build(self.world, placement, template)?;
+		if let Some(root) = spawned.first() {
+			self.world.entity_mut(*root).insert(entity_map);
 		}
 		Ok(spawned)
 	}
@@ -86,54 +86,64 @@ impl<'a> TemplateLoader<'a> {
 	/// The reverse of saving an entity's tree, so a tree read back lands where
 	/// its reader put it rather than one level below.
 	pub fn load_onto(self, body: &SceneBody) -> Result<Vec<Entity>> {
-		let Self { world, entity } = self;
-		let root = entity.ok_or_else(|| {
+		let template = self.reflect(body)?;
+		self.build_onto(template)
+	}
+
+	/// [`load_onto`](Self::load_onto) for a body already reflected.
+	pub fn build_onto(
+		self,
+		template: super::DynamicTemplate,
+	) -> Result<Vec<Entity>> {
+		let root = self.entity.ok_or_else(|| {
 			bevyhow!(
 				"a scene is loaded onto an entity, see `TemplateLoader::new_entity`"
 			)
 		})?;
-		let entry = EntryTemplate::Serde(body.reflect(world)?);
 		let (spawned, entity_map) =
-			Self::build(world, Placement::Onto(root), entry)?;
+			Self::build(self.world, Placement::Onto(root), template)?;
 		if !entity_map.is_empty() {
-			world.entity_mut(root).insert(entity_map);
+			self.world.entity_mut(root).insert(entity_map);
 		}
 		Ok(spawned)
 	}
 
-	/// Builds an [`EntryTemplate`] through
+	/// `body` reflected as the document it was read from.
+	fn reflect(&self, body: &SceneBody) -> Result<super::DynamicTemplate> {
+		match &self.path {
+			Some(path) => body.reflect_at(self.world, path),
+			None => body.reflect(self.world),
+		}
+	}
+
+	/// Builds a reflected body through
 	/// [`spawn_template`](WorldTemplateExt::spawn_template), returning every
-	/// spawned entity and the file keys they built from (empty for markup), for
-	/// the caller to retain wherever its document lives.
+	/// spawned entity and the file keys they built from, for the caller to
+	/// retain wherever its document lives.
 	pub(super) fn build(
 		world: &mut World,
 		placement: Placement,
-		entry: EntryTemplate,
+		template: super::DynamicTemplate,
 	) -> Result<(Vec<Entity>, TemplateEntityMap)> {
-		let is_serde = entry.is_serde();
-		// install the sink so a serde build records every real entity it maps to.
+		// install the sink so the build records every real entity it maps to.
 		world.insert_resource(TemplateBuildSink::default());
-		let root = match placement {
+		match placement {
 			Placement::Onto(root) => {
-				world.entity_mut(root).insert_template(entry)?;
-				root
+				world.entity_mut(root).insert_template(template)?;
 			}
-			_ => world.spawn_template(entry)?.id(),
-		};
+			_ => {
+				world.spawn_template(template)?;
+			}
+		}
 		let pairs = world
 			.remove_resource::<TemplateBuildSink>()
 			.map(|sink| sink.0)
 			.unwrap_or_default();
 		let entity_map = TemplateEntityMap::from_pairs(pairs.iter().cloned());
-		let mut spawned = pairs
+		let spawned = pairs
 			.into_iter()
 			.map(|(_, entity)| entity)
 			.collect::<Vec<_>>();
-		// a markup build does not feed the serde sink, so its single spawned root
-		// is the whole result.
-		if spawned.is_empty() {
-			spawned.push(root);
-		}
 
 		// in entity mode the spawned roots join the target's children, after any
 		// it already has, and before the batch signal so a listener resolving by
@@ -148,7 +158,10 @@ impl<'a> TemplateLoader<'a> {
 			for spawned_entity in
 				spawned.iter().filter(|spawned| **spawned != parent)
 			{
-				let entity = world.entity(*spawned_entity);
+				// a filled slot is despawned as the build settles
+				let Ok(entity) = world.get_entity(*spawned_entity) else {
+					continue;
+				};
 				if !entity.contains::<ChildOf>()
 					&& !entity.contains::<AttributeOf>()
 				{
@@ -157,16 +170,12 @@ impl<'a> TemplateLoader<'a> {
 			}
 		}
 
-		// the serde batch-completion signal: reflect inserts settle per-entity, so
+		// the batch-completion signal: reflect inserts settle per-entity, so
 		// per-insert observers run before relationships like `ChildOf` are whole.
-		// Listeners (eg `RouteTree` rebuild) react once the hierarchy is settled. A
-		// markup build inserts in tree order and rebuilds incrementally, so it needs
-		// no batch signal.
-		if is_serde {
-			world.trigger(LoadTemplateSerde {
-				entities: spawned.clone(),
-			});
-		}
+		// Listeners (eg `RouteTree` rebuild) react once the hierarchy is settled.
+		world.trigger(LoadTemplateSerde {
+			entities: spawned.clone(),
+		});
 
 		Ok((spawned, entity_map))
 	}
@@ -184,73 +193,19 @@ pub(super) enum Placement {
 	Onto(Entity),
 }
 
-/// The closed set of entry-document IRs the unified [`TemplateLoader`] builds: the
-/// serde [`DynamicTemplate`] or the BSX [`BsxTemplate`].
-///
-/// Both are [`Template`]s that tail through the one
-/// [`spawn_template`](WorldTemplateExt::spawn_template) build path. This enum lets
-/// the loader dispatch by [`MediaType`] without a `dyn Template`, which is not
-/// object-safe (`Template::clone_template` returns `Self`). They stay distinct
-/// IRs: `DynamicTemplate` is the serde round-trip form, `BsxTemplate` a syntax
-/// tree resolved against live registries, with no serializable value form.
-pub enum EntryTemplate {
-	/// The serde IR, from the bytes of a structured format.
-	Serde(super::DynamicTemplate),
-	/// The BSX markup IR, from `.bsx`/`.html` source.
-	#[cfg(feature = "bsx")]
-	Bsx(BsxTemplate),
-}
-
-impl EntryTemplate {
-	/// Parse entry bytes into the matching IR, dispatching by [`MediaType`]: the
-	/// parse half of [`TemplateLoader::load`]. For a caller that builds the result
-	/// into an existing entity rather than spawning a root, ie an include
-	/// (`<Template src>`) builds the parsed entry at its own site.
-	pub fn from_bytes(world: &World, bytes: &MediaBytes) -> Result<Self> {
-		match bytes.media_type() {
-			// markup entries parse through the core BSX engine; HTML is the
-			// features-off subset of the same grammar.
-			#[cfg(feature = "bsx")]
-			MediaType::Bsx | MediaType::Html => {
-				BsxTemplate::parse_entry(world, bytes.as_utf8()?).map(Self::Bsx)
-			}
-			// every other format is a scene body through the registry
-			_ => DocParsers::of(world)
-				.body(bytes)?
-				.reflect(world)
-				.map(Self::Serde),
-		}
-	}
-
-	/// Whether this is the serde IR, gating the [`LoadTemplateSerde`] batch signal.
-	pub fn is_serde(&self) -> bool {
-		match self {
-			Self::Serde(_) => true,
-			#[cfg(feature = "bsx")]
-			Self::Bsx(_) => false,
-		}
-	}
-}
-
-impl Template for EntryTemplate {
+/// A body builds as the document it is, its [`DocPath`]s as written: the one
+/// way any format reaches a world, `world.spawn_template(body)`.
+impl Template for SceneBody {
 	type Output = ();
 
 	fn build_template(&self, cx: &mut TemplateContext) -> Result<()> {
-		match self {
-			Self::Serde(template) => template.build_template(cx),
-			#[cfg(feature = "bsx")]
-			Self::Bsx(template) => template.build_template(cx),
-		}
+		self.reflect(cx.entity.world())?.build_template(cx)
 	}
 
-	fn clone_template(&self) -> Self {
-		match self {
-			Self::Serde(template) => Self::Serde(template.clone_template()),
-			#[cfg(feature = "bsx")]
-			Self::Bsx(template) => Self::Bsx(template.clone_template()),
-		}
-	}
+	fn clone_template(&self) -> Self { self.clone() }
 }
+
+subtree_template!(SceneBody);
 
 /// Triggered after a [`TemplateLoader`] builds a whole batch of deserialized
 /// entities into the world.
@@ -273,10 +228,10 @@ mod entry_test {
 
 	/// A `.bsx` entry and a `.json` entry both load through the one
 	/// [`TemplateLoader`] entry point, each landing the expected component on the
-	/// spawned root: markup dispatches to the BSX IR, json to the serde IR.
+	/// spawned root.
 	#[crate::test]
 	fn loads_bsx_and_json_through_one_loader() {
-		// markup: the single root element's component lands on the spawned root.
+		// markup: the single root element lands on the spawned root.
 		let mut world = TemplatePlugin::world();
 		let bsx =
 			MediaBytes::new_bsx("<main class=\"app\"><span>hi</span></main>");

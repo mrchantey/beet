@@ -270,13 +270,10 @@ pub enum DocumentError {
 	},
 }
 
-/// Marker for a [`Document`] that stores a `.bsx` template's props.
-///
-/// Inserted alongside the [`Document`] on a template's entity when its tag is
-/// built (see `resolve.rs::build_uppercase`). [`DocumentPath::Props`] resolves
-/// to the nearest ancestor carrying this marker, while [`DocumentPath::Ancestor`]
-/// skips it, so user document scoping inside a template body is unaffected by
-/// the store.
+/// Marker for a [`Document`] holding the props of a use of a document, on the
+/// use site beside it ([`Instance`]). [`DocumentPath::Props`] resolves to the
+/// nearest ancestor carrying this marker, while [`DocumentPath::Ancestor`] skips
+/// it, so user document scoping inside the instance is unaffected by its props.
 #[derive(
 	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Component, Reflect,
 )]

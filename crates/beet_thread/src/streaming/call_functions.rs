@@ -129,10 +129,7 @@ mod test {
 </Thread>
 "#;
 		let store = BlobStore::temp();
-		let thread = BsxTemplate::parse_entry(app.world(), source)
-			.unwrap()
-			.spawn(app.world_mut())
-			.unwrap();
+		let thread = SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
 		app.world_mut().entity_mut(thread).insert(store.clone());
 		app.update();
 		ThreadRecords::reduce_now(app.world_mut());
@@ -218,10 +215,7 @@ mod test {
 	</Thread>
 </Router>
 "#;
-		let root = BsxTemplate::parse_entry(app.world(), source)
-			.unwrap()
-			.spawn(app.world_mut())
-			.unwrap();
+		let root = SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
 		app.update();
 		ThreadRecords::reduce_now(app.world_mut());
 		let thread = app.world().entity(root).get::<Children>().unwrap()[0];

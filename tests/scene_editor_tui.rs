@@ -26,7 +26,7 @@ use tui_host::TuiHost;
 const ENTRY: &str = "scene_editor.bsx";
 /// The authored original of the scene, as the entry names it.
 const SCENE: &str = "scene_editor/scene.bsx";
-/// The document shell the entry wraps its page in, under its `<TemplateDir>`.
+/// The document shell the entry wraps its page in.
 const SHELL: &str = "templates/EditorShell.bsx";
 /// The fork, as the entry names it: absent until the first boot writes it.
 const FORK: &str = "scene_editor/scene.json";

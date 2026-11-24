@@ -23,10 +23,11 @@
 //! text/javascript                         one entity carrying `RunScript`, the
 //!                                         source as its `Value`
 //! text/plain, any other text type         one entity holding the text
+//! text/bsx, text/html, xml                a scene body (`bsx` feature)
 //! ```
 //!
-//! `beet_ui` adds the markup formats (BSX, HTML, markdown, the office
-//! formats). A file whose media type has no parser is loaded as its blob.
+//! `beet_ui` adds markdown, mdx and the office formats. A file whose media
+//! type has no parser is loaded as its blob.
 
 use crate::prelude::*;
 use alloc::sync::Arc;
@@ -46,34 +47,14 @@ pub trait DocParser: 'static + Send + Sync + Clone + Installer {
 	fn media_types(&self) -> Vec<MediaType>;
 
 	/// Bytes of one of those media types to a scene body, touching no world.
-	fn parse(&mut self, bytes: &MediaBytes) -> Result<SceneBody, ParseError>;
-
-	/// Parse onto `cx.entity`: [`parse`](Self::parse)'s body spawned onto
-	/// it, its first entity the entity itself. Overridden only by a markup
-	/// parser that builds into a world rather than returning a body.
-	fn parse_into(&mut self, cx: ParseContext) -> Result<(), ParseError> {
-		let body = self.parse(cx.bytes)?;
-		let entity = cx.entity.id();
-		cx.entity.world_scope(|world| {
-			TemplateLoader::new(world)
-				.with_entity(entity)
-				.load_onto(&body)
-		})?;
-		Ok(())
-	}
-
-	/// The components `bytes` declares at its document root, ie markdown's
-	/// frontmatter or markup's root spreads, its unsectioned keys naming
-	/// `frontmatter_type`. A format with no declaration surface declares
-	/// nothing.
-	#[cfg(feature = "bsx")]
-	fn declarations(
-		&self,
-		_bytes: &MediaBytes,
-		_frontmatter_type: &str,
-	) -> Result<RootDeclarations> {
-		RootDeclarations::default().xok()
-	}
+	/// `parsers` is the registry this was chosen from, what a format that
+	/// names things lowers against: its [types](DocParsers::types) and its
+	/// [directives](DocParsers::directives).
+	fn parse(
+		&mut self,
+		bytes: &MediaBytes,
+		parsers: &DocParsers,
+	) -> Result<SceneBody, ParseError>;
 }
 
 /// Every [`DocParser`] this world reads.
@@ -88,21 +69,27 @@ pub trait DocParser: 'static + Send + Sync + Clone + Installer {
 /// Every parse into a world ends in one [`PostParseTree`] run, whatever the
 /// format, with the document's root marked [`ParsedRoot`] for its duration.
 ///
-/// It carries the [`BsxDirectives`] too, so every parser that lowers BSX,
-/// markdown's embedded BSX included, reads one directive set with no world.
+/// It carries what every markup lowering reads with no world: the
+/// [`BsxDirectives`], the type registry names resolve against, and the
+/// component a document's unsectioned metadata declares.
 #[derive(Clone, Resource)]
 pub struct DocParsers {
 	parsers: Vec<Arc<dyn ErasedDocParser>>,
+	types: AppTypeRegistry,
+	metadata_type: SmolStr,
 	#[cfg(feature = "bsx")]
 	directives: BsxDirectives,
 }
 
-/// The base parsers: plain text, javascript and the structured formats, and
-/// the standard directives.
+/// The base parsers: plain text, javascript, the structured formats and BSX
+/// with HTML and XML, the standard directives, and no types, so every name a
+/// document writes is unregistered until it reaches a world.
 impl Default for DocParsers {
 	fn default() -> Self {
 		let mut parsers = Self {
 			parsers: Vec::new(),
+			types: default(),
+			metadata_type: "DocMeta".into(),
 			#[cfg(feature = "bsx")]
 			directives: default(),
 		};
@@ -110,6 +97,8 @@ impl Default for DocParsers {
 			.register(PlainTextParser::default())
 			.register(ScriptParser)
 			.register(StructuredParser);
+		#[cfg(feature = "bsx")]
+		parsers.register(BsxParser);
 		parsers
 	}
 }
@@ -128,6 +117,23 @@ impl DocParsers {
 		app.world_mut()
 			.get_resource_or_init::<Self>()
 			.register(parser);
+	}
+
+	/// The types a markup lowering resolves names against: a world's own where
+	/// this came from one ([`of`](Self::of)), else none.
+	pub fn types(&self) -> &AppTypeRegistry { &self.types }
+
+	/// The component a document's unsectioned metadata declares, ie a
+	/// markdown page's frontmatter keys, by short name.
+	pub fn metadata_type(&self) -> &str { &self.metadata_type }
+
+	/// Declare unsectioned metadata as the component `metadata_type` names.
+	pub fn with_metadata_type(
+		mut self,
+		metadata_type: impl Into<SmolStr>,
+	) -> Self {
+		self.metadata_type = metadata_type.into();
+		self
 	}
 
 	/// The directives every BSX lowering rewrites.
@@ -155,22 +161,44 @@ impl DocParsers {
 
 	/// `bytes` as a scene body, through the parser its media type selects.
 	pub fn body(&self, bytes: &MediaBytes) -> Result<SceneBody, ParseError> {
-		self.choose(bytes.media_type())?.parse(bytes)
+		self.choose(bytes.media_type())?.parse(bytes, self)
 	}
 
-	/// Parse `cx.bytes` onto `cx.entity` through the parser its media type
-	/// selects, then extend the parsed tree in one [`PostParseTree`] run.
+	/// Parse `cx.bytes` onto `cx.entity`, its root the entity itself, through
+	/// the parser its media type selects, then extend the parsed tree in one
+	/// [`PostParseTree`] run.
 	pub fn parse(cx: ParseContext) -> Result<(), ParseError> {
 		let ParseContext {
 			entity,
 			bytes,
 			path,
+			metadata_type,
 		} = cx;
-		let parser = Self::of(entity.world()).choose(bytes.media_type())?;
-		parser.parse_into(ParseContext {
-			entity: &mut *entity,
-			bytes,
-			path,
+		let mut parsers = Self::of(entity.world());
+		if let Some(metadata_type) = metadata_type {
+			parsers = parsers.with_metadata_type(metadata_type);
+		}
+		let body = parsers.body(bytes)?;
+		let template = match path {
+			Some(path) => body.reflect_at(entity.world(), &path),
+			None => body.reflect(entity.world()),
+		}?;
+		Self::build(entity, template)?;
+		Ok(())
+	}
+
+	/// Build `template` onto `entity`, its root the entity itself, then extend
+	/// the tree in one [`PostParseTree`] run: what [`parse`](Self::parse) does
+	/// with the body it read.
+	pub fn build(
+		entity: &mut EntityWorldMut,
+		template: DynamicTemplate,
+	) -> Result {
+		let id = entity.id();
+		entity.world_scope(|world| {
+			TemplateLoader::new(world)
+				.with_entity(id)
+				.build_onto(template)
 		})?;
 		// the parsed tree is extended once, whatever its format: its tables
 		// numbered, then whatever else is registered, ie styles or a deck's
@@ -183,30 +211,37 @@ impl DocParsers {
 		Ok(())
 	}
 
-	/// The components `bytes` declares at its document root, through the
-	/// parser its media type selects (see [`DocParser::declarations`]).
+	/// The components `bytes` declares at its document root, ie a markdown
+	/// page's frontmatter or a BSX page's root spreads: its first entity's
+	/// ([`EntityBody::declarations`]).
 	///
-	/// Deliberately not part of [`parse`](Self::parse): this reads the root
-	/// only, building nothing, so a route scan can know a page's title, order
-	/// and slug without spawning its content. A media type no parser reads
+	/// Nothing is spawned, so a route scan knows a page's title, order and
+	/// slug without building its content. A media type no parser reads
 	/// declares nothing; a source that does not parse is an error, since the
 	/// same bytes are about to be parsed for real.
-	#[cfg(feature = "bsx")]
-	pub fn declarations(
-		&self,
-		bytes: &MediaBytes,
-		frontmatter_type: &str,
-	) -> Result<RootDeclarations> {
+	pub fn root_components(&self, bytes: &MediaBytes) -> Result<EntityBody> {
 		match self.choose(bytes.media_type()) {
-			Ok(parser) => parser.declarations(bytes, frontmatter_type),
-			Err(_) => RootDeclarations::default().xok(),
+			Ok(parser) => parser
+				.parse(bytes, self)?
+				.entities
+				.into_iter()
+				.next()
+				.map(|(_, root)| root.declarations())
+				.unwrap_or_default()
+				.xok(),
+			Err(_) => EntityBody::default().xok(),
 		}
 	}
 
 	/// The [`DocParsers`] of `world`, cloned out for an async scan, the base
-	/// parsers where it has installed none.
+	/// parsers where it has installed none, lowering against its types.
 	pub fn of(world: &World) -> Self {
-		world.get_resource::<Self>().cloned().unwrap_or_default()
+		let mut parsers =
+			world.get_resource::<Self>().cloned().unwrap_or_default();
+		if let Some(types) = world.get_resource::<AppTypeRegistry>() {
+			parsers.types = types.clone();
+		}
+		parsers
 	}
 
 	/// The parser reading `media_type`, the last registered winning, falling
@@ -255,34 +290,22 @@ pub struct ParsedRoot;
 /// The object-safe face of a [`DocParser`], which a registry can hold.
 trait ErasedDocParser: 'static + Send + Sync {
 	fn media_types(&self) -> Vec<MediaType>;
-	fn parse(&self, bytes: &MediaBytes) -> Result<SceneBody, ParseError>;
-	fn parse_into(&self, cx: ParseContext) -> Result<(), ParseError>;
-	#[cfg(feature = "bsx")]
-	fn declarations(
+	fn parse(
 		&self,
 		bytes: &MediaBytes,
-		frontmatter_type: &str,
-	) -> Result<RootDeclarations>;
+		parsers: &DocParsers,
+	) -> Result<SceneBody, ParseError>;
 }
 
 impl<T: DocParser> ErasedDocParser for T {
 	fn media_types(&self) -> Vec<MediaType> { DocParser::media_types(self) }
 
-	fn parse(&self, bytes: &MediaBytes) -> Result<SceneBody, ParseError> {
-		DocParser::parse(&mut self.clone(), bytes)
-	}
-
-	fn parse_into(&self, cx: ParseContext) -> Result<(), ParseError> {
-		DocParser::parse_into(&mut self.clone(), cx)
-	}
-
-	#[cfg(feature = "bsx")]
-	fn declarations(
+	fn parse(
 		&self,
 		bytes: &MediaBytes,
-		frontmatter_type: &str,
-	) -> Result<RootDeclarations> {
-		DocParser::declarations(self, bytes, frontmatter_type)
+		parsers: &DocParsers,
+	) -> Result<SceneBody, ParseError> {
+		DocParser::parse(&mut self.clone(), bytes, parsers)
 	}
 }
 
@@ -433,6 +456,7 @@ mod test {
 			fn parse(
 				&mut self,
 				bytes: &MediaBytes,
+				_parsers: &DocParsers,
 			) -> Result<SceneBody, ParseError> {
 				let text = bytes.as_utf8()?.to_uppercase();
 				SceneBody::root(

@@ -280,17 +280,20 @@ mod test {
 	#[beet_core::test]
 	async fn head_previews_the_declared_social_card() {
 		let mut world = syndication_world(Some("https://beet.org"));
-		world
-			.get_resource_or_init::<BsxTemplateRegistry>()
-			.insert_source(
-				"HeadLayout",
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&RelPath::new("HeadLayout.bsx"),
 				"<html><RouteHead/><body><slot/></body></html>",
 			)
+			.await
 			.unwrap();
 		let root = spawn_syndication_router(&mut world, rsx! {
 			<SocialCards font="fonts/inter.ttf"/>
 		});
-		world.entity_mut(root).insert(Layout::new("HeadLayout"));
+		world
+			.entity_mut(root)
+			.insert((store, Layout::document("HeadLayout.bsx")));
 		let mut head = async |path: &str| {
 			world
 				.entity_mut(root)

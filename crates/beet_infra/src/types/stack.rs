@@ -596,16 +596,14 @@ mod tests {
 	#[beet_core::test]
 	fn the_none_literal_opts_out() {
 		let mut world = InfraPlugin.into_world();
-		BsxTemplate::parse_entry(
-			&world,
+		SceneBody::spawn_bsx(
+			&mut world,
 			r#"<Fragment>
 				<Stack app_name="throwaway" state_passphrase={None}/>
 				<Stack app_name="kept"/>
 				<Stack app_name="other" state_passphrase="OTHER"/>
 			</Fragment>"#,
 		)
-		.unwrap()
-		.spawn(&mut world)
 		.unwrap();
 		world.flush();
 		world

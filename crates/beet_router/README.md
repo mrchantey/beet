@@ -105,7 +105,7 @@ The matched `route` entity is reachable from **no** layout edge (`Portal` and `L
 
 ### Layouts
 
-A layout is render middleware, `Layout{template:"Layout"}` declared on an ancestor of the routes it wraps (typically the router). The name resolves exactly as it would in tag position: a `.bsx` document in the `BsxTemplateRegistry` first, else a rust `#[template]` registered by short type path, so markup and rust layouts are one mechanism with one declaration. From rust that name comes from the type, `Layout::of::<SiteLayout>()`, so a rename follows the symbol; `Layout::new("..")` is for a `.bsx` document, which has no type to name.
+A layout is render middleware, `Layout{document:"templates/Layout.bsx"}` declared on an ancestor of the routes it wraps (typically the router): the document is instantiated around each page. `Layout{template:"SiteLayout"}` names a registered rust `#[template]` instead, from rust `Layout::of::<SiteLayout>()`, so a rename follows the symbol.
 
 Layouts **nest**: every ancestor declaring one wraps the route exactly once, furthest ancestor outermost. So a site shell on the router and an article shell on `<Route path="blog">` render as `Layout(ArticleLayout(post))`, and the inner one is chrome only, never a second document.
 
@@ -122,7 +122,7 @@ Each wrap adds one layout root to the chain, so `LayoutContent` on an outer layo
 
 ### Page metadata
 
-A document's metadata is **whatever components it declares at its root**. A markdown page writes frontmatter, a BSX page writes bare spreads on its root element, and both lower to the same `RootDeclarations` literals:
+A document's metadata is **whatever components it declares at its root**. A markdown page writes frontmatter, a BSX page writes bare spreads on its root element, and both lower to the same root components (`EntityBody::declarations`):
 
 ```md
 +++
@@ -166,7 +166,7 @@ One declaration, three renders, chosen by the caller of `LivePage::prepare` and 
 
 The island route's response carries the island's own `CacheHeaders`, `no-store` when it has none, never the page's or the router's. Island content carrying a `<script>`, which a swap leaves inert, two islands sharing a name on one page, and an island nested in another are errors.
 
-Async island content parks on its build root with `TemplatePending::register_fetch`, never `Loading`, and its failure rides `TemplateError`: `<VisitCount/>` (the analytics store's visits, read as `beet analytics` reads them) is the worked example, `<StandardSiteComments/>` (an article's comments, the replies to its announcement read from the Bluesky AppView with the `atproto` feature) the second, its fallback the `<StandardSiteReplyLink/>` reading the same index synchronously.
+Async island content parks on its build root with `TemplatePending::park_task`, never `Loading`, and its failure rides `TemplateError`: `<VisitCount/>` (the analytics store's visits, read as `beet analytics` reads them) is the worked example, `<StandardSiteComments/>` (an article's comments, the replies to its announcement read from the Bluesky AppView with the `atproto` feature) the second, its fallback the `<StandardSiteReplyLink/>` reading the same index synchronously.
 
 ## Syndication
 

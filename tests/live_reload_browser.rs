@@ -26,16 +26,15 @@ use beet::prelude::*;
 /// The entry document, the site's `main.bsx` in miniature: the server owns the
 /// boot, the router wraps every route in the `templates/Layout.bsx` document
 /// and serves the default app routes (among them the `/__client_io` channel the
-/// live-reload client joins), and the entry instantiates `<Styles/>` once at
+/// live-reload client joins), and the entry instantiates `templates/Styles.bsx` once at
 /// build.
 fn main_bsx(port: u16, primary: &str) -> String {
 	format!(
 		r#"<CallOnReady {{HttpServer{{port:{port}, canonical:false}}}}>
-<Router {{Layout{{template:"Layout"}}}}>
+<Router {{Layout{{document:"templates/Layout.bsx"}}}}>
 	<PackageConfig title="Live"/>
 	<Theme color="{primary}" primary="{primary}"/>
-	<TemplateDir src="templates"/>
-	<Styles/>
+	<Instance document="templates/Styles.bsx"/>
 	<DefaultAppRoutes/>
 	<RoutesDir src="routes"/>
 </Router>
@@ -100,10 +99,6 @@ impl SiteFixture {
 				RouterPlugin,
 				material::MaterialStylePlugin::default(),
 			));
-			let formats = app
-				.world_mut()
-				.get_resource_or_init::<TemplateFormats>()
-				.clone();
 			let prescans = app
 				.world_mut()
 				.get_resource_or_init::<PrescanRegistry>()
@@ -115,10 +110,7 @@ impl SiteFixture {
 					..
 				} = entry_build::resolve_entry_path(&prescans, None, None, &dir)
 					.await?;
-				entry_build::build_watched(
-					&world, repo_store, entry_name, formats,
-				)
-				.await
+				entry_build::build_watched(&world, repo_store, entry_name).await
 			});
 		})
 		.await

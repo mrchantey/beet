@@ -12,14 +12,14 @@ A beet site is a directory:
 ```
 beetmania/
   main.bsx      the entrypoint: the router and its middleware
-  templates/    the site's own BSX templates, eg Layout.bsx
+  templates/    the documents others are built from, eg Layout.bsx
   routes/       the content: every file is a page
 ```
 
 The entrypoint declares the served site as a router:
 
 ```html
-<Router {(RequestLogger, HelpHandler, Layout{template:"Layout"})}>
+<Router {(RequestLogger, HelpHandler, Layout{document:"templates/Layout.bsx"})}>
 	<RoutesDir src="routes"/>
 </Router>
 ```

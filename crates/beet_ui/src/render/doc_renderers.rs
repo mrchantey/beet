@@ -253,12 +253,11 @@ mod test {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<div><p>hi</p></div>");
-		BsxParser
-			.parse_into(ParseContext::new(
-				&mut world.entity_mut(entity),
-				&bytes,
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(entity),
+			&bytes,
+		))
+		.unwrap();
 		(world, entity)
 	}
 
@@ -458,12 +457,11 @@ mod test {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_markdown("# Title");
-		MarkdownParser::new()
-			.parse_into(ParseContext::new(
-				&mut world.entity_mut(entity),
-				&bytes,
-			))
-			.unwrap();
+		DocParsers::parse(ParseContext::new(
+			&mut world.entity_mut(entity),
+			&bytes,
+		))
+		.unwrap();
 		DocRenderers::render(
 			&mut world,
 			entity,

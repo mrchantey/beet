@@ -134,9 +134,9 @@ impl RouteMeta {
 	/// declaration, so a numbered file is ordered whatever else it declares,
 	/// frontmatter or none.
 	///
-	/// A patch of the LITERAL rather than of a built value, so the discovery scan
-	/// and the codegen emit share it: an emitted route carries no filename to
-	/// derive the order from at spawn.
+	/// A patch of the declarations as data rather than of a built value, so the
+	/// discovery scan and the codegen emit share it: an emitted route carries no
+	/// filename to derive the order from at spawn.
 	///
 	/// So a numbered directory keeps its reading order in the nav and in a
 	/// generated page index even once a [`slug`](Self::slug) has taken the number
@@ -144,7 +144,7 @@ impl RouteMeta {
 	/// url would not.
 	#[cfg(feature = "bsx")]
 	pub fn declare_file_defaults(
-		declarations: &mut RootDeclarations,
+		declarations: &mut EntityBody,
 		file: &RelPath,
 	) {
 		let Some(order) = file
@@ -155,17 +155,13 @@ impl RouteMeta {
 			return;
 		};
 		let name = TypeName::of::<Self>().short();
-		if !declarations.0.iter().any(|named| named.name == name) {
-			declarations.0.push(NamedLiteral {
-				name: name.clone(),
-				fields: NamedFields::Unit,
-			});
+		if !declarations
+			.keys()
+			.any(|key| TypeName::new(key.as_str()).short() == name)
+		{
+			declarations.insert(Self::type_path(), Value::map());
 		}
-		declarations.declare_default(
-			&name,
-			"order",
-			DataLiteral::Scalar(Value::Uint(order)),
-		);
+		declarations.declare_default(&name, "order", Value::Uint(order));
 	}
 }
 
@@ -181,8 +177,9 @@ mod test {
 		registry.register::<RouteMeta>();
 		Frontmatter::parse(content, MediaType::Toml)
 			.unwrap()
-			.declarations(&TypeName::of::<DocMeta>().short())
-			.get::<RouteMeta>(&registry)
+			.components(&DocParsers::default())
+			.unwrap()
+			.get_reflect::<RouteMeta>(&registry)
 			.unwrap()
 			.unwrap_or_default()
 	}
@@ -240,12 +237,16 @@ mod test {
 			let mut declarations =
 				Frontmatter::parse(frontmatter, MediaType::Toml)
 					.unwrap()
-					.declarations(&TypeName::of::<DocMeta>().short());
+					.components(&DocParsers::default())
+					.unwrap();
 			RouteMeta::declare_file_defaults(
 				&mut declarations,
 				&RelPath::new(file),
 			);
-			declarations.get::<RouteMeta>(&registry).unwrap()?.order
+			declarations
+				.get_reflect::<RouteMeta>(&registry)
+				.unwrap()?
+				.order
 		};
 		order("blog/10-later.md", "title = \"Later\"")
 			.unwrap()

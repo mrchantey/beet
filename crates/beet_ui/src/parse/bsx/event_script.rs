@@ -84,13 +84,11 @@ mod test {
 	/// Spawn `markup` under `doc` and return the element the observer is wired
 	/// onto (the container's one content child).
 	fn click_target(world: &mut World, doc: Entity, markup: &str) -> Entity {
-		let container = world
-			.spawn_template(BsxTemplate::parse_document(markup).unwrap())
-			.unwrap()
-			.id();
-		world.entity_mut(container).insert(ChildOf(doc));
+		let body = SceneBody::parse_bsx(world, markup).unwrap();
+		let target = world.spawn_template(body).unwrap().id();
+		world.entity_mut(target).insert(ChildOf(doc));
 		world.update_local();
-		world.entity(container).get::<Children>().unwrap()[0]
+		target
 	}
 
 	/// Fire the trigger and drive the world until the script's evaluation has

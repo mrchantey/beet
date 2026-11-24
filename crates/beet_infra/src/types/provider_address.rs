@@ -116,18 +116,12 @@ mod test {
 	fn addresses_resolve_by_ancestry() {
 		let mut world = InfraPlugin.into_world();
 		world.init_resource::<PackageConfig>();
-		let root = BsxTemplate::parse_entry(
-			&world,
-			r#"<Router {AwsRegion("ap-southeast-2")}>
+		let root = SceneBody::spawn_bsx(&mut world, r#"<Router {AwsRegion("ap-southeast-2")}>
 				<Stack app_name="mail" {(CloudflareAccount("acct"), CloudflareZone{domain:"beetmash.com", id:"zone"})}>
 					<div/>
 				</Stack>
 				<Stack app_name="other" {AwsRegion("us-west-2")}/>
-			</Router>"#,
-		)
-		.unwrap()
-		.spawn(&mut world)
-		.unwrap();
+			</Router>"#).unwrap();
 		world.flush();
 		let stacks = world
 			.query_filtered::<Entity, With<Stack>>()

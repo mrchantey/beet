@@ -11,6 +11,7 @@
 //! the filesystem itself lives in [`fs_ext`](crate::prelude::fs_ext).
 
 mod abs_path;
+mod doc_path;
 pub mod path_ext;
 mod rel_path;
 mod smol_path;
@@ -19,6 +20,7 @@ mod url;
 mod ws_path;
 
 pub use abs_path::*;
+pub use doc_path::*;
 pub use rel_path::*;
 pub use smol_path::*;
 pub use uri::*;

@@ -160,18 +160,31 @@ async fn read_document_blob(
 	if last_written.matches(&bytes) {
 		return OK;
 	}
-	let path = blob.path().clone();
-	let document = TypedDocument::read(
+	let mut document = TypedDocument::read(
 		SchemaResolver::default().with_schemas(&snapshot),
-		path.as_str(),
-		&MediaBytes::new(super::document_media_type(&path), bytes),
+		blob.path().as_str(),
+		&MediaBytes::new(super::document_media_type(blob.path()), bytes),
 	)
 	.await?;
+	// what it names resolves from its path in its package
+	let path = entity
+		.with_state::<PackageQuery, _>({
+			let blob = blob.clone();
+			move |entity, packages| {
+				packages
+					.get(entity)
+					.map(|package| package.path_of(&blob))
+					.unwrap_or_else(|_| blob.path().clone())
+			}
+		})
+		.await?;
+	document.schema = document.schema.resolve_documents(&path);
 	// a schema document is a `ValueSchema` stored as data, so its own declared
 	// schema is the meta-schema by definition; that is the whole test for one.
 	let schema = (document.schema == ValueSchema::type_ref::<ValueSchema>())
 		.then(|| document.to_schema())
-		.transpose()?;
+		.transpose()?
+		.map(|schema| schema.resolve_documents(&path));
 	entity
 		.with(move |mut entity| {
 			// registered before the document lands, so the read backstop and

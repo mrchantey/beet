@@ -39,8 +39,7 @@ quit and run again: every edit came back from the fork.
 	     runtime. Each launch names the one it has, so the entry keeps its shape
 	     on all three and refuses a binary that could paint on none. -->
 	<RequireCfg cfg="feature:tui || feature:web"/>
-	<Router {Layout{template:"EditorShell"}}>
-		<TemplateDir src="templates"/>
+	<Router {Layout{document:"templates/EditorShell.bsx"}}>
 		<!-- the store the browser reads this entry through, and the wasm binary
 		     its page boots (`wasm/` links to the build output, `just build-wasm-ui`). -->
 		<ServeBlobs prefix="repo"/>

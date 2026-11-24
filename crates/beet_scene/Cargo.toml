@@ -1,0 +1,26 @@
+[package]
+name = "beet_scene"
+version.workspace = true
+edition.workspace = true
+description = "Documents as scenes: instantiating one document in another"
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+default = []
+
+[lib]
+harness = false
+
+[dependencies]
+beet_core = { workspace = true, features = ["std", "bsx"] }
+beet_net = { workspace = true, features = ["std"] }
+bevy.workspace = true
+
+[dev-dependencies]
+beet_core = { workspace = true, features = ["testing", "rsx", "json"] }

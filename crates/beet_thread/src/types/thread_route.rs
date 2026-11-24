@@ -5,24 +5,23 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-/// A thread run as a function: built for one request from the named
-/// template, run to its outcome, answered and despawned: a request in, an
+/// A thread run as a function: built for one request from the document or
+/// template it names, run to its outcome, answered and despawned: a request in, an
 /// answer out, nobody typing. It is the narrow case of a thread; one a person
 /// sits in is held by a [`RunThread`].
 ///
 /// ```bsx
-/// <Route path="review/:document" {ThreadRoute{template:"ReviewThread", message:"review {document}"}}/>
-/// <!-- ReviewThread.bsx -->
+/// <Route path="review/:document" {ThreadRoute{document:"templates/ReviewThread.bsx", message:"review {document}"}}/>
+/// <!-- templates/ReviewThread.bsx -->
 /// <Thread {(Sequence, MountThreadStore{path:"threads/review/{document}"})}> ..actors.. </Thread>
 /// ```
 ///
 /// The words are the model's, defined once in the [`table`](crate::table)
 /// module docs. On every request it:
 ///
-/// 1. builds a fresh thread from `template`, a name resolved as a [`Layout`]
-///    resolves its own ([`BsxTemplate::named`]), with the request on the
-///    [`RequestContextStack`] for the build, then attaches it beneath the
-///    route, where it resolves the ancestor stores and the surrounding url
+/// 1. builds a fresh thread from what it names ([`TemplateSource`], as a
+///    [`Layout`] does), with the request on the [`RequestContextStack`] for
+///    the build, then attaches it beneath the route, where it resolves the ancestor stores and the surrounding url
 ///    space as if authored there. It is built detached first, so the
 ///    surrounding [`RouteTree`] never rebuilds for it;
 /// 2. enters it ([`Thread::enter`]), the template's [`MountThreadStore`]
@@ -46,10 +45,13 @@ use beet_router::prelude::*;
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn ThreadRoute(
-	/// The template building the thread: a `.bsx` document in the
-	/// [`BsxTemplateRegistry`] or a rust `#[template]`, by name.
+	/// The document building the thread.
 	#[field]
-	template: SmolStr,
+	document: Option<DocPath>,
+	/// The rust `#[template]` building the thread, by name, in place of a
+	/// document.
+	#[field]
+	template: Option<SmolStr>,
 	/// The message each request posts once the thread is entered, each
 	/// `{param}` filled from the request. None posts nothing.
 	#[field]
@@ -70,10 +72,12 @@ pub async fn ThreadRoute(
 	if let Some(message) = &message {
 		entry = entry.with_message(message, actor)?;
 	}
+	let source = TemplateSource::load(&route, document, template).await?;
 	let root =
-		ThreadRoute::build(&route, template.clone(), cx.input.parts().clone())
+		ThreadRoute::build(&route, source.clone(), cx.input.parts().clone())
 			.await?;
-	let answer = ThreadRoute::run(&world.entity(root), &template, entry).await;
+	let answer =
+		ThreadRoute::run(&world.entity(root), source.name(), entry).await;
 	// torn down however the run ended, the response answered after
 	world
 		.with(move |world: &mut World| ThreadRoute::despawn(world, root))
@@ -82,19 +86,18 @@ pub async fn ThreadRoute(
 }
 
 impl ThreadRoute {
-	/// Build `template` for the request `parts`, settle it and attach it
+	/// Build `source` for the request `parts`, settle it and attach it
 	/// beneath `route`, answering the build root, the container holding the
 	/// template's own root.
 	async fn build(
 		route: &AsyncEntity,
-		template: SmolStr,
+		source: TemplateSource,
 		parts: RequestParts,
 	) -> Result<Entity> {
 		let route_id = route.id();
 		let root = route
 			.world()
 			.with(move |world: &mut World| -> Result<Entity> {
-				let template = BsxTemplate::named(world, &template)?;
 				let router = world
 					.with_state::<AncestorQuery<&RouteTree>, _>(|trees| {
 						trees.get_entity(route_id)
@@ -104,12 +107,7 @@ impl ThreadRoute {
 				RequestContextStack::scoped(
 					world,
 					RequestContext::new(parts, root, route_id, router),
-					|world| {
-						world
-							.entity_mut(root)
-							.insert_template(template)
-							.map(|_| ())
-					},
+					|world| source.build(&mut world.entity_mut(root)),
 				)?;
 				// the build's route tree wakes run while the thread is still
 				// detached, so they reach its own url spaces and never the
@@ -158,13 +156,11 @@ impl ThreadRoute {
 			})
 			.await?
 			.ok_or_else(|| {
-				bevyhow!(
-					"the template `{template}` must build exactly one root"
-				)
+bevyhow!("`{template}` must build exactly one root")
 			})?;
-		let thread = *threads.first().ok_or_else(|| {
-			bevyhow!("the template `{template}` builds no `<Thread>`")
-		})?;
+		let thread = *threads
+			.first()
+			.ok_or_else(|| bevyhow!("`{template}` builds no `<Thread>`"))?;
 		let outcome =
 			root.world().entity(behavior).call::<(), Outcome>(()).await;
 		RunThread::flush_all(&root.world(), &threads).await?;
@@ -211,7 +207,7 @@ impl ThreadRoute {
 			.await?;
 		match typing {
 			Some(actor) => bevybail!(
-				"the template `{template}` holds a `UserInput` on the actor `{actor}`, \
+				"`{template}` holds a `UserInput` on the actor `{actor}`, \
 				 but a `ThreadRoute` runs with nobody typing: a thread a person sits \
 				 in is held by a `RunThread`"
 			),
@@ -362,17 +358,15 @@ mod test {
 	#[require(Action<(), Outcome> = Action::new_async(hold))]
 	struct Hold;
 
-	/// A url space over an in-memory store, its routes running each
-	/// template.
-	fn url_space() -> (App, Entity, BlobStore) {
+	/// A url space over an in-memory store holding each thread document, its
+	/// routes running each.
+	async fn url_space() -> (App, Entity, BlobStore) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.install_type::<ThreadPlugin>()
 			.register_type::<Bail>()
 			.register_type::<Hold>();
-		let mut registry = app
-			.world_mut()
-			.get_resource_or_init::<BsxTemplateRegistry>();
+		let store = BlobStore::temp();
 		for (name, source) in [
 			("ReviewThread", REVIEW_THREAD),
 			("DelegateThread", DELEGATE_THREAD),
@@ -380,24 +374,25 @@ mod test {
 			("HoldingThread", HOLDING_THREAD),
 			("SittingThread", SITTING_THREAD),
 		] {
-			registry.insert_source(name, source).unwrap();
+			store
+				.insert(&RelPath::new(format!("{name}.bsx")), source)
+				.await
+				.unwrap();
 		}
-		let store = BlobStore::temp();
-		let router = BsxTemplate::parse_entry(
+		let body = SceneBody::parse_bsx(
 			app.world(),
 			r#"<Router>
-	<Route path="review/:document" {ThreadRoute{template:"ReviewThread", message:"review {document}"}}/>
-	<Route path="edit/:document" {ThreadRoute{template:"ReviewThread", message:"edit {document}", actor:3}}/>
-	<Route path="delegate" {ThreadRoute{template:"DelegateThread"}}/>
-	<Route path="fail" {ThreadRoute{template:"FailingThread"}}/>
-	<Route path="hold" {ThreadRoute{template:"HoldingThread"}}/>
-	<Route path="lonely" {ThreadRoute{template:"FailingThread", message:"anyone?"}}/>
-	<Route path="sit" {ThreadRoute{template:"SittingThread"}}/>
+	<Route path="review/:document" {ThreadRoute{document:"ReviewThread.bsx", message:"review {document}"}}/>
+	<Route path="edit/:document" {ThreadRoute{document:"ReviewThread.bsx", message:"edit {document}", actor:3}}/>
+	<Route path="delegate" {ThreadRoute{document:"DelegateThread.bsx"}}/>
+	<Route path="fail" {ThreadRoute{document:"FailingThread.bsx"}}/>
+	<Route path="hold" {ThreadRoute{document:"HoldingThread.bsx"}}/>
+	<Route path="lonely" {ThreadRoute{document:"FailingThread.bsx", message:"anyone?"}}/>
+	<Route path="sit" {ThreadRoute{document:"SittingThread.bsx"}}/>
 </Router>"#,
 		)
-		.unwrap()
-		.spawn(app.world_mut())
 		.unwrap();
+		let router = app.world_mut().spawn_template(body).unwrap().id();
 		app.world_mut()
 			.entity_mut(router)
 			.insert((store.clone(), TableStore::new(store.clone())));
@@ -444,7 +439,7 @@ mod test {
 	/// its posts in the store and the surrounding route tree untouched.
 	#[beet_core::test]
 	async fn answers_then_despawns_its_thread() {
-		let (mut app, router, store) = url_space();
+		let (mut app, router, store) = url_space().await;
 		let tree = app
 			.world()
 			.entity(router)
@@ -475,7 +470,7 @@ mod test {
 	/// posting its own message, and another document keeps its own.
 	#[beet_core::test]
 	async fn continues_by_its_path() {
-		let (mut app, router, store) = url_space();
+		let (mut app, router, store) = url_space().await;
 		for path in ["review/product", "review/product", "review/market"] {
 			review(&mut app, router, Request::get(path))
 				.await
@@ -499,7 +494,7 @@ mod test {
 	/// by the named actor, else the thread's first User actor by id.
 	#[beet_core::test]
 	async fn posts_the_message_by_its_actor() {
-		let (mut app, router, store) = url_space();
+		let (mut app, router, store) = url_space().await;
 		for path in ["review/product", "edit/product"] {
 			review(&mut app, router, Request::get(path))
 				.await
@@ -537,7 +532,7 @@ mod test {
 	/// no User actor.
 	#[beet_core::test]
 	async fn a_message_needs_an_author() {
-		let (mut app, router, _) = url_space();
+		let (mut app, router, _) = url_space().await;
 		let (status, text) =
 			review(&mut app, router, Request::get("lonely")).await;
 		status.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
@@ -548,7 +543,7 @@ mod test {
 	/// `--thread` continues a stored one by id, a malformed id refused.
 	#[beet_core::test]
 	async fn its_params_pick_the_thread() {
-		let (mut app, router, store) = url_space();
+		let (mut app, router, store) = url_space().await;
 		review(&mut app, router, Request::get("review/product")).await;
 		let (first, _) = only_thread(&store, "threads/product").await;
 		for request in [
@@ -581,7 +576,7 @@ mod test {
 	/// keeps its creator, and usage stays on each response's metadata.
 	#[beet_core::test]
 	async fn each_request_joins_its_actors() {
-		let (mut app, router, store) = url_space();
+		let (mut app, router, store) = url_space().await;
 		let creator = delegating_post();
 		let second = PostRef::new(ThreadId::from_u128(1), PostId::from_u128(3));
 		for spawned_by in [&creator, &second] {
@@ -646,7 +641,7 @@ mod test {
 	/// field of the call.
 	#[beet_core::test]
 	async fn spawned_by_travels_as_a_body_field() {
-		let (mut app, router, store) = url_space();
+		let (mut app, router, store) = url_space().await;
 		review(&mut app, router, Request::get("review/product")).await;
 		only_thread(&store, "threads/product")
 			.await
@@ -654,7 +649,7 @@ mod test {
 			.spawned_by()
 			.xpect_none();
 
-		let (mut app, router, store) = url_space();
+		let (mut app, router, store) = url_space().await;
 		review(&mut app, router, Request::get("delegate"))
 			.await
 			.0
@@ -670,7 +665,7 @@ mod test {
 	/// for its end.
 	#[beet_core::test]
 	async fn an_erroring_thread_still_flushes() {
-		let (mut app, router, store) = url_space();
+		let (mut app, router, store) = url_space().await;
 		review(&mut app, router, Request::get("fail"))
 			.await
 			.1
@@ -689,7 +684,7 @@ mod test {
 	/// turn passes.
 	#[beet_core::test]
 	async fn a_live_thread_answers_conflict() {
-		let (mut app, router, _) = url_space();
+		let (mut app, router, _) = url_space().await;
 		let (first, second) = app
 			.world_mut()
 			.entity_mut(router)
@@ -732,7 +727,7 @@ mod test {
 	/// A template a person types into is refused, naming the actor.
 	#[beet_core::test]
 	async fn refuses_a_person_typing() {
-		let (mut app, router, _) = url_space();
+		let (mut app, router, _) = url_space().await;
 		let (status, text) =
 			review(&mut app, router, Request::get("sit")).await;
 		status.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);

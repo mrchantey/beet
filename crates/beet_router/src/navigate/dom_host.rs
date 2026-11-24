@@ -129,7 +129,7 @@ mod test {
 		DomHost::settled(&mut world, host).xpect_true();
 		// a pending template dependency holds it too
 		let mut pending = TemplatePending::default();
-		pending.register(PendingKind::Structural, "<Template src>");
+		pending.register(PendingKind::Structural, "<Instance>");
 		world.entity_mut(page).insert(pending);
 		DomHost::settled(&mut world, host).xpect_false();
 	}

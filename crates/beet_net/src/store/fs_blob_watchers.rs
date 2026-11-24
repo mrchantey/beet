@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 /// Registers a single directory to be watched for live reload, keyed to the
 /// [`base`](BlobStore::base) of its owning [`BlobStore`].
 ///
-/// Each mount that exposes a directory (a `RoutesDir`/`TemplateDir`/`AssetsDir`
+/// Each mount that exposes a directory (a `RoutesDir`/`AssetsDir`
 /// [`DirPath`] scope, the entry document's own dir) carries one, so only those
 /// subtrees are watched, never the whole store root (a recursive watch over the
 /// workspace exceeds the inotify limit and dies silently).

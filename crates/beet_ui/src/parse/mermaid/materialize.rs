@@ -331,24 +331,6 @@ mod test {
 			.xpect_eq(art);
 	}
 
-	/// A reparse into the same tree (a watched file, an editor) diffs the
-	/// changed fence back onto its figure, and the form is built again from
-	/// the new source.
-	#[beet_core::test]
-	fn reparse_rebuilds_the_form() {
-		let mut app = App::new();
-		app.add_plugins(StylePlugin);
-		let root = app.world_mut().spawn_empty().id();
-		parse_md(app.world_mut(), root, FLOWCHART);
-		html(&mut app, root).xpect_contains("Paint");
-		parse_md(app.world_mut(), root, &FLOWCHART.replace("Paint", "Draw"));
-		html(&mut app, root)
-			.xpect_contains("<figure class=\"diagram\">")
-			.xpect_contains("Draw")
-			.xnot()
-			.xpect_contains("Paint");
-	}
-
 	#[beet_core::test]
 	fn render_error_keeps_the_source() {
 		let mut app = App::new();
