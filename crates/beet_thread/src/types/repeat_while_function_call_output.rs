@@ -4,12 +4,11 @@ use beet_core::prelude::*;
 
 /// Whether the newest post of the thread that is not a log is a function
 /// call output its call answered, rather than one an interrupt closed.
-/// The `thread_entity` should be an entity within a thread tree
-/// (the Thread entity itself or any descendant).
+/// `entity` is the window or any descendant.
 async fn has_pending_function_call_output(
-	thread_entity: &AsyncEntity,
+	entity: &AsyncEntity,
 ) -> Result<bool> {
-	thread_entity
+	entity
 		.with_state::<ThreadQuery, _>(|entity, query| -> Result<bool> {
 			query
 				.records(entity)?
@@ -30,8 +29,8 @@ async fn has_pending_function_call_output(
 /// Calls its single child in a loop, continuing as long as the
 /// thread's newest post that is not a log is a completed
 /// [`AgentPost::FunctionCallOutput`].
-/// This drives the standard agent loop: stream response → call tools →
-/// check if the agent needs another turn.
+/// This drives the standard agent loop: stream a response, call its tools,
+/// then call the model again if it has outputs to read.
 ///
 /// Returns [`Outcome::Pass`] when that post is anything else, ie a text
 /// response, a person's post, or the output of a call an [`InterruptTurn`]
@@ -73,7 +72,7 @@ pub async fn RepeatWhileFunctionCallOutput(
 		}
 
 		// check if the agent produced tool call outputs that need processing,
-		// using the child entity which is within the thread tree
+		// using the child entity, which is at or under the window
 		if !has_pending_function_call_output(&child_entity).await? {
 			return Outcome::PASS.xok();
 		}

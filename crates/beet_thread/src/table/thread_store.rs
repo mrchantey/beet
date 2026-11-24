@@ -6,8 +6,8 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
-/// The stored threads of one directory, the truth every window of them is a
-/// view onto: [`Thread`], [`Actor`], [`Post`] and [`ResponseMeta`] rows in a
+/// The stored threads of one directory, the truth every window of them is
+/// open onto: [`Thread`], [`Actor`], [`Post`] and [`ResponseMeta`] rows in a
 /// [`TableStore`].
 ///
 /// Every record is its own row, keyed by the mount's filled directory, its

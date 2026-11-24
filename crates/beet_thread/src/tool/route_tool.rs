@@ -1,39 +1,39 @@
-//! `<HostTool/>`: a verb of the url space hosting an agent, as one of its
-//! tools.
+//! `<RouteTool/>`: a route of the url space surrounding an agent, as one of
+//! its tools.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-/// A route of the url space hosting the agent, ie `eval/grade`, as one of the
-/// agent's tools: a route in the agent's own url space at the same path, so
+/// A route of the url space surrounding the agent, ie `eval/grade`, as one of
+/// the agent's tools: a route in the agent's own url space at the same path, so
 /// the tool's name is the verb a person runs.
 ///
 /// ```bsx
 /// <CreateActor name="Coach" kind="Agent" {ModelStreamer{provider:OpenAi}}>
 ///     <Router>
-///         <HostTool path="eval/rows"/>
-///         <HostTool path="eval/put" params="table=claims"/>
+///         <RouteTool path="eval/rows"/>
+///         <RouteTool path="eval/put" params="table=claims"/>
 ///     </Router>
 /// </CreateActor>
 /// ```
 ///
-/// Its definition is the host route's ([`HostRoute::definition`]): its doc,
-/// and its declared params as the arguments. A dynamic segment after `path`,
-/// ie the `*rubric` of `eval/build/*rubric`, is a string argument filled
-/// into the path. A call is forwarded to the host answering what the host
-/// answers, a refusal included: to a route reading its params off the
-/// request, ie an `#[action]` taking `#[param]`s, its arguments are sent as
-/// those params, so the host validates them as it does flags; to a route
-/// taking a typed input, as the JSON body that input reads.
+/// Its definition is the target route's ([`RouteToolCall::definition`]): its
+/// doc, and its declared params as the arguments. A dynamic segment after
+/// `path`, ie the `*rubric` of `eval/build/*rubric`, is a string argument
+/// filled into the path. A call is forwarded to the target and answers what it
+/// answers, a refusal included: to a route reading its params off the request,
+/// ie an `#[action]` taking `#[param]`s, its arguments are sent as those
+/// params, so they are validated as flags are; to a route taking a typed
+/// input, as the JSON body that input reads.
 ///
 /// `params` pins params the agent cannot choose, as a query string: each is
 /// left out of the schema, sent with every call, and a call supplying one is
-/// refused. `accept` is the media type asked of the host, `text/markdown`, an
-/// agent's reading form, by default.
+/// refused. `accept` is the media type asked of the target, `text/markdown`,
+/// an agent's reading form, by default.
 #[template]
-pub fn HostTool(
-	/// The host route's path, its static segments, and this tool's path in
+pub fn RouteTool(
+	/// The target route's path, its static segments, and this tool's path in
 	/// the agent's url space.
 	#[prop(required)]
 	path: String,
@@ -41,58 +41,58 @@ pub fn HostTool(
 	/// `package=acme&table=claims`.
 	#[prop(default)]
 	params: String,
-	/// The media type asked of the host.
+	/// The media type asked of the target.
 	#[prop(default = String::from("text/markdown"))]
 	accept: String,
 ) -> impl Bundle {
-	(PathPartial::new(&path), HostRoute {
+	(PathPartial::new(&path), RouteToolCall {
 		path: path.into(),
 		params: params.into(),
 		accept: accept.into(),
 	})
 }
 
-/// The action of a [`HostTool`]: each call forwarded to the route at `path`
-/// in the url space hosting the agent ([`ThreadQuery::agent_host`]).
+/// The action of a [`RouteTool`]: each call forwarded to the route at `path`
+/// in the url space surrounding the agent ([`ThreadQuery::agent_url_space`]).
 #[action]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn HostRoute(
-	/// The host route's static path.
+pub async fn RouteToolCall(
+	/// The target route's static path.
 	#[field]
 	path: SmolStr,
 	/// The pinned params, as a query string.
 	#[field]
 	params: SmolStr,
-	/// The media type asked of the host.
+	/// The media type asked of the target.
 	#[field]
 	accept: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
-	let this = HostRoute {
+	let this = RouteToolCall {
 		path,
 		params,
 		accept,
 	};
 	let world = cx.world();
-	let (host, captures, params) = cx
+	let (url_space, captures, params) = cx
 		.caller
 		.with_state::<(ThreadQuery, Query<&RouteTree>), _>({
 			let this = this.clone();
 			move |entity, (query, trees)| -> Result<_> {
-				let host = query.agent_host(entity)?;
-				let node = this.host_node(&query, &trees, host)?;
-				let captures = HostRoute::captures(&node.path, &this.path);
+				let url_space = query.agent_url_space(entity)?;
+				let node = this.target(&query, &trees, url_space)?;
+				let captures = RouteToolCall::captures(&node.path, &this.path);
 				let params = node.reads_request().then(|| node.params.clone());
-				(host, captures, params).xok()
+				(url_space, captures, params).xok()
 			}
 		})
 		.await??;
 	let request = this.forward(cx.input, &captures, params.as_ref()).await?;
-	world.entity(host).exchange(request).await.xok()
+	world.entity(url_space).exchange(request).await.xok()
 }
 
-/// A dynamic segment of a host route after a [`HostTool`]'s path: a string
+/// A dynamic segment of a target route after a [`RouteTool`]'s path: a string
 /// argument of the tool, filled into the path.
 struct Capture {
 	name: SmolStr,
@@ -100,22 +100,22 @@ struct Capture {
 	greedy: bool,
 }
 
-impl HostRoute {
-	/// The tool definition of this route: the host route's description, and
-	/// as its arguments the host route's own params less those pinned, beside
-	/// a string per dynamic segment after [`path`](Self::path).
+impl RouteToolCall {
+	/// The tool definition of this route: the target route's description, and
+	/// as its arguments the target's own params less those pinned, beside a
+	/// string per dynamic segment after [`path`](Self::path).
 	///
 	/// ## Errors
 	///
-	/// Errors when the url space at `host` has no such route, or the route
-	/// takes a typed input while this pins params or fills captures.
+	/// Errors when the url space at `url_space` has no such route, or the
+	/// route takes a typed input while this pins params or fills captures.
 	pub fn definition(
 		&self,
 		query: &ThreadQuery,
 		trees: &Query<&RouteTree>,
-		host: Entity,
+		url_space: Entity,
 	) -> Result<FunctionToolDefinition> {
-		let node = self.host_node(query, trees, host)?;
+		let node = self.target(query, trees, url_space)?;
 		let description = node.description().unwrap_or_default();
 		let captures = Self::captures(&node.path, &self.path);
 		let pinned = self.pinned();
@@ -135,14 +135,14 @@ impl HostRoute {
 			false if pinned.is_empty() && captures.is_empty() => {
 				node.meta.input_json_schema()?.ok_or_else(|| {
 					bevyhow!(
-						"the host route `{}` takes no input a tool can describe",
+						"the route `{}` takes no input a tool can describe",
 						self.path
 					)
 				})?
 			}
 			false => bevybail!(
-				"`<HostTool path=\"{}\"/>` pins params or fills a path segment, \
-				 which only a host route reading its params off the request takes",
+				"`<RouteTool path=\"{}\"/>` pins params or fills a path segment, \
+				 which only a route reading its params off the request takes",
 				self.path
 			),
 		};
@@ -154,21 +154,23 @@ impl HostRoute {
 		Url::parse_query_string(&self.params)
 	}
 
-	/// The route of the url space at `host` this tool forwards to: the one
-	/// whose static segments are [`path`](Self::path), every segment after
+	/// The route of the url space at `url_space` this tool forwards to: the
+	/// one whose static segments are [`path`](Self::path), every segment after
 	/// them dynamic, a route at exactly `path` preferred.
-	fn host_node<'a>(
+	fn target<'a>(
 		&self,
 		query: &ThreadQuery,
 		trees: &'a Query<&RouteTree>,
-		host: Entity,
+		url_space: Entity,
 	) -> Result<&'a ActionNode> {
 		let tree = query
 			.children
-			.iter_descendants_inclusive(host)
+			.iter_descendants_inclusive(url_space)
 			.find_map(|entity| trees.get(entity).ok())
 			.ok_or_else(|| {
-				bevyhow!("no RouteTree at or under the agent's host {host}")
+				bevyhow!(
+					"no RouteTree at or under the agent's url space {url_space}"
+				)
 			})?;
 		let segments = self
 			.path
@@ -191,7 +193,7 @@ impl HostRoute {
 		candidates.sort_by_key(|node| node.path.len());
 		candidates.into_iter().next().ok_or_else(|| {
 			bevyhow!(
-				"`<HostTool path=\"{}\"/>` names no route of the url space hosting the agent",
+				"`<RouteTool path=\"{}\"/>` names no route of the url space surrounding the agent",
 				self.path
 			)
 		})
@@ -214,8 +216,8 @@ impl HostRoute {
 			.collect()
 	}
 
-	/// The host request for one `call`: its arguments less the captures,
-	/// which fill the path, as the `params` of a host route reading its
+	/// The request forwarded for one `call`: its arguments less the captures,
+	/// which fill the path, as the `params` of a target route reading its
 	/// params off the request ([`Self::insert_params`]), else as a JSON body,
 	/// with the pinned params beside them.
 	///
@@ -353,7 +355,7 @@ mod test {
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
 
-	/// Stands in for a host verb taking params.
+	/// Stands in for a verb taking params.
 	#[action(route = "eval/grade")]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
@@ -388,7 +390,7 @@ mod test {
 		Strict,
 	}
 
-	/// Stands in for a host verb writing a row of a table.
+	/// Stands in for a verb writing a row of a table.
 	#[action(route = "eval/put")]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
@@ -407,7 +409,7 @@ mod test {
 		.xok()
 	}
 
-	/// Stands in for a host verb whose target is a path capture.
+	/// Stands in for a verb whose target is a path capture.
 	#[action(route = "eval/build/*rubric")]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
@@ -415,7 +417,7 @@ mod test {
 		MediaBytes::new_text(format!("built {}", cx.input.path_string())).xok()
 	}
 
-	/// Stands in for a host verb the agent is given no tool for.
+	/// Stands in for a verb the agent is given no tool for.
 	#[action(route = "eval/secret")]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
@@ -423,14 +425,14 @@ mod test {
 		MediaBytes::new_text("leaked").xok()
 	}
 
-	/// A host router of the four verbs, a thread beneath it whose agent plays
-	/// `script` holding `HostTool`s for all but `eval/secret`, returning the
+	/// A router of the four verbs, a thread beneath it whose agent plays
+	/// `script` holding a [`RouteTool`] for all but `eval/secret`, returning the
 	/// app and the agent.
 	fn setup(script: &str) -> (App, Entity, Entity) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.install_type::<ThreadPlugin>();
-		let host = app
+		let router = app
 			.world_mut()
 			.spawn((Router, children![
 				Grade::default(),
@@ -445,9 +447,9 @@ mod test {
 	<CreateActor name="User" kind="User"><CreatePost text="go"/></CreateActor>
 	<CreateActor name="Agent" kind="Agent" {{MockPostStreamer{{script:[{script}]}}}}>
 		<Router>
-			<HostTool path="eval/grade"/>
-			<HostTool path="eval/put" params="table=claims"/>
-			<HostTool path="eval/build"/>
+			<RouteTool path="eval/grade"/>
+			<RouteTool path="eval/put" params="table=claims"/>
+			<RouteTool path="eval/build"/>
 		</Router>
 	</CreateActor>
 </Thread>
@@ -457,7 +459,7 @@ mod test {
 			.unwrap()
 			.spawn(app.world_mut())
 			.unwrap();
-		app.world_mut().entity_mut(host).add_child(thread);
+		app.world_mut().entity_mut(router).add_child(thread);
 		app.update();
 		ThreadRecords::reduce_now(app.world_mut());
 		let agent = app
@@ -517,17 +519,15 @@ mod test {
 		})
 	}
 
-	/// A host verb is a tool at its own path, its params the arguments, and a
-	/// call answers what the host answers.
+	/// A verb is a tool at its own path, its params the arguments, and a call
+	/// answers what the verb answers.
 	#[beet_core::test]
-	async fn calls_a_host_verb_with_params() {
+	async fn calls_a_route_with_params() {
 		let (mut app, thread, agent) = setup(
 			r#"Call{tool:"eval/grade", arguments:{eval:"brand.voice", level:2, tags:["a", "b"]}}"#,
 		);
 		let grade = tool(&mut app, agent, "eval/grade");
-		grade
-			.description()
-			.xpect_contains("Stands in for a host verb");
+		grade.description().xpect_contains("Stands in for a verb");
 		grade
 			.params_schema()
 			.get("required")
@@ -539,11 +539,11 @@ mod test {
 		]);
 	}
 
-	/// The host route's params are the tool's schema, each typed as a
+	/// The target route's params are the tool's schema, each typed as a
 	/// structured caller writes it, with its doc line and how its type is
 	/// written where that is particular.
 	#[beet_core::test]
-	fn host_params_are_the_schema() {
+	fn route_params_are_the_schema() {
 		let (mut app, _, agent) = setup("");
 		tool(&mut app, agent, "eval/grade")
 			.params_schema()
@@ -551,10 +551,10 @@ mod test {
 			.xpect_snapshot();
 	}
 
-	/// A host route the agent holds no `HostTool` for is its router's
+	/// A surrounding route the agent holds no [`RouteTool`] for is its router's
 	/// not-found.
 	#[beet_core::test]
-	async fn refuses_a_host_route_with_no_tool() {
+	async fn refuses_a_route_with_no_tool() {
 		let (mut app, thread, agent) =
 			setup(r#"Call{tool:"eval/secret", arguments:{}}"#);
 		outputs(&mut app, thread, agent, 1).await[0]
@@ -564,7 +564,7 @@ mod test {
 			.xpect_contains("leaked");
 	}
 
-	/// A path capture of the host route is a required string argument,
+	/// A path capture of the target route is a required string argument,
 	/// filled into the path.
 	#[beet_core::test]
 	async fn fills_a_capture_from_an_argument() {

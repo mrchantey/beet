@@ -3,8 +3,8 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 
 impl Post {
-	/// Spawn a single-turn thread from an `author_scene` (its actors and seed posts),
-	/// run the thread to completion, and collect the posts it authored.
+	/// Spawn a thread from an `author_scene` (its actors and seed posts), run its
+	/// behavior, one turn each, to completion, and collect the posts it made.
 	///
 	/// You **call the thread**, not "the agent": the scene reduces into a
 	/// [`ThreadRecords`], then calling the thread's `Sequence` runs each actor's turn
@@ -34,7 +34,7 @@ impl Post {
 		// reduce the author scene into a ThreadRecords + behavior entities
 		ThreadRecords::reduce_now(world);
 
-		// a cursor past the seed, so only the turn's posts come back
+		// a cursor past the seed, so only the turns' posts come back
 		let cursor = world.with_state::<Query<&ThreadRecords>, _>(
 			move |thread_records| {
 				thread_records.get(thread).ok().and_then(|records| {

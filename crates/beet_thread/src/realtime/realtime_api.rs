@@ -8,7 +8,7 @@ pub struct RealtimeApi;
 impl RealtimeApi {
 	/// Create an ephemeral API token on the server for use in client-side applications with the Realtime API. Can be configured with the same session parameters as the session.update client event.
 	/// It responds with a session object, plus a client_secret key which contains a usable ephemeral API token that can be used to authenticate browser clients for the Realtime API.
-	/// https://platform.openai.com/docs/api-reference/realtime-sessions
+	/// <https://platform.openai.com/docs/api-reference/realtime-sessions>
 	pub async fn create_session(
 		req: RealtimeSessionCreateRequest,
 	) -> Result<RealtimeSessionCreateResponse> {

@@ -3,21 +3,22 @@ use beet_core::prelude::*;
 
 pub type ThreadId = Uuid7<Thread>;
 
-/// A conversation, for its whole life: the record every window open onto it
-/// holds, named by its [`ThreadId`].
+/// A conversation's record, for its whole life, named by its [`ThreadId`]: one
+/// row in its store, and a component on each window open onto it.
 ///
 /// Two relations name another thread's post, each by [`PostRef`] and neither
 /// mirrored by an entity relationship, so the tree of threads reads from
 /// records alone:
 ///
 /// - [`Self::spawned_by`]: the post whose action started this thread, ie a
-///   loop's decision or a delegate call. Causal only, no context comes with it.
+///   loop's decision, a delegate call or a person opening a sub-thread. Causal
+///   only, no context comes with it.
 /// - [`Self::branch_of`]: the post this thread continues the history of before
 ///   going its own way. Its history is its ancestors' posts up to each branch
 ///   point, referenced rather than copied, then its own.
 ///
-/// A thread may be both: a subagent seeing its parent's context is spawned by
-/// and branched from the same delegating post.
+/// A thread may be both: a sub-thread opening with its parent's history is
+/// spawned by and branched from the same post.
 #[derive(
 	Debug,
 	Clone,

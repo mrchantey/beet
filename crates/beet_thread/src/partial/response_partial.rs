@@ -48,7 +48,7 @@ pub enum ResponseStatus {
 pub struct TokenUsage {
 	/// The number of input tokens used to generate the response.
 	pub input_tokens: u32,
-	/// The number of input tokens used to generate the response.
+	/// The number of output tokens generated.
 	pub output_tokens: u32,
 	/// The total number of tokens used.
 	pub total_tokens: u32,

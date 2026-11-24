@@ -38,9 +38,10 @@ impl Plugin for ThreadPlugin {
 			// markup image bounding: stub older images so an endless loop's
 			// request stays bounded without dropping a post
 			.register_type::<StubOldImages>()
-			// a host verb as an agent's tool, `<HostTool path=".."/>`
-			.register_type::<HostRoute>()
-			.install_type::<HostTool>()
+			// a route of the surrounding url space as an agent's tool,
+			// `<RouteTool path=".."/>`
+			.register_type::<RouteToolCall>()
+			.install_type::<RouteTool>()
 			// a seed post read from a route's answer
 			.install_type::<RoutePost>()
 			// the OpenResponses streamer is an action

@@ -3,8 +3,11 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Markup verb that makes an entity run a thread, and runs it when the entry
-/// starts.
+/// Markup verb holding a live thread: its window is entered when the entry
+/// starts, with the start request, and lives as long as the runtime, as the
+/// thread's canonical window. This is how a thread a person sits in is held; a
+/// thread run as a function, nobody typing, is a [`ThreadRoute`]. The words are
+/// the model's, defined once in the [`table`](crate::table) module docs.
 ///
 /// Spread it onto a thread's outer root, anywhere under the servers. The entry
 /// root declares [`SweepDescendants`], so its start sweeps down to the verb:
@@ -41,8 +44,7 @@ use beet_net::prelude::*;
 ///
 /// A thread under it declaring a [`MountThreadStore`] continues the newest
 /// thread in the mount's path, filled from the start request, so a restart
-/// resumes; declaring none, it starts a thread every run. A thread built per
-/// request rather than per entry is a [`ThreadRoute`].
+/// resumes; declaring none, it starts a thread every run.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(CallOnStart)]
@@ -149,7 +151,7 @@ mod test {
 		)
 	}
 
-	/// Pump long enough for the entry -> adopt -> mount -> run -> sync chain.
+	/// Pump long enough for the enter -> run -> flush chain.
 	fn pump(app: &mut App, ticks: usize) {
 		for _ in 0..ticks {
 			app.update();
@@ -208,13 +210,13 @@ mod test {
 
 	/// A `{MountThreadStore}` thread, run twice against the same store,
 	/// continues the stored thread its path names rather than creating a
-	/// duplicate. Regression for the deferred mount: the sync used to flush the
-	/// fresh, un-adopted thread before adoption ran, growing the store to two
-	/// threads on the second run.
+	/// duplicate. Regression for the deferred mount: a flush ahead of the entry
+	/// would write the thread it is about to leave for the stored one, growing
+	/// the store to two threads on the second run.
 	// runs a full app twice; the async flushes can exceed the 5s default under
 	// parallel test load.
 	#[beet_core::test(timeout_ms = 30000)]
-	async fn reload_adopts_without_duplicating() {
+	async fn reload_continues_without_duplicating() {
 		let store = BlobStore::temp();
 		let system = ActorId::from_u128(1);
 		let agent = ActorId::from_u128(2);
@@ -229,9 +231,9 @@ mod test {
 
 	/// Calling a mounted thread directly is the whole thread, not half of it: the
 	/// entry point is the entity's own `Request -> Outcome` action, so a caller
-	/// with no start notification still adopts before running.
+	/// with no start notification still enters before running.
 	#[beet_core::test(timeout_ms = 30000)]
-	async fn a_direct_call_adopts_before_running() {
+	async fn a_direct_call_enters_before_running() {
 		let store = BlobStore::temp();
 		let system = ActorId::from_u128(3);
 		let agent = ActorId::from_u128(4);
@@ -240,7 +242,7 @@ mod test {
 		run_once(&store, system, agent);
 		stored_threads(&store).await.xpect_eq(1);
 
-		// .. then re-run it by calling the entity itself. An un-adopted thread
+		// .. then re-run it by calling the entity itself. A thread not entered
 		// would run its seed alone, ending on two posts rather than continuing the
 		// stored conversation, its joins aside.
 		let mut app = app();

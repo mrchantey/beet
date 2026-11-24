@@ -1,7 +1,7 @@
 // only the two `ActionMeta` readers below are action-aware; the definitions
 // themselves are plain wire types.
 #[cfg(feature = "action")]
-use crate::prelude::HostRoute;
+use crate::prelude::RouteToolCall;
 #[cfg(feature = "action")]
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -12,13 +12,13 @@ use serde::Deserialize;
 use serde::Serialize;
 
 /// Builds a route's [`ToolDefinition`] when its path lands, inserted with its
-/// [`ActionMeta`]. A [`HostRoute`]'s is read off the host when the tools are
-/// listed instead.
+/// [`ActionMeta`]. A [`RouteToolCall`]'s is read off its target route when the
+/// tools are listed instead.
 #[cfg(feature = "action")]
 pub(crate) fn insert_tool_definition(
 	ev: On<Insert<PathPattern>>,
 	mut commands: Commands,
-	query: Query<(&ActionMeta, &PathPattern), Without<HostRoute>>,
+	query: Query<(&ActionMeta, &PathPattern), Without<RouteToolCall>>,
 ) -> Result {
 	let Ok((meta, pattern)) = query.get(ev.entity) else {
 		return Ok(());
@@ -38,7 +38,7 @@ pub(crate) fn insert_tool_definition(
 #[derive(Debug, Clone, Component, Serialize, Deserialize, Reflect)]
 #[reflect(Serialize, Deserialize, Component)]
 pub enum ToolDefinition {
-	/// A tool defined in this application.
+	/// A route of the agent's own url space.
 	Function(FunctionToolDefinition),
 	/// A tool defined by the model provider.
 	Provider(ProviderToolDefinition),
@@ -68,8 +68,8 @@ impl From<ProviderToolDefinition> for ToolDefinition {
 	fn from(def: ProviderToolDefinition) -> Self { Self::Provider(def) }
 }
 
-/// Tool defined by the model provider,
-/// output is returned as regular context.
+/// A tool defined and run by the model provider, its output returned as
+/// regular context.
 #[derive(Debug, Clone, Deref, Serialize, Deserialize, Reflect)]
 #[reflect(Serialize, Deserialize)]
 pub struct ProviderToolDefinition {
@@ -80,8 +80,8 @@ impl ProviderToolDefinition {
 	pub fn name(&self) -> &str { &self.name }
 }
 
-/// Tool defined in this application,
-/// output is the result of a function call.
+/// A tool that is a route of the agent's own url space, its output what the
+/// route answers a call with.
 ///
 /// A tool has one identity, the path of its route in the agent's url space,
 /// the [`Router`](beet_router::prelude::Router) beneath the agent, ie

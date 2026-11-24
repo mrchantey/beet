@@ -19,14 +19,14 @@ use beet_ui::prelude::style;
 // ThreadView: the reactive chat widget
 // ═══════════════════════════════════════════════════════════════════════
 
-/// A reactive view of a thread, rendering its [`ThreadRecords`] as a scrollable
+/// A reactive view of a window, rendering its [`ThreadRecords`] as a scrollable
 /// list of posts. Carries its own [`Document`] (seeded empty, filled by
-/// [`project_records_to_document`]), so the inner [`ReactiveChildren`] and the
+/// `project_records_to_document`), so the inner [`ReactiveChildren`] and the
 /// per-row [`FieldRef`]s resolve against it via `DocumentPath::Ancestor`.
 ///
 /// Host-agnostic content, not a host: spawn it under any render surface (a
-/// charcell terminal host, a web page) and bind it to its thread with an
-/// [`OfThread`] relationship. A marker, so the bound thread lives in the
+/// charcell terminal host, a web page) and bind it to its window with an
+/// [`OfThread`] relationship. A marker, so the bound window lives in the
 /// relationship, not a stored field. From markup the view is the tag and its
 /// binding a spread on the same entity, so the same view serves a local terminal
 /// and a per-connection server surface alike:
@@ -89,7 +89,7 @@ fn transcript_style() -> OnSpawn {
 }
 
 /// Marks a [`ThreadView`]'s transcript container, and carries the follow state
-/// [`follow_thread_scroll`] uses to keep the latest post in view.
+/// `follow_thread_scroll` uses to keep the latest post in view.
 #[derive(Debug, Clone, Copy, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct ThreadScroll {
@@ -277,13 +277,13 @@ fn body_text() -> impl Bundle {
 // ═══════════════════════════════════════════════════════════════════════
 
 /// Project every changed [`ThreadRecords`] into the [`Document`] of each
-/// [`ThreadView`] bound to its thread, and (per the contract) into a
-/// [`Document`] on the thread entity itself.
+/// [`ThreadView`] bound to its window, and into a [`Document`] on the window
+/// itself.
 ///
 /// The document holds every post (display intent or not, so reasoning and tool
-/// traffic remain inspectable) as `{ "posts": [{ id, author, text }, ..] }`.
-/// A view re-projects when its thread's records change or it is bound to
-/// another thread. Keyed reconciliation downstream means a
+/// traffic remain inspectable) as `{ "posts": [{ id, author, kind, text }, ..] }`.
+/// A view re-projects when its window's records change or it is bound to
+/// another window. Keyed reconciliation downstream means a
 /// grown in-progress body updates a row rather than rebuilding it, so
 /// streaming flows through the bound [`Value`].
 pub(crate) fn project_records_to_document(
@@ -292,7 +292,7 @@ pub(crate) fn project_records_to_document(
 	views: Query<(Entity, Ref<OfThread>), With<ThreadView>>,
 	mut documents: Query<&mut Document>,
 ) -> Result {
-	// the contract's thread-side document, inserted if absent
+	// the window's own document, inserted if absent
 	for (thread_entity, records) in thread_records
 		.iter()
 		.filter(|(_, records)| records.is_changed())
@@ -411,7 +411,7 @@ pub(crate) fn follow_thread_scroll(
 /// layout pass and the clamp that gives the containers their extent.
 const FOLLOW_FRAMES: u8 = 4;
 
-/// Build the document value for a thread's records: a `posts` list of
+/// Build the document value for a window's records: a `posts` list of
 /// `{ id, author, kind, text }`.
 fn project_records(records: &ThreadRecords) -> Value {
 	let posts = records

@@ -74,8 +74,9 @@ fn set_post_status(post: &mut Post, status: PostStatus) {
 // AgentPost
 // ═══════════════════════════════════════════════════════════════════════
 
-/// A typed projection of a [`Post`] into one of the known agent content
-/// variants. Checks for validity are performed during construction.
+/// A typed projection of a [`Post`] that is not a log, whoever its author,
+/// into one of the content variants a model reads or writes. Checks for
+/// validity are performed during construction.
 pub enum AgentPost<'a> {
 	Text(TextView<'a>),
 	Refusal(RefusalView<'a>),
@@ -99,7 +100,7 @@ impl<'a> AgentPost<'a> {
 	/// Classifies the post into the most specific view variant, falling
 	/// back to [`Text`](AgentPost::Text) for text-like posts and
 	/// [`Bytes`](AgentPost::Bytes) for everything else, or `None` for a
-	/// [`PostIntent::Log`] post, which is no agent content.
+	/// [`PostIntent::Log`] post, which is not content.
 	pub fn new(post: &'a Post) -> Option<Self> {
 		// metadata-based kinds first
 		if let Some(fc) = FunctionCallView::try_new(post) {
@@ -150,7 +151,7 @@ impl<'a> AgentPost<'a> {
 		}
 	}
 
-	/// Whether this post should usually be surfaced to the user.
+	/// Whether this post is usually shown to a person.
 	pub fn is_display(&self) -> bool { self.post().intent().is_display() }
 }
 
@@ -522,7 +523,7 @@ impl<'a> TextView<'a> {
 	pub fn post(&self) -> &'a Post { self.post }
 }
 
-/// A refusal post (REFUSAL intent).
+/// A refusal post ([`PostIntent::Refusal`]).
 #[derive(Deref)]
 pub struct RefusalView<'a> {
 	post: &'a Post,
@@ -754,7 +755,7 @@ impl<'a> ReasoningContentView<'a> {
 	pub fn post(&self) -> &'a Post { self.post }
 }
 
-/// A reasoning summary post (REASONING_SUMMARY intent).
+/// A reasoning summary post ([`PostIntent::ReasoningSummary`]).
 pub struct ReasoningSummaryView<'a> {
 	post: &'a Post,
 }

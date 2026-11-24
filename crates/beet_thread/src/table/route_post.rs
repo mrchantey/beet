@@ -96,9 +96,9 @@ mod test {
 		MediaBytes::new_text(format!("notes on {about}")).xok()
 	}
 
-	/// A host url space over a temp store with the `notes` verb and a route
+	/// A url space over a temp store with the `notes` verb and a route
 	/// building a thread seeded from `path`, its records under `threads`.
-	fn host(path: &str) -> (App, Entity, BlobStore) {
+	fn url_space(path: &str) -> (App, Entity, BlobStore) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.install_type::<ThreadPlugin>();
@@ -146,7 +146,7 @@ mod test {
 	/// A seed is the answer of a route, its path filled from the request.
 	#[beet_core::test]
 	async fn seeds_from_a_route() {
-		let (mut app, router, store) = host("notes?about={document}");
+		let (mut app, router, store) = url_space("notes?about={document}");
 		review(&mut app, router).await.0.xpect_eq(StatusCode::OK);
 		let records =
 			ThreadStore::new(TableStore::new(store), RelPath::new("threads"));
@@ -159,7 +159,7 @@ mod test {
 	/// A route answering anything but OK fails the entry, naming the path.
 	#[beet_core::test]
 	async fn a_refusal_fails_the_entry() {
-		let (mut app, router, _) = host("nowhere");
+		let (mut app, router, _) = url_space("nowhere");
 		let (status, text) = review(&mut app, router).await;
 		status.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 		text.xpect_contains("the seed route `nowhere` answered 404");

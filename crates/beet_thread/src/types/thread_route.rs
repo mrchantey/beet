@@ -6,7 +6,9 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 /// A thread run as a function: built for one request from the named
-/// template, run to its outcome, answered and despawned, nobody typing.
+/// template, run to its outcome, answered and despawned: a request in, an
+/// answer out, nobody typing. It is the narrow case of a thread; one a person
+/// sits in is held by a [`RunThread`].
 ///
 /// ```bsx
 /// <Route path="review/:document" {ThreadRoute{template:"ReviewThread", message:"review {document}"}}/>
@@ -20,9 +22,9 @@ use beet_router::prelude::*;
 /// 1. builds a fresh thread from `template`, a name resolved as a [`Layout`]
 ///    resolves its own ([`BsxTemplate::named`]), with the request on the
 ///    [`RequestContextStack`] for the build, then attaches it beneath the
-///    route, where it resolves the ancestor stores and the host url
-///    space as if authored there. It is built detached first, so the host
-///    [`RouteTree`] never rebuilds for it;
+///    route, where it resolves the ancestor stores and the surrounding url
+///    space as if authored there. It is built detached first, so the
+///    surrounding [`RouteTree`] never rebuilds for it;
 /// 2. enters it ([`Thread::enter`]), the template's [`MountThreadStore`]
 ///    path, filled from the request, naming the thread it continues, and
 ///    the request's [`ThreadEntryParams`] overriding it; then posts
@@ -38,8 +40,8 @@ use beet_router::prelude::*;
 ///
 /// A failed build, a refused entry or a behavior that errors fail the
 /// request the same way, the thread despawned all the same. A template
-/// holding a [`UserInput`] is refused, naming it: a thread a person sits in is
-/// held by a [`RunThread`].
+/// holding a [`UserInput`] is refused, naming its actor, and a request for a
+/// thread whose canonical window is live answers `409`.
 #[action]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -111,7 +113,7 @@ impl ThreadRoute {
 				)?;
 				// the build's route tree wakes run while the thread is still
 				// detached, so they reach its own url spaces and never the
-				// host's; attached after, it resolves its ancestors as if
+				// surrounding one's; attached after, it resolves its ancestors as if
 				// authored beneath the route, before any seed is read
 				world.flush();
 				world.entity_mut(root).insert(ChildOf(route_id));
@@ -219,8 +221,8 @@ impl ThreadRoute {
 
 	/// Tear down the build `root`: detached from the route first, then every
 	/// entity leaves first, so each route removal records the url space it
-	/// leaves while its ancestry is whole and the host [`RouteTree`] never
-	/// rebuilds for a thread that was never part of it.
+	/// leaves while its ancestry is whole and the surrounding [`RouteTree`]
+	/// never rebuilds for a thread that was never part of it.
 	fn despawn(world: &mut World, root: Entity) {
 		let Ok(mut root_mut) = world.get_entity_mut(root) else {
 			return;
@@ -240,7 +242,7 @@ impl ThreadRoute {
 
 	/// The last completed text an acting actor of `thread` posted: an actor
 	/// with behavior beneath it ([`ActorRef`]) other than a person, so an
-	/// agent's reply or a loop's decision answers, never the owner's turn.
+	/// agent's reply or a loop's decision answers, never a person's post.
 	fn last_text(world: &mut World, thread: Entity) -> Option<String> {
 		let acting = world
 			.with_state::<(Query<&Children>, Query<&ActorRef>), _>(
@@ -291,7 +293,7 @@ mod test {
 </RepeatWhileFunctionCallOutput>
 "#;
 
-	/// A thread delegating a review: its agent requests the host's review
+	/// A thread delegating a review: its agent requests the surrounding review
 	/// route as a tool, naming the post that asked for it as a body field.
 	const DELEGATE_THREAD: &str = r#"
 <RepeatWhileFunctionCallOutput>
@@ -300,7 +302,7 @@ mod test {
 			document:"product",
 			spawned_by:"00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000002",
 		}}]}}>
-			<Router><HostTool path="review"/></Router>
+			<Router><RouteTool path="review"/></Router>
 		</CreateActor>
 	</Thread>
 </RepeatWhileFunctionCallOutput>
@@ -360,9 +362,9 @@ mod test {
 	#[require(Action<(), Outcome> = Action::new_async(hold))]
 	struct Hold;
 
-	/// A host url space over an in-memory store, its routes running each
+	/// A url space over an in-memory store, its routes running each
 	/// template.
-	fn host() -> (App, Entity, BlobStore) {
+	fn url_space() -> (App, Entity, BlobStore) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.install_type::<ThreadPlugin>()
@@ -402,7 +404,7 @@ mod test {
 		(app, router, store)
 	}
 
-	/// Request `request` of the host, answering its status and body.
+	/// Request `request` of `router`, answering its status and body.
 	async fn review(
 		app: &mut App,
 		router: Entity,
@@ -439,10 +441,10 @@ mod test {
 	}
 
 	/// The thread answers with its agent's last text, and is gone once it has,
-	/// its posts in the store and the host's route tree untouched.
+	/// its posts in the store and the surrounding route tree untouched.
 	#[beet_core::test]
 	async fn answers_then_despawns_its_thread() {
-		let (mut app, router, store) = host();
+		let (mut app, router, store) = url_space();
 		let tree = app
 			.world()
 			.entity(router)
@@ -473,7 +475,7 @@ mod test {
 	/// posting its own message, and another document keeps its own.
 	#[beet_core::test]
 	async fn continues_by_its_path() {
-		let (mut app, router, store) = host();
+		let (mut app, router, store) = url_space();
 		for path in ["review/product", "review/product", "review/market"] {
 			review(&mut app, router, Request::get(path))
 				.await
@@ -497,7 +499,7 @@ mod test {
 	/// by the named actor, else the thread's first User actor by id.
 	#[beet_core::test]
 	async fn posts_the_message_by_its_actor() {
-		let (mut app, router, store) = host();
+		let (mut app, router, store) = url_space();
 		for path in ["review/product", "edit/product"] {
 			review(&mut app, router, Request::get(path))
 				.await
@@ -535,7 +537,7 @@ mod test {
 	/// no User actor.
 	#[beet_core::test]
 	async fn a_message_needs_an_author() {
-		let (mut app, router, _) = host();
+		let (mut app, router, _) = url_space();
 		let (status, text) =
 			review(&mut app, router, Request::get("lonely")).await;
 		status.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
@@ -546,7 +548,7 @@ mod test {
 	/// `--thread` continues a stored one by id, a malformed id refused.
 	#[beet_core::test]
 	async fn its_params_pick_the_thread() {
-		let (mut app, router, store) = host();
+		let (mut app, router, store) = url_space();
 		review(&mut app, router, Request::get("review/product")).await;
 		let (first, _) = only_thread(&store, "threads/product").await;
 		for request in [
@@ -579,7 +581,7 @@ mod test {
 	/// keeps its creator, and usage stays on each response's metadata.
 	#[beet_core::test]
 	async fn each_request_joins_its_actors() {
-		let (mut app, router, store) = host();
+		let (mut app, router, store) = url_space();
 		let creator = delegating_post();
 		let second = PostRef::new(ThreadId::from_u128(1), PostId::from_u128(3));
 		for spawned_by in [&creator, &second] {
@@ -644,7 +646,7 @@ mod test {
 	/// field of the call.
 	#[beet_core::test]
 	async fn spawned_by_travels_as_a_body_field() {
-		let (mut app, router, store) = host();
+		let (mut app, router, store) = url_space();
 		review(&mut app, router, Request::get("review/product")).await;
 		only_thread(&store, "threads/product")
 			.await
@@ -652,7 +654,7 @@ mod test {
 			.spawned_by()
 			.xpect_none();
 
-		let (mut app, router, store) = host();
+		let (mut app, router, store) = url_space();
 		review(&mut app, router, Request::get("delegate"))
 			.await
 			.0
@@ -668,7 +670,7 @@ mod test {
 	/// for its end.
 	#[beet_core::test]
 	async fn an_erroring_thread_still_flushes() {
-		let (mut app, router, store) = host();
+		let (mut app, router, store) = url_space();
 		review(&mut app, router, Request::get("fail"))
 			.await
 			.1
@@ -687,7 +689,7 @@ mod test {
 	/// turn passes.
 	#[beet_core::test]
 	async fn a_live_thread_answers_conflict() {
-		let (mut app, router, _) = host();
+		let (mut app, router, _) = url_space();
 		let (first, second) = app
 			.world_mut()
 			.entity_mut(router)
@@ -730,7 +732,7 @@ mod test {
 	/// A template a person types into is refused, naming the actor.
 	#[beet_core::test]
 	async fn refuses_a_person_typing() {
-		let (mut app, router, _) = host();
+		let (mut app, router, _) = url_space();
 		let (status, text) =
 			review(&mut app, router, Request::get("sit")).await;
 		status.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);

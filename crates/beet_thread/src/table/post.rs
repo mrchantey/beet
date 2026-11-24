@@ -4,8 +4,8 @@ use beet_core::prelude::*;
 pub type PostId = Uuid7<Post>;
 
 /// What a post is for, beside who wrote it, its author's [`ActorKind`]: a
-/// System actor's [`Message`](Self::Message) is a system prompt, its
-/// [`Log`](Self::Log) a session divider.
+/// System actor's [`Message`](Self::Message) is a system prompt, a person's
+/// [`Log`](Self::Log) may be their join.
 #[derive(
 	Debug,
 	Clone,
@@ -31,13 +31,14 @@ pub enum PostIntent {
 	Refusal,
 	/// The response failed.
 	Error,
-	/// What happened to the thread rather than what was said in it, never
-	/// model input, its body naming its kind ([`LogKind`]).
+	/// What happened to the thread rather than what was said in it, its body
+	/// naming its kind ([`LogKind`]). A model reads none but a join, as a note
+	/// ([`ThreadRecords::join_note`]).
 	Log,
 }
 
 impl PostIntent {
-	/// Whether this intent should usually be surfaced to the user.
+	/// Whether a post of this intent is usually shown to a person.
 	pub const fn is_display(&self) -> bool {
 		matches!(self, Self::Message | Self::Refusal)
 	}
@@ -49,8 +50,7 @@ impl PostIntent {
 /// for text-based content, or the view types in [`AgentPost`]
 /// for structured access.
 ///
-/// Note that `MessageRole` is not stored
-/// as this is relative to the Actor.
+/// `MessageRole` is not stored, being relative to the agent reading the post.
 ///
 /// Posts implement [`Ord`], sorted by [`Self::created`]
 #[derive(
@@ -218,10 +218,11 @@ impl Post {
 		}
 	}
 
-	/// Author a seed post in markup as a child of its `<CreateActor>`, ie
-	/// `children![Post::spawn("hello")]`. The author-to-behavior reduction
-	/// resolves its author (the actor parent) and thread, hoists it into the
-	/// [`ThreadRecords`], and despawns the entity, leaving only the record.
+	/// Author a seed post in rust as a child of its [`Actor`], ie
+	/// `children![Post::spawn("hello")]`, as `<CreatePost>` does in markup. The
+	/// author-to-behavior reduction resolves its author (the actor parent) and
+	/// thread, hoists it into the [`ThreadRecords`] and despawns the entity,
+	/// leaving only the record. An entry continuing a thread discards it unread.
 	///
 	/// The intent follows the content (text is [`PostIntent::Message`]); see
 	/// [`Self::spawn_with`] / `<CreatePost>` to author refusals, reasoning, or

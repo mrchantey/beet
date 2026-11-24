@@ -47,7 +47,8 @@ fn next_id(prefix: &str) -> String {
 ///   its parameter schema (`default_arguments`): a
 ///   required string becomes `""`, a required integer `0`, an optional field
 ///   is absent
-/// - **Without tools**: returns the user's input prefixed with "you said:"
+/// - **Without tools**: echoes the last post by a User actor prefixed with
+///   "you said:"
 ///
 /// Text answers are [`custom_response`](Self::custom_response) when set.
 #[derive(Debug, Clone, Default, PartialEq, Component, Reflect)]
@@ -242,7 +243,7 @@ impl PostStreamer for MockPostStreamer {
 							query.thread_and_records(actor_entity)?;
 						let agent_id = query.actor_id(actor_entity)?;
 
-						// Extract last user text
+						// the last text a User actor posted
 						let last_text = records
 							.content_posts()
 							.filter(|view| view.actor.kind() == ActorKind::User)
@@ -251,7 +252,7 @@ impl PostStreamer for MockPostStreamer {
 							.unwrap_or_default()
 							.to_string();
 
-						// Get first tool if any
+						// the first tool, if any
 						let first_tool = query
 							.tools(actor_entity)?
 							.into_iter()

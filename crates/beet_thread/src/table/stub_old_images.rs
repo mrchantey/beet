@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// Bound the image bytes of a thread's records, as a standalone action.
+/// Bound the image bytes of a window's records, as a standalone action.
 ///
 /// The action form of [`ThreadRecords::stub_old_images`]: every image post older
 /// than the most recent `keep` is replaced in place by a short text stub, so an
@@ -12,8 +12,8 @@ use beet_core::prelude::*;
 /// ```rsx
 /// <Thread {Sequence}>
 ///     <CreateActor name="Camera" kind="User" {PostPhoto}/>
-///     <Template {StubOldImages}/>
-/// </div>
+///     <StubOldImages/>
+/// </Thread>
 /// ```
 ///
 /// Standing on its own entity is the point: bounding is a policy of the thread,

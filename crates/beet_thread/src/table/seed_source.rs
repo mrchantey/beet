@@ -32,7 +32,7 @@ pub struct SeedSource {
 }
 
 impl SeedSource {
-	/// A completed, OK seed whose text `action` reads, named by `label`.
+	/// A completed [`PostIntent::Message`] seed whose text `action` reads, named by `label`.
 	pub fn new(
 		label: impl Into<SmolStr>,
 		action: Action<ThreadEntry, String>,

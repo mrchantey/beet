@@ -9,7 +9,7 @@ use beet_net::prelude::*;
 ///
 /// The path names the thread. Each `{param}` is filled from the request
 /// entering it ([`ThreadEntry::fill_path`]), and the newest thread in the
-/// filled directory continues, so `threads/coach/{claim}` keeps one thread
+/// filled directory continues, so `threads/coach/{claim}` continues a thread
 /// per claim. The records are rows of the [`TableStore`] at or above the
 /// thread, keyed under the filled path ([`ThreadStore`]). A deferred mount:
 /// [`Thread::enter`] fills it, picks the stored thread and only then inserts
@@ -56,7 +56,7 @@ pub struct ThreadEntryParams {
 	pub thread: Option<ThreadId>,
 	/// The post whose action asked for this entry, `<thread id>/<post id>`:
 	/// a thread the entry creates records it as [`Thread::spawned_by`], and
-	/// the entry's join as its cause.
+	/// each of the entry's joins as its cause.
 	pub spawned_by: Option<PostRef>,
 	/// Create a thread continuing the history of this post,
 	/// `<thread id>/<post id>`, which the mount's store must hold
@@ -340,9 +340,9 @@ impl Thread {
 	/// 4. continuing, or branching: reduce the scene dropping its seed posts,
 	///    reading no seed source;
 	/// 5. load the stored records, apply a live window's records if there is
-	///    one, post a join for each actor the scene authors
-	///    that no other window holds ([`PresentActors`]), then the request's
-	///    message if the entry carries one, and write them.
+	///    one, post a join for each actor the scene authors that is not of kind
+	///    System and no other window holds ([`PresentActors`]), then the
+	///    request's message if the entry carries one, and write them.
 	///
 	/// A thread mounting no store persists nothing, so every entry creates
 	/// it. A branch enters with its parent's history up to the branch point,
@@ -427,8 +427,8 @@ impl Thread {
 			})
 			.await?;
 
-		// 5. load the stored records, apply a live window's and join each absent actor,
-		// then post the request's message
+		// 5. load the stored records, apply a live window's, join each absent
+		// actor, then post the request's message
 		let loaded = match &mounted {
 			Some((_, store)) => store.load_records(&record).await?,
 			None => ThreadRecords::new(),
@@ -580,7 +580,7 @@ mod test {
 	}
 
 	/// A continued thread reads no seed file and calls no seed route: both
-	/// sources would fail if read, and it enters with its stored seed.
+	/// sources would fail if read, and it enters with its stored posts.
 	#[beet_core::test]
 	async fn a_continued_thread_reads_no_seed() {
 		let store = BlobStore::temp();

@@ -71,18 +71,19 @@
 //!   person typing in a browser tab is answered, or interrupts, exactly as one
 //!   typing beside it.
 //!
-//! A window lives as long as the scene holding it. `RunThread` holds a
+//! A window lives as long as the scene holding it.
+//! [`RunThread`](crate::prelude::RunThread) holds a
 //! canonical window for the runtime's life, entered with the start request,
 //! which is how a thread a person sits in is held.
 //!
-//! - **Thread route.** A thread run as a function (`ThreadRoute`): built for
-//!   one request, run to its outcome, answered and despawned, nobody typing.
+//! - **Thread route.** A thread run as a function
+//!   ([`ThreadRoute`](crate::prelude::ThreadRoute)): built for one request, run to its outcome, answered and despawned, nobody typing.
 //!   It refuses a template holding a [`UserInput`](crate::prelude::UserInput), and a request for a thread
 //!   whose canonical window is live answers `409`.
 //!
 //! # Entering
 //!
-//! `Thread::enter` is the one place that knows whether a thread is created or
+//! [`Thread::enter`] is the one place that knows whether a thread is created or
 //! continued, so it owns everything that depends on the answer, in order:
 //!
 //! 1. fill the mount's path from the request, refusing an escaping value;
@@ -176,7 +177,8 @@
 //!
 //! - **Tool.** A route of an agent's own `<Router>`, its identity its route
 //!   path, so a call of anything else is that router's not-found. A route of
-//!   the surrounding url space becomes a tool through `<RouteTool/>`.
+//!   the surrounding url space becomes a tool through
+//!   [`<RouteTool/>`](crate::prelude::RouteTool).
 //!
 //! # Lineage
 //!

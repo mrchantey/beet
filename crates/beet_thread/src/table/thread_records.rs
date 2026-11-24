@@ -15,7 +15,8 @@ use beet_core::prelude::*;
 /// entity walk; ordering is by [`PostId`] (a time-sortable [`Uuid7`]).
 #[derive(Debug, Default, Clone, Component)]
 pub struct ThreadRecords {
-	/// All actors that appear in the posts of these records, keyed by [`ActorId`].
+	/// The actors the window's scene authors and those that authored a post,
+	/// keyed by [`ActorId`].
 	actors: HashMap<ActorId, Actor>,
 	/// Ordered list of posts (by [`PostId`]).
 	posts: Vec<Post>,
@@ -445,7 +446,7 @@ impl<'a> ModelPost<'a> {
 /// this id plus the actor's behavior (its [`Action`] and tools).
 ///
 /// Produced by the author-to-behavior reduction, which swaps every in-place
-/// `Actor` for an `ActorRef`.
+/// `Actor` carrying behavior for an `ActorRef`.
 #[derive(Debug, Clone, Copy, Deref, Component, Reflect)]
 #[reflect(Component)]
 pub struct ActorRef(pub ActorId);
@@ -460,7 +461,8 @@ pub struct ActorRef(pub ActorId);
 /// This is the runtime component the author-to-behavior reduction queries
 /// ([`ThreadRecords::reduce`]): it resolves the seed's author (its actor parent)
 /// and thread, hoists the materialized [`Post`] into the [`ThreadRecords`], and
-/// despawns the entity.
+/// despawns the entity. An entry continuing its thread despawns it unread
+/// ([`Thread::enter`]).
 ///
 /// It is the payload, not the tag. `<CreatePost>` is the `#[template]` that
 /// produces a `SeedPost` from markup; the two cannot be merged: a `#[template]`
@@ -674,9 +676,9 @@ impl Reduction<'_, '_> {
 // ThreadRecordsQuery: mutate the thread records from a behavior entity
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Locate and mutate the [`ThreadRecords`] of the thread a behavior entity
+/// Locate and mutate the [`ThreadRecords`] of the window a behavior entity
 /// belongs to. Behavior entities ([`ActorRef`]) are descendants of their
-/// thread; the records live on the thread.
+/// window; the records live on the window.
 #[derive(SystemParam)]
 pub struct ThreadRecordsQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
@@ -687,7 +689,7 @@ pub struct ThreadRecordsQuery<'w, 's> {
 }
 
 impl ThreadRecordsQuery<'_, '_> {
-	/// Walk ancestors to the thread entity carrying the [`ThreadRecords`].
+	/// Walk ancestors to the window carrying the [`ThreadRecords`].
 	pub fn thread_entity(&self, entity: Entity) -> Result<Entity> {
 		self.ancestors
 			.iter_ancestors_inclusive(entity)
@@ -711,13 +713,13 @@ impl ThreadRecordsQuery<'_, '_> {
 		Ok(self.thread_records.get(thread_entity)?.0.id())
 	}
 
-	/// The thread's records.
+	/// The window's records.
 	pub fn records(&self, entity: Entity) -> Result<&ThreadRecords> {
 		let thread_entity = self.thread_entity(entity)?;
 		Ok(self.thread_records.get(thread_entity)?.1)
 	}
 
-	/// Mutable access to the thread's records.
+	/// Mutable access to the window's records.
 	pub fn records_mut(
 		&mut self,
 		entity: Entity,
@@ -726,7 +728,7 @@ impl ThreadRecordsQuery<'_, '_> {
 		Ok(self.thread_records.get_mut(thread_entity)?.1)
 	}
 
-	/// Append a post to the thread's records.
+	/// Append a post to the window's records.
 	pub fn push_post(&mut self, entity: Entity, post: Post) -> Result {
 		self.records_mut(entity)?.upsert_post(post);
 		Ok(())

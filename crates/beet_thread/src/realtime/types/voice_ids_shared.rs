@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 /// The voices available for the Realtime API.
-/// https://platform.openai.com/docs/api-reference/realtime-sessions/create#realtime-sessions-create-voice
+/// <https://platform.openai.com/docs/api-reference/realtime-sessions/create#realtime-sessions-create-voice>
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub enum VoiceIdsShared {
 	#[serde(rename = "alloy")]

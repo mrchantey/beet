@@ -13,18 +13,17 @@ use serde::Serialize;
 /// Items come from model providers in all sorts of weird and wonderful ways.
 /// The first step is to translate these forms into a unified type,
 /// for integrating into our own stateful representations.
-/// The [`key`] and [`status`] fields are particularly useful for diffing
+/// The [`key`](Self::key) and [`status`](Self::status) fields are particularly useful for diffing
 /// state.
 ///
 ///
-/// openresponses ----> PartialItem ----> Post
+/// openresponses ----> PostPartial ----> Post
 ///
 /// ## Duplicate Events
 ///
 /// This type will reduce many matching events into an identical representation,
 /// for example OutputTextDone and OutputItemDone, which is intended
-/// as an equality check is used before reifying into an [`Post`].
-///
+/// as an equality check is used before reifying into a [`Post`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PostPartial {
 	pub key: PostPartialKey,
@@ -41,7 +40,7 @@ impl PostPartial {
 			.into_iter()
 			.flat_map(move |item| Self::from_output_item(item, status))
 	}
-	/// Create a [`Vec<PartialItem>`] from an output item,
+	/// Create a [`Vec<PostPartial>`] from an output item,
 	/// optionally setting status for ambiguous types like function call items.
 	///
 	/// ## `status`
@@ -203,33 +202,33 @@ pub enum PartialContent {
 	/// - [`OutputItem::Reasoning`] - content
 	ReasoningContent(String),
 	/// - [`OutputItem::Reasoning`] - summary
-	/// - [`StreamingEvent::ReasoningSummary`]
+	/// - [`StreamingEvent::ReasoningSummaryTextDone`](crate::o11s::StreamingEvent::ReasoningSummaryTextDone)
 	ReasoningSummary(String),
-	/// - [`StreamingEvent::OutputTextDelta`]
-	/// - [`StreamingEvent::RefusalDelta`]
-	/// - [`StreamingEvent::ReasoningDelta`]
-	/// - [`StreamingEvent::ReasoningSummaryTextDelta`]
-	/// - [`StreamingEvent::FunctionCallArgumentsDelta`]
+	/// - [`StreamingEvent::OutputTextDelta`](crate::o11s::StreamingEvent::OutputTextDelta)
+	/// - [`StreamingEvent::RefusalDelta`](crate::o11s::StreamingEvent::RefusalDelta)
+	/// - [`StreamingEvent::ReasoningDelta`](crate::o11s::StreamingEvent::ReasoningDelta)
+	/// - [`StreamingEvent::ReasoningSummaryTextDelta`](crate::o11s::StreamingEvent::ReasoningSummaryTextDelta)
+	/// - [`StreamingEvent::FunctionCallArgumentsDelta`](crate::o11s::StreamingEvent::FunctionCallArgumentsDelta)
 	Delta(String),
-	/// - [`StreamingEvent::OutputTextDone`]
+	/// - [`StreamingEvent::OutputTextDone`](crate::o11s::StreamingEvent::OutputTextDone)
 	TextDone {
 		text: String,
 		logprobs: Vec<LogProb>,
 	},
-	/// - [`StreamingEvent::RefusalDone`]
+	/// - [`StreamingEvent::RefusalDone`](crate::o11s::StreamingEvent::RefusalDone)
 	RefusalDone {
 		refusal: String,
 	},
-	/// - [`StreamingEvent::ReasoningDone`]
+	/// - [`StreamingEvent::ReasoningDone`](crate::o11s::StreamingEvent::ReasoningDone)
 	ReasoningDone {
 		content: String,
 	},
-	/// - [`StreamingEvent::OutputTextAnnotationAdded`]
+	/// - [`StreamingEvent::OutputTextAnnotationAdded`](crate::o11s::StreamingEvent::OutputTextAnnotationAdded)
 	AnnotationAdded {
 		annotation_index: u32,
 		annotation: Annotation,
 	},
-	/// - [`StreamingEvent::FunctionCallArgumentsDone`]
+	/// - [`StreamingEvent::FunctionCallArgumentsDone`](crate::o11s::StreamingEvent::FunctionCallArgumentsDone)
 	/// Full arguments are provided but name and call_id
 	/// are not.
 	/// The function call must already exist and its arguments

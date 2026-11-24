@@ -3,7 +3,8 @@
 //! driven with terminal bytes.
 //!
 //! What only this suite can show is that the pieces assemble: the projection
-//! reaching a painted frame, the composer's keystrokes advancing a user turn,
+//! reaching a painted frame, the composer's keystrokes posting and so passing a
+//! person's turn,
 //! and the transcript scrolling inside its own region rather than shoving the
 //! composer off screen.
 
@@ -38,7 +39,7 @@ mod test {
 	}
 
 	/// A router serving `page` as its one persistent route, wrapped in the
-	/// [`AppShell`] — the shape every thread example declares. `page` is the
+	/// [`AppShell`], the shape every thread example declares. `page` is the
 	/// route's `children!` bundle, so its members are the page's own top-level
 	/// nodes (a view and a composer, as siblings), never nested under a wrapper.
 	/// Returns the router entity, which surfaces browse.
@@ -378,7 +379,7 @@ mod test {
 
 	/// The composer's `<input>` resolves to the surface serving it, however deep
 	/// the page sits (layout, portal transclusion, wrapper element), and
-	/// `{FocusOnAdd}` focuses it — so typed bytes route to the right widget with
+	/// `{FocusOnAdd}` focuses it, so typed bytes route to the right widget with
 	/// no per-widget surface wiring.
 	#[beet_core::test]
 	async fn composer_focus_resolves_to_surface() {
@@ -398,7 +399,7 @@ mod test {
 			.xpect_eq(Some(surface));
 	}
 
-	/// A thread whose user turn precedes the agent's, so one `Sequence` call
+	/// A thread whose person's turn precedes the agent's, so one `Sequence` call
 	/// exercises both.
 	fn user_then_agent() -> impl Bundle {
 		(Thread::default(), Sequence::new(), children![
@@ -451,7 +452,7 @@ mod test {
 
 	/// The full deterministic interaction: real keystrokes through the terminal
 	/// input bridge type into the focused form and Enter submits, posting and
-	/// so passing the user turn, and the mock agent replies. The bytes arrive
+	/// so passing the person's turn, and the mock agent replies. The bytes arrive
 	/// on the surface's own channel, exactly as a `StdioTerminal` or an SSH
 	/// session delivers them.
 	#[beet_core::test]

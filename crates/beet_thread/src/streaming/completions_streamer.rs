@@ -18,7 +18,7 @@ use std::task::Poll;
 
 /// Streams responses from an OpenAI-compatible Chat Completions endpoint,
 /// mapping them into [`PostStream`] values via
-/// [`completions_mapper`](super::completions_mapper).
+/// [`completions_mapper`].
 #[derive(Debug, Clone, Component, Serialize, Deserialize, Reflect)]
 #[reflect(Serialize, Deserialize, Component)]
 #[require(Action<(),Outcome> = Self::default_action())]

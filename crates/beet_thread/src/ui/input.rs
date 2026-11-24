@@ -24,7 +24,7 @@ use bevy::input::keyboard::KeyboardInput;
 /// triggers [`InterruptTurn`] on every actor of its thread, in every window of
 /// the runtime.
 ///
-/// Host-agnostic content bound to a thread with an [`OfThread`] relationship.
+/// Host-agnostic content bound to a window with an [`OfThread`] relationship.
 /// From markup the two spread together onto one entity:
 /// `<CreatePostForm {OfThread($thread)}/>`, or
 /// `<CreatePostForm actor=3 {OfThread($thread)}/>` to post as the actor `3`.

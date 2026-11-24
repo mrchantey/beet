@@ -3,10 +3,10 @@
 //! A [`PostIntent::Log`] post's body is a JSON object naming its kind,
 //! `{"kind":"session_opened", ..}`, the rest of the object that kind's
 //! fields. The intent is closed and the kinds are open: any crate adds one by
-//! implementing [`LogKind`], and model input skips every log post by its
-//! intent alone ([`ThreadRecords::model_posts`]), so a kind needs no
-//! registration to stay out of it. The one kind a model reads is a join
-//! ([`SessionOpened`]), as a note. A view renders a kind it knows its own
+//! implementing [`LogKind`]. A model reads one kind, a join
+//! ([`SessionOpened`]), as a note, and every other stays out of its input by
+//! the post's intent alone ([`ThreadRecords::model_posts`]), so a kind needs
+//! no registration. A view renders a kind it knows its own
 //! way and any other by its name ([`Post::log_kind`]).
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -97,8 +97,8 @@ mod test {
 		const KIND: &'static str = "other";
 	}
 
-	/// A log post reads back as its own kind and no other, and is no agent
-	/// content.
+	/// A log post reads back as its own kind and no other, and is no
+	/// [`AgentPost`].
 	#[beet_core::test]
 	fn reads_back_its_own_kind() {
 		let noted = Noted { text: "hi".into() };

@@ -1,7 +1,7 @@
 //! Maps between [`async_openai::types::chat`] types and beet
 //! [`ResponsePartial`] / [`PostPartial`] types.
 //!
-//! Analogous to [`o11s_mapper`](super::o11s_mapper) but targeting the
+//! Analogous to [`o11s_mapper`] but targeting the
 //! OpenAI Chat Completions API.
 use crate::o11s::ReasoningEffort;
 use crate::prelude::*;

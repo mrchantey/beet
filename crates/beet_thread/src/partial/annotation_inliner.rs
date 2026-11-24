@@ -20,7 +20,7 @@ struct AnnotationState {
 #[derive(Debug, Clone)]
 pub struct AnnotationInliner {
 	footnote_style: bool,
-	/// Per-item state keyed by [`PartialItemKey`], storing original text
+	/// Per-item state keyed by [`PostPartialKey`], storing original text
 	/// and all annotations received so far.
 	item_state: HashMap<PostPartialKey, AnnotationState>,
 }

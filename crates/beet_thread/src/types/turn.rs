@@ -449,7 +449,7 @@ mod test {
 		);
 	}
 
-	/// The window entity holding records.
+	/// The window holding records.
 	fn thread_entity(app: &mut App) -> Entity {
 		app.world_mut()
 			.query_filtered::<Entity, With<ThreadRecords>>()
@@ -506,7 +506,8 @@ mod test {
 			);
 	}
 
-	/// A person's turn is the behavior of `typing` and `agent` in turns.
+	/// A chat looping a typing person's turn then `agent`'s, the person having
+	/// said `go`.
 	fn chat(agent: impl Bundle) -> impl Bundle {
 		(Repeat::new(), children![(
 			Thread::default(),

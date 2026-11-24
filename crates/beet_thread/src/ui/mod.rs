@@ -1,7 +1,7 @@
-//! Agnostic reactive chat UI for a [`ThreadRecords`], built on `beet_ui`.
+//! Agnostic reactive chat UI for a [`ThreadRecords`](crate::prelude::ThreadRecords), built on `beet_ui`.
 //!
 //! The pipeline is two hops, each renderer-agnostic:
-//! 1. [`project_records_to_document`] projects a thread's [`ThreadRecords`] into a
+//! 1. `project_records_to_document` projects a window's records into a
 //!    structured [`Document`] (`{ "posts": [{ id, author, text }, ..] }`),
 //! 2. [`ThreadView`] renders that document reactively: a scroll container whose
 //!    rows are a *keyed* [`ReactiveChildren`] over the `posts` field, each row's
@@ -11,7 +11,7 @@
 //! Keying on the post id means an appended post reuses every settled row's
 //! entity and binding, and a growing in-progress body re-syncs that row's bound
 //! [`Value`] rather than respawning it. The view + composer are host-agnostic
-//! ([`thread_view`] / [`input`]); hosting is the server's job, and a thread
+//! ([`ThreadView`] / [`CreatePostForm`]); hosting is the server's job, and a thread
 //! scene wraps its routes in `beet_router`'s chrome-free `AppShell`.
 //! `beet_ui` never depends on `beet_thread`; this layer is additive, behind the
 //! `ui` feature.
@@ -31,9 +31,9 @@ pub use thread_view::*;
 use beet_core::prelude::*;
 use beet_router::prelude::*;
 
-/// Registers the [`ThreadRecords`] -> [`Document`] projection and the reactive
-/// UI types. Pairs with `beet_ui`'s [`CharcellTuiPlugin`] (or any renderer that
-/// drives the document chain) and the [`ThreadPlugin`].
+/// Registers the records -> [`Document`] projection and the reactive
+/// UI types. Pairs with `beet_ui`'s [`CharcellTuiPlugin`](beet_ui::prelude::CharcellTuiPlugin) (or any renderer that
+/// drives the document chain) and the [`ThreadPlugin`](crate::prelude::ThreadPlugin).
 #[derive(Default)]
 pub struct ThreadUiPlugin;
 

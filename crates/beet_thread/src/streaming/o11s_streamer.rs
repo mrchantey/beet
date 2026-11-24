@@ -212,7 +212,7 @@ impl PostStreamer for O11sStreamer {
 	}
 }
 
-/// Parses raw SSE events into typed [`StreamingEvent`](openresponses::StreamingEvent) values.
+/// Parses raw SSE events into typed [`StreamingEvent`](o11s::StreamingEvent) values.
 ///
 /// Handles the `[DONE]` sentinel by cleanly terminating the stream.
 struct O11sSseStream<S> {

@@ -1,13 +1,13 @@
 //! The thread<->UI relationship: a [`ThreadView`](crate::prelude::ThreadView) or
-//! [`CreatePostForm`](crate::prelude::CreatePostForm) points at the thread it
-//! renders/drives via [`OfThread`], and the thread names all its UI items via
-//! [`ThreadItems`]. One relationship carries both kinds; the projection + input
+//! [`CreatePostForm`](crate::prelude::CreatePostForm) points at the window,
+//! a thread entity, it renders or posts to via [`OfThread`], and the window names
+//! all its UI items via [`ThreadItems`]. One relationship carries both kinds; the projection + input
 //! systems traverse `ThreadItems` (filtering by the item marker) rather than
 //! scanning every view/form for a stored entity.
 
 use beet_core::prelude::*;
 
-/// The thread a [`ThreadView`](crate::prelude::ThreadView) or
+/// The window a [`ThreadView`](crate::prelude::ThreadView) or
 /// [`CreatePostForm`](crate::prelude::CreatePostForm) is bound to: the source half
 /// of the [`ThreadItems`] relationship.
 ///
@@ -22,12 +22,12 @@ use beet_core::prelude::*;
 pub struct OfThread(#[entities] pub Entity);
 
 impl OfThread {
-	/// The thread entity this UI item is bound to.
+	/// The window this UI item is bound to.
 	pub fn thread(&self) -> Entity { self.0 }
 }
 
-/// Every UI item (view, form) bound to a thread: the target half of the
-/// [`OfThread`] relationship, on the thread entity. The projection + input systems
+/// Every UI item (view, form) bound to a window: the target half of the
+/// [`OfThread`] relationship, on the window. The projection + input systems
 /// traverse this, filtering by `With<ThreadView>` / `With<CreatePostForm>`, rather
 /// than scanning by a stored entity.
 #[derive(Debug, Default, Reflect, Component)]

@@ -4,8 +4,9 @@ use beet_core::prelude::*;
 /// Author a seed [`Post`] in markup as a child of a `<CreateActor>`.
 ///
 /// Expands to a [`SeedPost`]; the author-to-behavior reduction resolves its
-/// author (the actor parent) and thread, hoists it into the [`ThreadRecords`],
-/// and despawns the entity, leaving only the record.
+/// author (the actor parent) and thread, hoists it into the [`ThreadRecords`]
+/// and despawns the entity, leaving only the record. An entry continuing a
+/// thread discards it unread.
 ///
 /// With `src` rather than `text` it expands to a [`SeedSource`] reading the
 /// file at that path in the store at or above the thread, read by the entry
@@ -14,7 +15,8 @@ use beet_core::prelude::*;
 ///
 /// Set `intent` / `status` to author refusals ([`PostIntent::Refusal`]),
 /// reasoning ([`PostIntent::Reasoning`]), or in-progress posts
-/// ([`PostStatus::InProgress`]); both default to a completed, OK post.
+/// ([`PostStatus::InProgress`]); the default is a completed
+/// [`PostIntent::Message`].
 #[template]
 pub fn CreatePost(
 	/// The post's text.
