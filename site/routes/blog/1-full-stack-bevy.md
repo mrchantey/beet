@@ -1,6 +1,6 @@
 +++
 title = "Full Stack Bevy"
-description = "Beet now does web! Now with all the features you would expect from a web framework from file routes to client islands, proving the versatility of Bevy ECS."
+description = "Beet does web stuff! Now with all the features you would expect of a web framework from file routes to client islands, proving the versatility of Bevy ECS."
 tags = ["release-notes", "bevy", "web", "ecs"]
 created = "2025-07-11"
 authors = ["Pete Hayman"]

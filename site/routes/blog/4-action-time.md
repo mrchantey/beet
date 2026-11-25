@@ -1,6 +1,6 @@
 +++
 title = "Action Time!"
-description = "More refactors and features this month with behavior trees on Bevy 0.17's event triggers, plus WebDriver BiDi, analytics and PDF exports."
+description = "More refactors and features with behavior trees on Bevy 0.17's event triggers, plus WebDriver BiDi, analytics and PDF exports."
 tags = ["release-notes", "behavior-trees"]
 created = "2025-10-07"
 authors = ["Pete Hayman"]

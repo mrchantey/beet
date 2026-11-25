@@ -1,6 +1,6 @@
 +++
 title = "Malleable Application Framework"
-description = "Completing the great ECS-ification of the beet repo makes it feel more like something you can shape like clay than ever."
+description = "Completing the great ECS-ification of the beet repo makes it feel more like malleable clay than ever."
 tags = ["release-notes", "architecture", "ecs", "malleable-software"]
 created = "2026-01-04"
 authors = ["Pete Hayman"]

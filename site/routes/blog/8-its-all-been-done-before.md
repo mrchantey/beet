@@ -1,6 +1,6 @@
 +++
 title = "It's All Been Done Before"
-description = "Looking for the similarities between the old and new leads to clean abstractions like a truly agnostic router serving CLIs, sitemaps --help flags and agentic tools through a single interface."
+description = "Looking for similarities between the old and new leads to clean abstractions, like one router serving CLIs, sitemaps and agentic tools."
 tags = ["architecture", "ecs"]
 created = "2026-02-01"
 authors = ["Pete Hayman"]
