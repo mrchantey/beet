@@ -15,8 +15,8 @@ Writing a metaframework can be surprisingly straightforward: Start with an unmet
 > Make writing performant web apps a delightful developer experience.
 
 But porting Astro's islands architecture from JS to rust has surfaced some major drawbacks:
-1. Hybrid server-client architecture means two recompilations per change, doubling the achilles heel of rust DX.
-2. Wasm binary sizes are quite large, big enough to present a noticable hydration lag.
+1. Hybrid server-client architecture means two recompilations per change, doubling the Achilles heel of rust DX.
+2. Wasm binary sizes are quite large, big enough to present a noticeable hydration lag.
 
 The creators of `dioxus` and `leptos` are working hard to overcome these issues with projects like `subsecond` and wasm bundle splitting but I feel like we're fixing symptoms of a deeper underlying issue, so for the past month I've taken a step back and started researching alternative approaches from first principles.
 
@@ -36,7 +36,7 @@ fn Counter() -> impl Template {
 }
 ```
 
-Imperative state binding in general is error-prone, all the best engineering practices in the world couldn't save Cloudflare [from DDoSing itsself](https://blog.cloudflare.com/deep-dive-into-cloudflares-sept-12-dashboard-and-api-outage/) two months ago due to a classic `useEffect` bug we can all relate to, I clearly remember my boss helping me debug a pesky spinner `useEffect` I wrote that was causing a 60fps full page rerender.
+Imperative state binding in general is error-prone, all the best engineering practices in the world couldn't save Cloudflare [from DDoSing itself](https://blog.cloudflare.com/deep-dive-into-cloudflares-sept-12-dashboard-and-api-outage/) two months ago due to a classic `useEffect` bug we can all relate to, I clearly remember my boss helping me debug a pesky spinner `useEffect` I wrote that was causing a 60fps full page rerender.
 
 HTMX circumnavigates this by pairing declarative template directives with SSR, demonstrating a crucial insight about web development:
 
@@ -52,9 +52,9 @@ Router::new().route("/clicked", |mut state: State<u32>| {
 });
 ```
 
-Now we have a gloriously thin client and the surface-area for bugs has largely been constrained to the server, but it does com at a cost. We've broken colocation as our counter is now spread across two files, and we've introduced a 200ms server trip *per every interaction*.
+Now we have a gloriously thin client and the surface-area for bugs has largely been constrained to the server, but it does come at a cost. We've broken colocation as our counter is now spread across two files, and we've introduced a 200ms server trip *for every interaction*.
 
-Interesting but lets keep looking.
+Interesting but let's keep looking.
 
 ### State Synchronization
 
@@ -89,7 +89,7 @@ fn Counter()-> impl Template {
 }
 ```
 
-At a glance this looks almost identical to your garden variety `solidjs` component, but now lets see the html this compiles to:
+At a glance this looks almost identical to your garden variety `solidjs` component, but now let's see the html this compiles to:
 
 ```html
 // index.html
@@ -122,7 +122,7 @@ Importantly notice what is *missing* from the output: No js, no wasm, just some 
 Of course there are limitations to this approach. State mutations are constrained to specific verbs like `increment`, `push_form_data`, `set_from_target_value` in a similar way to the HTMX rendering verbs of `innerHTML`, `outerHTML`, etc.
 Here we're counting on the HTMX insight: 80% of reactive operations are CRUD-like and do not require custom client code. We can use Astro-style JS sprinkling for special cases and we still have client islands in the back pocket for inherently heavy applications like 3D rendering or robotics dashboards.
 
-There is still a lot of questions around both in performance and developer experience that can only be answered by hacking away at something like this but I think it looks promising. If you'd like to nerd out on this and other metaframework stuff please come and say hi in the [Beet Roomy space](https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm).
+There are still a lot of questions around both performance and developer experience that can only be answered by hacking away at something like this but I think it looks promising. If you'd like to nerd out on this and other metaframework stuff please come and say hi in the [Beet Roomy space](https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm).
 
 ## A Fully ECS Router
 

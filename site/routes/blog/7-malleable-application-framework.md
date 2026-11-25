@@ -10,13 +10,13 @@ video_url = "https://youtu.be/ycOUd6f0XRw"
 slug = "malleable-application-framework"
 +++
 
-This post and [pr #75](https://github.com/mrchantey/beet/pull/75) marks the completion of the great ECS-ification. The test runner was the final crate built in the hap-hazard 'c++ style oop' and now that it has been converted the beet repo is entirely ECS.
+This post and [pr #75](https://github.com/mrchantey/beet/pull/75) mark the completion of the great ECS-ification. The test runner was the final crate built in the haphazard 'c++ style oop' and now that it has been converted the beet repo is entirely ECS.
 
-In celebration I'd like to dive a bit deeper into this specific refactor. Its all well and good to make grandious statements how ECS architecture is the bees knees, but these kinds of claims are best served alongside concrete examples.
+In celebration I'd like to dive a bit deeper into this specific refactor. It's all well and good to make grandiose statements about how ECS architecture is the bee's knees, but these kinds of claims are best served alongside concrete examples.
 
 ### Before: Separate Runtimes
 
-The very first thing the original runner does is fork behavior between native and wasm. These two environments are very different, for example a wasm app must first yield to the event loop in order to run async tests, and accomodating for this resulted in two completely different runtimes.
+The very first thing the original runner does is fork behavior between native and wasm. These two environments are very different, for example a wasm app must first yield to the event loop in order to run async tests, and accommodating for this resulted in two completely different runtimes.
 
 ```rust
 pub fn test_runner(tests: &[&TestDescAndFn]) {	
@@ -29,7 +29,7 @@ pub fn test_runner(tests: &[&TestDescAndFn]) {
 
 ### After: Unified Runtime
 
-Bevy has already solved a lot of the cross-platform differences for us, now the test runner is a regular bevy app. This is a shift from a unique and bespoke implementation, to a standardized well trodden path, reducing bugs and maintenance costs.
+Bevy has already solved a lot of the cross-platform differences for us, now the test runner is a regular bevy app. This is a shift from a unique and bespoke implementation, to a standardized well-trodden path, reducing bugs and maintenance costs.
 
 ```rust
 pub fn test_runner(tests: &[&TestDescAndFn]) {
@@ -42,7 +42,7 @@ pub fn test_runner(tests: &[&TestDescAndFn]) {
 
 ### Before: Abstract Traits
 
-Extensibility was always a goal for sweet, the original implementation was full of traits, best-effort attempts to accomodate for current and future needs. A lot of busy-work is involved in moving these strategy types around, and the traits inevitably become tangled as requirements shift.
+Extensibility was always a goal for sweet, the original implementation was full of traits, best-effort attempts to accommodate for current and future needs. A lot of busy-work is involved in moving these strategy types around, and the traits inevitably become tangled as requirements shift.
 
 ```rust
 struct TestHarness {
@@ -88,7 +88,7 @@ impl Plugin for TestPlugin {
 
 ## Branding
 
-In other news the repo has had a slight adjustment from last months rebranding:
+In other news the repo has had a slight adjustment from last month's rebranding:
 
 > A Malleable Application Framework
 
@@ -98,15 +98,15 @@ Mostly inspired by some recent reading I've been doing:
 - [Essay](https://usermodifiable.codingitwrong.com/)
 - [YouTube](https://youtu.be/x-FkNd5DkOQ?si=yXyLtS1k0Cs5TpKO)
 
-This is a great breakdown on two pioneers in malleable applications: `smalltalk` and `hypercard`.
+This is a great breakdown of two pioneers in malleable applications: `smalltalk` and `hypercard`.
 
 ## InkAndSwitch - Malleable Software
 - [Essay](https://www.inkandswitch.com/essay/malleable-software/)
 
 The phrasing used in this essay is really growing on me. The term 'malleable' has this tangible quality I really like, and reflects well this idea of technology that can be bent into shape without breaking.
 
-## Maggie Appleton: Bare-foot developers
+## Maggie Appleton: Barefoot developers
 - [Blog Post](https://maggieappleton.com/home-cooked-software)
 - [YouTube](https://youtu.be/qo5m92-9_QI)
 
-I think Maggie's concept of 'bare-foot developers' well articulates the semi-technical as a key audience for malleable applications.
+I think Maggie's concept of 'barefoot developers' well articulates the semi-technical as a key audience for malleable applications.

@@ -106,7 +106,7 @@
                 "$type": "pub.leaflet.blocks.unorderedList#listItem",
                 "content": {
                   "$type": "pub.leaflet.blocks.text",
-                  "plaintext": "The malleable software essay calls out for \"tools, not apps\", describing the common defnition of apps as 'avacado slicers', doing one thing well but nothing else."
+                  "plaintext": "The malleable software essay calls out for \"tools, not apps\", describing the common definition of apps as 'avocado slicers', doing one thing well but nothing else."
                 }
               },
               {
@@ -124,7 +124,7 @@
           "block": {
             "$type": "pub.leaflet.blocks.header",
             "level": 2,
-            "plaintext": "Frameworks are avacado slicers"
+            "plaintext": "Frameworks are avocado slicers"
           }
         },
         {
@@ -175,7 +175,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "Engines offer capability without a prescribed usage. The 19th century equivelent of a generator was the portable steam engine, simply providing a rotating flywheel to be attached to anything you choose."
+            "plaintext": "Engines offer capability without a prescribed usage. The 19th century equivalent of a generator was the portable steam engine, simply providing a rotating flywheel to be attached to anything you choose."
           }
         },
         {
@@ -195,7 +195,7 @@
                 }
               }
             ],
-            "plaintext": "The Doom Engine was the first instance of cleanly seperating the executable from the application. doom.exe contains capabilities but is entirely driven by a serializable WAD file. As a result doom is still being modified and hacked at even thirty years later. The executable provides capabilities, but is entirely driven by serializable scene files."
+            "plaintext": "The Doom Engine was the first instance of cleanly separating the executable from the application. doom.exe contains capabilities but is entirely driven by a serializable WAD file. As a result doom is still being modified and hacked at even thirty years later."
           }
         },
         {
@@ -223,7 +223,7 @@
                 }
               }
             ],
-            "plaintext": "A game engine is like a collection of mini engines working together: rendering, UI, physics, networking. Often this broad scope results in game engines having massive binaries and heavy editors. Bevy is an outlier here, simultaneously offering rendering features like Unreal nanite, and running on a no_std microcontroller. This uniquely positions Bevy to be the best pick for an extremely broad range of usages. That said, there's still a lot of work to be done to bring those capabilities up to industry standard expectations across all these domains, and thats where Beet comes in."
+            "plaintext": "A game engine is like a collection of mini engines working together: rendering, UI, physics, networking. Often this broad scope results in game engines having massive binaries and heavy editors. Bevy is an outlier here, simultaneously offering rendering features like Unreal nanite, and running on a no_std microcontroller. This uniquely positions Bevy to be the best pick for an extremely broad range of usages. That said, there's still a lot of work to be done to bring those capabilities up to industry standard expectations across all these domains, and that's where Beet comes in."
           }
         },
         {
@@ -258,14 +258,14 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "On the technical side, this month a lot of work has been put into removing the dependency on rust for the application layer. Bevy's bsn asset format isnt ready yet, and will not be no_std at least at first, also xml markup feels much more natural for building ui, routers etc and thats what I'm primarily using it for at the moment."
+            "plaintext": "On the technical side, this month a lot of work has been put into removing the dependency on rust for the application layer. Bevy's bsn asset format isn't ready yet, and will not be no_std at least at first, also xml markup feels much more natural for building ui, routers etc and that's what I'm primarily using it for at the moment."
           }
         },
         {
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "That said, I wouldn't be surprised if this gets ripped out at some point in the future. DSLs are a major buzzkill, and they inevitably evolve into a lesser subset of JSX. At some point, writing a Vite plugin will probably be the way to go, but until then bsx help to keep the binary/tool divide clean."
+            "plaintext": "That said, I wouldn't be surprised if this gets ripped out at some point in the future. DSLs are a major buzzkill, and they inevitably evolve into a lesser subset of JSX. At some point, writing a Vite plugin will probably be the way to go, but until then bsx helps to keep the binary/tool divide clean."
           }
         },
         {
@@ -280,12 +280,12 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 159,
-                  "byteStart": 135
+                  "byteEnd": 160,
+                  "byteStart": 136
                 }
               }
             ],
-            "plaintext": "as you can see, the inheritence model that html/xml is built on isnt a perfect fit for ECS, we end up heavily leaning into this spread <Comp1 {(Comp2,Comp3)}/> syntax, but at least its somewhat familiar."
+            "plaintext": "As you can see, the inheritance model that html/xml is built on isn't a perfect fit for ECS, we end up heavily leaning into this spread <Comp1 {(Comp2,Comp3)}/> syntax, but at least it's somewhat familiar."
           }
         },
         {
@@ -293,7 +293,7 @@
           "block": {
             "$type": "pub.leaflet.blocks.code",
             "language": "jsx",
-            "plaintext": "<Name(\"Malenia\") {(Health(100.0), HealingPotions(2), Repeat, CallOnReady)}>\n\t<Fallback>\n\t\t<TryHealSelf/>\n\t\t<HighestScore>\n\t\t\t<Name(\"Waterfoul Dance\") {(AttackPlayer{max_damage:15.0,max_recoil:30.0}, RandomScore)}/>\n\t\t\t<Name(\"Scarlet Aeonia\") {(AttackPlayer{max_damage:10000.0,max_recoil:10.0}, Score(0.05))}/>\n\t\t</HighestScore>\n\t</Fallback>\n\t<Name(\"Elden Lord\") {(Health(100.0), AttackTarget)}/>\n</Name>"
+            "plaintext": "<Name(\"Malenia\") {(Health(100.0), HealingPotions(2), Repeat, CallOnReady)}>\n\t<Fallback>\n\t\t<TryHealSelf/>\n\t\t<HighestScore>\n\t\t\t<Name(\"Waterfowl Dance\") {(AttackPlayer{max_damage:15.0,max_recoil:30.0}, RandomScore)}/>\n\t\t\t<Name(\"Scarlet Aeonia\") {(AttackPlayer{max_damage:10000.0,max_recoil:10.0}, Score(0.05))}/>\n\t\t</HighestScore>\n\t</Fallback>\n\t<Name(\"Elden Lord\") {(Health(100.0), AttackTarget)}/>\n</Name>"
           }
         }
       ]

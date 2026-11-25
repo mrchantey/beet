@@ -33,14 +33,14 @@
                 }
               }
             ],
-            "plaintext": "This post and pr #75 marks the completion of the great ECS-ification. The test runner was the final crate built in the hap-hazard 'c++ style oop' and now that it has been converted the beet repo is entirely ECS."
+            "plaintext": "This post and pr #75 mark the completion of the great ECS-ification. The test runner was the final crate built in the haphazard 'c++ style oop' and now that it has been converted the beet repo is entirely ECS."
           }
         },
         {
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "In celebration I'd like to dive a bit deeper into this specific refactor. Its all well and good to make grandious statements how ECS architecture is the bees knees, but these kinds of claims are best served alongside concrete examples."
+            "plaintext": "In celebration I'd like to dive a bit deeper into this specific refactor. It's all well and good to make grandiose statements about how ECS architecture is the bee's knees, but these kinds of claims are best served alongside concrete examples."
           }
         },
         {
@@ -55,7 +55,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "The very first thing the original runner does is fork behavior between native and wasm. These two environments are very different, for example a wasm app must first yield to the event loop in order to run async tests, and accomodating for this resulted in two completely different runtimes."
+            "plaintext": "The very first thing the original runner does is fork behavior between native and wasm. These two environments are very different, for example a wasm app must first yield to the event loop in order to run async tests, and accommodating for this resulted in two completely different runtimes."
           }
         },
         {
@@ -78,7 +78,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "Bevy has already solved a lot of the cross-platform differences for us, now the test runner is a regular bevy app. This is a shift from a unique and bespoke implementation, to a standardized well trodden path, reducing bugs and maintenance costs."
+            "plaintext": "Bevy has already solved a lot of the cross-platform differences for us, now the test runner is a regular bevy app. This is a shift from a unique and bespoke implementation, to a standardized well-trodden path, reducing bugs and maintenance costs."
           }
         },
         {
@@ -101,7 +101,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "Extensibility was always a goal for sweet, the original implementation was full of traits, best-effort attempts to accomodate for current and future needs. A lot of busy-work is involved in moving these strategy types around, and the traits inevitably become tangled as requirements shift."
+            "plaintext": "Extensibility was always a goal for sweet, the original implementation was full of traits, best-effort attempts to accommodate for current and future needs. A lot of busy-work is involved in moving these strategy types around, and the traits inevitably become tangled as requirements shift."
           }
         },
         {
@@ -171,7 +171,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "In other news the repo has had a slight adjustment from last months rebranding:"
+            "plaintext": "In other news the repo has had a slight adjustment from last month's rebranding:"
           }
         },
         {
@@ -274,7 +274,7 @@
                 }
               }
             ],
-            "plaintext": "This is a great breakdown on two pioneers in malleable applications: smalltalk and hypercard."
+            "plaintext": "This is a great breakdown of two pioneers in malleable applications: smalltalk and hypercard."
           }
         },
         {
@@ -326,7 +326,7 @@
           "block": {
             "$type": "pub.leaflet.blocks.header",
             "level": 2,
-            "plaintext": "Maggie Appleton: Bare-foot developers"
+            "plaintext": "Maggie Appleton: Barefoot developers"
           }
         },
         {
@@ -383,7 +383,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "I think Maggie's concept of 'bare-foot developers' well articulates the semi-technical as a key audience for malleable applications."
+            "plaintext": "I think Maggie's concept of 'barefoot developers' well articulates the semi-technical as a key audience for malleable applications."
           }
         }
       ]

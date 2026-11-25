@@ -1,0 +1,20 @@
+{
+  "beet_core::atproto::provenance::Provenance": {
+    "created": "2026-11-25T04:39:23.144Z",
+    "sources": [],
+    "ttl": null
+  },
+  "beet_router::router::site::syndication::standard_site::standard_site_index::StandardSiteIndex": {
+    "documents": [
+      {
+        "cid": "bafyreicfgh5ihhehdnqforfgoqfh6uuxcnk3xvmxizwh5kvsc5izdhprfa",
+        "path": "/full-stack-bevy",
+        "uri": "at://did:plc:vgxy56shhs3t3b2mu2avizjf/site.standard.document/3n34dokl57dgb"
+      }
+    ],
+    "publication": {
+      "cid": "bafyreib57nko2rpfnenksk543q7jq3foloklsqbzdjl77rmgz6x3lwrcyu",
+      "uri": "at://did:plc:vgxy56shhs3t3b2mu2avizjf/site.standard.publication/3n34doib5mggb"
+    }
+  }
+}

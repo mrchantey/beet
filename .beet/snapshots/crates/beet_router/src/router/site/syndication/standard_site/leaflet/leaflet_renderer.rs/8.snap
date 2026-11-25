@@ -19,7 +19,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "My one-year-old has started getting new ideas, wanting to try something he hasn't done before like open a screw-top lid. Naturally things usually dont go as planned the first time which can be frustrating. In these times I find myself reminding him to take it easy by quoting one of my faviorite songs as a ten-year-old."
+            "plaintext": "My one-year-old has started getting new ideas, wanting to try something he hasn't done before like open a screw-top lid. Naturally things usually don't go as planned the first time which can be frustrating. In these times I find myself reminding him to take it easy by quoting one of my favorite songs as a ten-year-old."
           }
         },
         {
@@ -117,7 +117,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "I wasn't around for any of that, my first coding steps in the 2000s was a Visual Basic GUI:"
+            "plaintext": "I wasn't around for any of that, my first coding steps in the 2000s were a Visual Basic GUI:"
           }
         },
         {
@@ -160,19 +160,19 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 53,
-                  "byteStart": 33
+                  "byteEnd": 54,
+                  "byteStart": 34
                 }
               }
             ],
-            "plaintext": "So if thats true the question is what ya yellin' for?, why do these changes cause so much disruption? To software the difference between a CLI, Server or GUI is simply a matter of I/O, or at least it should be. Instead we usually find ourselves in a tech stack that does not translate well to the new interface: C is too verbose for UI, BASIC is too heavy for browsers, javascript is too slow for XR, etc, so we start again from scratch."
+            "plaintext": "So if that's true the question is what ya yellin' for?, why do these changes cause so much disruption? To software the difference between a CLI, Server or GUI is simply a matter of I/O, or at least it should be. Instead we usually find ourselves in a tech stack that does not translate well to the new interface: C is too verbose for UI, BASIC is too heavy for browsers, javascript is too slow for XR, etc, so we start again from scratch."
           }
         },
         {
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "As somebody with a career split across web, games and robotics I'm tired of starting again, learning entirely new ecosystems just because the interface is different. Rust can run anywhere and does so very well. Bevy ECS can represent any application and does so very well. For me its time to stop starting again."
+            "plaintext": "As somebody with a career split across web, games and robotics I'm tired of starting again, learning entirely new ecosystems just because the interface is different. Rust can run anywhere and does so very well. Bevy ECS can represent any application and does so very well. For me it's time to stop starting again."
           }
         },
         {
@@ -478,8 +478,8 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 90,
-                  "byteStart": 84
+                  "byteEnd": 91,
+                  "byteStart": 85
                 }
               },
               {
@@ -489,8 +489,8 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 181,
-                  "byteStart": 159
+                  "byteEnd": 182,
+                  "byteStart": 160
                 }
               },
               {
@@ -501,12 +501,12 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 181,
-                  "byteStart": 159
+                  "byteEnd": 182,
+                  "byteStart": 160
                 }
               }
             ],
-            "plaintext": "With this generalization things can get very weird, for example a http sitemap, cli --help flag and clanker tool definition list are now the same thing. Visit https://beet.org/?help to see it in action!"
+            "plaintext": "With this generalization things can get very weird, for example an http sitemap, cli --help flag and clanker tool definition list are now the same thing. Visit https://beet.org/?help to see it in action!"
           }
         },
         {

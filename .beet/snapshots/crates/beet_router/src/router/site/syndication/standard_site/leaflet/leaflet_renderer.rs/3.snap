@@ -91,7 +91,7 @@
                 }
               }
             ],
-            "plaintext": "It seems I'm not alone here, in particular many of the game AI crates I've poked around share this same issue, introducing new paradigms, new macros, new complexity that cuts against the grain of ECS (shoutout to bevy_gearbox for not doing this!). I'm not sure whether this is a habit we've built up working with less versatile paradigms, or if messy architecture is a nessecary step in the process of finding the best fit. When Tim Sweeney was recently asked what he admired most about John Carmack he had this to say about Carmack's computer graphics breakthroughs:"
+            "plaintext": "It seems I'm not alone here, in particular many of the game AI crates I've poked around share this same issue, introducing new paradigms, new macros, new complexity that cuts against the grain of ECS (shoutout to bevy_gearbox for not doing this!). I'm not sure whether this is a habit we've built up working with less versatile paradigms, or if messy architecture is a necessary step in the process of finding the best fit. When Tim Sweeney was recently asked what he admired most about John Carmack he had this to say about Carmack's computer graphics breakthroughs:"
           }
         },
         {
@@ -120,7 +120,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "Either way I like to think I'm starting to learn my lesson, for example recently working with LLM apis there's a lot of temptations:"
+            "plaintext": "Either way I like to think I'm starting to learn my lesson, for example recently working with LLM apis there are a lot of temptations:"
           }
         },
         {
@@ -152,7 +152,7 @@
                 "$type": "pub.leaflet.blocks.unorderedList#listItem",
                 "content": {
                   "$type": "pub.leaflet.blocks.text",
-                  "plaintext": "Wait but this model doesnt have that feature so we should probably create some interlinked trait system.."
+                  "plaintext": "Wait but this model doesn't have that feature so we should probably create some interlinked trait system.."
                 }
               },
               {
@@ -189,7 +189,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "I even found myself pushing back against the idea of writing it ECS-first: Well even if we wanted to use ECS you cant cos its all async.. I think this is where ECS-as-a-dicipline comes in, better to spend three days sorting out a sensible async ECS pattern, than to put on your architecture astronaut helment and spend two months lost in space (something ive done more times than I'm proud of). And yes, I did spend the first few hours building up horrific abstractions before catching myself in the act."
+            "plaintext": "I even found myself pushing back against the idea of writing it ECS-first: Well even if we wanted to use ECS you can't cos it's all async.. I think this is where ECS-as-a-discipline comes in, better to spend three days sorting out a sensible async ECS pattern, than to put on your architecture astronaut helmet and spend two months lost in space (something I've done more times than I'm proud of). And yes, I did spend the first few hours building up horrific abstractions before catching myself in the act."
           }
         },
         {
@@ -271,7 +271,7 @@
                 }
               }
             ],
-            "plaintext": "In Beet news we have the beginnings of DOM diffing, the starter app is now a todo-app supporting insertion and removal of dom nodes. It has some glaring bugs that I have an idea for how to fix but am deciding not to until I can prove they are fixed. Thats where in-browser DOM testing the likes of cypress and playwright comes in, and I'm looking forward to sewing the seeds for that in the new moon."
+            "plaintext": "In Beet news we have the beginnings of DOM diffing, the starter app is now a todo-app supporting insertion and removal of dom nodes. It has some glaring bugs that I have an idea for how to fix but am deciding not to until I can prove they are fixed. That's where in-browser DOM testing with the likes of cypress and playwright comes in, and I'm looking forward to sowing the seeds for that in the new moon."
           }
         },
         {

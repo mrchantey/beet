@@ -60,12 +60,12 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 162,
-                  "byteStart": 146
+                  "byteEnd": 163,
+                  "byteStart": 147
                 }
               }
             ],
-            "plaintext": "beet_net addresses the ergonomics of webframework routing with features like multiple rendering strategies (ssr,ssg) and middleware beyond opaque Request/Response types."
+            "plaintext": "beet_net addresses the ergonomics of web framework routing with features like multiple rendering strategies (ssr,ssg) and middleware beyond opaque Request/Response types."
           }
         },
         {
@@ -176,12 +176,12 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 253,
-                  "byteStart": 247
+                  "byteEnd": 252,
+                  "byteStart": 246
                 }
               }
             ],
-            "plaintext": "Config files are a bug not a feature, even I found the beet.toml hard to work with and I'm the one who wrote it! Previously the cli would load the config file into an tree of entities, now these are declared directly by the user, gated behind the launch feature."
+            "plaintext": "Config files are a bug not a feature, even I found the beet.toml hard to work with and I'm the one who wrote it! Previously the cli would load the config file into a tree of entities, now these are declared directly by the user, gated behind the launch feature."
           }
         },
         {
@@ -232,7 +232,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "And thats it for this harvest, I'll need to focus on beetmash for the next month so so the next harvest will likely be a polish release."
+            "plaintext": "And that's it for this harvest, I'll need to focus on beetmash for the next month so the next harvest will likely be a polish release."
           }
         }
       ]

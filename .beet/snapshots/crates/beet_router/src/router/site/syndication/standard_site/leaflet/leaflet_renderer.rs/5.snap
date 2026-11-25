@@ -45,14 +45,14 @@
                 "$type": "pub.leaflet.blocks.orderedList#listItem",
                 "content": {
                   "$type": "pub.leaflet.blocks.text",
-                  "plaintext": "Hybrid server-client architecture means two recompilations per change, doubling the achilles heel of rust DX."
+                  "plaintext": "Hybrid server-client architecture means two recompilations per change, doubling the Achilles heel of rust DX."
                 }
               },
               {
                 "$type": "pub.leaflet.blocks.orderedList#listItem",
                 "content": {
                   "$type": "pub.leaflet.blocks.text",
-                  "plaintext": "Wasm binary sizes are quite large, big enough to present a noticable hydration lag."
+                  "plaintext": "Wasm binary sizes are quite large, big enough to present a noticeable hydration lag."
                 }
               }
             ],
@@ -137,7 +137,7 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 145,
+                  "byteEnd": 144,
                   "byteStart": 125
                 }
               },
@@ -148,8 +148,8 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 187,
-                  "byteStart": 178
+                  "byteEnd": 186,
+                  "byteStart": 177
                 }
               },
               {
@@ -159,12 +159,12 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 283,
-                  "byteStart": 274
+                  "byteEnd": 282,
+                  "byteStart": 273
                 }
               }
             ],
-            "plaintext": "Imperative state binding in general is error-prone, all the best engineering practices in the world couldn't save Cloudflare from DDoSing itsself two months ago due to a classic useEffect bug we can all relate to, I clearly remember my boss helping me debug a pesky spinner useEffect I wrote that was causing a 60fps full page rerender."
+            "plaintext": "Imperative state binding in general is error-prone, all the best engineering practices in the world couldn't save Cloudflare from DDoSing itself two months ago due to a classic useEffect bug we can all relate to, I clearly remember my boss helping me debug a pesky spinner useEffect I wrote that was causing a 60fps full page rerender."
           }
         },
         {
@@ -201,19 +201,19 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 271,
-                  "byteStart": 250
+                  "byteEnd": 272,
+                  "byteStart": 251
                 }
               }
             ],
-            "plaintext": "Now we have a gloriously thin client and the surface-area for bugs has largely been constrained to the server, but it does com at a cost. We've broken colocation as our counter is now spread across two files, and we've introduced a 200ms server trip per every interaction."
+            "plaintext": "Now we have a gloriously thin client and the surface-area for bugs has largely been constrained to the server, but it does come at a cost. We've broken colocation as our counter is now spread across two files, and we've introduced a 200ms server trip for every interaction."
           }
         },
         {
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "Interesting but lets keep looking."
+            "plaintext": "Interesting but let's keep looking."
           }
         },
         {
@@ -299,7 +299,7 @@
                 }
               }
             ],
-            "plaintext": "At a glance this looks almost identical to your garden variety solidjs component, but now lets see the html this compiles to:"
+            "plaintext": "At a glance this looks almost identical to your garden variety solidjs component, but now let's see the html this compiles to:"
           }
         },
         {
@@ -462,12 +462,12 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 293,
-                  "byteStart": 277
+                  "byteEnd": 291,
+                  "byteStart": 275
                 }
               }
             ],
-            "plaintext": "There is still a lot of questions around both in performance and developer experience that can only be answered by hacking away at something like this but I think it looks promising. If you'd like to nerd out on this and other metaframework stuff please come and say hi in the Beet Roomy space."
+            "plaintext": "There are still a lot of questions around both performance and developer experience that can only be answered by hacking away at something like this but I think it looks promising. If you'd like to nerd out on this and other metaframework stuff please come and say hi in the Beet Roomy space."
           }
         },
         {

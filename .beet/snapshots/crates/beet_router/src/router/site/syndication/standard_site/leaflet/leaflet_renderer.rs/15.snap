@@ -53,7 +53,7 @@
                 "$type": "pub.leaflet.blocks.orderedList#listItem",
                 "content": {
                   "$type": "pub.leaflet.blocks.text",
-                  "plaintext": "Meeting and hearing from other people who rethinking software from first principles in adjacent fields like Decentralized Web."
+                  "plaintext": "Meeting and hearing from other people who are rethinking software from first principles in adjacent fields like the Decentralized Web."
                 }
               }
             ],
@@ -64,7 +64,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "Both of these endeavours have been utterly exhausting but exciting, a back-to-back DWeb Camp/Local-First adventure in Berlin has crystalized my view of the impending tech revolution and I can't wait to see Bevy's role in it unfold."
+            "plaintext": "Both of these endeavours have been utterly exhausting but exciting, a back-to-back DWeb Camp/Local-First adventure in Berlin has crystallized my view of the impending tech revolution and I can't wait to see Bevy's role in it unfold."
           }
         },
         {
@@ -99,12 +99,12 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 128,
+                  "byteEnd": 127,
                   "byteStart": 112
                 }
               }
             ],
-            "plaintext": "In my last blog post, ATProto isn't malleable yet, I argued that sovereign protocols like ATProto are missing a truely malleable application layer."
+            "plaintext": "In my last blog post, ATProto isn't malleable yet, I argued that sovereign protocols like ATProto are missing a truly malleable application layer."
           }
         },
         {
@@ -257,12 +257,12 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 512,
-                  "byteStart": 491
+                  "byteEnd": 513,
+                  "byteStart": 492
                 }
               }
             ],
-            "plaintext": "Application code has unrestricted access to the filesystem, network and computer hardware, making it unsuitable for running untrusted code. Deno solves this at the executable level but that's a coarse instrument, permissions apply to the whole process rather than the individual scripts we may or may not trust. Lua, Rhai and QuickJS enable sandboxed scripting, but these are only as powerful as the parameters and methods an application is capable of exposing. Bevy's Dynamic API allow for fine-grained exposure of application behavior at engine, library and application levels."
+            "plaintext": "Application code has unrestricted access to the filesystem, network and computer hardware, making it unsuitable for running untrusted code. Deno solves this at the executable level but that's a coarse instrument, permissions apply to the whole process rather than the individual scripts we may or may not trust. Lua, Rhai and QuickJS enable sandboxed scripting, but these are only as powerful as the parameters and methods an application is capable of exposing. Bevy's Dynamic API allows for fine-grained exposure of application behavior at engine, library and application levels."
           }
         },
         {
@@ -277,7 +277,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "Data-driven software has been the industry standard for video games since id Software's WAD files in Doom. Games are naturally multi-diciplinary and deep access for non-technical team members and modders is very valuable."
+            "plaintext": "Data-driven software has been the industry standard for video games since id Software's WAD files in Doom. Games are naturally multi-disciplinary and deep access for non-technical team members and modders is very valuable."
           }
         },
         {
@@ -368,7 +368,7 @@
                 }
               }
             ],
-            "plaintext": "The standard specifies how components are defined but implementation is optional. Applications only implement the component definitions they care about and silently carry the rest, respecting round-trip data retention in a similar spirit to the USD spec. In this way the standard is a method for resolving component schemas and semantics, not the schemas themselves. This reflects how ATProto defines the spec but not the actual lexicons, BlueSky lexicons are no more standardized than any others."
+            "plaintext": "The standard specifies how components are defined but implementation is optional. Applications only implement the component definitions they care about and silently carry the rest, respecting round-trip data retention in a similar spirit to the USD spec. In this way the standard is a method for resolving component schemas and semantics, not the schemas themselves. This reflects how ATProto defines the spec but not the actual lexicons, Bluesky lexicons are no more standardized than any others."
           }
         },
         {
@@ -384,12 +384,12 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 145,
-                  "byteStart": 136
+                  "byteEnd": 142,
+                  "byteStart": 133
                 }
               }
             ],
-            "plaintext": "This is one area I'm excited to explore further on over the next year, perhaps by writing a scene adaptor for some other ecosystem like Patchwork. Thank you Cart, Alice and the bevy of people who created this incredible community and technological playground! 🐦"
+            "plaintext": "This is one area I'm excited to explore further over the next year, perhaps by writing a scene adaptor for some other ecosystem like Patchwork. Thank you Cart, Alice and the bevy of people who created this incredible community and technological playground! 🐦"
           }
         }
       ]

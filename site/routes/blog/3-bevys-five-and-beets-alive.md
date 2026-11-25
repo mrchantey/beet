@@ -16,7 +16,7 @@ It's been a very good year, but for this reflection I'd like to share my journey
 
 The ECS approach to structuring data is deceptively simple, all instances of a concept are entities and all associated data lies in itty-bitty components. That is all. I've known this for many years, so why did it take me three ground-up rewrites of `beet_flow` to discover behavior trees are best represented as plain ol' entity hierarchies? Why did I spend three months writing `beet_rsx` as a bowl of enum spaghetti held together by bubble gum, only to discover that dom trees are best represented as plain ol'.. you get the picture.
 
-It seems I'm not alone here, in particular many of the game AI crates I've poked around share this same issue, introducing new paradigms, new macros, new complexity that cuts against the grain of ECS (shoutout to [bevy_gearbox](https://crates.io/crates/bevy_gearbox) for not doing this!). I'm not sure whether this is a habit we've built up working with less versatile paradigms, or if messy architecture is a nessecary step in the process of finding the best fit.
+It seems I'm not alone here, in particular many of the game AI crates I've poked around share this same issue, introducing new paradigms, new macros, new complexity that cuts against the grain of ECS (shoutout to [bevy_gearbox](https://crates.io/crates/bevy_gearbox) for not doing this!). I'm not sure whether this is a habit we've built up working with less versatile paradigms, or if messy architecture is a necessary step in the process of finding the best fit.
 When Tim Sweeney was recently asked what he admired most about John Carmack he had [this to say](https://lexfridman.com/tim-sweeney-transcript/#chapter12_john_carmack) about Carmack's computer graphics breakthroughs:
 > They were like his seventh or eighth try after he’d done something time and time again, tried it, found a better approach, thrown out the old one, built it again, and continually rewrite his code until he found the absolute best solution to a problem. I think that stands as a lesson for every programmer to pick up on.
 
@@ -24,14 +24,14 @@ It reminds me a bit of bevy's fearless approach to redesigning both internals an
 
 ## Learning The Way
 
-Either way I like to think I'm starting to learn my lesson, for example recently working with LLM apis there's a lot of temptations:
+Either way I like to think I'm starting to learn my lesson, for example recently working with LLM apis there are a lot of temptations:
 - Ooh maybe we should build an `LlmMessage` abstraction that covers features from all the models..
-- Wait but this model doesnt have that feature so we should probably create some interlinked trait system..
+- Wait but this model doesn't have that feature so we should probably create some interlinked trait system..
 - Hmmm they're also stateful so what if we had like an `LlmSession` hashmap to store previous messages..
 
 And with each abstraction the merry-go-round of complexity starts again.
 
-I even found myself pushing back against the idea of writing it ECS-first: Well even if we wanted to use ECS you cant cos its all async.. I think this is where ECS-as-a-dicipline comes in, better to spend three days sorting out a sensible async ECS pattern, than to put on your architecture astronaut helment and spend two months lost in space (something ive done more times than I'm proud of). And yes, I did spend the first few hours building up horrific abstractions before catching myself in the act.
+I even found myself pushing back against the idea of writing it ECS-first: Well even if we wanted to use ECS you can't cos it's all async.. I think this is where ECS-as-a-discipline comes in, better to spend three days sorting out a sensible async ECS pattern, than to put on your architecture astronaut helmet and spend two months lost in space (something I've done more times than I'm proud of). And yes, I did spend the first few hours building up horrific abstractions before catching myself in the act.
 
 ### Example
 This snippet can be adapted for any llm provider. We communicate directly between a stateful api and the `World` via simple `CommandQueue` channels.
@@ -67,6 +67,6 @@ fn handle_input(
 
 ## Big Diff
 
-In Beet news we have the beginnings of DOM diffing, the starter app is now a `todo-app` supporting insertion and removal of dom nodes. It has some glaring bugs that I have an idea for how to fix but am deciding not to until I can prove they are fixed. Thats where in-browser DOM testing the likes of cypress and playwright comes in, and I'm looking forward to sewing the seeds for that in the new moon.
+In Beet news we have the beginnings of DOM diffing, the starter app is now a `todo-app` supporting insertion and removal of dom nodes. It has some glaring bugs that I have an idea for how to fix but am deciding not to until I can prove they are fixed. That's where in-browser DOM testing with the likes of cypress and playwright comes in, and I'm looking forward to sowing the seeds for that in the new moon.
 
 This is the warmest online community I've been a part of and I'm so excited to be on this epic adventure with my bevy fam, Happy Birthday Bevy!

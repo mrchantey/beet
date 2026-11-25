@@ -22,7 +22,7 @@ I think the joke is that while Patchwork and Automerge do not *at all* resemble 
 
 The first systems for operating computing machines were largely analogue, with human operators managing *both the electronics and administration*, keeping physical records for schedules and user identity. The role of the operator was holistic and involved systems oriented around users and their tasks, not hardware.
 
-The world has changed a lot since since the punchcard batch monitors of the '50s. Instead of many people sharing one machine, each person has many machines. I haven't genuinely shared a device with another user since high school yet we still talk about an OS as being hardware bound. The system of completing computational tasks has always been broader than a single piece of hardware, and treating it so has left the data and software for deskop work entirely stranded from mobile, unless of course we kneel and kiss the ring of the Google Workspace king.. Remember those WHATWG cooporation incentives?
+The world has changed a lot since the punchcard batch monitors of the '50s. Instead of many people sharing one machine, each person has many machines. I haven't genuinely shared a device with another user since high school yet we still talk about an OS as being hardware bound. The system of completing computational tasks has always been broader than a single piece of hardware, and treating it so has left the data and software for desktop work entirely stranded from mobile, unless of course we kneel and kiss the ring of the Google Workspace king.. Remember those WHATWG corporation incentives?
 
 
 
@@ -39,6 +39,6 @@ A computer operator managing the machine with programmers providing the domain s
 
 ## References
 
-- [A Discorse Disscussion](https://discourse.atmosphere.community/t/web-tiles-as-the-base-for-lexicon-embeds) of the use of [Web Tiles](https://webtil.es/) as the foundation for lexicon embeds
+- [A Discourse Discussion](https://discourse.atmosphere.community/t/web-tiles-as-the-base-for-lexicon-embeds) of the use of [Web Tiles](https://webtil.es/) as the foundation for lexicon embeds
 - [ATStore](https://atstore.fyi/), an ATProto app store
-- [Operating Systems, Unbound](/assets/blog/operating-systems-unbound.html), a site i vibe coded for OS reasearch
+- [Operating Systems, Unbound](/assets/blog/operating-systems-unbound.html), a site I vibe coded for OS research

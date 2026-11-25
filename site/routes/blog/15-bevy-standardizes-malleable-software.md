@@ -11,13 +11,13 @@ slug = "bevy-standardizes-malleable-software"
 
 In the tradition of Bevy Birthdays we get a chance to reflect on our adventures over the past year and hopes for the future. For me the last twelve months carried two major themes:
 1. Developing the storytelling of my work by presenting at [DevOps Days Wollongong](https://youtu.be/a-Sx0aEhDhc?list=PLKIKuXdn4ZMjKxet6G2oQkdIZqsKXLit7) and [Local-First Conf '26](https://youtu.be/eRpMQhOR93U?si=6SMyrZWDEOyQFphS).
-2. Meeting and hearing from other people who rethinking software from first principles in adjacent fields like Decentralized Web.
+2. Meeting and hearing from other people who are rethinking software from first principles in adjacent fields like the Decentralized Web.
 
-Both of these endeavours have been utterly exhausting but exciting, a back-to-back DWeb Camp/Local-First adventure in Berlin has crystalized my view of the impending tech revolution and I can't wait to see Bevy's role in it unfold.
+Both of these endeavours have been utterly exhausting but exciting, a back-to-back DWeb Camp/Local-First adventure in Berlin has crystallized my view of the impending tech revolution and I can't wait to see Bevy's role in it unfold.
 
 ## Malleable Standards
 
-In my last blog post, [ATProto isn't malleable yet](/blog/atproto-isnt-malleable-yet), I argued that sovereign protocols like ATProto are missing a *truely malleable* application layer. 
+In my last blog post, [ATProto isn't malleable yet](/blog/atproto-isnt-malleable-yet), I argued that sovereign protocols like ATProto are missing a *truly malleable* application layer. 
 
 Over the decades we have seen many genuinely awesome solutions to malleable software but none have been standardized in the same way other technologies have. It seems interoperability is not a priority at the application layer like it is for protocols, but *it should be!* In my favorite panel discussion of all time [Robin Berjon advocates for sync standards](https://youtu.be/gjG_cUx_ueU?t=1013), another application layer problem, and similar arguments can be made for malleability.
 
@@ -33,11 +33,11 @@ Bevy apps are plugins all the way down. Engine internals, external libraries and
 
 ### 2. Dynamic Scripts for modders
 
-Application code has unrestricted access to the filesystem, network and computer hardware, making it unsuitable for running untrusted code. Deno solves this at the executable level but that's a coarse instrument, permissions apply to the whole process rather than the individual scripts we may or may not trust. Lua, Rhai and QuickJS enable sandboxed scripting, but these are only as powerful as the parameters and methods an application is capable of exposing. Bevy's [Dynamic API](https://github.com/bevyengine/bevy/blob/main/examples/ecs/dynamic.rs) allow for **fine-grained exposure** of application behavior at engine, library and application levels.
+Application code has unrestricted access to the filesystem, network and computer hardware, making it unsuitable for running untrusted code. Deno solves this at the executable level but that's a coarse instrument, permissions apply to the whole process rather than the individual scripts we may or may not trust. Lua, Rhai and QuickJS enable sandboxed scripting, but these are only as powerful as the parameters and methods an application is capable of exposing. Bevy's [Dynamic API](https://github.com/bevyengine/bevy/blob/main/examples/ecs/dynamic.rs) allows for **fine-grained exposure** of application behavior at engine, library and application levels.
 
 ### 3. Scene Files for users
 
-Data-driven software has been the industry standard for video games since id Software's WAD files in Doom. Games are naturally multi-diciplinary and deep access for non-technical team members and modders is very valuable.
+Data-driven software has been the industry standard for video games since id Software's WAD files in Doom. Games are naturally multi-disciplinary and deep access for non-technical team members and modders is very valuable.
 
 ## Interoperable Scenes
 
@@ -64,6 +64,6 @@ The missing piece for true engine interoperability is standardization around com
 }
 ```
 
-The standard specifies how components are defined but implementation is optional. Applications only implement the component definitions they care about and silently carry the rest, respecting round-trip data retention in a similar spirit to the USD spec. In this way the standard is a *method for resolving component schemas and semantics*, not the schemas themselves. This reflects how ATProto defines the spec but not the actual lexicons, BlueSky lexicons are no more standardized than any others. 
+The standard specifies how components are defined but implementation is optional. Applications only implement the component definitions they care about and silently carry the rest, respecting round-trip data retention in a similar spirit to the USD spec. In this way the standard is a *method for resolving component schemas and semantics*, not the schemas themselves. This reflects how ATProto defines the spec but not the actual lexicons, Bluesky lexicons are no more standardized than any others. 
 
-This is one area I'm excited to explore further on over the next year, perhaps by writing a scene adaptor for some other ecosystem like [Patchwork](https://www.inkandswitch.com/patchwork/notebook/). Thank you Cart, Alice and the bevy of people who created this incredible community and technological playground! 🐦
+This is one area I'm excited to explore further over the next year, perhaps by writing a scene adaptor for some other ecosystem like [Patchwork](https://www.inkandswitch.com/patchwork/notebook/). Thank you Cart, Alice and the bevy of people who created this incredible community and technological playground! 🐦

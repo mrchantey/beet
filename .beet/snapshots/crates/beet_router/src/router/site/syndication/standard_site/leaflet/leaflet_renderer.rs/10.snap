@@ -32,7 +32,7 @@
                 }
               }
             ],
-            "plaintext": "As much as I'd like to be I'm not a lisp guy, when somebody tells me (+ 1 2) is so cool because its all just data, I believe them and can admire the symmetry but have not yet built up an intuition for why thats useful."
+            "plaintext": "As much as I'd like to be I'm not a lisp guy, when somebody tells me (+ 1 2) is so cool because it's all just data, I believe them and can admire the symmetry but have not yet built up an intuition for why that's useful."
           }
         },
         {
@@ -94,7 +94,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "Its a simple idea, the hard part is doing it well. Upon release, beet was actually the third iteration of this idea, and while the public api for this pattern has remained the same in the two years since its release, the implementation has evolved dramatically. But with every rewrite it gets closer, feels more native and with the grain of the existing bevy ecosystem."
+            "plaintext": "It's a simple idea, the hard part is doing it well. Upon release, beet was actually the third iteration of this idea, and while the public api for this pattern has remained the same in the two years since its release, the implementation has evolved dramatically. But with every rewrite it gets closer, feels more native and with the grain of the existing bevy ecosystem."
           }
         },
         {
@@ -109,8 +109,8 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 112,
-                  "byteStart": 103
+                  "byteEnd": 113,
+                  "byteStart": 104
                 }
               },
               {
@@ -120,8 +120,8 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 154,
-                  "byteStart": 145
+                  "byteEnd": 155,
+                  "byteStart": 146
                 }
               },
               {
@@ -131,12 +131,12 @@
                   }
                 ],
                 "index": {
-                  "byteEnd": 238,
-                  "byteStart": 211
+                  "byteEnd": 239,
+                  "byteStart": 212
                 }
               }
             ],
-            "plaintext": "In the last month I've fully rewritten the implementation for what feels very close to the ideal form. beet_flow will be deprecated in favour of beet_tool, instead of juggling multiple observers and a dangerous Arc<Mutex<Option<T>>>::take pattern for non-clone types, the api is now just an async function."
+            "plaintext": "In the last month I've fully rewritten the implementation into what feels very close to the ideal form. beet_flow will be deprecated in favour of beet_tool, instead of juggling multiple observers and a dangerous Arc<Mutex<Option<T>>>::take pattern for non-clone types, the api is now just an async function."
           }
         },
         {
@@ -144,7 +144,7 @@
           "block": {
             "$type": "pub.leaflet.blocks.code",
             "language": "rust",
-            "plaintext": "/// run all children in sequence,\n/// propagating the input or short-circuting\n/// with the 'output' if one fails.\nasync fn sequence::<In,Out>(mut input: In, entity: AsyncEntity) -> Outcome<In,Out> {\n\tfor child in entity.children().await {\n\t\tmatch child.call.await {\n\t\t\tOutcome::Pass(next_input) => {\n\t\t\t\t*input = next_input;\n\t\t\t}\n\t\t\tOutcome::Fail(fail) => {\n\t\t\t\treturn Outcome::Fail(fail)\n\t\t\t}\n\t\t}\n\t}\n\tOutcome::Pass(input)\n}"
+            "plaintext": "/// run all children in sequence,\n/// propagating the input or short-circuiting\n/// with the 'output' if one fails.\nasync fn sequence::<In,Out>(mut input: In, entity: AsyncEntity) -> Outcome<In,Out> {\n\tfor child in entity.children().await {\n\t\tmatch child.call.await {\n\t\t\tOutcome::Pass(next_input) => {\n\t\t\t\t*input = next_input;\n\t\t\t}\n\t\t\tOutcome::Fail(fail) => {\n\t\t\t\treturn Outcome::Fail(fail)\n\t\t\t}\n\t\t}\n\t}\n\tOutcome::Pass(input)\n}"
           }
         },
         {
@@ -254,7 +254,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "The gains in simplicity are self-evident but i think thats just the beginning:"
+            "plaintext": "The gains in simplicity are self-evident but I think that's just the beginning:"
           }
         },
         {
@@ -298,7 +298,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "ECS is a weird architecture in that its so agnostic to the application, and the scope of beet has evolved beyond a simple behavior library into a full stack framework to explore this."
+            "plaintext": "ECS is a weird architecture in that it's so agnostic to the application, and the scope of beet has evolved beyond a simple behavior library into a full stack framework to explore this."
           }
         },
         {
@@ -363,14 +363,14 @@
                 }
               }
             ],
-            "plaintext": "As a concrete example, I am currently rewriting the web ui layer of beet to be target agnostic. I just finished building the parsers and renderers for various formats: html, markdown, ratatui etc, and realized I could view example.com in ratatui by combining the html parser and tui renderer. A few hours twiddling with the Naivgator, Scrollbar and UrlBar components, and there you have it! A crude sans-js/css web browser."
+            "plaintext": "As a concrete example, I am currently rewriting the web ui layer of beet to be target agnostic. I just finished building the parsers and renderers for various formats: html, markdown, ratatui etc, and realized I could view example.com in ratatui by combining the html parser and tui renderer. A few hours twiddling with the Navigator, Scrollbar and UrlBar components, and there you have it! A crude sans-js/css web browser."
           }
         },
         {
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "I wasn't intending to build that, it just came out of the general nature of the architecture. No need to create some intricate binding layer between the html AST and application framework, its already represented as Bevy ECS! Likewise for the tui renderer. Translating between technologies is not required when everything speaks the same language."
+            "plaintext": "I wasn't intending to build that, it just came out of the general nature of the architecture. No need to create some intricate binding layer between the html AST and application framework, it's already represented as Bevy ECS! Likewise for the tui renderer. Translating between technologies is not required when everything speaks the same language."
           }
         },
         {
@@ -378,7 +378,7 @@
           "block": {
             "$type": "pub.leaflet.blocks.header",
             "level": 2,
-            "plaintext": "Its gonna be awesome"
+            "plaintext": "It's gonna be awesome"
           }
         },
         {
