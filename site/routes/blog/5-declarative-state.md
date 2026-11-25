@@ -1,6 +1,6 @@
 +++
 title = "Declarative State"
-description = "Exploring a declarative, local-first htmx-like state bindings with Automerge as an alternative to client islands."
+description = "What if HTMX were local-first? Binding state to the DOM with declarative directives synced by Automerge instead of client islands."
 tags = ["web", "local-first", "architecture"]
 created = "2025-11-05"
 authors = ["Pete Hayman"]

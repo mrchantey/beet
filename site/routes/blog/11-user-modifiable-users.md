@@ -1,6 +1,6 @@
 +++
 title = "User Modifiable Users"
-description = "Papert says learning is an act of creation, so effective personal development tools must be creative. Also explorations of self-describing data types and a new token based design system."
+description = "Papert says we learn by making, so effective personal development tools must be creative and deeply modifiable."
 tags = ["malleable-software", "local-first"]
 created = "2026-05-01"
 authors = ["Pete Hayman"]

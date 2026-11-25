@@ -1,6 +1,6 @@
 +++
 title = "HTML was a mistake"
-description = "HTML was designed for documents, not software, and we've been paying the price for that ever since."
+description = "HTML was designed for documents, not software, and we've been paying the price ever since."
 created = "2026-09-26"
 tags = ["malleable-software", "atproto"]
 authors = ["Pete Hayman"]

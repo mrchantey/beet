@@ -1,6 +1,6 @@
 +++
 title = "ATProto isn't malleable yet"
-description = "The Atmosphere is swappable but opaque, we need data-driven primitives for fine-grained malleability."
+description = "The Atmosphere is swappable but opaque. Fine-grained malleability needs powerful data primitives and agnostic apps."
 tags = ["atproto", "malleable-software", "talks"]
 created = "2026-08-18"
 authors = ["Pete Hayman"]

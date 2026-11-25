@@ -1,6 +1,6 @@
 +++
 title = "Action Time!"
-description = "Rewriting beet_flow on the Bevy 0.17 event triggers and other additions: cross platform websockets, Webdriver BiDi, analytics, PDF printing and the first moves toward bsn."
+description = "More refactors and features this month with behavior trees on Bevy 0.17’s event triggers, plus WebDriver BiDi, analytics and PDF exports."
 tags = ["release-notes", "behavior-trees"]
 created = "2025-10-07"
 authors = ["Pete Hayman"]

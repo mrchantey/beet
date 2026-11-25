@@ -1,6 +1,6 @@
 +++
 title = "Gentle Slopes up Lonely Mountains"
-description = "Gentle slope tech like excel or hypercard are usually domain specific, a mountain peak of specialization. Game engines are more like escarpments leading to broad plateaus."
+description = "Excel and Squarespace lead users up a domain specifc mountain peak. Game engines are escarpments leading to broad plateaus."
 tags = ["bevy", "malleable-software", "terminal"]
 created = "2026-06-02"
 authors = ["Pete Hayman"]

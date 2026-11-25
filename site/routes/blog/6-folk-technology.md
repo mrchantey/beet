@@ -1,6 +1,6 @@
 +++
 title = "Folk Technology"
-description = "Drawing parallels between malleable software and the open participitary culture of folk festivals."
+description = "What can folk festival culture teach us about software? Reflections on how malleable software leads to tools of abundance."
 tags = ["malleable-software", "talks"]
 created = "2025-12-04"
 authors = ["Pete Hayman"]

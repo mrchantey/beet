@@ -1,6 +1,6 @@
 +++
 title = "Standardizing Standard Site Content"
-description = "Standard Site unifies discovery but content is fractured, lets explore some options."
+description = "Standard Site unifies discovery but content is still fractured. Scene graphs offer fine-grained interop while keeping extensibility."
 tags = ["malleable-software", "atproto"]
 created = "2026-10-21"
 authors = ["Pete Hayman"]

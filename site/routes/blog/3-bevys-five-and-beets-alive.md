@@ -1,6 +1,6 @@
 +++
 title = "Bevy's Five and Beet's Alive!"
-description = "ECS requires a fundamental shift in how we build apps, and it takes practice to learn the Way."
+description = "I've found data-driven paradigms like ECS require a fundamental shift in how we build apps, and its a path that takes practice to learn."
 tags = ["architecture", "ecs", "bevy"]
 created = "2025-09-06"
 authors = ["Pete Hayman"]

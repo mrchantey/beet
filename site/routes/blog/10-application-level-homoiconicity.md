@@ -1,6 +1,6 @@
 +++
 title = "Application Level Homoiconicity"
-description = "Malleable software bends but doesn't break. Encoding behavior as data is a natural fit for sync engines and provides a fine-grained boundary for developers to safely expose parts of the application."
+description = "Malleable software bends but doesn't break. Encoding behavior as data allows developers to meaningfully expose the application to changes without breaking."
 tags = ["ecs", "behavior-trees", "malleable-software"]
 created = "2026-04-06"
 authors = ["Pete Hayman"]

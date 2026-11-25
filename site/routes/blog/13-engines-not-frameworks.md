@@ -1,6 +1,6 @@
 +++
 title = "Engines, not frameworks"
-description = "Apps are avocado slicers, reflecting the frameworks used to build them. Out of necessity, game engines are generalizable and the natural fit for 'tools, not apps'."
+description = "If apps are avocado slicers, so are the frameworks that build them. Engines are knives, generalized and powerful."
 tags = ["bevy", "malleable-software"]
 created = "2026-06-30"
 authors = ["Pete Hayman"]

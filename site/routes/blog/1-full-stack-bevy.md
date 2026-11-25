@@ -1,6 +1,6 @@
 +++
 title = "Full Stack Bevy"
-description = "Bevy ECS as the foundation for a full-stack metaframework with file based routes, markdown, rusty MDX, SSR, CSR, SSG, client islands, server actions, template scoped styles and live reload."
+description = "Beet now does web! Now with all the features you would expect from a web framework from file routes to client islands, proving versatility of Bevy ECS."
 tags = ["release-notes", "bevy", "web", "ecs"]
 created = "2025-07-11"
 authors = ["Pete Hayman"]
