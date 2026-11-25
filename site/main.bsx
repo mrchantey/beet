@@ -217,7 +217,7 @@ beetmania audit --stage=prod`), so a stray under them is still found.
 
     just beet-deploy [--stage=prod]        # the package: site, shared, social, in that order
     just site-stage deploy [--stage=prod]  # the stage stack alone: build -> stores -> sync -> release -> watch -> purge
-    just beet-sync                         # re-publish the site + restart (no redeploy)
+    just beet-sync --stage=prod            # re-publish the site + restart (no redeploy)
     just beet-watch                        # tail the instance logs
     just site-shared apply                 # provision the site assets bucket
     just site-shared pull                  # hydrate site/assets from it (no credentials)
@@ -252,13 +252,13 @@ content, its images by url. `<StandardSitePub bx:ref="harvest">`
 in the served router declares it; `social/publish` converges the repo to it and
 rewrites the committed index the served site reads
 (`site/derived/standard-site.json`), so the index lands with the next deploy or
-`just beet-sync`. A post publishes only when named, so the back catalogue drips
+`just beet-sync --stage=prod`. A post publishes only when named, so the back catalogue drips
 out rather than landing at once, oldest first, one a week, each published and
 announced in one run, a dry run first:
 
     just site-social publish --only=<slug> --announce=<slug> --dry-run   # read every line first
     just site-social publish --only=<slug> --announce=<slug>             # the week's post, its announcement and the reposts
-    just beet-sync                                                       # promptly: serve the index, restart, purge
+    just beet-sync --stage=prod                                          # promptly: serve the index, restart, purge
     just site-social probe --stage=prod                                  # the handles, then the live site against the repo
     just site-social publish                                             # update what is published, create nothing
 

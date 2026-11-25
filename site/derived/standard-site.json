@@ -1,6 +1,6 @@
 {
   "beet_core::atproto::provenance::Provenance": {
-    "created": "2026-11-25T04:39:23.144Z",
+    "created": "2026-11-25T05:09:01.186Z",
     "sources": [],
     "ttl": null
   },
@@ -13,7 +13,7 @@
       }
     ],
     "publication": {
-      "cid": "bafyreib57nko2rpfnenksk543q7jq3foloklsqbzdjl77rmgz6x3lwrcyu",
+      "cid": "bafyreiheewtyxyejgn6wrlsh7tjpafeakuu6hqdw45kmcprjuxkce2vj7y",
       "uri": "at://did:plc:vgxy56shhs3t3b2mu2avizjf/site.standard.publication/3n34doib5mggb"
     }
   }

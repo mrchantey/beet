@@ -80,7 +80,7 @@ Every credential the deploy needs (the AWS pair, `CLOUDFLARE_API_TOKEN`), and th
 | local serve (http+ssh) | `cargo run -p beet-cli -- --entry=site serve --server=http,ssh` |
 | pre-apply safety check | `just beet-validate` then `just beet-plan` (eyeball the plan) |
 | dev deploy (the stage stack alone) | `just site-stage deploy` |
-| re-publish site only (no redeploy) | `just beet-sync` |
+| re-publish site only (no redeploy) | `just beet-sync --stage=prod` |
 | tail the instance logs | `just beet-watch` |
 | dev destroy | `just beet-destroy` |
 | prod deploy (the package: stage, shared, social) | `just beet-deploy --stage=prod` |
