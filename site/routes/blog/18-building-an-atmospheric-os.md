@@ -2,11 +2,12 @@
 title = "Building an Atmospheric OS"
 description = "The endgame for the ATProto application layer is a malleable operating system"
 tags = ["malleable-software", "atproto"]
-created = "2026-10-21"
+created = "2026-11-24"
 authors = ["Pete Hayman"]
 
 [RouteMeta]
 slug = "building-an-atmospheric-os"
+visibility = "draft"
 +++
 
 

@@ -12,17 +12,14 @@ use beet_net::prelude::*;
 /// `auto_repost` account credited on an announced document.
 ///
 /// The post's text is the page's description, its links, mentions and
-/// hashtags made live. A page announced more than
-/// [`DocMeta::UNDATED_ANNOUNCE_DAYS`](beet_ui::prelude::DocMeta::UNDATED_ANNOUNCE_DAYS) after its `created` day opens with its
-/// date line, ie `Published 11 July 2025` and a blank line, the facets
-/// computed over the whole text, while the post itself is dated the day it is
-/// made. A text over a Bluesky post's 300 graphemes refuses the run before
-/// any write, dry run included; `beet check` flags such a description
-/// beforehand, reserving the date line in every dated page's budget. It
-/// embeds the page as a link card: the canonical url,
-/// the title and description, the page's social card as its thumb (never
-/// its raw image, so every preview wears the one frame), and strong refs to
-/// the document and the publication, which Bluesky hydrates the card from.
+/// hashtags made live, and the post is dated the day it is made: when the page
+/// was written is its social card's to say, and the document's. A text over a
+/// Bluesky post's 300 graphemes refuses the run before any write, dry run
+/// included, and `beet check` flags such a description beforehand. It embeds
+/// the page as a link card: the canonical url, the title and description, the
+/// page's social card as its thumb (never its raw image, so every preview
+/// wears the one frame), and strong refs to the document and the publication,
+/// which Bluesky hydrates the card from.
 /// The document's ref in the card goes stale when the document gains its
 /// `bskyPostRef`, which is expected: a post is never edited, and Bluesky
 /// resolves the refs by uri.
@@ -48,14 +45,13 @@ pub async fn StandardSiteAnnounce(
 		.in_run(&mut input, dry_run);
 	let mut records = publishing.records().await?;
 	// every text composed first, so one too long refuses before any write
-	let day = Date::today();
 	let texts = announce
 		.0
 		.announce
 		.iter()
 		.map(|slug| {
 			publishing
-				.announcement(slug, day)
+				.announcement(slug)
 				.map(|text| (slug.as_str(), text))
 		})
 		.collect::<Result<Vec<_>>>()?;
@@ -262,37 +258,5 @@ impl StandardSiteAnnounce {
 			.xmap(Publishing::log);
 		}
 		Ok(())
-	}
-}
-
-#[cfg(test)]
-mod test {
-	use beet_core::prelude::*;
-	use beet_net::prelude::*;
-	use beet_ui::prelude::*;
-
-	/// A late announcement's facets are computed over the dated text, so a
-	/// link lands on its bytes past the date line, not where it sits in the
-	/// description.
-	#[beet_core::test]
-	async fn facets_land_past_the_date_line() {
-		let text = DocMeta {
-			description: Some("see https://beet.org".into()),
-			created: Date::parse("2025-07-11").ok(),
-			..default()
-		}
-		.announcement(Date::parse("2026-11-19").unwrap())
-		.unwrap();
-		let line = "Published 11 July 2025\n\n";
-		text.starts_with(line).xpect_true();
-		let rich = RichText::new(text, async |_| bevybail!("no mentions"))
-			.await
-			.unwrap();
-		let start = line.len() + "see ".len();
-		rich.facets[0].index.byte_start.xpect_eq(start);
-		rich.facets[0]
-			.index
-			.byte_end
-			.xpect_eq(start + "https://beet.org".len());
 	}
 }

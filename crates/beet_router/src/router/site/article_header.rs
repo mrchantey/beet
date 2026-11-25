@@ -45,25 +45,18 @@ pub fn ArticleHeader(
 	rsx! { {header} }
 }
 
-/// The `AUTHOR · DATE` byline, or nothing when the page declares neither: a page
+/// The page's [`DocMeta::credit_line`], or nothing when it has none: a page
 /// without one renders no empty paragraph.
 ///
 /// Shared with [`RouteIndex`](crate::prelude::RouteIndex), whose entries wear the
 /// same line, so the two cannot drift apart.
 pub(crate) fn article_byline(meta: &DocMeta) -> Snippet {
-	let text = [
-		meta.byline().map(|byline| byline.to_uppercase()),
-		meta.created
-			.map(|created| created.format_long().to_uppercase()),
-	]
-	.into_iter()
-	.flatten()
-	.collect::<Vec<_>>()
-	.join(" · ");
-	if text.is_empty() {
-		return Snippet::from_bundle(());
+	match meta.credit_line() {
+		Some(line) => {
+			rsx! { <p {Classes::new([classes::TEXT_EYEBROW])}>{line}</p> }
+		}
+		None => Snippet::from_bundle(()),
 	}
-	rsx! { <p {Classes::new([classes::TEXT_EYEBROW])}>{text}</p> }
 }
 
 /// A YouTube video as its player iframe, named by the WATCH url a page's

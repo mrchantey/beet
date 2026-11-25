@@ -74,9 +74,8 @@ pub async fn StandardSitePublish(
 		.collect::<Result<Vec<_>>>()?;
 	// and the announcements after it, so one too long to post refuses before
 	// any document is written
-	let day = Date::today();
 	for slug in &announce.0.announce {
-		publishing.announcement(slug, day)?;
+		publishing.announcement(slug)?;
 	}
 	let records = publishing.records().await?;
 	let site =

@@ -9,7 +9,7 @@ authors = ["Beet Lover"]
 slug = "every-name-for-a-beet"
 +++
 
-Beetroot in most of the world, beets in North America, and a dozen names besides. This post's other job is its description: announced more than a week after it was written, its announcement opens with a date line, and the description under it is written to land a few graphemes short of the three hundred a Bluesky post can hold.
+Beetroot in most of the world, beets in North America, and a dozen names besides. This post's other job is its description, which is also the text of its announcement: it is written to land close to the three hundred graphemes a Bluesky post can hold.
 
 | name | where you will hear it |
 | --- | --- |

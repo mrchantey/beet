@@ -204,17 +204,15 @@ impl Publishing {
 		)
 	}
 
-	/// The text announcing the listed page `slug` names on `day`, its
-	/// description opened by its date line when it is late (see
-	/// [`DocMeta::announcement`]).
+	/// The text announcing the listed page `slug` names, its description.
 	///
 	/// # Errors
 	/// Errors as [`page`](Self::page) does, for a page with no description,
 	/// and for a text over [`TextLimit::BSKY_POST_TEXT`], naming the post and
 	/// its length.
-	pub fn announcement(&self, slug: &str, day: Date) -> Result<String> {
+	pub fn announcement(&self, slug: &str) -> Result<String> {
 		let page = self.page(slug)?;
-		let text = page.meta.announcement(day).ok_or_else(|| {
+		let text = page.meta.description.clone().ok_or_else(|| {
 			bevyhow!(
 				"page '{}' has no description, which its announcement's text is",
 				page.path
@@ -903,12 +901,12 @@ pub(super) mod test {
 		card.thumb
 			.xpect_eq(Some(BlobRef::of(&png(1200, 630), MediaType::Png)));
 		card.associated_refs.len().xpect_eq(2);
-		// the fixture post is long past its week, so it opens dated
+		// the text is the description alone: the date is the card's
 		posts[0]
 			.value
 			.text
 			.as_str()
-			.xpect_eq("Published 11 July 2025\n\nall about Full Stack Bevy");
+			.xpect_eq("all about Full Stack Bevy");
 		let post = posts[0].strong_ref();
 		let document = site.document("/full-stack-bevy").await;
 		document
@@ -970,20 +968,18 @@ pub(super) mod test {
 		site.clean().await;
 	}
 
-	/// An announcement over a Bluesky post's limit, only once its date line
-	/// opens it, refuses the run before anything is written, the error
-	/// naming the post and its length.
+	/// An announcement over a Bluesky post's limit refuses the run before
+	/// anything is written, the error naming the post and its length.
 	#[beet_core::test]
 	async fn refuses_an_announcement_over_the_limit() {
 		let mut site = Site::new().await;
-		// 24 graphemes of date line beside 277 of description
 		for mut meta in site
 			.world
 			.query::<&mut DocMeta>()
 			.iter_mut(&mut site.world)
 			.filter(|meta| meta.title.as_deref() == Some("Full Stack Bevy"))
 		{
-			meta.description = Some("a".repeat(277));
+			meta.description = Some("a".repeat(301));
 		}
 		for args in ["", " --dry-run"] {
 			site.publish(&format!(

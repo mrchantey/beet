@@ -1,6 +1,6 @@
 {
   "beet_core::atproto::provenance::Provenance": {
-    "created": "2026-11-21T02:41:25.367Z",
+    "created": "2026-11-24T23:52:32.271Z",
     "sources": [],
     "ttl": null
   },
@@ -11,7 +11,7 @@
           "cid": "bafyreianztrecyklti7rrihe4y4p3x5bm7igx7prepxzcrjnrvntlqgzyi",
           "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/app.bsky.feed.post/3n2s2xi7xwhqd"
         },
-        "cid": "bafyreigcsyz72sbj23fxwjs4k766iasacj2chqgxl2qgy22ski2xwsl6qm",
+        "cid": "bafyreid3hlbiia2xtm2wqrbkqoow4dvj6erdz7wrorzsinzcjm6uc2muzy",
         "path": "/every-name-for-a-beet",
         "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/site.standard.document/3n2s2xbamucqd"
       },
@@ -32,6 +32,15 @@
         "cid": "bafyreidntfrrtrr3ggiiqt25422lgxpy2ugupnhakzvyp7uimo3eukrgbi",
         "path": "/this-weeks-bunch",
         "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/site.standard.document/3n2s35iwqkfpr"
+      },
+      {
+        "bsky_post": {
+          "cid": "bafyreicq2ftacwb7zdlvh23dlgtqily7gg5rf5nvp75bfdoh42kpwoh52i",
+          "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/app.bsky.feed.post/3n33tnl4qwbwo"
+        },
+        "cid": "bafyreiapwvytvriv36kspeve3xh7wg72aizzt27cpmf7oqmwa6fss4xec4",
+        "path": "/welcome-to-beetmania",
+        "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/site.standard.document/3n33tnht7fiwo"
       }
     ],
     "publication": {

@@ -13,10 +13,12 @@
 //! One frame on every card, so every preview of a site is recognisable in a
 //! feed before it is read: the light `Background` tone, a `Primary` band along
 //! the foot, the title in the font's bold (at most three lines, ellipsized),
-//! the description in the `OnSurfaceVariant` tone (at most two lines), and
-//! along the bottom the logo, the site title and the homepage's host. The
-//! logo is the source image of the world's one [`IconSet`], so a site
-//! declares it once.
+//! the page's [`DocMeta::credit_line`](beet_ui::prelude::DocMeta::credit_line)
+//! as an eyebrow in the `Primary` tone (a page with neither author nor date
+//! wears none), the description in the `OnSurfaceVariant` tone (at most two
+//! lines), and along the bottom the logo, the site title and the homepage's
+//! host. The logo is the source image of the world's one [`IconSet`], so a
+//! site declares it once.
 //!
 //! A page with no media spans its text across the card. A page with media
 //! narrows the text to the left column and fills one fixed slot on the right
@@ -48,7 +50,8 @@
 //! it answered ([`ProvenanceSource::Url`], counted unchanged since nothing
 //! local can hash it without fetching it again). Beside the files, the
 //! declaration computes a value per card from what the card draws off the
-//! world (the page's title, description and media url) and one for the frame
+//! world (the page's title, credit line, description and media url) and one
+//! for the frame
 //! (the site title, description, homepage and `Theme`), so a page declared in
 //! code or a rebrand regenerates the set like an edited file
 //! ([`ProvenanceValue`]). A page added is a value the document was not
@@ -56,6 +59,10 @@
 //! regenerate too, and the removed page's card is pruned as a superseded
 //! output. One document rather than one per page: a regeneration redraws
 //! every card, which costs little at a site's size.
+//!
+//! The layout itself is code, which no source or value names: after changing
+//! it, remove `assets/og/social-cards.json` so the next derivation redraws the
+//! set.
 //!
 //! # The head
 //!
@@ -309,8 +316,10 @@ impl SocialCardsQuery<'_, '_> {
 			let card = SocialCards::card(&page.path);
 			// a poster url is only ever a video's, so the url implies the badge
 			let media = page.meta.social_image_url().map(|url| url.to_string());
+			let credit = page.meta.credit_line();
 			Self::value(card.as_str(), [
 				page.meta.title.as_deref(),
+				credit.as_deref(),
 				page.meta.description.as_deref(),
 				media.as_deref(),
 			])
@@ -619,18 +628,21 @@ impl CardFont {
 		.xok()
 	}
 
-	/// The advance width of `text` set at `size` and `weight`, at the optical
-	/// size `usvg` picks for that size, as it renders.
-	fn width(&self, text: &str, size: f32, weight: f32) -> Result<f32> {
+	/// The advance width of `text` set in `style`, at the optical size `usvg`
+	/// picks for its size, as it renders.
+	fn width(&self, text: &str, style: TextStyle) -> Result<f32> {
 		use skrifa::MetadataProvider;
 		let font = skrifa::FontRef::new(&self.bytes)?;
-		let location = font.axes().location([("wght", weight), ("opsz", size)]);
-		let metrics =
-			font.glyph_metrics(skrifa::instance::Size::new(size), &location);
+		let location = font
+			.axes()
+			.location([("wght", style.weight), ("opsz", style.size)]);
+		let metrics = font
+			.glyph_metrics(skrifa::instance::Size::new(style.size), &location);
 		let charmap = font.charmap();
 		text.chars()
 			.filter_map(|ch| charmap.map(ch))
 			.filter_map(|glyph| metrics.advance_width(glyph))
+			.map(|advance| advance + style.tracking)
 			.sum::<f32>()
 			.xok()
 	}
@@ -640,8 +652,7 @@ impl CardFont {
 	/// of them, the last ellipsized when the text runs on.
 	fn wrap(&self, text: &str, style: TextStyle) -> Result<Vec<String>> {
 		let fits = |line: &str| -> Result<bool> {
-			(self.width(line, style.size, style.weight)? <= style.max_width)
-				.xok()
+			(self.width(line, style)? <= style.max_width).xok()
 		};
 		let mut lines = Vec::<String>::new();
 		let mut line = String::new();
@@ -701,6 +712,8 @@ struct TextStyle {
 	size: f32,
 	/// The weight, the `wght` axis of a variable face.
 	weight: f32,
+	/// The space added after each glyph.
+	tracking: f32,
 	/// The distance between baselines.
 	line_height: f32,
 	/// The widest a line may be.
@@ -738,8 +751,10 @@ impl CardLayout {
 	const SLOT_RADIUS: f32 = 20.;
 	/// The gap between the text column and the media slot.
 	const GUTTER: f32 = 48.;
-	/// The gap between the title and the description.
+	/// The gap above the description.
 	const GAP: f32 = 20.;
+	/// The gap above the credit line, tighter since it belongs to the title.
+	const CREDIT_GAP: f32 = 18.;
 
 	/// The text column's width, the whole card without media.
 	fn column(media: bool) -> f32 {
@@ -754,9 +769,22 @@ impl CardLayout {
 		TextStyle {
 			size: 56.,
 			weight: 700.,
+			tracking: 0.,
 			line_height: 66.,
 			max_width: Self::column(media),
 			max_lines: 3,
+		}
+	}
+
+	/// The credit line's style, an eyebrow.
+	fn credit(media: bool) -> TextStyle {
+		TextStyle {
+			size: 22.,
+			weight: 700.,
+			tracking: 1.5,
+			line_height: 30.,
+			max_width: Self::column(media),
+			max_lines: 2,
 		}
 	}
 
@@ -765,6 +793,7 @@ impl CardLayout {
 		TextStyle {
 			size: 28.,
 			weight: 400.,
+			tracking: 0.,
 			line_height: 38.,
 			max_width: Self::column(media),
 			max_lines: 2,
@@ -777,7 +806,7 @@ impl CardLayout {
 struct CardPalette {
 	/// The frame.
 	background: String,
-	/// The band and the play badge.
+	/// The band, the credit line and the play badge.
 	primary: String,
 	/// The play badge's glyph.
 	on_primary: String,
@@ -875,6 +904,8 @@ impl CardMedia {
 struct Card {
 	/// The title's lines.
 	title: Vec<String>,
+	/// The credit line's lines, none for a page without one.
+	credit: Vec<String>,
 	/// The description's lines.
 	description: Vec<String>,
 	/// The site title along the bottom.
@@ -907,6 +938,10 @@ impl Card {
 			.unwrap_or_else(|| package.description.to_string());
 		Self {
 			title: font.wrap(&title, CardLayout::title(has_media))?,
+			credit: font.wrap(
+				&page.meta.credit_line().unwrap_or_default(),
+				CardLayout::credit(has_media),
+			)?,
 			description: font
 				.wrap(&description, CardLayout::description(has_media))?,
 			site: package.title.to_string(),
@@ -1017,22 +1052,28 @@ impl Card {
 				);
 			}
 		}
-		// the title, then the description beneath it
+		// the title, the credit line, then the description, each `gap` beneath
+		// the block above and an empty one taking no room
 		let text = |svg: &mut String,
 		            lines: &[String],
 		            style: TextStyle,
-		            top: f32,
+		            above: f32,
+		            gap: f32,
 		            fill: &str|
 		 -> f32 {
-			let mut baseline = top;
+			if lines.is_empty() {
+				return above;
+			}
+			let mut baseline = above + gap;
 			for line in lines {
 				baseline += style.line_height;
 				let _ = write!(
 					svg,
-					r#"<text x="{}" y="{baseline}" font-family="{family}" font-size="{}" font-weight="{}" fill="{fill}">{}</text>"#,
+					r#"<text x="{}" y="{baseline}" font-family="{family}" font-size="{}" font-weight="{}" letter-spacing="{}" fill="{fill}">{}</text>"#,
 					Layout::MARGIN,
 					style.size,
 					style.weight,
+					style.tracking,
 					escape(line),
 				);
 			}
@@ -1042,12 +1083,21 @@ impl Card {
 		let title = Layout::title(has_media);
 		let top = Layout::MARGIN - (title.line_height - title.size);
 		let after_title =
-			text(&mut svg, &self.title, title, top, &palette.on_surface);
+			text(&mut svg, &self.title, title, top, 0., &palette.on_surface);
+		let after_credit = text(
+			&mut svg,
+			&self.credit,
+			Layout::credit(has_media),
+			after_title,
+			Layout::CREDIT_GAP,
+			&palette.primary,
+		);
 		text(
 			&mut svg,
 			&self.description,
 			Layout::description(has_media),
-			after_title + Layout::GAP,
+			after_credit,
+			Layout::GAP,
 			&palette.on_surface_variant,
 		);
 		// the bottom row: the logo, the site title and the host
@@ -1444,6 +1494,62 @@ mod test {
 			.xpect_contains("page `post`'s image `/media/missing.png`");
 	}
 
+	/// The credit line sits between the title and the description beside the
+	/// media slot, its date never ellipsized, and a page with neither author
+	/// nor date gives it no room.
+	#[beet_core::test]
+	fn credits_the_page() {
+		let font = CardFont::new(FONT.to_vec()).unwrap();
+		let palette = CardPalette::new(&Theme::default()).unwrap();
+		let svg = |meta: DocMeta, media: Option<CardMedia>| {
+			let page = CardPage {
+				path: RelPath::new("post"),
+				meta: DocMeta {
+					title: Some("A Post".into()),
+					description: Some("about it".into()),
+					..meta
+				},
+				source: None,
+			};
+			let card =
+				Card::new(&font, &PackageConfig::default(), &page, media)
+					.unwrap();
+			(card.credit.clone(), card.svg(&font, &palette, false))
+		};
+		let baseline = |svg: &str, text: &str| {
+			let line = svg
+				.split("<text ")
+				.find(|line| line.contains(&format!(">{text}<")))
+				.unwrap();
+			line.split("y=\"")
+				.nth(1)
+				.and_then(|rest| rest.split('"').next())
+				.unwrap()
+				.parse::<f32>()
+				.unwrap()
+		};
+		let (credit, credited) = svg(
+			DocMeta {
+				authors: vec!["Pete Hayman".into()],
+				created: Date::parse("2026-11-21").ok(),
+				..default()
+			},
+			Some(CardMedia {
+				png: png(1, 1, [0; 4]),
+				video: false,
+			}),
+		);
+		// the longest usual line holds one line of the narrow column
+		credit.xpect_eq(vec!["PETE HAYMAN · 21 NOVEMBER 2026".to_string()]);
+		let credit = baseline(&credited, "PETE HAYMAN · 21 NOVEMBER 2026");
+		let described = baseline(&credited, "about it");
+		(baseline(&credited, "A Post") < credit && credit < described)
+			.xpect_true();
+		let (credit, bare) = svg(default(), None);
+		credit.xpect_empty();
+		(baseline(&bare, "about it") < described).xpect_true();
+	}
+
 	/// A long title wraps to three lines inside the column, the last
 	/// ellipsized.
 	#[beet_core::test]
@@ -1461,7 +1567,7 @@ mod test {
 			lines[2].ends_with('…').xpect_true();
 			lines[2].ends_with(" …").xpect_false();
 			for line in &lines {
-				let width = font.width(line, style.size, style.weight).unwrap();
+				let width = font.width(line, style).unwrap();
 				(width <= style.max_width).xpect_true();
 				(CardLayout::MARGIN + width
 					<= CardLayout::WIDTH - CardLayout::MARGIN)
@@ -1473,10 +1579,7 @@ mod test {
 		font.wrap(&"W".repeat(40), style)
 			.unwrap()
 			.iter()
-			.all(|line| {
-				font.width(line, style.size, style.weight).unwrap()
-					<= style.max_width
-			})
+			.all(|line| font.width(line, style).unwrap() <= style.max_width)
 			.xpect_true();
 	}
 }
