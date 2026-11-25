@@ -15,8 +15,9 @@
 //! the foot, the title in the font's bold (at most three lines, ellipsized),
 //! the page's [`DocMeta::credit_line`](beet_ui::prelude::DocMeta::credit_line)
 //! as an eyebrow in the `Primary` tone (a page with neither author nor date
-//! wears none), the description in the `OnSurfaceVariant` tone (at most two
-//! lines), and along the bottom the logo, the site title and the homepage's
+//! wears none, and one too long for a line breaks between its authors and its
+//! date), the description in the `OnSurfaceVariant` tone (filling the room
+//! left, then ellipsized), and along the bottom the logo, the site title and the homepage's
 //! host. The logo is the source image of the world's one [`IconSet`], so a
 //! site declares it once.
 //!
@@ -70,7 +71,9 @@
 //! image, ahead of the page's own image, which a site without `<SocialCards/>`
 //! still previews with. A page outside the set (unlisted, say) previews with
 //! the root route's card, so every page of a site with cards previews as a
-//! card. The standard.site `coverImage` stays the page's raw image, since a
+//! card. The card's text goes with it as the image's alt text, which an
+//! announcement's thumb cannot carry: a Bluesky link card has no field for one.
+//! The standard.site `coverImage` stays the page's raw image, since a
 //! reader renders it above the title and a card would repeat it.
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -144,16 +147,15 @@ impl SocialCards {
 		RelPath::new(Self::DIR).join(format!("{name}.png"))
 	}
 
-	/// The url of the card a page at route `route` previews with: its own when
+	/// The page whose card a page at route `route` previews with: its own when
 	/// `listed` holds it, else the root route's, else none.
-	fn card_href(listed: &[SyndicationPage], route: Entity) -> Option<SmolStr> {
-		listed
-			.iter()
-			.find(|page| page.route == route)
-			.or_else(|| {
-				listed.iter().find(|page| page.path.as_str().is_empty())
-			})
-			.map(|page| IconSet::href(&Self::card(&page.path)))
+	fn previewed(
+		listed: &[SyndicationPage],
+		route: Entity,
+	) -> Option<&SyndicationPage> {
+		listed.iter().find(|page| page.route == route).or_else(|| {
+			listed.iter().find(|page| page.path.as_str().is_empty())
+		})
 	}
 
 	/// The hook landing this set's [`Derivation`] on its entity, then the
@@ -222,7 +224,7 @@ fn queue_refresh<T: Component>(_ev: On<Insert<T>>, mut commands: Commands) {
 	commands.queue(SocialCards::refresh_inputs);
 }
 
-/// The url of the card the page at `route` previews with, when the world
+/// The card the page at `route` previews with, when the world
 /// declares a [`SocialCards`] set: see [`RouteHead`].
 #[derive(SystemParam)]
 pub(crate) struct SocialCardQuery<'w, 's> {
@@ -231,13 +233,13 @@ pub(crate) struct SocialCardQuery<'w, 's> {
 }
 
 impl SocialCardQuery<'_, '_> {
-	/// The absolute url of `route`'s card, `None` without a set, outside its
-	/// url space or with no `homepage` to resolve against, since a crawler
-	/// needs an absolute `og:image`.
+	/// The absolute url of `route`'s card and its alt text, `None` without a
+	/// set, outside its url space or with no `homepage` to resolve against,
+	/// since a crawler needs an absolute `og:image`.
 	///
 	/// # Errors
 	/// Errors when the world declares more than one set.
-	pub fn card_url(&self, route: Entity) -> Result<Option<Url>> {
+	pub fn preview(&self, route: Entity) -> Result<Option<(Url, String)>> {
 		let cards = match self.cards.iter().collect::<Vec<_>>().as_slice() {
 			[] => return Ok(None),
 			[cards] => *cards,
@@ -248,11 +250,60 @@ impl SocialCardQuery<'_, '_> {
 		let Ok(listed) = self.syndication.listed(cards, &default()) else {
 			return Ok(None);
 		};
-		SocialCards::card_href(&listed, route)
-			.and_then(|href| {
-				self.syndication.package().absolute_url(&href).ok()
+		let package = self.syndication.package();
+		SocialCards::previewed(&listed, route)
+			.and_then(|page| {
+				let href = IconSet::href(&SocialCards::card(&page.path));
+				let url = package.absolute_url(&href).ok()?;
+				Some((url, CardText::new(&page.meta, package).alt()))
 			})
 			.xok()
+	}
+}
+
+/// The words a page's card draws, the site's own where the page declares none.
+struct CardText {
+	/// The title.
+	title: String,
+	/// The page's [`DocMeta::credits`].
+	credits: Vec<String>,
+	/// The description.
+	description: String,
+}
+
+impl CardText {
+	/// The words on the card of a page declaring `meta` in the site `package`.
+	fn new(meta: &DocMeta, package: &PackageConfig) -> Self {
+		Self {
+			title: meta
+				.title
+				.clone()
+				.unwrap_or_else(|| package.title.to_string()),
+			credits: meta.credits(),
+			description: meta
+				.description
+				.clone()
+				.unwrap_or_else(|| package.description.to_string()),
+		}
+	}
+
+	/// The card's alt text: its words in reading order, a paragraph per block
+	/// and the credits in the case they were authored in, since a screen
+	/// reader may spell out capitals.
+	fn alt(&self) -> String {
+		[
+			self.title.as_str(),
+			&self.credits.join(", "),
+			&self.description,
+		]
+		.into_iter()
+		.filter(|block| !block.is_empty())
+		.map(|block| match block.ends_with(['.', '!', '?', '…']) {
+			true => block.to_string(),
+			false => format!("{block}."),
+		})
+		.collect::<Vec<_>>()
+		.join(" ")
 	}
 }
 
@@ -647,6 +698,27 @@ impl CardFont {
 			.xok()
 	}
 
+	/// `credits` as the uppercase credit line, broken between the authors and
+	/// the date when one line cannot hold both.
+	fn wrap_credits(
+		&self,
+		credits: &[String],
+		style: TextStyle,
+	) -> Result<Vec<String>> {
+		let line = credits.join(" · ").to_uppercase();
+		if self.width(&line, style)? <= style.max_width {
+			return self.wrap(&line, style);
+		}
+		credits
+			.iter()
+			.map(|credit| self.wrap(&credit.to_uppercase(), style))
+			.collect::<Result<Vec<_>>>()?
+			.into_iter()
+			.flatten()
+			.collect::<Vec<_>>()
+			.xok()
+	}
+
 	/// `text` wrapped at its words into lines no wider than `max_width`, a word
 	/// wider than a line broken where it overflows, and at most `max_lines`
 	/// of them, the last ellipsized when the text runs on.
@@ -722,6 +794,28 @@ struct TextStyle {
 	max_lines: usize,
 }
 
+#[cfg(feature = "site_images")]
+impl TextStyle {
+	/// The last baseline of `lines` lines set `gap` beneath the baseline
+	/// `above`, a block of none taking no room.
+	fn end(&self, above: f32, gap: f32, lines: usize) -> f32 {
+		match lines {
+			0 => above,
+			lines => above + gap + self.line_height * lines as f32,
+		}
+	}
+
+	/// Hold as many lines as fit `gap` beneath the baseline `above` with the
+	/// last no lower than `floor`, always one.
+	fn filling(self, above: f32, gap: f32, floor: f32) -> Self {
+		let room = (floor - above - gap) / self.line_height;
+		Self {
+			max_lines: (room.floor() as usize).max(1),
+			..self
+		}
+	}
+}
+
 /// The card's fixed geometry: the constants every card shares.
 #[cfg(feature = "site_images")]
 struct CardLayout;
@@ -755,6 +849,10 @@ impl CardLayout {
 	const GAP: f32 = 20.;
 	/// The gap above the credit line, tighter since it belongs to the title.
 	const CREDIT_GAP: f32 = 18.;
+	/// The top edge of the bottom row.
+	const ROW: f32 = Self::HEIGHT - Self::MARGIN - Self::LOGO;
+	/// The lowest baseline the text may reach, clear of the bottom row.
+	const FLOOR: f32 = Self::ROW - 24.;
 
 	/// The text column's width, the whole card without media.
 	fn column(media: bool) -> f32 {
@@ -776,6 +874,12 @@ impl CardLayout {
 		}
 	}
 
+	/// The baseline the title hangs from, its first line's cap at the margin.
+	fn top(media: bool) -> f32 {
+		let title = Self::title(media);
+		Self::MARGIN - (title.line_height - title.size)
+	}
+
 	/// The credit line's style, an eyebrow.
 	fn credit(media: bool) -> TextStyle {
 		TextStyle {
@@ -788,16 +892,17 @@ impl CardLayout {
 		}
 	}
 
-	/// The description's style.
-	fn description(media: bool) -> TextStyle {
+	/// The description's style, filling the room beneath the baseline `above`.
+	fn description(media: bool, above: f32) -> TextStyle {
 		TextStyle {
 			size: 28.,
 			weight: 400.,
 			tracking: 0.,
 			line_height: 38.,
 			max_width: Self::column(media),
-			max_lines: 2,
+			max_lines: 1,
 		}
+		.filling(above, Self::GAP, Self::FLOOR)
 	}
 }
 
@@ -926,24 +1031,24 @@ impl Card {
 		media: Option<CardMedia>,
 	) -> Result<Self> {
 		let has_media = media.is_some();
-		let title = page
-			.meta
-			.title
-			.clone()
-			.unwrap_or_else(|| package.title.to_string());
-		let description = page
-			.meta
-			.description
-			.clone()
-			.unwrap_or_else(|| package.description.to_string());
+		let text = CardText::new(&page.meta, package);
+		let title_style = CardLayout::title(has_media);
+		let title = font.wrap(&text.title, title_style)?;
+		let credit_style = CardLayout::credit(has_media);
+		let credit = font.wrap_credits(&text.credits, credit_style)?;
+		// the description takes the room the blocks above it leave
+		let after_title =
+			title_style.end(CardLayout::top(has_media), 0., title.len());
+		let after_credit =
+			credit_style.end(after_title, CardLayout::CREDIT_GAP, credit.len());
+		let description = font.wrap(
+			&text.description,
+			CardLayout::description(has_media, after_credit),
+		)?;
 		Self {
-			title: font.wrap(&title, CardLayout::title(has_media))?,
-			credit: font.wrap(
-				&page.meta.credit_line().unwrap_or_default(),
-				CardLayout::credit(has_media),
-			)?,
-			description: font
-				.wrap(&description, CardLayout::description(has_media))?,
+			title,
+			credit,
+			description,
 			site: package.title.to_string(),
 			host: package
 				.homepage
@@ -1061,12 +1166,8 @@ impl Card {
 		            gap: f32,
 		            fill: &str|
 		 -> f32 {
-			if lines.is_empty() {
-				return above;
-			}
-			let mut baseline = above + gap;
-			for line in lines {
-				baseline += style.line_height;
+			for (i, line) in lines.iter().enumerate() {
+				let baseline = style.end(above, gap, i + 1);
 				let _ = write!(
 					svg,
 					r#"<text x="{}" y="{baseline}" font-family="{family}" font-size="{}" font-weight="{}" letter-spacing="{}" fill="{fill}">{}</text>"#,
@@ -1077,13 +1178,16 @@ impl Card {
 					escape(line),
 				);
 			}
-			baseline
+			style.end(above, gap, lines.len())
 		};
-		// the first baseline sits a line below the margin, less the leading
-		let title = Layout::title(has_media);
-		let top = Layout::MARGIN - (title.line_height - title.size);
-		let after_title =
-			text(&mut svg, &self.title, title, top, 0., &palette.on_surface);
+		let after_title = text(
+			&mut svg,
+			&self.title,
+			Layout::title(has_media),
+			Layout::top(has_media),
+			0.,
+			&palette.on_surface,
+		);
 		let after_credit = text(
 			&mut svg,
 			&self.credit,
@@ -1095,13 +1199,13 @@ impl Card {
 		text(
 			&mut svg,
 			&self.description,
-			Layout::description(has_media),
+			Layout::description(has_media, after_credit),
 			after_credit,
 			Layout::GAP,
 			&palette.on_surface_variant,
 		);
 		// the bottom row: the logo, the site title and the host
-		let row = height - Layout::MARGIN - Layout::LOGO;
+		let row = Layout::ROW;
 		let mut x = Layout::MARGIN;
 		if logo {
 			let _ = write!(
@@ -1548,6 +1652,84 @@ mod test {
 		let (credit, bare) = svg(default(), None);
 		credit.xpect_empty();
 		(baseline(&bare, "about it") < described).xpect_true();
+		// a line too long for the column breaks before its date
+		let (credit, _) = svg(
+			DocMeta {
+				authors: vec!["Beetmania".into(), "Beet Lover".into()],
+				created: Date::parse("2026-11-21").ok(),
+				..default()
+			},
+			Some(CardMedia {
+				png: png(1, 1, [0; 4]),
+				video: false,
+			}),
+		);
+		credit.xpect_eq(vec![
+			"BEETMANIA, BEET LOVER".to_string(),
+			"21 NOVEMBER 2026".to_string(),
+		]);
+	}
+
+	/// The description fills the room above the bottom row and no more,
+	/// whatever the blocks above it took.
+	#[beet_core::test]
+	fn fills_the_room_left() {
+		let font = CardFont::new(FONT.to_vec()).unwrap();
+		let lines = |title: &str, media: bool| {
+			let page = CardPage {
+				path: RelPath::new("post"),
+				meta: DocMeta {
+					title: Some(title.into()),
+					description: Some("a beet in every pot ".repeat(60)),
+					created: Date::parse("2026-11-21").ok(),
+					..default()
+				},
+				source: None,
+			};
+			let media = media.then(|| CardMedia {
+				png: png(1, 1, [0; 4]),
+				video: false,
+			});
+			let has_media = media.is_some();
+			let card =
+				Card::new(&font, &PackageConfig::default(), &page, media)
+					.unwrap();
+			let above = CardLayout::credit(has_media).end(
+				CardLayout::title(has_media).end(
+					CardLayout::top(has_media),
+					0.,
+					card.title.len(),
+				),
+				CardLayout::CREDIT_GAP,
+				card.credit.len(),
+			);
+			let style = CardLayout::description(has_media, above);
+			let end = style.end(above, CardLayout::GAP, card.description.len());
+			(end <= CardLayout::FLOOR
+				&& end + style.line_height > CardLayout::FLOOR)
+				.xpect_true();
+			card.description.len()
+		};
+		lines("Beets", true)
+			.xpect_greater_than(lines(&"Beets ".repeat(9), true));
+		lines("Beets", false).xpect_greater_than(2);
+	}
+
+	/// The alt text is the card's words, each block closed as a sentence.
+	#[beet_core::test]
+	fn writes_the_alt_text() {
+		CardText::new(
+			&DocMeta {
+				title: Some("Beets!".into()),
+				description: Some("about beets".into()),
+				authors: vec!["Pete Hayman".into()],
+				created: Date::parse("2025-07-11").ok(),
+				..default()
+			},
+			&default(),
+		)
+		.alt()
+		.xpect_eq("Beets! Pete Hayman, 11 July 2025. about beets.");
 	}
 
 	/// A long title wraps to three lines inside the column, the last

@@ -1,6 +1,6 @@
 +++
 title = "Gentle Slopes up Lonely Mountains"
-description = "Excel and Squarespace lead users up a domain specifc mountain peak. Game engines are escarpments leading to broad plateaus."
+description = "Excel and Squarespace lead users up a domain-specific mountain peak. Game engines are escarpments leading to broad plateaus."
 tags = ["bevy", "malleable-software", "terminal"]
 created = "2026-06-02"
 authors = ["Pete Hayman"]

@@ -78,6 +78,11 @@ pub fn Head(
 	/// for it.
 	#[prop]
 	social_image: Option<Url>,
+	/// What [`social_image`](Self::social_image) shows, the alt text a link
+	/// preview carries. Only ever the given image's, so it is ignored without
+	/// one.
+	#[prop]
+	social_image_alt: Option<String>,
 	pkg_config: Res<PackageConfig>,
 	theme: Option<Res<Theme>>,
 ) -> Result<impl Bundle> {
@@ -101,6 +106,7 @@ pub fn Head(
 	let version = pkg_config.version.clone();
 	// the social card is omitted rather than defaulted, since an invented card
 	// url is a broken preview.
+	let social_image_alt = social_image.as_ref().and(social_image_alt);
 	let social_image = social_image
 		.or_else(|| meta.social_image_url())
 		.or_else(|| pkg_config.social_image.clone());
@@ -174,6 +180,7 @@ pub fn Head(
 			<meta property="og:description" content={&card_description}/>
 			{canonical.as_ref().map(|url| rsx!{ <meta property="og:url" content={url.to_string()}/> })}
 			{social_image.as_ref().map(|image| rsx!{ <meta property="og:image" content={image.to_string()}/> })}
+			{social_image_alt.as_ref().map(|alt| rsx!{ <meta property="og:image:alt" content={alt.clone()}/> })}
 			// article facts, emitted only for a page that has a publication date
 			{published.as_ref().map(|time| rsx!{ <meta property="article:published_time" content={time.clone()}/> })}
 			{modified.as_ref().map(|time| rsx!{ <meta property="article:modified_time" content={time.clone()}/> })}
@@ -186,6 +193,7 @@ pub fn Head(
 			<meta name="twitter:title" content={&card_title}/>
 			<meta name="twitter:description" content={&card_description}/>
 			{social_image.as_ref().map(|image| rsx!{ <meta name="twitter:image" content={image.to_string()}/> })}
+			{social_image_alt.as_ref().map(|alt| rsx!{ <meta name="twitter:image:alt" content={alt.clone()}/> })}
 			// Apple PWA
 			<meta name="apple-mobile-web-app-capable" content="yes"/>
 			<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>

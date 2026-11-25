@@ -1,6 +1,6 @@
 +++
 title = "Bevy standardizes malleable software"
-description = "Protocols get standards, applications become silos. The primitives offered by data-driven engines are our best to change that."
+description = "Protocols get standards, applications become silos. The primitives offered by data-driven engines are our best bet to change that."
 tags = ["bevy", "malleable-software", "atproto"]
 created = "2026-08-28"
 authors = ["Pete Hayman"]

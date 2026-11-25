@@ -1,6 +1,6 @@
 +++
 title = "ECS Router"
-description = "The latest refactor landed an ECS-native router, unifying server actions, client islands as scenes, and serving static files under a single paradigm."
+description = "The latest refactor landed an ECS-native router, unifying server actions, client islands as scenes, and static file serving under a single paradigm."
 tags = ["release-notes", "ecs", "web"]
 created = "2025-08-09"
 authors = ["Pete Hayman"]

@@ -310,7 +310,9 @@ mod test {
 			))
 			.xpect_contains(
 				r#"<meta name="twitter:card" content="summary_large_image" />"#,
-			);
+			)
+			.xpect_contains(r#"<meta property="og:image:alt" content="#)
+			.xpect_contains(r#"<meta name="twitter:image:alt" content="#);
 		head("blog/hidden").await.xpect_contains(
 			r#"content="https://beet.org/assets/og/index.png""#,
 		);

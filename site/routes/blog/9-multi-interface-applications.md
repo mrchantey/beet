@@ -1,6 +1,6 @@
 +++
 title = "Multi-Interface Applications"
-description = "Beet now give user agents real agency by bringing back content negotiation and serving HTML, Markdown, ANSI, and raw scenes all via the same route."
+description = "Beet now gives user agents real agency by bringing back content negotiation and serving HTML, Markdown, ANSI, and raw scenes all via the same route."
 tags = ["web", "terminal", "architecture"]
 created = "2026-03-06"
 authors = ["Pete Hayman"]

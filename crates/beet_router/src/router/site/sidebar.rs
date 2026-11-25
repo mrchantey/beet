@@ -83,14 +83,14 @@ pub fn RouteHead(
 			"more than one `IconSet` declared: a site has one set of icons"
 		),
 	};
-	let social_image = cards.card_url(cx.route())?;
+	let (social_image, social_image_alt) = cards.preview(cx.route())?.unzip();
 	let records = standard_site
 		.links(&RelPath::new(cx.current_path()))
 		.into_iter()
 		.map(|(rel, href)| rsx! { <link rel={rel} href={href}/> })
 		.collect::<Vec<_>>();
 	rsx! {
-		<Head omit_title=true meta=meta url=url omit_canonical=omit_canonical noindex=noindex social_image=social_image>
+		<Head omit_title=true meta=meta url=url omit_canonical=omit_canonical noindex=noindex social_image=social_image social_image_alt=social_image_alt>
 			<title>{title}</title>
 			{icons}
 			{records}

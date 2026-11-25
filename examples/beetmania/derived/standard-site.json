@@ -1,6 +1,6 @@
 {
   "beet_core::atproto::provenance::Provenance": {
-    "created": "2026-11-24T23:52:32.271Z",
+    "created": "2026-11-25T03:34:34.909Z",
     "sources": [],
     "ttl": null
   },
@@ -11,16 +11,25 @@
           "cid": "bafyreianztrecyklti7rrihe4y4p3x5bm7igx7prepxzcrjnrvntlqgzyi",
           "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/app.bsky.feed.post/3n2s2xi7xwhqd"
         },
-        "cid": "bafyreid3hlbiia2xtm2wqrbkqoow4dvj6erdz7wrorzsinzcjm6uc2muzy",
+        "cid": "bafyreiackhrutbh32t55sbfdkzmfu2ofvfqempbzflgixhafuovafdwahi",
         "path": "/every-name-for-a-beet",
         "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/site.standard.document/3n2s2xbamucqd"
+      },
+      {
+        "bsky_post": {
+          "cid": "bafyreiemkitw6vgdfc6bb2btith6sgvuiykxswigwtk7vjzwgltxes2or4",
+          "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/app.bsky.feed.post/3n34a2ks6obny"
+        },
+        "cid": "bafyreia3zoia23qmfebb55zfd4wo3adunpk7wkbsx5bjthsuxm4jui3zzi",
+        "path": "/pickled-beets-two-ways",
+        "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/site.standard.document/3n34a2eyilgny"
       },
       {
         "bsky_post": {
           "cid": "bafyreigx452vcgtznpvcenex3kyyblpecosdwnz6ha5ndov4f4xryx2h4e",
           "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/app.bsky.feed.post/3n2s2pafhsxis"
         },
-        "cid": "bafyreih2o5qr2pu3fqmrbbw5wj5fmaset5ud6kjyygflfys3ee7xhjiq5q",
+        "cid": "bafyreih2iyazwxsyagmljfqeijbyacimubfd5dj3cq2otabfkbzj6r5tmq",
         "path": "/the-great-beet-harvest",
         "uri": "at://did:plc:7bxw2ljdoqcny4rio7oiqsru/site.standard.document/3n2rvxnjmwcba"
       },

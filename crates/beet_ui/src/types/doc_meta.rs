@@ -256,20 +256,25 @@ impl DocMeta {
 		(!self.authors.is_empty()).then(|| self.authors.join(", "))
 	}
 
-	/// The [byline](Self::byline) and the [`created`](Self::created) day as the
-	/// one uppercase line set beneath the page's title, ie
-	/// `PETE HAYMAN · 11 JULY 2025`, or `None` when the page declares neither.
-	///
-	/// An article's header, an index entry and a social card all wear it.
-	pub fn credit_line(&self) -> Option<String> {
-		let line = [
+	/// The [byline](Self::byline) and the [`created`](Self::created) day, each
+	/// where the page declares it, ie `Pete Hayman` then `11 July 2025`.
+	pub fn credits(&self) -> Vec<String> {
+		[
 			self.byline(),
 			self.created.map(|created| created.format_long()),
 		]
 		.into_iter()
 		.flatten()
-		.collect::<Vec<_>>()
-		.join(" · ");
+		.collect()
+	}
+
+	/// The [`credits`](Self::credits) as the one uppercase line set beneath the
+	/// page's title, ie `PETE HAYMAN · 11 JULY 2025`, or `None` when the page
+	/// declares neither.
+	///
+	/// An article's header, an index entry and a social card all wear it.
+	pub fn credit_line(&self) -> Option<String> {
+		let line = self.credits().join(" · ");
 		(!line.is_empty()).then(|| line.to_uppercase())
 	}
 

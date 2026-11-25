@@ -1,6 +1,6 @@
 +++
 title = "Full Stack Bevy"
-description = "Beet now does web! Now with all the features you would expect from a web framework from file routes to client islands, proving versatility of Bevy ECS."
+description = "Beet now does web! Now with all the features you would expect from a web framework from file routes to client islands, proving the versatility of Bevy ECS."
 tags = ["release-notes", "bevy", "web", "ecs"]
 created = "2025-07-11"
 authors = ["Pete Hayman"]
@@ -40,7 +40,7 @@ And that brings us to today, the first RC for the fullstack bevy experience with
 - Template Scoped Styles
 - Instant Template Reloading
 
-If this project is of interest come and say hi in the [Beet Roomy space](https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm), and keep me in the loop if you decide to give the quickstart a go. Its difficult to do much without stepping on a proverbial rake at the moment 😅
+If this project is of interest come and say hi in the [Beet Roomy space](https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm), and keep me in the loop if you decide to give the quickstart a go. It's difficult to do much without stepping on a proverbial rake at the moment 😅
 
 Happy Harvest!
 
