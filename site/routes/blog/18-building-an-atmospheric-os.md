@@ -15,7 +15,7 @@ In this post I want to elaborate on exactly what the problem is, how Bevy and AT
 
 ## Beyond kernels
 
-> Patchwork is not an operating system, in the same way that Automerge is not a database.
+> *Patchwork is not an operating system, in the same way that Automerge is not a database.*
 > [PVH, 2026](https://www.youtube.com/watch?v=4UxGijnuXEs&t=468s)
 
 I think the joke is that while Patchwork and Automerge do not *at all* resemble the status quo that they 'are not', they certainly replace it. It feels like now is the time to start thinking about these terms from first principles.
