@@ -420,10 +420,10 @@ mod test {
 		let mut world = test_world();
 		let doc = world.spawn(Document::new(value!({ "counter": {} }))).id();
 		let scope = world
-			.spawn((ChildOf(doc), DocumentScope {
-				path: FieldPath::new(["counter"]),
-				terminate: false,
-			}))
+			.spawn((
+				ChildOf(doc),
+				DocumentScope::new(FieldPath::new(["counter"])),
+			))
 			.id();
 		let button = world.spawn(ChildOf(scope)).id();
 		serve(

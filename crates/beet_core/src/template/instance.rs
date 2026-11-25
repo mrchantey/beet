@@ -22,12 +22,13 @@ use crate::prelude::*;
 /// it built and one not yet activated stays the reference it is.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_insert = hook_ext::component_hook(|instance: &Instance| {
+// a document is serde's, so a build without it holds the reference as data
+#[cfg_attr(feature = "serde", component(on_insert = hook_ext::component_hook(|instance: &Instance| {
 	let props = instance.props.clone();
 	move |entity: &mut EntityCommands| {
 		entity.insert((Document::new(Value::Map(props)), PropsDocument));
 	}
-}))]
+})))]
 pub struct Instance {
 	/// The document to instantiate.
 	pub document: DocPath,

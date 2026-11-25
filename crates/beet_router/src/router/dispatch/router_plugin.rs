@@ -190,7 +190,7 @@ impl Plugin for RouterPlugin {
 					// requested with `<SiteLayout>`.
 					SiteLayout,
 					// its chrome-free twin, for an app that wants the theme and
-					// nothing else: `<Router {Layout{template:"AppShell"}}>`.
+					// nothing else: `<Router {Layout(Template("AppShell"))}>`.
 					AppShell,
 					// the machine-readable faces of a site, each an opt-in static
 					// route scoped by where it is declared
@@ -305,25 +305,28 @@ impl Plugin for RouterPlugin {
 			// target so an entry keeps its shape; its facet boots the DOM host
 			// when the start walk selects `dom`, in a browser tab only.
 			app.register_type::<DomServer>();
-			// the terminal servers, declarable in a markup spread
-			// (`<Router {(TuiServer, ..)}>`) on every target as `DomServer` is; the
-			// facet booting each, and the params it takes, ride the feature
-			// linking its transport.
-			app.register_type::<TuiServer>()
-				.register_type::<SshTuiServer>();
+			// the live-TUI server, declarable in a router markup spread
+			// (`<Router {(TuiServer, ..)}>`); its `on_add` hook boots the
+			// terminal app when the start walk selects `tui`.
 			#[cfg(feature = "tui")]
-			app.install((
+			app.register_type::<TuiServer>().install((
 				SubtreeParams::declare_on::<
 					TuiServer,
 					(BootParams, ServerParams),
 				>(),
 				ColorSchemeParams::declare_on::<TuiServer>(),
 			));
+			// the multi-tenant SSH-TUI server, likewise declarable in a markup
+			// spread. Registered by feature rather than by `SshTuiPlugin` (which
+			// adds the per-connection behavior), so an entry naming it resolves in
+			// any binary that linked the transport.
 			#[cfg(feature = "ssh")]
-			app.install(SubtreeParams::declare_on::<
-				SshTuiServer,
-				(BootParams, ServerParams),
-			>());
+			app.register_type::<SshTuiServer>().install(
+				SubtreeParams::declare_on::<
+					SshTuiServer,
+					(BootParams, ServerParams),
+				>(),
+			);
 			// the scripted route marker in the one instantiation `<ScriptRoute>`
 			// builds: the whole request in, whatever the script returned out.
 			// `Script<Value, Value>` itself is registered upstream by

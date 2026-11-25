@@ -105,14 +105,14 @@ The matched `route` entity is reachable from **no** layout edge (`Portal` and `L
 
 ### Layouts
 
-A layout is render middleware, `Layout{document:"templates/Layout.bsx"}` declared on an ancestor of the routes it wraps (typically the router): the document is instantiated around each page. `Layout{template:"SiteLayout"}` names a registered rust `#[template]` instead, from rust `Layout::of::<SiteLayout>()`, so a rename follows the symbol.
+A layout is render middleware, `Layout(Document("templates/Layout.bsx"))` declared on an ancestor of the routes it wraps (typically the router): the document is instantiated around each page. `Layout(Template("SiteLayout"))` names a registered rust `#[template]` instead, from rust `Layout::of::<SiteLayout>()`, so a rename follows the symbol.
 
 Layouts **nest**: every ancestor declaring one wraps the route exactly once, furthest ancestor outermost. So a site shell on the router and an article shell on `<Route path="blog">` render as `Layout(ArticleLayout(post))`, and the inner one is chrome only, never a second document.
 
 ```bsx
-<Router {Layout{template:"Layout"}}>
+<Router {Layout(Document("templates/Layout.bsx"))}>
 	<RoutesDir src="routes" filter={GlobFilter{exclude:["blog/**"]}}/>
-	<Route path="blog" {Layout{template:"ArticleLayout"}}>
+	<Route path="blog" {Layout(Document("templates/ArticleLayout.bsx"))}>
 		<RoutesDir src="routes/blog"/>
 	</Route>
 </Router>
@@ -133,7 +133,7 @@ created = "2025-07-11"
 slug = "full-stack-bevy"
 
 [Layout]
-template = "ArticleLayout"
+Document = "templates/ArticleLayout.bsx"
 +++
 ```
 

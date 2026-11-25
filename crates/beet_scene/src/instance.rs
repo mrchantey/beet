@@ -604,6 +604,59 @@ mod test {
 		}
 	}
 
+	/// A row's scope is its list's document alone: a binding in the row to the
+	/// props reads the prop, and one to the list's document its item.
+	#[beet_core::test]
+	async fn a_row_scope_leaves_props_alone() {
+		let (mut world, store) = package(&[
+			("Card.bsx", CARD),
+			(
+				"List.bsx",
+				r#"<ul {Document({items: [{name:"a"}, {name:"b"}]})} bx:for="items"><li>{@prop:name}{@doc:name}<Instance document="./Card" props={{title:@doc:name}}>{@prop:name}</Instance></li></ul>"#,
+			),
+			(
+				"Props.bsx",
+				r#"<ol {Document({name:"doc"})} {(ReactiveChildren, @prop:items)}><template><li>{@prop:name}{@doc:name}</li></template></ol>"#,
+			),
+		])
+		.await;
+		let root = spawn(
+			&mut world,
+			&store,
+			"main.bsx",
+			r#"<main><Instance document="./List" props={{name:"prop"}}/><Instance document="./Props" props={{items:[{name:"c"}]}}/></main>"#,
+		)
+		.await;
+		settle(&mut world).await;
+		settle(&mut world).await;
+		let row = |name: &str| {
+			format!(
+				"<li>prop{name}<section><h2>{name}</h2>prop<footer>none</footer></section></li>"
+			)
+		};
+		outline(&world, root)
+			.xpect_contains(&format!("{}{}</ul><ol>", row("a"), row("b")))
+			.xpect_contains("<li>cdoc</li>");
+	}
+
+	/// A document no use instantiates reads its own props' defaults, what it
+	/// slots into another document included, and never that document's props.
+	#[beet_core::test]
+	async fn an_unused_document_reads_its_defaults() {
+		let (mut world, store) = package(&[("Card.bsx", CARD)]).await;
+		let root = spawn(
+			&mut world,
+			&store,
+			"main.bsx",
+			r#"<main><Prop name="who" default="Ada"/><h1>{@prop:who}</h1><Instance document="./Card" props={{title:@prop:who}}><em>{@prop:who}</em><i>{@prop:title}</i></Instance></main>"#,
+		)
+		.await;
+		settle(&mut world).await;
+		outline(&world, root).xpect_contains(
+			"<h1>Ada</h1><section><h2>Ada</h2><em>Ada</em><i>null</i><footer>",
+		);
+	}
+
 	/// A snapshot holds what an activation built and nothing of the reference,
 	/// its bindings still reading the use they were built at.
 	#[beet_core::test]

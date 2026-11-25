@@ -13,7 +13,7 @@ use beet_ui::prelude::*;
 const MAIN_BSX: &str = r#"
 <!-- the whole site: middleware as spreads, routes discovered from disk,
 the package resource patched from markup -->
-<Router {(RequestLogger, Layout{document:"templates/Layout.bsx"})}>
+<Router {(RequestLogger, Layout(Document("templates/Layout.bsx")))}>
 	<PackageConfig title="Beet Test Site" description="markup declared"/>
 	<RoutesDir src="routes"/>
 	<ServeBlobs prefix="assets" {DirPath("assets")}/>

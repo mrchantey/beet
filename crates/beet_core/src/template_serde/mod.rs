@@ -37,7 +37,7 @@
 //!
 //! A body is read as values and needs no type registry; reflection happens
 //! when it spawns. A component whose type path this binary never registered is
-//! left off its entity with a warning and its value held in the entity's
+//! left off its entity and its value held in the entity's
 //! [`Unregistered`], which is also how markup's unknown tag or
 //! spread arrives, so the entity and its children survive, `beet check`, which
 //! registers everything, elevates it to an error, and a strict caller refuses
@@ -96,6 +96,7 @@ pub(self) use loader::Placement;
 pub use loader::TemplateLoader;
 pub use saver::*;
 pub use scene_document::*;
+#[cfg(feature = "bsx")]
 pub(crate) use scene_reflect::KeySentinels;
 pub use template_builder::*;
 pub use template_filter::*;

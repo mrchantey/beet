@@ -54,16 +54,16 @@ use beet_net::prelude::*;
 /// entity, exactly like any other middleware ([`RequestLogger`], [`HelpHandler`]):
 ///
 /// ```bsx
-/// <Router {Layout{document:"templates/Layout.bsx"}}>
+/// <Router {Layout(Document("templates/Layout.bsx"))}>
 ///     <RoutesDir src="routes"/>
-///     <Route path="blog" {Layout{document:"templates/ArticleLayout.bsx"}}>..</Route>
+///     <Route path="blog" {Layout(Document("templates/ArticleLayout.bsx"))}>..</Route>
 /// </Router>
 /// ```
 ///
-/// A layout is a document of the package the declaration is in, activated
-/// around each page, or a rust `#[template]` by its short type
-/// path: exactly one of the two. One naming neither, or nothing, fails the
-/// request rather than serving an unwrapped page.
+/// What it names is a [`TemplateSource`]: a document of the package the
+/// declaration is in, activated around each page, or a rust `#[template]` by
+/// its type path. One that names nothing fails the request rather than serving
+/// an unwrapped page.
 ///
 /// From rust a template's name comes from the type ([`Layout::of`]), so it is a
 /// symbol the compiler checks:
@@ -76,39 +76,24 @@ use beet_net::prelude::*;
 /// fn PageShell() -> impl Bundle { rsx! { <html><body><slot/></body></html> } }
 /// let bundle = (Router, Layout::of::<PageShell>());
 /// ```
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Component)]
 #[component(on_add = push_layout_middleware)]
-pub struct Layout {
-	/// The document, ie `templates/Layout.bsx`.
-	pub document: Option<DocPath>,
-	/// The rust template, ie `SiteLayout` or `path::to::SiteLayout`, registered
-	/// with `app.install_types::<SiteLayout>()`.
-	pub template: Option<SmolStr>,
-}
+pub struct Layout(pub TemplateSource);
 
 impl Layout {
-	/// Wrap descendant routes in the rust template `T`, named by its short type
-	/// path, the name `app.install_types::<T>()` registers it under.
-	pub fn of<T: BuildTemplate>() -> Self {
-		Self::template(TypeName::of::<T>().short())
-	}
+	/// Wrap descendant routes in the rust template `T` ([`TemplateSource::of`]).
+	pub fn of<T: BuildTemplate>() -> Self { Self(TemplateSource::of::<T>()) }
 
 	/// Wrap descendant routes in the rust template named `template`. Prefer
 	/// [`of`](Self::of), which derives the name from the type.
 	pub fn template(template: impl Into<SmolStr>) -> Self {
-		Self {
-			template: Some(template.into()),
-			..default()
-		}
+		Self(TemplateSource::template(template))
 	}
 
 	/// Wrap descendant routes in the document at `document` of their package.
 	pub fn document(document: impl Into<RelPath>) -> Self {
-		Self {
-			document: Some(document.into().into()),
-			..default()
-		}
+		Self(TemplateSource::document(document))
 	}
 }
 
@@ -141,12 +126,7 @@ fn push_layout_middleware(mut world: DeferredWorld, cx: HookContext) {
 							let layout = declarer
 								.get::<Layout, _>(Layout::clone)
 								.await?;
-							let source = TemplateSource::load(
-								&declarer,
-								layout.document,
-								layout.template,
-							)
-							.await?;
+							let source = layout.0.load(&declarer).await?;
 							next.world()
 								.clone()
 								.with(move |world: &mut World| {
@@ -175,7 +155,7 @@ fn wrap_content(
 	parts: RequestParts,
 	route: Entity,
 	content: Entity,
-	source: TemplateSource,
+	source: LoadedTemplate,
 ) -> Result<Entity> {
 	// the inner render root names the entity to render and its ephemerals
 	let (rendered, content_despawn) = {
@@ -245,7 +225,7 @@ fn wrap_content(
 /// the transcluded content, where slot resolution cannot see it.
 fn build_layout(
 	world: &mut World,
-	source: TemplateSource,
+	source: LoadedTemplate,
 	rendered: Entity,
 ) -> Result<Entity> {
 	let layout = world
@@ -481,11 +461,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn missing_layout_errors() {
-		for layout in [
-			Layout::template("Nope"),
-			Layout::document("Nope.bsx"),
-			Layout::default(),
-		] {
+		for layout in [Layout::template("Nope"), Layout::document("Nope.bsx")] {
 			let mut world = router_world();
 			let root = layout_root(&mut world, layout);
 			world.entity_mut(root).insert(BlobStore::temp());

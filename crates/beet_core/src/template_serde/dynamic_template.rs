@@ -264,7 +264,8 @@ impl DynamicTemplate {
 			}
 		}
 		// before anything lands, which may make the root a use site itself
-		let use_site = use_site(cx.entity.world(), cx.entity.id());
+		let root = cx.entity.id();
+		let use_site = use_site(cx.entity.world(), root);
 		// this build's own, so what it nests (a template building a document)
 		// records nothing in it
 		// SAFETY: only used to take the sink resource.
@@ -292,9 +293,7 @@ impl DynamicTemplate {
 			);
 			world.insert_resource(sink);
 		}
-		if let Some(use_site) = use_site {
-			settle_props(world, use_site, &built);
-		}
+		settle_props(world, root, use_site, &built);
 		self.forward_attributes(world, &built)?;
 		hold_prefabs(world, &built)
 	}
@@ -372,22 +371,62 @@ fn use_site(world: &World, root: Entity) -> Option<Entity> {
 /// Settle every [`DocumentPath::Props`] binding among `built` to `use_site`, so
 /// one slotted into another document reads the props of the document that
 /// wrote it.
-fn settle_props(world: &mut World, use_site: Entity, built: &[Entity]) {
-	for entity in built {
-		let Ok(mut entity) = world.get_entity_mut(*entity) else {
-			continue;
-		};
+///
+/// A document no use instantiates, ie a page or an entry, was passed nothing,
+/// so its bindings read the defaults of its own [`Prop`]s, held by an entity
+/// related to `root` so it never renders.
+fn settle_props(
+	world: &mut World,
+	root: Entity,
+	use_site: Option<Entity>,
+	built: &[Entity],
+) {
+	let bound = built
+		.iter()
+		.copied()
+		.filter(|entity| {
+			world.get_entity(*entity).is_ok_and(|entity| {
+				let field = entity.get::<FieldRef>().map(|it| &it.document);
+				let source =
+					entity.get::<SourceFieldRef>().map(|it| &it.document);
+				[field, source].contains(&Some(&DocumentPath::Props))
+			})
+		})
+		.collect::<Vec<_>>();
+	if bound.is_empty() {
+		return;
+	}
+	let props = use_site.unwrap_or_else(|| {
+		let defaults = built
+			.iter()
+			.filter_map(|entity| world.get::<Prop>(*entity))
+			.filter_map(|prop| {
+				prop.default
+					.clone()
+					.map(|default| (prop.name.clone(), default))
+			})
+			.collect::<Map>();
+		world
+			.spawn((
+				AttributeOf::new(root),
+				Document::new(Value::Map(defaults)),
+				PropsDocument,
+			))
+			.id()
+	});
+	for entity in bound {
+		let mut entity = world.entity_mut(entity);
 		if let Some(field) = entity
 			.get::<FieldRef>()
 			.filter(|field| field.document == DocumentPath::Props)
 			.cloned()
 		{
-			entity.insert(field.with_document(DocumentPath::Entity(use_site)));
+			entity.insert(field.with_document(DocumentPath::Entity(props)));
 		}
 		if let Some(mut source) = entity.get_mut::<SourceFieldRef>()
 			&& source.document == DocumentPath::Props
 		{
-			source.document = DocumentPath::Entity(use_site);
+			source.document = DocumentPath::Entity(props);
 		}
 	}
 }

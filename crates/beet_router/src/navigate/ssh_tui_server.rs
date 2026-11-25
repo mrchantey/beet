@@ -1026,7 +1026,7 @@ mod test {
 	}
 
 	/// Regression: the real beet-site path — a [`Layout`]-wrapped [`BlobPage`]
-	/// route (`RoutesDir` `.bsx` page + `Layout{template:"Layout"}`) — must render
+	/// route (`RoutesDir` `.bsx` page + `Layout(Document("Layout.bsx"))`) — must render
 	/// once per SSH session. The route's content lives on the shared route entity,
 	/// transcluded into each session's layout; a second session must not double it.
 	#[cfg(feature = "bsx")]
@@ -1041,22 +1041,24 @@ mod test {
 			)
 			.await
 			.unwrap();
-		let mut registry = BsxTemplateRegistry::default();
-		registry
-			.insert_source(
-				"Layout",
+		store
+			.insert(
+				&"Layout.bsx".into(),
 				"<html><body><main><slot/></main></body></html>",
 			)
+			.await
 			.unwrap();
-		app.world_mut().insert_resource(registry);
 		let server = app
 			.world_mut()
 			.spawn((
 				SshTuiServer::default(),
 				OpeningRoute(Url::coerce("")),
-				children![(store, Router, Layout::default(), children![
-					route::new("", BlobPage::new("index.html"))
-				])],
+				children![(
+					store,
+					Router,
+					Layout::document("Layout.bsx"),
+					children![route::new("", BlobPage::new("index.html"))]
+				)],
 			))
 			.flush();
 		let first = open_connection(&mut app, server, UVec2::new(40, 8));
@@ -1365,22 +1367,27 @@ mod test {
 			)
 			.await
 			.unwrap();
-		let mut registry = BsxTemplateRegistry::default();
-		registry
-			.insert_source(
-				"Layout",
+		store
+			.insert(
+				&"Layout.bsx".into(),
 				"<html><body><main><slot/></main></body></html>",
 			)
+			.await
 			.unwrap();
-		app.world_mut().insert_resource(registry);
 		let server = app
 			.world_mut()
 			.spawn((
 				SshTuiServer::default(),
 				OpeningRoute(Url::coerce("counter")),
-				children![(store, Router, Layout::default(), children![
-					route::new("counter", BlobPage::new("counter.bsx"))
-				])],
+				children![(
+					store,
+					Router,
+					Layout::document("Layout.bsx"),
+					children![route::new(
+						"counter",
+						BlobPage::new("counter.bsx")
+					)]
+				)],
 			))
 			.flush();
 		let session_a = open_connection(&mut app, server, UVec2::new(40, 8));

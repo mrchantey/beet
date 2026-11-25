@@ -1064,7 +1064,7 @@ mod test {
 		let files = [
 			(
 				"app/main.bsx",
-				r#"<Router {Layout{document:"templates/Layout.bsx"}}><Instance document="templates/Styles.bsx"/><RoutesDir src="app/routes"/></Router>"#,
+				r#"<Router {Layout(Document("templates/Layout.bsx"))}><Instance document="templates/Styles.bsx"/><RoutesDir src="app/routes"/></Router>"#,
 			),
 			(
 				"app/templates/Styles.bsx",

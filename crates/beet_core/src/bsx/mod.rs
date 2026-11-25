@@ -25,7 +25,7 @@
 //! its reactive sync components. `<script>` and `<style>` read their body as
 //! raw text, HTML's own rule. An uppercase tag or a spread nothing is
 //! registered under is not an error:
-//! it warns, is held with its value in the entity's [`Unregistered`] and, for
+//! it is held with its value in the entity's [`Unregistered`] and, for
 //! a tag, builds its children anyway, so a lean binary loads the same document
 //! shape a full one does and only its behavior is missing.
 //!

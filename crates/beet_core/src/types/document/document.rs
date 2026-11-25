@@ -314,7 +314,8 @@ pub enum DocumentPath {
 	///
 	/// A document building under a use settles its own to that use
 	/// ([`Entity`](Self::Entity)), so content it passes to another document's
-	/// slot still reads the props of the document that wrote it.
+	/// slot still reads the props of the document that wrote it. One built under
+	/// no use settles to the defaults of its own [`Prop`]s.
 	Props,
 	/// A specific document by entity id.
 	///

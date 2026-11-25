@@ -59,8 +59,8 @@ impl BsxParser {
 	/// text beside it documenting the file.
 	///
 	/// An entry is booted where any other document is instantiated: its root is
-	/// the entity a launch calls, so a second root would silently demote the
-	/// first to a child nothing calls.
+	/// the program, which a command loading the entry calls, so a second root
+	/// would silently demote the first to a child.
 	///
 	/// ## Errors
 	/// Errors naming every root found when there is not exactly one element.

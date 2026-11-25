@@ -168,7 +168,7 @@ pub(crate) fn clean_site() -> TempDir {
 	for (path, content) in [
 		(
 			"main.bsx",
-			r#"<Router {Layout{document:"templates/Layout.bsx"}}>
+			r#"<Router {Layout(Document("templates/Layout.bsx"))}>
 	<PackageConfig title="Clean Site"/>
 	<RoutesDir src="routes"/>
 </Router>"#,

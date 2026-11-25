@@ -11,7 +11,7 @@ use beet_router::prelude::*;
 /// sits in is held by a [`RunThread`].
 ///
 /// ```bsx
-/// <Route path="review/:document" {ThreadRoute{document:"templates/ReviewThread.bsx", message:"review {document}"}}/>
+/// <Route path="review/:document" {ThreadRoute{source:Document("templates/ReviewThread.bsx"), message:"review {document}"}}/>
 /// <!-- templates/ReviewThread.bsx -->
 /// <Thread {(Sequence, MountThreadStore{path:"threads/review/{document}"})}> ..actors.. </Thread>
 /// ```
@@ -41,17 +41,13 @@ use beet_router::prelude::*;
 /// request the same way, the thread despawned all the same. A template
 /// holding a [`UserInput`] is refused, naming its actor, and a request for a
 /// thread whose canonical window is live answers `409`.
-#[action]
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
+#[action(no_default)]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
 pub async fn ThreadRoute(
-	/// The document building the thread.
+	/// The document or rust template building the thread.
 	#[field]
-	document: Option<DocPath>,
-	/// The rust `#[template]` building the thread, by name, in place of a
-	/// document.
-	#[field]
-	template: Option<SmolStr>,
+	source: TemplateSource,
 	/// The message each request posts once the thread is entered, each
 	/// `{param}` filled from the request. None posts nothing.
 	#[field]
@@ -72,7 +68,7 @@ pub async fn ThreadRoute(
 	if let Some(message) = &message {
 		entry = entry.with_message(message, actor)?;
 	}
-	let source = TemplateSource::load(&route, document, template).await?;
+	let source = source.load(&route).await?;
 	let root =
 		ThreadRoute::build(&route, source.clone(), cx.input.parts().clone())
 			.await?;
@@ -91,7 +87,7 @@ impl ThreadRoute {
 	/// template's own root.
 	async fn build(
 		route: &AsyncEntity,
-		source: TemplateSource,
+		source: LoadedTemplate,
 		parts: RequestParts,
 	) -> Result<Entity> {
 		let route_id = route.id();
@@ -382,13 +378,13 @@ mod test {
 		let body = SceneBody::parse_bsx(
 			app.world(),
 			r#"<Router>
-	<Route path="review/:document" {ThreadRoute{document:"ReviewThread.bsx", message:"review {document}"}}/>
-	<Route path="edit/:document" {ThreadRoute{document:"ReviewThread.bsx", message:"edit {document}", actor:3}}/>
-	<Route path="delegate" {ThreadRoute{document:"DelegateThread.bsx"}}/>
-	<Route path="fail" {ThreadRoute{document:"FailingThread.bsx"}}/>
-	<Route path="hold" {ThreadRoute{document:"HoldingThread.bsx"}}/>
-	<Route path="lonely" {ThreadRoute{document:"FailingThread.bsx", message:"anyone?"}}/>
-	<Route path="sit" {ThreadRoute{document:"SittingThread.bsx"}}/>
+	<Route path="review/:document" {ThreadRoute{source:Document("ReviewThread.bsx"), message:"review {document}"}}/>
+	<Route path="edit/:document" {ThreadRoute{source:Document("ReviewThread.bsx"), message:"edit {document}", actor:3}}/>
+	<Route path="delegate" {ThreadRoute{source:Document("DelegateThread.bsx")}}/>
+	<Route path="fail" {ThreadRoute{source:Document("FailingThread.bsx")}}/>
+	<Route path="hold" {ThreadRoute{source:Document("HoldingThread.bsx")}}/>
+	<Route path="lonely" {ThreadRoute{source:Document("FailingThread.bsx"), message:"anyone?"}}/>
+	<Route path="sit" {ThreadRoute{source:Document("SittingThread.bsx")}}/>
 </Router>"#,
 		)
 		.unwrap();

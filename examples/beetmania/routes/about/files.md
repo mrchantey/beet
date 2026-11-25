@@ -19,7 +19,7 @@ beetmania/
 The entrypoint declares the served site as a router:
 
 ```html
-<Router {(RequestLogger, HelpHandler, Layout{document:"templates/Layout.bsx"})}>
+<Router {(RequestLogger, HelpHandler, Layout(Document("templates/Layout.bsx")))}>
 	<RoutesDir src="routes"/>
 </Router>
 ```

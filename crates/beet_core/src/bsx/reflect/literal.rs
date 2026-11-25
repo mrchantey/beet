@@ -150,6 +150,25 @@ fn named_shape(
 			}
 			return Some(DataLiteral::Struct(inner.clone()));
 		}
+		// a newtype of an enum named with its variant, ie a `[Layout]` section
+		(
+			DataLiteral::Enum(NamedLiteral {
+				name,
+				fields: NamedFields::Struct(fields),
+			}),
+			TypeInfo::TupleStruct(info),
+		) if info.field_len() == 1
+			&& matches!(
+				(fields.as_slice(), info.field_at(0)?.type_info()?),
+				([(variant, _)], TypeInfo::Enum(inner))
+					if inner.variant(variant).is_some()
+			) =>
+		{
+			(
+				name.clone(),
+				NamedFields::Tuple(vec![DataLiteral::Struct(fields.clone())]),
+			)
+		}
 		(DataLiteral::List(items), TypeInfo::TupleStruct(info)) => (
 			info.type_path_table().short_path().into(),
 			NamedFields::Tuple(items.clone()),

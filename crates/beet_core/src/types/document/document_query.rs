@@ -118,11 +118,9 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		field: &FieldRef,
 	) -> Result<Value> {
 		let doc_entity = self.entity(subject, &field.document);
-		let field_path = self.scopes.resolved_path(
-			subject,
-			&field.field_path,
-			Some(doc_entity),
-		);
+		let field_path =
+			self.scopes
+				.resolved_path(subject, &field.field_path, doc_entity);
 		match self
 			.doc_query
 			.get(doc_entity)
@@ -156,11 +154,9 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	) -> Result<Out> {
 		let doc_entity = self.entity(subject, &field.document);
 		// resolve the scope prefix fresh, so writes are reactive by construction
-		let field_path = self.scopes.resolved_path(
-			subject,
-			&field.field_path,
-			Some(doc_entity),
-		);
+		let field_path =
+			self.scopes
+				.resolved_path(subject, &field.field_path, doc_entity);
 
 		if let Ok(mut doc) = self.doc_query.get_mut(doc_entity) {
 			let value = if let Ok(value) = doc.get_field_mut(&field_path) {
@@ -223,11 +219,9 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 			return OK;
 		}
 		let doc_entity = self.entity(entity, &field.document);
-		let field_path = self.scopes.resolved_path(
-			entity,
-			&field.field_path,
-			Some(doc_entity),
-		);
+		let field_path =
+			self.scopes
+				.resolved_path(entity, &field.field_path, doc_entity);
 		// equality guard + policy, computed while the read borrow is live;
 		// the guard reads the scope-resolved path, the write scopes internally
 		let should_write = match self.doc_query.get(doc_entity) {
@@ -267,11 +261,9 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		field: &FieldRef,
 	) -> Option<ValueSchema> {
 		let doc_entity = self.entity(subject, &field.document);
-		let field_path = self.scopes.resolved_path(
-			subject,
-			&field.field_path,
-			Some(doc_entity),
-		);
+		let field_path =
+			self.scopes
+				.resolved_path(subject, &field.field_path, doc_entity);
 		let resolver = self.resolver();
 		let schema = self
 			.schemas
@@ -304,11 +296,9 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	) -> Result {
 		let doc_entity = self.entity(subject, &field.document);
 		// schema paths are authored against the resolved (absolute) path
-		let field_path = self.scopes.resolved_path(
-			subject,
-			&field.field_path,
-			Some(doc_entity),
-		);
+		let field_path =
+			self.scopes
+				.resolved_path(subject, &field.field_path, doc_entity);
 		if let Ok(schema) = self.schemas.get(doc_entity) {
 			schema.assert_field_type::<T>(self.resolver(), &field_path)?;
 		}
@@ -324,11 +314,9 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	) -> Result {
 		let doc_entity = self.entity(subject, &field.document);
 		// schema paths are authored against the resolved (absolute) path
-		let field_path = self.scopes.resolved_path(
-			subject,
-			&field.field_path,
-			Some(doc_entity),
-		);
+		let field_path =
+			self.scopes
+				.resolved_path(subject, &field.field_path, doc_entity);
 		if let Ok(schema) = self.schemas.get(doc_entity) {
 			schema.assert_list_item_type::<T>(self.resolver(), &field_path)?;
 		}

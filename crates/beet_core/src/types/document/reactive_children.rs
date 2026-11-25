@@ -48,12 +48,9 @@ struct ItemBuilder(Arc<dyn Fn(usize, &Value) -> OnSpawn + Send + Sync>);
 #[derive(Component)]
 pub struct ReactiveChild;
 
-/// The reconciliation key and current index of a keyed [`ReactiveChild`].
+/// The reconciliation key of a keyed [`ReactiveChild`].
 #[derive(Component)]
-pub(crate) struct ReactiveChildKey {
-	key: String,
-	index: usize,
-}
+pub(crate) struct ReactiveChildKey(String);
 
 impl ReactiveChildren {
 	/// Rows built per item by `build_item` rather than cloned from a prefab,
@@ -127,6 +124,10 @@ impl ReactiveChildren {
 
 /// System that rebuilds [`ReactiveChildren`] when their synced [`Value`] changes.
 ///
+/// A moved list rebuilds too, its [`ResolvedFieldPath`] changed and its value
+/// perhaps not, ie the inner list of a reordered row: each row names its item
+/// absolutely.
+///
 /// Runs in [`DocumentSyncSet::Rebuild`]: after
 /// [`sync_document_to_local`](super::sync_document_to_local) writes the
 /// [`Value`] and marks it `Changed`, so the rebuild reads the current list the
@@ -138,22 +139,32 @@ pub(super) fn update_reactive_children(
 		(
 			Entity,
 			&Value,
+			&FieldRef,
 			&ResolvedFieldPath,
 			&ReactiveChildren,
 			Option<&Children>,
 		),
-		Changed<Value>,
+		Or<(Changed<Value>, Changed<ResolvedFieldPath>)>,
 	>,
 	reactive_children: Query<(), With<ReactiveChild>>,
 	prefabs: Query<(), (With<Prefab>, Allow<Held>)>,
 	child_keys: Query<&ReactiveChildKey>,
+	child_scopes: Query<&DocumentScope>,
 ) -> Result {
-	for (entity, value, resolved, reactive, children) in changed.iter() {
+	for (entity, value, field, resolved, reactive, children) in changed.iter() {
+		// the document as a row resolves it, the list's own entity being its
+		// parent
+		let document = match &field.document {
+			DocumentPath::This => DocumentPath::Entity(entity),
+			document => document.clone(),
+		};
 		// the child's fully-resolved absolute item path, terminating so an inner
 		// FieldRef does not double-count outer scopes
-		let scope_at = |index: usize| DocumentScope {
-			path: resolved.field_path.with_pushed(index),
-			terminate: true,
+		let scope_at = |index: usize| {
+			DocumentScope::item(
+				resolved.field_path.with_pushed(index),
+				document.clone(),
+			)
 		};
 		let prefab = children
 			.into_iter()
@@ -191,7 +202,7 @@ pub(super) fn update_reactive_children(
 						child_keys
 							.get(*child)
 							.ok()
-							.map(|keyed| (keyed.key.clone(), *child))
+							.map(|keyed| (keyed.0.clone(), *child))
 					})
 					.collect();
 				let mut kept: HashSet<String> = HashSet::default();
@@ -199,18 +210,12 @@ pub(super) fn update_reactive_children(
 					let key = ReactiveChildren::item_key(key_path, item);
 					kept.insert(key.clone());
 					match existing.get(&key) {
-						// reuse: only touch the child if its index shifted, so
-						// an append never re-resolves a settled row's bindings
+						// reuse: only touch the child if its item moved, so an
+						// append never re-resolves a settled row's bindings
 						Some(&child) => {
-							let unchanged = child_keys
-								.get(child)
-								.map(|keyed| keyed.index)
-								.unwrap_or(usize::MAX) == index;
-							if !unchanged {
-								commands.entity(child).insert((
-									scope_at(index),
-									ReactiveChildKey { key, index },
-								));
+							let scope = scope_at(index);
+							if child_scopes.get(child).ok() != Some(&scope) {
+								commands.entity(child).insert(scope);
 							}
 						}
 						None => reactive.spawn_row(
@@ -219,7 +224,7 @@ pub(super) fn update_reactive_children(
 							prefab,
 							index,
 							item,
-							(ReactiveChildKey { key, index }, scope_at(index)),
+							(ReactiveChildKey(key), scope_at(index)),
 						),
 					}
 				}
@@ -532,5 +537,63 @@ mod test {
 		values.contains(&Value::Str("a0".into())).xpect_true();
 		values.contains(&Value::Str("a1".into())).xpect_true();
 		values.contains(&Value::Str("b0".into())).xpect_true();
+	}
+
+	/// A reordered row moves the list within it, whose value is unchanged: its
+	/// rows follow to the new path, so an edit lands in the item it shows.
+	#[crate::test]
+	fn an_inner_list_follows_its_row() {
+		let mut world = DocumentPlugin::world();
+		let groups = |ids: [&str; 2]| {
+			let groups = ids
+				.map(|id| value!({ "id": id, "tags": [{ "name": "same" }] }));
+			value!({ "groups": (groups.to_vec()) })
+		};
+		let document = world.spawn(Document::new(groups(["a", "b"]))).id();
+		world.spawn((
+			ChildOf(document),
+			FieldRef::new("groups"),
+			ReactiveChildren::from_fn(|_, _| {
+				OnSpawn::insert((
+					FieldRef::new("tags"),
+					ReactiveChildren::from_fn(|_, _| {
+						OnSpawn::insert((
+							Value::default(),
+							FieldRef::new("name"),
+						))
+					})
+					.with_key(FieldPath::new(["name"])),
+				))
+			})
+			.with_key(FieldPath::new(["id"])),
+		));
+		for ids in [["a", "b"], ["b", "a"]] {
+			world.get_mut::<Document>(document).unwrap().0 = groups(ids);
+			// a move reaches one level of nesting a frame
+			for _ in 0..4 {
+				world.update_local();
+			}
+			let rows = world
+				.query::<(Entity, &ChildOf, &FieldRef)>()
+				.iter(&world)
+				.filter(|(.., field)| {
+					field.field_path == FieldPath::new(["name"])
+				})
+				.map(|(entity, child, _)| (entity, child.parent()))
+				.collect::<Vec<_>>();
+			rows.len().xpect_eq(2);
+			for (row, list) in rows {
+				let path = |entity| {
+					world
+						.get::<ResolvedFieldPath>(entity)
+						.unwrap()
+						.field_path
+						.clone()
+				};
+				path(row).xpect_eq(
+					path(list).with_pushed(0usize).with_pushed("name"),
+				);
+			}
+		}
 	}
 }

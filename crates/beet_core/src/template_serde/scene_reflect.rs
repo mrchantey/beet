@@ -36,7 +36,7 @@ impl SceneBody {
 	/// template is its invocation, a deferred slot expanded when the entity
 	/// builds, and one naming a resource patches the live resource where it
 	/// stands. A component key that resolves as neither is left off its entity
-	/// with a warning and held, value and all, in the entity's
+	/// and held, value and all, in the entity's
 	/// [`Unregistered`]. One of the body's own resources has no entity to hold
 	/// it, so an unresolved one is an error, as is any registered type whose
 	/// value does not read.
@@ -133,7 +133,7 @@ impl SceneBody {
 		entries.sort_by_key(|(name, _)| name.as_str());
 		for (name, value) in entries {
 			let Some(registration) = Self::registration(registry, name) else {
-				warn!(
+				debug!(
 					"entity `{key}`: no type registered for `{name}`, left off and held unregistered"
 				);
 				unregistered.insert(name.clone(), value.clone());
@@ -296,7 +296,7 @@ impl EntityBody {
 	/// ([`DocPath`]).
 	///
 	/// A template or a resource is skipped, belonging to the document's build
-	/// rather than its metadata. A name nothing registers warns and is
+	/// rather than its metadata. A name nothing registers is
 	/// skipped, so a lean binary hoists the subset it links.
 	pub fn insert_onto(
 		&self,
@@ -318,7 +318,7 @@ impl EntityBody {
 		for (name, value) in self.iter() {
 			let Some(registration) = SceneBody::registration(&registry, name)
 			else {
-				warn!(
+				debug!(
 					"skipping `{name}`: no component of that name is registered in this binary"
 				);
 				continue;

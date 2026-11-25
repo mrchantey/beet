@@ -103,9 +103,10 @@ impl Prefab {
 		let derived = Self::derived_components(world);
 		let mut cloner = |nested: bool| {
 			let mut builder = EntityCloner::build_opt_out(world);
-			// the hierarchy rebuilds from each clone's `ChildOf`, in tree order
+			// the hierarchy and the attributes rebuild from each clone's own
+			// `ChildOf` or `AttributeOf`, in tree order
 			builder
-				.deny::<(Children, TemplateEntityMap)>()
+				.deny::<(Children, Attributes, TemplateEntityMap)>()
 				.deny_by_ids(derived.iter().copied());
 			if !nested {
 				builder.deny::<(Self, Held)>();
@@ -117,9 +118,11 @@ impl Prefab {
 		// the clone and held there in turn
 		let mut nested = HashSet::<Entity>::default();
 		for source in &sources {
-			let under_nested = world
-				.get::<ChildOf>(*source)
-				.is_some_and(|child| nested.contains(&child.parent()));
+			let under_nested = ElementTraverseQuery::element_parent(
+				world.get::<ChildOf>(*source),
+				world.get::<AttributeOf>(*source),
+			)
+			.is_some_and(|parent| nested.contains(&parent));
 			let is_prefab =
 				*source != prefab && world.get::<Self>(*source).is_some();
 			if under_nested || is_prefab {
@@ -177,21 +180,26 @@ impl Prefab {
 		}
 	}
 
-	/// `root` and its descendants in tree order, each [`Derived`] subtree
-	/// left out.
+	/// `root` and its descendants in tree order, each element's attributes
+	/// before its children and each [`Derived`] subtree left out.
 	fn subtree(world: &World, root: Entity) -> Vec<Entity> {
 		let mut found = Vec::new();
 		let mut stack = vec![root];
 		while let Some(entity) = stack.pop() {
 			found.push(entity);
-			if let Some(children) = world.get::<Children>(entity) {
-				stack.extend(
-					children
-						.iter()
-						.rev()
-						.filter(|child| world.get::<Derived>(*child).is_none()),
-				);
-			}
+			let children = world
+				.get::<Children>(entity)
+				.into_iter()
+				.flat_map(|children| children.iter().rev());
+			let attributes = world
+				.get::<Attributes>(entity)
+				.into_iter()
+				.flat_map(|attributes| attributes.iter().rev());
+			stack.extend(
+				children
+					.chain(attributes)
+					.filter(|owned| world.get::<Derived>(*owned).is_none()),
+			);
 		}
 		found
 	}
@@ -266,6 +274,50 @@ mod test {
 		let child = world.entity(clone.root).get::<Children>().unwrap()[0];
 		world.entity(child).contains::<Disabled>().xpect_true();
 		world.entity(child).contains::<Held>().xpect_false();
+	}
+
+	/// An element's attributes are its own entities, outside the hierarchy:
+	/// each is held and cloned with the element it is of, a bound one bound
+	/// to its clone alone.
+	#[crate::test]
+	fn attributes_are_cloned() {
+		let mut world = TemplatePlugin::world();
+		let prefab = world.spawn((Prefab, Element::new("li"))).id();
+		let attribute = world
+			.spawn((
+				AttributeOf::new(prefab),
+				Attribute::new("class"),
+				Value::Str("row".into()),
+			))
+			.id();
+		Prefab::hold(&mut world, prefab);
+		world.entity(attribute).contains::<Held>().xpect_true();
+		let target = world.spawn_empty().id();
+		let clones = [(); 2].map(|_| {
+			Prefab::clone_under(&mut world, prefab, target, ())
+				.unwrap()
+				.root
+		});
+		for clone in clones {
+			let attributes =
+				world.entity(clone).get::<Attributes>().unwrap().to_vec();
+			attributes.len().xpect_eq(1);
+			(attributes[0] == attribute).xpect_false();
+			let attribute = world.entity(attributes[0]);
+			attribute.contains::<Held>().xpect_false();
+			attribute
+				.get::<Value>()
+				.unwrap()
+				.clone()
+				.xpect_eq(Value::Str("row".into()));
+		}
+		// the prefab keeps its own
+		world
+			.entity(prefab)
+			.get::<Attributes>()
+			.unwrap()
+			.len()
+			.xpect_eq(1);
 	}
 
 	/// A row a nested generator made under the prefab is not cloned.

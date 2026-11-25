@@ -294,7 +294,7 @@ pub(super) fn sync_source_field_refs(
 		}
 		// scopes at the subject apply, matching the authored tag site
 		let field_path =
-			scopes.resolved_path(subject, &source.field_path, Some(doc_entity));
+			scopes.resolved_path(subject, &source.field_path, doc_entity);
 		let Ok(field_val) = doc.get_field_ref(&field_path) else {
 			continue;
 		};

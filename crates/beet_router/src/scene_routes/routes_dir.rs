@@ -46,7 +46,7 @@ use beet_ui::prelude::*;
 ///
 /// ```bsx
 /// <RoutesDir src="routes" filter={GlobFilter{exclude:["blog/**"]}}/>
-/// <Route path="blog" {Layout{document:"templates/ArticleLayout.bsx"}}>
+/// <Route path="blog" {Layout(Document("templates/ArticleLayout.bsx"))}>
 ///     <RoutesDir src="routes/blog"/>
 /// </Route>
 /// ```
@@ -1099,7 +1099,7 @@ mod test {
 			&mut world,
 			memory_fixture(&[(
 				"blog/post.md",
-				"+++\ntitle = \"Post\"\n[Layout]\ntemplate = \"ArticleLayout\"\n+++\n\n# Post",
+				"+++\ntitle = \"Post\"\n[Layout]\nDocument = \"templates/ArticleLayout.bsx\"\n+++\n\n# Post",
 			)])
 			.await,
 			(Router, children![RoutesDir::default()]),
@@ -1120,10 +1120,8 @@ mod test {
 			.entity(entity)
 			.get::<Layout>()
 			.unwrap()
-			.template
-			.as_deref()
-			.unwrap()
-			.xpect_eq("ArticleLayout");
+			.clone()
+			.xpect_eq(Layout::document("templates/ArticleLayout.bsx"));
 	}
 
 	/// A dir declaring its own [`FrontmatterType`] redirects the unsectioned
@@ -1135,7 +1133,7 @@ mod test {
 			&mut world,
 			memory_fixture(&[(
 				"post.md",
-				"+++\ntemplate = \"ArticleLayout\"\n+++\n\n# Post",
+				"+++\nTemplate = \"ArticleLayout\"\n+++\n\n# Post",
 			)])
 			.await,
 			(Router, children![(RoutesDir::default(), FrontmatterType {
@@ -1150,14 +1148,12 @@ mod test {
 			.entity(entity)
 			.get::<Layout>()
 			.unwrap()
-			.template
-			.as_deref()
-			.unwrap()
-			.xpect_eq("ArticleLayout");
+			.clone()
+			.xpect_eq(Layout::template("ArticleLayout"));
 		world.entity(entity).get::<DocMeta>().is_none().xpect_true();
 	}
 
-	/// A section naming a component this binary does not register warns and is
+	/// A section naming a component this binary does not register is
 	/// skipped: the page still serves, carrying every declaration that did
 	/// resolve, exactly as an unregistered tag still builds its subtree.
 	#[beet_core::test]

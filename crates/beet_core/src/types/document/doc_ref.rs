@@ -212,20 +212,20 @@ mod test {
 			})))
 			.id();
 		let outer_scope = world
-			.spawn((ChildOf(host), DocumentScope {
-				path: FieldPath::new(["outer"]),
-				terminate: false,
-			}))
+			.spawn((
+				ChildOf(host),
+				DocumentScope::new(FieldPath::new(["outer"])),
+			))
 			.id();
 		let subtree = world.spawn((ChildOf(outer_scope), DocRef(foreign))).id();
 		let unscoped = world
 			.spawn((ChildOf(subtree), Value::default(), FieldRef::new("name")))
 			.id();
 		let inner_scope = world
-			.spawn((ChildOf(subtree), DocumentScope {
-				path: FieldPath::new(["inner"]),
-				terminate: false,
-			}))
+			.spawn((
+				ChildOf(subtree),
+				DocumentScope::new(FieldPath::new(["inner"])),
+			))
 			.id();
 		let scoped = world
 			.spawn((

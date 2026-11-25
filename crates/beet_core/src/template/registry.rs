@@ -221,12 +221,13 @@ where
 /// Structure is universal: a document builds the same entity tree in every
 /// binary, and what a lean build lacks is behavior (unlinked components, absent
 /// actions), never structure. So an unresolvable uppercase tag or spread, and
-/// a scene body's key naming a type this binary never registered, each warn,
+/// a scene body's key naming a type this binary never registered, each
 /// are held here, and leave the entity's directives, spreads and children to
 /// build, which keeps `bx:ref` targets and the shape of the tree stable
 /// across builds.
 ///
-/// Loudness arrives later, where it can distinguish a lean binary from a typo:
+/// A load is quiet about what it holds, since it cannot tell a lean binary from
+/// a typo. Loudness arrives later: `beet check` and a dev page name every one,
 /// a subtree excluded by `bx:cfg` reports its condition rather than the missing
 /// features, a failed sequence route appends its unregistered children's names
 /// at the reporting edge, and a strict caller refuses through

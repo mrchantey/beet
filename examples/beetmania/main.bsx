@@ -142,7 +142,7 @@ judge or delete.
 		did="did:plc:xfhml5eyathkdgloyiresv4d" display_name="Beet Lover"
 		secret="BEETLOVER_BEET_ORG_APP_PASSWORD" auto_repost=true/>
 	<Route path="serve" {(HttpServer, TuiServer, SshTuiServer, DomServer)}>
-		<Router {(RequestLogger, CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, Layout{document:"templates/Layout.bsx"})}>
+		<Router {(RequestLogger, CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, Layout(Document("templates/Layout.bsx")))}>
 			<Theme color={Srgba(Srgba{red:0.61, green:0.12, blue:0.29, alpha:1.0})}/>
 			<Instance document="templates/Styles.bsx"/>
 			<DefaultAppRoutes/>
@@ -154,7 +154,7 @@ judge or delete.
 				name="The Beetmania Almanac" description="News, harvests and the odd experiment from the Beetmania patch."/>
 			<SocialCards font="assets/fonts/FiraSans-Bold.ttf"/>
 			<RoutesDir src="routes" filter={GlobFilter{exclude:["blog/**"]}}/>
-			<Route path="blog" {Layout{document:"templates/ArticleLayout.bsx"}}>
+			<Route path="blog" {Layout(Document("templates/ArticleLayout.bsx"))}>
 				<RoutesDir src="routes/blog"/>
 			</Route>
 			<ServeBlobs prefix="repo"/>

@@ -16,11 +16,13 @@
 
 use crate::prelude::*;
 
-/// A field-path prefix contributed to every [`FieldRef`] *beneath* this entity.
+/// A field-path prefix contributed to every [`FieldRef`] *beneath* this entity
+/// that reads the document the scope was opened on.
 ///
-/// Document-agnostic: contributes only path segments, never decides which
-/// document a [`FieldRef`] resolves against (that stays [`FieldRef::document`] /
-/// [`FieldOf`]).
+/// Contributes only path segments, never decides which document a [`FieldRef`]
+/// resolves against (that stays [`FieldRef::document`] / [`FieldOf`]). A
+/// binding to any other document is untouched, so an `@prop:name` in a row over
+/// `@doc:items` reads the prop.
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct DocumentScope {
@@ -28,6 +30,29 @@ pub struct DocumentScope {
 	pub path: FieldPath,
 	/// When true, scope collection stops here (this scope is still collected).
 	pub terminate: bool,
+	/// The document the scope is opened on, resolved from this entity.
+	#[entities]
+	pub document: DocumentPath,
+}
+
+impl DocumentScope {
+	/// A scope at `path` of the nearest document.
+	pub fn new(path: impl Into<FieldPath>) -> Self {
+		Self {
+			path: path.into(),
+			..default()
+		}
+	}
+
+	/// The scope of the list item at `path`, its absolute path in `document`,
+	/// so no scope further out is added to it.
+	pub fn item(path: impl Into<FieldPath>, document: DocumentPath) -> Self {
+		Self {
+			path: path.into(),
+			terminate: true,
+			document,
+		}
+	}
 }
 
 /// Derived from [`FieldRef::field_path`] plus the accumulated ancestor
@@ -54,41 +79,37 @@ pub struct ResolvedFieldPath {
 pub struct ScopeQuery<'w, 's> {
 	traverse: ElementTraverseQuery<'w, 's>,
 	scopes: Query<'w, 's, &'static DocumentScope>,
-	doc_refs: Query<'w, 's, (), With<DocRef>>,
+	doc_refs: Query<'w, 's, &'static DocRef>,
+	documents: DocumentResolver<'w, 's>,
 }
 
 impl ScopeQuery<'_, '_> {
-	/// Accumulate the [`DocumentScope`] prefix for `subject`, walking ancestors
-	/// inclusive. Outermost scope leads; a `terminate` scope is collected, then
-	/// the walk stops.
+	/// Accumulate the prefix of every [`DocumentScope`] opened on `document`,
+	/// walking `subject`'s ancestors inclusive. Outermost scope leads; a
+	/// `terminate` scope is collected, then the walk stops.
 	///
-	/// `document` bounds the walk at the bound document's entity (its own scope
-	/// is still collected): a scope above the document belongs to an *outer*
-	/// document's namespace and must not prefix this one. The canonical case is
-	/// a `@prop` binding inside a `bx:scope`d subtree: the user scope must not
-	/// reach into the template's props store.
-	///
-	/// A [`DocRef`] bounds it the same way, for the same reason: the document it
-	/// targets is never an ancestor, so nothing else would stop the walk, and the
-	/// host's prefix names paths in the host's namespace, not the foreign one.
-	pub fn scope_prefix(
-		&self,
-		subject: Entity,
-		document: Option<Entity>,
-	) -> FieldPath {
+	/// The walk ends at the document's entity (its own scope is still
+	/// collected), and at a [`DocRef`] re-rooting the subtree into it, above
+	/// which any scope names paths of the host's namespace.
+	pub fn scope_prefix(&self, subject: Entity, document: Entity) -> FieldPath {
 		// innermost -> outermost as we walk up
 		let mut collected: Vec<FieldPath> = Vec::new();
 		for ancestor in self.traverse.ancestors_inclusive(subject) {
-			if let Ok(scope) = self.scopes.get(ancestor) {
+			if let Ok(scope) = self.scopes.get(ancestor)
+				&& self.documents.entity(ancestor, &scope.document) == document
+			{
 				collected.push(scope.path.clone());
 				// a terminate scope is collected, then seals off outer scopes
 				if scope.terminate {
 					break;
 				}
 			}
-			// scopes above the bound document, or above the declaration that
-			// re-rooted the subtree into it, are out of its namespace
-			if document == Some(ancestor) || self.doc_refs.contains(ancestor) {
+			if document == ancestor
+				|| self
+					.doc_refs
+					.get(ancestor)
+					.is_ok_and(|doc_ref| doc_ref.document() == document)
+			{
 				break;
 			}
 		}
@@ -105,7 +126,7 @@ impl ScopeQuery<'_, '_> {
 		&self,
 		subject: Entity,
 		authored: &FieldPath,
-		document: Option<Entity>,
+		document: Entity,
 	) -> FieldPath {
 		let mut path = self.scope_prefix(subject, document);
 		path.extend(authored.iter().cloned());
@@ -130,7 +151,7 @@ pub(super) fn resolve_field_path(
 	let field = fields.get(ev.entity)?;
 	let document = docs.entity(ev.entity, &field.document);
 	let field_path =
-		resolver.resolved_path(ev.entity, &field.field_path, Some(document));
+		resolver.resolved_path(ev.entity, &field.field_path, document);
 	commands
 		.entity(ev.entity)
 		.insert(ResolvedFieldPath { field_path });
@@ -160,8 +181,9 @@ pub(super) fn field_bindings_need_update(
 /// ticks cannot see.
 ///
 /// For each changed entity (scope or [`DocRef`] add/mutate/removal, or a
-/// reparent), descend its subtree and recompute every [`FieldRef`] found,
-/// pruning subtrees that a terminating scope or a nested [`DocRef`] seals off.
+/// reparent), descend its subtree and recompute every [`FieldRef`] found.
+/// Nothing beneath is sealed off: a terminating scope and a [`DocRef`] each
+/// bound one document, and a ref may bind another.
 /// The descent only *selects* refs; both facts are always produced by the shared
 /// resolvers, and the equality guards absorb redundant recomputes.
 ///
@@ -175,8 +197,6 @@ pub(super) fn update_field_bindings(
 	mut removed_scopes: RemovedComponents<DocumentScope>,
 	mut removed_refs: RemovedComponents<DocRef>,
 	children: Query<&Children>,
-	scopes: Query<&DocumentScope>,
-	nested_refs: Query<(), With<DocRef>>,
 	has_document: Query<(), With<Document>>,
 	docs: DocumentResolver,
 	resolver: ScopeQuery,
@@ -197,11 +217,8 @@ pub(super) fn update_field_bindings(
 				(has_ref.get(node), resolved.get_mut(node))
 			{
 				let document = docs.entity(node, &field.document);
-				let next = resolver.resolved_path(
-					node,
-					&field.field_path,
-					Some(document),
-				);
+				let next =
+					resolver.resolved_path(node, &field.field_path, document);
 				// equality guard: only dirty when the path actually changed
 				if slot.field_path != next {
 					slot.field_path = next;
@@ -216,14 +233,7 @@ pub(super) fn update_field_bindings(
 				}
 			}
 			if let Ok(kids) = children.get(node) {
-				// a terminating child scope, or a child re-rooting its own
-				// subtree into another document, seals it off from `root`
-				stack.extend(kids.iter().filter(|child| {
-					!nested_refs.contains(*child)
-						&& scopes
-							.get(*child)
-							.map_or(true, |scope| !scope.terminate)
-				}));
+				stack.extend(kids.iter());
 			}
 		}
 	}
@@ -257,10 +267,7 @@ mod test {
 			.id();
 		// a DocumentScope ancestor scoping descendants into "user"
 		let scope = world
-			.spawn((ChildOf(doc), DocumentScope {
-				path: FieldPath::new(["user"]),
-				terminate: false,
-			}))
+			.spawn((ChildOf(doc), DocumentScope::new(FieldPath::new(["user"]))))
 			.id();
 		let field = world
 			.spawn((ChildOf(scope), Value::default(), FieldRef::new("name")))
@@ -281,16 +288,13 @@ mod test {
 			))
 			.id();
 		let outer = world
-			.spawn((ChildOf(doc), DocumentScope {
-				path: FieldPath::new(["user"]),
-				terminate: false,
-			}))
+			.spawn((ChildOf(doc), DocumentScope::new(FieldPath::new(["user"]))))
 			.id();
 		let inner = world
-			.spawn((ChildOf(outer), DocumentScope {
-				path: FieldPath::new(["address"]),
-				terminate: false,
-			}))
+			.spawn((
+				ChildOf(outer),
+				DocumentScope::new(FieldPath::new(["address"])),
+			))
 			.id();
 		let field = world
 			.spawn((ChildOf(inner), Value::default(), FieldRef::new("city")))
@@ -308,16 +312,16 @@ mod test {
 		let doc = world.spawn(Document::new(value!({ "name": "top" }))).id();
 		// an outer scope that would otherwise prefix "outer"
 		let outer = world
-			.spawn((ChildOf(doc), DocumentScope {
-				path: FieldPath::new(["outer"]),
-				terminate: false,
-			}))
+			.spawn((
+				ChildOf(doc),
+				DocumentScope::new(FieldPath::new(["outer"])),
+			))
 			.id();
 		// a terminating scope with an empty prefix seals off "outer"
 		let sealed = world
 			.spawn((ChildOf(outer), DocumentScope {
-				path: FieldPath::default(),
 				terminate: true,
+				..default()
 			}))
 			.id();
 		let field = world
@@ -340,10 +344,7 @@ mod test {
 			})))
 			.id();
 		let scope = world
-			.spawn((ChildOf(doc), DocumentScope {
-				path: FieldPath::new(["a"]),
-				terminate: false,
-			}))
+			.spawn((ChildOf(doc), DocumentScope::new(FieldPath::new(["a"]))))
 			.id();
 		let field = world
 			.spawn((ChildOf(scope), Value::default(), FieldRef::new("name")))
@@ -375,10 +376,7 @@ mod test {
 			})))
 			.id();
 		let scope = world
-			.spawn((ChildOf(doc), DocumentScope {
-				path: FieldPath::new(["a"]),
-				terminate: false,
-			}))
+			.spawn((ChildOf(doc), DocumentScope::new(FieldPath::new(["a"]))))
 			.id();
 		let field = world
 			.spawn((ChildOf(scope), Value::default(), FieldRef::new("name")))
@@ -405,10 +403,10 @@ mod test {
 			.spawn(Document::new(value!({ "counter": { "count": 5i64 } })))
 			.id();
 		let scope = world
-			.spawn((ChildOf(doc), DocumentScope {
-				path: FieldPath::new(["counter"]),
-				terminate: false,
-			}))
+			.spawn((
+				ChildOf(doc),
+				DocumentScope::new(FieldPath::new(["counter"])),
+			))
 			.id();
 		let element = world.spawn((ChildOf(scope), Element::new("div"))).id();
 		// a text binding under the element (in the ChildOf tree)
@@ -444,16 +442,10 @@ mod test {
 			})))
 			.id();
 		let scope_a = world
-			.spawn((ChildOf(doc), DocumentScope {
-				path: FieldPath::new(["a"]),
-				terminate: false,
-			}))
+			.spawn((ChildOf(doc), DocumentScope::new(FieldPath::new(["a"]))))
 			.id();
 		let scope_b = world
-			.spawn((ChildOf(doc), DocumentScope {
-				path: FieldPath::new(["b"]),
-				terminate: false,
-			}))
+			.spawn((ChildOf(doc), DocumentScope::new(FieldPath::new(["b"]))))
 			.id();
 		let field = world
 			.spawn((ChildOf(scope_a), Value::default(), FieldRef::new("name")))
@@ -477,10 +469,7 @@ mod test {
 			.spawn(Document::new(value!({ "user": { "name": "old" } })))
 			.id();
 		let scope = world
-			.spawn((ChildOf(doc), DocumentScope {
-				path: FieldPath::new(["user"]),
-				terminate: false,
-			}))
+			.spawn((ChildOf(doc), DocumentScope::new(FieldPath::new(["user"]))))
 			.id();
 		let field = world
 			.spawn((ChildOf(scope), Value::default(), FieldRef::new("name")))

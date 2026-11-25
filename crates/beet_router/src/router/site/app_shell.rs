@@ -38,7 +38,7 @@ use beet_ui::prelude::Reset;
 /// means.
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
-/// an app wraps its routes in it with `<Router {Layout{template:"AppShell"}}>`.
+/// an app wraps its routes in it with `<Router {Layout(Template("AppShell"))}>`.
 #[template(system)]
 pub fn AppShell(
 	stack: Res<RequestContextStack>,

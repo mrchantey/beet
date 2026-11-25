@@ -15,7 +15,7 @@ the stored thread's.
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
 	<RequireCfg cfg="feature:thread && feature:tui && feature:ssh"/>
-	<Router {Layout{template:"AppShell"}}>
+	<Router {Layout(Template("AppShell"))}>
 		<Route path="/" {FixedPage}>
 			<ThreadView {OfThread($thread)}/>
 			<CreatePostForm {OfThread($thread)}/>
