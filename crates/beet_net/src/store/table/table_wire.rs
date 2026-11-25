@@ -30,7 +30,7 @@ use std::sync::Arc;
 /// | `GET /_capabilities` | the [`Capability`]s supported |
 /// | `GET` / `POST` / `DELETE` `/_store` | exists (`200`/`404`), create, remove |
 /// | `GET` / `PUT` / `DELETE` `/_blob/<path>` | the blob side, `ETag` its version |
-/// | `GET /_blob?list` | every blob path, a json array |
+/// | `GET /_blob?list`, `GET /_blob/<dir>?list` | every blob path, or every one under `<dir>` relative to it, a json array |
 ///
 /// A write's precondition rides its headers: `If-Match: "<cid>"` (a blob's
 /// version for a blob) or `If-None-Match: *`. A failed one answers `412` with
@@ -214,8 +214,8 @@ impl TableWire {
 		}
 	}
 
-	/// The blob side: `rest` the blob's path, empty with `?list` for the
-	/// listing.
+	/// The blob side: `rest` the blob's path, or with `?list` the directory
+	/// listed, empty for the root.
 	async fn blob(
 		provider: &dyn TableProvider,
 		method: HttpMethod,
@@ -223,23 +223,24 @@ impl TableWire {
 		precondition: WirePrecondition,
 		request: Request,
 	) -> Result<Response> {
-		if rest.is_empty() {
-			return match (method, request.request_parts().get_param(Self::LIST))
-			{
-				(HttpMethod::Get, Some(_)) => {
-					let mut paths = provider
-						.list()
-						.await?
-						.into_iter()
-						.map(|path| path.to_string())
-						.collect::<Vec<_>>();
-					paths.sort();
-					Response::ok_json(&paths)
-				}
-				_ => Response::not_found().xok(),
-			};
-		}
 		let path = RelPath::new(rest.join("/"));
+		if matches!(method, HttpMethod::Get)
+			&& request.request_parts().get_param(Self::LIST).is_some()
+		{
+			let mut paths = match path.is_empty() {
+				true => provider.list(),
+				false => provider.with_subdir(path).list(),
+			}
+			.await?
+			.into_iter()
+			.map(|path| path.to_string())
+			.collect::<Vec<_>>();
+			paths.sort();
+			return Response::ok_json(&paths);
+		}
+		if path.is_empty() {
+			return Response::not_found().xok();
+		}
 		match method {
 			HttpMethod::Get => match provider.get_versioned(&path).await? {
 				Some((bytes, version)) => {
@@ -528,6 +529,8 @@ impl TableWireTransport {
 pub struct TableWireClient {
 	transport: TableWireTransport,
 	partition: Option<PartitionId>,
+	/// The scope of the blob side, which the rows ignore.
+	subdir: RelPath,
 	capabilities: Arc<std::sync::OnceLock<Vec<Capability>>>,
 }
 
@@ -536,6 +539,7 @@ impl core::fmt::Debug for TableWireClient {
 		f.debug_struct("TableWireClient")
 			.field("transport", &self.transport.describe)
 			.field("partition", &self.partition)
+			.field("subdir", &self.subdir)
 			.finish()
 	}
 }
@@ -547,6 +551,7 @@ impl TableWireClient {
 		Self {
 			transport,
 			partition: None,
+			subdir: default(),
 			capabilities: default(),
 		}
 	}
@@ -605,6 +610,20 @@ impl TableWireClient {
 	/// The url of a row.
 	fn row_url(&self, table: &TableSpec, key: &TableKey) -> Url {
 		self.url([table.name.clone(), SmolStr::from(key.as_str())])
+	}
+
+	/// The url of the blob at `path` in this scope, the scope itself for an
+	/// empty path.
+	fn blob_url(&self, path: &RelPath) -> Url {
+		let path = self.subdir.join(path);
+		self.url(
+			core::iter::once(SmolStr::from(TableWire::BLOB)).chain(
+				path.as_str()
+					.split('/')
+					.filter(|segment| !segment.is_empty())
+					.map(SmolStr::from),
+			),
+		)
 	}
 
 	async fn send(&self, request: Request) -> Result<Response> {
@@ -669,13 +688,21 @@ impl TableWireClient {
 impl BlobStoreProvider for TableWireClient {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	/// A scope of the blob side is a partition's blob side under a prefix,
-	/// which the protocol does not carry: refused at use rather than here.
-	fn with_subdir(&self, _path: RelPath) -> Box<dyn BlobStoreProvider> {
-		Box::new(self.clone())
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(Self {
+			subdir: self.subdir.join(&path),
+			..self.clone()
+		})
 	}
 
-	fn base(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(Self {
+			subdir: default(),
+			..self.clone()
+		})
+	}
+
+	fn subdir(&self) -> RelPath { self.subdir.clone() }
 
 	fn id(&self) -> &'static str { "table-wire" }
 
@@ -737,8 +764,8 @@ impl BlobStoreProvider for TableWireClient {
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let this = self.clone();
 		Box::pin(async move {
-			let mut request = Request::get(this.url([TableWire::BLOB]));
-			request = request.with_param(TableWire::LIST, "true");
+			let request = Request::get(this.blob_url(&default()))
+				.with_param(TableWire::LIST, "true");
 			Self::checked(this.send(request).await?)
 				.await?
 				.json::<Vec<String>>()
@@ -786,10 +813,7 @@ impl BlobStoreProvider for TableWireClient {
 		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 		let this = self.clone();
-		let url = self.url(
-			core::iter::once(SmolStr::from(TableWire::BLOB))
-				.chain(path.as_str().split('/').map(SmolStr::from)),
-		);
+		let url = self.blob_url(path);
 		Box::pin(async move {
 			let response = this.send(Request::get(url)).await?;
 			if response.status() == StatusCode::NOT_FOUND {
@@ -808,11 +832,8 @@ impl BlobStoreProvider for TableWireClient {
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result<BlobVersion>> {
 		let this = self.clone();
+		let url = self.blob_url(path);
 		let path = path.clone();
-		let url = self.url(
-			core::iter::once(SmolStr::from(TableWire::BLOB))
-				.chain(path.as_str().split('/').map(SmolStr::from)),
-		);
 		Box::pin(async move {
 			let request = Self::with_blob_condition(
 				Request::put(url).with_body(body),
@@ -832,11 +853,8 @@ impl BlobStoreProvider for TableWireClient {
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result> {
 		let this = self.clone();
+		let url = self.blob_url(path);
 		let path = path.clone();
-		let url = self.url(
-			core::iter::once(SmolStr::from(TableWire::BLOB))
-				.chain(path.as_str().split('/').map(SmolStr::from)),
-		);
 		Box::pin(async move {
 			let request =
 				Self::with_blob_condition(Request::delete(url), &condition);
@@ -867,6 +885,7 @@ impl TableProvider for TableWireClient {
 				Some(parent) => parent.join(id),
 				None => id.clone(),
 			}),
+			subdir: default(),
 			// the same server, so the same capabilities
 			capabilities: self.capabilities.clone(),
 			transport: self.transport.clone(),

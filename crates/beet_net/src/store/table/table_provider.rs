@@ -438,7 +438,9 @@ impl Scan {
 		match parent.as_ref().trim_end_matches('/') {
 			"" => self,
 			// `0` is the byte after `/`
-			parent => self.from(format!("{parent}/")).before(format!("{parent}0")),
+			parent => {
+				self.from(format!("{parent}/")).before(format!("{parent}0"))
+			}
 		}
 	}
 	/// At most `limit` rows a page.

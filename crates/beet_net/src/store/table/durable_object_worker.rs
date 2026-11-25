@@ -66,11 +66,18 @@ impl DurableObjectStore {
 #[derive(Clone)]
 pub struct DurableObjectSql {
 	sql: worker::SqlStorage,
+	/// The scope of the blobs, which the rows ignore.
+	subdir: RelPath,
 }
 
 impl DurableObjectSql {
 	/// The partition `sql` stores.
-	pub fn new(sql: worker::SqlStorage) -> Self { Self { sql } }
+	pub fn new(sql: worker::SqlStorage) -> Self {
+		Self {
+			sql,
+			subdir: default(),
+		}
+	}
 
 	/// Run `func` against this storage as a provider future.
 	fn run<T: 'static>(
@@ -120,12 +127,17 @@ impl DurableObjectSql {
 		.map(drop)
 	}
 
-	/// The blob at `path` with its version.
+	/// The key of the blob at `path` in this scope.
+	fn blob_key(&self, path: &RelPath) -> SqlArg {
+		SqlArg::Text(self.subdir.join(path).to_string())
+	}
+
+	/// The blob at `path` in this scope with its version.
 	fn blob(&self, path: &RelPath) -> Result<Option<(Bytes, BlobVersion)>> {
 		self.ensure_blobs()?;
 		match self
 			.query("SELECT body, version FROM blobs WHERE path = ?1", &[
-				SqlArg::Text(path.to_string()),
+				self.blob_key(path)
 			])?
 			.into_iter()
 			.next()
@@ -172,10 +184,19 @@ impl SqlEngine for DurableObjectSql {
 
 impl BlobStoreProvider for DurableObjectSql {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-	fn with_subdir(&self, _path: RelPath) -> Box<dyn BlobStoreProvider> {
-		Box::new(self.clone())
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(Self {
+			subdir: self.subdir.join(&path),
+			..self.clone()
+		})
 	}
-	fn base(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(Self {
+			subdir: default(),
+			..self.clone()
+		})
+	}
+	fn subdir(&self) -> RelPath { self.subdir.clone() }
 	fn id(&self) -> &'static str { "durable-object" }
 	fn root_key(&self) -> SmolStr { "durable-object".into() }
 	fn region(&self) -> Option<String> { None }
@@ -211,13 +232,28 @@ impl BlobStoreProvider for DurableObjectSql {
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		self.run(|this| {
 			this.ensure_blobs()?;
-			this.query("SELECT path FROM blobs ORDER BY path", &[])?
-				.into_iter()
-				.map(|row| match row.into_iter().next() {
-					Some(SqlArg::Text(path)) => RelPath::new(path).xok(),
-					_ => bevybail!("blob path is not text"),
-				})
-				.collect()
+			let prefix = match this.subdir.is_empty() {
+				true => String::new(),
+				false => format!("{}/", this.subdir),
+			};
+			// `substr` rather than `LIKE`: a prefix holding `%` or `_` needs
+			// no escaping
+			this.query(
+				"SELECT path FROM blobs WHERE substr(path, 1, ?2) = ?1 \
+				 ORDER BY path",
+				&[
+					SqlArg::Text(prefix.clone()),
+					SqlArg::Integer(prefix.chars().count() as i64),
+				],
+			)?
+			.into_iter()
+			.map(|row| match row.into_iter().next() {
+				Some(SqlArg::Text(path)) => {
+					RelPath::new(&path[prefix.len()..]).xok()
+				}
+				_ => bevybail!("blob path is not text"),
+			})
+			.collect()
 		})
 	}
 	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
@@ -239,7 +275,7 @@ impl BlobStoreProvider for DurableObjectSql {
 		let path = path.clone();
 		self.run(move |this| {
 			match this.execute("DELETE FROM blobs WHERE path = ?1", &[
-				SqlArg::Text(path.to_string()),
+				this.blob_key(&path)
 			])? {
 				0 => bevybail!("blob `{path}` not found"),
 				_ => Ok(()),
@@ -268,7 +304,7 @@ impl BlobStoreProvider for DurableObjectSql {
 				"INSERT INTO blobs (path, body, version) VALUES (?1, ?2, ?3) \
 				 ON CONFLICT(path) DO UPDATE SET body = excluded.body, version = excluded.version",
 				&[
-					SqlArg::Text(path.to_string()),
+					this.blob_key(&path),
 					SqlArg::Blob(body.to_vec()),
 					SqlArg::Text(version.to_string()),
 				],
@@ -290,7 +326,7 @@ impl BlobStoreProvider for DurableObjectSql {
 				found.as_ref().map(|(_, version)| version),
 			)?;
 			this.execute("DELETE FROM blobs WHERE path = ?1", &[
-				SqlArg::Text(path.to_string()),
+				this.blob_key(&path)
 			])?;
 			Ok(())
 		})
