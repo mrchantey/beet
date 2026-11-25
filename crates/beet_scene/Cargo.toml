@@ -2,7 +2,7 @@
 name = "beet_scene"
 version.workspace = true
 edition.workspace = true
-description = "Documents as scenes: instantiating one document in another"
+description = "Turns documents into scenes, and instantiates scenes within one another."
 documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -12,15 +12,40 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = []
+default = ["std"]
+# no_std without: the parsers, the loader and the saver, and activation over
+# `beet_net`'s no_std store core.
+std = ["beet_core/std", "beet_net/std"]
+# The `SceneBlob` fork, json by default. The structured formats themselves ride
+# `beet_core`'s features (`MediaType::structured`).
+json = ["beet_core/json", "beet_net/json"]
+postcard = ["beet_core/postcard"]
+toml = ["beet_core/toml"]
+# The markdown and mdx parser, markup embedded in either read by the BSX
+# fragment primitive, so BSX is the single markup authority and an embedded
+# component, template or `bx:` directive is the one it is in BSX.
+markdown_parser = ["dep:pulldown-cmark"]
 
 [lib]
 harness = false
 
 [dependencies]
-beet_core = { workspace = true, features = ["std", "bsx"] }
-beet_net = { workspace = true, features = ["std"] }
+beet_core = { workspace = true, features = ["serde", "bevy_async"] }
+beet_net.workspace = true
 bevy.workspace = true
+indexmap.workspace = true
+serde.workspace = true
+pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
+
+# the types of the crates below, through the toolchain
+[[test]]
+name = "declared"
+path = "tests/declared.rs"
+harness = false
 
 [dev-dependencies]
+beet_action = { workspace = true, features = ["std", "reflect", "scripting"] }
 beet_core = { workspace = true, features = ["testing", "rsx", "json"] }
+beet_net = { workspace = true, features = ["atproto"] }
+# the formats the suite reads
+beet_scene = { path = ".", features = ["json", "toml", "postcard", "markdown_parser"] }

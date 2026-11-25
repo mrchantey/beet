@@ -103,6 +103,8 @@ impl Installer for AnsiTermRenderer {
 mod test {
 	use super::*;
 	use beet_net::prelude::*;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 
 	/// The tree at `entity` rendered via [`AnsiTermRenderer`], answering a
 	/// default request.
@@ -124,11 +126,9 @@ mod test {
 		app.add_plugins(CharcellPlugin);
 		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_markdown(md);
-		DocParsers::parse(ParseContext::new(
-			&mut app.world_mut().entity_mut(entity),
-			&bytes,
-		))
-		.unwrap();
+		ParseContext::new(&mut app.world_mut().entity_mut(entity), &bytes)
+			.parse()
+			.unwrap();
 		ansi(app.world_mut(), entity)
 	}
 
@@ -283,18 +283,16 @@ mod test {
 			.xpect_contains("\n\n");
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn unescape_html_entities() {
 		let mut app = App::new();
 		app.add_plugins((TemplatePlugin, DocumentPlugin, CharcellPlugin));
 		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_html("<p>a &amp; b</p>");
-		DocParsers::parse(ParseContext::new(
-			&mut app.world_mut().entity_mut(entity),
-			&bytes,
-		))
-		.unwrap();
+		ParseContext::new(&mut app.world_mut().entity_mut(entity), &bytes)
+			.parse()
+			.unwrap();
 		ansi(app.world_mut(), entity)
 			.xmap(strip_ansi)
 			.xpect_contains("a & b");

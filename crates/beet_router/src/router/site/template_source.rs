@@ -96,9 +96,8 @@ impl LoadedTemplate {
 					.insert_template(InstanceTemplate::new(prefab.clone()))?
 			}
 			Self::Template(name) => {
-				let template = SceneBody::invoking(entity.world(), name)?
-					.reflect(entity.world())?;
-				entity.insert_template(template)?
+				let body = BsxParser::invoking(entity.world(), name)?;
+				entity.insert_template(body)?
 			}
 		};
 		Ok(())

@@ -3,6 +3,7 @@
 use super::style::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 
 /// Edit mode for the scene this tag sits in: a [`SceneEditor`] behind a closed
 /// disclosure, so a page ships the ability to edit itself without wearing it.

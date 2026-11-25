@@ -146,12 +146,13 @@ impl LivePage {
 
 // the fixture publication's `content` is the default, a scene, which the
 // scene lexicon renders
-#[cfg(all(test, feature = "template_serde"))]
+#[cfg(all(test, feature = "scene"))]
 mod test {
 	use super::super::test_fixtures::*;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 	use beet_ui::prelude::*;
 
 	/// The fixture post's frontmatter: a cover image, a title and a date.
@@ -475,7 +476,7 @@ mod test {
 	async fn resolves_the_content_format_when_publishing() {
 		let (mut world, router) = site().await;
 		let unknown = Nsid::new_static("com.example.unknown");
-		let body = SceneBody::parse_bsx(
+		let body = BsxParser::body(
 			&world,
 			r#"<StandardSitePub path="blog" name="Harvest" content="com.example.unknown"/>"#,
 		)

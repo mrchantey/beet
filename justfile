@@ -411,7 +411,7 @@ test-core-wasm *args:
 check-embedded:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	features=embedded,bevy_color,template_serde,json,bsx,net,action,mdns,quickjs,rand,router_embedded,scripting,sockets,testing_embedded
+	features=embedded,bevy_color,scene,json,net,action,mdns,quickjs,rand,router_embedded,scripting,sockets,testing_embedded
 	tree="cargo tree -p beet --no-default-features --features $features --target xtensa-esp32s3-none-elf -e features,normal,no-proc-macro"
 	if $tree | grep -E 'beet[a-z_]* feature "std"'; then
 		echo "the embedded feature set enables a beet crate's std, trace it with: $tree -i <crate>"
@@ -464,7 +464,7 @@ test-beetmania-browser *args:
 
 _test-beetmania-browser *args:
 	just beetmania assets
-	cargo test --test beetmania_browser --features "router style markdown fs http_server template_serde testing webdriver" {{ args }} -- --include-ignored
+	cargo test --test beetmania_browser --features "router style markdown fs http_server scene testing webdriver" {{ args }} -- --include-ignored
 
 # The scene editor example in a real browser, the terminal suite's twin: build
 # `beet-ui.wasm`, serve the example as the binary does and drive the editor in
@@ -480,7 +480,7 @@ test-scene-editor-browser *args:
 	just _test-scene-editor-browser {{ args }}
 
 _test-scene-editor-browser *args:
-	cargo test --test scene_editor_browser --features "router style json fs http_server tui template_serde testing webdriver" {{ args }} -- --include-ignored
+	cargo test --test scene_editor_browser --features "router style json fs http_server tui scene testing webdriver" {{ args }} -- --include-ignored
 
 # The `Script` backends are mutually exclusive at compile time, so the host-realm
 # fallbacks need their own invocations: `test-core`/`test-core-wasm` enumerate

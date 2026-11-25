@@ -39,6 +39,7 @@
 //!   impl Bundle`) when it is more than two tokens long; keep it inline at the
 //!   call site otherwise.
 mod animate;
+#[cfg(feature = "scene")]
 mod bsx_style;
 mod color_scheme;
 pub mod common_props;
@@ -52,6 +53,7 @@ mod style_query;
 pub mod syntax;
 mod values;
 pub use animate::*;
+#[cfg(feature = "scene")]
 pub use bsx_style::*;
 pub(crate) use color_scheme::*;
 pub use css::*;

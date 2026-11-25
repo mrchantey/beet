@@ -367,6 +367,7 @@ pub fn LightsailBeetSiteBlock(
 mod test {
 	use super::*;
 	use crate::infra::InfraExamplesPlugin;
+	use beet_scene::prelude::*;
 
 	fn test_world() -> World { core::mem::take(test_app().world_mut()) }
 
@@ -391,7 +392,7 @@ mod test {
 	}
 
 	fn spawn_markup(world: &mut World, router: Entity, markup: &str) {
-		let body = SceneBody::parse_bsx(world, markup).unwrap();
+		let body = BsxParser::body(world, markup).unwrap();
 		world.spawn(ChildOf(router)).insert_template(body).unwrap();
 		world.flush();
 	}

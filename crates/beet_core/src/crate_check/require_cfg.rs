@@ -46,7 +46,6 @@ impl RequireCfg {
 	/// unmet requirement refuses the load outright, rather than reporting while
 	/// the rest of the tree builds and its `CallOnReady` actions run in a binary
 	/// that cannot support them. Errors naming every unmet requirement at once.
-	#[cfg(feature = "bsx")]
 	pub fn assert_all<'a>(
 		world: &mut World,
 		requirements: impl IntoIterator<Item = &'a RequireCfg>,
@@ -68,11 +67,6 @@ impl RequireCfg {
 	///
 	/// Failures across several declarations inserted in the same frame all
 	/// report before the exit processes in `Last`, so one run names everything.
-	///
-	/// Gated on `bsx`, which owns the condition grammar this parses: a build
-	/// without it carries the requirement as inert data rather than failing to
-	/// compile.
-	#[cfg(feature = "bsx")]
 	pub fn check_on_insert(
 		ev: On<Insert<RequireCfg>>,
 		mut commands: Commands,
@@ -96,7 +90,6 @@ impl RequireCfg {
 	/// What this binary is missing to satisfy the requirement, or `None` when it
 	/// holds: the condition and every unmet atom, since
 	/// [`BuildCondition::explain`] walks without short-circuiting.
-	#[cfg(feature = "bsx")]
 	fn report(&self, world: &mut World) -> Result<Option<String>> {
 		let condition = BuildCondition::parse(&self.cfg)?;
 		let conditions =
@@ -134,17 +127,13 @@ pub struct CrateCheckPlugin;
 impl Plugin for CrateCheckPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<CrateRegistration>()
-			.register_type::<RequireCfg>();
-		// the condition grammar and the `bx:cfg` tombstone both live in the
-		// bsx layer, so a build without it registers the requirement type but
-		// has nothing to assert it against.
-		#[cfg(feature = "bsx")]
-		app.register_type::<CfgExcluded>()
+			.register_type::<RequireCfg>()
+			.register_type::<CfgExcluded>()
 			.add_observer(RequireCfg::check_on_insert);
 	}
 }
 
-#[cfg(all(test, feature = "bsx"))]
+#[cfg(test)]
 mod test {
 	use crate::prelude::*;
 

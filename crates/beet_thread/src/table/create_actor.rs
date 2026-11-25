@@ -41,6 +41,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::PathPartial;
 	use beet_router::prelude::*;
+	use beet_scene::prelude::*;
 
 	/// Probe input for the markup-tool experiment.
 	#[derive(Reflect, serde::Serialize, serde::Deserialize)]
@@ -90,7 +91,7 @@ mod test {
 	</CreateActor>
 </div>
 "#;
-		let root = SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
+		let root = BsxParser::spawn(app.world_mut(), source).unwrap();
 		ThreadRecords::reduce_now(app.world_mut());
 		// every remaining direct child of the Sequence must carry ActionMeta, else
 		// `Sequence::valid_children` bails "sequence child has no action".
@@ -119,7 +120,7 @@ mod test {
 	<CreateActor name="Person" kind="User"/>
 </div>
 "#;
-		SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
+		BsxParser::spawn(app.world_mut(), source).unwrap();
 		ThreadRecords::reduce_now(app.world_mut());
 
 		let thread = app
@@ -160,7 +161,7 @@ mod test {
 	</CreateActor>
 </div>
 "#;
-		SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
+		BsxParser::spawn(app.world_mut(), source).unwrap();
 		app.world_mut().flush();
 
 		// the tool entity gained its routed requires + the derived tool definition
@@ -191,7 +192,7 @@ line three'/>
 	</CreateActor>
 </div>
 ";
-		let thread = SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
+		let thread = BsxParser::spawn(app.world_mut(), source).unwrap();
 		ThreadRecords::reduce_now(app.world_mut());
 
 		let records = app.world().get::<ThreadRecords>(thread).unwrap();
@@ -220,7 +221,7 @@ line three'/>
 	<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama}}/>
 </div>
 "#;
-		let thread = SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
+		let thread = BsxParser::spawn(app.world_mut(), source).unwrap();
 		ThreadRecords::reduce_now(app.world_mut());
 
 		// the records hold both actors and the seed post

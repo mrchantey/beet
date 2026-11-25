@@ -269,6 +269,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
+	use beet_scene::prelude::*;
 
 	/// The thread a review builds per request, one per document: two people
 	/// with pinned ids, and a reading agent with tools of its own that reads
@@ -375,7 +376,7 @@ mod test {
 				.await
 				.unwrap();
 		}
-		let body = SceneBody::parse_bsx(
+		let body = BsxParser::body(
 			app.world(),
 			r#"<Router>
 	<Route path="review/:document" {ThreadRoute{source:Document("ReviewThread.bsx"), message:"review {document}"}}/>

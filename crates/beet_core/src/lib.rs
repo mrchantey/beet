@@ -61,8 +61,6 @@ pub mod atproto;
 mod bevy_extensions;
 pub mod bevy_utils;
 pub mod bootstrap;
-#[cfg(feature = "bsx")]
-pub mod bsx;
 mod crate_check;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
@@ -79,8 +77,6 @@ pub mod vault;
 // `term_style` (colours) is no_std and feeds the test logger, so the embedded
 // test runner needs `terminal` too; the io/tty control parts stay std-gated
 // inside the module.
-#[cfg(feature = "template_serde")]
-pub mod template_serde;
 #[cfg(any(feature = "std", feature = "testing_embedded"))]
 pub mod terminal;
 #[cfg(any(feature = "testing", feature = "testing_embedded"))]
@@ -182,8 +178,6 @@ pub mod prelude {
 	pub use crate::bevybail;
 	pub use crate::bevyhow;
 	pub use crate::bootstrap::*;
-	#[cfg(feature = "bsx")]
-	pub use crate::bsx::*;
 	pub use crate::cfg_if;
 	pub use crate::crate_check::*;
 	pub use crate::crate_registration;
@@ -196,8 +190,6 @@ pub mod prelude {
 	pub use crate::secrets::*;
 	pub use crate::subtree_template;
 	pub use crate::template::*;
-	#[cfg(feature = "template_serde")]
-	pub use crate::template_serde::*;
 	#[cfg(any(feature = "std", feature = "testing_embedded"))]
 	pub use crate::terminal::*;
 	#[cfg(any(feature = "testing", feature = "testing_embedded"))]

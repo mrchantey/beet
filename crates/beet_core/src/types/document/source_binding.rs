@@ -216,7 +216,7 @@ pub(crate) fn component_id_by_short_path(
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect, MapEntities)]
 #[reflect(Component, MapEntities)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub(crate) struct SourceFieldRef {
+pub struct SourceFieldRef {
 	/// The path to the source document, resolved from [`subject`](Self::subject).
 	#[entities]
 	pub document: DocumentPath,
@@ -227,9 +227,6 @@ pub(crate) struct SourceFieldRef {
 	pub subject: BindingTarget,
 }
 
-// the bsx prop-binding resolver is the only rust-side builder of these; a
-// markup-authored `SourceFieldRef` comes through reflect.
-#[cfg(feature = "bsx")]
 impl SourceFieldRef {
 	/// Mirror the [`DocumentPath::Ancestor`] document's field into this entity's
 	/// [`Value`].

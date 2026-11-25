@@ -189,7 +189,7 @@ fn build_root(
 			// the content under a tag-less wrapper when the document is
 			// multi-root), then resolve.
 			anchor_pre_slot_children(world, root, &pre_slot_children);
-			resolve_slots(world, root)
+			SlotTarget::resolve_all(world, root)
 		}
 	});
 	// a failure rides `TemplateError` + `Ready` *and* is returned, all

@@ -482,6 +482,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 mod tests {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_scene::prelude::*;
 
 	/// A stack resolved against an app that names itself.
 	fn resolved(stack: Stack) -> ResolvedStack {
@@ -596,7 +597,7 @@ mod tests {
 	#[beet_core::test]
 	fn the_none_literal_opts_out() {
 		let mut world = InfraPlugin.into_world();
-		SceneBody::spawn_bsx(
+		BsxParser::spawn(
 			&mut world,
 			r#"<Fragment>
 				<Stack app_name="throwaway" state_passphrase={None}/>

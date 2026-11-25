@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+#[cfg(feature = "scene")]
+use beet_scene::prelude::*;
 
 /// A [`DocRenderer`] that serializes the entity subtree via [`TemplateSaver`],
 /// as the scene whose root the entity is: a parent above it is no part of the
@@ -52,7 +54,7 @@ impl DocRenderer for TemplateRenderer {
 	}
 }
 
-#[cfg(feature = "template_serde")]
+#[cfg(feature = "scene")]
 impl Installer for TemplateRenderer {
 	fn install(self, app: &mut App) { DocRenderers::register_on(app, self); }
 }

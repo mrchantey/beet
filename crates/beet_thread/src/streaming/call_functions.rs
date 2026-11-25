@@ -104,6 +104,7 @@ mod test {
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 
 	/// Each agent's tools are the routes of its own router: the writer's
 	/// `write-text` lands, while the reader, given `read_only`, has no
@@ -129,7 +130,7 @@ mod test {
 </Thread>
 "#;
 		let store = BlobStore::temp();
-		let thread = SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
+		let thread = BsxParser::spawn(app.world_mut(), source).unwrap();
 		app.world_mut().entity_mut(thread).insert(store.clone());
 		app.update();
 		ThreadRecords::reduce_now(app.world_mut());
@@ -215,7 +216,7 @@ mod test {
 	</Thread>
 </Router>
 "#;
-		let root = SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
+		let root = BsxParser::spawn(app.world_mut(), source).unwrap();
 		app.update();
 		ThreadRecords::reduce_now(app.world_mut());
 		let thread = app.world().entity(root).get::<Children>().unwrap()[0];

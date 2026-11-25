@@ -13,6 +13,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+#[cfg(feature = "scene")]
+use beet_scene::prelude::*;
 use beet_ui::prelude::*;
 use bevy::math::UVec2;
 
@@ -203,7 +205,7 @@ pub(crate) fn parse_page(
 	bytes: MediaBytes,
 ) -> Result<Entity> {
 	let mut entity = world.spawn_empty();
-	DocParsers::parse(ParseContext::new(&mut entity, &bytes))?;
+	ParseContext::new(&mut entity, &bytes).parse()?;
 	let page = entity.id();
 	// the parsed tree is this page's own; clean it up when the page is replaced.
 	world

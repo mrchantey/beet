@@ -263,15 +263,15 @@ impl SyncS3Bucket {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_scene::prelude::*;
 
 	/// A stack declaring `assets` beside `markup`, returning the world and the
 	/// sync entity the markup's last child is.
 	fn declared(markup: &str) -> (World, Entity) {
-		let mut world =
-			(AsyncPlugin, TemplatePlugin, DocumentPlugin, InfraPlugin)
-				.into_world();
+		let mut world = (AsyncPlugin, ScenePlugin, DocumentPlugin, InfraPlugin)
+			.into_world();
 		world.init_resource::<PackageConfig>();
-		let stack = SceneBody::spawn_bsx(
+		let stack = BsxParser::spawn(
 			&mut world,
 			&format!(
 				r#"<Stack stage="prod" {{AwsRegion("eu-west-1")}}>

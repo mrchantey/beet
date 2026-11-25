@@ -153,7 +153,7 @@ impl Prefab {
 			.any(|clone| world.get::<SlotChild>(*clone).is_some())
 		{
 			world.flush();
-			resolve_slots(world, root)?;
+			SlotTarget::resolve_all(world, root)?;
 		}
 		PrefabClone { root, keys }.xok()
 	}
@@ -330,40 +330,5 @@ mod test {
 		let clone =
 			Prefab::clone_under(&mut world, prefab, target, ()).unwrap();
 		world.entity(clone.root).get::<Children>().xpect_none();
-	}
-
-	/// An authored `Disabled` is content a save keeps, where `Held` is never
-	/// written and a load holds the prefab again.
-	#[cfg(feature = "json")]
-	#[crate::test]
-	fn disabled_saves_and_held_does_not() {
-		let new_world = || <(TemplatePlugin, MinimalTypesPlugin)>::world();
-		let mut world = new_world();
-		let root = world.spawn(Name::new("root")).id();
-		world.spawn((Name::new("off"), Disabled, ChildOf(root)));
-		let prefab = world.spawn((Prefab, ChildOf(root))).id();
-		world.spawn((Name::new("held"), ChildOf(prefab)));
-		world.flush();
-		let bytes = TemplateSaver::new()
-			.save_roots(&mut world, MediaType::Json, [root])
-			.unwrap();
-		bytes
-			.as_utf8()
-			.unwrap()
-			.xref()
-			.xpect_contains("Disabled")
-			.xpect_contains("Prefab")
-			.xnot()
-			.xpect_contains("Held");
-		let mut loaded = new_world();
-		let root = TemplateLoader::new(&mut loaded).load(&bytes).unwrap()[0];
-		loaded.flush();
-		let children = loaded.entity(root).get::<Children>().unwrap().to_vec();
-		loaded
-			.entity(children[0])
-			.contains::<Disabled>()
-			.xpect_true();
-		let held = loaded.entity(children[1]).get::<Children>().unwrap()[0];
-		loaded.entity(held).contains::<Held>().xpect_true();
 	}
 }

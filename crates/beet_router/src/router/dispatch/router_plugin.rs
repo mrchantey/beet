@@ -2,6 +2,8 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+#[cfg(feature = "scene")]
+use beet_scene::prelude::*;
 #[cfg(feature = "std")]
 use beet_ui::prelude::*;
 
@@ -11,7 +13,7 @@ use beet_ui::prelude::*;
 /// actions are spawned in an entity hierarchy. The route-building observers are
 /// shared across std and no_std; the std build additionally wires the scene /
 /// asset / charcell rendering pipeline and the reflect registrations the
-/// help/scene routes and `template_serde`/scripting need (all std-only). Scene
+/// help/scene routes and `scene`/scripting need (all std-only). Scene
 /// routes register as actions (via [`PageRoot`] + [`ActionMeta`]), so there is
 /// no separate scene observer.
 #[derive(Default)]
@@ -54,14 +56,16 @@ impl Plugin for RouterPlugin {
 		.add_observer(rebuild_route_tree_on_build)
 		// a replaced route outlives the swap while a request holds it
 		.add_systems(Update, despawn_idle_retired);
-		// a loaded scene's routes settle their parents after the load, on every
-		// target that loads scenes (the esp scene server among them).
-		#[cfg(feature = "template_serde")]
-		app.add_observer(rebuild_route_trees_on_load);
+		// documents read as scenes, and a loaded scene's routes settle their
+		// parents after the load, on every target that loads scenes (the esp
+		// scene server among them).
+		#[cfg(feature = "scene")]
+		app.install_types::<ScenePlugin>()
+			.add_observer(rebuild_route_trees_on_load);
 		// `CfgExcluded` (a beet_core component) is reported here, where
 		// dispatch lives: an unmet declaration fails any call at or under it
 		// naming the missing features.
-		#[cfg(feature = "bsx_core")]
+		#[cfg(feature = "scene")]
 		app.add_observer(report_cfg_excluded);
 
 		// no_std-core reflect registrations: these types are shared across std
@@ -138,7 +142,7 @@ impl Plugin for RouterPlugin {
 					TemplatePlugin,
 					DocumentPlugin,
 					// a page, a layout or an entry instantiating a document
-					beet_scene::prelude::ScenePlugin,
+					SceneStorePlugin,
 				)>()
 				// the re-entrant stack of request-scoped render contexts the
 				// layout middleware pushes onto and layout widgets read the top of.
@@ -158,10 +162,6 @@ impl Plugin for RouterPlugin {
 				// per-route metadata, bindable via the reserved ref, eg
 				// `@entity:PageRoot::DocMeta.title`
 				.register_type::<DocMeta>()
-				// the component a document's unsectioned frontmatter keys declare,
-				// overridable per dir, eg
-				// `<RoutesDir {FrontmatterType{component:"MyMeta"}}/>`
-				.register_type::<FrontmatterType>()
 				// the no-code render-diagnostics config, patchable from markup
 				// like `PackageConfig`, eg `<RenderDiagnostics unknown_class="Off"/>`
 				.register_type::<RenderDiagnostics>()
@@ -627,7 +627,7 @@ fn rebuild_route_tree_on_build(ev: On<SpawnTemplate>, mut commands: Commands) {
 /// The load trigger fires synchronously once the hierarchy is whole, so each
 /// affected namespace is recomputed exactly once, through the same
 /// [`RouteTreeBuilder::rebuild_subtree`] walk, before any async serving begins.
-#[cfg(feature = "template_serde")]
+#[cfg(feature = "scene")]
 fn rebuild_route_trees_on_load(
 	ev: On<LoadTemplateSerde>,
 	mut builder: RouteTreeBuilder,
@@ -649,11 +649,13 @@ fn rebuild_route_trees_on_load(
 	Ok(())
 }
 
-#[cfg(all(test, feature = "std", feature = "bsx"))]
+#[cfg(all(test, feature = "std"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 
 	/// REGRESSION: the beet.org box's binary, built without `vault`, warned
 	/// `<Secrets>` unregistered on every load of the site entry, which
@@ -664,10 +666,11 @@ mod test {
 	fn every_build_knows_the_secrets_declaration() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let mut root = world.spawn(Router);
-		DocParsers::parse(ParseContext::new(
+		ParseContext::new(
 			&mut root,
 			&MediaBytes::new_bsx(r#"<Secrets path="../secrets.toml"/>"#),
-		))
+		)
+		.parse()
 		.unwrap();
 		let root = root.flush();
 		let declared = world
@@ -694,13 +697,14 @@ mod test {
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let mut root = world.spawn((store, Router));
-		DocParsers::parse(ParseContext::new(
+		ParseContext::new(
 			&mut root,
 			&MediaBytes::new_bsx(
 				r#"<Route path="guide" {BlobPage{path:"guide.md"}}/>
 					<DocumentView/>"#,
 			),
-		))
+		)
+		.parse()
 		.unwrap();
 		let root = root.flush();
 		for (path, expected) in

@@ -12,11 +12,11 @@ mod check_routes;
 // the machine-readable export of the site's tags/classes/routes/style-props for a
 // future editor; needs `json` to serialize and the BSX registries (`bsx`,
 // pulled in by `std`) to enumerate handler/template tags.
-#[cfg(all(feature = "json", feature = "bsx"))]
+#[cfg(all(feature = "json", feature = "scene"))]
 mod manifest;
 mod render_diagnostics;
 
 pub use check_routes::*;
-#[cfg(all(feature = "json", feature = "bsx"))]
+#[cfg(all(feature = "json", feature = "scene"))]
 pub use manifest::*;
 pub use render_diagnostics::*;

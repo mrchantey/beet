@@ -36,8 +36,8 @@ impl Plugin for StylePlugin {
 			.get_resource_or_init::<RuleSet>()
 			.extend_rules(default_element_rules());
 
-		// the cascade, with the fence passes ahead of it: a mermaid fence becomes
-		// a figure before the highlighter could tokenize it (`DiagramSet`), and
+		// the cascade, with the fence passes ahead of it: a diagram is drawn
+		// before the highlighter could tokenize it (`DiagramSet`), and
 		// the spans and figures both get styled by the one pass
 		app.configure_sets(PostParseTree, DiagramSet.before(ResolveStylesSet))
 			.add_systems(
@@ -47,12 +47,12 @@ impl Plugin for StylePlugin {
 
 		#[cfg(feature = "mermaid")]
 		{
-			app.register_type::<MermaidDiagram>().add_systems(
-				PostParseTree,
-				(collect_mermaid_blocks, materialize_diagrams)
-					.chain()
-					.in_set(DiagramSet),
-			);
+			app.install(MermaidParser)
+				.register_type::<MermaidDiagram>()
+				.add_systems(
+					PostParseTree,
+					materialize_diagrams.in_set(DiagramSet),
+				);
 			// the `:root` defaults, so the stylesheet states `--diagram-render:
 			// auto` for a script to read, the cascade always resolves a mode, and
 			// every paint role has its material colour for the svg's `var()`s
@@ -104,9 +104,10 @@ impl Plugin for StylePlugin {
 	}
 }
 
-/// The [`PostParseTree`] set the diagram passes run in, ahead of the syntax
-/// highlighter and [`ResolveStylesSet`]: a fence becomes a figure before the
-/// highlighter could tokenize it. Empty without the `mermaid` feature.
+/// The [`PostParseTree`] set diagrams are drawn in, ahead of the syntax
+/// highlighter and [`ResolveStylesSet`]: what a diagram is drawn as is in place
+/// before the highlighter could tokenize it. Empty without the `mermaid`
+/// feature.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct DiagramSet;
 

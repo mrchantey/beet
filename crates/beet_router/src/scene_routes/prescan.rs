@@ -14,6 +14,7 @@
 
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_scene::prelude::*;
 use bevy::reflect::FromReflect;
 use bevy::reflect::GetTypeRegistration;
 use bevy::reflect::Typed;
@@ -217,21 +218,23 @@ pub struct EntryPrescan {
 }
 
 impl EntryPrescan {
-	/// Pre-scan an entry document against `registry`. A non-markup (serde)
+	/// Pre-scan an entry document, the file at `path` where it has one,
+	/// against `registry`. A non-markup (serde)
 	/// entry declares none of these, so it yields the default; a markup entry
 	/// that fails to parse is an error, since every later stage would fail on
 	/// it too.
 	pub fn parse(
 		entry: &MediaBytes,
+		path: Option<&RelPath>,
 		registry: &PrescanRegistry,
 	) -> Result<Self> {
 		if !matches!(entry.media_type(), MediaType::Bsx | MediaType::Html) {
 			return Ok(Self::default());
 		}
-		let nodes =
-			BsxNode::parse_document(entry.as_utf8()?, &BsxParseConfig::bsx())?;
 		let mut prescan = Self::default();
-		prescan.collect(&nodes, registry)?;
+		BsxNode::parse_document(entry.as_utf8()?, &BsxParseConfig::bsx())
+			.and_then(|nodes| prescan.collect(&nodes, registry))
+			.map_err(|error| ParseError::from(error).locate(entry, path))?;
 		prescan.xok()
 	}
 
@@ -283,7 +286,10 @@ impl EntryPrescan {
 				.by_tag(&element.tag)
 				.filter(|_| !Self::has_spread(element))
 			{
-				self.declarations.push((registration.collect)(element)?);
+				self.declarations.push(
+					(registration.collect)(element)
+						.map_err(|error| element.span.locate(error))?,
+				);
 			}
 			self.collect(&element.children, registry)?;
 		}
@@ -369,7 +375,8 @@ mod test {
 	}
 
 	fn parse(markup: &str, registry: &PrescanRegistry) -> EntryPrescan {
-		EntryPrescan::parse(&MediaBytes::new_bsx(markup), registry).unwrap()
+		EntryPrescan::parse(&MediaBytes::new_bsx(markup), None, registry)
+			.unwrap()
 	}
 
 	/// One walk reads every declaration kind, at any depth, from one document.
@@ -455,7 +462,7 @@ mod test {
 	/// rather than erroring on non-markup bytes.
 	#[beet_core::test]
 	fn non_markup_yields_default() {
-		EntryPrescan::parse(&MediaBytes::new_json("{}"), &registry())
+		EntryPrescan::parse(&MediaBytes::new_json("{}"), None, &registry())
 			.unwrap()
 			.is_empty()
 			.xpect_true();

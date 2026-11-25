@@ -10,10 +10,10 @@
 //! slug = "getting-started"
 //! ```
 
-#[cfg(feature = "serde")]
-use crate::prelude::ReflectFrontmatter;
 use crate::prelude::*;
 use beet_core::prelude::*;
+#[cfg(feature = "scene")]
+use beet_scene::prelude::ReflectFrontmatter;
 
 /// The metadata of a document served at a path: its url segment, its order
 /// and label in the nav, and its [`RouteVisibility`].
@@ -25,7 +25,7 @@ use beet_core::prelude::*;
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", reflect(Frontmatter))]
+#[cfg_attr(feature = "scene", reflect(Frontmatter))]
 pub struct RouteMeta {
 	/// The single url segment this page serves at, replacing the one its
 	/// filename implies, so a file may be numbered for reading order while its
@@ -142,7 +142,7 @@ impl RouteMeta {
 	/// generated page index even once a [`slug`](Self::slug) has taken the number
 	/// out of the url, and `10-` sorts after `2-` where a string compare of the
 	/// url would not.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	pub fn declare_file_defaults(
 		declarations: &mut EntityBody,
 		file: &RelPath,
@@ -165,9 +165,10 @@ impl RouteMeta {
 	}
 }
 
-#[cfg(all(test, feature = "bsx"))]
+#[cfg(all(test, feature = "scene"))]
 mod test {
 	use super::*;
+	use beet_scene::prelude::*;
 	use bevy::reflect::TypeRegistry;
 
 	/// Resolve a frontmatter block exactly as a scan does, its `[RouteMeta]`
@@ -177,9 +178,9 @@ mod test {
 		registry.register::<RouteMeta>();
 		Frontmatter::parse(content, MediaType::Toml)
 			.unwrap()
-			.components(&DocParsers::default())
+			.components(&ParsePlugin::parsers())
 			.unwrap()
-			.get_reflect::<RouteMeta>(&registry)
+			.xmap(|body| BodyComponents::get::<RouteMeta>(&body, &registry))
 			.unwrap()
 			.unwrap_or_default()
 	}
@@ -237,14 +238,14 @@ mod test {
 			let mut declarations =
 				Frontmatter::parse(frontmatter, MediaType::Toml)
 					.unwrap()
-					.components(&DocParsers::default())
+					.components(&ParsePlugin::parsers())
 					.unwrap();
 			RouteMeta::declare_file_defaults(
 				&mut declarations,
 				&RelPath::new(file),
 			);
 			declarations
-				.get_reflect::<RouteMeta>(&registry)
+				.xmap(|body| BodyComponents::get::<RouteMeta>(&body, &registry))
 				.unwrap()?
 				.order
 		};

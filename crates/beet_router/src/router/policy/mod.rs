@@ -3,7 +3,7 @@
 //! refusal of undeclared params.
 
 mod cache_headers;
-#[cfg(feature = "bsx_core")]
+#[cfg(feature = "scene")]
 mod cfg_excluded;
 mod cors;
 mod interrupt;
@@ -14,7 +14,7 @@ mod reject_unknown_params;
 mod request_logger;
 
 pub use cache_headers::*;
-#[cfg(feature = "bsx_core")]
+#[cfg(feature = "scene")]
 pub(crate) use cfg_excluded::*;
 pub use cors::*;
 pub use interrupt::*;

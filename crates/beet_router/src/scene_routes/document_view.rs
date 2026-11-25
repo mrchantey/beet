@@ -53,8 +53,8 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 	#[cfg(feature = "markdown_parser")]
-	use beet_ui::prelude::*;
 
 	/// A file a request names is parsed by its media type and rendered as the
 	/// request accepts.

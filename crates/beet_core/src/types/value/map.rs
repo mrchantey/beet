@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 ///
 /// Entries keep their **insertion order**, so a map read from a file iterates
 /// as the file did. A scene's `entities` map relies on that: its order is child
-/// order (`template_serde`), a fact a hashed map would silently drop. Equality
+/// order ([`SceneBody`]), a fact a hashed map would silently drop. Equality
 /// and [`Hash`] ignore order, and the generic serde form still sorts keys, so
 /// two maps holding the same entries stay equal however they were built.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut, Reflect)]

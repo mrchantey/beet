@@ -5,7 +5,7 @@ impl ValueSchema {
 	/// The registry name of the scene schema, [`scene`](Self::scene).
 	pub const SCENE: &'static str = "Scene";
 
-	/// The schema describing a scene document as data, the `template_serde`
+	/// The schema describing a scene document as data, the [`SceneBody`]
 	/// shape, flat at every level:
 	/// `{ resources: { type path: value }, entities: { key: { type path: value } } }`.
 	///

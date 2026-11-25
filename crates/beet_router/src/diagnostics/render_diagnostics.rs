@@ -22,6 +22,7 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 use beet_ui::prelude::*;
 
 /// The severity of a render [`Diagnostic`], also the per-check configuration in
@@ -137,8 +138,9 @@ impl RenderDiagnostics {
 }
 
 /// A single problem found by [`render_diagnostics`]: its [`DiagnosticKind`], the
-/// resolved [`DiagnosticSeverity`], a human message, and the originating route path when
-/// known (the entry-point drivers set it per route).
+/// resolved [`DiagnosticSeverity`], a human message, where it was written when its
+/// document's format says, and the originating route path when known (the
+/// entry-point drivers set it per route).
 #[derive(Debug, Clone, Get)]
 pub struct Diagnostic {
 	/// The check that produced this diagnostic.
@@ -148,6 +150,8 @@ pub struct Diagnostic {
 	pub severity: DiagnosticSeverity,
 	/// A concise, author-facing description of the problem.
 	pub message: String,
+	/// Where the entity it is of was written, `routes/index.md:3:5`.
+	pub position: Option<SourcePosition>,
 	/// The route path this was found on, set by the per-route drivers.
 	pub route: Option<RelPath>,
 }
@@ -164,8 +168,15 @@ impl Diagnostic {
 			kind,
 			severity,
 			message,
+			position: None,
 			route: None,
 		}
+	}
+
+	/// Declare where what it is of was written, if anything says.
+	pub fn with_position(mut self, position: Option<SourcePosition>) -> Self {
+		self.position = position;
+		self
 	}
 
 	/// The [`Unregistered`](DiagnosticKind::Unregistered) diagnostic for one
@@ -204,12 +215,16 @@ impl Diagnostic {
 			.as_ref()
 			.map(|path| format!(" [{}]", path.with_leading_slash()))
 			.unwrap_or_default();
+		let message = match &self.position {
+			Some(position) => format!("{position}: {}", self.message),
+			None => self.message.clone(),
+		};
 		match self.severity {
 			DiagnosticSeverity::Error => {
-				error!("render-diagnostic{route}: {}", self.message)
+				error!("render-diagnostic{route}: {message}")
 			}
 			DiagnosticSeverity::Warn => {
-				warn!("render-diagnostic{route}: {}", self.message)
+				warn!("render-diagnostic{route}: {message}")
 			}
 			DiagnosticSeverity::Off => {}
 		}
@@ -241,11 +256,12 @@ pub(crate) fn render_diagnostics(
 /// (with its attributes/classes) plus any [`TemplateError`] or
 /// [`Unregistered`] reachable from a render root.
 #[derive(SystemParam)]
-struct DiagnosticsQuery<'w, 's> {
+pub(super) struct DiagnosticsQuery<'w, 's> {
 	elements: ElementQuery<'w, 's>,
 	errors: Query<'w, 's, &'static TemplateError>,
 	unregistered: UnregisteredQuery<'w, 's>,
 	children: Query<'w, 's, &'static Children>,
+	sources: SourceQuery<'w, 's>,
 }
 
 impl DiagnosticsQuery<'_, '_> {
@@ -298,22 +314,42 @@ impl DiagnosticsQuery<'_, '_> {
 		let mut stack = vec![root];
 		while let Some(entity) = stack.pop() {
 			if let Ok(error) = self.errors.get(entity) {
-				out.push(Diagnostic::new(
-					DiagnosticKind::Unregistered,
-					severity,
-					format!("template build error: {}", error.error),
-				));
+				out.push(
+					Diagnostic::new(
+						DiagnosticKind::Unregistered,
+						severity,
+						format!("template build error: {}", error.error),
+					)
+					.with_position(self.sources.position(entity)),
+				);
 			}
 			if let Ok(children) = self.children.get(entity) {
 				stack.extend(children.iter());
 			}
 		}
-		out.extend(
-			self.unregistered
-				.names(root)
-				.into_iter()
-				.map(|name| Diagnostic::unregistered(name, severity)),
-		);
+		out.extend(self.unregistered(root, severity));
+	}
+
+	/// One diagnostic per component held [`Unregistered`] under `root`.
+	pub fn unregistered(
+		&self,
+		root: Entity,
+		severity: DiagnosticSeverity,
+	) -> Vec<Diagnostic> {
+		self.unregistered
+			.collect(root)
+			.into_iter()
+			.flat_map(|(entity, unregistered)| {
+				let position = self.sources.position(entity);
+				unregistered
+					.keys()
+					.map(|name| {
+						Diagnostic::unregistered(name, severity)
+							.with_position(position.clone())
+					})
+					.collect::<Vec<_>>()
+			})
+			.collect()
 	}
 
 	/// Run the per-element checks (literal uppercase tag, internal href, classes).
@@ -325,18 +361,22 @@ impl DiagnosticsQuery<'_, '_> {
 		config: &RenderDiagnostics,
 		out: &mut Vec<Diagnostic>,
 	) {
+		let position = || self.sources.position(el.entity);
 		// an uppercase tag that survived as a literal element resolved to nothing.
 		let tag_severity = config.severity(DiagnosticKind::Unregistered);
 		if tag_severity != DiagnosticSeverity::Off && is_uppercase_tag(el.tag())
 		{
-			out.push(Diagnostic::new(
+			out.push(
+				Diagnostic::new(
 				DiagnosticKind::Unregistered,
 				tag_severity,
 				format!(
 					"unknown tag `<{}>`: no component, resource, template or tag-resolver registered",
 					el.tag()
 				),
-			));
+			)
+			.with_position(position()),
+			);
 		}
 
 		// an internal href (`/..`) must resolve to a route; external/anchor hrefs
@@ -349,13 +389,16 @@ impl DiagnosticsQuery<'_, '_> {
 			&& let Some(segments) = internal_href_segments(href)
 			&& route_tree.find(&segments).is_none()
 		{
-			out.push(Diagnostic::new(
-				DiagnosticKind::BrokenHref,
-				href_severity,
-				format!(
-					"broken internal link `href=\"{href}\"`: no matching route"
-				),
-			));
+			out.push(
+				Diagnostic::new(
+					DiagnosticKind::BrokenHref,
+					href_severity,
+					format!(
+						"broken internal link `href=\"{href}\"`: no matching route"
+					),
+				)
+				.with_position(position()),
+			);
 		}
 
 		// each class token must match a selector in the live rule set, except the
@@ -372,13 +415,16 @@ impl DiagnosticsQuery<'_, '_> {
 					continue;
 				}
 				if !rule_set_has_class(rule_set, &class) {
-					out.push(Diagnostic::new(
-						DiagnosticKind::UnknownClass,
-						class_severity,
-						format!(
-							"unknown class `{class}`: no matching style rule"
-						),
-					));
+					out.push(
+						Diagnostic::new(
+							DiagnosticKind::UnknownClass,
+							class_severity,
+							format!(
+								"unknown class `{class}`: no matching style rule"
+							),
+						)
+						.with_position(position()),
+					);
 				}
 			}
 		}
@@ -476,7 +522,7 @@ mod test {
 	/// A world with the substrate + a `RuleSet` carrying a single `.page` rule,
 	/// and a route tree exposing `/` and `/about`.
 	fn diagnostics_world() -> World {
-		(TemplatePlugin, DocumentPlugin).into_world()
+		(ScenePlugin, DocumentPlugin).into_world()
 	}
 
 	/// A `RuleSet` with one `.page` class rule, the "known class" fixture.
@@ -529,7 +575,7 @@ mod test {
 			.entity_mut(root)
 			.xtap(|entity| {
 				// the build failure rides `TemplateError`, never a panic/return.
-				DocParsers::parse(ParseContext::new(entity, &bytes)).ok();
+				ParseContext::new(entity, &bytes).parse().ok();
 			})
 			.flush();
 		let tree = route_tree();

@@ -108,6 +108,8 @@ mod test {
 	use crate::style::Length;
 	use crate::style::Spacing;
 	use crate::style::common_props::Padding;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 
 	/// A chain that lays out wider than 36 columns unbounded, so a fit shows.
 	const SOURCE: &str =
@@ -151,10 +153,11 @@ mod test {
 			))
 			.id();
 		// the media parse runs the post-parse passes, the diagram's among them
-		DocParsers::parse(ParseContext::new(
+		ParseContext::new(
 			&mut world.entity_mut(column),
 			&MediaBytes::new_markdown(&format!("```mermaid\n{SOURCE}\n```")),
-		))
+		)
+		.parse()
 		.unwrap();
 		let figure = world.entity(column).get::<Children>().unwrap()[0];
 		let children = world.entity(figure).get::<Children>().unwrap().to_vec();

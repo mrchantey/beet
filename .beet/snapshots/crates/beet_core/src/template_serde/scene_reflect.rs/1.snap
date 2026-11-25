@@ -1,1 +1,0 @@
-{"$type":"org.beet.scene#body","resources":{},"entities":{"0":{"bevy_ecs::name::Name":"root"},"1":{"beet_core::template_serde::scene_reflect::test::Health":3,"beet_core::template_serde::scene_reflect::test::Shield":{"strength":1.3},"bevy_ecs::hierarchy::ChildOf":"0"}}}

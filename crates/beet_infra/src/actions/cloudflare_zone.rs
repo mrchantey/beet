@@ -302,6 +302,7 @@ impl CloudflareDnsRecords {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_scene::prelude::*;
 
 	/// A purge names the stack's proxied hostnames and nothing else: not the
 	/// unproxied certificate validation records beside them, and nothing for a
@@ -369,7 +370,7 @@ mod test {
 	fn authors_aliases_in_markup() {
 		let mut world = InfraPlugin.into_world();
 		world.init_resource::<PackageConfig>();
-		let entity = SceneBody::spawn_bsx(
+		let entity = BsxParser::spawn(
 			&mut world,
 			r#"<CloudflareApexRedirect aliases=["www"]/>"#,
 		)

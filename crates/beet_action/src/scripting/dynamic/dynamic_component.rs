@@ -173,66 +173,6 @@ mod test {
 			.xpect_eq(ValueSchema::U64(default()));
 	}
 
-	/// A runtime component is saved under its name and loaded back once the
-	/// name is minted, whichever comes first: here the declaration sits after
-	/// the entity using it, so the value waits held until it runs.
-	#[cfg(feature = "json")]
-	#[beet_core::test]
-	fn a_runtime_component_round_trips_a_scene() {
-		// a world saving the hierarchy and the declaration
-		let scene_world = || {
-			let world = test_world();
-			world
-				.resource::<AppTypeRegistry>()
-				.write()
-				.register::<(ChildOf, DynamicComponent)>();
-			world
-		};
-		let mut world = scene_world();
-		DynamicComponents::register(&mut world, "game.Loot", ValueSchema::Any)
-			.unwrap();
-		let root = world.spawn_empty().id();
-		let looted = world.spawn(ChildOf(root)).id();
-		WorldWrite::insert(
-			&mut world,
-			looted,
-			"game.Loot",
-			value!(["sword"]),
-			&ScriptConfig::default(),
-		)
-		.unwrap();
-		world.spawn((DynamicComponent::new("game.Loot"), ChildOf(root)));
-		world.flush();
-		let bytes = TemplateSaver::new()
-			.save_roots(&mut world, MediaType::Json, [root])
-			.unwrap();
-		bytes
-			.as_utf8()
-			.unwrap()
-			.xref()
-			.xpect_contains(r#""game.Loot":["sword"]"#);
-
-		let mut loaded = scene_world();
-		let root = TemplateLoader::new(&mut loaded).load(&bytes).unwrap()[0];
-		loaded.flush();
-		let looted = loaded.entity(root).get::<Children>().unwrap()[0];
-		WorldRead::get(
-			&mut loaded,
-			looted,
-			"game.Loot",
-			&ScriptConfig::default(),
-		)
-		.unwrap()
-		.unwrap()
-		.xpect_eq(value!(["sword"]));
-		loaded.get::<Unregistered>(looted).xpect_none();
-		// and the reload re-saves the bytes it read
-		TemplateSaver::new()
-			.save_roots(&mut loaded, MediaType::Json, [root])
-			.unwrap()
-			.xpect_eq(bytes);
-	}
-
 	/// Insert a runtime component through the bridge and read it back, the round
 	/// trip every script value takes.
 	fn round_trip(value: Value) -> Value {

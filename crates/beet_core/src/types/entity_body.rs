@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 /// One entity's components as data, each keyed by its type path: the shape
-/// every entity of a scene takes (`template_serde`'s `{ resources, entities }`
+/// every entity of a scene takes ([`SceneBody`]'s `{ resources, entities }`
 /// holds one per entity), and the whole of a document that is one entity, ie a
 /// derived file carrying [`Provenance`].
 ///
@@ -74,6 +74,71 @@ impl EntityBody {
 	/// Whether the body carries a component of type `T`.
 	pub fn contains_typed<T: TypePath>(&self) -> bool {
 		self.0.contains(T::type_path())
+	}
+}
+
+/// What a document declares at its root, read without spawning it.
+impl EntityBody {
+	/// What markup writes of an entity rather than of the document: its node,
+	/// its place and its bindings.
+	const CONTENT: &'static [&'static str] = &[
+		"Attribute",
+		"AttributeOf",
+		"CData",
+		"Cfg",
+		"ChildOf",
+		"Comment",
+		"Doctype",
+		"DocumentScope",
+		"Element",
+		"FieldRef",
+		"Instance",
+		"OnEvent",
+		"Prefab",
+		"ProcessingInstruction",
+		"ReactiveChildren",
+		"ReflectFieldRef",
+		"ResourceFieldRef",
+		"RunScript",
+		"SlotChild",
+		"SlotTarget",
+		"Value",
+	];
+
+	/// The components this body declares rather than is, a document root's
+	/// metadata: everything but its content. A document's metadata is so
+	/// *whatever components its root declares*, never one blessed type.
+	pub fn declarations(&self) -> Self {
+		self.iter()
+			.filter(|(name, _)| {
+				let short = TypeName::new(name.as_str()).short();
+				!Self::CONTENT.contains(&short.as_str())
+			})
+			.map(|(name, value)| (name.clone(), value.clone()))
+			.collect::<Map>()
+			.into()
+	}
+
+	/// Declare `field` of the component short named `component` when this
+	/// body holds that component without it: a default something other than
+	/// the document implies, ie a content file's numbered filename. Never adds
+	/// the component, since a document naming none declared none.
+	pub fn declare_default(
+		&mut self,
+		component: &str,
+		field: &str,
+		default: Value,
+	) {
+		let name = self
+			.keys()
+			.find(|name| TypeName::new(name.as_str()).short() == component)
+			.cloned();
+		if let Some(Value::Map(fields)) =
+			name.and_then(|name| self.0.get_mut(&name))
+			&& !fields.contains(field)
+		{
+			fields.insert(field, default);
+		}
 	}
 }
 

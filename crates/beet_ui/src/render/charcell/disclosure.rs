@@ -12,7 +12,7 @@
 //! `toggle_details_on_click`. Helpers take raw queries rather than
 //! [`ElementQuery`]/`AttributeQuery` so callers can hold `&mut Value` without a
 //! query conflict.
-#[cfg(any(feature = "tui", feature = "template_serde"))]
+#[cfg(any(feature = "tui", feature = "scene"))]
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -104,7 +104,7 @@ pub(crate) fn attr_string(
 /// subtree the same frame (attribute values live on attribute entities, which
 /// the cascade's change filters cannot see).
 // read by the tui disclosure and the scene editor's tree, so gated like them
-#[cfg(any(feature = "tui", feature = "template_serde"))]
+#[cfg(any(feature = "tui", feature = "scene"))]
 pub(crate) fn set_attr_str(
 	commands: &mut Commands,
 	values: &mut Query<&mut Value>,

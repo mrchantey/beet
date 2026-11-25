@@ -268,6 +268,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 	use beet_ui::prelude::*;
 	use beet_ui::style::Length;
 	use beet_ui::style::common_props::MaxWidth;
@@ -674,7 +675,7 @@ mod test {
 
 	/// In markup the tag's children are its content and a `slot="fallback"`
 	/// child its fallback, held unbuilt, its spreads applied like any tag's.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	async fn markup_holds_its_children() {
 		const MARKUP: &str = r#"<article><ServerIsland name="visits" {CacheHeaders{edge_max_age: "60s"}}>
@@ -688,7 +689,7 @@ mod test {
 					OnSpawn::new(|entity: &mut EntityWorldMut| {
 						entity
 							.insert_template(
-								SceneBody::parse_bsx(entity.world(), MARKUP)
+								BsxParser::body(entity.world(), MARKUP)
 									.unwrap(),
 							)
 							.unwrap();

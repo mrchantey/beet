@@ -42,22 +42,22 @@
 //! [`DocMeta::validate`] checks a page against them; `beet check` raises each
 //! [`DocMetaViolation`] as a diagnostic on the page that authored it.
 
-#[cfg(feature = "serde")]
-use crate::prelude::ReflectFrontmatter;
 use beet_core::prelude::*;
+#[cfg(feature = "scene")]
+use beet_scene::prelude::ReflectFrontmatter;
 
 /// General document metadata: a blog post's, a docs page's, a Word file's.
 ///
 /// Flat by design: every field is a frontmatter key by the same name, so a
 /// document's authored surface maps onto the component 1:1 through reflection
 /// with no hand-written mapping. It is the default
-/// [`FrontmatterType`](crate::prelude::FrontmatterType), so its
+/// `FrontmatterType`, so its
 /// keys are written unsectioned; a route's own keys sit in a `[RouteMeta]`
 /// table (see [`RouteMeta`](crate::prelude::RouteMeta)).
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", reflect(Frontmatter))]
+#[cfg_attr(feature = "scene", reflect(Frontmatter))]
 pub struct DocMeta {
 	/// Document title; overrides the package title in the document `Head`.
 	pub title: Option<String>,
@@ -324,10 +324,11 @@ impl DocMeta {
 	}
 }
 
-#[cfg(all(test, feature = "bsx"))]
+#[cfg(all(test, feature = "scene"))]
 mod test {
 	use super::*;
 	use crate::prelude::*;
+	use beet_scene::prelude::*;
 	use bevy::reflect::TypeRegistry;
 
 	/// Resolve a frontmatter block exactly as a scan does: lower it to root
@@ -337,9 +338,9 @@ mod test {
 		registry.register::<DocMeta>();
 		Frontmatter::parse(content, media_type)
 			.unwrap()
-			.components(&DocParsers::default())
+			.components(&ParsePlugin::parsers())
 			.unwrap()
-			.get_reflect::<DocMeta>(&registry)
+			.xmap(|body| BodyComponents::get::<DocMeta>(&body, &registry))
 			.unwrap()
 			.unwrap_or_default()
 	}

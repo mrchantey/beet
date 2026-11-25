@@ -230,7 +230,7 @@ fn emit_blob_route(
 	let store_path = store_path.to_string();
 	let declarations = (!declarations.is_empty()).then(|| {
 		let declarations = declarations.self_token_stream();
-		quote! { #declarations.hoist(), }
+		quote! { BodyComponents::hoist(#declarations), }
 	});
 	quote! {
 		(

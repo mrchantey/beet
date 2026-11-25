@@ -31,6 +31,9 @@ impl DiagramRender {
 			_ => None,
 		}
 	}
+
+	/// This mode as the declaration `bx:style` would write.
+	pub fn declaration(&self) -> String { format!("diagram-render={self:?}") }
 }
 
 impl AsCssValue for DiagramRender {
@@ -169,6 +172,8 @@ mod test {
 	use crate::style::common_props::DiagramRenderProp;
 	use crate::style::material::MaterialStylePlugin;
 	use crate::style::material::colors;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 
 	/// The ramp declares every step as a fill/text pair, cycling a short ramp,
 	/// and each paint role's name is the property the stylesheet writes.
@@ -219,11 +224,11 @@ mod test {
 
 	/// A page root's `bx:style` reaches every figure below it (the prop is
 	/// inherited), and a nested declaration overrides it.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn inherits_from_the_page_root() {
 		let mut world = MaterialStylePlugin::world();
-		let body = SceneBody::parse_bsx(
+		let body = BsxParser::body(
 			&world,
 			r#"<div bx:style="diagram-render=Text"><figure/><div bx:style="diagram-render=Svg"><figure/></div></div>"#,
 		)

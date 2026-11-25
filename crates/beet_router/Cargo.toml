@@ -29,10 +29,10 @@ std = [
 	# serde-saturated, mirroring beet_net's `std → serde`
 	"serde",
 	"dep:beet_ui",
-	"dep:beet_scene",
+	"beet_scene/std",
 	"beet_ui/net",
-	# markup parsing for media negotiation routes `MediaType::Html` through BSX.
-	"bsx",
+	# documents parsed for media negotiation and scenes loaded, saved and managed
+	"scene",
 	# the std-gated `open_link` opens external links in the system browser on
 	# native (the wasm render target uses `window.open`). `webbrowser` lives in the
 	# non-wasm target table, so this activates it only off wasm; the no_std embedded
@@ -56,17 +56,11 @@ cloudflare = ["std", "beet_net/cloudflare"]
 # bucket-backed `BlobStore`.
 aws = ["std", "beet_net/aws"]
 interface = ["serde"]
-# The BSX markup parser, forwarded to `beet_ui` (which delegates to the core
-# parser). Routes `MediaType::Html` parsing through BSX for media negotiation.
-bsx = ["std", "bsx_core", "beet_ui/bsx"]
-# The no_std core parser alone, so a `bx:cfg` tombstone it leaves still answers
-# at dispatch, naming the condition that excluded it.
-bsx_core = ["beet_core/bsx"]
 # The entry's `<Secrets>` declarations loaded into the process environment
 # before the entry builds (the prescan's half of `beet_net/vault`), so every
 # declaration constructed in the build walk finds its credentials set.
 vault = ["std", "beet_net/vault"]
-json = ["serde", "dep:serde_json", "beet_core/json", "beet_net/json"]
+json = ["serde", "dep:serde_json", "beet_core/json", "beet_net/json", "beet_scene?/json"]
 # The standard.site records (`router/site/syndication/standard_site`): plain
 # data in the atproto model, beside `beet_net`'s `Pds` family.
 dag_cbor = ["serde", "beet_core/dag_cbor", "beet_net/dag_cbor"]
@@ -81,8 +75,8 @@ standard_site_extra = ["dag_cbor", "json", "dep:imagesize"]
 # (`<StandardSiteComments/>`). Without it the comments island fails over to
 # its fallback, the link to reply on Bluesky. And the publish sequence, which
 # writes each document's `content` as a scene (`org.beet.scene#body`) by
-# default, so it carries the scene lexicon (`template_serde`).
-atproto = ["dag_cbor", "json", "template_serde", "beet_net/atproto"]
+# default, so it carries the scene lexicon (`scene`).
+atproto = ["dag_cbor", "json", "scene", "beet_net/atproto"]
 # Deriving the site's images: an `<IconSet/>`'s files from its source image
 # (decode, resize and encode through `image`, `ico` for the multi-size favicon,
 # svg rasterisation through `resvg`) and a `<SocialCards/>` set (an svg per
@@ -115,14 +109,10 @@ http = ["std", "beet_net/server"]
 # websocket upgrades, so the channel runs a tungstenite listener on its own
 # port beside the HTTP server.
 client_io = ["http", "beet_net/tungstenite"]
-# beet_router's only template_serde use is rebuilding route trees on a
-# `TemplateLoaded` event, which comes from `beet_core/template_serde` (beet's
-# own fork). It does NOT need bevy's `bevy_world_serialization` feature, which
-# drags in `bevy_asset` (std) and so breaks no_std consumers.
-# `beet_core/rsx`: the `SceneServer` meta-route bundle is a `#[template]`, whose
-# attribute macro is rsx-gated; scene_server compiles wherever template_serde is on.
-# `bsx_core`: swapping a scene despawns the `SceneResource`s its markup created.
-template_serde = ["beet_core/template_serde", "beet_core/rsx", "bsx_core", "beet_ui?/template_serde", "serde"]
+# Scenes loaded, served and swapped (`SceneServer`, `ResetScene`) through
+# `beet_scene`, no_std as it is. `beet_core/rsx`: the `SceneServer` meta-route
+# bundle is a `#[template]`, whose attribute macro is rsx-gated.
+scene = ["dep:beet_scene", "beet_core/rsx", "beet_ui?/scene", "serde"]
 # The scripting route registrations (the `Script`/`ExchangeScript`/
 # `ExchangeScriptElement` reflect types and the `<ScriptRoute>` template).
 # Backend-agnostic and self-sufficient: this compiles and registers on its own,
@@ -140,12 +130,12 @@ quickjs = ["scripting", "beet_action/quickjs", "beet_ui?/quickjs"]
 # Build-time code generation: route tree, server/client actions, typed links.
 # The collection scan reads a content file's root declarations through the doc
 # parsers exactly as `RoutesDir` discovery does, so blob routes are emitted
-# with the declarations they hoist: `bsx` reads markup roots and markdown
+# with the declarations they hoist: `scene` reads markup roots and markdown
 # frontmatter alike, no markdown content parser required.
 codegen = [
 	"std",
 	"serde",
-	"bsx",
+	"scene",
 	"beet_core/tokens",
 	"beet_net/tokens",
 	"dep:syn",
@@ -166,7 +156,7 @@ beet_action = { workspace = true, default-features = false }
 beet_net = { workspace = true, default-features = false, features = ["action"] }
 # std-only: the template/render pipeline backing template routes, media, help, sidebar.
 beet_ui = { workspace = true, optional = true, features = ["action", "template"] }
-# std-only: the documents a page, a layout or an entry instantiates
+# the documents a page, a layout or an entry is and instantiates
 beet_scene = { workspace = true, optional = true }
 bevy.workspace = true
 extend.workspace = true

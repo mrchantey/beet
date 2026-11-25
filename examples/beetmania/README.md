@@ -66,7 +66,7 @@ The site is the router under the `serve` command:
 
 ## Bindings
 
-All interpolation is reactive and source-prefixed with `@` (the canonical grammar reference is the `beet_core::bsx` module doc). The site uses each source:
+All interpolation is reactive and source-prefixed with `@` (the canonical grammar reference is the `beet_scene::bsx` module doc). The site uses each source:
 
 - `@doc:` document state: the beet counter binds `{@doc:count=0}` and the buttons mutate it from a one-line event script, `bx:onclick="target.with_field('count', count => count + 1)"`.
 - `@res:` resource fields: the footer pulls `@res:PackageConfig.description` straight from the resource (the default document head emits `og:site_name` from `PackageConfig.title` automatically, so the layout no longer hand-writes it).

@@ -288,6 +288,7 @@ async fn run_deploy(caller: &AsyncEntity) -> Result {
 mod tests {
 	use super::*;
 	use crate::types::test_support::*;
+	use beet_scene::prelude::*;
 
 	/// A stack with a document store holding one secret of each roll,
 	/// an entry document listing the process identity and alice in
@@ -392,7 +393,7 @@ mod tests {
 		let mut world = infra_world();
 		let (root, _, alice, _) = revocable_stack(&mut world).await;
 		let router = world.entity(root).get::<Children>().unwrap()[1];
-		let body = SceneBody::parse_bsx(
+		let body = BsxParser::body(
 			&world,
 			r#"<Route path="secrets/revoke" {SecretsRevoke}/>"#,
 		)

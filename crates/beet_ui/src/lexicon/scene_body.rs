@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 
 /// `org.beet.scene#body` ([`SceneBody::NSID`]): a tree as a scene body, and
 /// one read back onto an entity.
@@ -67,6 +68,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 
 	/// A post exercising the blocks a page is made of, long enough that its
 	/// keys run past `"9"`, where a sorted map and file order part ways.
@@ -102,10 +104,11 @@ fn main() { println!("hello"); }
 	fn post(world: &mut World) -> Entity {
 		let layout = world.spawn(Element::new("main")).id();
 		let post = world.spawn(ChildOf(layout)).id();
-		DocParsers::parse(ParseContext::new(
+		ParseContext::new(
 			&mut world.entity_mut(post),
 			&MediaBytes::new_markdown(POST),
-		))
+		)
+		.parse()
 		.unwrap();
 		post
 	}

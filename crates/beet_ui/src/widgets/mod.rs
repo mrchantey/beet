@@ -62,7 +62,7 @@ mod debug;
 // `<Mermaid src>` reads through `beet_net`'s `BlobStore`.
 #[cfg(all(feature = "net", feature = "mermaid"))]
 mod mermaid;
-#[cfg(feature = "template_serde")]
+#[cfg(feature = "scene")]
 mod scene_editor;
 mod schema_ui;
 /// Shared harness for the widget tests.
@@ -83,7 +83,7 @@ pub use controls::*;
 pub use debug::*;
 #[cfg(all(feature = "net", feature = "mermaid"))]
 pub use mermaid::*;
-#[cfg(feature = "template_serde")]
+#[cfg(feature = "scene")]
 pub use scene_editor::*;
 pub use schema_ui::*;
 pub use toast::*;

@@ -1,6 +1,6 @@
 //! A scene document described at the schema level.
 //!
-//! The scene is the `template_serde` shape (resources plus file-keyed entities,
+//! The scene is the [`SceneBody`] shape (resources plus file-keyed entities,
 //! each a map of component values keyed by type path), and it is an ordinary
 //! registry entry rather than a widget's special case: each component value is
 //! described by its key ([`MapSchema::Keyed`](crate::prelude::MapSchema)), so

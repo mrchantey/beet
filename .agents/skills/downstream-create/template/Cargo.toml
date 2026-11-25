@@ -11,9 +11,9 @@ default = []
 # so `main.bsx` resolves the types defined here. Off by default so a library
 # consumer never links the runner; the `[[bin]]` below requires it, which is
 # what makes a flagless `cargo run` fail with cargo's own guidance. `launch` is
-# the entry loader (`router` + `template_serde`), the rest its `--help` render.
+# the entry loader (`router` + `scene`), the rest its `--help` render.
 cli = [
-	"beet/template_serde",
+	"beet/scene",
 	"beet/serde_plain",
 	"beet/markdown",
 	"beet/style",

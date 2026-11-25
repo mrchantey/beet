@@ -70,7 +70,7 @@ harness = false
 
 
 [features]
-default = ["std", "bsx"]
+default = ["std"]
 std = [
 	"bevy_color",
 	"bevy/std",
@@ -138,9 +138,7 @@ custom_test_frameworks = [
 	"nightly",
 ]
 crossterm = ["dep:crossterm", "dep:libc"]
-bevy_default = ["template_serde", "bevy_multithreaded", "bevy_asset"]
-# template serialization, see src/template_serde. needs reflect + Entity serde
-template_serde = ["serde", "bevy/serialize"]
+bevy_default = ["serde", "bevy_multithreaded", "bevy_asset"]
 bevy_keyboard = ["bevy/keyboard"]
 bevy_mouse = ["bevy/mouse"]
 # the window-types layer (CursorMoved etc); does not pull winit, so a terminal
@@ -229,13 +227,6 @@ tokens = [
 	"dep:prettyplease",
 ]
 rsx = ["beet_core_macros/rsx"]
-# The hand-written BSX (`.bsx`) cursor parser and its resolution into the
-# document-wired template tree (`src/bsx`). Default-on, gated only because it is
-# a lot of code: an ultra-minimal build can drop it and keep the serde
-# front-ends. The parser is no_std-capable; `register_dir` is additionally
-# `fs`-gated, remote fetch `bevy_async`-gated, and JSON schemas `json`-gated.
-# Its directive set travels in the format registry, `template_serde`'s.
-bsx = ["template_serde"]
 
 
 [dependencies]
@@ -429,5 +420,5 @@ md-5 = { workspace = true }
 # --all-features`) both copies auto-register every reflected type, so every
 # short type path resolves ambiguously to nothing. Doctests are exempt: they
 # compile as separate crates and legitimately name `beet_core::`.
-beet_core = {path = ".", features=["testing", "rsx", "bsx", "json"] }
+beet_core = {path = ".", features=["testing", "rsx", "json"] }
 # beet_core = {path = ".", features=["testing", "rand", "json", "postcard"]}

@@ -67,7 +67,8 @@ fn fetch_and_render(async_commands: AsyncCommands) {
 				let mut entity = world.spawn_empty();
 
 				// 2. Parse the response body into ECS and render it
-				DocParsers::parse(ParseContext::new(&mut entity, &input_bytes))
+				ParseContext::new(&mut entity, &input_bytes)
+					.parse()
 					.unwrap();
 
 				// 3. Render as the answer to a request accepting that type

@@ -13,6 +13,7 @@ use crate::widgets::schema_ui::collection_edit::CollectionButton;
 use crate::widgets::schema_ui::collection_edit::CollectionEdit;
 use crate::widgets::schema_ui::collection_edit::NewEntryKey;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 
 /// The page every test edits: an element tree with an attribute, a text node
 /// and the editor tag, keyed `0..=5` in fork order.

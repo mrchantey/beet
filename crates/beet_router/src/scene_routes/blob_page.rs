@@ -6,7 +6,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_scene::prelude::*;
-use beet_ui::prelude::*;
+use std::sync::Arc;
 
 /// Serves the file at `path` in the nearest ancestor [`BlobStore`], parsed
 /// into a render tree per request. The file is the route's [`Blob`], derived
@@ -56,16 +56,11 @@ impl BlobPage {
 		// the package the page's references resolve in, a detached tree carrying
 		// its own, and the component its unsectioned metadata declares
 		let (package, frontmatter_type) = caller
-			.with_state::<(PackageQuery, AncestorQuery<&FrontmatterType>), _>(
+			.with_state::<(PackageQuery, FrontmatterTypeQuery), _>(
 				|entity, (packages, types)| {
-					packages.get(entity).map(|package| {
-						let frontmatter_type = types
-							.get(entity)
-							.cloned()
-							.unwrap_or_default()
-							.component;
-						(package, frontmatter_type)
-					})
+					packages
+						.get(entity)
+						.map(|package| (package, types.get(entity)))
 				},
 			)
 			.await??;
@@ -75,10 +70,10 @@ impl BlobPage {
 			.with({
 				let path = path.clone();
 				move |world: &mut World| -> Result<DynamicTemplate> {
-					DocParsers::of(world)
+					let source = DocParsers::of(world)
 						.with_metadata_type(frontmatter_type)
-						.body(&bytes)?
-						.reflect_at(world, &path)
+						.read(&bytes, Some(&path))?;
+					DynamicTemplate::read(world, Arc::new(source))
 				}
 			})
 			.await?;
@@ -123,7 +118,7 @@ impl BlobPage {
 					RequestContext::new(parts, content, route, router),
 					|world| -> Result<PageRequest> {
 						let mut entity = world.entity_mut(content);
-						DocParsers::build(&mut entity, template)?;
+						template.build_document(&mut entity)?;
 						PageRoot::insert(&mut entity, vec![content]);
 						Ok(PageRequest(content))
 					},

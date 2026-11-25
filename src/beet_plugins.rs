@@ -77,7 +77,7 @@ impl PluginGroup for BeetPlugins {
 		// (which installs it too, absent)
 		#[cfg(feature = "scene")]
 		{
-			builder = builder.add(beet_scene::prelude::ScenePlugin);
+			builder = builder.add(beet_scene::prelude::SceneStorePlugin);
 		}
 
 		// the route tree / document / server / navigation observers (the former
@@ -99,7 +99,7 @@ impl PluginGroup for BeetPlugins {
 			if #[cfg(all(
 				not(target_arch = "wasm32"),
 				feature = "router",
-				feature = "template_serde"
+				feature = "scene"
 			))] {
 				builder = builder.add(SceneManagementPlugin);
 			}
@@ -370,8 +370,8 @@ fn router_plugin(app: &mut App) {
 		PageHostPlugin,
 	)>();
 	// the scene-server meta-routes load/save scenes through world serde, so they
-	// are only available (and only useful) with `template_serde`.
-	#[cfg(feature = "template_serde")]
+	// are only available (and only useful) with `scene`.
+	#[cfg(feature = "scene")]
 	app.add_plugins(SceneServerPlugin);
 }
 

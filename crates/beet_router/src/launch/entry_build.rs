@@ -15,8 +15,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 use beet_scene::prelude::*;
+use std::sync::Arc;
 
 /// Entry-document file names discovery looks for, in priority order. The native
 /// binary walks the cwd and its ancestors for the first match; the `check`/`serve`/
@@ -32,10 +32,11 @@ pub async fn read_prescan(
 	prescans: &PrescanRegistry,
 	entry_name: &str,
 ) -> Result<EntryPrescan> {
+	let path = RelPath::from(entry_name);
 	repo_store
-		.get_media(&RelPath::from(entry_name))
+		.get_media(&path)
 		.await?
-		.xmap(|entry| EntryPrescan::parse(&entry, prescans))
+		.xmap(|entry| EntryPrescan::parse(&entry, Some(&path), prescans))
 }
 
 /// A resolved entry: its store, the entry document name within it, and the local
@@ -364,16 +365,12 @@ pub fn build_root(
 	// in a binary that cannot support it, and the report holds even when the
 	// tree itself cannot build (eg its root tag is not registered here).
 	RequireCfg::assert_all(world, prescan.iter::<RequireCfg>())?;
+	// its own path in its package, whose root is its directory
+	let path = RelPath::new(entry_path.file_name().unwrap_or_default());
 	let template = DocParsers::of(world)
-		.body(&entry)
+		.read(&entry, Some(&path))
 		.map_err(BevyError::from)
-		.and_then(|body| {
-			// its own path in its package, whose root is its directory
-			body.reflect_at(
-				world,
-				&RelPath::new(entry_path.file_name().unwrap_or_default()),
-			)
-		})
+		.and_then(|source| DynamicTemplate::read(world, Arc::new(source)))
 		.map_err(|err| {
 			bevyhow!("failed to parse entry `{entry_name}`: {err}")
 		})?;

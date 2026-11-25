@@ -57,9 +57,6 @@ impl Plugin for TemplatePlugin {
 			// name it
 			.install_types::<Held>()
 			.add_systems(Update, sweep_dropped_pending);
-		// what a markup document writes, so a world that reads one resolves it
-		#[cfg(feature = "bsx")]
-		app.install_types::<BsxPlugin>();
 	}
 }
 

@@ -22,7 +22,7 @@
 //! [`RenderPlugin`] registers the built-in renderers: [`HtmlRenderer`],
 //! [`XmlRenderer`], [`MarkdownRenderer`], [`PlainTextRenderer`], and with
 //! their features [`AnsiTermRenderer`] (`style`) and the serialized scene of
-//! [`TemplateRenderer`] (`template_serde`, json and postcard).
+//! [`TemplateRenderer`] (`scene`, json and postcard).
 //!
 //! # Registering a renderer
 //!

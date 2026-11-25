@@ -16,6 +16,7 @@ use super::*;
 use crate::beet::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_scene::prelude::*;
 
 /// Config + discovered catalog for scene rotation, spawned on the agent root.
 ///
@@ -378,7 +379,7 @@ async fn apply_scene(
 /// Parse a scene's `main.bsx` (a single `<ScenePrompt text=..>` root) and return its
 /// text, using a throwaway entity so nothing lingers in the world.
 fn extract_scene_prompt(world: &mut World, source: &str) -> Result<String> {
-	let root = SceneBody::spawn_bsx(world, source)?;
+	let root = BsxParser::spawn(world, source)?;
 	let text = world
 		.get::<ScenePrompt>(root)
 		.map(|prompt| prompt.text.clone())

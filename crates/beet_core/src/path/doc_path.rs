@@ -7,7 +7,7 @@ use crate::prelude::*;
 ///
 /// The type is the mark: every `DocPath` a document's components hold is
 /// rewritten package absolute when the document's body is reflected
-/// ([`SceneBody::reflect_at`]), so a component holding one needs nothing but
+/// (`beet_scene`'s `DynamicTemplate::reflect_at`), so a component holding one needs nothing but
 /// the type, and what reads it never asks which document it was written in.
 ///
 /// ```

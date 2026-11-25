@@ -575,7 +575,7 @@ impl TemplatePending {
 			let root_id = root.id();
 			let result = root.world_scope(|world| {
 				anchor_pre_slot_children(world, root_id, &pre_slot_children);
-				resolve_slots(world, root_id)
+				SlotTarget::resolve_all(world, root_id)
 			});
 			if let Err(err) = result {
 				root.insert(TemplateError::new(CloneError::new(err)));

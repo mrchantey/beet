@@ -61,9 +61,6 @@ impl Plugin for DocumentPlugin {
 			.register_type::<RelationMeta>()
 			// the one by-name schema namespace, seeded with the intrinsic schemas
 			.init_resource::<SchemaRegistry>();
-		// the fork relation a scene records on its first entity
-		#[cfg(feature = "template_serde")]
-		app.register_type::<SceneFork>();
 		// the hierarchy is the relation bevy keeps acyclic in the world, so a
 		// scene edit is checked against it before the world sees the write
 		RelationMeta::acyclic().register::<ChildOf>(
@@ -91,13 +88,6 @@ impl Plugin for DocumentPlugin {
 			(sync_resource_field_bindings, sync_reflect_field_bindings).chain();
 		#[cfg(not(feature = "serde"))]
 		let reflect_sync = || {};
-		// a scene document drives its world after the write-back, so an
-		// inspector's edit reaches the live entity in the pass it reaches the
-		// document, and a refused edit is reverted before anything reads it
-		#[cfg(feature = "template_serde")]
-		let scene_sync = sync_scene_documents;
-		#[cfg(not(feature = "template_serde"))]
-		let scene_sync = || {};
 
 		// the chain lives in its own on-demand schedule so a one-shot render can
 		// run it to settlement ([`DocumentSync::settle`]) without driving the
@@ -110,6 +100,7 @@ impl Plugin for DocumentPlugin {
 				DocumentSyncSet::Rebuild,
 				DocumentSyncSet::Seed,
 				DocumentSyncSet::Write,
+				DocumentSyncSet::Apply,
 			)
 				.chain(),
 		);
@@ -137,9 +128,7 @@ impl Plugin for DocumentPlugin {
 					.chain()
 					.run_if(rows_spawned)
 					.in_set(DocumentSyncSet::Seed),
-				(sync_local_to_document, scene_sync)
-					.chain()
-					.in_set(DocumentSyncSet::Write),
+				sync_local_to_document.in_set(DocumentSyncSet::Write),
 			),
 		);
 		// with `bevy_async` the per-frame run waits for the async sync point so an
@@ -209,7 +198,7 @@ impl DocumentSync {
 	}
 }
 
-/// The three phases of a [`DocumentSync`] pass, in order.
+/// The phases of a [`DocumentSync`] pass, in order.
 ///
 /// A generation reconciles *between* the read path and the write-back: it is
 /// rebuilt against the document as read this pass, so a control born of a
@@ -228,8 +217,13 @@ pub enum DocumentSyncSet {
 	/// The read path again for the rows a rebuild just cloned, so a fresh
 	/// row paints its item on the pass that spawned it.
 	Seed,
-	/// Local → document: the write-back and the scene sync behind it.
+	/// Local → document: the write-back.
 	Write,
+	/// Document → world: a document the world is built from (`beet_scene`'s
+	/// `SceneDocument`) drives it, behind the write-back, so an edit reaches
+	/// the live entity in the pass it reaches the document and a refused one
+	/// is reverted before anything reads it.
+	Apply,
 }
 
 #[cfg(test)]

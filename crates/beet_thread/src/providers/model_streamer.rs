@@ -190,6 +190,7 @@ mod test {
 	#[beet_core::test]
 	fn markup_streamer_carries_instructions() {
 		use beet_core::prelude::*;
+		use beet_scene::prelude::*;
 
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
@@ -199,7 +200,7 @@ mod test {
 	<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama, instructions:"be terse"}}/>
 </div>
 "#;
-		SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
+		BsxParser::spawn(app.world_mut(), source).unwrap();
 		app.world_mut().flush();
 
 		let streamer = app

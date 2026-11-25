@@ -38,7 +38,7 @@ fn spawn_bsx_under(
 		Some(parent) => world.spawn(ChildOf(parent)),
 		None => world.spawn_empty(),
 	};
-	DocParsers::parse(ParseContext::new(&mut entity, &bytes)).unwrap();
+	ParseContext::new(&mut entity, &bytes).parse().unwrap();
 	entity.id()
 }
 
@@ -47,7 +47,7 @@ fn spawn_bsx_under(
 async fn package(documents: &[(&str, &str)]) -> (World, Entity) {
 	let mut app = world_ext::ui_app();
 	app.install_types::<AsyncPlugin>()
-		.install_types::<ScenePlugin>();
+		.install_types::<SceneStorePlugin>();
 	let mut world = core::mem::take(app.world_mut());
 	let store = BlobStore::temp();
 	for (path, source) in documents {
@@ -695,7 +695,7 @@ async fn props_bind_every_source() {
 	world
 		.entity_mut(package)
 		.insert(Document::new(value!({ "name": "Alice" })));
-	let mut render = async |world: &mut World, source: &str| {
+	let render = async |world: &mut World, source: &str| {
 		let root = spawn_in(world, package, source).await;
 		(root, render_html(world, root))
 	};
@@ -914,7 +914,7 @@ async fn counter_bsx_repaints_in_live_tui() {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, CharcellTuiPlugin))
 		.install_types::<AsyncPlugin>()
-		.install_types::<ScenePlugin>();
+		.install_types::<SceneStorePlugin>();
 	// the site-local card the counter instantiates
 	let store = BlobStore::temp();
 	store
@@ -939,11 +939,9 @@ async fn counter_bsx_repaints_in_live_tui() {
 	app.update();
 	// parse the counter markup as the host's content tree.
 	let bytes = MediaBytes::new_bsx(COUNTER_BSX);
-	DocParsers::parse(ParseContext::new(
-		&mut app.world_mut().entity_mut(host),
-		&bytes,
-	))
-	.unwrap();
+	ParseContext::new(&mut app.world_mut().entity_mut(host), &bytes)
+		.parse()
+		.unwrap();
 
 	// step until the scoped `@doc:count=0` init reaches the rendered frame.
 	let frame = step_until(&mut app, host, "clicked 0 times").await;
@@ -1172,7 +1170,7 @@ fn resource_tag_inserts_when_absent() {
 
 /// The error lowering `source` refuses with.
 fn build_error(world: &mut World, source: &str) -> String {
-	SceneBody::parse_bsx(world, source).unwrap_err().to_string()
+	BsxParser::body(world, source).unwrap_err().to_string()
 }
 
 #[beet_core::test]
@@ -1404,7 +1402,7 @@ fn mdx_resolves_embedded_template() {
 	let world = app.world_mut();
 	let bytes = MediaBytes::new_markdown("# Title\n\n<Greeting/>\n");
 	let mut entity = world.spawn_empty();
-	DocParsers::parse(ParseContext::new(&mut entity, &bytes)).unwrap();
+	ParseContext::new(&mut entity, &bytes).parse().unwrap();
 	let root = entity.id();
 	// the embedded <Greeting/> resolved to its <strong>Hi</strong> subtree.
 	render_html(world, root).xpect_contains("<strong>Hi</strong>");
@@ -1415,7 +1413,7 @@ fn mdx_resolves_embedded_template() {
 fn render_markdown(world: &mut World, md: &str) -> String {
 	let bytes = MediaBytes::new_markdown(md);
 	let mut entity = world.spawn_empty();
-	DocParsers::parse(ParseContext::new(&mut entity, &bytes)).unwrap();
+	ParseContext::new(&mut entity, &bytes).parse().unwrap();
 	let root = entity.id();
 	render_html(world, root)
 }
@@ -1457,7 +1455,7 @@ fn html_mode_is_plain_html() {
 	let mut world = world();
 	let bytes = MediaBytes::new_html("<div class=\"a\">hi</div>");
 	let mut entity = world.spawn_empty();
-	DocParsers::parse(ParseContext::new(&mut entity, &bytes)).unwrap();
+	ParseContext::new(&mut entity, &bytes).parse().unwrap();
 	let div = entity.id();
 	world
 		.entity(div)

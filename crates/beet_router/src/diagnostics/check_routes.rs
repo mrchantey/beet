@@ -11,10 +11,12 @@
 //! `content` entity, which for a `BlobPage`/`RoutesDir` route is the persistent
 //! [`RouteTree`] node that every later request reuses.
 
+use super::render_diagnostics::DiagnosticsQuery;
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_scene::prelude::*;
 use beet_ui::prelude::DocMeta;
 use beet_ui::prelude::DocMetaRules;
 use beet_ui::prelude::RuleSet;
@@ -204,12 +206,8 @@ fn unregistered_tags(
 	if severity == DiagnosticSeverity::Off {
 		return Vec::new();
 	}
-	world.with_state::<UnregisteredQuery, _>(|query| {
-		query
-			.names(root)
-			.into_iter()
-			.map(|name| Diagnostic::unregistered(name, severity))
-			.collect()
+	world.with_state::<DiagnosticsQuery, _>(|query| {
+		query.unregistered(root, severity)
 	})
 }
 
@@ -442,6 +440,9 @@ fn doc_meta_diagnostics(
 	if severity == DiagnosticSeverity::Off {
 		return Vec::new();
 	}
+	let position = world
+		.get::<SceneSource>(content)
+		.and_then(|source| source.position(content));
 	meta.validate(
 		&world
 			.get_resource::<DocMetaRules>()
@@ -455,6 +456,7 @@ fn doc_meta_diagnostics(
 			severity,
 			format!("page metadata: {violation}"),
 		)
+		.with_position(position.clone())
 	})
 	.collect()
 }
@@ -666,12 +668,13 @@ mod test {
 	async fn unregistered_errors() {
 		let mut world = check_world();
 		let router = world.spawn(Router).id();
-		DocParsers::parse(ParseContext::new(
+		ParseContext::new(
 			&mut world.entity_mut(router),
 			&MediaBytes::new_bsx(
 				r#"<Butonn label="go"/><div {Mispelt{size: 2}}/>"#,
 			),
-		))
+		)
+		.parse()
 		.unwrap();
 		world.flush();
 		let report = check(&mut world, router).await;
@@ -691,7 +694,7 @@ mod test {
 	/// A scene body naming a component this binary never registered spawns its
 	/// entity without it and holds it, which this pass elevates to an error
 	/// exactly as it does a tag markup wrote.
-	#[cfg(all(feature = "json", feature = "template_serde"))]
+	#[cfg(all(feature = "json", feature = "scene"))]
 	#[beet_core::test]
 	async fn an_unregistered_scene_component_errors() {
 		let mut world = check_world();
@@ -753,6 +756,80 @@ mod test {
 			.unwrap_str()
 			.await
 			.xpect_contains("body");
+	}
+
+	/// A diagnostic says where the entity it is of was written, in a page's
+	/// prose, in markup embedded in it and in a document it instantiates.
+	#[beet_core::test]
+	async fn a_diagnostic_names_its_place() {
+		let store = BlobStore::temp();
+		for (path, source) in [
+			(
+				"post.md",
+				"+++\ntitle = \"Post\"\n+++\n\n# Title\n\n[gone](/gone)\n\n<div class=\"nope\"><Typo/></div>\n\n<Instance document=\"/Card\"/>",
+			),
+			(
+				"Card.bsx",
+				"<section>\n\t<a href=\"/lost\">x</a>\n</section>",
+			),
+		] {
+			store
+				.insert(&RelPath::new(path), source.to_string())
+				.await
+				.unwrap();
+		}
+		let mut world = check_world();
+		let router = world
+			.spawn((
+				PackageStore::new(store.clone()),
+				store,
+				Router,
+				children![route::new("post", BlobPage::new("post.md"))],
+			))
+			.flush();
+		let mut places = check(&mut world, router)
+			.await
+			.diagnostics
+			.into_iter()
+			.map(|diagnostic| {
+				format!(
+					"{} {}",
+					diagnostic.position.unwrap_or_default(),
+					diagnostic.message.split(':').next().unwrap()
+				)
+			})
+			.collect::<Vec<_>>();
+		places.sort();
+		places.xpect_eq(vec![
+			"Card.bsx:2:2 broken internal link `href=\"/lost\"`".to_string(),
+			"post.md:7:1 broken internal link `href=\"/gone\"`".into(),
+			"post.md:9:1 unknown class `nope`".into(),
+			"post.md:9:19 unregistered `Typo`".into(),
+		]);
+	}
+
+	/// A page that does not parse says where.
+	#[beet_core::test]
+	async fn a_malformed_page_names_its_place() {
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&"post.md".into(),
+				"# Title\n\n<p>\n<b bx:nope=\"x\"></b>\n</p>".to_owned(),
+			)
+			.await
+			.unwrap();
+		let mut world = check_world();
+		let router = world
+			.spawn((store, Router, children![route::new(
+				"post",
+				BlobPage::new("post.md")
+			)]))
+			.flush();
+		check(&mut world, router).await.diagnostics[0]
+			.message
+			.xref()
+			.xpect_contains("post.md:4:1: `bx:nope`");
 	}
 
 	/// A page whose metadata breaks the rules fails the check, one

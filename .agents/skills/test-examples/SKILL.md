@@ -52,9 +52,9 @@ cargo run --example router           --features=router,markdown -- about
 cargo run --example cli              --features=router,quickjs -- greet --name=world
 # the persisted scene caches the route scripts, so regenerate it after any change
 # to script authoring or to a registered type
-cargo run --example router_serde     --features=router,quickjs,template_serde -- --new
-cargo run --example router_serde     --features=router,quickjs,template_serde
-cargo run --example router_serde     --features=router,quickjs,template_serde -- greet --name=world
+cargo run --example router_serde     --features=router,quickjs,scene -- --new
+cargo run --example router_serde     --features=router,quickjs,scene
+cargo run --example router_serde     --features=router,quickjs,scene -- greet --name=world
 # rsx_site is a crate, not a root example: generate its routes, then serve. It
 # scans typed pages, markdown content and a server action from three collections.
 cargo run -p rsx_site --no-default-features --features codegen   # regenerate src/codegen/

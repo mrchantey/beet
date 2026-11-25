@@ -18,11 +18,9 @@ fn main() {
 	// 2. Parse the markdown source into the entity tree. The parser runs
 	// `PostParseTree` automatically once the tree is built.
 	let bytes = MediaBytes::new_markdown(MARKDOWN);
-	DocParsers::parse(ParseContext::new(
-		&mut app.world_mut().entity_mut(entity),
-		&bytes,
-	))
-	.unwrap();
+	ParseContext::new(&mut app.world_mut().entity_mut(entity), &bytes)
+		.parse()
+		.unwrap();
 
 	// 3. Render. The charcell-backed ANSI renderer paints the resolved
 	// `VisualStyle` of each span; the `hl-*` classes emitted during parsing

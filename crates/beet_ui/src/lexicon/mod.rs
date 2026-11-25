@@ -40,7 +40,7 @@
 //!
 //! # The targets
 //!
-//! - `org.beet.scene#body` ([`SceneBodyLexicon`], with `template_serde`): the
+//! - `org.beet.scene#body` ([`SceneBodyLexicon`], with `scene`): the
 //!   tree as a scene body, every component keyed by type path and read back
 //!   without loss. A standard site document's `content` by default.
 //! - Leaflet (`pub.leaflet.content` and its blocks, `beet_router`'s
@@ -51,11 +51,11 @@
 //! [`OpenUnion`]: beet_core::prelude::OpenUnion
 mod lexicon_parsers;
 mod lexicon_renderers;
-#[cfg(feature = "template_serde")]
+#[cfg(feature = "scene")]
 mod scene_body;
 mod unknown_lexicon;
 pub use lexicon_parsers::*;
 pub use lexicon_renderers::*;
-#[cfg(feature = "template_serde")]
+#[cfg(feature = "scene")]
 pub use scene_body::*;
 pub use unknown_lexicon::*;

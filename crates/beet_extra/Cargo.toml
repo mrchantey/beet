@@ -44,10 +44,10 @@ perceive_act_web = ["json", "dep:beet_net", "beet_net?/sockets", "dep:beet_route
 # `bevy_default`. The inline tool is a `#[action(route)]`, so it pulls the
 # router/net surface the route registration expands to, and `json` for the tool
 # schemas' serde derives (which `json` forwards to `beet_action/json`).
-# `template_serde` (on top of the `sockets` that `beet_thread` drags in) gives the
+# `scene` (on top of the `sockets` that `beet_thread` drags in) gives the
 # perceive-act agent the scene-management surface it now uses: `ResetOnDisconnect` on a
 # bound capability socket, so a dropped head/body cleanly resets the scene.
-thread = ["json", "dep:beet_thread", "dep:beet_net", "dep:beet_router", "beet_net/template_serde", "beet_router/template_serde"]
+thread = ["json", "dep:beet_thread", "dep:beet_net", "dep:beet_router", "dep:beet_scene", "beet_router/scene"]
 # The cloudflare/aws deploy example wiring (`InfraExamplesPlugin`): the deploy
 # block/config types + the standalone deploy-action templates, so the `beet`
 # binary runs `examples/infra/*.bsx`. Headless (no render), so independent of
@@ -70,6 +70,8 @@ beet_thread = { workspace = true, features = ["ui"], optional = true }
 beet_net = { workspace = true, features = ["std", "serde", "json"], optional = true }
 beet_router = { workspace = true, features = ["json"], optional = true }
 beet_infra = { workspace = true, optional = true }
+# the scenes the perceive-act agent pushes to its body
+beet_scene = { workspace = true, optional = true, features = ["std"] }
 
 
 serde = { workspace = true, optional = true }
@@ -78,6 +80,7 @@ bevy = { workspace = true }
 # bevy-inspector-egui = "0.25.0"
 
 [dev-dependencies]
+beet_scene = { workspace = true, features = ["std"] }
 beet_core = { workspace = true, features = ["testing"] }
 # the forms a rolled ssh host key takes, for `the_host_key_never_renders`
 base64.workspace = true

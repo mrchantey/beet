@@ -84,8 +84,7 @@ async fn spawn_site(world: &mut World) -> Entity {
 	// the repo store and build into a root carrying that store.
 	let store = site_store().await;
 	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();
-	let template =
-		SceneBody::parse_bsx(world, entry.as_utf8().unwrap()).unwrap();
+	let template = BsxParser::body(world, entry.as_utf8().unwrap()).unwrap();
 	let root = world.spawn(store).id();
 	world.entity_mut(root).insert_template(template).unwrap();
 	// the `<RoutesDir>` scan is async, so settle it before reading the route tree
@@ -415,8 +414,7 @@ async fn an_instance_carries_boot() {
 		.unwrap();
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();
-	let template =
-		SceneBody::parse_bsx(&world, entry.as_utf8().unwrap()).unwrap();
+	let template = BsxParser::body(&world, entry.as_utf8().unwrap()).unwrap();
 	// the binary spawns the root with no load verb of its own (`build_root`'s
 	// empty `extra`), then builds the entry onto it; the server rides the markup.
 	// Disarmed so the assertion is arrival, not a boot with the test argv.
@@ -453,7 +451,7 @@ async fn home_route_serves_index() {
 fn spawn_bsx_under(world: &mut World, parent: Entity, source: &str) -> Entity {
 	let bytes = MediaBytes::new_bsx(source);
 	let mut entity = world.spawn(ChildOf(parent));
-	DocParsers::parse(ParseContext::new(&mut entity, &bytes)).unwrap();
+	ParseContext::new(&mut entity, &bytes).parse().unwrap();
 	entity.id()
 }
 

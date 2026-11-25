@@ -4,7 +4,7 @@
 //! Two surfaces read it, and they differ only in what an unrecognized word
 //! means, which is the part that must stay deliberate:
 //!
-//! - a `schema="u64"` markup attribute (`bsx::reflect`), where an unknown word is
+//! - a `schema="u64"` markup attribute (its [`LiteralParser`]), where an unknown word is
 //!   an authoring typo and the error lists what is accepted;
 //! - a JSON Schema descriptor ([`ValueSchema::from_json_value`]), where an
 //!   unknown word is a [`SchemaRef::Name`] to another schema.
@@ -13,7 +13,6 @@ use crate::prelude::*;
 impl ValueSchema {
 	/// The canonical primitive kind names, as a diagnostic lists them. Only the
 	/// markup attribute names them, since only it rejects an unknown word.
-	#[cfg(feature = "bsx")]
 	pub(crate) const PRIMITIVE_NAMES: &'static str = "\"any\", \"null\", \"bool\", \"i64\", \"u64\", \"f64\", \"string\", \
 \"bytes\", \"entity\"";
 

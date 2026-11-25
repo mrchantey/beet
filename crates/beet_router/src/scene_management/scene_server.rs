@@ -15,6 +15,7 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_scene::prelude::*;
 
 extern crate alloc;
 use alloc::format;
@@ -213,6 +214,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 
 	fn server_world() -> World {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();

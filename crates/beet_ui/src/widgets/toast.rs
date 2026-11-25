@@ -268,7 +268,7 @@ mod test {
 }
 
 /// The widget set, not one renderer, owns the toast lifecycle.
-#[cfg(all(test, feature = "bsx"))]
+#[cfg(all(test, feature = "scene"))]
 mod widget_set_test {
 	use super::*;
 

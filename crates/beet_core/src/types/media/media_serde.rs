@@ -15,8 +15,8 @@
 //! Each format rides its own feature (`json`, `toml`, `postcard`,
 //! `serde_plain`, `dag_cbor`), and a build without it answers the same
 //! "feature is required" error from every caller, so a disabled format fails
-//! identically everywhere. Why RON is none of them is written once, in the
-//! [`StructuredParser`] docs. [`MediaType::Yaml`] is beet's own, the subset a
+//! identically everywhere. Why RON is none of them is written once, in
+//! `beet_scene`'s `StructuredParser` docs. [`MediaType::Yaml`] is beet's own, the subset a
 //! frontmatter block uses read and written through [`Value`], so it needs no
 //! feature beyond `serde` (see the `yaml` module). [`MediaType::DagCbor`] is canonical DAG-CBOR
 //! through the atproto data model ([`AtprotoValue`]): a link is CBOR tag 42,
@@ -32,6 +32,75 @@ pub struct SerializeOptions {
 }
 
 impl MediaType {
+	/// [`deserialize`](Self::deserialize) a document, its error a
+	/// [`SourceError`] where the format's reader says it is: json's and
+	/// TOML's do.
+	pub fn deserialize_document<T: serde::de::DeserializeOwned>(
+		&self,
+		bytes: &[u8],
+	) -> Result<T> {
+		self.deserialize::<T>(bytes).map_err(|error| {
+			match self.error_place::<T>(bytes) {
+				Some((offset, message)) => {
+					SourceError::at(bevyhow!("{message}"), offset)
+				}
+				None => error,
+			}
+		})
+	}
+
+	/// Where `bytes` fail to read as a `T` and why, less the line and column
+	/// the reader counts in them, where the format's reader says.
+	fn error_place<T: serde::de::DeserializeOwned>(
+		&self,
+		bytes: &[u8],
+	) -> Option<(usize, String)> {
+		match self {
+			#[cfg(feature = "json")]
+			MediaType::Json => {
+				let error = serde_json::from_slice::<T>(bytes).err()?;
+				// its line is zero for an error of no place
+				let line = error.line().checked_sub(1)?;
+				let start = bytes
+					.split_inclusive(|byte| *byte == b'\n')
+					.take(line)
+					.map(<[u8]>::len)
+					.sum::<usize>();
+				let message = error.to_string();
+				let message = message
+					.rsplit_once(" at line ")
+					.map_or(message.as_str(), |(message, _)| message);
+				Some((
+					start + error.column().saturating_sub(1),
+					message.to_string(),
+				))
+			}
+			#[cfg(feature = "toml")]
+			MediaType::Toml => {
+				let text = core::str::from_utf8(bytes).ok()?;
+				let error = toml::from_str::<T>(text).err()?;
+				Some((error.span()?.start, error.message().to_string()))
+			}
+			_ => {
+				let _ = bytes;
+				None
+			}
+		}
+	}
+
+	/// The structured data formats this build reads, each behind its own
+	/// feature: json, postcard and toml.
+	pub fn structured() -> Vec<MediaType> {
+		[
+			cfg!(feature = "json").then_some(MediaType::Json),
+			cfg!(feature = "postcard").then_some(MediaType::Postcard),
+			cfg!(feature = "toml").then_some(MediaType::Toml),
+		]
+		.into_iter()
+		.flatten()
+		.collect()
+	}
+
 	/// Serialize `value` into [`MediaBytes`] using the first media type in
 	/// `accept` that succeeds, falling back to JSON or plain text if empty.
 	pub fn serialize_accepts<T: serde::Serialize>(

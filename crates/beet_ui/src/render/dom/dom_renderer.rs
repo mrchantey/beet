@@ -811,6 +811,8 @@ mod test {
 	use super::super::test_ext::*;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 	use std::sync::Arc;
 	use std::sync::Mutex;
 	use wasm_bindgen::JsCast;
@@ -1045,11 +1047,9 @@ mod test {
 		let markdown = MediaBytes::new_markdown(
 			"# Routing\n\n`<RoutesDir/>` scans:\n\n| file | route |\n| --- | --- |\n| `a.md` | `/a` |\n| `b/c.md` | `/b/c` |\n\nFrontmatter:\n\n```toml\n+++\ntitle = \"Routing\"\n+++\n```\n\n- one\n- two\n",
 		);
-		DocParsers::parse(ParseContext::new(
-			&mut app.world_mut().entity_mut(host),
-			&markdown,
-		))
-		.unwrap();
+		ParseContext::new(&mut app.world_mut().entity_mut(host), &markdown)
+			.parse()
+			.unwrap();
 		let target = serve(&mut app, host);
 		adopt(&mut app, host, &target).is_clean().xpect_true();
 		target
@@ -1059,7 +1059,7 @@ mod test {
 
 	/// The scene editor page forked and opened, the tree the browser suite
 	/// edits.
-	#[cfg(feature = "template_serde")]
+	#[cfg(feature = "scene")]
 	fn scene_editor_page(app: &mut App) -> Entity {
 		app.install_types::<MinimalTypesPlugin>();
 		let host = app.world_mut().spawn_empty().id();
@@ -1081,7 +1081,7 @@ mod test {
 
 	/// The probe over the scene editor page itself, editor open: the page
 	/// the browser suite edits paints byte-equal to its SSR.
-	#[cfg(feature = "template_serde")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test(browser)]
 	fn the_scene_editor_page_paints_byte_equal() {
 		let mut app = dom_app();
@@ -1094,7 +1094,7 @@ mod test {
 
 	/// The conformance probe over the scene editor page: served and parsed
 	/// by the browser, it adopts untouched.
-	#[cfg(feature = "template_serde")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test(browser)]
 	fn the_scene_editor_page_adopts_untouched() {
 		let mut app = dom_app();

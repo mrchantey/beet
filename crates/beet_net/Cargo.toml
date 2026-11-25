@@ -207,7 +207,6 @@ rustls-tls = [
 # dev cert (rcgen) or provided PEM files. Grants browsers a secure context on
 # LAN origins (`getUserMedia` etc); see the `tls` module docs.
 secure = ["server", "fs", "rustls-tls", "dep:rcgen", "dep:rustls-pki-types"]
-template_serde = ["beet_core/template_serde", "beet_action?/template_serde"]
 bevy_multithreaded = ["beet_core/bevy_multithreaded"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 russh_server = [
@@ -373,9 +372,7 @@ web-sys = { workspace = true, features = [
 ] }
 
 [dev-dependencies]
-# `bsx` so the scene fork test can build a markup original
-beet_core = { workspace = true, features = ["testing", "bsx"] }
-beet_net = {path = ".", features = ["template_serde"] }
+beet_core = { workspace = true, features = ["testing"] }
 # beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls", "flow"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

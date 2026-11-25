@@ -313,6 +313,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 	use serde_json::Value;
 
 	const ALICE: &str = "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa";
@@ -484,10 +485,9 @@ mod test {
 	/// rather than a construction test.
 	#[beet_core::test]
 	fn spawns_by_tag() {
-		let mut world =
-			(AsyncPlugin, TemplatePlugin, DocumentPlugin, InfraPlugin)
-				.into_world();
-		SceneBody::spawn_bsx(
+		let mut world = (AsyncPlugin, ScenePlugin, DocumentPlugin, InfraPlugin)
+			.into_world();
+		BsxParser::spawn(
 			&mut world,
 			&format!(
 				r#"<Fragment>

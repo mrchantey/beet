@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+#[cfg(feature = "scene")]
+use beet_scene::prelude::*;
 
 /// The markdown target's own render params, which every scene route takes
 /// through its render params.
@@ -499,7 +501,10 @@ impl MarkdownRenderer {
 		let open = match (view.tag(), style.is_empty()) {
 			("mark", true) => "<mark>".to_string(),
 			(tag, false) => {
-				format!("<{tag} style=\"{}\">", escape_html_attribute(&style))
+				format!(
+					"<{tag} style=\"{}\">",
+					html_ext::escape_attribute(&style)
+				)
 			}
 			_ => {
 				self.inline_stack
@@ -1103,15 +1108,13 @@ impl DocRenderer for MarkdownRenderer {
 		self.write_hidden |= params.hidden;
 		// asked for, a document's metadata leads it as the frontmatter that
 		// declares it
-		#[cfg(feature = "bsx")]
+		#[cfg(feature = "scene")]
 		if let Some(media_type) = params.frontmatter {
 			let entity = cx.entity;
-			let component = cx
-				.world
-				.with_state::<AncestorQuery<&FrontmatterType>, _>(|types| {
-					types.get(entity).cloned().unwrap_or_default()
-				})
-				.component;
+			let component =
+				cx.world.with_state::<FrontmatterTypeQuery, _>(|types| {
+					types.get(entity)
+				});
 			if let Some(block) =
 				Frontmatter::write(cx.world, entity, &component, &media_type)?
 			{
@@ -1161,11 +1164,9 @@ mod test {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_markdown(md);
-		DocParsers::parse(ParseContext::new(
-			&mut world.entity_mut(entity),
-			&bytes,
-		))
-		.unwrap();
+		ParseContext::new(&mut world.entity_mut(entity), &bytes)
+			.parse()
+			.unwrap();
 		render_with(&mut world, entity, MarkdownRenderer::new().with_comments())
 	}
 
@@ -1263,10 +1264,11 @@ mod test {
 				..default()
 			})
 			.id();
-		DocParsers::parse(ParseContext::new(
+		ParseContext::new(
 			&mut world.entity_mut(entity),
 			&MediaBytes::new_markdown("# Plan"),
-		))
+		)
+		.parse()
 		.unwrap();
 		let mut render = |request: RequestParts| {
 			MarkdownRenderer::new()
@@ -1301,41 +1303,37 @@ mod test {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_markdown("<!-- note -->\n\n# Title\n");
-		DocParsers::parse(ParseContext::new(
-			&mut world.entity_mut(entity),
-			&bytes,
-		))
-		.unwrap();
+		ParseContext::new(&mut world.entity_mut(entity), &bytes)
+			.parse()
+			.unwrap();
 		render_with(&mut world, entity, MarkdownRenderer::new())
 			.xpect_eq("# Title\n");
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	/// Parse HTML (with entities), then render as markdown.
 	fn render_unescaped(html: &str) -> String {
 		render_html_with(html, MarkdownRenderer::new())
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	/// Parse HTML, then render it with `renderer`.
 	fn render_html_with(html: &str, renderer: MarkdownRenderer) -> String {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
-		DocParsers::parse(ParseContext::new(
-			&mut world.entity_mut(entity),
-			&bytes,
-		))
-		.unwrap();
+		ParseContext::new(&mut world.entity_mut(entity), &bytes)
+			.parse()
+			.unwrap();
 		render_with(&mut world, entity, renderer)
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	const VIDEO: &str = "<p>before</p><video controls><source src=\"clip.mp4\" type=\"video/mp4\">no video here</video><p>after</p>";
 
 	/// An embedded element is written whole as html by default, its children
 	/// and fallback text with it, a block of its own between blocks.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn passes_embedded_html_through() {
 		render_unescaped(VIDEO).xpect_eq(
@@ -1344,7 +1342,7 @@ mod test {
 	}
 
 	/// An embedded element inside a paragraph stays among its words.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn passes_inline_html_through() {
 		render_unescaped("<p>see <svg><text>x &amp; y</text></svg> here</p>")
@@ -1392,7 +1390,7 @@ mod test {
 	}
 
 	/// The words alone write nothing for an embedded element.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn text_passthrough_skips_embedded() {
 		render_html_with(
@@ -1405,7 +1403,7 @@ mod test {
 
 	/// Every textless tag passes through under `All`, a `<style>` with it;
 	/// the default skips one.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn all_passthrough_keeps_metadata() {
 		let html = "<style>p { color: red; }</style><p>hi</p>";
@@ -1425,7 +1423,7 @@ mod test {
 		roundtrip(md).xpect_eq(md);
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn unescape_html_entities_in_text() {
 		render_unescaped("<p>a &amp; b</p>")
@@ -1433,7 +1431,7 @@ mod test {
 			.xpect_eq("a & b");
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn unescape_angle_brackets_in_text() {
 		render_unescaped("<p>&lt;div&gt;</p>")
@@ -1448,7 +1446,7 @@ mod test {
 			.xpect_eq("| a | b |\n|---|---|\n| c | d \\| e |");
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn render_html_table() {
 		render_unescaped(
@@ -1458,7 +1456,7 @@ mod test {
 		.xpect_eq("before\n\n| one<br>two | x |  |\n|---|---|---|\n| a |  |  |\n\nafter");
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn render_inline_html() {
 		render_unescaped(
@@ -1470,7 +1468,7 @@ mod test {
 
 	/// A block opening a list item stays on the item's line, whatever block
 	/// ended in an item before it, ie a sidebar's disclosure groups.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn block_opens_on_its_item_line() {
 		render_unescaped(
@@ -1483,7 +1481,7 @@ mod test {
 
 	/// A block after an item's nested list is a block of its own, never a
 	/// continuation of the nested item's line.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn block_after_nested_list_is_its_own() {
 		render_unescaped(
@@ -1495,7 +1493,7 @@ mod test {
 
 	/// Items with nothing between them stay apart, ie a nav's links or a
 	/// pair of buttons, while adjacent formatting runs still join.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn spaces_adjacent_items() {
 		render_unescaped(
@@ -1514,7 +1512,7 @@ mod test {
 	/// A tree read from a richer format reads as a person writes markdown:
 	/// edge whitespace outside its emphasis, two wrappers of one look as one,
 	/// an empty wrapper or block unwritten.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn writes_inline_looks_as_a_person_would() {
 		render_unescaped(
@@ -1527,7 +1525,7 @@ mod test {
 
 	/// A table's caption sits above it, and a table nested in a cell, which
 	/// GFM cannot hold, is named in the cell and follows its host.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn writes_captions_and_nested_tables() {
 		render_unescaped(
@@ -1542,7 +1540,7 @@ mod test {
 
 	/// A table opens a block of its own, never the tail of a line of text,
 	/// ie the link of the list item holding it.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn table_opens_its_own_block() {
 		render_unescaped(
@@ -1552,7 +1550,7 @@ mod test {
 	}
 
 	/// A checkbox reads as a task list writes it.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn writes_checkboxes() {
 		roundtrip("- [x] done\n- [ ] not yet")

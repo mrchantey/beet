@@ -11,7 +11,8 @@ pub const TABLE: ClassName = ClassName::new_static("table");
 /// page wider than a phone screen. A `<table>` itself cannot scroll (`overflow`
 /// is ignored on a table box) and `display: block` on it would drop the
 /// full-width look, so the scroll lives on this wrapper.
-pub const TABLE_SCROLL: ClassName = ClassName::new_static("table-scroll");
+pub const TABLE_SCROLL: ClassName =
+	ClassName::new_static(beet_core::prelude::html_ext::TABLE_SCROLL_CLASS);
 /// A table with internal vertical column dividers, in addition to the default
 /// horizontal row rules.
 pub const TABLE_VERTICAL_BORDERS: ClassName =

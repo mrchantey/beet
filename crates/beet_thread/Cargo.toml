@@ -17,7 +17,6 @@ default = ["fs","action","agent"]
 nightly = []
 rustls-tls = ["beet_net/rustls-tls"]
 native-tls = ["beet_net/native-tls"]
-template_serde = ["beet_net/template_serde", "beet_core/template_serde"]
 fs = ["beet_core/fs"]
 action = ["dep:beet_action"]
 # The model-provider layer: the async-openai-backed completions protocol and the
@@ -74,6 +73,7 @@ web-sys = { workspace = true, features = [
 
 
 [dev-dependencies]
+beet_scene = { workspace = true, features = ["std"] }
 beet_core = { workspace = true, features = ["testing", "fs", "rand"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

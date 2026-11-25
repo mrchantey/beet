@@ -20,13 +20,13 @@
 //!
 //! A body is always written with its `$type`, which is how a structured
 //! document says it is a scene body rather than a plain value: the structured
-//! parsers in `template_serde` read one whose root names it as a body and any
+//! parser in `beet_scene` reads one whose root names it as a body and any
 //! other as one entity holding the value. Read back, the `$type` may be absent,
 //! as it is in an atproto union member's fields, but never names another def.
 //!
 //! Every value is a plain [`Value`], so a body is read and written with no
 //! type registry: reflection happens on the way to and from a world, in
-//! `template_serde` (`SceneBody::reflect` and `TemplateBuilder`).
+//! `beet_scene` (`DynamicTemplate::reflect` and `TemplateBuilder`).
 use crate::prelude::*;
 use bevy::reflect::TypePath;
 use indexmap::IndexMap;

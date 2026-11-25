@@ -26,6 +26,7 @@ use crate::prelude::*;
 use crate::style::PropResolver;
 use crate::style::color_role_map;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::world::DeferredWorld;
 
@@ -308,7 +309,7 @@ mod test {
 	fn rule_from(markup: &str) -> Rule {
 		let mut world = MaterialStylePlugin::world();
 		let before = world.resource::<RuleSet>().rules().count();
-		let body = SceneBody::parse_bsx(&world, markup).unwrap();
+		let body = BsxParser::body(&world, markup).unwrap();
 		world.spawn_template(body).unwrap();
 		world
 			.resource::<RuleSet>()
@@ -327,7 +328,7 @@ mod test {
 		let before = world.resource::<RuleSet>().rules().count();
 		let markup = r#"<Rule class="probe" display=Flex/>"#;
 		let spawn = |world: &mut World| {
-			let body = SceneBody::parse_bsx(world, markup).unwrap();
+			let body = BsxParser::body(world, markup).unwrap();
 			world.spawn_template(body).unwrap().id()
 		};
 		let first = spawn(&mut world);

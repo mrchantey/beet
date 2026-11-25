@@ -5,6 +5,7 @@ beet_core::test_main!();
 
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_scene::prelude::*;
 use beet_ui::prelude::*;
 
 /// A spawn-capable template world.
@@ -17,7 +18,7 @@ fn parse_bsx(
 ) -> core::result::Result<Entity, ParseError> {
 	let bytes = MediaBytes::new_bsx(source);
 	let mut entity = world.spawn_empty();
-	DocParsers::parse(ParseContext::new(&mut entity, &bytes))?;
+	ParseContext::new(&mut entity, &bytes).parse()?;
 	entity.id().xok()
 }
 
@@ -132,7 +133,7 @@ fn component_field_binds_document() {
 	let bytes = MediaBytes::new_bsx("<Slider value=@doc:level/>");
 	let root = {
 		let mut entity = world.spawn(ChildOf(doc));
-		DocParsers::parse(ParseContext::new(&mut entity, &bytes)).unwrap();
+		ParseContext::new(&mut entity, &bytes).parse().unwrap();
 		entity.id()
 	};
 	world.update_local();

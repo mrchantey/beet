@@ -1,7 +1,7 @@
 //! Marker-based slot resolution, run synchronously inside the build walk.
 //!
 //! A `<slot>` placeholder lowers to a [`SlotTarget`] marker; content routed to
-//! a slot lowers to a [`SlotChild`] marker. [`resolve_slots`] matches children
+//! a slot lowers to a [`SlotChild`] marker. [`SlotTarget::resolve_all`] matches children
 //! to targets positionally over an already-built subtree, identically for the
 //! `rsx!` macro, the BSX parser, and serde, because all three produce the same
 //! markers in the same tree.
@@ -86,32 +86,34 @@ impl SlotChild {
 	}
 }
 
-/// Resolves every [`SlotChild`] under `root` into its matching [`SlotTarget`].
-///
-/// Synchronous over the world: collects each composition scope's direct
-/// [`SlotChild`]s and the [`SlotTarget`]s reachable in its subtree, then matches
-/// them positionally. A filled [`SlotTarget`] collapses, its content taking the
-/// placeholder's position; an unfilled target keeps its fallback. An unmatched
-/// [`SlotChild`] returns an error naming the missing slot and the available
-/// targets.
-///
-/// Resolution iterates to a fixpoint: a pass splices each scope's matched
-/// content, which exposes deeper targets (a relay buried under another scope's
-/// content becomes reachable once that content is spliced in), so multi-level
-/// forwarding resolves one hop per pass until no wiring remains. Only then is
-/// leftover content an error.
-///
-/// Returns `Err` so the walker can ride a failure onto [`TemplateError`].
-pub(crate) fn resolve_slots(world: &mut World, root: Entity) -> Result {
-	loop {
-		let plan = world.run_system_cached_with(plan_slots, root)?;
-		// nothing matched this pass: the resolution is stable, so leftover content
-		// is genuinely unconsumed, unless its scope offered no slots at all
-		if plan.wirings.is_empty() {
-			pass_through(world, &plan.passthrough);
-			return report_unmatched(plan);
+impl SlotTarget {
+	/// Resolves every [`SlotChild`] under `root` into its matching [`SlotTarget`].
+	///
+	/// Synchronous over the world: collects each composition scope's direct
+	/// [`SlotChild`]s and the [`SlotTarget`]s reachable in its subtree, then matches
+	/// them positionally. A filled [`SlotTarget`] collapses, its content taking the
+	/// placeholder's position; an unfilled target keeps its fallback. An unmatched
+	/// [`SlotChild`] returns an error naming the missing slot and the available
+	/// targets.
+	///
+	/// Resolution iterates to a fixpoint: a pass splices each scope's matched
+	/// content, which exposes deeper targets (a relay buried under another scope's
+	/// content becomes reachable once that content is spliced in), so multi-level
+	/// forwarding resolves one hop per pass until no wiring remains. Only then is
+	/// leftover content an error.
+	///
+	/// Returns `Err` so the walker can ride a failure onto [`TemplateError`].
+	pub fn resolve_all(world: &mut World, root: Entity) -> Result {
+		loop {
+			let plan = world.run_system_cached_with(plan_slots, root)?;
+			// nothing matched this pass: the resolution is stable, so leftover content
+			// is genuinely unconsumed, unless its scope offered no slots at all
+			if plan.wirings.is_empty() {
+				pass_through(world, &plan.passthrough);
+				return report_unmatched(plan);
+			}
+			apply_wirings(world, plan.wirings);
 		}
-		apply_wirings(world, plan.wirings);
 	}
 }
 
@@ -482,7 +484,7 @@ mod test {
 			))
 			.id();
 
-		resolve_slots(&mut world, scope).unwrap();
+		SlotTarget::resolve_all(&mut world, scope).unwrap();
 
 		// each filled slot collapses: its content lands in the scope at the slot's
 		// old position, the placeholder target despawned.
@@ -508,7 +510,7 @@ mod test {
 			world.spawn((SlotTarget::new(), ChildOf(scope))).id();
 		world.spawn((Name::new("body"), SlotChild::new(), ChildOf(scope)));
 
-		resolve_slots(&mut world, scope).unwrap();
+		SlotTarget::resolve_all(&mut world, scope).unwrap();
 
 		// the unfilled header target survives with its fallback intact.
 		world.get_entity(target).is_ok().xpect_true();
@@ -542,7 +544,7 @@ mod test {
 			ChildOf(scope),
 		));
 
-		resolve_slots(&mut world, scope).unwrap();
+		SlotTarget::resolve_all(&mut world, scope).unwrap();
 
 		child_names(&world, bar).xpect_eq(vec!["blog".to_string()]);
 	}
@@ -564,7 +566,7 @@ mod test {
 			ChildOf(scope),
 		));
 
-		resolve_slots(&mut world, scope)
+		SlotTarget::resolve_all(&mut world, scope)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("\"nav\"");
@@ -579,7 +581,7 @@ mod test {
 			world.spawn((Name::new(name), SlotChild::new(), ChildOf(scope)));
 		}
 
-		resolve_slots(&mut world, scope).unwrap();
+		SlotTarget::resolve_all(&mut world, scope).unwrap();
 
 		// the collapsed target leaves its three children in order in the scope.
 		world.get_entity(target).is_err().xpect_true();
@@ -602,7 +604,7 @@ mod test {
 			ChildOf(scope),
 		));
 
-		let err = resolve_slots(&mut world, scope).unwrap_err();
+		let err = SlotTarget::resolve_all(&mut world, scope).unwrap_err();
 		err.to_string().xpect_contains("header");
 		err.to_string().xpect_contains("default");
 	}
@@ -620,7 +622,7 @@ mod test {
 				ChildOf(scope),
 			))
 			.id();
-		resolve_slots(&mut world, scope).unwrap();
+		SlotTarget::resolve_all(&mut world, scope).unwrap();
 		world.entity(span).contains::<SlotChild>().xpect_false();
 		let attribute = world.entity(span).get::<Attributes>().unwrap()[0];
 		world
@@ -655,7 +657,7 @@ mod test {
 			ChildOf(scope_b),
 		));
 
-		resolve_slots(&mut world, root).unwrap();
+		SlotTarget::resolve_all(&mut world, root).unwrap();
 
 		// each scope keeps only its own content, collapsed into the scope.
 		world.get_entity(target_a).is_err().xpect_true();
@@ -681,7 +683,7 @@ mod test {
 			})
 			.collect();
 
-		resolve_slots(&mut world, root).unwrap();
+		SlotTarget::resolve_all(&mut world, root).unwrap();
 
 		// the slot collapsed: its content are now direct children of the root, in
 		// order, with no intermediate entity.
@@ -731,7 +733,7 @@ mod test {
 			))
 			.id();
 
-		resolve_slots(&mut world, scope).unwrap();
+		SlotTarget::resolve_all(&mut world, scope).unwrap();
 
 		// the structural slot collapsed, the relay taking its place in the scope.
 		world.get_entity(structural).is_err().xpect_true();
@@ -779,7 +781,7 @@ mod test {
 			.spawn((SlotTarget::named("head"), ChildOf(scope)))
 			.id();
 
-		resolve_slots(&mut world, scope).unwrap();
+		SlotTarget::resolve_all(&mut world, scope).unwrap();
 
 		// the relay adopted meta (it did not consume itself) and took the
 		// collapsed structural slot's place in the scope.

@@ -7,11 +7,12 @@
 //! another trigger adds its own observer beside this one.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 
 /// Runs the default BSX event handlers, and registers the widget set by name
 /// so a `<Head/>`/`<Sidebar/>` tag resolves.
 ///
-/// Builds on [`BsxPlugin`]. With the `scripting` feature it also runs `click`
+/// Builds on [`ScenePlugin`]. With the `scripting` feature it also runs `click`
 /// handlers and installs the [`AsyncPlugin`] their evaluations resolve
 /// against; without it a `bx:on<event>` directive still builds, its handler
 /// inert.
@@ -20,7 +21,8 @@ pub struct BsxDefaultsPlugin;
 
 impl Plugin for BsxDefaultsPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_types::<BsxPlugin>().add_plugins(widget_plugin);
+		app.install_types::<ScenePlugin>()
+			.add_plugins(widget_plugin);
 		#[cfg(feature = "scripting")]
 		{
 			// every `world` call an event script makes is served at the async

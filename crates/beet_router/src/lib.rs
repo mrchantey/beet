@@ -19,16 +19,15 @@ mod diagnostics;
 mod extra;
 // finding, building and running an entry document: the half of a beet binary
 // that is not its capabilities. Store-backed (`std`) and document-building
-// (`template_serde`, for the entry's body and the `BeetSceneRoot` a
-// watched rebuild swaps), so gated on both.
-#[cfg(all(feature = "std", feature = "template_serde"))]
+// (for the entry's body and the `BeetSceneRoot` a watched rebuild swaps).
+#[cfg(feature = "std")]
 pub mod launch;
 mod navigate;
 #[cfg(all(feature = "codegen", feature = "std"))]
 mod route_codegen;
 mod router;
-// every scene-management module needs `template_serde` (load/save a scene through it).
-#[cfg(feature = "template_serde")]
+// every scene-management module loads or saves a scene.
+#[cfg(feature = "scene")]
 mod scene_management;
 #[cfg(feature = "std")]
 mod scene_routes;
@@ -44,15 +43,15 @@ pub mod prelude {
 	pub use crate::diagnostics::*;
 	#[cfg(feature = "std")]
 	pub use crate::extra::*;
-	#[cfg(all(feature = "std", feature = "template_serde"))]
+	#[cfg(feature = "std")]
 	pub use crate::launch::entry_build;
-	#[cfg(all(feature = "std", feature = "template_serde"))]
+	#[cfg(feature = "std")]
 	pub use crate::launch::*;
 	pub use crate::navigate::*;
 	#[cfg(all(feature = "codegen", feature = "std"))]
 	pub use crate::route_codegen::*;
 	pub use crate::router::*;
-	#[cfg(feature = "template_serde")]
+	#[cfg(feature = "scene")]
 	pub use crate::scene_management::*;
 	#[cfg(feature = "std")]
 	pub use crate::scene_routes::*;

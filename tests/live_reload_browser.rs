@@ -16,7 +16,7 @@
 //! Run: chromedriver + chromium on PATH, then
 //! ```sh
 //! cargo test --test live_reload_browser \
-//!   --features router,markdown,fs,rand,client_io,template_serde,testing,webdriver -- --include-ignored
+//!   --features router,markdown,fs,rand,client_io,scene,testing,webdriver -- --include-ignored
 //! ```
 beet::test_main!();
 
@@ -31,7 +31,7 @@ use beet::prelude::*;
 fn main_bsx(port: u16, primary: &str) -> String {
 	format!(
 		r#"<CallOnReady {{HttpServer{{port:{port}, canonical:false}}}}>
-<Router {{Layout{{document:"templates/Layout.bsx"}}}}>
+<Router {{Layout(Document("templates/Layout.bsx"))}}>
 	<PackageConfig title="Live"/>
 	<Theme color="{primary}" primary="{primary}"/>
 	<Instance document="templates/Styles.bsx"/>

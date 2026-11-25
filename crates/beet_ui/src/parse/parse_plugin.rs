@@ -1,15 +1,13 @@
-//! The markup formats, and scheduling for the post-parse pipeline.
+//! The formats this crate adds, and scheduling for the post-parse pipeline.
 //!
-//! The format registry is `beet_core`'s [`DocParsers`], where a parser returns
-//! a scene body and the base formats (plain text, the structured ones, BSX,
-//! HTML and XML) are always present; [`ParsePlugin`] adds the formats this
-//! crate reads, markdown and mdx (`markdown_parser`). The Office formats
-//! (`ooxml`) are `OoxmlPlugin`'s, which a router installs: their writers
-//! resolve looks through the style plugin, itself built over this one.
+//! `beet_scene`'s `ScenePlugin` registers the base formats, which
+//! [`ParsePlugin`] installs (`scene`). The Office formats (`ooxml`) are
+//! `OoxmlPlugin`'s, which a router installs: their writers resolve looks
+//! through the style plugin, itself built over this one.
 //!
 //! [`PostParseTree`] is the single schedule where a parsed entity tree is
 //! styled, decorated, laid out, and painted. Every render path runs it
-//! on demand: [`DocParsers::parse`] and the charcell renderers call
+//! on demand: `ParseContext::parse` and the charcell renderers call
 //! [`World::run_schedule`]/[`World::try_run_schedule`] right after building
 //! their tree.
 //!
@@ -22,9 +20,11 @@
 //! and it opts in with [`RealtimeParsePlugin`].
 use crate::prelude::*;
 use beet_core::prelude::*;
+#[cfg(feature = "scene")]
+use beet_scene::prelude::*;
 
-/// Registers the markup [`DocParsers`] and the [`PostParseTree`] schedule
-/// for on-demand runs.
+/// Installs the document formats and the [`PostParseTree`] schedule for
+/// on-demand runs.
 ///
 /// Does not add the schedule to the main schedule order, see the module docs.
 /// Realtime apps add [`RealtimeParsePlugin`] for per-frame repaint.
@@ -32,29 +32,12 @@ use beet_core::prelude::*;
 pub struct ParsePlugin;
 
 impl ParsePlugin {
-	/// The parsers this plugin registers beside the base ones, for a caller
-	/// with no app, ie a codegen scan.
+	/// The base formats, declaring [`DocMeta`], for a caller with no app, ie a
+	/// codegen scan.
+	#[cfg(feature = "scene")]
 	pub fn parsers() -> DocParsers {
-		let mut parsers = DocParsers::default();
-		Self::register_markup(&mut parsers);
-		parsers
-	}
-
-	/// Register the markup formats this build reads. The plain text fallback
-	/// reads markdown frontmatter, so a route scan reads a page's metadata
-	/// with no markdown parser.
-	fn register_markup(parsers: &mut DocParsers) {
-		#[cfg(feature = "bsx")]
-		parsers.register(
-			PlainTextParser::default()
-				.with_root_components(Frontmatter::root_components),
-		);
-		#[cfg(feature = "markdown_parser")]
-		parsers
-			.register(MarkdownParser::new())
-			.register(MarkdownParser::mdx());
-		#[cfg(not(any(feature = "bsx", feature = "markdown_parser")))]
-		let _ = parsers;
+		ScenePlugin::parsers()
+			.with_metadata_type(TypeName::of::<DocMeta>().short())
 	}
 }
 
@@ -64,14 +47,15 @@ impl Plugin for ParsePlugin {
 		// adding it to the per-frame main loop (which would repaint the whole world
 		// every tick).
 		app.init_schedule(PostParseTree);
-		// the markup formats beside the base ones; `OoxmlPlugin`, which
-		// installs the style plugin over this, adds the Office formats
-		Self::register_markup(
-			&mut app.world_mut().get_resource_or_init::<DocParsers>(),
-		);
+		// the base formats, a document's unsectioned metadata its `DocMeta`
+		#[cfg(feature = "scene")]
+		app.install_types::<ScenePlugin>()
+			.world_mut()
+			.get_resource_or_init::<DocParsers>()
+			.set_metadata_type(TypeName::of::<DocMeta>().short());
 		// the default BSX event vocabulary, so every `bx:onclick="..."` runs
 		// its script on a click.
-		#[cfg(feature = "bsx")]
+		#[cfg(feature = "scene")]
 		app.install_types::<crate::prelude::BsxDefaultsPlugin>();
 		// a document's root metadata and its route's, which frontmatter
 		// declares and writes
@@ -81,8 +65,6 @@ impl Plugin for ParsePlugin {
 		// the limits and vocabulary `beet check` holds every page's metadata to
 		app.register_type::<DocMetaRules>()
 			.register_type::<TextLimit>();
-		#[cfg(feature = "bsx")]
-		app.register_type::<FrontmatterType>();
 	}
 }
 
@@ -105,6 +87,8 @@ impl Plugin for RealtimeParsePlugin {
 #[cfg(test)]
 mod test {
 	use super::*;
+	#[cfg(feature = "markdown_parser")]
+	use beet_net::prelude::*;
 	use bevy::app::MainScheduleOrder;
 	use bevy::ecs::schedule::ScheduleLabel;
 
@@ -139,11 +123,9 @@ mod test {
 	fn parse(bytes: &MediaBytes) -> (World, Entity) {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
-		DocParsers::parse(ParseContext::new(
-			&mut world.entity_mut(entity),
-			bytes,
-		))
-		.unwrap();
+		ParseContext::new(&mut world.entity_mut(entity), bytes)
+			.parse()
+			.unwrap();
 		(world, entity)
 	}
 
@@ -165,14 +147,14 @@ mod test {
 
 	/// `MediaType::Html` reads through the BSX parser, HTML being the
 	/// features-off subset.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn parse_html() {
 		let (world, entity) = parse(&MediaBytes::new_html("<div>hello</div>"));
 		tag(&world, entity).xpect_eq("div");
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn parse_bsx() {
 		let (world, entity) = parse(&MediaBytes::new_bsx("<div>hello</div>"));
@@ -189,18 +171,19 @@ mod test {
 
 	/// Frontmatter is a property of the markdown format: with only the plain
 	/// text fallback registered, a scan still reads a page's declarations.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn text_fallback_reads_markdown_frontmatter() {
-		let mut parsers = DocParsers::default();
-		parsers.register(
-			PlainTextParser::default()
-				.with_root_components(Frontmatter::root_components),
-		);
+		let mut parsers = DocParsers::default()
+			.with_metadata_type(TypeName::of::<DocMeta>().short());
+		parsers.register(PlainTextParser::default());
 		parsers
-			.root_components(&MediaBytes::new_markdown(
-				"+++\ntitle = \"Post\"\n[RouteMeta]\norder = 2\n+++\n\n# Post",
-			))
+			.root_components(
+				&MediaBytes::new_markdown(
+					"+++\ntitle = \"Post\"\n[RouteMeta]\norder = 2\n+++\n\n# Post",
+				),
+				None,
+			)
 			.unwrap()
 			.keys()
 			.map(|name| name.as_str())
@@ -208,7 +191,10 @@ mod test {
 			.xpect_eq(vec!["DocMeta", "RouteMeta"]);
 		// a plain text document leading with a fence declares nothing
 		parsers
-			.root_components(&MediaBytes::new_text("+++\ntitle = \"x\"\n+++"))
+			.root_components(
+				&MediaBytes::new_text("+++\ntitle = \"x\"\n+++"),
+				None,
+			)
 			.unwrap()
 			.is_empty()
 			.xpect_true();
@@ -223,13 +209,13 @@ mod test {
 		let parsers = DocParsers::of(&world);
 		let registry = world.resource::<AppTypeRegistry>().read();
 		let title = |bytes: MediaBytes| {
-			parsers
-				.root_components(&bytes)
-				.unwrap()
-				.get_reflect::<DocMeta>(&registry)
-				.unwrap()
-				.unwrap()
-				.title
+			BodyComponents::get::<DocMeta>(
+				&parsers.root_components(&bytes, None).unwrap(),
+				&registry,
+			)
+			.unwrap()
+			.unwrap()
+			.title
 		};
 		let expected =
 			title(MediaBytes::new_markdown("---\ntitle: Post\n---\n# Hi"));
@@ -257,5 +243,115 @@ mod test {
 			.contains::<DocumentScope>()
 			.xpect_true();
 		world.query::<&FieldRef>().iter(&world).count().xpect_eq(1);
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn parse_yaml_frontmatter() {
+		let (world, entity) = parse(&MediaBytes::new_markdown(
+			"---\ntitle: Hello\ndescription: World\n---\n\n# Hello",
+		));
+		world
+			.get::<DocMeta>(entity)
+			.unwrap()
+			.title
+			.as_deref()
+			.xpect_eq(Some("Hello"));
+	}
+
+	/// Parse markdown then render it back via [`HtmlRenderer`].
+	#[cfg(feature = "markdown_parser")]
+	fn roundtrip(md: &str) -> String {
+		let (mut world, entity) = parse(&MediaBytes::new_markdown(md));
+		HtmlRenderer::new()
+			.render(&mut RenderContext::new(
+				&mut world,
+				entity,
+				&RequestParts::default(),
+			))
+			.unwrap()
+			.to_string()
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn roundtrip_paragraph() {
+		roundtrip("Hello world").xpect_eq("<p>Hello world</p>".to_string());
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn roundtrip_heading() {
+		roundtrip("# Title").xpect_eq("<h1>Title</h1>".to_string());
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn roundtrip_emphasis() {
+		roundtrip("*hello*").xpect_eq("<p><em>hello</em></p>".to_string());
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn roundtrip_strong() {
+		roundtrip("**hello**")
+			.xpect_eq("<p><strong>hello</strong></p>".to_string());
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn roundtrip_link() {
+		let html = roundtrip("[click](https://example.com)");
+		html.xpect_contains("<a")
+			.xpect_contains("href=\"https://example.com\"")
+			.xpect_contains("click")
+			.xpect_contains("</a>");
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn roundtrip_unordered_list() {
+		let html = roundtrip("- a\n- b");
+		html.xpect_contains("<ul>")
+			.xpect_contains("<li>")
+			.xpect_contains("</li>")
+			.xpect_contains("</ul>");
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn roundtrip_code_block() {
+		let html = roundtrip("```rust\nfn main() {}\n```");
+		html.xpect_contains("<pre>")
+			.xpect_contains("<code")
+			.xpect_contains("</code>")
+			.xpect_contains("</pre>");
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn roundtrip_blockquote() {
+		let html = roundtrip("> quoted text");
+		html.xpect_contains("<blockquote>")
+			.xpect_contains("quoted text")
+			.xpect_contains("</blockquote>");
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn roundtrip_thematic_break() { roundtrip("---").xpect_contains("<hr />"); }
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn roundtrip_image() {
+		let html = roundtrip("![alt](image.png)");
+		html.xpect_contains("<img")
+			.xpect_contains("src=\"image.png\"");
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn roundtrip_inline_code() {
+		roundtrip("use `foo()` here").xpect_contains("<code>foo()</code>");
 	}
 }

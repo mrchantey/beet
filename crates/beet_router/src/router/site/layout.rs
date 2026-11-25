@@ -244,6 +244,7 @@ mod test {
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 	use beet_ui::prelude::DocMeta;
 	// the `MetaLayout` test template's site-title link, gated like its only user.
 	// Named rather than glob-imported: `beet_net` has a `Header` trait too.
@@ -890,7 +891,7 @@ mod test {
 	/// relationship whose `#[entities]` source remaps onto the freshly spawned
 	/// content, and whose collection target the relationship hook rebuilds on
 	/// load. This is the link a reloaded layout tree's reserved bindings follow.
-	#[cfg(all(feature = "template_serde", feature = "json"))]
+	#[cfg(all(feature = "scene", feature = "json"))]
 	#[beet_core::test]
 	fn layout_content_round_trips_through_scene() {
 		// a tree the saver collects by `Children`: a content sibling and a layout

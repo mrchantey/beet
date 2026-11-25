@@ -38,11 +38,11 @@
 //!
 //! ## Passes
 //!
-//! Both run in [`DiagramSet`], ahead of the highlighter and the cascade:
+//! A fence is read by [`MermaidParser`] into a `<figure class="diagram">`
+//! carrying [`MermaidDiagram`], an info word (`text | svg | auto`) its
+//! [`InlineStyle`]. Drawing it is the one pass here, in [`DiagramSet`], ahead
+//! of the highlighter and the cascade:
 //!
-//! - [`collect_mermaid_blocks`] turns `<pre><code class="mermaid">` into a
-//!   `<figure class="diagram">` carrying [`MermaidDiagram`], declaring an info
-//!   word (`text | svg | auto`) as the inline rule `bx:style` would.
 //! - [`materialize_diagrams`] resolves the figure's mode and builds its form:
 //!   an inline `<svg>` beneath it, sized by its `viewBox` and pinned to its
 //!   natural width; a `<pre class="diagram-text">` of art, built unbounded;
@@ -103,17 +103,18 @@
 //! the figure's width; `.diagram-text` is the mono typeface with
 //! `white-space: pre`. All are registered by
 //! [`StylePlugin`](crate::style::StylePlugin) from [`diagram_rules`].
-mod collect;
 mod diagram;
 mod materialize;
+mod parser;
 mod style;
 #[cfg(all(feature = "mermaid_svg", not(target_arch = "wasm32")))]
 mod svg;
 #[cfg(all(feature = "mermaid_svg", not(target_arch = "wasm32")))]
 mod theme;
-pub(crate) use collect::*;
 pub use diagram::*;
 pub(crate) use materialize::*;
+pub use parser::MermaidParser;
+pub(crate) use parser::declare_render;
 pub use style::*;
 #[cfg(all(feature = "mermaid_svg", not(target_arch = "wasm32")))]
 pub(crate) use svg::DiagramSvgCache;

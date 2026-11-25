@@ -80,11 +80,12 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 
 	/// Spawn `markup` under `doc` and return the element the observer is wired
 	/// onto (the container's one content child).
 	fn click_target(world: &mut World, doc: Entity, markup: &str) -> Entity {
-		let body = SceneBody::parse_bsx(world, markup).unwrap();
+		let body = BsxParser::body(world, markup).unwrap();
 		let target = world.spawn_template(body).unwrap().id();
 		world.entity_mut(target).insert(ChildOf(doc));
 		world.update_local();

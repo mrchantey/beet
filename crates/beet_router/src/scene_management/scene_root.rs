@@ -5,6 +5,7 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 
 extern crate alloc;
 use alloc::vec::Vec;
@@ -130,11 +131,12 @@ impl BeetSceneRoot {
 		});
 	}
 }
-#[cfg(all(test, feature = "template_serde", feature = "json"))]
+#[cfg(all(test, feature = "scene", feature = "json"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 
 	#[action]
 	#[derive(Default, Clone, Component, Reflect)]
@@ -205,17 +207,15 @@ mod test {
 	async fn despawn_scene_removes_markup_resources() {
 		// no pre-inserted `PackageConfig` (unlike `test_world`), so the markup
 		// *creates* the resource and owns its lifetime.
-		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
+		let mut world = (ScenePlugin, DocumentPlugin).into_world();
 		world
 			.resource::<AppTypeRegistry>()
 			.write()
 			.register::<PackageConfig>();
 		let spawn = |world: &mut World| -> Entity {
-			let body = SceneBody::parse_bsx(
-				world,
-				r#"<PackageConfig title="Owned"/>"#,
-			)
-			.unwrap();
+			let body =
+				BsxParser::body(world, r#"<PackageConfig title="Owned"/>"#)
+					.unwrap();
 			let root = world.spawn_template(body).unwrap().id();
 			world.entity_mut(root).insert(BeetSceneRoot);
 			root
@@ -244,15 +244,14 @@ mod test {
 	/// leaving the host entry without the config it declared.
 	#[beet_core::test]
 	async fn despawn_scene_keeps_other_roots_resources() {
-		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
+		let mut world = (ScenePlugin, DocumentPlugin).into_world();
 		world
 			.resource::<AppTypeRegistry>()
 			.write()
 			.register::<PackageConfig>();
 		// the host entry declares the resource and owns it, with no `BeetSceneRoot`
-		let body =
-			SceneBody::parse_bsx(&world, r#"<PackageConfig title="Host"/>"#)
-				.unwrap();
+		let body = BsxParser::body(&world, r#"<PackageConfig title="Host"/>"#)
+			.unwrap();
 		let entry = world.spawn_template(body).unwrap().id();
 		world
 			.resource::<PackageConfig>()

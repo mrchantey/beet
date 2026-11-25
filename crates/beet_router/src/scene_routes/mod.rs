@@ -60,15 +60,15 @@ mod route_query;
 pub use route_query::*;
 // the entry-declared store root (`<RepoRoot src="../.."/>`), pre-scanned by
 // entry resolution.
-#[cfg(feature = "bsx")]
+#[cfg(feature = "scene")]
 mod repo_root;
-#[cfg(feature = "bsx")]
+#[cfg(feature = "scene")]
 pub use repo_root::*;
 // the registered set of declarations that act before the entry builds, and the
 // one registry-free walk entry resolution reads them from.
-#[cfg(feature = "bsx")]
+#[cfg(feature = "scene")]
 mod prescan;
-#[cfg(feature = "bsx")]
+#[cfg(feature = "scene")]
 pub use prescan::*;
 // `RoutesDir` + its discovery is compiled on every std target: one observer
 // scans the store off the async runtime, so native and wasm share the path.

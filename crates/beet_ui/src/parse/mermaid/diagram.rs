@@ -1,12 +1,16 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// A mermaid diagram awaiting its form: the fence body and the family its first
-/// line names. Carried by the `<figure class="diagram">` the collector spawns
-/// (or a `<Mermaid>` template), read by `materialize_diagrams`, which builds the
+/// line names. Carried by the `<figure class="diagram">` a fence lowers to
+/// ([`MermaidParser`], or a `<Mermaid>` template), read by `materialize_diagrams`, which builds the
 /// diagram's form beneath the figure for the sink it is on, and rebuilds it when
 /// the sink changes.
-#[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
-#[reflect(Component)]
+#[derive(
+	Debug, Clone, PartialEq, Eq, Reflect, Component, Serialize, Deserialize,
+)]
+#[reflect(Component, Serialize, Deserialize)]
+#[require(Classes = Classes::new([DIAGRAM]))]
 pub struct MermaidDiagram {
 	/// The mermaid source, the fence body verbatim.
 	pub source: String,
@@ -34,7 +38,9 @@ impl MermaidDiagram {
 /// The diagram family a mermaid source's first line names, the one fact the
 /// `Auto` rule needs: a flowchart reflows as text, everything else is a picture
 /// where the sink can show one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[derive(
+	Debug, Clone, Copy, PartialEq, Eq, Reflect, Serialize, Deserialize,
+)]
 pub enum DiagramKind {
 	/// `graph` or `flowchart` (any direction, including `flowchart-elk`).
 	Flowchart,

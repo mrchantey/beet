@@ -1029,7 +1029,7 @@ mod test {
 	/// route (`RoutesDir` `.bsx` page + `Layout(Document("Layout.bsx"))`) — must render
 	/// once per SSH session. The route's content lives on the shared route entity,
 	/// transcluded into each session's layout; a second session must not double it.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	async fn bsx_layout_blob_page_renders_once_per_session() {
 		let mut app = ssh_tui_app();
@@ -1354,7 +1354,7 @@ mod test {
 	/// `bx:onclick` script's own round trips through the world bridge) over the
 	/// real shared-content Portal structure: the `bx:scope`/`@doc:count` reactive
 	/// document is parsed fresh per session, so each binds its own.
-	#[cfg(all(feature = "bsx", feature = "scripting"))]
+	#[cfg(all(feature = "scene", feature = "scripting"))]
 	#[beet_core::test]
 	async fn counter_increments_only_its_own_session() {
 		let mut app = ssh_tui_live_app();

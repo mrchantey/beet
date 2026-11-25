@@ -2,7 +2,7 @@
 use crate::prelude::*;
 
 /// The key an entity is written under in a scene body
-/// (`template_serde`'s `{ resources, entities }`), and the form every
+/// (`{ resources, entities }`), and the form every
 /// reference to it takes: a component naming another entity holds that
 /// entity's key.
 ///

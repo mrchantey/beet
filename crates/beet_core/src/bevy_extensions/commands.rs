@@ -14,16 +14,6 @@ pub impl Commands<'_, '_> {
 		});
 	}
 
-	/// Loads world serde data from [`MediaBytes`].
-	#[cfg(feature = "template_serde")]
-	fn load_template(&mut self, bytes: impl Into<MediaBytes>) {
-		let bytes = bytes.into();
-		self.queue(move |world: &mut World| -> Result {
-			TemplateLoader::new(world).load(&bytes)?;
-			Ok(())
-		});
-	}
-
 	/// Queues an asynchronous task to be run in the world context.
 	#[cfg(feature = "bevy_async")]
 	fn queue_async<Func, Fut, Out>(&mut self, func: Func)

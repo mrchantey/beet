@@ -181,11 +181,13 @@ impl XmlWriter<'_, '_> {
 }
 
 #[cfg(test)]
-#[cfg(feature = "bsx")]
+#[cfg(feature = "scene")]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 
 	/// Every lexical form the writer chooses is the one Office writes, so a
 	/// document written that way round-trips byte for byte: the declaration,
@@ -202,10 +204,11 @@ mod test {
 	/// `xml` parsed into a fresh entity of `world`.
 	fn spawn_xml(world: &mut World, xml: &str) -> Entity {
 		let entity = world.spawn_empty().id();
-		DocParsers::parse(ParseContext::new(
+		ParseContext::new(
 			&mut world.entity_mut(entity),
 			&MediaBytes::new_string(MediaType::Xml, xml.into()),
-		))
+		)
+		.parse()
 		.unwrap();
 		entity
 	}

@@ -3,7 +3,9 @@
 //! [`crate_registration!`], and documents ask about it through the one cfg
 //! condition grammar, either by excluding a branch (`bx:cfg`) or by refusing
 //! to load at all ([`RequireCfg`]).
+mod build_cfg;
 mod crate_registration;
 mod require_cfg;
+pub use build_cfg::*;
 pub use crate_registration::*;
 pub use require_cfg::*;

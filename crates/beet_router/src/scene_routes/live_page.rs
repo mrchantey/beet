@@ -688,7 +688,7 @@ mod test {
 
 	/// A scene response is rooted at the cascade's root, the route's
 	/// `DocMeta` carried onto that root at every rung.
-	#[cfg(all(feature = "template_serde", feature = "json"))]
+	#[cfg(all(feature = "scene", feature = "json"))]
 	#[beet_core::test]
 	async fn scene_root_carries_the_doc_meta() {
 		let (mut world, router) = site().await;
@@ -809,7 +809,7 @@ mod test {
 			MediaType::Markdown,
 			MediaType::Text,
 			MediaType::AnsiTerm,
-			#[cfg(all(feature = "template_serde", feature = "json"))]
+			#[cfg(all(feature = "scene", feature = "json"))]
 			MediaType::Json,
 		];
 		// a page with no layout and no `<body>` has no chrome to leave out, so

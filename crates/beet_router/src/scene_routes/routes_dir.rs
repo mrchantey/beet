@@ -26,6 +26,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_scene::prelude::*;
 use beet_ui::prelude::*;
 
 /// Spawns one [`BlobPage`] route child per content file under `src`,
@@ -157,12 +158,12 @@ impl RoutesDir {
 					// built so the ancestor links are reliably present: the store
 					// the files load from, the package they are documents of, and the
 					// component this dir's unsectioned frontmatter keys declare.
-					let (store, package, frontmatter_type) = dir
-						.with_state::<(
+					let (store, package, frontmatter_type) =
+						dir.with_state::<(
 							Query<&BlobStore>,
 							PackageQuery,
-							AncestorQuery<&FrontmatterType>,
-						), Result<(BlobStore, PackageStore, FrontmatterType)>>(
+							FrontmatterTypeQuery,
+						), Result<(BlobStore, PackageStore, SmolStr)>>(
 							move |entity, (stores, packages, types)| {
 								Ok((
 									scoped_store(
@@ -172,10 +173,7 @@ impl RoutesDir {
 										&src,
 									)?,
 									packages.get(entity)?,
-									types
-										.get(entity)
-										.cloned()
-										.unwrap_or_default(),
+									types.get(entity),
 								))
 							},
 						)
@@ -187,7 +185,7 @@ impl RoutesDir {
 						&package,
 						&store,
 						&filter,
-						&frontmatter_type.component,
+						&frontmatter_type,
 					)
 					.await?;
 					dir.world()
@@ -261,9 +259,11 @@ impl RoutesDir {
 			RouteHidden,
 		));
 		// scan-time page metadata, so navigation knows titles/order up front
-		if let Err(err) =
-			declarations.insert_onto(&mut route_entity, Some(&document))
-		{
+		if let Err(err) = BodyComponents::insert(
+			&declarations,
+			&mut route_entity,
+			Some(&document),
+		) {
 			route_entity.despawn();
 			return Err(err);
 		}
@@ -284,7 +284,8 @@ impl RoutesDir {
 	) -> Result<(EntityBody, RelPath)> {
 		let mut declarations = spec.declarations?;
 		RouteMeta::declare_file_defaults(&mut declarations, &spec.store_path);
-		let meta = declarations.get_reflect::<RouteMeta>(
+		let meta = BodyComponents::get::<RouteMeta>(
+			&declarations,
 			&world
 				.get_resource::<AppTypeRegistry>()
 				.ok_or_else(|| {
@@ -313,28 +314,27 @@ impl RoutesDir {
 		// guaranteed on the runtime's local executor.
 		entity_mut.run_async_local(async move |route: AsyncEntity| -> Result {
 			let (package, frontmatter_type) = route
-				.with_state::<(PackageQuery, AncestorQuery<&FrontmatterType>), _>(
+				.with_state::<(PackageQuery, FrontmatterTypeQuery), _>(
 					|entity, (packages, types)| {
-						packages.get(entity).map(|package| {
-							(
-								package,
-								types.get(entity).cloned().unwrap_or_default(),
-							)
-						})
+						packages
+							.get(entity)
+							.map(|package| (package, types.get(entity)))
 					},
 				)
 				.await??;
 			let parsers =
 				route.world().with(|world| DocParsers::of(world)).await;
+			let document = package.path_of(&blob);
 			let spec = RouteSpec {
 				declarations: Self::scan_declarations(
 					&parsers,
 					blob.store(),
 					blob.path(),
-					&frontmatter_type.component,
+					&document,
+					&frontmatter_type,
 				)
 				.await,
-				document: package.path_of(&blob),
+				document,
 				store_path: blob.path().clone(),
 			};
 			let entity = route.id();
@@ -379,8 +379,11 @@ impl RoutesDir {
 				world.entity_mut(dir).insert(rescan);
 				Ok(())
 			}
-			_ => declarations
-				.insert_onto(&mut world.entity_mut(route), Some(&document)),
+			_ => BodyComponents::insert(
+				&declarations,
+				&mut world.entity_mut(route),
+				Some(&document),
+			),
 		}
 	}
 
@@ -438,17 +441,21 @@ impl RoutesDir {
 		paths
 			.into_iter()
 			.filter(|path| Self::is_content(path) && filter.passes(path))
-			.map(async |path| RouteSpec {
-				declarations: Self::scan_declarations(
-					parsers,
-					store,
-					&path,
-					frontmatter_type,
-				)
-				.await,
-				document: package
-					.path_of(&Blob::new(store.clone(), path.clone())),
-				store_path: path,
+			.map(async |path| {
+				let document =
+					package.path_of(&Blob::new(store.clone(), path.clone()));
+				RouteSpec {
+					declarations: Self::scan_declarations(
+						parsers,
+						store,
+						&path,
+						&document,
+						frontmatter_type,
+					)
+					.await,
+					document,
+					store_path: path,
+				}
 			})
 			.xmap(async_ext::join_all)
 			.await
@@ -507,7 +514,8 @@ impl RoutesDir {
 		meta.apply_slug(&route_path)
 	}
 
-	/// Read a content file's ROOT declarations through the store, by the
+	/// Read a content file's ROOT declarations through the store, the
+	/// `document` of its package an error names, by the
 	/// [`DocParser`] its media type selects: markdown frontmatter, or the root
 	/// spreads of a BSX or HTML document. A file that cannot be read or parsed
 	/// is an error, so a malformed page fails discovery loudly instead of
@@ -516,12 +524,13 @@ impl RoutesDir {
 		parsers: &DocParsers,
 		store: &BlobStore,
 		path: &RelPath,
+		document: &RelPath,
 		frontmatter_type: &str,
 	) -> Result<EntityBody> {
 		parsers
 			.clone()
 			.with_metadata_type(frontmatter_type)
-			.root_components(&store.get_media(path).await?)
+			.root_components(&store.get_media(path).await?, Some(document))
 	}
 }
 
@@ -620,6 +629,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 	use beet_ui::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }

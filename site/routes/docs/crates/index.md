@@ -24,6 +24,7 @@ The foundations every other crate shares.
 | [beet_core](/docs/crates/beet_core) | 🦢 | Cross-platform types, extension traits and the test runner |
 | [beet_net](/docs/crates/beet_net) | 🐣 | Transport-agnostic request/response networking |
 | [beet_action](/docs/crates/beet_action) | 🐣 | Entities as callable async functions |
+| [beet_scene](/docs/crates/beet_scene) | 🐉 | Turns documents into scenes, and instantiates scenes within one another |
 | [beet_ui](/docs/crates/beet_ui) | 🐉 | Interface agnostic ui trees |
 | [beet_router](/docs/crates/beet_router) | 🐉 | Transport-agnostic routing |
 | [beet_infra](/docs/crates/beet_infra) | 🐉 | Infrastructure as code, built on OpenTofu |
@@ -49,4 +50,4 @@ Behaviors built on `beet_action`: behavior trees, utility AI and agentic systems
 
 ## How they stack up
 
-`beet_core` sits at the bottom and `beet_async` gives futures exclusive access to the Bevy world. On top of those, `beet_action` turns entities into callable functions, the primitive that `beet_net`, `beet_router`, `beet_thread`, `beet_spatial` and `beet_ml` all build on. `beet_ui` describes interfaces, and `beet_infra` describes the cloud they deploy to. Pick one crate or compose them all.
+`beet_core` sits at the bottom and `beet_async` gives futures exclusive access to the Bevy world. On top of those, `beet_action` turns entities into callable functions, the primitive that `beet_net`, `beet_router`, `beet_thread`, `beet_spatial` and `beet_ml` all build on. `beet_scene` turns a document into a scene over them, `beet_ui` describes interfaces, and `beet_infra` describes the cloud they deploy to. Pick one crate or compose them all.

@@ -339,9 +339,7 @@ fn add_domain(table: &mut Table) {
 	// a bare word naming the shape a field accepts, so `<DynamicComponent
 	// name=".." schema="u64"/>` declares what a runtime component means.
 	// `ValueSchema` is reflect-opaque, so this is the only way markup can build
-	// one short of a rust expression, and the vocabulary it reads is the markup
-	// attribute's, hence `bsx`.
-	#[cfg(feature = "bsx")]
+	// one short of a rust expression.
 	table.add(|value: &Value| match value {
 		Value::Str(source) => value_schema(source.as_str()).map(Some),
 		_ => Ok(None),
@@ -449,7 +447,6 @@ fn glob_patterns(items: &[Value]) -> Result<Vec<&str>> {
 /// A shape with more to say than a kind is written as a JSON Schema object,
 /// which is the schema language a document author is likeliest to already know,
 /// and anything richer than that is a rust expression.
-#[cfg(feature = "bsx")]
 fn value_schema(source: &str) -> Result<ValueSchema> {
 	let source = source.trim();
 	if source.starts_with('{') {
@@ -466,13 +463,13 @@ fn value_schema(source: &str) -> Result<ValueSchema> {
 }
 
 /// A [`ValueSchema`] from one JSON Schema descriptor.
-#[cfg(all(feature = "bsx", feature = "json"))]
+#[cfg(feature = "json")]
 fn json_schema(source: &str) -> Result<ValueSchema> {
 	ValueSchema::from_json_value(&serde_json::from_str(source)?)
 }
 
 /// Parsing a JSON schema requires the `json` feature.
-#[cfg(all(feature = "bsx", not(feature = "json")))]
+#[cfg(not(feature = "json"))]
 fn json_schema(_source: &str) -> Result<ValueSchema> {
 	bevybail!("parsing a JSON schema requires the `json` feature")
 }
@@ -552,7 +549,6 @@ mod test {
 		parse::<GlobPattern>(Value::str("*.md"))
 			.unwrap()
 			.xpect_eq(Some(GlobPattern::new("*.md")));
-		#[cfg(feature = "bsx")]
 		parse::<ValueSchema>(Value::str("u64"))
 			.unwrap()
 			.xpect_eq(Some(ValueSchema::U64(default())));
@@ -574,7 +570,6 @@ mod test {
 		// a struct literal targeting a `GlobFilter` builds structurally
 		parse::<GlobFilter>(Value::map()).unwrap().xpect_none();
 		parse::<GlobPattern>(Value::Int(1)).unwrap().xpect_none();
-		#[cfg(feature = "bsx")]
 		parse::<ValueSchema>(Value::Int(1)).unwrap().xpect_none();
 	}
 
@@ -606,7 +601,6 @@ mod test {
 			.xpect_contains("invalid glob pattern");
 		message::<GlobPattern>(Value::str("["))
 			.xpect_contains("invalid glob pattern");
-		#[cfg(feature = "bsx")]
 		message::<ValueSchema>(Value::str("uint64"))
 			.xpect_contains("unknown schema")
 			.xpect_contains("\"u64\"");

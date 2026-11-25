@@ -47,7 +47,7 @@ impl PlainTextRenderer {
 
 	/// Whether `tag` takes lines of its own.
 	fn breaks(tag: &str) -> bool {
-		is_block_element(tag)
+		html_ext::is_block_element(tag)
 			|| Self::LINE_ELEMENTS
 				.iter()
 				.any(|line| line.eq_ignore_ascii_case(tag))

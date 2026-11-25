@@ -106,10 +106,6 @@ mod store_provider;
 // hashed through DAG-CBOR, so `json` (which brings `dag_cbor`).
 #[cfg(feature = "json")]
 mod table;
-// the scene fork: a `template_serde` document in a store, the serde form
-// gating with the json format it is written in.
-#[cfg(all(feature = "template_serde", feature = "json"))]
-mod scene_blob;
 #[cfg(feature = "std")]
 pub use analytics::*;
 #[cfg(feature = "std")]
@@ -120,8 +116,6 @@ pub use document_blob::*;
 pub(crate) use document_store::*;
 #[cfg(all(feature = "std", feature = "json"))]
 pub use http_store::*;
-#[cfg(all(feature = "template_serde", feature = "json"))]
-pub use scene_blob::*;
 #[cfg(feature = "std")]
 pub use store_provider::*;
 #[cfg(feature = "std")]
@@ -228,13 +222,6 @@ impl Plugin for StorePlugin {
 		app.init_resource::<FsBlobWatchers>()
 			.add_observer(add_watch_dir)
 			.add_observer(remove_watch_dir);
-
-		// the scene fork: booted from the store (the fork, else the original
-		// forked) and written back on every edit to its scene document.
-		#[cfg(all(feature = "template_serde", feature = "json"))]
-		app.register_type::<SceneBlob>()
-			.add_systems(PreUpdate, read_scene_blobs)
-			.add_systems(PostUpdate, write_scene_blobs);
 
 		// the by-location half of schema resolution: a document naming its
 		// schema by path has that schema read out of its own store.

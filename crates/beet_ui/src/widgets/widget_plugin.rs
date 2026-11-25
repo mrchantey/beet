@@ -90,7 +90,7 @@ pub(crate) fn widget_plugin(app: &mut App) {
 	// the scene editor: its tag survives a fork as a reflected component, its
 	// frame binds the scene it sits in, and its tree and inspector follow the
 	// scene's selection
-	#[cfg(feature = "template_serde")]
+	#[cfg(feature = "scene")]
 	super::scene_editor::scene_editor_plugin(app);
 	// `Toast` is target-neutral, so its tag registration and expiry timer belong
 	// to the widget set rather than to the one renderer that pops toasts today

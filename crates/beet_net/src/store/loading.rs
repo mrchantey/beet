@@ -38,7 +38,7 @@ impl Loading {
 	/// Clear the mark on `entity`: its read landed, or failed and was reported
 	/// by the caller, retried on the next change.
 	#[cfg(feature = "json")]
-	pub(crate) async fn clear(entity: &AsyncEntity) -> Result {
+	pub async fn clear(entity: &AsyncEntity) -> Result {
 		entity
 			.with(|mut entity| {
 				entity.remove::<Loading>();

@@ -194,32 +194,4 @@ mod test {
 		config.homepage.xpect_none();
 		config.repository.xpect_none();
 	}
-
-	/// A markup-declared `<PackageConfig/>` patches only its named fields over
-	/// [`PackageConfig::default`]: set fields override, unset fields keep the
-	/// defaults (and the optionals stay `None`).
-	#[crate::test]
-	fn markup_patches_over_defaults() {
-		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
-		world
-			.resource_mut::<AppTypeRegistry>()
-			.write()
-			.register::<PackageConfig>();
-		let body =
-			SceneBody::parse_bsx(&world, r#"<PackageConfig title="Patched"/>"#)
-				.unwrap();
-		world.spawn_template(body).unwrap();
-
-		let config = world.resource::<PackageConfig>();
-		// the set field overrides the default
-		config.title.as_str().xpect_eq("Patched");
-		// unset fields keep their defaults
-		config
-			.description
-			.as_str()
-			.xpect_eq("An app built with beet");
-		config.app_name.as_str().xpect_eq("beet-app");
-		// version keeps the default since the markup did not set it
-		config.version.as_str().xpect_eq("0.0.1");
-	}
 }

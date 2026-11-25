@@ -10,6 +10,7 @@ use super::theme::web_theme;
 use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 use mermaid_rs_renderer::LayoutConfig;
 use mermaid_rs_renderer::Theme;
 use std::hash::BuildHasher;
@@ -211,7 +212,7 @@ fn make_responsive(world: &mut World, root: Entity, width: f32) -> Result {
 #[cfg(all(test, feature = "markdown_parser"))]
 mod test {
 	use super::*;
-	use crate::parse::mermaid::collect::test::parse_md;
+	use crate::parse::mermaid::parser::test::parse_md;
 	use crate::style::DiagramRender;
 	use crate::style::common_props::DiagramRenderProp;
 	use beet_net::prelude::*;

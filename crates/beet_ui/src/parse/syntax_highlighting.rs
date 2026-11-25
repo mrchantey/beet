@@ -463,4 +463,38 @@ mod test {
 			.collect::<String>()
 			.xpect_eq(src);
 	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn syntax_highlighting_replaces_text_with_spans() {
+		use beet_scene::prelude::*;
+		let mut app = App::new();
+		app.add_plugins(StylePlugin);
+		let entity = app.world_mut().spawn_empty().id();
+		let bytes = MediaBytes::new_markdown("```rust\nfn main() {}\n```");
+		// highlighting is a post-parse pass, which the media parse runs
+		ParseContext::new(&mut app.world_mut().entity_mut(entity), &bytes)
+			.parse()
+			.unwrap();
+
+		// root -> pre -> code -> spans (no plain text child)
+		let world = app.world_mut();
+		let pre = world.entity_mut(entity).child(0).unwrap().id();
+		let code = world.entity_mut(pre).child(0).unwrap().id();
+		let code_children: Vec<_> = world
+			.entity(code)
+			.get::<Children>()
+			.map(|c| c.iter().collect())
+			.unwrap_or_default();
+		(code_children.len() >= 2).xpect_true();
+		// every direct child of the code element is a span element
+		for child in code_children {
+			world
+				.entity(child)
+				.get::<Element>()
+				.unwrap()
+				.tag()
+				.xpect_eq("span");
+		}
+	}
 }

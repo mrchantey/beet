@@ -327,6 +327,8 @@ mod test {
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
@@ -550,7 +552,7 @@ mod test {
 	/// use is a structural pending dependency, so `Ready` is deferred until it
 	/// has built. The regression this pins is a slide back to insert-time
 	/// resolution, which would see no `site` route at all.
-	#[cfg(feature = "template_serde")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	async fn targets_from_an_instance_resolve() {
 		let mut world = router_world();
@@ -564,7 +566,7 @@ mod test {
 			.await
 			.unwrap();
 
-		let body = SceneBody::parse_bsx(
+		let body = BsxParser::body(
 			&world,
 			r#"<Router><Instance document="site.bsx"/><Route path="all" {RouteMatrix{prefixes:["site"], routes:["deploy"]}}/></Router>"#,
 		)

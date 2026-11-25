@@ -194,7 +194,6 @@ where
 
 #[cfg(test)]
 mod test {
-	use core::marker::PhantomData;
 	use core::str::FromStr;
 
 	use crate::prelude::*;
@@ -206,59 +205,6 @@ mod test {
 	fn double(val: i32) -> i32 { val * 2 }
 	#[action(pure)]
 	fn negate(val: i32) -> i32 { -val }
-
-	// -- serde roundtrip helpers ------------------------------------------
-
-	/// Trait for types whose action handler can be constructed statically,
-	/// allowing a wrapper to build the inner action at `#[require]` time.
-	trait InnerTestAction: 'static + Send + Sync {
-		fn inner_action() -> Action<i32, i32>;
-	}
-
-	/// Inner action defined with `#[action]`, used as the wrapped target.
-	#[action(pure)]
-	#[derive(Debug, Reflect)]
-	fn Doubler(val: i32) -> i32 { val * 2 }
-
-	impl InnerTestAction for Doubler {
-		fn inner_action() -> Action<i32, i32> { Doubler.into_action() }
-	}
-
-	/// Wrapper function defined with `#[action]`, provides the wrapping logic.
-	#[action]
-	async fn AddOneWrap(
-		cx: ActionContext<(i32, Next<i32, i32>)>,
-	) -> Result<i32> {
-		let inner_out = cx.1.call(cx.0).await?;
-		Ok(inner_out + 1)
-	}
-
-	/// Serializable wrapper component, generic over the inner action `T`.
-	/// Uses `#[require]` to provide the wrapped action at bundle-resolution
-	/// time, avoiding timing issues during world serde deserialization.
-	#[derive(Debug, Clone, Component, Reflect)]
-	#[reflect(Component, Default)]
-	#[require(Action<i32, i32> = AddOneWrapper::<T>::make_action())]
-	struct AddOneWrapper<T: InnerTestAction = Doubler>(
-		#[reflect(ignore)] PhantomData<fn() -> T>,
-	);
-
-	impl<T: InnerTestAction> Default for AddOneWrapper<T> {
-		fn default() -> Self { Self(PhantomData) }
-	}
-
-	impl<T: InnerTestAction> AddOneWrapper<T> {
-		fn make_action() -> Action<i32, i32> {
-			let inner = T::inner_action();
-			Action::new_async(move |cx: ActionContext<i32>| {
-				let inner = inner.clone();
-				async move {
-					let inner_out = cx.caller.call_detached(inner, *cx).await?;
-					Ok(inner_out + 1)
-				}
-			})
-		}
-	}
 
 	/// Example middleware accepting and returning an opaque type
 	async fn my_middleware<In, Out>(
@@ -375,119 +321,5 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(-29);
-	}
-
-	// -- serde roundtrip tests --------------------------------------------
-
-	fn serde_app() -> App {
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, AsyncPlugin));
-		app.register_type::<AddOneWrapper<Doubler>>();
-		app.register_type::<i32>();
-		app.init();
-		app.update();
-		app
-	}
-
-	#[beet_core::test]
-	async fn wrapper_works_directly() {
-		let mut app = serde_app();
-		// Only AddOneWrapper is needed — its #[require] provides the
-		// wrapped action, constructing the inner Doubler action statically.
-		let entity = app
-			.world_mut()
-			.spawn(AddOneWrapper::<Doubler>::default())
-			.id();
-		app.update();
-
-		// double(5) + 1 = 11
-		app.world_mut()
-			.entity_mut(entity)
-			.call::<i32, i32>(5)
-			.await
-			.unwrap()
-			.xpect_eq(11);
-	}
-
-	#[beet_core::test]
-	fn wrapper_template_roundtrip() {
-		let mut app = serde_app();
-
-		let entity = app
-			.world_mut()
-			.spawn(AddOneWrapper::<Doubler>::default())
-			.id();
-		app.update();
-
-		// The entity should have the wrapper component and a ActionMeta.
-		app.world()
-			.entity(entity)
-			.get::<AddOneWrapper<Doubler>>()
-			.xpect_some();
-		app.world().entity(entity).get::<ActionMeta>().xpect_some();
-
-		// Serialize
-		let template_bytes = TemplateSaver::new()
-			.with_entities([entity])
-			.save(app.world(), MediaType::Json)
-			.unwrap();
-		template_bytes
-			.as_utf8()
-			.unwrap()
-			.xref()
-			.xpect_contains("AddOneWrapper");
-
-		// Despawn original
-		app.world_mut().entity_mut(entity).despawn();
-		app.update();
-
-		// Deserialize
-		let loaded = TemplateLoader::new(app.world_mut())
-			.load(&template_bytes)
-			.unwrap();
-		app.update();
-
-		// The loaded entity should have the wrapper and a ActionMeta
-		// (Action itself isn't serializable, but #[require] re-creates it)
-		let loaded = *loaded.first().unwrap();
-		app.world()
-			.entity(loaded)
-			.get::<AddOneWrapper<Doubler>>()
-			.xpect_some();
-		app.world().entity(loaded).get::<ActionMeta>().xpect_some();
-	}
-
-	#[beet_core::test]
-	async fn wrapper_works_after_roundtrip() {
-		let mut app = serde_app();
-
-		let entity = app
-			.world_mut()
-			.spawn(AddOneWrapper::<Doubler>::default())
-			.id();
-		app.update();
-
-		// Serialize then despawn
-		let template_bytes = TemplateSaver::new()
-			.with_entities([entity])
-			.save(app.world(), MediaType::Json)
-			.unwrap();
-		app.world_mut().entity_mut(entity).despawn();
-		app.update();
-
-		// Deserialize
-		let loaded = TemplateLoader::new(app.world_mut())
-			.load(&template_bytes)
-			.unwrap();
-		app.update();
-
-		// Call the wrapped action on the loaded entity: double(5) + 1 = 11
-		let loaded = *loaded.first().unwrap();
-		app.world_mut()
-			.entity_mut(loaded)
-			.call::<i32, i32>(5)
-			.await
-			.unwrap()
-			.xpect_eq(11);
 	}
 }

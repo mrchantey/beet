@@ -1,4 +1,4 @@
-//! HTML rendering: the [`HtmlRenderer`] and its utilities, the
+//! HTML rendering: the [`HtmlRenderer`], the
 //! [`XmlRenderer`], plus the template-serde wiring.
 //!
 //! The shared walk/serialize substrate (`node_walker`, `render_context`) lives
@@ -6,11 +6,9 @@
 //! build on it too.
 mod html;
 pub use html::*;
-#[cfg(feature = "template_serde")]
+#[cfg(feature = "scene")]
 mod template;
-#[cfg(feature = "template_serde")]
+#[cfg(feature = "scene")]
 pub use template::*;
-mod html_utils;
-pub(crate) use html_utils::*;
 mod xml;
 pub use xml::*;

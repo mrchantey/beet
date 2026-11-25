@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Sequential block/inline rendering state used by the [`MarkdownRenderer`].
@@ -45,7 +44,7 @@ impl TextRenderState {
 	pub fn new() -> Self {
 		Self {
 			buffer: String::new(),
-			block_elements: element_names(BLOCK_ELEMENTS),
+			block_elements: html_ext::element_names(html_ext::BLOCK_ELEMENTS),
 			list_depth: 0,
 			list_stack: Vec::new(),
 			in_preformatted: false,

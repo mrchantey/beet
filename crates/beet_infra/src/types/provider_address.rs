@@ -95,6 +95,7 @@ impl CloudflareZone {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_scene::prelude::*;
 
 	/// The apex and every name under it are in the zone; a lookalike suffix
 	/// and a parent are not.
@@ -116,7 +117,7 @@ mod test {
 	fn addresses_resolve_by_ancestry() {
 		let mut world = InfraPlugin.into_world();
 		world.init_resource::<PackageConfig>();
-		let root = SceneBody::spawn_bsx(&mut world, r#"<Router {AwsRegion("ap-southeast-2")}>
+		let root = BsxParser::spawn(&mut world, r#"<Router {AwsRegion("ap-southeast-2")}>
 				<Stack app_name="mail" {(CloudflareAccount("acct"), CloudflareZone{domain:"beetmash.com", id:"zone"})}>
 					<div/>
 				</Stack>

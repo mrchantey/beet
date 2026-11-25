@@ -161,6 +161,7 @@ blocking = { workspace = true, optional = true }
 brotli = { workspace = true, optional = true }
 
 [dev-dependencies]
+beet_scene = { workspace = true, features = ["std"] }
 beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "ureq", "rustls-tls", "server", "russh_client"] }
 beet_router = { workspace = true, features = ["http"] }
 beet_core = { workspace = true, features = ["testing"] }

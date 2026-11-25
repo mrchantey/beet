@@ -558,14 +558,14 @@ mod test {
 	use beet_core::prelude::*;
 	#[cfg(feature = "scheduled_job_block")]
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 
 	/// The world an entry's markup builds into: the plugin under test plus the
 	/// document machinery a `.bsx` load runs through.
 	fn spawn(markup: &str) -> World {
-		let mut world =
-			(AsyncPlugin, TemplatePlugin, DocumentPlugin, InfraPlugin)
-				.into_world();
-		SceneBody::spawn_bsx(&mut world, markup).unwrap();
+		let mut world = (AsyncPlugin, ScenePlugin, DocumentPlugin, InfraPlugin)
+			.into_world();
+		BsxParser::spawn(&mut world, markup).unwrap();
 		world.flush();
 		world
 	}

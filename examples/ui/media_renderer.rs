@@ -21,7 +21,7 @@ fn main() {
 
 	// 1. Load the markdown into ecs — falls back to plain text without
 	// the `markdown_parser` feature.
-	DocParsers::parse(ParseContext::new(&mut entity, &md_bytes)).unwrap();
+	ParseContext::new(&mut entity, &md_bytes).parse().unwrap();
 
 	// 2. Get the requested media type
 	let media_type = CliArgs::parse_env()

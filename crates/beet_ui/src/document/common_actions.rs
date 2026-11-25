@@ -476,9 +476,11 @@ pub fn ReadDocField(
 #[cfg(test)]
 mod test {
 	use super::*;
-	#[cfg(feature = "template_serde")]
+	#[cfg(feature = "scene")]
 	use crate::prelude::DocumentUiPlugin;
 	use beet_action::prelude::*;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 
 	fn count_field() -> FieldRef { FieldRef::new("count") }
 
@@ -716,10 +718,10 @@ mod test {
 	}
 
 	#[beet_core::test]
-	#[cfg(all(feature = "template_serde", feature = "json"))]
+	#[cfg(all(feature = "scene", feature = "json"))]
 	fn roundtrip_increment_template() {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins);
+		app.add_plugins((MinimalPlugins, ScenePlugin));
 		app.install_types::<DocumentUiPlugin>();
 		app.init();
 		app.update();

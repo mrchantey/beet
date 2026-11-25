@@ -19,7 +19,6 @@ default = ["std", "reflect"]
 std = ["beet_core/std", "beet_core/fs", "rquickjs?/std"]
 serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
 json = ["serde", "dep:serde_json", "beet_core/json"]
-template_serde = ["beet_core/template_serde"]
 reflect = ["beet_core/bevy_reflect_documentation"]
 # The engine-agnostic `Script` / `ScriptAction` surface: a JavaScript program as
 # data, plus the backend selection that runs it. A `Script` always marshals its
@@ -86,7 +85,7 @@ web-sys = { workspace = true, optional = true, features = [
 ] }
 
 [dev-dependencies]
-beet_action = { path = ".", features= ["template_serde", "scripting"] }
+beet_action = { path = ".", features= ["scripting"] }
 beet_core = { workspace = true, features = ["testing", "json"] }
 
 [lib]

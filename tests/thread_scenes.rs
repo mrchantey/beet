@@ -49,7 +49,7 @@ async fn reduce(source: &str) -> App {
 		.register_type::<AgentChoiceAction>();
 	app.world_mut().spawn(cli_registration());
 	AsyncRunner::settle_async_tasks(app.world_mut()).await;
-	SceneBody::spawn_bsx(app.world_mut(), source).unwrap();
+	BsxParser::spawn(app.world_mut(), source).unwrap();
 	ThreadRecords::reduce_now(app.world_mut());
 	app.world_mut().flush();
 	app

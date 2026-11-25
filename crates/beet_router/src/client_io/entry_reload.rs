@@ -141,7 +141,7 @@ fn disconnect_clients(world: &mut World) {
 	world.flush();
 }
 
-#[cfg(all(test, feature = "template_serde"))]
+#[cfg(all(test, feature = "scene"))]
 mod test {
 	use super::*;
 	use beet_net::prelude::*;

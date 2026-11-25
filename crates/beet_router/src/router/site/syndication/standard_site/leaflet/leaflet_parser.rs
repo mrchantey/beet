@@ -556,6 +556,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 	use beet_ui::prelude::*;
 
 	/// `pub.leaflet.content` as Leaflet's own publication wrote it: "Newsletter
@@ -701,10 +702,11 @@ fn main() { println!("hello"); }
 	fn round_trips_a_markdown_post() {
 		let mut source = world();
 		let post = source.spawn_empty().id();
-		DocParsers::parse(ParseContext::new(
+		ParseContext::new(
 			&mut source.entity_mut(post),
 			&MediaBytes::new_markdown(POST),
-		))
+		)
+		.parse()
 		.unwrap();
 		let original = html(&mut source, post, true);
 		let member = Value::from(render(&mut source, post));

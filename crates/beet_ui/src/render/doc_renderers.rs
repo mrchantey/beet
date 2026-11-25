@@ -178,8 +178,8 @@ impl DocRenderers {
 
 /// Registers the built-in doc renderers: html, xml, markdown, plain text,
 /// and with their features ansi (`style`) and the serialized scene
-/// (`template_serde`), and the lexicon registries ([`LexiconRenderers`],
-/// [`LexiconParsers`]), holding `org.beet.scene#body` (`template_serde`).
+/// (`scene`), and the lexicon registries ([`LexiconRenderers`],
+/// [`LexiconParsers`]), holding `org.beet.scene#body` (`scene`).
 #[derive(Default)]
 pub struct RenderPlugin;
 
@@ -197,7 +197,7 @@ impl Plugin for RenderPlugin {
 		app.init_resource::<LexiconRenderers>()
 			.init_resource::<LexiconParsers>()
 			.register_type::<UnknownLexicon>();
-		#[cfg(feature = "template_serde")]
+		#[cfg(feature = "scene")]
 		app.install((TemplateRenderer::default(), SceneBodyLexicon));
 	}
 }
@@ -245,25 +245,25 @@ mod test {
 	use beet_core::prelude::*;
 	#[allow(unused)]
 	use beet_net::prelude::*;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 
 	/// A world holding `<div><p>hi</p></div>`, parsed from html, with the
 	/// built-in renderers, and its root.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	fn page() -> (World, Entity) {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<div><p>hi</p></div>");
-		DocParsers::parse(ParseContext::new(
-			&mut world.entity_mut(entity),
-			&bytes,
-		))
-		.unwrap();
+		ParseContext::new(&mut world.entity_mut(entity), &bytes)
+			.parse()
+			.unwrap();
 		(world, entity)
 	}
 
 	/// The media type a request with `accept` (raw, `None` for no header)
 	/// negotiates to, and the body.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	fn negotiate(
 		accept: Option<&str>,
 	) -> Result<(MediaType, String), RenderError> {
@@ -277,7 +277,7 @@ mod test {
 	}
 
 	/// No `Accept` renders the default media type.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn no_accept_renders_the_default() {
 		negotiate(None)
@@ -287,7 +287,7 @@ mod test {
 
 	/// `accepts` is consulted in priority order, the first registered type
 	/// winning, plain text an ordinary renderer like any other.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn accepts_in_priority_order() {
 		negotiate(Some("text/html, text/plain"))
@@ -310,7 +310,7 @@ mod test {
 	/// A wildcard (`*/*`, `text/*`, eg a bare `curl` or an API Gateway
 	/// default) resolves to the default media type, not the plain text
 	/// fallback.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn wildcard_resolves_to_the_default() {
 		negotiate(Some("*/*")).unwrap().0.xpect_eq(MediaType::Html);
@@ -326,7 +326,7 @@ mod test {
 
 	/// A text type with no renderer of its own falls back to plain text, even
 	/// behind a type nothing renders.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn text_falls_back_to_plain_text() {
 		negotiate(Some("text/css"))
@@ -341,7 +341,7 @@ mod test {
 
 	/// Nothing renderable is a mismatch naming what was asked for and what is
 	/// available.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn no_match_is_a_mismatch() {
 		match negotiate(Some("image/png")) {
@@ -362,7 +362,7 @@ mod test {
 
 	/// The scene renderer answers every format it serializes, the selected
 	/// one reaching it.
-	#[cfg(all(feature = "bsx", feature = "template_serde", feature = "json"))]
+	#[cfg(all(feature = "scene", feature = "json"))]
 	#[beet_core::test]
 	fn serializes_the_scene() {
 		negotiate(Some("application/json"))
@@ -377,7 +377,7 @@ mod test {
 	}
 
 	/// The terminal renderer answers ansi.
-	#[cfg(all(feature = "bsx", feature = "style"))]
+	#[cfg(all(feature = "scene", feature = "style"))]
 	#[beet_core::test]
 	fn renders_ansi() {
 		negotiate(Some("text/ansi-term"))
@@ -390,7 +390,7 @@ mod test {
 	/// media type through the same call, one registered later replaces a
 	/// built-in for the type both answer, and the negotiated type reaches it
 	/// though the request's `Accept` names only a wildcard.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn registers_a_downstream_target() {
 		#[derive(Clone)]
@@ -457,11 +457,9 @@ mod test {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_markdown("# Title");
-		DocParsers::parse(ParseContext::new(
-			&mut world.entity_mut(entity),
-			&bytes,
-		))
-		.unwrap();
+		ParseContext::new(&mut world.entity_mut(entity), &bytes)
+			.parse()
+			.unwrap();
 		DocRenderers::render(
 			&mut world,
 			entity,

@@ -1,0 +1,416 @@
+//! Composite construction: a list, struct, enum or named literal to its dynamic
+//! reflected value, recursing into each item or field against the target's info.
+
+use super::literal::*;
+use crate::prelude::*;
+use beet_core::prelude::*;
+use bevy::reflect::PartialReflect;
+use bevy::reflect::TypeInfo;
+use bevy::reflect::TypeRegistry;
+use bevy::reflect::array::DynamicArray;
+use bevy::reflect::enums::DynamicEnum;
+use bevy::reflect::enums::DynamicVariant;
+use bevy::reflect::enums::VariantInfo;
+use bevy::reflect::list::DynamicList;
+use bevy::reflect::structs::DynamicStruct;
+use bevy::reflect::structs::StructInfo;
+use bevy::reflect::tuple::DynamicTuple;
+use bevy::reflect::tuple_struct::DynamicTupleStruct;
+
+/// Build a [`DynamicList`] (or a [`DynamicArray`] for an array-typed field, eg
+/// `host: [u8; 4]`) from items, recursing per the collection's item info.
+pub(super) fn list_to_reflect(
+	items: &[DataLiteral],
+	field_info: Option<&'static TypeInfo>,
+	registry: &TypeRegistry,
+	resolver: EntityResolver,
+) -> Result<Box<dyn PartialReflect>> {
+	// a list of scalars targeting a field type with its own authored spelling
+	// builds through it, so an allowlist authors as the list it reads like:
+	// `{ScriptConfig{read:["guestbook.*","Text"]}}` is one `GlobFilter`, whose
+	// patterns are a private `Vec<GlobPattern>` field-by-field construction
+	// cannot reach. A non-scalar item, or a parser that declines the list,
+	// falls to the structural walk below.
+	if let Some(info) = field_info
+		&& let Some(values) =
+			items.iter().map(scalar_value).collect::<Option<Vec<_>>>()
+		&& let Some(reflected) =
+			LiteralParser::parse_type(info.type_id(), &Value::List(values))?
+	{
+		return Ok(reflected);
+	}
+	let item_info = match field_info {
+		Some(TypeInfo::List(info)) => info.item_info(),
+		Some(TypeInfo::Array(info)) => info.item_info(),
+		_ => None,
+	};
+	let values = items
+		.iter()
+		.map(|item| {
+			DataLiteral::to_reflect(item, item_info, registry, resolver)
+		})
+		.collect::<Result<Vec<_>>>()?;
+	if let Some(info @ TypeInfo::Array(_)) = field_info {
+		let mut array = DynamicArray::new(values.into_boxed_slice());
+		array.set_represented_type(Some(info));
+		return Ok(Box::new(array));
+	}
+	let mut list = DynamicList::default();
+	for value in values {
+		list.push_box(value);
+	}
+	list.set_represented_type(field_info);
+	Ok(Box::new(list))
+}
+
+/// The [`Value`] a list item carries when it is a plain scalar, for the
+/// parser lookup above. `None` for any richer shape, which has no `Value`
+/// form and so goes structural.
+fn scalar_value(item: &DataLiteral) -> Option<Value> {
+	match item {
+		DataLiteral::Scalar(value) => Some(value.clone()),
+		_ => None,
+	}
+}
+
+/// Build a [`DynamicStruct`] from named fields, recursing per field info.
+///
+/// The result is COMPLETED over the target's default when it can be, since a
+/// nested value is consumed by `FromReflect` (a list item, a struct-typed
+/// field), which needs every field and silently drops the whole value without
+/// them. That is the same fill a top-level component patch gets, one level
+/// down: `mailboxes={[{localpart:"probe"}]}` means a default mailbox at that
+/// localpart, not a mailbox list that quietly stays empty.
+///
+/// A field the target does not have is an error naming both: `FromReflect`
+/// would drop it in silence, which is a declaration (`{SyncS3Bucket{paths:".."}}`
+/// after the field moved) that quietly does something else.
+pub(super) fn struct_to_reflect(
+	fields: &[(SmolStr, DataLiteral)],
+	field_info: Option<&'static TypeInfo>,
+	registry: &TypeRegistry,
+	resolver: EntityResolver,
+) -> Result<Box<dyn PartialReflect>> {
+	if let Some(reflected) = parsed_fields(fields, field_info)? {
+		return Ok(reflected);
+	}
+	let struct_info = match field_info {
+		Some(TypeInfo::Struct(info)) => Some(info),
+		_ => None,
+	};
+	let mut dynamic = DynamicStruct::default();
+	for (name, literal) in fields {
+		let nested = struct_field_info(struct_info, name)?;
+		dynamic.insert_boxed(
+			name.as_str(),
+			DataLiteral::to_reflect(literal, nested, registry, resolver)?,
+		);
+	}
+	dynamic.set_represented_type(field_info);
+	Ok(complete_over_default(
+		Box::new(dynamic),
+		field_info,
+		registry,
+	))
+}
+
+/// A struct literal offered to its target's own authored spelling, before the
+/// structural walk.
+///
+/// A literal whose every value maps cleanly to a [`Value`] is a [`Value::Map`],
+/// so a type whose fields are private still authors as the shape it reads like:
+/// `{exclude:["blog/**"]}` is one `GlobFilter`, whose ordered rules
+/// field-by-field construction cannot reach. A parser that declines the map (or
+/// a target with no entry) yields [`None`] and the structural walk takes over,
+/// which is what keeps `{GlobFilter{rules:[..]}}` building the ordinary way.
+fn parsed_fields(
+	fields: &[(SmolStr, DataLiteral)],
+	field_info: Option<&'static TypeInfo>,
+) -> Result<Option<Box<dyn PartialReflect>>> {
+	let Some(info) = field_info else {
+		return Ok(None);
+	};
+	let Some(entries) = fields
+		.iter()
+		.map(|(key, literal)| literal.value().map(|value| (key.clone(), value)))
+		.collect::<Option<Vec<_>>>()
+	else {
+		return Ok(None);
+	};
+	let mut map = Map::default();
+	for (key, value) in entries {
+		map.insert(key, value);
+	}
+	LiteralParser::parse_type(info.type_id(), &Value::Map(map))
+}
+
+/// The type info of `name` on a struct target, `None` for an unknown target
+/// (the literal builds untyped) and an error naming both for a field the
+/// known target does not have.
+fn struct_field_info(
+	struct_info: Option<&'static StructInfo>,
+	name: &str,
+) -> Result<Option<&'static TypeInfo>> {
+	let Some(info) = struct_info else {
+		return Ok(None);
+	};
+	info.field(name)
+		.ok_or_else(|| {
+			bevyhow!(
+				"`{}` has no field `{name}`",
+				info.type_path_table().short_path()
+			)
+		})?
+		.type_info()
+		.xok()
+}
+
+/// Apply `partial` over its target type's `Default`, yielding a CONCRETE value
+/// every field of which is set. Falls through unchanged when the target is
+/// unknown, carries no `#[reflect(Default)]`, or refuses the patch (a field the
+/// type does not have), so a miss stays as loud as it was.
+fn complete_over_default(
+	partial: Box<dyn PartialReflect>,
+	field_info: Option<&'static TypeInfo>,
+	registry: &TypeRegistry,
+) -> Box<dyn PartialReflect> {
+	use bevy::reflect::std_traits::ReflectDefault;
+	let Some(mut value) = field_info
+		.and_then(|info| registry.get(info.type_id()))
+		.and_then(|registration| registration.data::<ReflectDefault>())
+		.map(ReflectDefault::default)
+	else {
+		return partial;
+	};
+	match value.try_apply(partial.as_ref()) {
+		Ok(()) => value.into_partial_reflect(),
+		Err(_) => partial,
+	}
+}
+
+/// Build a named literal (`Name`, `Name(..)`, `Name { .. }`) to a reflected
+/// value, dispatching on the target's [`TypeInfo`]: a struct/tuple-struct target
+/// (a component spread) builds a [`DynamicStruct`]/[`DynamicTupleStruct`], an
+/// enum (or unknown) target builds a [`DynamicEnum`].
+pub(super) fn enum_to_reflect(
+	named: &NamedLiteral,
+	field_info: Option<&'static TypeInfo>,
+	registry: &TypeRegistry,
+	resolver: EntityResolver,
+) -> Result<Box<dyn PartialReflect>> {
+	match field_info {
+		Some(TypeInfo::Struct(_)) => {
+			return named_struct_to_reflect(
+				named, field_info, registry, resolver,
+			);
+		}
+		Some(TypeInfo::TupleStruct(_)) => {
+			return named_tuple_struct_to_reflect(
+				named, field_info, registry, resolver,
+			);
+		}
+		_ => {}
+	}
+	let enum_info = match field_info {
+		Some(TypeInfo::Enum(info)) => Some(info),
+		_ => None,
+	};
+	// reflection keys on the bare variant name, so a qualified path
+	// (`ButtonVariant::Outlined`) reduces to its last segment (`Outlined`), the
+	// markup twin of Rust accepting either form. Without this the variant lookup
+	// misses and the value silently falls back to the enum's default.
+	let variant_name = named.name.rsplit("::").next().unwrap_or(&named.name);
+	let variant = enum_info.and_then(|info| info.variant(variant_name));
+
+	let dynamic_variant = match (&named.fields, enum_info) {
+		// a bare name spells a variant exactly as a string does: a unit one, a
+		// tuple one carrying only `()` (`Fail` for `Outcome::Fail(())`), and an
+		// error for a name the enum lacks, which a unit `DynamicEnum` would have
+		// let `from_reflect` miss and leave the field's DEFAULT in place
+		(NamedFields::Unit, Some(enum_info)) => {
+			let mut unit =
+				reflect_ext::unit_variant_value(enum_info, variant_name)?;
+			// what tells an option's `None` from a string, written as null
+			unit.set_represented_type(field_info);
+			return Ok(Box::new(unit));
+		}
+		(NamedFields::Unit, None) => DynamicVariant::Unit,
+		(NamedFields::Tuple(items), _) => {
+			let mut tuple = DynamicTuple::default();
+			for (index, item) in items.iter().enumerate() {
+				let nested = match variant {
+					Some(VariantInfo::Tuple(info)) => {
+						info.field_at(index).and_then(|f| f.type_info())
+					}
+					_ => None,
+				};
+				tuple.insert_boxed(DataLiteral::to_reflect(
+					item, nested, registry, resolver,
+				)?);
+			}
+			DynamicVariant::Tuple(tuple)
+		}
+		(NamedFields::Struct(struct_fields), _) => {
+			assert_variant_complete(variant_name, variant, struct_fields)?;
+			let mut dynamic = DynamicStruct::default();
+			for (name, literal) in struct_fields {
+				let nested = match variant {
+					Some(VariantInfo::Struct(info)) => {
+						info.field(name).and_then(|f| f.type_info())
+					}
+					_ => None,
+				};
+				dynamic.insert_boxed(
+					name.as_str(),
+					DataLiteral::to_reflect(
+						literal, nested, registry, resolver,
+					)?,
+				);
+			}
+			DynamicVariant::Struct(dynamic)
+		}
+	};
+
+	let mut dynamic_enum =
+		DynamicEnum::new(variant_name.to_string(), dynamic_variant);
+	dynamic_enum.set_represented_type(field_info);
+	Ok(Box::new(dynamic_enum))
+}
+
+/// Reject a struct-variant literal that omits any of its variant's fields.
+///
+/// Unlike a struct target, an enum variant cannot be COMPLETED over a default:
+/// a default names one variant and says nothing about the others, so
+/// `FromReflect` needs every field of the variant actually written. Without
+/// this check a partial literal reaches `from_reflect`, misses, and leaves the
+/// target's default in place, so `dns={Cloudflare{authority:"x"}}` resolves to
+/// no provider at all rather than to a bad one.
+fn assert_variant_complete(
+	variant_name: &str,
+	variant: Option<&'static VariantInfo>,
+	fields: &[(SmolStr, DataLiteral)],
+) -> Result {
+	let Some(VariantInfo::Struct(info)) = variant else {
+		return Ok(());
+	};
+	let missing = info
+		.iter()
+		.map(|field| field.name())
+		.filter(|name| !fields.iter().any(|(given, _)| given == name))
+		.collect::<Vec<_>>();
+	if !missing.is_empty() {
+		bevybail!(
+			"`{variant_name}` is missing {missing:?}: an enum variant has no default to fill from, so every field of the variant must be written"
+		);
+	}
+	Ok(())
+}
+
+/// Build a [`DynamicStruct`] from a named literal targeting a struct component,
+/// eg a `{MyComponent{foo:"bar"}}` spread. The unit form is an empty patch over
+/// default; the positional form is an error, since a struct with named fields
+/// has no position for a value to land in and an empty patch would build the
+/// default in silence.
+pub(super) fn named_struct_to_reflect(
+	named: &NamedLiteral,
+	field_info: Option<&'static TypeInfo>,
+	registry: &TypeRegistry,
+	resolver: EntityResolver,
+) -> Result<Box<dyn PartialReflect>> {
+	if let NamedFields::Struct(fields) = &named.fields
+		&& let Some(reflected) = parsed_fields(fields, field_info)?
+	{
+		return Ok(reflected);
+	}
+	let struct_info = match field_info {
+		Some(TypeInfo::Struct(info)) => Some(info),
+		_ => None,
+	};
+	if let (NamedFields::Tuple(items), Some(info)) =
+		(&named.fields, struct_info)
+		&& !items.is_empty()
+	{
+		let name = info.type_path_table().short_path();
+		bevybail!(
+			"`{name}` has named fields ({}), so it is written `{name}{{{}:..}}`: \
+			{} positional value(s) have no field to land in",
+			info.field_names().join(", "),
+			info.field_names().first().copied().unwrap_or("field"),
+			items.len()
+		);
+	}
+	let mut dynamic = DynamicStruct::default();
+	if let NamedFields::Struct(fields) = &named.fields {
+		for (name, literal) in fields {
+			let nested = struct_field_info(struct_info, name)?;
+			dynamic.insert_boxed(
+				name.as_str(),
+				DataLiteral::to_reflect(literal, nested, registry, resolver)?,
+			);
+		}
+	}
+	dynamic.set_represented_type(field_info);
+	Ok(Box::new(dynamic))
+}
+
+/// Build a [`DynamicTupleStruct`] from a named literal targeting a tuple-struct
+/// component, eg `{Wrapper(1, 2)}`.
+///
+/// A tuple struct is written positionally, so on a known target a field literal
+/// is an error (unless the type's own [`LiteralParser`] takes it as a map), and
+/// so is a value past its last position. Both used to build an empty patch over
+/// the default in silence, which is how `{CloudflareAccount{id:".."}}` once
+/// resolved to an account with no id and only failed where a provider happened
+/// to require the field.
+pub(super) fn named_tuple_struct_to_reflect(
+	named: &NamedLiteral,
+	field_info: Option<&'static TypeInfo>,
+	registry: &TypeRegistry,
+	resolver: EntityResolver,
+) -> Result<Box<dyn PartialReflect>> {
+	let tuple_info = match field_info {
+		Some(TypeInfo::TupleStruct(info)) => Some(info),
+		_ => None,
+	};
+	if let (NamedFields::Struct(fields), Some(info)) =
+		(&named.fields, tuple_info)
+		&& !fields.is_empty()
+	{
+		if let Some(reflected) = parsed_fields(fields, field_info)? {
+			return Ok(reflected);
+		}
+		let name = info.type_path_table().short_path();
+		bevybail!(
+			"`{name}` is a tuple struct, so it is written positionally as \
+			`{name}(..)`: the field(s) {} name nothing it has",
+			fields
+				.iter()
+				.map(|(field, _)| format!("`{field}`"))
+				.collect::<Vec<_>>()
+				.join(", ")
+		);
+	}
+	if let (NamedFields::Tuple(items), Some(info)) = (&named.fields, tuple_info)
+		&& items.len() > info.field_len()
+	{
+		bevybail!(
+			"`{}` has {} field(s) and is given {}",
+			info.type_path_table().short_path(),
+			info.field_len(),
+			items.len()
+		);
+	}
+	let mut dynamic = DynamicTupleStruct::default();
+	if let NamedFields::Tuple(items) = &named.fields {
+		for (index, item) in items.iter().enumerate() {
+			let nested = tuple_info
+				.and_then(|info| info.field_at(index))
+				.and_then(|field| field.type_info());
+			dynamic.insert_boxed(DataLiteral::to_reflect(
+				item, nested, registry, resolver,
+			)?);
+		}
+	}
+	dynamic.set_represented_type(field_info);
+	Ok(Box::new(dynamic))
+}

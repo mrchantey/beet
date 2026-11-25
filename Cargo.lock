@@ -1238,6 +1238,7 @@ dependencies = [
  "beet_ml",
  "beet_net",
  "beet_router",
+ "beet_scene",
  "beet_spatial",
  "beet_thread",
  "bevy",
@@ -1259,6 +1260,7 @@ dependencies = [
  "beet_infra",
  "beet_net",
  "beet_router",
+ "beet_scene",
  "blocking",
  "brotli",
  "bytes",
@@ -1315,7 +1317,6 @@ dependencies = [
  "base64 0.22.1",
  "beet_action",
  "beet_core",
- "beet_net",
  "bevy",
  "blocking",
  "bytes",
@@ -1391,9 +1392,14 @@ dependencies = [
 name = "beet_scene"
 version = "0.0.9-dev.16"
 dependencies = [
+ "beet_action",
  "beet_core",
  "beet_net",
+ "beet_scene",
  "bevy",
+ "indexmap 2.14.0",
+ "pulldown-cmark",
+ "serde",
 ]
 
 [[package]]
@@ -1421,6 +1427,7 @@ dependencies = [
  "beet_core",
  "beet_net",
  "beet_router",
+ "beet_scene",
  "beet_thread",
  "beet_ui",
  "bevy",
@@ -1459,7 +1466,6 @@ dependencies = [
  "mermaid-rs-renderer",
  "mermaid-text",
  "postcard",
- "pulldown-cmark",
  "resvg",
  "serde",
  "serde_json",

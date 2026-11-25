@@ -118,6 +118,8 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 
 	/// Settle the freshly built tree so the seeded fields reach their document
 	/// before the first dispatch.
@@ -131,7 +133,7 @@ mod test {
 	fn router_with(markup: &str) -> (World, Entity) {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world.spawn(Router::with_defaults()).flush();
-		let body = SceneBody::parse_bsx(&world, markup).unwrap();
+		let body = BsxParser::body(&world, markup).unwrap();
 		world.spawn(ChildOf(root)).insert_template(body).unwrap();
 		world.flush();
 		settle(&mut world);

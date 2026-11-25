@@ -3,7 +3,7 @@ use crate::prelude::*;
 
 /// The map between a document's **file keys** and the world entities they built
 /// into, retained for the document's lifetime on the loaded root, or on the host
-/// of a [`SceneDocument`](super::SceneDocument).
+/// of a `SceneDocument`, `beet_scene`'s.
 ///
 /// A serialized entity is keyed by an [`EntityKey`], so a first save reads
 /// `"0"`, `"1"`, `"2"`. Stability across an edit comes from this map, not from

@@ -18,7 +18,7 @@ fn main() {
 	let container = {
 		let bytes = MediaBytes::new_bsx(CARD_BSX);
 		let mut entity = bsx_world.spawn_empty();
-		DocParsers::parse(ParseContext::new(&mut entity, &bytes)).unwrap();
+		ParseContext::new(&mut entity, &bytes).parse().unwrap();
 		entity.id()
 	};
 	let bsx_root = bsx_world.entity(container).get::<Children>().unwrap()[0];

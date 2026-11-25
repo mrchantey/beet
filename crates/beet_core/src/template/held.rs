@@ -11,6 +11,8 @@
 use crate::prelude::*;
 use alloc::sync::Arc;
 use bevy::ecs::template::Template;
+#[cfg(feature = "serde")]
+use bevy::ecs::template::TemplateContext;
 use bevy::reflect::CreateTypeData;
 
 /// The erased build a [`HeldTemplate`] holds.
@@ -33,7 +35,7 @@ type BuildFn = Arc<dyn Fn(&mut EntityWorldMut) -> Result + Send + Sync>;
 /// ```
 #[derive(Clone, Default, Reflect)]
 #[reflect(opaque, Default)]
-#[cfg_attr(feature = "template_serde", reflect(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub struct HeldTemplate(HeldKind);
 
 /// What is held.
@@ -45,7 +47,7 @@ enum HeldKind {
 	/// Code, from Rust.
 	Build(BuildFn),
 	/// A scene body, from a document, and the package path it was read from.
-	#[cfg(feature = "template_serde")]
+	#[cfg(feature = "serde")]
 	Body(Arc<SceneBody>, Option<RelPath>),
 }
 
@@ -63,7 +65,7 @@ impl HeldTemplate {
 	}
 
 	/// Build `body` each time this builds.
-	#[cfg(feature = "template_serde")]
+	#[cfg(feature = "serde")]
 	pub fn from_body(body: SceneBody) -> Self {
 		Self(match body.entities.is_empty() {
 			true => HeldKind::Empty,
@@ -72,8 +74,8 @@ impl HeldTemplate {
 	}
 
 	/// Resolve the references of a held body from the document at `document`.
-	#[cfg(feature = "template_serde")]
-	pub(crate) fn set_document(&mut self, document: &RelPath) {
+	#[cfg(feature = "serde")]
+	pub fn set_document(&mut self, document: &RelPath) {
 		if let HeldKind::Body(_, path) = &mut self.0 {
 			*path = Some(document.clone());
 		}
@@ -81,8 +83,8 @@ impl HeldTemplate {
 
 	/// The documents a held body instantiates, package absolute once its own
 	/// document is known.
-	#[cfg(feature = "template_serde")]
-	pub(crate) fn instances(&self) -> Vec<RelPath> {
+	#[cfg(feature = "serde")]
+	pub fn instances(&self) -> Vec<RelPath> {
 		let HeldKind::Body(body, path) = &self.0 else {
 			return Vec::new();
 		};
@@ -104,17 +106,38 @@ impl HeldTemplate {
 		match &self.0 {
 			HeldKind::Empty => Ok(()),
 			HeldKind::Build(func) => func(entity),
-			#[cfg(feature = "template_serde")]
-			HeldKind::Body(body, path) => {
-				let template = match path {
-					Some(path) => body.reflect_at(entity.world(), path),
-					None => body.reflect(entity.world()),
-				}?;
-				entity.insert_template(template).map(|_| ())
-			}
+			#[cfg(feature = "serde")]
+			HeldKind::Body(body, path) => entity
+				.insert_template(HeldBody {
+					body: body.clone(),
+					path: path.clone(),
+				})
+				.map(|_| ()),
 		}
 	}
 }
+
+/// A held body as the document it was written in.
+#[cfg(feature = "serde")]
+#[derive(Clone)]
+struct HeldBody {
+	body: Arc<SceneBody>,
+	path: Option<RelPath>,
+}
+
+#[cfg(feature = "serde")]
+impl Template for HeldBody {
+	type Output = ();
+
+	fn build_template(&self, cx: &mut TemplateContext) -> Result {
+		SceneBodyBuilder::build(&self.body, self.path.as_ref(), cx)
+	}
+
+	fn clone_template(&self) -> Self { self.clone() }
+}
+
+#[cfg(feature = "serde")]
+subtree_template!(HeldBody);
 
 impl core::fmt::Debug for HeldTemplate {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -126,7 +149,7 @@ impl core::fmt::Debug for HeldTemplate {
 }
 
 /// A held body as the body it is; code is not data, so writes an empty one.
-#[cfg(feature = "template_serde")]
+#[cfg(feature = "serde")]
 impl Serialize for HeldTemplate {
 	fn serialize<S: serde::Serializer>(
 		&self,
@@ -139,7 +162,7 @@ impl Serialize for HeldTemplate {
 	}
 }
 
-#[cfg(feature = "template_serde")]
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for HeldTemplate {
 	fn deserialize<D: serde::Deserializer<'de>>(
 		deserializer: D,

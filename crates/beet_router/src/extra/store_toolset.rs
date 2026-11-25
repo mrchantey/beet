@@ -50,6 +50,7 @@ mod test {
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 
 	/// Two toolsets under one router are two routes on each path of one url
 	/// space, which the tree build refuses, naming both entities.
@@ -60,7 +61,7 @@ mod test {
 		world.insert_resource(bevy::ecs::error::FallbackErrorHandler(
 			bevy::ecs::error::warn,
 		));
-		let body = SceneBody::parse_bsx(
+		let body = BsxParser::body(
 			&world,
 			"<Router><StoreToolset/><StoreToolset/></Router>",
 		)

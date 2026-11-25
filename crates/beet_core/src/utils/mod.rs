@@ -30,6 +30,8 @@ pub mod display_ext;
 pub mod env_ext;
 mod file_span;
 mod glob_filter;
+/// HTML vocabulary: element kinds and character references.
+pub mod html_ext;
 mod into_option;
 // LazyPool is built on async_lock (std-only).
 #[cfg(feature = "rand")]

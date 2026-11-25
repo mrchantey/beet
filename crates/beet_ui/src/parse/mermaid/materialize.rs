@@ -223,7 +223,7 @@ pub(super) fn spawn_error(
 #[cfg(all(test, feature = "markdown_parser"))]
 mod test {
 	use super::*;
-	use crate::parse::mermaid::collect::test::parse_md;
+	use crate::parse::mermaid::parser::test::parse_md;
 	use crate::render::CharcellPlugin;
 	use crate::render::FlexBuffer;
 	use beet_net::prelude::*;
@@ -387,7 +387,7 @@ mod test {
 ))]
 mod raster_test {
 	use super::*;
-	use crate::parse::mermaid::collect::test::parse_md;
+	use crate::parse::mermaid::parser::test::parse_md;
 	use crate::render::test_host::TestHost;
 	use bevy::math::UVec2;
 

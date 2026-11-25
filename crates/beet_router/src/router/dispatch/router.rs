@@ -395,6 +395,8 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 	use beet_ui::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
@@ -731,7 +733,7 @@ mod test {
 			]))
 			.flush();
 		// built from markup so the spread takes the real warn-and-skip path.
-		let body = SceneBody::parse_bsx(
+		let body = BsxParser::body(
 			&world,
 			r#"<Route path="deploy" {NotRegistered}/>"#,
 		)

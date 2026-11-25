@@ -8,6 +8,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_scene::prelude::*;
 use beet_ui::prelude::*;
 use bevy::reflect::TypeRegistry;
 use proc_macro2::Span;
@@ -116,8 +117,7 @@ impl RouteCollection {
 		// through and the one type it reads out of those declarations (a `slug`
 		// renaming the emitted route) are built here; the rest resolve against
 		// the app registry when the emitted route spawns.
-		let parsers = ParsePlugin::parsers()
-			.with_metadata_type(FrontmatterType::default().component);
+		let parsers = ParsePlugin::parsers();
 		let mut registry = TypeRegistry::default();
 		registry.register::<RouteMeta>();
 
@@ -154,6 +154,7 @@ impl RouteCollection {
 					// drafts), through the same parsers `RoutesDir` discovery reads
 					let mut declarations = parsers.root_components(
 						&store.get_media(&store_path).await?,
+						Some(&store_path),
 					)?;
 					RouteMeta::declare_file_defaults(
 						&mut declarations,
@@ -161,9 +162,10 @@ impl RouteCollection {
 					);
 					// the frontmatter has the last word on the url, exactly as it
 					// does in `RoutesDir` discovery
-					let route_path = match declarations
-						.get_reflect::<RouteMeta>(&registry)?
-					{
+					let route_path = match BodyComponents::get::<RouteMeta>(
+						&declarations,
+						&registry,
+					)? {
 						Some(meta) => meta.apply_slug(&route_path)?,
 						None => route_path,
 					};

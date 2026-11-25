@@ -20,6 +20,7 @@ use crate::style::common_props::BackgroundColor;
 use crate::style::common_props::FontSize;
 use crate::style::material::colors;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 use bevy::reflect::FromReflect;
 use bevy::reflect::TypeRegistry;
 use bevy::reflect::Typed;

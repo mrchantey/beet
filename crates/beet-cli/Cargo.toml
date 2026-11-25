@@ -177,7 +177,7 @@ web_min = ["web"]
 # `beet-ui.wasm`, the editor middle: the browser binary plus the scripting seam
 # (`beet/scripting`: the engine-agnostic `Script` and the `bx:on<event>` runner),
 # so a page edits its own scene and its event scripts run in the tab. The editor
-# itself (`beet_ui`'s `template`/`style`/`template_serde` widgets, `beet_net`'s
+# itself (`beet_ui`'s `template`/`style`/`scene` widgets, `beet_net`'s
 # `SceneBlob`) already rides `web`, since the base `beet` dep below carries those
 # features on every target; what `web_min` lacks is behaviour behind a `bx:onclick`.
 # No engine: scripts run through the iframe backend, the sandbox the browser
@@ -241,7 +241,7 @@ beet = { workspace = true, features = [
 	# the atproto data model, so every build serves and checks the
 	# standard.site records and the `<AtprotoAccount/>` declarations
 	"dag_cbor",
-	"template_serde",
+	"scene",
 	"markdown",
 	"style",
 	"template",
@@ -288,7 +288,7 @@ image = { workspace = true, optional = true, features = ["png"] }
 # (both the standalone `beet` binary and the Cloudflare Worker): `beet/router` is
 # the cross-platform render/server stack the cloudflare build already proves
 # wasm-clean, and cargo merges these features with the base `beet` dep, so the wasm
-# bin gets json/template_serde/markdown/style/template/serde_plain *plus* router.
+# bin gets json/scene/markdown/style/template/serde_plain *plus* router.
 # The Workers SDK + a panic hook stay optional, pulled only by the `cloudflare`
 # feature; the standalone binary uses `console_error_panic_hook` directly so it is
 # not optional here.

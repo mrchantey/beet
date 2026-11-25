@@ -265,9 +265,7 @@ mod test {
 			[Nsid::new_static("com.example.a")]
 				.into_iter()
 				// the built-in, installed with the scene serializer
-				.chain(
-					cfg!(feature = "template_serde").then_some(SceneBody::NSID),
-				)
+				.chain(cfg!(feature = "scene").then_some(SceneBody::NSID))
 				.collect::<Vec<_>>(),
 		);
 	}

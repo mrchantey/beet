@@ -133,6 +133,8 @@ fn materialize(
 mod test {
 	use super::*;
 	use crate::style::common_props::DiagramRenderProp;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 
 	/// Build `bsx` under a fresh root in a styled world, settling any read.
 	async fn spawn(store: Option<BlobStore>, bsx: &str) -> (World, Entity) {
@@ -141,10 +143,11 @@ mod test {
 		if let Some(store) = store {
 			world.entity_mut(root).insert(store);
 		}
-		DocParsers::parse(ParseContext::new(
+		ParseContext::new(
 			&mut world.entity_mut(root),
 			&MediaBytes::new_bsx(bsx),
-		))
+		)
+		.parse()
 		.unwrap();
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		(world, root)
@@ -244,13 +247,12 @@ mod test {
 		let mut world = (AsyncPlugin, CharcellPlugin).into_world();
 		let root = world.spawn(BlobStore::new(FsStore::new(routes))).id();
 		// the diagrams are post-parse passes, which the media parse runs
-		DocParsers::parse(
-			ParseContext::new(
-				&mut world.entity_mut(root),
-				&MediaBytes::new_markdown(&md),
-			)
-			.with_path(RelPath::new("docs/design/diagrams.md")),
+		ParseContext::new(
+			&mut world.entity_mut(root),
+			&MediaBytes::new_markdown(&md),
 		)
+		.with_path(RelPath::new("docs/design/diagrams.md"))
+		.parse()
 		.unwrap();
 		// the include reads its file off a task
 		AsyncRunner::settle_async_tasks(&mut world).await;
@@ -327,12 +329,13 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(StylePlugin);
 		let root = app.world_mut().spawn_empty().id();
-		DocParsers::parse(ParseContext::new(
+		ParseContext::new(
 			&mut app.world_mut().entity_mut(root),
 			&MediaBytes::new_markdown(
 				"# Flow\n\n<Mermaid render=\"Text\">graph LR; A --> B</Mermaid>\n",
 			),
-		))
+		)
+		.parse()
 		.unwrap();
 		let world = app.world_mut();
 		let figure = world.entity(root).get::<Children>().unwrap()[1];

@@ -23,8 +23,8 @@ pub struct HtmlRenderer {
 	/// Current indentation depth, used with `indent`.
 	current_depth: usize,
 	/// When `true`, escape special characters in text content and
-	/// attribute values using [`escape_html_text`] and
-	/// [`escape_html_attribute`] respectively.
+	/// attribute values using [`html_ext::escape_text`] and
+	/// [`html_ext::escape_attribute`] respectively.
 	escape_html: bool,
 	/// When `true` (the default), authoring comments (`<!-- note -->`) are
 	/// stripped so they never leak into rendered output. Functional `bx`-prefixed
@@ -71,11 +71,13 @@ impl HtmlRenderer {
 			buffer: String::new(),
 			head_hoist: Vec::new(),
 			indent: None,
-			void_elements: element_names(VOID_ELEMENTS),
+			void_elements: html_ext::element_names(html_ext::VOID_ELEMENTS),
 			current_depth: 0,
 			escape_html: true,
 			strip_comments: true,
-			raw_text_elements: element_names(RAW_TEXT_ELEMENTS),
+			raw_text_elements: html_ext::element_names(
+				html_ext::RAW_TEXT_ELEMENTS,
+			),
 			in_raw_text_element: false,
 			select_value: None,
 		}
@@ -150,7 +152,9 @@ impl HtmlRenderer {
 		if let Some(value) = value {
 			self.buffer.push_str("=\"");
 			match self.escape_html {
-				true => self.buffer.push_str(&escape_html_attribute(value)),
+				true => {
+					self.buffer.push_str(&html_ext::escape_attribute(value))
+				}
 				false => self.buffer.push_str(value),
 			}
 			self.buffer.push('"');
@@ -336,7 +340,7 @@ impl NodeVisitor for HtmlRenderer {
 		}
 		let raw = value.to_string();
 		if self.escape_html && !self.in_raw_text_element {
-			self.buffer.push_str(&escape_html_text(&raw));
+			self.buffer.push_str(&html_ext::escape_text(&raw));
 		} else {
 			self.buffer.push_str(&raw);
 		}
@@ -376,6 +380,8 @@ impl Installer for HtmlRenderer {
 mod test {
 	use super::*;
 	use beet_net::prelude::*;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 
 	/// Render the tree at `root` with `renderer`, answering a default request.
 	fn render_with(
@@ -393,48 +399,46 @@ mod test {
 			.to_string()
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	/// Parse HTML (via the BSX parser's HTML mode) into a world, returning the
 	/// root entity ready to render.
 	fn parse_html(html: &str) -> (World, Entity) {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
-		DocParsers::parse(ParseContext::new(
-			&mut world.entity_mut(entity),
-			&bytes,
-		))
-		.unwrap();
+		ParseContext::new(&mut world.entity_mut(entity), &bytes)
+			.parse()
+			.unwrap();
 		(world, entity)
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	/// Parse HTML then render it back with the given renderer.
 	fn roundtrip_with(html: &str, renderer: HtmlRenderer) -> String {
 		let (mut world, entity) = parse_html(html);
 		render_with(&mut world, entity, renderer)
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	/// Parse HTML then render it back.
 	fn roundtrip(html: &str) -> String {
 		roundtrip_with(html, HtmlRenderer::new())
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn render_simple_element() {
 		roundtrip("<div>hello</div>").xpect_eq("<div>hello</div>".to_string());
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn render_nested_elements() {
 		roundtrip("<div><span>inner</span></div>")
 			.xpect_eq("<div><span>inner</span></div>".to_string());
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn render_void_element() {
 		roundtrip("<div><br>text</div>")
@@ -443,7 +447,7 @@ mod test {
 
 	/// A void element, having no close tag, leaves its siblings at its own
 	/// depth.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn pretty_void_element_keeps_its_depth() {
 		roundtrip_with(
@@ -453,33 +457,33 @@ mod test {
 		.xpect_eq("<div>\n\t<hr />\n\t<p>\n\t\tafter\n\t</p>\n</div>\n");
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn strips_plain_comment() {
 		// authoring comments are stripped so they never leak into rendered HTML
 		roundtrip("<!-- hello -->").xpect_eq(String::new());
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn keeps_bx_comment() {
 		// functional `bx`-prefixed anchors survive
 		roundtrip("<!--bx-ref-->").xpect_eq("<!--bx-ref-->".to_string());
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn render_doctype() {
 		roundtrip("<!DOCTYPE html>").xpect_eq("<!DOCTYPE html>".to_string());
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn render_text_only() {
 		roundtrip("hello world").xpect_eq("hello world".to_string());
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn render_attributes() {
 		roundtrip("<div class=\"foo\" id=\"bar\"></div>")
@@ -487,7 +491,7 @@ mod test {
 			.xpect_contains("id=\"bar\"");
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn render_self_closing() {
 		roundtrip("<img src=\"foo.png\" />")
@@ -495,7 +499,7 @@ mod test {
 			.xpect_contains("/>");
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn caller_hoists_into_head() {
 		// a contributor pushes a <meta> that must land inside <head>, before
@@ -513,7 +517,7 @@ mod test {
 		.xpect_contains("<meta name=\"x\" content=\"y\">");
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn head_hoist_falls_back_with_no_head() {
 		// a fragment with no <head> never hits the in-walk drain, so the hoisted
@@ -540,7 +544,7 @@ mod test {
 	/// the tag: an `<input>`'s default value, a `<select>`'s marked option, a
 	/// `<textarea>`'s content, and a checkbox's `checked`, which its value
 	/// decides over the authored attribute.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn a_control_value_is_markup() {
 		let mut world = world_ext::ui_world();
@@ -615,7 +619,7 @@ mod test {
 			.xpect_contains("&amp;");
 	}
 
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn roundtrip_script_raw_text() {
 		// Parsing and re-rendering script content should preserve raw text.
