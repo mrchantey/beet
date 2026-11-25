@@ -1,13 +1,25 @@
-//! A block whose resource is a blob store, and the erased half every consumer
-//! of "the store, whichever kind" reads.
+//! A block whose resource is a store, of blobs or of rows, and the erased half
+//! every consumer of "the store, whichever provider" reads.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use std::sync::Arc;
 
-/// A [`Block`] whose resource is a blob store: a bucket the deploy creates, or
-/// a [`StoreUriBlock`] naming one it does not. What every store block shares
+/// Which kind of store a [`StoreBlock`] declares, so a uri naming either (a
+/// database file) attaches the one that was declared.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
+#[reflect(Default)]
+pub enum StoreKind {
+	/// Bytes, a [`BlobStore`].
+	#[default]
+	Blob,
+	/// Rows, a [`TableStore`].
+	Table,
+}
+
+/// A [`Block`] whose resource is a store: a bucket or a table the deploy
+/// creates, or a [`StoreUriBlock`] naming one it does not. What every store block shares
 /// is where a process reads it, a [`StoreUri`], and whether each deploy
 /// publishes under its own id; [`ErasedStoreBlock`] projects exactly that, so
 /// the consumers that want "the store" rather than "the bucket" (the repo
@@ -20,6 +32,9 @@ pub trait StoreBlock: Block {
 	/// the stack declares no address the uri needs (a bucket's region), so a
 	/// declaration never lands a store the deploy would not have created.
 	fn store_uri(&self, stack: &ResolvedStack) -> Result<StoreUri>;
+
+	/// The kind of store this declares, bytes by default.
+	fn kind(&self) -> StoreKind { StoreKind::Blob }
 
 	/// Whether every deploy publishes under its own id below the root, so a
 	/// process reads the document version it shipped with: the window between
@@ -57,6 +72,8 @@ pub struct ErasedStoreBlock {
 	/// ([`ServiceAccess::local_store_uri`]), keyed by the composed resource
 	/// name so it is exactly as distinct per app and stage as the root.
 	local: StoreUri,
+	/// See [`StoreBlock::kind`].
+	kind: StoreKind,
 	/// See [`StoreBlock::deploy_versioned`].
 	deploy_versioned: bool,
 	/// See [`StoreBlock::storage_class`].
@@ -72,6 +89,7 @@ impl PartialEq for ErasedStoreBlock {
 	fn eq(&self, other: &Self) -> bool {
 		self.root == other.root
 			&& self.local == other.local
+			&& self.kind == other.kind
 			&& self.deploy_versioned == other.deploy_versioned
 			&& self.storage_class == other.storage_class
 	}
@@ -89,6 +107,7 @@ impl ErasedStoreBlock {
 			local: ServiceAccess::local_store_uri(
 				&stack.resource_name(block.label().clone()),
 			),
+			kind: block.kind(),
 			deploy_versioned: block.deploy_versioned(),
 			storage_class: block.storage_class(),
 			declared: Reproject(Arc::new(move |stack| {
@@ -126,9 +145,11 @@ impl ErasedStoreBlock {
 	/// The store a process running under `access` attaches for this
 	/// declaration: [`Remote`](ServiceAccess::Remote) reads
 	/// [`store_uri`](Self::store_uri), exactly the uri a deploy bakes;
-	/// [`Local`](ServiceAccess::Local) reads the host's stand-in. The ONE place
-	/// the two-way choice is made, so a declaration runs both ways without any
-	/// consumer knowing there are two.
+	/// [`Local`](ServiceAccess::Local) reads the host's stand-in, a table's a
+	/// [`JsonTableStore`] over it. The ONE place the two-way choice is made, so
+	/// a declaration runs both ways without any consumer knowing there are two;
+	/// an exact store (`<S3Store/>`, `--repo=s3://..`) never chooses, and a
+	/// [`StoreSync`] end is the remote root whatever the launch's access.
 	pub fn runtime_uri(
 		&self,
 		access: ServiceAccess,
@@ -182,10 +203,11 @@ impl ErasedStoreBlock {
 
 /// Observer: attach the runtime meaning of a declared store, the concrete
 /// provider the declaration's [`ErasedStoreBlock::runtime_uri`] names under
-/// this launch's [`ServiceAccess`], built through [`StoreProvider::from_uri`]
-/// on every target: a store kind this build has no backend for errors with
-/// guidance here rather than silently carrying no store. The provider's own
-/// hook lands the erased [`BlobStore`] (and table) beside it.
+/// this launch's [`ServiceAccess`], as the [`StoreKind`] it declares and that
+/// one alone, so a table over a blob uri lands no [`BlobStore`]. Built through
+/// [`StoreProvider::from_uri`] or [`TableStoreProvider::from_uri`] on every
+/// target: a store kind this build has no backend for errors with guidance
+/// here rather than silently carrying no store.
 ///
 /// Registered by [`InfraPlugin`] rather than hooked on the component, and on
 /// the erased half rather than a block type, so a store block defined anywhere
@@ -206,7 +228,14 @@ pub(crate) fn attach_store(
 				BootstrapConfig::get().service_access,
 				Some(&deploy_id),
 			);
-			StoreProvider::from_uri(&uri)?.insert(&mut entity);
+			match store.kind {
+				StoreKind::Blob => {
+					StoreProvider::from_uri(&uri)?.insert(&mut entity)
+				}
+				StoreKind::Table => {
+					TableStoreProvider::from_uri(&uri)?.insert(&mut entity)
+				}
+			}
 			Ok(())
 		});
 }
@@ -269,6 +298,30 @@ mod test {
 			ServiceAccess::local_store_dir("app--prod--docs").into_abs(),
 		);
 		world.get::<BlobStore>(entity).xpect_some();
+		world.get::<TableStore>(entity).xpect_none();
+	}
+
+	/// A declaration lands the kind it declares and no other, whatever the uri
+	/// could also be: a table's local form is json files, its blob store never
+	/// on the entity.
+	#[beet_core::test]
+	fn attaches_the_declared_kind() {
+		let mut world = InfraPlugin.into_world();
+		world.init_resource::<PackageConfig>();
+		let uri = || StoreUri::parse("memory://declared-kind").unwrap();
+		let table = spawn_store(
+			&mut world,
+			StoreUriBlock::new("rows", uri()).with_kind(StoreKind::Table),
+		);
+		world.flush();
+		world
+			.get::<TableStore>(table)
+			.unwrap()
+			.describe()
+			.xpect_contains("json:")
+			.xpect_contains("app--prod--rows");
+		world.get::<BlobStore>(table).xpect_none();
+		world.get::<FsStore>(table).xpect_none();
 	}
 
 	/// The two-way choice lives on the erased half: remote is the declared

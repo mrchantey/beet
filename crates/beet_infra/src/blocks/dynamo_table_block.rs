@@ -18,9 +18,9 @@ use beet_net::prelude::*;
 /// carries only its `label`, and the `<app>--<stage>--<label>` name composes at
 /// resolution through the ancestor [`Stack`]. The deploy creates the table from
 /// that name, and as a [`StoreBlock`] its erased root is the `dynamo://` uri
-/// of the same name, so the one runtime attach lands a [`DynamoStore`] (its
-/// hook a table-native `TableStore`) remotely and the host's local stand-in
-/// locally: one declaration and nothing to keep in agreement.
+/// of the same name, so the one runtime attach lands a [`DynamoStore`] remotely
+/// and a [`JsonTableStore`] over the host's local stand-in locally, rows alone
+/// either way: one declaration and nothing to keep in agreement.
 ///
 /// Authored directly from markup, ie
 /// `<DynamoTableBlock bx:ref="analytics" label="analytics"/>`.
@@ -66,12 +66,13 @@ impl DynamoTableBlock {
 }
 
 impl StoreBlock for DynamoTableBlock {
+	fn kind(&self) -> StoreKind { StoreKind::Table }
+
 	/// The composed table name pinned to the stack's declared region, so the
 	/// process a deploy hands it to reaches the table the deploy created.
 	fn store_uri(&self, stack: &ResolvedStack) -> Result<StoreUri> {
 		StoreUri::Dynamo {
 			name: self.table_name(stack).into(),
-			path_prefix: None,
 			region: Some(stack.aws_region()?.clone()),
 		}
 		.xok()

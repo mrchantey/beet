@@ -88,7 +88,7 @@ pub struct S3BucketBlock {
 	/// once here and read both ways: the deploy renders a day-zero transition
 	/// (or the class's minimum, for the infrequent-access classes) that moves
 	/// every object already in the bucket in place, no re-upload, and a
-	/// [`DirSync`] push lands new objects there directly. Current versions
+	/// [`StoreSync`] into it lands new objects there directly. Current versions
 	/// only: a noncurrent version expiring inside the class's minimum duration
 	/// would be billed for the whole of it, more than its days at Standard.
 	storage_class: S3StorageClass,

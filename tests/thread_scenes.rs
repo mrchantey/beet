@@ -141,20 +141,26 @@ fn record_counts(app: &mut App) -> (usize, usize) {
 	(records.actors().len(), records.content_posts().count())
 }
 
+/// Declare one temp table store on every thread mounting one, nearer than the
+/// one its example declares, which is on disk, answering those threads.
+fn declare_temp_tables(app: &mut App) -> Vec<Entity> {
+	let tables = TableStore::temp();
+	let threads = app
+		.world_mut()
+		.query_filtered_once::<Entity, With<MountThreadStore>>()
+		.into_iter()
+		.collect::<Vec<_>>();
+	for thread in &threads {
+		app.world_mut().entity_mut(*thread).insert(tables.clone());
+	}
+	threads
+}
+
 /// Enter every thread mounting a store, over a temp store, as its start
 /// would: a mounted thread reduces once its entry knows whether it creates
 /// its thread.
 async fn enter_mounted(app: &mut App) {
-	let threads = app
-		.world_mut()
-		.query_filtered::<Entity, With<MountThreadStore>>()
-		.iter(app.world())
-		.collect::<Vec<_>>();
-	for thread in &threads {
-		app.world_mut()
-			.entity_mut(*thread)
-			.insert(InMemoryStore::new());
-	}
+	let threads = declare_temp_tables(app);
 	app.world_mut()
 		.run_async_local_then(async move |world: AsyncWorld| -> Result {
 			for thread in threads {
@@ -276,18 +282,13 @@ async fn persistent_chat_scene_reduces() {
 }
 
 /// Enter every mounted thread one after the other, as one `RunThread` would,
-/// over one store at the scene's root, so the second window finds the thread
-/// the first created.
+/// over one store at each, so the second window finds the thread the first
+/// created.
 #[beet::test]
 async fn group_chat_scene_opens_two_windows() {
 	let mut app =
 		reduce(include_str!("../examples/thread/group_chat.bsx")).await;
-	let root = app
-		.world_mut()
-		.query_filtered_once::<Entity, With<TuiServer>>()[0];
-	app.world_mut()
-		.entity_mut(root)
-		.insert(InMemoryStore::new());
+	declare_temp_tables(&mut app);
 	let holder = app
 		.world_mut()
 		.query_filtered_once::<Entity, With<RunThread>>()[0];

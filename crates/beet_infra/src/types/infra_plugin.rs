@@ -75,9 +75,8 @@ impl Plugin for InfraPlugin {
 		// the blocks a beet *application* declares (the bucket it is served from,
 		// the stores it records to), so `<S3BucketBlock label="app"/>` and
 		// `<DynamoTableBlock label="events"/>` spawn by tag in any build
-		// carrying their default-on binding features. The site's own analytics
-		// are blob-backed, so its stores are buckets; a workload wanting
-		// indexed queries declares the table instead.
+		// carrying their default-on binding features: a bucket for bytes, a
+		// table for rows.
 		#[cfg(feature = "bindings_aws_common")]
 		app.register_type::<crate::prelude::S3BucketBlock>()
 			.add_systems(
@@ -476,27 +475,14 @@ impl Plugin for InfraPlugin {
 				crate::prelude::MtaStsPolicyHost,
 			)>();
 
-		// the bucket sync settings (`{SyncS3Bucket{delete:true}}`), the direction
-		// enum a markup attribute names by variant, and the `<DirSync>` front-end
-		// that binds a local dir to a bucket by label.
-		#[cfg(all(
-			feature = "deploy",
-			feature = "aws",
-			not(target_arch = "wasm32")
-		))]
-		app.register_type::<crate::prelude::SyncS3Bucket>()
-			.register_type::<crate::prelude::SyncDirection>()
-			.register_type::<crate::prelude::DirSync>()
-			.add_observer(crate::actions::attach_dir_sync_store);
-
 		// publishing the document: the assemble composing it, the mirror of
 		// the assembled copy into the repo store, the borrowed-paths copy
 		// (`<DirCopy src=".." dest=".." paths=".."/>`) and the derived files
 		// (`<Derive/>`) the assemble hosts, the wasm runtime a deploy builds
-		// before publishing it (`<WasmRuntime/>`), the store-to-store mirror
-		// (`<StoreSync src=".." dest=".."/>`), and the retention window over
-		// the versions the store holds. Plain fs and `BlobStore` work, so
-		// none needs a cloud backend.
+		// before publishing it (`<WasmRuntime/>`), the one sync between any two
+		// stores (`<StoreSync src=".." dest={$bucket}/>`), and the retention
+		// window over the versions the store holds. Plain fs and `BlobStore`
+		// work, so none needs a cloud backend.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 		app.register_type::<crate::prelude::RepoAssemble>()
 			.register_type::<crate::prelude::RepoSync>()
@@ -764,27 +750,30 @@ mod test {
 			.xpect_eq(ZoneAuditScope::Zone);
 	}
 
-	/// A store mirror authors both ends as strings coerced to `StoreUri`, and
+	/// A sync authors each end as a uri or as a reference to a declaration, and
 	/// both are required, so a half-written tag errors at call rather than
 	/// syncing the cwd onto itself; a `~` end is the home directory at parse.
 	#[beet_core::test]
 	fn the_store_sync_spawns_by_tag() {
 		let mut world = spawn(
-			r#"<StoreSync src="fs:~/.claude/projects" dest="fs:store/claude-code"/>"#,
+			r#"<Fragment>
+				<FsStore bx:ref="store" path="store"/>
+				<StoreSync src="fs:~/.claude/projects" dest={$store} delete=true filter={{exclude:["*/blobs/*"]}}/>
+			</Fragment>"#,
 		);
+		let store = world.query_filtered_once::<Entity, With<FsStore>>()[0];
 		let sync = world.query::<&StoreSync>().single(&world).unwrap();
 		let home = env_ext::var("HOME").unwrap();
-		sync.src
-			.as_ref()
-			.unwrap()
-			.to_string()
-			.xpect_eq(format!("fs:{home}/.claude/projects"));
-		sync.dest
-			.as_ref()
-			.unwrap()
-			.to_string()
-			.xpect_eq("fs:store/claude-code");
-		sync.delete.xpect_false();
+		sync.src.clone().xpect_eq(Some(StoreEnd::Uri(
+			StoreUri::parse(&format!("fs:{home}/.claude/projects")).unwrap(),
+		)));
+		sync.dest.clone().xpect_eq(Some(StoreEnd::Store(store)));
+		sync.delete.xpect_true();
+		sync.filter
+			.clone()
+			.xpect_eq(GlobFilter::default().with_exclude("*/blobs/*"));
+		sync.anonymous.xpect_false();
+		sync.follow_symlinks.xpect_false();
 	}
 
 	/// The cold copy authors as one bucket tag beside the box that names it,

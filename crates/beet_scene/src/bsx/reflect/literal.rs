@@ -102,7 +102,9 @@ impl DataLiteral {
 			DataLiteral::Enum(named) => {
 				enum_to_reflect(named, field_info, registry, resolver)
 			}
-			DataLiteral::EntityRef(name) => Ok(Box::new(resolver(name))),
+			DataLiteral::EntityRef(name) => {
+				entity_ref_to_reflect(name, field_info, resolver)
+			}
 			DataLiteral::Binding(_) => bevybail!(
 				"an `@` binding has no value to author a field from: only an \
 				`Instance`'s props take one"
@@ -185,6 +187,33 @@ fn named_shape(
 		_ => return None,
 	};
 	Some(DataLiteral::Enum(NamedLiteral { name, fields }))
+}
+
+/// Resolve a `$name` to the entity a field holds, or against an enum with one
+/// variant holding an [`Entity`], to that variant: a field that takes either a
+/// value or a reference to a declaration authors both bare, ie
+/// `<StoreSync src="fs:site/assets" dest={$assets}/>`.
+fn entity_ref_to_reflect(
+	name: &str,
+	field_info: Option<&'static TypeInfo>,
+	resolver: EntityResolver,
+) -> Result<Box<dyn PartialReflect>> {
+	let Some(TypeInfo::Enum(info)) = field_info else {
+		return Ok(Box::new(resolver(name)));
+	};
+	match entity_variant(info) {
+		Some(variant) => Ok(newtype_variant(
+			variant,
+			field_info,
+			Box::new(resolver(name)),
+		)),
+		// a bare entity would miss in `from_reflect` and leave the default
+		None => bevybail!(
+			"`${name}` names no one variant of `{}` holding an entity: write \
+			 the variant, ie `Variant(${name})`",
+			info.type_path()
+		),
+	}
 }
 
 /// Whether a literal already names an `Option` variant (`Some`/`None`).
@@ -356,7 +385,7 @@ mod test {
 			filter: GlobFilter::default().with_exclude("blog/**"),
 		});
 		// ..and unnamed, the form a colocated field spread authors
-		// (`{SyncS3Bucket{filter:{exclude:["*/blobs/*"]}}}`)
+		// (`{StoreSync{filter:{exclude:["*/blobs/*"]}}}`)
 		resolve::<Discovery>(DataLiteral::Struct(vec![(
 			"filter".into(),
 			DataLiteral::Struct(vec![(
@@ -413,7 +442,7 @@ mod test {
 	/// A struct literal naming a field the target does not have is an error
 	/// naming both, never a value that quietly drops it: a declaration written
 	/// against a field that has since moved must fail rather than do something
-	/// else (`{SyncS3Bucket{paths:".."}}` once synced a whole checkout).
+	/// else (a sync's `paths:".."` once synced a whole checkout).
 	#[beet_core::test]
 	fn an_unknown_field_is_refused() {
 		#[derive(Reflect, PartialEq, Debug, Default)]
@@ -1117,5 +1146,100 @@ mod test {
 			fields: NamedFields::Unit,
 		}))
 		.xpect_eq(Emphasis::High);
+	}
+
+	/// An enum holding a value or an entity takes both bare: a string its one
+	/// valued variant parses, and a `$name` its one entity variant, so a field
+	/// naming a store by uri or by declaration is one field.
+	#[beet_core::test]
+	fn authors_a_value_or_a_reference_bare() {
+		#[derive(Reflect, PartialEq, Debug)]
+		enum End {
+			Uri(StoreUri),
+			Store(Entity),
+		}
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Sync {
+			src: Option<End>,
+			dest: Option<End>,
+		}
+		let mut world = World::new();
+		let declared = world.spawn_empty().id();
+		let registry = TypeRegistry::default();
+		let mut resolver = |name: &str| {
+			name.xpect_eq("assets");
+			declared
+		};
+		let build =
+			|src: DataLiteral, dest: DataLiteral, resolver: EntityResolver| {
+				DataLiteral::to_reflect(
+					&DataLiteral::Enum(NamedLiteral {
+						name: "Sync".into(),
+						fields: NamedFields::Struct(vec![
+							("src".into(), src),
+							("dest".into(), dest),
+						]),
+					}),
+					Some(Sync::type_info()),
+					&registry,
+					resolver,
+				)
+			};
+		let string = |text: &str| DataLiteral::Scalar(Value::str(text));
+		let reference = || DataLiteral::EntityRef("assets".into());
+		let expected = Sync {
+			src: Some(End::Uri(StoreUri::parse("fs:site/assets").unwrap())),
+			dest: Some(End::Store(declared)),
+		};
+		build(string("fs:site/assets"), reference(), &mut resolver)
+			.unwrap()
+			.xmap(|reflected| Sync::from_reflect(reflected.as_ref()).unwrap())
+			.xpect_eq(expected);
+		// the variant spelled out is the same value
+		let named = DataLiteral::Enum(NamedLiteral {
+			name: "End::Store".into(),
+			fields: NamedFields::Tuple(vec![reference()]),
+		});
+		build(named, reference(), &mut resolver)
+			.unwrap()
+			.xmap(|reflected| Sync::from_reflect(reflected.as_ref()).unwrap())
+			.xpect_eq(Sync {
+				src: Some(End::Store(declared)),
+				dest: Some(End::Store(declared)),
+			});
+		// a malformed value is the parser's own error
+		build(string("nope"), reference(), &mut resolver)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("unknown store `nope`");
+	}
+
+	/// An enum that cannot tell which variant a bare reference or string is
+	/// says so, rather than keeping the field's default.
+	#[beet_core::test]
+	fn an_ambiguous_reference_is_refused() {
+		#[derive(Reflect, PartialEq, Debug)]
+		enum Both {
+			From(Entity),
+			To(Entity),
+		}
+		#[derive(Reflect, PartialEq, Debug)]
+		enum Plain {
+			Uri(StoreUri),
+		}
+		for info in [Both::type_info(), Plain::type_info()] {
+			DataLiteral::to_reflect(
+				&DataLiteral::EntityRef("assets".into()),
+				Some(info),
+				&TypeRegistry::default(),
+				&mut |_: &str| Entity::PLACEHOLDER,
+			)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("Variant($assets)");
+		}
+		// a string still names a variant of an enum holding no entity
+		resolve_err::<Plain>(DataLiteral::Scalar(Value::str("fs:site")))
+			.xpect_contains("names no unit variant");
 	}
 }

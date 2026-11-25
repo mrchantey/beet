@@ -81,6 +81,27 @@ impl StoreFork {
 	pub fn upstream(&self) -> &BlobStore { &self.upstream }
 }
 
+impl StoreBackend for StoreFork {
+	fn id(&self) -> &'static str { "fork" }
+
+	fn describe(&self) -> String { self.root_key().to_string() }
+
+	fn region(&self) -> Option<String> { self.upstream.region() }
+
+	/// The upstream is the store; the local half is created on demand.
+	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
+		self.upstream.store_exists()
+	}
+
+	fn store_create(&self) -> SendBoxedFuture<Result> {
+		self.local.store_create()
+	}
+
+	fn store_remove(&self) -> SendBoxedFuture<Result> {
+		self.local.store_remove()
+	}
+}
+
 impl BlobStoreProvider for StoreFork {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
@@ -133,8 +154,6 @@ impl BlobStoreProvider for StoreFork {
 			.xok()
 	}
 
-	fn id(&self) -> &'static str { "fork" }
-
 	fn root_key(&self) -> SmolStr {
 		format!(
 			"fork:{}+{}",
@@ -170,21 +189,6 @@ impl BlobStoreProvider for StoreFork {
 			&& self.subdir().join(path) == event.root_relative_path())
 			|| self.local.matches_object(event, path)
 			|| self.upstream.matches_object(event, path)
-	}
-
-	fn region(&self) -> Option<String> { self.upstream.region() }
-
-	/// The upstream is the store; the local half is created on demand.
-	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
-		self.upstream.store_exists()
-	}
-
-	fn store_create(&self) -> SendBoxedFuture<Result> {
-		self.local.store_create()
-	}
-
-	fn store_remove(&self) -> SendBoxedFuture<Result> {
-		self.local.store_remove()
 	}
 
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {

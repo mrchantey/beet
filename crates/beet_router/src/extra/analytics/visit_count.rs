@@ -110,7 +110,7 @@ mod test {
 
 	/// A router recording analytics to `store`, its home page holding the
 	/// count in an island, and the island route.
-	fn site(store: InMemoryStore) -> (World, Entity) {
+	fn site(store: TableStore) -> (World, Entity) {
 		let mut world = App::new()
 			.with_plugins((AsyncPlugin, RouterPlugin))
 			.world_mut()
@@ -139,9 +139,8 @@ mod test {
 	/// of the rest, and is worded as visits.
 	#[beet_core::test]
 	async fn counts_rollups_and_raw_events() {
-		let store = InMemoryStore::new();
-		let analytics =
-			AnalyticsStore::new(TableStore::new(BlobStore::new(store.clone())));
+		let store = TableStore::temp();
+		let analytics = AnalyticsStore::new(store.clone());
 		// two visits today, one of them reading two pages
 		let (left, right) = (uuid_ext::now_v7(), uuid_ext::now_v7());
 		for event in [view(left, 0), view(left, 0), view(right, 0)] {
@@ -172,7 +171,7 @@ mod test {
 	/// declaration it needs.
 	#[beet_core::test]
 	async fn needs_an_analytics_config() {
-		let (mut world, router) = site(InMemoryStore::new());
+		let (mut world, router) = site(TableStore::temp());
 		world.entity_mut(router).remove::<AnalyticsConfig>();
 		world
 			.entity_mut(router)

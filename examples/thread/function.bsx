@@ -9,8 +9,8 @@ through the one binary:
 `{ThreadRoute}` builds `templates/ReviewThread.bsx` for each request, enters the
 thread its store path names, posts `message` with `{document}` filled from the
 request, runs the thread to its outcome and answers the reviewer's last text. The
-threads are rows keyed under `reviews/`, in the `thread*` directories beside this
-file, so a second review of a document continues its thread.
+threads are rows keyed under `reviews/`, in the json file under `target/reviews` that
+`{JsonTableStore}` keeps, so a second review of a document continues its thread.
 
 The reviewer's one tool is `<RouteTool path="read-blob"/>`, the `read-blob` route of
 this url space, forwarded to as a call of the agent's own.
@@ -19,6 +19,8 @@ this url space, forwarded to as a call of the agent's own.
 	<RequireCfg cfg="feature:thread"/>
 	<Router {HelpHandler}>
 		<StoreToolset read_only=true/>
-		<Route path="review/:document" {ThreadRoute{source:Document("templates/ReviewThread.bsx"), message:"Review the document {document}."}}/>
+		<FsStore path="target/reviews" {JsonTableStore}>
+			<Route path="review/:document" {ThreadRoute{source:Document("templates/ReviewThread.bsx"), message:"Review the document {document}."}}/>
+		</FsStore>
 	</Router>
 </CallOnReady>

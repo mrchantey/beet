@@ -1,40 +1,31 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bytes::Bytes;
 use rusqlite::Connection;
-use rusqlite::OptionalExtension;
-use rusqlite::params;
 use rusqlite::types::Value as SqlValue;
 use rusqlite::types::ValueRef;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-/// A SQLite database file as a store, the one a `sqlite:<path>` uri names:
-/// blobs in one `blobs` table, and each [`TableStoreRow`] table as a real SQL
-/// table (`key TEXT PRIMARY KEY, json TEXT NOT NULL, cid TEXT NOT NULL`, see
-/// its [`TableProvider`] impl), so a backend-agnostic
-/// caller reaches it through the erased [`BlobStore`] and [`TableStore`] like
-/// any other store while a consumer that chose SQLite indexes and queries the
-/// rows with SQL ([`execute`](Self::execute), [`query`](Self::query)), or from
-/// markup through [`SqlSelect`](crate::prelude::SqlSelect).
+/// A SQLite database file as a table store: each [`TableStoreRow`] table a real
+/// SQL table (`key TEXT PRIMARY KEY, json TEXT NOT NULL, cid TEXT NOT NULL`, see
+/// its [`TableProvider`] impl), so a backend-agnostic caller reaches it through
+/// the erased [`TableStore`] like any other while a consumer that chose SQLite
+/// indexes and queries the rows with SQL ([`execute`](Self::execute),
+/// [`query`](Self::query)), or from markup through
+/// [`SqlSelect`](crate::prelude::SqlSelect). Rows alone: blobs in the same file
+/// are a [`SqliteBlobStore`]'s.
 ///
-/// One pooled connection per path is shared by every clone and scope of the
-/// store, opened in WAL mode on first use (which creates the file); every
-/// operation runs on the blocking pool, never on the async executor. Rows are
-/// stored as canonical json (sorted keys), so the same document always stores
+/// One pooled connection per path is shared by every clone of the store, opened
+/// in WAL mode on first use (which creates the file); every operation runs on
+/// the blocking pool, never on the async executor. Rows are stored as canonical json (sorted keys), so the same document always stores
 /// the same text and `json = ?` comparisons are meaningful.
 #[derive(Debug, Clone, Component, Get, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_insert = on_insert_sqlite)]
+#[component(on_insert = TableStore::on_insert::<Self>)]
 pub struct SqliteStore {
 	/// The database file. Coerces from a workspace-relative string attribute
 	/// in markup, ie `<SqliteStore path="data.db"/>`.
 	path: AbsPath,
-	/// Optional key prefix for blobs. Rows are store-wide: a SQL table is a
-	/// namespace of its own and takes no prefix.
-	#[get(skip)]
-	#[reflect(default)]
-	subdir: Option<RelPath>,
 }
 
 /// The pooled connection, a [`Mutex`] since a [`Connection`] is not [`Sync`].
@@ -130,18 +121,7 @@ impl SqliteStore {
 	}
 
 	/// The store at the database file `path`, created on first use.
-	pub fn new(path: impl Into<AbsPath>) -> Self {
-		Self {
-			path: path.into(),
-			subdir: None,
-		}
-	}
-
-	/// Set the key prefix for all blobs.
-	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
-		self.subdir = Some(subdir.into());
-		self
-	}
+	pub fn new(path: impl Into<AbsPath>) -> Self { Self { path: path.into() } }
 
 	/// The database file of partition `id`: `<dir>/<stem>/<id>.db` beside
 	/// this one, a nested id a nested directory, so a partition is one
@@ -231,7 +211,7 @@ impl SqliteStore {
 	}
 
 	/// Evict this path's pooled connection, closing it, so the next operation
-	/// opens afresh: what [`store_remove`](BlobStoreProvider::store_remove)
+	/// opens afresh: what [`store_remove`](StoreBackend::store_remove)
 	/// does before deleting the file the connection was open on.
 	async fn close(&self) {
 		let conn = POOL.remove(&self.path).await;
@@ -239,7 +219,7 @@ impl SqliteStore {
 		let _ = Self::offload(move || Ok(drop(conn))).await;
 	}
 
-	/// Open the database at `path`, creating it and the `blobs` table. WAL
+	/// Open the database at `path`, creating it. WAL
 	/// journaling with normal sync: durable across a process crash, and a
 	/// reader never blocks the writer.
 	///
@@ -267,15 +247,11 @@ impl SqliteStore {
 				conn
 			}
 		};
-		conn.execute_batch(
-			"CREATE TABLE IF NOT EXISTS blobs (\
-				path TEXT PRIMARY KEY, body BLOB NOT NULL)",
-		)?;
 		Arc::new(Mutex::new(conn)).xok()
 	}
 
 	/// Run `func` against the pooled connection, off the async executor.
-	fn run<T: 'static + Send>(
+	pub(super) fn run<T: 'static + Send>(
 		&self,
 		func: impl 'static + Send + FnOnce(&Connection) -> Result<T>,
 	) -> SendBoxedFuture<Result<T>> {
@@ -327,37 +303,6 @@ impl SqliteStore {
 			}
 		}
 	}
-
-	/// The `path` column `path` keys to: the path under this store's subdir.
-	fn qualify(&self, path: &RelPath) -> String {
-		match &self.subdir {
-			Some(sub) => format!("{sub}/{path}"),
-			None => path.to_string(),
-		}
-	}
-
-	/// The `path` prefix every blob in this scope shares, empty at the root.
-	fn prefix(&self) -> String {
-		self.subdir
-			.as_ref()
-			.map(|sub| format!("{sub}/"))
-			.unwrap_or_default()
-	}
-
-	/// A 404 for a missing blob or row, matching every other backend so a
-	/// served route distinguishes an absent object from a broken store.
-	fn not_found(what: impl core::fmt::Display) -> BevyError {
-		HttpError::new(StatusCode::NOT_FOUND, format!("{what} not found"))
-			.into()
-	}
-}
-
-/// Insert both erased store currencies: the [`BlobStore`] every provider gets,
-/// then the [`TableStore`] wrapping this provider directly, so its SQL tables
-/// win over the json-over-blobs table the blob hook materializes.
-fn on_insert_sqlite(mut world: DeferredWorld, cx: HookContext) {
-	BlobStore::on_insert::<SqliteStore>(world.reborrow(), cx);
-	TableStore::on_insert::<SqliteStore>(world, cx);
 }
 
 /// A column value as a [`Value`]: SQLite's five storage classes map one to
@@ -373,28 +318,10 @@ fn value_of(value: ValueRef) -> Result<Value> {
 	.xok()
 }
 
-impl BlobStoreProvider for SqliteStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
-		Box::new(SqliteStore {
-			path: self.path.clone(),
-			subdir: Some(match &self.subdir {
-				Some(existing) => existing.join(&path),
-				None => path,
-			}),
-		})
-	}
-
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
-		Box::new(SqliteStore::new(self.path.clone()))
-	}
-
+impl StoreBackend for SqliteStore {
 	fn id(&self) -> &'static str { "sqlite" }
 
-	fn root_key(&self) -> SmolStr { format!("sqlite:{}", self.path).into() }
-
-	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
+	fn describe(&self) -> String { format!("sqlite:{}", self.path) }
 
 	fn region(&self) -> Option<String> { None }
 
@@ -416,7 +343,7 @@ impl BlobStoreProvider for SqliteStore {
 		}
 	}
 
-	/// Create the database file and its `blobs` table.
+	/// Create the database file.
 	///
 	/// # Errors
 	/// Fails if the file already exists.
@@ -430,8 +357,9 @@ impl BlobStoreProvider for SqliteStore {
 		})
 	}
 
-	/// Close the pooled connection and delete the file, with the WAL sidecars
-	/// a crash may have left beside it and every partition's file. Under the wasm memory VFS closing IS
+	/// Close the pooled connection and delete the file, a
+	/// [`SqliteBlobStore`]'s blobs in it included, with the WAL sidecars a
+	/// crash may have left beside it and every partition's file. Under the wasm memory VFS closing IS
 	/// the delete: the database lives in the connection, and there is no file
 	/// and no sidecar to unlink.
 	///
@@ -466,157 +394,6 @@ impl BlobStoreProvider for SqliteStore {
 			}
 			Ok(())
 		})
-	}
-
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
-		let key = self.qualify(path);
-		self.run(move |conn| {
-			conn.execute(
-				"INSERT OR REPLACE INTO blobs (path, body) VALUES (?1, ?2)",
-				params![key, body.as_ref()],
-			)?;
-			Ok(())
-		})
-	}
-
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
-		let prefix = self.prefix();
-		self.run(move |conn| {
-			// `substr` rather than `LIKE`: a prefix holding `%` or `_` needs
-			// no escaping, and every match is exact
-			let mut stmt = conn.prepare(
-				"SELECT path FROM blobs WHERE substr(path, 1, ?2) = ?1 \
-				 ORDER BY path",
-			)?;
-			stmt.query_map(
-				params![prefix, prefix.chars().count() as i64],
-				|row| row.get::<_, String>(0),
-			)?
-			.map(|path| {
-				path.map(|path| RelPath::new(&path[prefix.len()..]))
-					.map_err(BevyError::from)
-			})
-			.collect()
-		})
-	}
-
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
-		let key = self.qualify(path);
-		self.run(move |conn| {
-			conn.query_row(
-				"SELECT body FROM blobs WHERE path = ?1",
-				params![key],
-				|row| row.get::<_, Vec<u8>>(0),
-			)
-			.optional()?
-			.map(Bytes::from)
-			.ok_or_else(|| Self::not_found(format!("blob `{key}`")))
-		})
-	}
-
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
-		let key = self.qualify(path);
-		self.run(move |conn| {
-			conn.query_row(
-				"SELECT 1 FROM blobs WHERE path = ?1",
-				params![key],
-				|_| Ok(()),
-			)
-			.optional()?
-			.is_some()
-			.xok()
-		})
-	}
-
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
-		let key = self.qualify(path);
-		self.run(move |conn| {
-			match conn
-				.execute("DELETE FROM blobs WHERE path = ?1", params![key])?
-			{
-				0 => Err(Self::not_found(format!("blob `{key}`"))),
-				_ => Ok(()),
-			}
-		})
-	}
-
-	fn get_versioned(
-		&self,
-		path: &RelPath,
-	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
-		let key = self.qualify(path);
-		self.run(move |conn| Self::versioned_blob(conn, &key))
-	}
-
-	/// Checked and written under the connection's lock, the version the
-	/// content's digest.
-	fn insert_if(
-		&self,
-		path: &RelPath,
-		body: Bytes,
-		condition: BlobCondition,
-	) -> SendBoxedFuture<Result<BlobVersion>> {
-		let key = self.qualify(path);
-		let path = path.clone();
-		self.run(move |conn| {
-			let found = Self::versioned_blob(conn, &key)?;
-			BlobConflict::check(
-				&condition,
-				&path,
-				found.as_ref().map(|(_, version)| version),
-			)?;
-			conn.execute(
-				"INSERT OR REPLACE INTO blobs (path, body) VALUES (?1, ?2)",
-				params![key, body.as_ref()],
-			)?;
-			BlobVersion::of(&body).xok()
-		})
-	}
-
-	fn remove_if(
-		&self,
-		path: &RelPath,
-		condition: BlobCondition,
-	) -> SendBoxedFuture<Result> {
-		let key = self.qualify(path);
-		let path = path.clone();
-		self.run(move |conn| {
-			let found = Self::versioned_blob(conn, &key)?;
-			BlobConflict::check(
-				&condition,
-				&path,
-				found.as_ref().map(|(_, version)| version),
-			)?;
-			conn.execute("DELETE FROM blobs WHERE path = ?1", params![key])?;
-			Ok(())
-		})
-	}
-
-	fn public_url(
-		&self,
-		_path: &RelPath,
-	) -> SendBoxedFuture<Result<Option<String>>> {
-		Box::pin(async move { Ok(None) })
-	}
-}
-
-impl SqliteStore {
-	/// The blob at `key` with its digest, `None` where there is none.
-	fn versioned_blob(
-		conn: &Connection,
-		key: &str,
-	) -> Result<Option<(Bytes, BlobVersion)>> {
-		conn.query_row(
-			"SELECT body FROM blobs WHERE path = ?1",
-			params![key],
-			|row| row.get::<_, Vec<u8>>(0),
-		)
-		.optional()?
-		.map(|body| {
-			let version = BlobVersion::of(&body);
-			(Bytes::from(body), version)
-		})
-		.xok()
 	}
 }
 
@@ -822,12 +599,6 @@ mod test {
 		}
 	}
 
-	#[beet_core::test]
-	async fn store() {
-		let (_dir, store) = temp_store();
-		store_test::run(store).await;
-	}
-
 	/// The whole suite, a few hundred commits, each a blocking pool hop.
 	#[beet_core::test(timeout_ms = 60_000)]
 	async fn table() {
@@ -835,35 +606,15 @@ mod test {
 		table_test::run(TableStore::new(store)).await;
 	}
 
-	/// The component hook derives both erased currencies, the table one
-	/// wrapping this store's SQL tables.
+	/// The component lands its table store and no blob store.
 	#[beet_core::test]
-	fn materializes_both_stores() {
+	fn materializes_tables_alone() {
 		let (_dir, store) = temp_store();
 		let mut world = World::new();
 		let entity = world.spawn(store).id();
 		world.flush();
-		world.entity(entity).contains::<BlobStore>().xpect_true();
 		world.entity(entity).contains::<TableStore>().xpect_true();
-	}
-
-	/// A blob scope is a key prefix, and the base store lists through it.
-	#[beet_core::test]
-	async fn subdir_scopes_blobs() {
-		let (_dir, store) = temp_store();
-		let store = BlobStore::new(store);
-		let docs = store.with_subdir(RelPath::new("docs"));
-		docs.insert(&RelPath::new("a.txt"), "a").await.unwrap();
-		store.insert(&RelPath::new("b.txt"), "b").await.unwrap();
-		docs.list()
-			.await
-			.unwrap()
-			.xpect_eq(vec![RelPath::new("a.txt")]);
-		store
-			.list()
-			.await
-			.unwrap()
-			.xpect_eq(vec![RelPath::new("b.txt"), RelPath::new("docs/a.txt")]);
+		world.entity(entity).contains::<BlobStore>().xpect_false();
 	}
 
 	/// The shape a consumer indexes a json table by: `VIRTUAL` columns

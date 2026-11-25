@@ -167,7 +167,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.install_types::<ThreadPlugin>();
-		let root = app.world_mut().spawn(InMemoryStore::new()).id();
+		let root = app.world_mut().spawn(TableStore::temp()).id();
 		(app, root)
 	}
 

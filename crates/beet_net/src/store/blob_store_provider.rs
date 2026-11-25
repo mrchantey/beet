@@ -133,8 +133,10 @@ impl BlobConflict {
 ///
 /// Implementations provide the actual storage operations for [`BlobStore`].
 /// Each provider stores all required state internally (store name, region,
-/// connection info, etc.) so that no external context is needed.
-pub trait BlobStoreProvider: 'static + Send + Sync {
+/// connection info, etc.) so that no external context is needed. A blob store
+/// holds bytes and is never a table store: rows over one are opted into, see
+/// `JsonTableStore`.
+pub trait BlobStoreProvider: StoreBackend {
 	/// Returns a boxed clone of this provider.
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider>;
 
@@ -187,11 +189,7 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 		(provider, entry_name).xok()
 	}
 
-	/// Stable family discriminator, ie `"fs"`, `"memory"`, `"localstorage"`,
-	/// `"s3"`.
-	fn id(&self) -> &'static str;
-
-	/// [`id`](Self::id) plus the backing-instance identity, *without* the subdir.
+	/// [`id`](StoreBackend::id) plus the backing-instance identity, *without* the subdir.
 	/// Two stores with the same `root_key` are the same effective store:
 	/// - fs:           `"fs:{path}"`             (the base store directory)
 	/// - memory:       `"memory:{name}"`         (the backing's name)
@@ -230,91 +228,6 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	fn matches_object(&self, event: &BlobEvent, path: &RelPath) -> bool {
 		self.root_key() == event.store.root_key()
 			&& self.subdir().join(path) == event.root_relative_path()
-	}
-
-	/// Returns the provider's region, if applicable.
-	fn region(&self) -> Option<String>;
-
-	/// Where this store actually lives, ie `s3:beet-site--prod--app
-	/// (us-west-2)`. The one thing an operator needs from a store that will not
-	/// answer, so it belongs in any error naming one.
-	fn describe(&self) -> String {
-		match self.region() {
-			Some(region) => format!("{} ({region})", self.root_key()),
-			None => self.root_key().to_string(),
-		}
-	}
-
-	/// Check if store exists.
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
-	/// let exists = store.store_exists().await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	fn store_exists(&self) -> SendBoxedFuture<Result<bool>>;
-
-	/// Create store (may take 10+ seconds for some services like DynamoDB).
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
-	/// store.store_create().await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	///
-	/// # Errors
-	/// Fails if store already exists.
-	fn store_create(&self) -> SendBoxedFuture<Result>;
-
-	/// Remove store (destructive operation!).
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
-	/// store.store_remove().await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	///
-	/// # Errors
-	/// Fails if store doesn't exist.
-	fn store_remove(&self) -> SendBoxedFuture<Result>;
-
-	/// Ensure store exists, creating if needed.
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
-	/// store.store_try_create().await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	fn store_try_create(&self) -> SendBoxedFuture<Result> {
-		let exists_fut = self.store_exists();
-		let create_fut = self.store_create();
-		Box::pin(async move {
-			if exists_fut.await? {
-				Ok(())
-			} else {
-				create_fut.await
-			}
-		})
 	}
 
 	/// Check if store is empty (contains no objects).
@@ -451,6 +364,13 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// ```
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result>;
 
+	/// Whether [`get_versioned`](Self::get_versioned),
+	/// [`insert_if`](Self::insert_if) and [`remove_if`](Self::remove_if) are
+	/// answered, so a caller that cannot do without them refuses a backend as
+	/// it is declared rather than on its first write. A backend overriding
+	/// them overrides this.
+	fn conditional_writes(&self) -> bool { false }
+
 	/// The object with its [`BlobVersion`], `None` when it does not exist:
 	/// the read a conditional write swaps on. Refused by a backend without
 	/// conditional writes, which is the default.
@@ -558,6 +478,13 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 		})
 	}
 
+	/// The links a listing reads through that name an empty or missing
+	/// directory, relative to this store: what a mirror refuses to publish as
+	/// nothing. None but on a filesystem whose links are followed.
+	fn empty_links(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+		Box::pin(async { Vec::new().xok() })
+	}
+
 	/// Get public URL of object.
 	/// - fs: `file:///data/stores/my-store/key`
 	/// - s3: `https://my-store.s3.us-west-2.amazonaws.com/key`
@@ -578,6 +505,30 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	) -> SendBoxedFuture<Result<Option<String>>>;
 }
 
+impl StoreBackend for Box<dyn BlobStoreProvider> {
+	fn id(&self) -> &'static str { self.as_ref().id() }
+
+	fn describe(&self) -> String { self.as_ref().describe() }
+
+	fn region(&self) -> Option<String> { self.as_ref().region() }
+
+	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
+		self.as_ref().store_exists()
+	}
+
+	fn store_create(&self) -> SendBoxedFuture<Result> {
+		self.as_ref().store_create()
+	}
+
+	fn store_try_create(&self) -> SendBoxedFuture<Result> {
+		self.as_ref().store_try_create()
+	}
+
+	fn store_remove(&self) -> SendBoxedFuture<Result> {
+		self.as_ref().store_remove()
+	}
+}
+
 impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> {
 		self.as_ref().box_clone()
@@ -593,7 +544,6 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
 		self.as_ref().rebase(entry_name, root)
 	}
-	fn id(&self) -> &'static str { self.as_ref().id() }
 	fn root_key(&self) -> SmolStr { self.as_ref().root_key() }
 	fn subdir(&self) -> RelPath { self.as_ref().subdir() }
 	fn watch_dir(&self) -> Option<AbsPath> { self.as_ref().watch_dir() }
@@ -603,16 +553,6 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	}
 	fn matches_object(&self, event: &BlobEvent, path: &RelPath) -> bool {
 		self.as_ref().matches_object(event, path)
-	}
-	fn region(&self) -> Option<String> { self.as_ref().region() }
-	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
-		self.as_ref().store_exists()
-	}
-	fn store_create(&self) -> SendBoxedFuture<Result> {
-		self.as_ref().store_create()
-	}
-	fn store_remove(&self) -> SendBoxedFuture<Result> {
-		self.as_ref().store_remove()
 	}
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.as_ref().insert(path, body)
@@ -640,6 +580,7 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		self.as_ref().remove(path)
 	}
+	fn conditional_writes(&self) -> bool { self.as_ref().conditional_writes() }
 	fn get_versioned(
 		&self,
 		path: &RelPath,
@@ -672,6 +613,9 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	}
 	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
 		self.as_ref().list_stats()
+	}
+	fn empty_links(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+		self.as_ref().empty_links()
 	}
 	fn public_url(
 		&self,

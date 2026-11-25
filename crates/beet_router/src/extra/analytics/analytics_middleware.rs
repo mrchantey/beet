@@ -161,12 +161,31 @@ mod stalled_store_test {
 	/// standing in for a remote blob store behind a connect timeout. Reads answer
 	/// empty rather than delegating: nothing in this test reads the store, and a
 	/// write that never returns is the whole point.
-	#[derive(Clone, Component)]
-	#[component(on_insert = BlobStore::on_insert::<Self>)]
+	#[derive(Clone)]
 	struct StalledStore {
 		/// Writes started, ie the count of parked pushes. Non-zero is what proves
 		/// the request actually reached the store rather than passing it by.
 		started: Arc<AtomicUsize>,
+	}
+
+	impl StoreBackend for StalledStore {
+		fn id(&self) -> &'static str { "stalled" }
+
+		fn describe(&self) -> String { self.root_key().to_string() }
+
+		fn region(&self) -> Option<String> { None }
+
+		fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
+			Box::pin(async { true.xok() })
+		}
+
+		fn store_create(&self) -> SendBoxedFuture<Result> {
+			Box::pin(async { Ok(()) })
+		}
+
+		fn store_remove(&self) -> SendBoxedFuture<Result> {
+			Box::pin(async { Ok(()) })
+		}
 	}
 
 	impl BlobStoreProvider for StalledStore {
@@ -178,18 +197,7 @@ mod stalled_store_test {
 			Box::new(self.clone())
 		}
 		fn base(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-		fn id(&self) -> &'static str { "stalled" }
 		fn root_key(&self) -> SmolStr { "stalled".into() }
-		fn region(&self) -> Option<String> { None }
-		fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
-			Box::pin(async { true.xok() })
-		}
-		fn store_create(&self) -> SendBoxedFuture<Result> {
-			Box::pin(async { Ok(()) })
-		}
-		fn store_remove(&self) -> SendBoxedFuture<Result> {
-			Box::pin(async { Ok(()) })
-		}
 		fn insert(
 			&self,
 			_path: &RelPath,
@@ -201,7 +209,16 @@ mod stalled_store_test {
 				Ok(())
 			})
 		}
-		/// An event's row is a conditional write, which parks the same way.
+		fn conditional_writes(&self) -> bool { true }
+
+		fn get_versioned(
+			&self,
+			_path: &RelPath,
+		) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+			Box::pin(async { None.xok() })
+		}
+
+		/// An event's row is a conditional write, which parks.
 		fn insert_if(
 			&self,
 			_path: &RelPath,
@@ -276,9 +293,12 @@ mod stalled_store_test {
 			app.set_error_handler(bevy::ecs::error::warn);
 			let store = app
 				.world_mut()
-				.spawn(StalledStore {
-					started: store_started,
-				})
+				.spawn(
+					JsonTableStore::over(BlobStore::new(StalledStore {
+						started: store_started,
+					}))
+					.unwrap(),
+				)
 				.id();
 			// the server owns the boot, the analytics router is its dispatch child
 			app.world_mut().spawn((server, on_spawn, children![(
@@ -349,7 +369,11 @@ mod test {
 		world.add_observer(move |ev: On<AnalyticsEvent>| {
 			captured.lock().unwrap().push(ev.event().clone());
 		});
-		let store = world.spawn(InMemoryStore::new()).flush();
+		// without `json` there are no tables and nothing records
+		#[cfg(feature = "json")]
+		let store = world.spawn(TableStore::temp()).flush();
+		#[cfg(not(feature = "json"))]
+		let store = world.spawn_empty().flush();
 		world
 			.spawn((
 				Router,

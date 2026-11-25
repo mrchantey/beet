@@ -210,7 +210,7 @@ mod test {
 			.spawn((
 				sweep(),
 				store.clone(),
-				TableStore::new(store.clone()),
+				JsonTableStore::over(store.clone()).unwrap(),
 				children![scene(system, agent)],
 			))
 			.trigger(|entity| StartRunning::new(entity, Request::default()));
@@ -241,7 +241,7 @@ mod test {
 			.spawn((
 				sweep(),
 				store.clone(),
-				TableStore::new(store.clone()),
+				JsonTableStore::over(store.clone()).unwrap(),
 				children![(RunThread, children![
 					window(1, "Ann"),
 					window(2, "Bob")
@@ -278,11 +278,14 @@ mod test {
 	/// The stored thread count, read through a fresh thread store so the
 	/// records are re-read rather than served from an in-memory snapshot.
 	async fn stored_threads(store: &BlobStore) -> usize {
-		ThreadStore::new(TableStore::new(store.clone()), RelPath::new(RECORDS))
-			.threads()
-			.await
-			.unwrap()
-			.len()
+		ThreadStore::new(
+			JsonTableStore::over(store.clone()).unwrap(),
+			RelPath::new(RECORDS),
+		)
+		.threads()
+		.await
+		.unwrap()
+		.len()
 	}
 
 	/// A `{MountThreadStore}` thread, run twice against the same store,
@@ -325,7 +328,10 @@ mod test {
 		let mut app = app();
 		let root = app
 			.world_mut()
-			.spawn((store.clone(), TableStore::new(store.clone())))
+			.spawn((
+				store.clone(),
+				JsonTableStore::over(store.clone()).unwrap(),
+			))
 			.id();
 		let thread = app
 			.world_mut()

@@ -101,7 +101,9 @@ impl SearchEntry {
 			entries.len(),
 			started.elapsed()
 		);
-		Value::new_list(entries.iter().map(Self::to_value)).to_json_string()
+		Value::new_list(entries.iter().map(Self::to_value))
+			.to_json_string()
+			.xok()
 	}
 
 	/// A page's plain text as an index carries it: whitespace collapsed to

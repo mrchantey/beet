@@ -71,7 +71,7 @@ pub async fn LightsailRelease(
 /// itself, so a change to `main.bsx` (its `<Redirect/>` block, its middleware)
 /// takes. Without it those need a full deploy to appear.
 ///
-/// Declared under the sync sequence AFTER the `<DirSync/>` that publishes, and
+/// Declared under the sync sequence AFTER the `<StoreSync/>` that publishes, and
 /// BEFORE the `<CloudflarePurgeCache/>`: purging while the old process still
 /// serves just re-caches the old responses for the whole edge TTL.
 #[action]

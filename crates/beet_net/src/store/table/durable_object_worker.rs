@@ -3,7 +3,6 @@
 //! own SQLite storage.
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bytes::Bytes;
 use send_wrapper::SendWrapper;
 use worker::SqlStorageValue;
 
@@ -55,8 +54,7 @@ impl DurableObjectStore {
 }
 
 /// One Durable Object's own SQLite storage as a partition: [`SqlTable`]'s
-/// schema and semantics run through the object's `SqlStorage`, blobs in a
-/// `blobs` table beside the rows. Every statement runs synchronously in the
+/// schema and semantics run through the object's `SqlStorage`. Every statement runs synchronously in the
 /// object's event, which nothing interleaves, and a batch checks every
 /// precondition before it writes ([`SqlTable::apply`]), the object's storage
 /// refusing `BEGIN`.
@@ -66,18 +64,11 @@ impl DurableObjectStore {
 #[derive(Clone)]
 pub struct DurableObjectSql {
 	sql: worker::SqlStorage,
-	/// The scope of the blobs, which the rows ignore.
-	subdir: RelPath,
 }
 
 impl DurableObjectSql {
 	/// The partition `sql` stores.
-	pub fn new(sql: worker::SqlStorage) -> Self {
-		Self {
-			sql,
-			subdir: default(),
-		}
-	}
+	pub fn new(sql: worker::SqlStorage) -> Self { Self { sql } }
 
 	/// Run `func` against this storage as a provider future.
 	fn run<T: 'static>(
@@ -117,41 +108,6 @@ impl DurableObjectSql {
 			args.iter().map(Self::bind).collect::<Result<Vec<_>>>()?;
 		self.sql.exec(sql, bindings)?.xok()
 	}
-
-	fn ensure_blobs(&self) -> Result {
-		self.execute(
-			"CREATE TABLE IF NOT EXISTS blobs (\
-				path TEXT PRIMARY KEY, body BLOB NOT NULL, version TEXT NOT NULL)",
-			&[],
-		)
-		.map(drop)
-	}
-
-	/// The key of the blob at `path` in this scope.
-	fn blob_key(&self, path: &RelPath) -> SqlArg {
-		SqlArg::Text(self.subdir.join(path).to_string())
-	}
-
-	/// The blob at `path` in this scope with its version.
-	fn blob(&self, path: &RelPath) -> Result<Option<(Bytes, BlobVersion)>> {
-		self.ensure_blobs()?;
-		match self
-			.query("SELECT body, version FROM blobs WHERE path = ?1", &[
-				self.blob_key(path)
-			])?
-			.into_iter()
-			.next()
-		{
-			Some(row) => match <[SqlArg; 2]>::try_from(row) {
-				Ok([SqlArg::Blob(body), SqlArg::Text(version)]) => {
-					Some((Bytes::from(body), BlobVersion::new(version)))
-				}
-				_ => bevybail!("blob `{path}` is not a body and a version"),
-			},
-			None => None,
-		}
-		.xok()
-	}
 }
 
 impl SqlEngine for DurableObjectSql {
@@ -182,30 +138,21 @@ impl SqlEngine for DurableObjectSql {
 	}
 }
 
-impl BlobStoreProvider for DurableObjectSql {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
-		Box::new(Self {
-			subdir: self.subdir.join(&path),
-			..self.clone()
-		})
-	}
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
-		Box::new(Self {
-			subdir: default(),
-			..self.clone()
-		})
-	}
-	fn subdir(&self) -> RelPath { self.subdir.clone() }
+impl StoreBackend for DurableObjectSql {
 	fn id(&self) -> &'static str { "durable-object" }
-	fn root_key(&self) -> SmolStr { "durable-object".into() }
+
+	fn describe(&self) -> String { "durable-object".into() }
+
 	fn region(&self) -> Option<String> { None }
+
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		Box::pin(async { true.xok() })
 	}
+
 	fn store_create(&self) -> SendBoxedFuture<Result> {
 		Box::pin(async { Ok(()) })
 	}
+
 	/// Drop every table, the object's storage left empty.
 	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		self.run(|this| {
@@ -224,118 +171,6 @@ impl BlobStoreProvider for DurableObjectSql {
 			}
 			Ok(())
 		})
-	}
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
-		let insert = self.insert_if(path, body, BlobCondition::Any);
-		Box::pin(async move { insert.await.map(drop) })
-	}
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
-		self.run(|this| {
-			this.ensure_blobs()?;
-			let prefix = match this.subdir.is_empty() {
-				true => String::new(),
-				false => format!("{}/", this.subdir),
-			};
-			// `substr` rather than `LIKE`: a prefix holding `%` or `_` needs
-			// no escaping
-			this.query(
-				"SELECT path FROM blobs WHERE substr(path, 1, ?2) = ?1 \
-				 ORDER BY path",
-				&[
-					SqlArg::Text(prefix.clone()),
-					SqlArg::Integer(prefix.chars().count() as i64),
-				],
-			)?
-			.into_iter()
-			.map(|row| match row.into_iter().next() {
-				Some(SqlArg::Text(path)) => {
-					RelPath::new(&path[prefix.len()..]).xok()
-				}
-				_ => bevybail!("blob path is not text"),
-			})
-			.collect()
-		})
-	}
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
-		let path = path.clone();
-		self.run(move |this| match this.blob(&path)? {
-			Some((bytes, _)) => bytes.xok(),
-			None => Err(HttpError::new(
-				StatusCode::NOT_FOUND,
-				format!("blob `{path}` not found"),
-			)
-			.into()),
-		})
-	}
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
-		let path = path.clone();
-		self.run(move |this| this.blob(&path).map(|blob| blob.is_some()))
-	}
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
-		let path = path.clone();
-		self.run(move |this| {
-			match this.execute("DELETE FROM blobs WHERE path = ?1", &[
-				this.blob_key(&path)
-			])? {
-				0 => bevybail!("blob `{path}` not found"),
-				_ => Ok(()),
-			}
-		})
-	}
-	fn get_versioned(
-		&self,
-		path: &RelPath,
-	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
-		let path = path.clone();
-		self.run(move |this| this.blob(&path))
-	}
-	fn insert_if(
-		&self,
-		path: &RelPath,
-		body: Bytes,
-		condition: BlobCondition,
-	) -> SendBoxedFuture<Result<BlobVersion>> {
-		let path = path.clone();
-		self.run(move |this| {
-			let found = this.blob(&path)?;
-			BlobConflict::check(&condition, &path, found.as_ref().map(|(_, version)| version))?;
-			let version = BlobVersion::of(&body);
-			this.execute(
-				"INSERT INTO blobs (path, body, version) VALUES (?1, ?2, ?3) \
-				 ON CONFLICT(path) DO UPDATE SET body = excluded.body, version = excluded.version",
-				&[
-					this.blob_key(&path),
-					SqlArg::Blob(body.to_vec()),
-					SqlArg::Text(version.to_string()),
-				],
-			)?;
-			version.xok()
-		})
-	}
-	fn remove_if(
-		&self,
-		path: &RelPath,
-		condition: BlobCondition,
-	) -> SendBoxedFuture<Result> {
-		let path = path.clone();
-		self.run(move |this| {
-			let found = this.blob(&path)?;
-			BlobConflict::check(
-				&condition,
-				&path,
-				found.as_ref().map(|(_, version)| version),
-			)?;
-			this.execute("DELETE FROM blobs WHERE path = ?1", &[
-				this.blob_key(&path)
-			])?;
-			Ok(())
-		})
-	}
-	fn public_url(
-		&self,
-		_path: &RelPath,
-	) -> SendBoxedFuture<Result<Option<String>>> {
-		Box::pin(async { None.xok() })
 	}
 }
 

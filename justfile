@@ -37,7 +37,7 @@ default:
 
 #💡 Init
 
-# Install the cli. The dev commands (run-wasm, check, export-static, s3-sync, ...)
+# Install the cli. The dev commands (run-wasm, check, export-static, store-sync, ...)
 # are wired in the repo's `main.bsx`, discovered at runtime — no scene to load.
 init-cli:
 	just install-cli

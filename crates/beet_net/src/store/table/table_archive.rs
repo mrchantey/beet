@@ -112,7 +112,7 @@ impl TableArchive {
 
 	/// The archive at `path` in `bucket` as a read-only [`SqliteStore`], a
 	/// copy in memory of its own, so two opens never share one;
-	/// [`store_remove`](BlobStoreProvider::store_remove) frees it.
+	/// [`store_remove`](StoreBackend::store_remove) frees it.
 	pub async fn open(
 		bucket: &BlobStore,
 		path: &RelPath,
@@ -170,12 +170,16 @@ impl TableArchive {
 			}
 			.scan_all(&tables)
 			.await?;
-			let text = |rows: &[StoredRow]| {
+			// the content hashed again, not only the cid carried with it
+			let contents = |rows: &[StoredRow]| {
 				rows.iter()
-					.map(|row| Ok((row.key().clone(), row.to_stored_json()?)))
+					.map(|row| {
+						(row.key().clone(), row.cid().clone(), row.row().cid()?)
+							.xok()
+					})
 					.collect::<Result<Vec<_>>>()
 			};
-			if text(&copied)? != text(rows)? {
+			if contents(&copied)? != contents(rows)? {
 				bevybail!(
 					"table archive of `{}` failed verification: the copy holds {} rows of {}",
 					self.table.name,

@@ -1,9 +1,8 @@
-//! The table wire protocol: one partition's rows and blobs over beet's
+//! The table wire protocol: one partition's rows over beet's
 //! [`Request`]/[`Response`], so a table store is reachable from another
 //! process exactly as it is in this one.
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bytes::Bytes;
 use core::ops::Bound;
 use serde::Deserialize;
 use serde::Serialize;
@@ -29,14 +28,12 @@ use std::sync::Arc;
 /// | `POST /_apply` `{writes}` | `204`, every write or none |
 /// | `GET /_capabilities` | the [`Capability`]s supported |
 /// | `GET` / `POST` / `DELETE` `/_store` | exists (`200`/`404`), create, remove |
-/// | `GET` / `PUT` / `DELETE` `/_blob/<path>` | the blob side, `ETag` its version |
-/// | `GET /_blob?list`, `GET /_blob/<dir>?list` | every blob path, or every one under `<dir>` relative to it, a json array |
 ///
-/// A write's precondition rides its headers: `If-Match: "<cid>"` (a blob's
-/// version for a blob) or `If-None-Match: *`. A failed one answers `412` with
-/// the [`TableError::Conflict`] as json (a blob's, an empty body), an
-/// unsupported capability `501` and a limit `413`, each read back by the client
-/// as the same typed error.
+/// Rows alone: a mount of bytes is `<ServeBlobs/>`. A write's precondition
+/// rides its headers: `If-Match: "<cid>"` or `If-None-Match: *`. A failed one
+/// answers `412` with the [`TableError::Conflict`] as json, an unsupported
+/// capability `501` and a limit `413`, each read back by the client as the
+/// same typed error.
 pub struct TableWire;
 
 impl TableWire {
@@ -48,10 +45,6 @@ impl TableWire {
 	const CAPABILITIES: &'static str = "_capabilities";
 	/// The reserved segment of the store's lifecycle.
 	const STORE: &'static str = "_store";
-	/// The reserved segment of the blob side.
-	const BLOB: &'static str = "_blob";
-	/// The query param a blob listing is asked with.
-	const LIST: &'static str = "list";
 
 	/// Answer `request`, its path relative to the mount, from `provider`.
 	/// Never fails: an error is the response that says so.
@@ -161,9 +154,6 @@ impl TableWire {
 					.xref()
 					.xmap(Response::with_json)
 			}
-			(_, [segment, rest @ ..]) if segment == Self::BLOB => {
-				Self::blob(provider, method, rest, precondition, request).await
-			}
 			(HttpMethod::Get, [table]) => {
 				let scan = Self::scan_of(request.request_parts())?;
 				provider
@@ -195,16 +185,14 @@ impl TableWire {
 						let cid = body.row.cid().clone();
 						let spec = spec.with_indexes(body.indexes);
 						TableStore::from_box(provider.box_clone_table())
-							.put(spec, body.row, precondition.into_row()?)
+							.put(spec, body.row, precondition)
 							.await?;
 						Response::from_status(StatusCode::NO_CONTENT)
 							.with_header("etag", &Self::etag(&cid))
 							.xok()
 					}
 					HttpMethod::Delete => {
-						provider
-							.remove_row(&spec, &key, precondition.into_row()?)
-							.await?;
+						provider.remove_row(&spec, &key, precondition).await?;
 						Response::from_status(StatusCode::NO_CONTENT).xok()
 					}
 					_ => Self::method_not_allowed(),
@@ -214,87 +202,11 @@ impl TableWire {
 		}
 	}
 
-	/// The blob side: `rest` the blob's path, or with `?list` the directory
-	/// listed, empty for the root.
-	async fn blob(
-		provider: &dyn TableProvider,
-		method: HttpMethod,
-		rest: &[SmolStr],
-		precondition: WirePrecondition,
-		request: Request,
-	) -> Result<Response> {
-		let path = RelPath::new(rest.join("/"));
-		if matches!(method, HttpMethod::Get)
-			&& request.request_parts().get_param(Self::LIST).is_some()
-		{
-			let mut paths = match path.is_empty() {
-				true => provider.list(),
-				false => provider.with_subdir(path).list(),
-			}
-			.await?
-			.into_iter()
-			.map(|path| path.to_string())
-			.collect::<Vec<_>>();
-			paths.sort();
-			return Response::with_json(&paths);
-		}
-		if path.is_empty() {
-			return Response::not_found().xok();
-		}
-		match method {
-			HttpMethod::Get => match provider.get_versioned(&path).await? {
-				Some((bytes, version)) => {
-					Response::ok_body(bytes, MediaType::Bytes)
-						.with_header(
-							"etag",
-							&format!("\"{}\"", version.as_str()),
-						)
-						.xok()
-				}
-				None => Response::not_found().xok(),
-			},
-			HttpMethod::Put => {
-				let body = request.into_parts().1.into_bytes().await?;
-				let version = match precondition {
-					WirePrecondition::Any => {
-						provider
-							.insert_if(&path, body, BlobCondition::Any)
-							.await?
-					}
-					WirePrecondition::Absent => {
-						provider
-							.insert_if(&path, body, BlobCondition::Absent)
-							.await?
-					}
-					WirePrecondition::Matches(version) => {
-						provider
-							.insert_if(
-								&path,
-								body,
-								BlobCondition::Matches(BlobVersion::new(
-									version,
-								)),
-							)
-							.await?
-					}
-				};
-				Response::from_status(StatusCode::NO_CONTENT)
-					.with_header("etag", &format!("\"{}\"", version.as_str()))
-					.xok()
-			}
-			HttpMethod::Delete => {
-				provider.remove_if(&path, precondition.into_blob()).await?;
-				Response::from_status(StatusCode::NO_CONTENT).xok()
-			}
-			_ => Self::method_not_allowed(),
-		}
-	}
-
 	/// The quoted etag of a cid.
 	fn etag(cid: &Cid) -> String { format!("\"{cid}\"") }
 
 	/// The precondition a request's headers carry.
-	fn precondition(headers: &HeaderMap) -> Result<WirePrecondition> {
+	fn precondition(headers: &HeaderMap) -> Result<Precondition> {
 		match (
 			headers.first_raw("if-match"),
 			headers.first_raw("if-none-match"),
@@ -305,13 +217,13 @@ impl TableWire {
 				)
 			}
 			(Some(tag), None) => {
-				WirePrecondition::Matches(tag.trim_matches('"').into())
+				Precondition::Matches(Cid::parse(tag.trim_matches('"'))?)
 			}
-			(None, Some("*")) => WirePrecondition::Absent,
+			(None, Some("*")) => Precondition::Absent,
 			(None, Some(other)) => {
 				bevybail!("`If-None-Match: {other}` is not supported, only `*`")
 			}
-			(None, None) => WirePrecondition::Any,
+			(None, None) => Precondition::Any,
 		}
 		.xok()
 	}
@@ -377,9 +289,8 @@ impl TableWire {
 		Response::from_status(StatusCode::METHOD_NOT_ALLOWED).xok()
 	}
 
-	/// The response an error is: a table error as its status and json, a
-	/// blob conflict `412`, an http error its own status, anything else
-	/// `500`.
+	/// The response an error is: a table error as its status and json, an
+	/// http error its own status, anything else `500`.
 	fn error_response(err: BevyError) -> Response {
 		if let Some(table) = TableError::of(&err) {
 			let status = match table {
@@ -391,9 +302,6 @@ impl TableWire {
 				.map(|response| response.with_status(status))
 				.unwrap_or_else(|_| Response::from_status(status));
 		}
-		if err.downcast_ref::<BlobConflict>().is_some() {
-			return Response::from_status(StatusCode::PRECONDITION_FAILED);
-		}
 		if let Some(http) = err.downcast_ref::<HttpError>() {
 			return Response::status_text(
 				http.status_code,
@@ -404,35 +312,6 @@ impl TableWire {
 			StatusCode::INTERNAL_SERVER_ERROR,
 			err.to_string(),
 		)
-	}
-}
-
-/// A precondition as the headers carry it, before it is known to be a row's
-/// cid or a blob's version.
-enum WirePrecondition {
-	Any,
-	Absent,
-	Matches(SmolStr),
-}
-
-impl WirePrecondition {
-	fn into_row(self) -> Result<Precondition> {
-		match self {
-			Self::Any => Precondition::Any,
-			Self::Absent => Precondition::Absent,
-			Self::Matches(cid) => Precondition::Matches(Cid::parse(&cid)?),
-		}
-		.xok()
-	}
-
-	fn into_blob(self) -> BlobCondition {
-		match self {
-			Self::Any => BlobCondition::Any,
-			Self::Absent => BlobCondition::Absent,
-			Self::Matches(version) => {
-				BlobCondition::Matches(BlobVersion::new(version))
-			}
-		}
 	}
 }
 
@@ -529,8 +408,6 @@ impl TableWireTransport {
 pub struct TableWireClient {
 	transport: TableWireTransport,
 	partition: Option<PartitionId>,
-	/// The scope of the blob side, which the rows ignore.
-	subdir: RelPath,
 	capabilities: Arc<std::sync::OnceLock<Vec<Capability>>>,
 }
 
@@ -539,7 +416,6 @@ impl core::fmt::Debug for TableWireClient {
 		f.debug_struct("TableWireClient")
 			.field("transport", &self.transport.describe)
 			.field("partition", &self.partition)
-			.field("subdir", &self.subdir)
 			.finish()
 	}
 }
@@ -551,7 +427,6 @@ impl TableWireClient {
 		Self {
 			transport,
 			partition: None,
-			subdir: default(),
 			capabilities: default(),
 		}
 	}
@@ -612,20 +487,6 @@ impl TableWireClient {
 		self.url([table.name.clone(), SmolStr::from(key.as_str())])
 	}
 
-	/// The url of the blob at `path` in this scope, the scope itself for an
-	/// empty path.
-	fn blob_url(&self, path: &RelPath) -> Url {
-		let path = self.subdir.join(path);
-		self.url(
-			core::iter::once(SmolStr::from(TableWire::BLOB)).chain(
-				path.as_str()
-					.split('/')
-					.filter(|segment| !segment.is_empty())
-					.map(SmolStr::from),
-			),
-		)
-	}
-
 	async fn send(&self, request: Request) -> Result<Response> {
 		(self.transport.send)(request).await
 	}
@@ -646,23 +507,6 @@ impl TableWireClient {
 		}
 	}
 
-	/// `request` with a blob `condition` as its headers.
-	fn with_blob_condition(
-		request: Request,
-		condition: &BlobCondition,
-	) -> Request {
-		match condition {
-			BlobCondition::Any => request,
-			BlobCondition::Absent => {
-				request.with_header_raw("if-none-match", "*")
-			}
-			BlobCondition::Matches(version) => request.with_header_raw(
-				"if-match",
-				&format!("\"{}\"", version.as_str()),
-			),
-		}
-	}
-
 	/// The response when it succeeded, else the typed error it carries.
 	async fn checked(response: Response) -> Result<Response> {
 		let status = response.status();
@@ -675,45 +519,18 @@ impl TableWireClient {
 			Err(_) => Err(HttpError::new(status, text).into()),
 		}
 	}
-
-	/// The version a response's `ETag` names.
-	fn version_of(response: &Response) -> Result<BlobVersion> {
-		match response.response_parts().headers().first_raw("etag") {
-			Some(tag) => BlobVersion::new(tag.trim_matches('"')).xok(),
-			None => bevybail!("a table wire blob answered without an etag"),
-		}
-	}
 }
 
-impl BlobStoreProvider for TableWireClient {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
-		Box::new(Self {
-			subdir: self.subdir.join(&path),
-			..self.clone()
-		})
-	}
-
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
-		Box::new(Self {
-			subdir: default(),
-			..self.clone()
-		})
-	}
-
-	fn subdir(&self) -> RelPath { self.subdir.clone() }
-
+impl StoreBackend for TableWireClient {
 	fn id(&self) -> &'static str { "table-wire" }
 
-	fn root_key(&self) -> SmolStr {
+	fn describe(&self) -> String {
 		match &self.partition {
 			Some(partition) => {
 				format!("{}/@{partition}", self.transport.describe)
 			}
 			None => self.transport.describe.to_string(),
 		}
-		.into()
 	}
 
 	fn region(&self) -> Option<String> { None }
@@ -755,123 +572,6 @@ impl BlobStoreProvider for TableWireClient {
 			Ok(())
 		})
 	}
-
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
-		let insert = self.insert_if(path, body, BlobCondition::Any);
-		Box::pin(async move { insert.await.map(drop) })
-	}
-
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
-		let this = self.clone();
-		Box::pin(async move {
-			let request = Request::get(this.blob_url(&default()))
-				.with_param(TableWire::LIST, "true");
-			Self::checked(this.send(request).await?)
-				.await?
-				.json::<Vec<String>>()
-				.await?
-				.into_iter()
-				.map(RelPath::new)
-				.collect::<Vec<_>>()
-				.xok()
-		})
-	}
-
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
-		let get = self.get_versioned(path);
-		let path = path.clone();
-		Box::pin(async move {
-			match get.await? {
-				Some((bytes, _)) => Ok(bytes),
-				None => Err(HttpError::new(
-					StatusCode::NOT_FOUND,
-					format!("blob `{path}` not found"),
-				)
-				.into()),
-			}
-		})
-	}
-
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
-		let get = self.get_versioned(path);
-		Box::pin(async move { get.await.map(|found| found.is_some()) })
-	}
-
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
-		let this = self.clone();
-		let path = path.clone();
-		Box::pin(async move {
-			if !this.exists(&path).await? {
-				bevybail!("blob `{path}` not found");
-			}
-			this.remove_if(&path, BlobCondition::Any).await
-		})
-	}
-
-	fn get_versioned(
-		&self,
-		path: &RelPath,
-	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
-		let this = self.clone();
-		let url = self.blob_url(path);
-		Box::pin(async move {
-			let response = this.send(Request::get(url)).await?;
-			if response.status() == StatusCode::NOT_FOUND {
-				return Ok(None);
-			}
-			let response = Self::checked(response).await?;
-			let version = Self::version_of(&response)?;
-			Some((response.bytes().await?, version)).xok()
-		})
-	}
-
-	fn insert_if(
-		&self,
-		path: &RelPath,
-		body: Bytes,
-		condition: BlobCondition,
-	) -> SendBoxedFuture<Result<BlobVersion>> {
-		let this = self.clone();
-		let url = self.blob_url(path);
-		let path = path.clone();
-		Box::pin(async move {
-			let request = Self::with_blob_condition(
-				Request::put(url).with_body(body),
-				&condition,
-			);
-			let response = this.send(request).await?;
-			if response.status() == StatusCode::PRECONDITION_FAILED {
-				return Err(BlobConflict::at(&path));
-			}
-			Self::version_of(&Self::checked(response).await?)
-		})
-	}
-
-	fn remove_if(
-		&self,
-		path: &RelPath,
-		condition: BlobCondition,
-	) -> SendBoxedFuture<Result> {
-		let this = self.clone();
-		let url = self.blob_url(path);
-		let path = path.clone();
-		Box::pin(async move {
-			let request =
-				Self::with_blob_condition(Request::delete(url), &condition);
-			let response = this.send(request).await?;
-			if response.status() == StatusCode::PRECONDITION_FAILED {
-				return Err(BlobConflict::at(&path));
-			}
-			Self::checked(response).await.map(drop)
-		})
-	}
-
-	fn public_url(
-		&self,
-		_path: &RelPath,
-	) -> SendBoxedFuture<Result<Option<String>>> {
-		Box::pin(async move { None.xok() })
-	}
 }
 
 impl TableProvider for TableWireClient {
@@ -885,7 +585,6 @@ impl TableProvider for TableWireClient {
 				Some(parent) => parent.join(id),
 				None => id.clone(),
 			}),
-			subdir: default(),
 			// the same server, so the same capabilities
 			capabilities: self.capabilities.clone(),
 			transport: self.transport.clone(),
@@ -1052,6 +751,10 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	fn json_tables(blobs: BlobStore) -> JsonTableProvider {
+		JsonTableProvider::new(blobs).unwrap()
+	}
+
 	/// The suite through the protocol, answered in process by `provider`.
 	async fn in_process(provider: impl TableProvider + Clone) {
 		let client = TableWireClient::connect(TableWireTransport::new(
@@ -1069,35 +772,17 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn blob_backed() { in_process(BlobStore::temp()).await }
+	async fn json() { in_process(json_tables(BlobStore::temp())).await }
 
 	#[cfg(feature = "sqlite")]
 	#[beet_core::test(timeout_ms = 60_000)]
 	async fn sqlite() { in_process(SqliteStore::memory("wire-sqlite")).await }
 
-	/// The blob suite through the protocol's blob side.
-	#[beet_core::test]
-	async fn blob_side() {
-		let provider = BlobStore::temp();
-		let client = TableWireClient::connect(TableWireTransport::new(
-			"in-process",
-			move |request| {
-				let provider = provider.clone();
-				Box::pin(async move {
-					TableWire::serve(&provider, request).await.xok()
-				}) as SendBoxedFuture<Result<Response>>
-			},
-		))
-		.await
-		.unwrap();
-		store_test::run(client).await;
-	}
-
 	/// A key holding a `/`, `#`, `?`, a space and multi-byte text reaches the
 	/// server whole.
 	#[beet_core::test]
 	async fn keys_survive_the_path() {
-		let provider = BlobStore::temp();
+		let provider = json_tables(BlobStore::temp());
 		let store = TableStore::new(
 			TableWireClient::connect(TableWireTransport::new(
 				"in-process",
@@ -1145,12 +830,17 @@ mod test {
 		}
 
 		#[beet_core::test(timeout_ms = 60_000)]
-		async fn memory() { over_http(BlobStore::temp()).await }
+		async fn json_memory() {
+			over_http(json_tables(BlobStore::temp())).await
+		}
 
 		#[beet_core::test(timeout_ms = 60_000)]
-		async fn fs() {
+		async fn json_fs() {
 			let dir = TempDir::new_ws().unwrap();
-			over_http(BlobStore::new(FsStore::new(dir.path().clone()))).await
+			over_http(json_tables(BlobStore::new(FsStore::new(
+				dir.path().clone(),
+			))))
+			.await
 		}
 
 		#[cfg(feature = "sqlite")]
@@ -1177,9 +867,9 @@ mod test {
 		}
 
 		/// The suite's row cases over http through a Worker under `wrangler
-		/// dev`, the table blob backed on its R2 binding, so every precondition
-		/// is the binding's conditional put: a document mounting
-		/// `<R2WorkersStore binding="ARCHIVE"><ServeTables prefix="r2"/></R2WorkersStore>`.
+		/// dev`, the rows json files on its R2 binding, so every write is the
+		/// binding's conditional put: a document mounting
+		/// `<R2WorkersStore binding="ARCHIVE" {JsonTableStore{path:"tables"}}><ServeTables prefix="r2"/></R2WorkersStore>`.
 		#[beet_core::test(timeout_ms = 600_000)]
 		#[ignore = "needs a Worker under wrangler dev on 127.0.0.1:8787"]
 		async fn r2_binding() {

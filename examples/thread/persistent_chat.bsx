@@ -6,12 +6,19 @@ binary:
     beet --entry=examples/thread/persistent_chat.bsx --new   # start fresh
 
 `{MountThreadStore}` persists the thread's records as rows keyed under its path, in
-the entry's own store, so the `thread*` directories beside this file; `{RunThread}` continues the newest
-thread stored there before the first turn, so a re-run resumes where it left
-off. `--new` starts a fresh thread, which the next run continues. The system
+the table store around it; `{RunThread}` continues the newest thread stored there
+before the first turn, so a re-run resumes where it left off. `--new` starts a fresh
+thread, which the next run continues. The system
 prompt is the seed, written once when a thread is created, so an edited prompt
 reaches a new thread only. The actor ids are pinned so each run's actors are
 the stored thread's.
+
+The table store here is `{JsonTableStore}`, rows as json files in a directory, ie
+`target/persistent_chat/@root.json`, which any binary runs and a person reads. Each
+write costs the size of the file, so a chat kept for years belongs in a database. With
+the `sqlite` feature, swap the line declaring it for:
+
+    <SqliteStore path="target/persistent_chat.db">
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
 	<RequireCfg cfg="feature:thread && feature:tui && feature:ssh"/>
@@ -20,14 +27,16 @@ the stored thread's.
 			<ThreadView {OfThread($thread)}/>
 			<CreatePostForm {OfThread($thread)}/>
 		</Route>
-		<Repeat {RunThread}>
-			<Thread bx:ref="thread" {(Sequence, MountThreadStore{path:"persistent_chat"})}>
-				<CreateActor id=1 name="System" kind="System">
-					<CreatePost text="Ask a single brief, challenging question about the user's life choices. Followup with more brief questions based on the users' answers"/>
-				</CreateActor>
-				<CreateActor id=2 name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
-				<CreateActor id=3 name="User" kind="User" {UserInput}/>
-			</Thread>
-		</Repeat>
+		<FsStore path="target/persistent_chat" {JsonTableStore}>
+			<Repeat {RunThread}>
+				<Thread bx:ref="thread" {(Sequence, MountThreadStore{path:"persistent_chat"})}>
+					<CreateActor id=1 name="System" kind="System">
+						<CreatePost text="Ask a single brief, challenging question about the user's life choices. Followup with more brief questions based on the users' answers"/>
+					</CreateActor>
+					<CreateActor id=2 name="Agent" kind="Agent" {ModelStreamer{provider:OpenAi}}/>
+					<CreateActor id=3 name="User" kind="User" {UserInput}/>
+				</Thread>
+			</Repeat>
+		</FsStore>
 	</Router>
 </CallOnReady>

@@ -9,9 +9,12 @@
 //! - [`LocalStorageStore`]: Browser localStorage (WASM only)
 //! - [`S3Store`]: AWS S3 storage, and any S3-compatible service ie R2
 //!   (requires `aws`)
-//! - [`DynamoStore`]: AWS DynamoDB storage (requires `aws`)
-//! - [`SqliteStore`]: a SQLite database file, blobs and real SQL tables with an
-//!   SQL escape hatch (requires `sqlite`)
+//! - [`DynamoStore`]: tables in AWS DynamoDB (requires `aws`)
+//! - [`SqliteStore`]: tables in a SQLite database file, with an SQL escape
+//!   hatch (requires `sqlite`)
+//! - [`SqliteBlobStore`]: blobs in a SQLite database file (requires `sqlite`)
+//! - [`JsonTableStore`]: tables as json files in any blob store, for trying
+//!   things in a small binary and for a browser tab (requires `json`)
 //! - [`DurableObjectStore`]: tables whose every partition is a Cloudflare
 //!   Durable Object, natively a [`PartitionHost`] of SQLite files (requires
 //!   `json`)
@@ -32,12 +35,12 @@
 //!
 //! Use [`StorePlugin`] to register store types for world serialization.
 //! Concrete store types (like [`FsStore`], [`S3Store`]) are Components whose
-//! insert hooks derive the type-erased currencies: a [`BlobStore`], and a
-//! `TableStore` (blob backed, or natively for a table backend like SQLite or
-//! DynamoDB, see [`TableStore`] and the crate README's table section), so a
-//! consumer resolves either from the entity without naming a backend. Every store is selected by a `StoreUri` and
-//! built through `StoreProvider::from_uri`, the one place a uri becomes a
-//! backend.
+//! insert hooks derive the type-erased currency of what they hold: a
+//! [`BlobStore`] for bytes or a `TableStore` for rows, never one from the
+//! other, so a consumer resolves the kind it reads without naming a backend
+//! and never reaches the wrong store. Every store is selected by a `StoreUri`
+//! and built through `store_provider`, the one place a uri becomes a backend,
+//! as the kind that is asked for.
 //!
 //! # Example
 //!
@@ -56,6 +59,8 @@
 mod blob;
 mod blob_event;
 mod blob_store_provider;
+// what a blob store and a table store share.
+mod store_backend;
 pub use blob_event::*;
 pub use blob_store_provider::*;
 mod blob_store;
@@ -79,6 +84,7 @@ pub use blob_sync::*;
 pub use in_memory_store::*;
 pub use package_store::*;
 pub use repo_store::*;
+pub use store_backend::*;
 pub use store_fork::*;
 pub use store_path::*;
 
@@ -102,6 +108,9 @@ mod store_ref;
 // the uri -> concrete component seam every store construction goes through.
 #[cfg(feature = "std")]
 mod store_provider;
+// one sync between any two stores, by uri or by declaration.
+#[cfg(feature = "std")]
+mod store_sync;
 // tables, beet's one dialect for table-shaped data: rows as canonical json, keyed and
 // hashed through DAG-CBOR, so `json` (which brings `dag_cbor`).
 #[cfg(feature = "json")]
@@ -120,6 +129,8 @@ pub use http_store::*;
 pub use store_provider::*;
 #[cfg(feature = "std")]
 pub use store_ref::*;
+#[cfg(feature = "std")]
+pub use store_sync::*;
 #[cfg(feature = "json")]
 pub use table::*;
 // the `WatchDir` registration component (any `std` target) and the notify-based
@@ -157,17 +168,17 @@ pub use s3_store::*;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub use worker_env::*;
 #[cfg(feature = "aws")]
-mod s3_fs_store;
-#[cfg(feature = "aws")]
 mod s3_store;
 #[cfg(feature = "aws")]
 pub use dynamo_store::*;
 #[cfg(feature = "aws")]
-pub use s3_fs_store::*;
-#[cfg(feature = "aws")]
 mod dynamo_store;
 #[cfg(feature = "sqlite")]
+mod sqlite_blob_store;
+#[cfg(feature = "sqlite")]
 mod sqlite_store;
+#[cfg(feature = "sqlite")]
+pub use sqlite_blob_store::*;
 #[cfg(feature = "sqlite")]
 pub use sqlite_store::*;
 
@@ -259,12 +270,20 @@ impl Plugin for StorePlugin {
 
 		// the database-file store, so a scene declares a local index.
 		#[cfg(feature = "sqlite")]
-		app.register_type::<SqliteStore>();
+		app.register_type::<SqliteStore>()
+			.register_type::<SqliteBlobStore>();
 
 		// partitions as Durable Objects (natively a partition host), so a
 		// scene declares `<DurableObjectStore binding="TABLES"/>`
 		#[cfg(feature = "json")]
-		app.register_type::<DurableObjectStore>();
+		app.register_type::<DurableObjectStore>()
+			// tables over the nearest blob store, following it as it churns
+			.register_type::<JsonTableStore>()
+			.add_observer(on_insert_json_tables)
+			.add_observer(on_insert_json_table_blobs)
+			.add_observer(on_parent_json_tables)
+			.add_observer(on_remove_json_table_blobs)
+			.add_observer(on_remove_json_tables);
 
 		// the http-served store, so a scene declares a remote repo it reads.
 		#[cfg(all(feature = "std", feature = "json"))]

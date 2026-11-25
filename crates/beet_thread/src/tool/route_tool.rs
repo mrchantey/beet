@@ -281,7 +281,7 @@ impl RouteToolCall {
 			}
 			None => {
 				request = request
-					.with_body(Value::Map(fields).to_json_string()?)
+					.with_body(Value::Map(fields).to_json_string())
 					.with_content_type(MediaType::Json);
 			}
 		}
@@ -308,7 +308,7 @@ impl RouteToolCall {
 		let text = |value: &Value| -> Result<SmolStr> {
 			match value {
 				Value::Str(text) => text.clone(),
-				other => other.to_json_string()?.into(),
+				other => other.to_json_string().into(),
 			}
 			.xok()
 		};
@@ -409,7 +409,7 @@ mod test {
 	) -> Result<MediaBytes> {
 		MediaBytes::new_text(format!(
 			"put {} into {table}",
-			row.to_json_string()?
+			row.to_json_string()
 		))
 		.xok()
 	}
@@ -535,7 +535,6 @@ mod test {
 			.get("required")
 			.unwrap()
 			.to_json_string()
-			.unwrap()
 			.xpect_eq(r#"["eval","level"]"#);
 		outputs(&mut app, thread, agent, 1).await.xpect_eq(vec![
 			r#""graded brand.voice at 2 [\"a\", \"b\"]""#.to_string(),
@@ -551,7 +550,6 @@ mod test {
 		tool(&mut app, agent, "eval/grade")
 			.params_schema()
 			.to_json_string()
-			.unwrap()
 			.xpect_snapshot();
 	}
 
@@ -580,7 +578,6 @@ mod test {
 			.get("required")
 			.unwrap()
 			.to_json_string()
-			.unwrap()
 			.xpect_eq(r#"["rubric"]"#);
 		outputs(&mut app, thread, agent, 1)
 			.await
@@ -597,8 +594,7 @@ mod test {
 		);
 		let schema = tool(&mut app, agent, "eval/put")
 			.params_schema()
-			.to_json_string()
-			.unwrap();
+			.to_json_string();
 		schema
 			.as_str()
 			.xpect_contains("row")

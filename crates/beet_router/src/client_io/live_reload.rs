@@ -102,7 +102,7 @@ pub(crate) fn start_live_reload(
 
 /// Observer: a [`BlobEvent`] landed; latch [`NeedsReload`] onto every
 /// [`LiveReload`] site whose store owns the changed object (minus excluded
-/// churn), upgrading an already-latched marker to structural rather than
+/// churn, and the files a table store in it keeps its rows in), upgrading an already-latched marker to structural rather than
 /// clobbering it, so a structural change is never demoted by a following
 /// content change in the same burst.
 pub(crate) fn reload_site_on_change(
@@ -113,9 +113,14 @@ pub(crate) fn reload_site_on_change(
 		&BlobStore,
 		Option<&mut NeedsReload>,
 	)>,
+	#[cfg(feature = "json")] tables: Query<&TableStore>,
 	reloader: Option<Res<EntryReloader>>,
 	mut commands: Commands,
 ) {
+	#[cfg(feature = "json")]
+	if tables.iter().any(|tables| tables.holds_blob(ev.event())) {
+		return;
+	}
 	let structural = reloader
 		.as_ref()
 		.is_some_and(|reloader| reloader.is_structural(&ev.path));
@@ -432,6 +437,51 @@ mod test {
 		world.query_once::<&Retired>().len().xpect_eq(0);
 		// the edited document is read again
 		card(&mut world).await.xpect_contains("second card");
+	}
+
+	/// A row written to a table store kept in the watched repo store reloads
+	/// nothing, its first write and the next alike, where a page beside it
+	/// does.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn a_row_written_beside_a_site_reloads_nothing() {
+		let mut world = reload_world();
+		let root = spawn_site(
+			&mut world,
+			(InMemoryStore::new(), JsonTableStore::default()),
+		);
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		let tables = world.get::<TableStore>(root).unwrap().clone();
+		let blobs = world.get::<BlobStore>(root).unwrap().clone();
+		for tables in [tables.clone(), tables.partition("chat").unwrap()] {
+			for row in ["one", "two"] {
+				tables
+					.put(
+						"rows",
+						StoredRow::new(row, Row::default()).unwrap(),
+						Precondition::Any,
+					)
+					.await
+					.unwrap();
+				// the store's own event, drained as a watcher's is
+				world.update_local();
+				AsyncRunner::settle_async_tasks(&mut world).await;
+				world.entity(root).contains::<ReloadTail>().xpect_false();
+			}
+		}
+		blobs
+			.exists(&RelPath::new("chat.json"))
+			.await
+			.unwrap()
+			.xpect_true();
+		blobs
+			.insert(&RelPath::new("routes/about.md"), "# About")
+			.await
+			.unwrap();
+		tick_until(&mut world, |world| {
+			world.entity(root).contains::<ReloadTail>()
+		})
+		.await;
 	}
 
 	/// Drive the world frame by frame until `done` answers true, panicking if

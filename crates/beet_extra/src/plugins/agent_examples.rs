@@ -13,7 +13,6 @@
 //!   </Thread>
 //! </RepeatWhileFunctionCallOutput>
 //! ```
-use crate::beet::prelude::*;
 use beet_core::prelude::*;
 
 /// The two operands a calculator tool takes.

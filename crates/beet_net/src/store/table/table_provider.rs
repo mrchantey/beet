@@ -5,7 +5,8 @@ use serde::Deserialize;
 use serde::Serialize;
 
 /// Storage provider for one partition's tables: rows read and written as
-/// [`StoredRow`]s, each write guarded by a [`Precondition`].
+/// [`StoredRow`]s, each write guarded by a [`Precondition`]. Rows alone: a table
+/// store holds no bytes, which are a [`BlobStoreProvider`]'s.
 ///
 /// A provider is one database with one writer, atomic within itself:
 /// [`partition`](Self::partition) scopes another one out of the same
@@ -34,7 +35,7 @@ use serde::Serialize;
 /// side. [`apply`](Self::apply) is `applyWrites` guarded by `swapCommit`
 /// after reading the records its preconditions name, stricter than per-row
 /// and still correct. A PDS has no secondary indexes and refuses them.
-pub trait TableProvider: BlobStoreProvider {
+pub trait TableProvider: StoreBackend {
 	/// Returns a boxed clone of this provider for type erasure.
 	fn box_clone_table(&self) -> Box<dyn TableProvider>;
 
@@ -112,6 +113,14 @@ pub trait TableProvider: BlobStoreProvider {
 				.await?;
 			Ok(())
 		})
+	}
+
+	/// Whether `event` is of a blob these tables are kept in, which a watcher
+	/// of the blob store around them does not take for content. None for a
+	/// backend keeping no blobs.
+	fn holds_blob(&self, event: &BlobEvent) -> bool {
+		let _ = event;
+		false
 	}
 
 	/// One page of `table`'s rows ordered by the declared index `index`,
@@ -232,7 +241,7 @@ pub enum TableError {
 	/// The backend lacks a [`Capability`].
 	#[error("`{backend}` does not support {capability}")]
 	Unsupported {
-		/// The backend, its [`describe`](BlobStoreProvider::describe).
+		/// The backend, its [`describe`](StoreBackend::describe).
 		backend: SmolStr,
 		/// What it lacks.
 		capability: Capability,
@@ -240,7 +249,7 @@ pub enum TableError {
 	/// A request past one of the backend's fixed limits.
 	#[error("`{backend}` refuses {found} {what}, past its limit of {limit}")]
 	Limit {
-		/// The backend, its [`describe`](BlobStoreProvider::describe).
+		/// The backend, its [`describe`](StoreBackend::describe).
 		backend: SmolStr,
 		/// What is limited, ie `writes in one batch`.
 		what: SmolStr,
@@ -254,7 +263,7 @@ pub enum TableError {
 impl TableError {
 	/// The refusal of `capability` by `provider`.
 	pub fn unsupported(
-		provider: &(impl ?Sized + BlobStoreProvider),
+		provider: &(impl ?Sized + StoreBackend),
 		capability: Capability,
 	) -> Self {
 		Self::Unsupported {

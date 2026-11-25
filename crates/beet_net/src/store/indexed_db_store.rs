@@ -212,33 +212,10 @@ impl IndexedDbStore {
 	}
 }
 
-impl BlobStoreProvider for IndexedDbStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
-		Box::new(IndexedDbStore {
-			db_name: self.db_name.clone(),
-			subdir: Some(match &self.subdir {
-				Some(existing) => existing.join(&path),
-				None => path,
-			}),
-		})
-	}
-
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
-		Box::new(IndexedDbStore {
-			subdir: None,
-			..self.clone()
-		})
-	}
-
+impl StoreBackend for IndexedDbStore {
 	fn id(&self) -> &'static str { "indexeddb" }
 
-	fn root_key(&self) -> SmolStr {
-		format!("indexeddb:{}", self.db_name).into()
-	}
-
-	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
+	fn describe(&self) -> String { self.root_key().to_string() }
 
 	fn region(&self) -> Option<String> { None }
 
@@ -263,6 +240,33 @@ impl BlobStoreProvider for IndexedDbStore {
 			Ok(())
 		}))
 	}
+}
+
+impl BlobStoreProvider for IndexedDbStore {
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(IndexedDbStore {
+			db_name: self.db_name.clone(),
+			subdir: Some(match &self.subdir {
+				Some(existing) => existing.join(&path),
+				None => path,
+			}),
+		})
+	}
+
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(IndexedDbStore {
+			subdir: None,
+			..self.clone()
+		})
+	}
+
+	fn root_key(&self) -> SmolStr {
+		format!("indexeddb:{}", self.db_name).into()
+	}
+
+	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
 
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let db_name = self.db_name.clone();
@@ -384,6 +388,8 @@ impl BlobStoreProvider for IndexedDbStore {
 		}))
 	}
 
+	fn conditional_writes(&self) -> bool { true }
+
 	fn get_versioned(
 		&self,
 		path: &RelPath,
@@ -468,11 +474,14 @@ mod test {
 		store_test::run(provider).await;
 	}
 
-	#[beet_core::test(browser)]
+	#[beet_core::test(browser, timeout_ms = 60_000)]
 	async fn table() {
-		table_test::run(TableStore::new(BlobStore::new(IndexedDbStore::new(
-			"test-table",
-		))))
+		table_test::run(
+			JsonTableStore::over(BlobStore::new(IndexedDbStore::new(
+				"test-table",
+			)))
+			.unwrap(),
+		)
 		.await;
 	}
 }

@@ -25,8 +25,9 @@ use beet::prelude::*;
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn AnalyticsReport(
-	/// The analytics store, ie `sqlite:target/stores/analytics.db` or
-	/// `dynamo://my-app--prod--analytics`, for a report over a store no entry
+	/// The analytics table store, ie `sqlite:target/stores/analytics.db` or
+	/// `dynamo://my-app--prod--analytics` (a blob uri is the json tables in
+	/// it), for a report over a store no entry
 	/// declares. Absent, the report reads the store the entry's
 	/// `AnalyticsConfig` writes to, local or remote by `--service-access`.
 	#[param]
@@ -133,7 +134,10 @@ mod test {
 	fn recording_world(temp: &TempDir) -> World {
 		let mut world = crate::commands::render_world();
 		let declared = world
-			.spawn(FsStore::new(AbsPath::new(temp.path()).unwrap()))
+			.spawn((
+				FsStore::new(AbsPath::new(temp.path()).unwrap()),
+				JsonTableStore::default(),
+			))
 			.id();
 		world.spawn((AnalyticsConfig::default(), StoreRef(declared)));
 		world
@@ -169,7 +173,7 @@ mod test {
 	async fn several_configs_need_a_store() {
 		let temp = TempDir::new().unwrap();
 		let mut world = recording_world(&temp);
-		let other = world.spawn(InMemoryStore::new()).id();
+		let other = world.spawn(TableStore::temp()).id();
 		world.spawn((AnalyticsConfig::default(), StoreRef(other)));
 		exchange(&mut world, "analytics summary")
 			.await

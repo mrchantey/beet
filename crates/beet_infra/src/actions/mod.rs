@@ -11,8 +11,6 @@ mod cloudflare_zone;
 pub mod cloudwatch_ext;
 mod derive;
 mod dir_copy;
-#[cfg(feature = "aws")]
-mod dir_sync;
 mod ensure_secret;
 #[cfg(feature = "lambda_block")]
 mod lambda_restart;
@@ -30,8 +28,6 @@ mod ssh_authority;
 mod ssh_connection;
 mod stack_teardown;
 mod store_sync;
-#[cfg(feature = "aws")]
-mod sync_s3_bucket;
 mod tofu_apply_action;
 mod tofu_destroy_action;
 mod wasm_runtime;
@@ -46,8 +42,6 @@ pub use cloudflare_zone::*;
 pub use cloudwatch_ext::MetricDatum;
 pub use derive::*;
 pub use dir_copy::*;
-#[cfg(feature = "aws")]
-pub use dir_sync::*;
 pub use ensure_secret::*;
 #[cfg(feature = "lambda_block")]
 pub use lambda_restart::*;
@@ -65,8 +59,6 @@ pub use ssh_authority::*;
 pub use ssh_connection::*;
 pub use stack_teardown::*;
 pub use store_sync::*;
-#[cfg(feature = "aws")]
-pub use sync_s3_bucket::*;
 pub use tofu_apply_action::*;
 pub use tofu_destroy_action::*;
 pub use wasm_runtime::*;

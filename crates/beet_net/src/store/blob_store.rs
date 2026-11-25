@@ -8,7 +8,8 @@ use bytes::Bytes;
 ///
 /// Wraps an [`Arc<dyn BlobStoreProvider>`] and delegates all operations to the
 /// inner provider. Implements [`BlobStoreProvider`] itself, so it can be used
-/// anywhere a provider is expected.
+/// anywhere a provider is expected. Bytes alone: a blob store is never a table
+/// store, see `JsonTableStore` for rows over one.
 #[derive(Clone, Component)]
 pub struct BlobStore {
 	/// Provider that handles store operations (S3, filesystem, memory, etc.)
@@ -164,17 +165,6 @@ impl BlobStore {
 	/// ```
 	pub fn blob(&self, path: RelPath) -> Blob { Blob::new(self.clone(), path) }
 
-	/// The erased currencies a store entity carries: this store and, since any
-	/// blob store backs a table (json rows keyed by id), the [`TableStore`]
-	/// over it.
-	pub fn into_bundle(self) -> impl Bundle {
-		(
-			#[cfg(all(feature = "json", feature = "std"))]
-			TableStore::new(self.clone()),
-			self,
-		)
-	}
-
 	/// Component hook that reads a concrete store component from
 	/// the entity and inserts a [`BlobStore`] wrapping it.
 	/// Use with `#[component(on_insert = BlobStore::on_insert::<MyStore>)]`.
@@ -184,13 +174,10 @@ impl BlobStore {
 	) {
 		match world.entity(cx.entity).get_or_else::<T>().cloned() {
 			Ok(provider) => {
-				let store = BlobStore::new(provider);
-				// a table-native provider's own [`TableStore::on_insert`] runs
-				// after and overrides the table.
 				world
 					.commands()
 					.entity(cx.entity)
-					.insert(store.into_bundle());
+					.insert(BlobStore::new(provider));
 			}
 			Err(err) => {
 				world.fallback_error_handler()(err, ErrorContext::Command {
@@ -289,6 +276,30 @@ impl BlobStore {
 	}
 }
 
+impl StoreBackend for BlobStore {
+	fn id(&self) -> &'static str { self.provider.id() }
+
+	fn describe(&self) -> String { self.provider.describe() }
+
+	fn region(&self) -> Option<String> { self.provider.region() }
+
+	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
+		self.provider.store_exists()
+	}
+
+	fn store_create(&self) -> SendBoxedFuture<Result> {
+		self.provider.store_create()
+	}
+
+	fn store_try_create(&self) -> SendBoxedFuture<Result> {
+		self.provider.store_try_create()
+	}
+
+	fn store_remove(&self) -> SendBoxedFuture<Result> {
+		self.provider.store_remove()
+	}
+}
+
 impl BlobStoreProvider for BlobStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
@@ -302,7 +313,6 @@ impl BlobStoreProvider for BlobStore {
 	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
 		self.provider.rebase(entry_name, root)
 	}
-	fn id(&self) -> &'static str { self.provider.id() }
 	fn root_key(&self) -> SmolStr { self.provider.root_key() }
 	fn subdir(&self) -> RelPath { self.provider.subdir() }
 	fn watch_dir(&self) -> Option<AbsPath> { self.provider.watch_dir() }
@@ -312,16 +322,6 @@ impl BlobStoreProvider for BlobStore {
 	}
 	fn matches_object(&self, event: &BlobEvent, path: &RelPath) -> bool {
 		self.provider.matches_object(event, path)
-	}
-	fn region(&self) -> Option<String> { self.provider.region() }
-	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
-		self.provider.store_exists()
-	}
-	fn store_create(&self) -> SendBoxedFuture<Result> {
-		self.provider.store_create()
-	}
-	fn store_remove(&self) -> SendBoxedFuture<Result> {
-		self.provider.store_remove()
 	}
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.provider.insert(path, body)
@@ -341,6 +341,7 @@ impl BlobStoreProvider for BlobStore {
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		self.provider.remove(path)
 	}
+	fn conditional_writes(&self) -> bool { self.provider.conditional_writes() }
 	fn get_versioned(
 		&self,
 		path: &RelPath,
@@ -373,6 +374,9 @@ impl BlobStoreProvider for BlobStore {
 	}
 	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
 		self.provider.list_stats()
+	}
+	fn empty_links(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+		self.provider.empty_links()
 	}
 	fn public_url(
 		&self,

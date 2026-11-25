@@ -1,26 +1,27 @@
 //! The one seam between a [`StoreUri`] and the concrete store component it
-//! names.
+//! names, as the kind it is asked for: [`StoreProvider`] a store of bytes,
+//! [`TableStoreProvider`] a store of rows.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// The concrete store component a [`StoreUri`] names, built by
+/// The concrete blob store component a [`StoreUri`] names, built by
 /// [`from_uri`](Self::from_uri): the single construction seam for store
 /// selection, shared by the binary's entry resolution, the `check`/`serve`/
 /// `export-static` commands and every declaration's runtime attach, so store
 /// selection is uri-driven everywhere and no call site matches on a kind.
 ///
 /// A concrete component rather than an erased [`BlobStore`], because the
-/// component's own insert hook is what lands the erased currencies (the
-/// [`BlobStore`], and the `TableStore` under `json`) on its entity, and a
-/// concrete component reflects, so a scene serializes and inspects the store
-/// it was given. [`insert`](Self::insert) lands it on an entity;
+/// component's own insert hook is what lands the [`BlobStore`] on its entity,
+/// and a concrete component reflects, so a scene serializes and inspects the
+/// store it was given. [`insert`](Self::insert) lands it on an entity;
 /// [`into_blob_store`](Self::into_blob_store) erases it for a world-free
 /// caller.
 ///
 /// A kind whose backend this build did not compile errors with guidance rather
 /// than degrading: the store concept is target-agnostic, only the backend is
-/// gated.
+/// gated. A uri naming a table store alone (`dynamo:`) is refused, see
+/// [`TableStoreProvider`].
 #[derive(Debug, Clone)]
 pub enum StoreProvider {
 	/// `fs` / `fs:<path>`.
@@ -30,9 +31,6 @@ pub enum StoreProvider {
 	/// `s3://<bucket>`.
 	#[cfg(feature = "aws")]
 	S3(S3Store),
-	/// `dynamo://<table>`.
-	#[cfg(feature = "aws")]
-	Dynamo(DynamoStore),
 	/// `local-storage://<store>`.
 	#[cfg(target_arch = "wasm32")]
 	LocalStorage(LocalStorageStore),
@@ -47,7 +45,7 @@ pub enum StoreProvider {
 	Http(HttpStore),
 	/// `sqlite:<path>`.
 	#[cfg(feature = "sqlite")]
-	Sqlite(SqliteStore),
+	Sqlite(SqliteBlobStore),
 }
 
 /// Apply `$body` to every variant's store, the one match `insert` and
@@ -59,8 +57,6 @@ macro_rules! each_store {
 			StoreProvider::Memory($store) => $body,
 			#[cfg(feature = "aws")]
 			StoreProvider::S3($store) => $body,
-			#[cfg(feature = "aws")]
-			StoreProvider::Dynamo($store) => $body,
 			#[cfg(target_arch = "wasm32")]
 			StoreProvider::LocalStorage($store) => $body,
 			#[cfg(target_arch = "wasm32")]
@@ -76,7 +72,7 @@ macro_rules! each_store {
 }
 
 impl StoreProvider {
-	/// The store `uri` names. A relative `fs:` path resolves against the cwd,
+	/// The blob store `uri` names. A relative `fs:` path resolves against the cwd,
 	/// the context dir a caller with a better one pins first
 	/// ([`StoreUri::rooted_at`]).
 	pub fn from_uri(uri: &StoreUri) -> Result<Self> {
@@ -98,10 +94,12 @@ impl StoreProvider {
 			}
 			#[cfg(feature = "aws")]
 			StoreUri::S3 { .. } => Self::S3(S3Store::from_uri(uri)?),
-			#[cfg(feature = "aws")]
-			StoreUri::Dynamo { .. } => Self::Dynamo(DynamoStore::from_uri(uri)?),
+			StoreUri::Dynamo { .. } => bevybail!(
+				"store `{uri}` is a table store and holds no blobs: name a \
+				 bucket or a directory for bytes, ie `s3://<bucket>`"
+			),
 			#[cfg(not(feature = "aws"))]
-			StoreUri::S3 { .. } | StoreUri::Dynamo { .. } => bevybail!(
+			StoreUri::S3 { .. } => bevybail!(
 				"store `{uri}` requires a compiled AWS backend (enable the \
 				 `aws` feature)"
 			),
@@ -144,7 +142,7 @@ impl StoreProvider {
 				 (enable the `json` feature)"
 			),
 			#[cfg(feature = "sqlite")]
-			StoreUri::Sqlite { .. } => Self::Sqlite(SqliteStore::from_uri(uri)?),
+			StoreUri::Sqlite { .. } => Self::Sqlite(SqliteBlobStore::from_uri(uri)?),
 			#[cfg(not(feature = "sqlite"))]
 			StoreUri::Sqlite { .. } => bevybail!(
 				"store `{uri}` is a SQLite database (enable the `sqlite` \
@@ -177,7 +175,7 @@ impl StoreProvider {
 	}
 
 	/// Land the store on `entity`, its insert hook deriving the erased
-	/// currencies at the next flush.
+	/// [`BlobStore`] at the next flush.
 	pub fn insert(self, entity: &mut EntityWorldMut) {
 		each_store!(self, |store| {
 			entity.insert(store);
@@ -188,18 +186,79 @@ impl StoreProvider {
 	pub fn into_blob_store(self) -> BlobStore {
 		each_store!(self, |store| BlobStore::new(store))
 	}
+}
 
-	/// The erased table store, for a caller with no entity to land it on: a
-	/// table-native backend's own tables, any other the blob backed form,
-	/// exactly as the component hooks materialize it.
-	#[cfg(feature = "json")]
+/// The table store a [`StoreUri`] names, built by
+/// [`from_uri`](Self::from_uri): [`StoreProvider`]'s twin for rows. A uri
+/// names a table store or a blob store by which is asked for, so a `sqlite:`
+/// file answers both, and any blob uri asked for as a table store is a
+/// [`JsonTableStore`] over it, since a caller asking for that names it by
+/// asking.
+#[cfg(feature = "json")]
+#[derive(Debug, Clone)]
+pub enum TableStoreProvider {
+	/// `dynamo://<table>`.
+	#[cfg(feature = "aws")]
+	Dynamo(DynamoStore),
+	/// `sqlite:<path>`.
+	#[cfg(feature = "sqlite")]
+	Sqlite(SqliteStore),
+	/// A blob uri, its rows json files.
+	Json(JsonTableProvider),
+}
+
+#[cfg(feature = "json")]
+impl TableStoreProvider {
+	/// The table store `uri` names, a relative path resolved as
+	/// [`StoreProvider::from_uri`] resolves one.
+	///
+	/// # Errors
+	/// Errors for a kind this build has no backend for, and for a blob store
+	/// no rows can be kept in (one read over http).
+	pub fn from_uri(uri: &StoreUri) -> Result<Self> {
+		match uri {
+			#[cfg(feature = "aws")]
+			StoreUri::Dynamo { .. } => Self::Dynamo(DynamoStore::from_uri(uri)?),
+			#[cfg(not(feature = "aws"))]
+			StoreUri::Dynamo { .. } => bevybail!(
+				"store `{uri}` requires a compiled AWS backend (enable the \
+				 `aws` feature)"
+			),
+			#[cfg(feature = "sqlite")]
+			StoreUri::Sqlite { .. } => Self::Sqlite(SqliteStore::from_uri(uri)?),
+			uri => StoreProvider::from_uri(uri)?
+				.into_blob_store()
+				.xmap(JsonTableProvider::new)?
+				.xmap(Self::Json),
+		}
+		.xok()
+	}
+
+	/// Land the table store on `entity`, the concrete component where there
+	/// is one. A blob uri lands its rows alone, never the blob store they are
+	/// in.
+	pub fn insert(self, entity: &mut EntityWorldMut) {
+		match self {
+			#[cfg(feature = "aws")]
+			Self::Dynamo(store) => {
+				entity.insert(store);
+			}
+			#[cfg(feature = "sqlite")]
+			Self::Sqlite(store) => {
+				entity.insert(store);
+			}
+			Self::Json(store) => TableStore::new(store).land(entity),
+		}
+	}
+
+	/// The erased store, for a caller with no entity to land it on.
 	pub fn into_table_store(self) -> TableStore {
 		match self {
 			#[cfg(feature = "aws")]
 			Self::Dynamo(store) => TableStore::new(store),
 			#[cfg(feature = "sqlite")]
 			Self::Sqlite(store) => TableStore::new(store),
-			other => TableStore::new(other.into_blob_store()),
+			Self::Json(store) => TableStore::new(store),
 		}
 	}
 }
@@ -226,7 +285,7 @@ mod test {
 			.xpect_eq(("memory:m".into(), RelPath::new("docs")));
 	}
 
-	/// A database file uri builds the sqlite backend, its relative path
+	/// A database file uri builds the sqlite blob store, its relative path
 	/// resolved against the cwd and its blobs unscoped.
 	#[cfg(feature = "sqlite")]
 	#[beet_core::test]
@@ -241,6 +300,65 @@ mod test {
 			.root_key()
 			.xpect_eq(format!("sqlite:{}", AbsPath::new("data.db").unwrap()));
 		store.subdir().xpect_eq(RelPath::default());
+	}
+
+	/// A uri is the kind it is asked for: a database file either, a Dynamo
+	/// table rows alone, and a blob uri rows as json files in it.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	fn a_uri_is_the_kind_asked_for() {
+		let uri = |uri: &str| StoreUri::parse(uri).unwrap();
+		TableStore::from_uri(&uri("memory://kinds"))
+			.unwrap()
+			.describe()
+			.xpect_eq("json:memory:kinds/@root.json");
+		BlobStore::from_uri(&uri("dynamo://t"))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("holds no blobs")
+			.xpect_contains("s3://<bucket>");
+		TableStore::from_uri(&uri("http://localhost/repo"))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("conditional writes")
+			.xpect_contains("SqliteStore");
+		#[cfg(feature = "aws")]
+		TableStore::from_uri(&uri("dynamo://t"))
+			.unwrap()
+			.describe()
+			.xpect_eq("dynamo:t");
+		#[cfg(feature = "sqlite")]
+		{
+			TableStore::from_uri(&uri("sqlite:/data.db"))
+				.unwrap()
+				.supports(Capability::Sql)
+				.xpect_true();
+			BlobStore::from_uri(&uri("sqlite:/data.db"))
+				.unwrap()
+				.id()
+				.xpect_eq("sqlite");
+		}
+	}
+
+	/// Landing a uri as either kind lands that kind alone.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	fn lands_one_kind() {
+		let mut world = World::new();
+		let uri = StoreUri::parse("memory://lands-one-kind").unwrap();
+		let blobs = world.spawn_empty().id();
+		StoreProvider::from_uri(&uri)
+			.unwrap()
+			.insert(&mut world.entity_mut(blobs));
+		let tables = world.spawn_empty().id();
+		TableStoreProvider::from_uri(&uri)
+			.unwrap()
+			.insert(&mut world.entity_mut(tables));
+		world.flush();
+		world.entity(blobs).contains::<BlobStore>().xpect_true();
+		world.entity(blobs).contains::<TableStore>().xpect_false();
+		world.entity(tables).contains::<BlobStore>().xpect_false();
+		world.entity(tables).contains::<TableStore>().xpect_true();
 	}
 
 	/// A memory uri names one backing: every build of it reads the same data,

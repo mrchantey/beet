@@ -1,8 +1,8 @@
 <!--
-The thread `function.bsx` builds for each request. It mounts a store path naming
-the document, so a second review of one document continues its thread, and the
-message that asks for the review is the route's, never the template's. The agent
-loop is `{RepeatWhileFunctionCallOutput}`: read through the tool, then answer.
+The thread `function.bsx` builds for each request. It mounts a path naming the
+document, in the table store `function.bsx` declares around its route, so a second
+review of one document continues its thread, and the message that asks for the review
+is the route's, never the template's. The agent loop is `{RepeatWhileFunctionCallOutput}`: read through the tool, then answer.
 -->
 <RepeatWhileFunctionCallOutput>
 	<Thread {(Sequence, MountThreadStore{path:"reviews/{document}"})}>

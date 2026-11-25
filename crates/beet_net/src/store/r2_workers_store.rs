@@ -93,33 +93,10 @@ impl R2WorkersStore {
 	}
 }
 
-impl BlobStoreProvider for R2WorkersStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
-		Box::new(R2WorkersStore {
-			binding: self.binding.clone(),
-			subdir: Some(match &self.subdir {
-				Some(existing) => existing.join(&path),
-				None => path,
-			}),
-		})
-	}
-
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
-		Box::new(R2WorkersStore {
-			subdir: None,
-			..self.clone()
-		})
-	}
-
+impl StoreBackend for R2WorkersStore {
 	fn id(&self) -> &'static str { "r2_workers" }
 
-	fn root_key(&self) -> SmolStr {
-		format!("r2_workers:{}", self.binding).into()
-	}
-
-	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
+	fn describe(&self) -> String { self.root_key().to_string() }
 
 	fn region(&self) -> Option<String> { None }
 
@@ -140,6 +117,33 @@ impl BlobStoreProvider for R2WorkersStore {
 			bevybail!("R2WorkersStore does not support removing the bucket")
 		}))
 	}
+}
+
+impl BlobStoreProvider for R2WorkersStore {
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(R2WorkersStore {
+			binding: self.binding.clone(),
+			subdir: Some(match &self.subdir {
+				Some(existing) => existing.join(&path),
+				None => path,
+			}),
+		})
+	}
+
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(R2WorkersStore {
+			subdir: None,
+			..self.clone()
+		})
+	}
+
+	fn root_key(&self) -> SmolStr {
+		format!("r2_workers:{}", self.binding).into()
+	}
+
+	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
 
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let bucket = self.bucket();
@@ -223,6 +227,8 @@ impl BlobStoreProvider for R2WorkersStore {
 			().xok()
 		}))
 	}
+
+	fn conditional_writes(&self) -> bool { true }
 
 	/// The object and its etag, the version the binding's conditional put
 	/// compares.

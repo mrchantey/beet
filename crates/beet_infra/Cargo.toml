@@ -18,7 +18,7 @@ repository.workspace = true
 default = ["bindings_aws_common", "bindings_aws_dynamo"]
 bindings_generator = ["tokens","prettyplease","beet_core/tokens"]
 tokens = ["proc-macro2", "quote", "syn"]
-# The S3 bucket declaration's runtime half: a `<DirSync>` spells its S3 end
+# The S3 bucket declaration's runtime half: a `<StoreSync>` reaches its bucket
 # through `S3BucketBlock::store_uri`, an S3 state backend and an R2 bucket are
 # reached through `S3Store`. The client itself is always on.
 aws = ["bindings_aws_common"]

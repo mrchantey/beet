@@ -40,13 +40,14 @@
 //! outside the mount's own prefix. A mount declaring `new:true` persists and
 //! never continues: every entry behaves as `--new`.
 //!
-//! The store is the `TableStore` at or above the thread, its rows keyed under
+//! The store is the `TableStore` declared at or above the thread, never one a
+//! blob store implies, its rows keyed under
 //! the mount's filled path ([`ThreadStore`], which gives the layout): the
 //! thread, each actor, each post and each response's metadata
 //! ([`ResponseMeta`]) is its own row, keyed by its id. A write is a row, never
 //! a rewrite of the thread, so two writers on one thread never erase each
-//! other, and whatever backs the table, json over blobs, sqlite or dynamo,
-//! backs the thread.
+//! other, and whatever backs the table, json files, sqlite or dynamo, backs
+//! the thread.
 //!
 //! # Windows
 //!

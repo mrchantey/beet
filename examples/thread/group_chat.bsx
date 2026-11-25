@@ -7,7 +7,8 @@ Run it through the one binary, serving the local terminal and ssh:
 
 Each `<Thread>` is a window onto the one thread stored under `group_chat`, with its
 own view and composer, Ann's at `/` and Bob's at `/guest`. A post in either shows in
-both at once (window sync) and is stored once, so a re-run continues the chat. Press
+both at once (window sync) and is stored once, as rows of the json file under
+`target/group_chat` that `{JsonTableStore}` keeps, so a re-run continues the chat. Press
 Tab to reach a composer that has no focus, since two pages each ask for it.
 
 Adding `http` to the servers serves the same pages to a browser, to read: each load
@@ -28,13 +29,15 @@ like. The actor ids are pinned so each run's actors are the stored thread's.
 			<ThreadView {OfThread($guest)}/>
 			<CreatePostForm actor=2 {OfThread($guest)}/>
 		</Route>
-		<Fragment {RunThread}>
-			<Thread bx:ref="home" {MountThreadStore{path:"group_chat"}}>
-				<CreateActor id=1 name="Ann" kind="User"/>
-			</Thread>
-			<Thread bx:ref="guest" {MountThreadStore{path:"group_chat"}}>
-				<CreateActor id=2 name="Bob" kind="User"/>
-			</Thread>
-		</Fragment>
+		<FsStore path="target/group_chat" {JsonTableStore}>
+			<Fragment {RunThread}>
+				<Thread bx:ref="home" {MountThreadStore{path:"group_chat"}}>
+					<CreateActor id=1 name="Ann" kind="User"/>
+				</Thread>
+				<Thread bx:ref="guest" {MountThreadStore{path:"group_chat"}}>
+					<CreateActor id=2 name="Bob" kind="User"/>
+				</Thread>
+			</Fragment>
+		</FsStore>
 	</Router>
 </CallOnReady>

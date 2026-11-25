@@ -327,10 +327,10 @@ pub async fn read_sources(
 	.xok()
 }
 
-/// Build read [`EntrySources`] into a root carrying `repo_store`, the [`TableStore`]
-/// over it ([`BlobStore::into_bundle`]) and its [`PackageStore`] (resolved by ancestry
-/// for `<RoutesDir>`, a thread's mount and the rest), with `extra` riding onto the
-/// root. The entry runs itself: its own `CallOnReady` verbs act on their `Ready`, so
+/// Build read [`EntrySources`] into a root carrying `repo_store` and its
+/// [`PackageStore`] (resolved by ancestry for `<RoutesDir>` and the rest), with
+/// `extra` riding onto the root. It carries no table store: an entry keeping
+/// rows, ie a thread's records, declares one. The entry runs itself: its own `CallOnReady` verbs act on their `Ready`, so
 /// a render-only command (`check`, `export-static`, the Worker) passes
 /// [`DisableCallOnReady`] in `extra` to build the tree disarmed. The synchronous
 /// world-mutating tail of an entry load; returns the root entity. A driver
@@ -359,7 +359,7 @@ pub fn build_root(
 	// claims the app's one canonical store: a command loading a foreign entry
 	// into the same world builds a second rooted store, which is that sub-app's,
 	// not this process's.
-	let root = world.spawn((extra, repo_store.into_bundle(), package)).id();
+	let root = world.spawn((extra, repo_store, package)).id();
 	// the pre-scanned `<RequireCfg>`s, asserted before the tree builds: an unmet
 	// one refuses the load, so nothing in the tree (a `CallOnReady` action) runs
 	// in a binary that cannot support it, and the report holds even when the
@@ -619,8 +619,9 @@ mod test {
 			build_source(&mut world, "<Router><DefaultAppRoutes/></Router>")
 				.await
 				.unwrap();
-		// its store backs tables, ie a thread's records, for every descendant
-		world.entity(root).contains::<TableStore>().xpect_true();
+		// its store is bytes alone: an entry keeping rows declares a table store
+		world.entity(root).contains::<BlobStore>().xpect_true();
+		world.entity(root).contains::<TableStore>().xpect_false();
 		// the entry built into a router root carrying the default app routes
 		world.entity(root).contains::<Router>().xpect_true();
 		world

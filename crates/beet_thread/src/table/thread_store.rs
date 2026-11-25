@@ -650,9 +650,10 @@ pub(crate) mod thread_store_test {
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn fs() {
 		let dir = TempDir::new_ws().unwrap();
-		run(TableStore::new(BlobStore::new(FsStore::new(
+		run(JsonTableStore::over(BlobStore::new(FsStore::new(
 			dir.path().clone(),
-		))))
+		)))
+		.unwrap())
 		.await;
 	}
 

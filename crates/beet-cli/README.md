@@ -26,7 +26,7 @@ site (eg `examples/beetmania`) declares its own servers and commands in markup, 
 | `check` | Lint a no-code site's routes |
 | `export-static` | Render a no-code site to its `dist/` |
 | `export-pdf` | Render a route to PDF |
-| `s3-sync` | Sync a directory between the local filesystem and S3 |
+| `store-sync` | Sync one store into another, any two store uris |
 | `qrcode` | Generate a QR code (`qrcode` feature) |
 | `vault/*` | The age identity (`keygen`, `backup`, `restore-identity`) and any age file by path (`encrypt`, `decrypt`, `rekey`); `vault` feature |
 | `secrets/*` | The entry's secrets document (`ls`, `get`, `set`, `rm`, `rekey`, `check`, `exec`); `vault` feature, see [Secrets](https://beet.org/docs/secrets) |

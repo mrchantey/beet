@@ -492,6 +492,8 @@ mod test {
 	/// placeholders the served html carries, since the tab adopts that html:
 	/// the wrapper foreign, so the document's swap survives the adoption, and
 	/// carrying the address a fresh paint fetches, the content never built.
+	// the wasm runner (deno) has no document for the host to paint
+	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	async fn a_browser_surface_resolves_island_placeholders() {
 		let mut app = nav_app();

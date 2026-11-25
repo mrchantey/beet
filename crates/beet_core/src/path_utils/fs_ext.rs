@@ -149,6 +149,29 @@ pub fn is_dir(path: impl AsRef<Path>) -> bool {
 	}
 }
 
+/// The symbolic links directly in the directory `path`, one naming nothing
+/// included, which a [`ReadDir`] skips. Always empty on wasm, which has no link
+/// metadata.
+pub fn symlinks(path: impl AsRef<Path>) -> FsResult<Vec<PathBuf>> {
+	let path = path.as_ref();
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			let _ = path;
+			Ok(Vec::new())
+		} else {
+			fs::read_dir(path)
+				.map_err(|err| FsError::io(path, err))?
+				.map(|entry| {
+					entry
+						.map(|entry| entry.path())
+						.map_err(|err| FsError::io(path, err))
+				})
+				.filter(|entry| entry.as_ref().map_or(true, is_symlink))
+				.collect()
+		}
+	}
+}
+
 /// Whether `path` is a symbolic link, without following it. Always false on
 /// wasm, which has no link metadata.
 pub fn is_symlink(path: impl AsRef<Path>) -> bool {
@@ -601,43 +624,83 @@ pub async fn write_async(
 	}
 }
 
-/// The suffix of the temporary file [`write_replacing_async`] renames into
-/// place, so a listing in flight can skip it.
+/// The suffix of the temporary file [`write_replacing`] renames into place, so
+/// a listing in flight can skip it.
 pub const REPLACING_SUFFIX: &str = ".beet-replacing";
 
 /// Write a file whole or not at all, ensuring the path exists: the data
 /// lands in a sibling temporary file, named with [`REPLACING_SUFFIX`], renamed
 /// over `path`, so a concurrent reader sees the old content or the new and
-/// never a torn write. On wasm a plain [`write_async`], the runner's fs
-/// having no rename.
-pub async fn write_replacing_async(
+/// never a torn write. On wasm a plain [`write`], the runner's fs having no
+/// rename.
+pub fn write_replacing(
 	path: impl AsRef<Path>,
 	data: impl AsRef<[u8]>,
 ) -> FsResult {
-	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
-	{
-		fs_ext::write_async(path, data).await
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			fs_ext::write(path, data)
+		} else {
+			use core::sync::atomic::AtomicU64;
+			use core::sync::atomic::Ordering;
+			static NEXT: AtomicU64 = AtomicU64::new(0);
+			let path = path.as_ref();
+			let name = path
+				.file_name()
+				.map(|name| name.to_string_lossy().to_string())
+				.unwrap_or_default();
+			let temp = path.with_file_name(format!(
+				".{name}.{}-{}{REPLACING_SUFFIX}",
+				std::process::id(),
+				NEXT.fetch_add(1, Ordering::Relaxed)
+			));
+			fs_ext::write(&temp, data)?;
+			fs::rename(&temp, path).map_err(|err| FsError::io(path, err))
+		}
 	}
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-	{
-		use core::sync::atomic::AtomicU64;
-		use core::sync::atomic::Ordering;
-		static NEXT: AtomicU64 = AtomicU64::new(0);
-		let path = path.as_ref();
-		let name = path
-			.file_name()
-			.map(|name| name.to_string_lossy().to_string())
-			.unwrap_or_default();
-		let temp = path.with_file_name(format!(
-			".{name}.{}-{}{REPLACING_SUFFIX}",
-			std::process::id(),
-			NEXT.fetch_add(1, Ordering::Relaxed)
-		));
-		fs_ext::write_async(&temp, data).await?;
-		async_fs::rename(&temp, path)
-			.await
-			.map_err(|err| FsError::io(path, err))?;
-		Ok(())
+}
+
+/// A directory locked by [`lock_dir`], until dropped.
+#[derive(Debug)]
+pub struct DirLock(
+	/// `None` where the directory could not be locked.
+	#[allow(dead_code, reason = "held for its drop")]
+	Option<fs::File>,
+);
+
+impl DirLock {
+	/// Whether the directory is held against other processes.
+	pub fn is_held(&self) -> bool { self.0.is_some() }
+}
+
+/// Lock the directory at `path` against every other process locking it, ie by
+/// another path through a symlink, blocking until it is free: an advisory lock
+/// on the directory itself (`flock`), so no lock file is left behind or seen
+/// by a watcher. The kernel releases it as the handle closes, however the
+/// process ends.
+///
+/// Nothing is held, and [`DirLock::is_held`] says so, where a directory cannot
+/// be opened to lock (anything but unix) or its filesystem has no locks.
+///
+/// # Errors
+/// Errors when the directory cannot be opened, ie is missing.
+pub fn lock_dir(path: impl AsRef<Path>) -> FsResult<DirLock> {
+	let path = path.as_ref();
+	cfg_if! {
+		if #[cfg(unix)] {
+			let dir =
+				fs::File::open(path).map_err(|err| FsError::io(path, err))?;
+			match dir.lock() {
+				Ok(()) => Ok(DirLock(Some(dir))),
+				Err(err) if err.kind() == std::io::ErrorKind::Unsupported => {
+					Ok(DirLock(None))
+				}
+				Err(err) => Err(FsError::io(path, err)),
+			}
+		} else {
+			let _ = path;
+			Ok(DirLock(None))
+		}
 	}
 }
 

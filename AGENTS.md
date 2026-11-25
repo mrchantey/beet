@@ -7,7 +7,7 @@ Beet is a pre-release (no current users) Atmospheric OS for homegrown tech built
 ## Core Principles
 
 1. Beet is entirely configurable. Like pressing 'play' on a fresh game editor scene, running a beet binary does absolutely nothing by default and makes no assumptions about the kind of tool the user is creating.
-2. Beet is target agnostic. Everything everything everything. Http servers run on wasm, tui servers run on ssh etc. Use `AncestorQuery<&BlobStore>` instead of `fs_ext`. In general `FsStore` must only be inserted explicitly in tests.
+2. Beet is target agnostic. Everything everything everything. Http servers run on wasm, tui servers run on ssh etc. Use `AncestorQuery<&BlobStore>` instead of `fs_ext`, and a `TableStore` for rows, which is declared and never implied by a blob store. In general `FsStore` must only be inserted explicitly in tests.
 
 ## This file
 
@@ -24,7 +24,7 @@ Situational cheatsheets, read before touching the subsystem:
 - Styling: `crates/beet_ui/src/style/mod.rs`
 - Scene editing (tree, inspector, entity and component pickers): `crates/beet_ui/src/widgets/scene_editor/mod.rs`
 - Rendering (web + charcell): the `beet-rendering` skill
-- Tables (`TableStore`, rows, preconditions, partitions, record tables, the capability matrix, the wire, Durable Objects): `crates/beet_net/README.md`, "Tables"
+- Tables (`TableStore`, the naive `JsonTableStore`, rows, preconditions, partitions, record tables, the capability matrix, the wire, Durable Objects): `crates/beet_net/README.md`, "Tables"
 - Derived files (`Derivation`, `<Derive/>`, `beet check`'s stale or missing one): `crates/beet_net/src/store/derivation.rs` + `Provenance`'s module docs
 - Secrets (the age identity, `secrets.toml`, the `vault`/`secrets` verbs, the `SecretStore` seam every secret a process reads or a deploy mints goes through): `crates/beet_core/src/secrets/mod.rs` + `site/routes/docs/secrets.md`
 - Atproto (records and their primitives, an account's repo as a `Pds`, the converge, `<AtprotoAccount/>`, the live test account): `crates/beet_core/src/atproto/mod.rs` + `crates/beet_net/src/atproto/mod.rs`; the standard.site records: `crates/beet_router/src/router/site/syndication/standard_site/mod.rs`

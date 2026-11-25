@@ -197,8 +197,11 @@ mod native {
 		bus: Res<BlobEventBus>,
 	) {
 		for path_event in ev.iter() {
-			// directories are not objects
-			if fs_ext::is_dir(&path_event.path) {
+			// directories are not objects, nor is a conditional write's file on
+			// its way into place
+			if fs_ext::is_dir(&path_event.path)
+				|| path_event.path.as_str().ends_with(fs_ext::REPLACING_SUFFIX)
+			{
 				continue;
 			}
 			let kind = match path_event.kind {

@@ -1022,15 +1022,15 @@ mod test {
 			router,
 			r#"<Route path="shared">
 				<Stack stage="shared">
-					<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
+					<S3BucketBlock bx:ref="assets" label="assets" deploy_versioned=false public_read=true force_destroy=false/>
 					<Group bx:ref="deploy_up"><TofuApply/></Group>
 					<Group bx:ref="deploy_down"><StackTeardown/><TofuDestroy/></Group>
 					<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
 					<Route path="push" {ExchangeSequence}>
-						<DirSync bucket="assets" local_dir="site/assets"/>
+						<StoreSync src="fs:site/assets" dest={$assets}/>
 					</Route>
 					<Route path="pull" {ExchangeSequence}>
-						<DirSync bucket="assets" local_dir="site/assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>
+						<StoreSync src={$assets} dest="fs:site/assets" anonymous=true/>
 					</Route>
 				</Stack>
 			</Route>"#,
@@ -1059,16 +1059,20 @@ mod test {
 			ServiceAccess::local_store_dir("beet-site--shared--assets")
 				.into_abs(),
 		);
-		// ..and so did the syncs, which name the bucket by label alone
-		world
-			.query::<&S3FsStore>()
-			.iter(&world)
-			.map(|store| store.s3_store().bucket_name().to_string())
-			.collect::<Vec<_>>()
-			.xpect_eq(vec![
-				"beet-site--shared--assets".to_string(),
-				"beet-site--shared--assets".to_string(),
-			]);
+		// ..and the syncs name the declaration itself, either way round
+		let bucket =
+			world.query_filtered_once::<Entity, With<S3BucketBlock>>()[0];
+		let local = StoreUri::parse("fs:site/assets").unwrap();
+		let push = (Some(local.clone().into()), Some(bucket.into()));
+		let pull = (Some(bucket.into()), Some(local.into()));
+		for sync in [push, pull] {
+			world
+				.query::<&StoreSync>()
+				.iter(&world)
+				.filter(|found| (found.src.clone(), found.dest.clone()) == sync)
+				.count()
+				.xpect_eq(1);
+		}
 	}
 
 	/// A host template that OWNS its `Router` (the router is inside the bundle
@@ -1223,37 +1227,5 @@ mod test {
 			.map(|apply| apply.layer.as_ref().cloned())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![Some(SmolStr::new("storage")), None]);
-	}
-
-	/// The sync verbs coerce from markup: an enum by variant name, the flags by
-	/// bool, and the defaults are the conservative push/additive pair.
-	#[beet_core::test]
-	fn dir_sync_verb_props() {
-		/// The single [`SyncS3Bucket`] a `<DirSync>` markup fragment builds.
-		fn sync(markup: &str) -> SyncS3Bucket {
-			let mut world = test_world();
-			world.insert_resource(PackageConfig {
-				app_name: "beet-site".into(),
-				..default()
-			});
-			let router = router(&mut world);
-			spawn_markup(&mut world, router, markup);
-			world
-				.query::<&SyncS3Bucket>()
-				.single(&world)
-				.unwrap()
-				.clone()
-		}
-		let pull = sync(
-			r#"<DirSync bucket="assets" local_dir="assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>"#,
-		);
-		pull.direction.xpect_eq(SyncDirection::Pull);
-		pull.no_sign_request.xpect_true();
-		pull.delete.xpect_false();
-		let push = sync(
-			r#"<DirSync bucket="repo" local_dir="site" {SyncS3Bucket{delete:true}}/>"#,
-		);
-		push.direction.xpect_eq(SyncDirection::Push);
-		push.delete.xpect_true();
 	}
 }

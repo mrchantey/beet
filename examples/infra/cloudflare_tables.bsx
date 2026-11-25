@@ -5,8 +5,8 @@ The document a Worker built from beet serves to prove its tables locally: every
 partition of `TABLES` a Durable Object of the one class the Worker exports
 (`BeetTableObject`), owning that partition's SQLite storage. Two mounts answer
 the table wire protocol, a route reading and writing partitioned tables from
-outside the Worker: `/tables` over the objects, `/r2` a blob backed table over
-the `ARCHIVE` bucket's binding. `/rollup` runs the analytics job against the
+outside the Worker: `/tables` over the objects, `/r2` over a `JsonTableStore`, rows
+as json files under `tables/` of the `ARCHIVE` bucket's binding. `/rollup` runs the analytics job against the
 objects, archiving cold days into the bucket as SQLite files built inside the
 Worker.
 
@@ -36,7 +36,7 @@ binding, and the archive built in the Worker:
 	<DurableObjectStore bx:ref="tables" binding="TABLES">
 		<ServeTables prefix="tables"/>
 	</DurableObjectStore>
-	<R2WorkersStore bx:ref="archive" binding="ARCHIVE">
+	<R2WorkersStore bx:ref="archive" binding="ARCHIVE" {JsonTableStore{path:"tables"}}>
 		<ServeTables prefix="r2"/>
 	</R2WorkersStore>
 	<Route path="rollup" {AnalyticsRollupJob{analytics: $tables, archive: $archive}}/>

@@ -1,5 +1,8 @@
-//! Tables: beet's one dialect for table-shaped data, see [`TableStore`].
-mod blob_table;
+//! Tables: beet's one dialect for table-shaped data, see [`TableStore`]. A
+//! table store holds rows and a blob store bytes, and neither implies the
+//! other: each is declared.
+// the naive table, json files in any blob store
+mod json_table_store;
 mod row;
 // the SQL every SQLite table backend runs, whatever engine runs it
 mod sql_table;
@@ -9,7 +12,7 @@ mod table_archive;
 // many partitions in one process, each a SQLite file, served over the wire
 #[cfg(feature = "sqlite")]
 mod partition_host;
-// one partition's rows and blobs over `Request`/`Response`
+// one partition's rows over `Request`/`Response`
 mod table_wire;
 // partitions as Durable Objects, natively a partition host
 mod durable_object_store;
@@ -24,6 +27,7 @@ pub mod table_test;
 pub use durable_object_store::*;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub use durable_object_worker::*;
+pub use json_table_store::*;
 #[cfg(feature = "sqlite")]
 pub use partition_host::*;
 pub use row::*;

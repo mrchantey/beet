@@ -5,17 +5,19 @@ use beet_core::prelude::*;
 /// The entity whose store this consumer reads and writes: the source half of the
 /// [`StoreConsumers`] relationship.
 ///
-/// Backend-agnostic on purpose. A provider component materializes both erased
-/// currencies on its entity (a [`BlobStore`](crate::prelude::BlobStore) and a
-/// [`TableStore`](crate::prelude::TableStore)), so the consumer picks whichever
-/// it reads off the target rather than the relation naming one.
+/// Backend-agnostic on purpose. A provider component materializes the erased
+/// currency of what it holds on its entity (a
+/// [`BlobStore`](crate::prelude::BlobStore) or a
+/// [`TableStore`](crate::prelude::TableStore)), so the consumer reads the kind
+/// it needs off the target rather than the relation naming one, and a target
+/// of the other kind is refused, never read through.
 ///
 /// A resource is declared once, as its provider block, and every consumer names
 /// that declaration rather than a backend or a resource name. Spawn it beside the
 /// consumer marker so the relationship machinery remaps its `$name` reference:
 ///
 /// ```html
-/// <S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true object_versioning=true/>
+/// <DynamoTableBlock bx:ref="analytics" label="analytics"/>
 /// <Router {(AnalyticsConfig, StoreRef($analytics))}>..</Router>
 /// ```
 ///
@@ -39,10 +41,10 @@ impl StoreRef {
 	pub fn store(&self) -> Entity { self.0 }
 
 	/// Read a store component an entity materializes asynchronously: the erased
-	/// [`TableStore`](crate::prelude::TableStore) or
 	/// [`BlobStore`](crate::prelude::BlobStore) a declaration lands, or the
 	/// writer a consumer derives from one, ie the `AnalyticsStore` beside an
-	/// `AnalyticsConfig`.
+	/// `AnalyticsConfig`. A table store is resolved by `TableStore::declared`,
+	/// whose error says how to declare one.
 	///
 	/// A declaration's runtime half lands through the command queue (the
 	/// ancestry a stack scope resolves against arrives with the rest of the
@@ -53,6 +55,22 @@ impl StoreRef {
 		world: &AsyncWorld,
 		target: Entity,
 	) -> Result<T> {
+		Self::find(world, target).await.ok_or_else(|| {
+			bevyhow!(
+				"entity {target} has no `{}`: give the declaration it names a \
+				 store provider component of that kind, ie `<FsStore/>` for a \
+				 `BlobStore`",
+				TypeName::of::<T>()
+			)
+		})
+	}
+
+	/// [`resolve`](Self::resolve) answering `None` where it errors, for a
+	/// caller whose own error says what to declare.
+	pub async fn find<T: Component + Clone>(
+		world: &AsyncWorld,
+		target: Entity,
+	) -> Option<T> {
 		let mut backoff = Backoff::default().with_max_attempts(5).stream();
 		loop {
 			if let Ok(store) = world
@@ -60,15 +78,9 @@ impl StoreRef {
 				.get::<T, _>(|store| store.clone())
 				.await
 			{
-				return Ok(store);
+				return Some(store);
 			}
-			if backoff.next().await.is_none() {
-				bevybail!(
-					"entity {target} has no `{}`: give the declaration it names a \
-					 store provider component, ie `<FsStore/>`",
-					TypeName::of::<T>()
-				);
-			}
+			backoff.next().await?;
 		}
 	}
 }

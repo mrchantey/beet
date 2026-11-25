@@ -110,6 +110,31 @@ async fn fetch(url: Url) -> Result<Response> {
 	Request::get(url).send().await?.into_result().await?.xok()
 }
 
+impl StoreBackend for HttpStore {
+	fn id(&self) -> &'static str { "http" }
+
+	fn describe(&self) -> String { self.root_key().to_string() }
+
+	fn region(&self) -> Option<String> { None }
+
+	/// The mount answers its listing: an unreachable or unmounted one is a
+	/// store that does not exist.
+	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
+		let list = self.list();
+		Box::pin(async move { list.await.is_ok().xok() })
+	}
+
+	fn store_create(&self) -> SendBoxedFuture<Result> {
+		let err = self.read_only();
+		Box::pin(async move { Err(err) })
+	}
+
+	fn store_remove(&self) -> SendBoxedFuture<Result> {
+		let err = self.read_only();
+		Box::pin(async move { Err(err) })
+	}
+}
+
 impl BlobStoreProvider for HttpStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
@@ -130,30 +155,9 @@ impl BlobStoreProvider for HttpStore {
 		})
 	}
 
-	fn id(&self) -> &'static str { "http" }
-
 	fn root_key(&self) -> SmolStr { format!("http:{}", self.base).into() }
 
 	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
-
-	fn region(&self) -> Option<String> { None }
-
-	/// The mount answers its listing: an unreachable or unmounted one is a
-	/// store that does not exist.
-	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
-		let list = self.list();
-		Box::pin(async move { list.await.is_ok().xok() })
-	}
-
-	fn store_create(&self) -> SendBoxedFuture<Result> {
-		let err = self.read_only();
-		Box::pin(async move { Err(err) })
-	}
-
-	fn store_remove(&self) -> SendBoxedFuture<Result> {
-		let err = self.read_only();
-		Box::pin(async move { Err(err) })
-	}
 
 	fn insert(&self, _path: &RelPath, _body: Bytes) -> SendBoxedFuture<Result> {
 		let err = self.read_only();

@@ -66,7 +66,7 @@ impl S3Store {
 	/// (`beet_infra` depends on `beet_net`, never the reverse), so it cannot
 	/// resolve an ancestor stack's region and a region-less one spawned in a
 	/// tree would silently ignore it. Stack-relative resolution belongs to the
-	/// DECLARATION (`<S3BucketBlock/>`, `<DirSync/>`), whose attach observer
+	/// DECLARATION (`<S3BucketBlock/>`), whose attach observer
 	/// hands the resolved region in. If a raw store ever does need it, the way
 	/// to add it is an `InfraPlugin` observer: on add of an `S3Store` with no
 	/// region, watch that entity for `Ready`, then walk up for a `Stack`
@@ -469,29 +469,15 @@ impl S3Store {
 	fn key_path(key: &str) -> String { format!("/{key}") }
 }
 
-impl BlobStoreProvider for S3Store {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
-		Box::new(S3Store {
-			subdir: Some(match &self.subdir {
-				Some(existing) => existing.join(&path),
-				None => path,
-			}),
-			..self.clone()
-		})
-	}
-
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
-		Box::new(S3Store {
-			subdir: None,
-			..self.clone()
-		})
-	}
-
+impl StoreBackend for S3Store {
 	fn id(&self) -> &'static str { "s3" }
 
-	fn root_key(&self) -> SmolStr { format!("s3:{}", self.bucket_name).into() }
+	fn describe(&self) -> String {
+		match &self.region {
+			Some(region) => format!("{} ({region})", self.root_key()),
+			None => self.root_key().to_string(),
+		}
+	}
 
 	fn region(&self) -> Option<String> {
 		self.region.as_ref().map(ToString::to_string)
@@ -550,6 +536,29 @@ impl BlobStoreProvider for S3Store {
 			().xok()
 		})
 	}
+}
+
+impl BlobStoreProvider for S3Store {
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(S3Store {
+			subdir: Some(match &self.subdir {
+				Some(existing) => existing.join(&path),
+				None => path,
+			}),
+			..self.clone()
+		})
+	}
+
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(S3Store {
+			subdir: None,
+			..self.clone()
+		})
+	}
+
+	fn root_key(&self) -> SmolStr { format!("s3:{}", self.bucket_name).into() }
 
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
@@ -699,6 +708,8 @@ impl BlobStoreProvider for S3Store {
 			}
 		})
 	}
+
+	fn conditional_writes(&self) -> bool { true }
 
 	/// `GetObject`, the version its `ETag`.
 	fn get_versioned(
@@ -874,15 +885,18 @@ mod test {
 		.await;
 	}
 
-	/// The table suite over a bucket, every precondition an S3 conditional
-	/// write, in the bucket the root entry's `test` stage provisions.
+	/// The table suite as json files in a bucket, every write an S3
+	/// conditional put, in the bucket the root entry's `test` stage provisions.
 	#[beet_core::test(timeout_ms = 600_000)]
 	#[ignore = "hits remote s3"]
 	async fn table() {
-		table_test::run_rows(&TableStore::new(BlobStore::new(S3Store::new(
-			"beet--test--table",
-			"us-west-2",
-		))))
+		table_test::run_rows(
+			&JsonTableStore::over(BlobStore::new(S3Store::new(
+				"beet--test--table",
+				"us-west-2",
+			)))
+			.unwrap(),
+		)
 		.await;
 	}
 
@@ -890,14 +904,17 @@ mod test {
 	#[beet_core::test(timeout_ms = 120_000)]
 	#[ignore = "needs a local S3 server on 127.0.0.1:8333"]
 	async fn local_table() {
-		table_test::run(TableStore::new(BlobStore::new(
-			S3Store::new("beet-local-table", "us-east-1")
-				.with_endpoint("http://127.0.0.1:8333")
-				.with_credentials(AwsCredentials::new(
-					"beetlocal",
-					"beetlocalsecret",
-				)),
-		)))
+		table_test::run(
+			JsonTableStore::over(BlobStore::new(
+				S3Store::new("beet-local-table", "us-east-1")
+					.with_endpoint("http://127.0.0.1:8333")
+					.with_credentials(AwsCredentials::new(
+						"beetlocal",
+						"beetlocalsecret",
+					)),
+			))
+			.unwrap(),
+		)
 		.await;
 	}
 

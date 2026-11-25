@@ -215,7 +215,12 @@ pub(super) fn spawn_store_on_config(
 				"an `AnalyticsConfig` records to the store it names: add a `StoreRef` beside it pointing at a store declaration, ie `<DynamoTableBlock bx:ref=\"analytics\" label=\"analytics\"/>` and `{{(AnalyticsConfig, StoreRef($analytics))}}`"
 			);
 		};
-		let store = StoreRef::resolve::<TableStore>(&world, target).await?;
+		let store = TableStore::declared(
+			&world,
+			target,
+			"an `AnalyticsConfig`",
+		)
+		.await?;
 		config_entity.insert(AnalyticsStore::new(store)).await?;
 		Ok(())
 	});
@@ -335,7 +340,7 @@ mod test {
 	#[beet_core::test]
 	async fn config_entity_carries_the_store() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
-		let (config, _) = config_with_store(&mut world, InMemoryStore::new());
+		let (config, _) = config_with_store(&mut world, TableStore::temp());
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		world
 			.entity(config)
@@ -347,7 +352,7 @@ mod test {
 	async fn records_to_the_declared_store() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
 		let (_, store_entity) =
-			config_with_store(&mut world, InMemoryStore::new());
+			config_with_store(&mut world, TableStore::temp());
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		world.trigger(request("/about"));
 		AsyncRunner::settle_async_tasks(&mut world).await;
@@ -389,9 +394,13 @@ mod test {
 
 		let mut world = collecting_world();
 		let attempts = Arc::new(AtomicUsize::new(0));
-		config_with_store(&mut world, FailingStore {
-			attempts: attempts.clone(),
-		});
+		config_with_store(
+			&mut world,
+			JsonTableStore::over(BlobStore::new(FailingStore {
+				attempts: attempts.clone(),
+			}))
+			.unwrap(),
+		);
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		for index in 0..8 {
 			world.trigger(request(&format!("/page-{index}")));
@@ -406,10 +415,29 @@ mod test {
 		attempts.load(Ordering::SeqCst).xpect_eq(8);
 	}
 
-	#[derive(Clone, Component)]
-	#[component(on_insert = BlobStore::on_insert::<Self>)]
+	#[derive(Clone)]
 	struct FailingStore {
 		attempts: Arc<AtomicUsize>,
+	}
+
+	impl StoreBackend for FailingStore {
+		fn id(&self) -> &'static str { "failing" }
+
+		fn describe(&self) -> String { self.root_key().to_string() }
+
+		fn region(&self) -> Option<String> { None }
+
+		fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
+			Box::pin(async { true.xok() })
+		}
+
+		fn store_create(&self) -> SendBoxedFuture<Result> {
+			Box::pin(async { Ok(()) })
+		}
+
+		fn store_remove(&self) -> SendBoxedFuture<Result> {
+			Box::pin(async { Ok(()) })
+		}
 	}
 
 	impl BlobStoreProvider for FailingStore {
@@ -420,18 +448,7 @@ mod test {
 			Box::new(self.clone())
 		}
 		fn base(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-		fn id(&self) -> &'static str { "failing" }
 		fn root_key(&self) -> SmolStr { "no-such-store".into() }
-		fn region(&self) -> Option<String> { None }
-		fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
-			Box::pin(async { true.xok() })
-		}
-		fn store_create(&self) -> SendBoxedFuture<Result> {
-			Box::pin(async { Ok(()) })
-		}
-		fn store_remove(&self) -> SendBoxedFuture<Result> {
-			Box::pin(async { Ok(()) })
-		}
 		fn insert(
 			&self,
 			_path: &RelPath,
@@ -439,6 +456,15 @@ mod test {
 		) -> SendBoxedFuture<Result> {
 			Box::pin(async { bevybail!("store unavailable") })
 		}
+		fn conditional_writes(&self) -> bool { true }
+
+		fn get_versioned(
+			&self,
+			_path: &RelPath,
+		) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
+			Box::pin(async { None.xok() })
+		}
+
 		fn insert_if(
 			&self,
 			_path: &RelPath,

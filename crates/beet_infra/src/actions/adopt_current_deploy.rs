@@ -20,7 +20,7 @@ use beet_net::prelude::*;
 /// ```bsx
 /// <Route path="sync" {ExchangeSequence}>
 ///     <AdoptCurrentDeploy/>
-///     <DirSync bucket="app" local_dir="."/>
+///     <StoreSync src="fs:." dest={$app}/>
 /// </Route>
 /// ```
 ///

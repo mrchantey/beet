@@ -1,13 +1,11 @@
 use crate::prelude::*;
-use base64::Engine;
 use beet_core::prelude::*;
-use bytes::Bytes;
 use core::ops::Bound;
 use serde_json::Value as JsonValue;
 use serde_json::json;
 
-/// AWS DynamoDB as a store: one Dynamo table holds every partition's rows and
-/// blobs in a single-table layout. Each call is an [`AwsClient`] request
+/// AWS DynamoDB as a table store: one Dynamo table holds every partition's
+/// rows in a single-table layout, and no bytes, which a bucket holds. Each call is an [`AwsClient`] request
 /// (`awsJson1_0`) signed as the launch's own credential, in the region this
 /// store names, else the one the launch does ([`AwsClient::launch_region`]).
 ///
@@ -15,11 +13,9 @@ use serde_json::json;
 ///
 /// - `pk`, the partition key: the partition id, `@` for the declaration's own
 ///   (never a partition id, whose alphabet has no `@`).
-/// - `sk`, the sort key: `<table>#<key>` for a row and `@blob#<path>` for a
-///   blob (no table name begins with `@`), so a table is one key range of
+/// - `sk`, the sort key: `<table>#<key>`, so a table is one key range of
 ///   its partition, scanned with `Query` in the key's byte order.
-/// - `row` the row's canonical json text and `cid` its cid; `data` a blob's
-///   bytes.
+/// - `row` the row's canonical json text and `cid` its cid.
 /// - `gsi1pk`/`gsi1sk` to `gsi4pk`/`gsi4sk`: generic global secondary index
 ///   slots. A row's nth declared index writes `<partition>#<table>#<index>`
 ///   and its [`IndexKey`] text into slot n, so declaring an index never
@@ -31,13 +27,12 @@ use serde_json::json;
 /// A precondition is a `ConditionExpression` (`attribute_not_exists(pk)`,
 /// `cid = :cid`), and [`apply`](TableProvider::apply) is one
 /// `TransactWriteItems`, refused over its limit of
-/// [`MAX_BATCH`](Self::MAX_BATCH) writes. An item is at most 400KB, a row or
-/// a blob alike. Index scans read a global secondary index, so they are
+/// [`MAX_BATCH`](Self::MAX_BATCH) writes. An item is at most 400KB. Index scans read a global secondary index, so they are
 /// eventually consistent: a row just written may briefly be missing from
 /// one, or found at its previous position.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_insert = on_insert_dynamo)]
+#[component(on_insert = TableStore::on_insert::<Self>)]
 pub struct DynamoStore {
 	/// The DynamoDB table name (maps to "store name" in the storage abstraction).
 	table_name: SmolStr,
@@ -47,9 +42,6 @@ pub struct DynamoStore {
 	/// process happens to carry.
 	#[reflect(default)]
 	region: Option<SmolStr>,
-	/// Optional subdirectory prefix for all blob keys.
-	#[reflect(default)]
-	subdir: Option<RelPath>,
 	/// An endpoint override, ie DynamoDB Local, else AWS's regional host.
 	#[reflect(default)]
 	endpoint: Option<SmolStr>,
@@ -79,7 +71,6 @@ impl DynamoStore {
 		Self {
 			table_name: table_name.into(),
 			region: None,
-			subdir: None,
 			endpoint: None,
 			partition: None,
 		}
@@ -97,30 +88,15 @@ impl DynamoStore {
 		self
 	}
 
-	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
-		self.subdir = Some(subdir.into());
-		self
-	}
-
-	/// The store a `dynamo://<table>[/<path_prefix>][?region=..]` uri names,
+	/// The store a `dynamo://<table>[?region=..]` uri names,
 	/// see [`StoreUri::Dynamo`].
 	pub fn from_uri(uri: &StoreUri) -> Result<Self> {
-		let StoreUri::Dynamo {
-			name,
-			path_prefix,
-			region,
-		} = uri
-		else {
+		let StoreUri::Dynamo { name, region } = uri else {
 			bevybail!("store `{uri}` is not a dynamo:// table");
 		};
-		let store = match region {
+		match region {
 			Some(region) => Self::new(name.clone(), region.clone()),
 			None => Self::new_default_region(name.clone()),
-		};
-		match path_prefix {
-			Some(path_prefix) => store.with_subdir(path_prefix.clone()),
-			None => store,
 		}
 		.xok()
 	}
@@ -161,22 +137,12 @@ impl DynamoStore {
 	pub const INDEX_SLOTS: usize = 4;
 	/// The attribute an expiring item carries its expiry in, epoch seconds.
 	pub const TTL_ATTRIBUTE: &'static str = "ttl";
-	/// The sort key prefix of a blob.
-	const BLOB_PREFIX: &'static str = "@blob#";
 
 	/// The `pk` this handle's partition keys to.
 	fn pk(&self) -> String {
 		self.partition
 			.as_ref()
 			.map_or_else(|| "@".to_string(), |id| id.to_string())
-	}
-
-	/// The `sk` a blob at `path` keys to, under this store's subdir.
-	fn blob_sk(&self, path: &RelPath) -> String {
-		match &self.subdir {
-			Some(sub) => format!("{}{sub}/{path}", Self::BLOB_PREFIX),
-			None => format!("{}{path}", Self::BLOB_PREFIX),
-		}
 	}
 
 	/// The `sk` a row of `table` at `key` keys to.
@@ -218,7 +184,7 @@ impl DynamoStore {
 		StoredRow::from_parts(
 			key.into(),
 			Cid::parse(cid)?,
-			Row::from_json(serde_json::from_str(row)?)?,
+			Row::parse_json(row)?,
 		)
 		.xok()
 	}
@@ -386,48 +352,21 @@ impl DynamoStore {
 	}
 }
 
-/// Insert both erased store currencies: the [`BlobStore`] every provider gets,
-/// then the [`TableStore`] wrapping this provider directly, so its native
-/// single-table layout wins over the blob backed table the blob hook
-/// materializes.
-fn on_insert_dynamo(mut world: DeferredWorld, cx: HookContext) {
-	BlobStore::on_insert::<DynamoStore>(world.reborrow(), cx);
-	TableStore::on_insert::<DynamoStore>(world, cx);
-}
-
-impl BlobStoreProvider for DynamoStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
-		Box::new(DynamoStore {
-			subdir: Some(match &self.subdir {
-				Some(existing) => existing.join(&path),
-				None => path,
-			}),
-			..self.clone()
-		})
-	}
-
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
-		Box::new(DynamoStore {
-			subdir: None,
-			..self.clone()
-		})
-	}
-
+impl StoreBackend for DynamoStore {
 	fn id(&self) -> &'static str { "dynamo" }
 
-	fn root_key(&self) -> SmolStr {
-		match &self.partition {
+	fn describe(&self) -> String {
+		let name = match &self.partition {
 			Some(partition) => {
 				format!("dynamo:{}/{partition}", self.table_name)
 			}
 			None => format!("dynamo:{}", self.table_name),
+		};
+		match &self.region {
+			Some(region) => format!("{name} ({region})"),
+			None => name,
 		}
-		.into()
 	}
-
-	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
 
 	fn region(&self) -> Option<String> {
 		self.region.as_ref().map(ToString::to_string)
@@ -468,231 +407,9 @@ impl BlobStoreProvider for DynamoStore {
 			this.await_status("DELETING", None).await
 		})
 	}
-
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
-		let this = self.clone();
-		let sk = self.blob_sk(path);
-		Box::pin(async move {
-			this.call("PutItem", json!({"Item": this.blob_item(&sk, &body)}))
-				.await?;
-			Ok(())
-		})
-	}
-
-	/// Every blob in this scope, one `Query` of the partition's blob range.
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
-		let this = self.clone();
-		Box::pin(async move {
-			let prefix = this.blob_sk(&RelPath::default());
-			let prefix = match this.subdir.is_some() {
-				true => prefix,
-				false => Self::BLOB_PREFIX.to_string(),
-			};
-			let (items, _) = this
-				.query(
-					json!({
-						"KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-						"ExpressionAttributeValues": {
-							":pk": {"S": this.pk()},
-							":prefix": {"S": prefix}
-						},
-						"ProjectionExpression": "sk"
-					}),
-					None,
-					|_| true,
-				)
-				.await?;
-			items
-				.iter()
-				.filter_map(|item| Self::string_attr(item, "sk"))
-				.filter_map(|sk| sk.strip_prefix(prefix.as_str()))
-				.map(RelPath::new)
-				.collect::<Vec<_>>()
-				.xok()
-		})
-	}
-
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
-		let this = self.clone();
-		let key = self.item_key(&self.blob_sk(path));
-		let path = path.clone();
-		Box::pin(async move {
-			let out = this
-				.call("GetItem", json!({"Key": key, "ConsistentRead": true}))
-				.await?;
-			let Some(data) = out["Item"]["data"]["B"].as_str() else {
-				return Err(HttpError::new(
-					StatusCode::NOT_FOUND,
-					format!("blob `{path}` not found"),
-				)
-				.into());
-			};
-			base64::engine::general_purpose::STANDARD
-				.decode(data)?
-				.xmap(Bytes::from)
-				.xok()
-		})
-	}
-
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
-		let this = self.clone();
-		let key = self.item_key(&self.blob_sk(path));
-		Box::pin(async move {
-			match this
-				.call(
-					"GetItem",
-					json!({"Key": key, "ProjectionExpression": "pk", "ConsistentRead": true}),
-				)
-				.await
-			{
-				Ok(out) => Ok(!out["Item"].is_null()),
-				Err(err)
-					if AwsError::is(&err, &["ResourceNotFoundException"]) =>
-				{
-					Ok(false)
-				}
-				Err(err) => Err(err),
-			}
-		})
-	}
-
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
-		let this = self.clone();
-		let key = self.item_key(&self.blob_sk(path));
-		Box::pin(async move {
-			let out = this
-				.call(
-					"DeleteItem",
-					json!({"Key": key, "ReturnValues": "ALL_OLD"}),
-				)
-				.await?;
-			if out["Attributes"].is_null() {
-				bevybail!("Item not found");
-			}
-			Ok(())
-		})
-	}
-
-	fn get_versioned(
-		&self,
-		path: &RelPath,
-	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
-		let this = self.clone();
-		let key = self.item_key(&self.blob_sk(path));
-		Box::pin(async move {
-			let out = this
-				.call("GetItem", json!({"Key": key, "ConsistentRead": true}))
-				.await?;
-			let item = &out["Item"];
-			let (Some(data), Some(version)) = (
-				item["data"]["B"].as_str(),
-				Self::string_attr(item, "version"),
-			) else {
-				return None.xok();
-			};
-			Some((
-				Bytes::from(
-					base64::engine::general_purpose::STANDARD.decode(data)?,
-				),
-				BlobVersion::new(version),
-			))
-			.xok()
-		})
-	}
-
-	/// `PutItem` conditioned on the item's `version` attribute, its content
-	/// digest.
-	fn insert_if(
-		&self,
-		path: &RelPath,
-		body: Bytes,
-		condition: BlobCondition,
-	) -> SendBoxedFuture<Result<BlobVersion>> {
-		let this = self.clone();
-		let sk = self.blob_sk(path);
-		let path = path.clone();
-		Box::pin(async move {
-			let version = BlobVersion::of(&body);
-			let body = Self::with_blob_condition(
-				json!({"Item": this.blob_item(&sk, &body)}),
-				&condition,
-			);
-			match this.call("PutItem", body).await {
-				Ok(_) => version.xok(),
-				Err(err)
-					if AwsError::is(&err, &[
-						"ConditionalCheckFailedException",
-					]) =>
-				{
-					Err(BlobConflict::at(&path))
-				}
-				Err(err) => Err(err),
-			}
-		})
-	}
-
-	fn remove_if(
-		&self,
-		path: &RelPath,
-		condition: BlobCondition,
-	) -> SendBoxedFuture<Result> {
-		let this = self.clone();
-		let key = self.item_key(&self.blob_sk(path));
-		let path = path.clone();
-		Box::pin(async move {
-			let body =
-				Self::with_blob_condition(json!({"Key": key}), &condition);
-			match this.call("DeleteItem", body).await {
-				Ok(_) => Ok(()),
-				Err(err)
-					if AwsError::is(&err, &[
-						"ConditionalCheckFailedException",
-					]) =>
-				{
-					Err(BlobConflict::at(&path))
-				}
-				Err(err) => Err(err),
-			}
-		})
-	}
-
-	fn public_url(
-		&self,
-		_path: &RelPath,
-	) -> SendBoxedFuture<Result<Option<String>>> {
-		Box::pin(async move { Ok(None) })
-	}
 }
 
 impl DynamoStore {
-	/// The wire item a blob is written as: its bytes and their digest, the
-	/// version a conditional write compares.
-	fn blob_item(&self, sk: &str, body: &[u8]) -> JsonValue {
-		let mut item = self.item_key(sk);
-		item["data"] = json!({"B": base64::engine::general_purpose::STANDARD.encode(body)});
-		item["version"] = json!({"S": BlobVersion::of(body).as_str()});
-		item
-	}
-
-	/// Set a blob condition on a request body.
-	fn with_blob_condition(
-		mut body: JsonValue,
-		condition: &BlobCondition,
-	) -> JsonValue {
-		match condition {
-			BlobCondition::Any => {}
-			BlobCondition::Absent => {
-				body["ConditionExpression"] = json!("attribute_not_exists(pk)");
-			}
-			BlobCondition::Matches(version) => {
-				body["ConditionExpression"] = json!("version = :version");
-				body["ExpressionAttributeValues"] =
-					json!({":version": {"S": version.as_str()}});
-			}
-		}
-		body
-	}
-
 	/// The `CreateTable` request the single-table layout is.
 	fn create_table_body() -> JsonValue {
 		let mut attributes = vec![
@@ -798,7 +515,6 @@ impl TableProvider for DynamoStore {
 				Some(parent) => parent.join(id),
 				None => id.clone(),
 			}),
-			subdir: None,
 			..self.clone()
 		})
 	}
@@ -1100,19 +816,9 @@ impl TableProvider for DynamoStore {
 mod test {
 	use super::*;
 
-	/// The store and table suites against AWS, in the one table the root
-	/// entry's `test` stage provisions (`beet --entry=. test/deploy`), as the
-	/// `beet` app's deploy credential: blobs and rows share it, as they do any
-	/// store's.
-	#[beet_core::test(timeout_ms = 600_000)]
-	#[ignore = "hits remote dynamo"]
-	async fn store() {
-		store_test::run_objects(&BlobStore::new(DynamoStore::new(
-			"beet--test--dynamo",
-			"us-west-2",
-		)))
-		.await;
-	}
+	/// The table suite against AWS, in the one table the root entry's `test`
+	/// stage provisions (`beet --entry=. test/deploy`), as the `beet` app's
+	/// deploy credential.
 	#[beet_core::test(timeout_ms = 600_000)]
 	#[ignore = "hits remote dynamo"]
 	async fn table() {
@@ -1123,18 +829,9 @@ mod test {
 		.await;
 	}
 
-	/// The store and table suites against DynamoDB Local
+	/// The table suite against DynamoDB Local
 	/// (`podman run -p 8000:8000 amazon/dynamodb-local`), which checks every
 	/// request's wire shape and accepts any signature.
-	#[beet_core::test(timeout_ms = 120_000)]
-	#[ignore = "needs DynamoDB Local on 127.0.0.1:8000"]
-	async fn local_store() {
-		store_test::run(
-			DynamoStore::new("beet-local-store", "us-west-2")
-				.with_endpoint("http://127.0.0.1:8000"),
-		)
-		.await;
-	}
 	#[beet_core::test(timeout_ms = 120_000)]
 	#[ignore = "needs DynamoDB Local on 127.0.0.1:8000"]
 	async fn local_table() {
@@ -1195,9 +892,6 @@ mod test {
 			.unwrap()
 			.xpect_eq("did:plc:abc#indexed_row#by_rank");
 		store.pk().xpect_eq("@");
-		store
-			.blob_sk(&RelPath::new("a/b.txt"))
-			.xpect_eq("@blob#a/b.txt");
 		// five indexes overflow the four slots
 		let spec = TableSpec::new("t").with_indexes(
 			(0..5).map(|idx| TableIndex::new(format!("i{idx}"), ["f"])),
@@ -1214,7 +908,7 @@ mod test {
 		table.insert("table_name", SmolStr::from("t"));
 		DynamoStore::from_reflect(&table)
 			.unwrap()
-			.root_key()
+			.describe()
 			.xpect_eq("dynamo:t");
 		let mut bucket = DynamicStruct::default();
 		bucket.insert("bucket_name", SmolStr::from("b"));

@@ -4,8 +4,11 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Declare where a thread's records persist, in the store at or above the
-/// thread: `<Thread {(Sequence, MountThreadStore{path:"threads/coach/{claim}"})}>`.
+/// Declare where a thread's records persist, in the table store at or above
+/// the thread: `<Thread {(Sequence, MountThreadStore{path:"threads/coach/{claim}"})}>`.
+/// The table store is declared too, ie
+/// `<FsStore path="target/chat" {JsonTableStore}>` or `<SqliteStore path="chat.db">`
+/// around it: entering with none is an error, a blob store not being one.
 ///
 /// The path names the thread. Each `{param}` is filled from the request
 /// entering it ([`ThreadEntry::fill_path`]), and the newest thread in the
@@ -351,8 +354,8 @@ impl Thread {
 	///
 	/// ## Errors
 	///
-	/// Errors when the mount's path cannot be filled, when the mount has no
-	/// store above the thread, when the params name a thread or post the
+	/// Errors when the mount's path cannot be filled, when no table
+	/// store is declared at or above the mount, when the params name a thread or post the
 	/// store lacks, when another window holds the thread's behavior, when a
 	/// seed cannot be read, naming it, and when the request's message has no
 	/// author.
@@ -365,27 +368,23 @@ impl Thread {
 		// 1. fill the mount. It stays on the thread until the reduction
 		// consumes it, so no scheduled reduce runs ahead of this entry.
 		let mount_entry = entry.clone();
-		let mounted = world
-			.with(move |world: &mut World| -> Result<Option<_>> {
-				let Some(mount) =
-					world.get::<MountThreadStore>(entity).cloned()
-				else {
-					return Ok(None);
-				};
-				let table = world
-					.with_state::<AncestorQuery<&TableStore>, _>(|query| {
-						query.get(entity).cloned()
-					})
-					.map_err(|_| {
-						bevyhow!(
-							"no store above the thread to keep its records under `{}`",
-							mount.path
-						)
-					})?;
-				let thread_store = mount.build(&table, &mount_entry)?;
-				(mount, thread_store).xsome().xok()
+		let mount = world
+			.with(move |world: &mut World| {
+				world.get::<MountThreadStore>(entity).cloned()
 			})
-			.await?;
+			.await;
+		let mounted = match mount {
+			Some(mount) => {
+				let table = TableStore::nearest(
+					&world.entity(entity),
+					format!("the thread mounted at `{}`", mount.path),
+				)
+				.await?;
+				let thread_store = mount.build(&table, &mount_entry)?;
+				Some((mount, thread_store))
+			}
+			None => None,
+		};
 
 		// 2. find the stored thread, and claim it as this window's
 		let stored = match &mounted {
@@ -511,8 +510,10 @@ mod test {
 			.install_types::<ThreadPlugin>();
 		let thread = app
 			.world_mut()
-			.spawn((store.clone(), TableStore::new(store.clone()), children![
-				(Thread::default(), mount, children![
+			.spawn((
+				store.clone(),
+				JsonTableStore::over(store.clone()).unwrap(),
+				children![(Thread::default(), mount, children![
 					(
 						Actor::new_with_id(
 							ActorId::from_u128(1),
@@ -526,8 +527,8 @@ mod test {
 						"Person",
 						ActorKind::User,
 					),
-				])
-			]))
+				])],
+			))
 			.get::<Children>()
 			.unwrap()[0];
 		let entry = ThreadEntry::parse(request.parts().clone())?;
@@ -576,7 +577,10 @@ mod test {
 
 	/// The thread store of `path` in `store`.
 	fn threads(store: &BlobStore, path: &str) -> ThreadStore {
-		ThreadStore::new(TableStore::new(store.clone()), RelPath::new(path))
+		ThreadStore::new(
+			JsonTableStore::over(store.clone()).unwrap(),
+			RelPath::new(path),
+		)
 	}
 
 	/// A continued thread reads no seed file and calls no seed route: both

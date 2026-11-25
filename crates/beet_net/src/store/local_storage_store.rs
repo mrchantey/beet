@@ -54,33 +54,10 @@ impl LocalStorageStore {
 	}
 }
 
-impl BlobStoreProvider for LocalStorageStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
-		Box::new(LocalStorageStore {
-			store_name: self.store_name.clone(),
-			subdir: Some(match &self.subdir {
-				Some(existing) => existing.join(&path),
-				None => path,
-			}),
-		})
-	}
-
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
-		Box::new(LocalStorageStore {
-			subdir: None,
-			..self.clone()
-		})
-	}
-
+impl StoreBackend for LocalStorageStore {
 	fn id(&self) -> &'static str { "localstorage" }
 
-	fn root_key(&self) -> SmolStr {
-		format!("localstorage:{}", self.store_name).into()
-	}
-
-	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
+	fn describe(&self) -> String { self.root_key().to_string() }
 
 	fn region(&self) -> Option<String> { None }
 
@@ -118,6 +95,33 @@ impl BlobStoreProvider for LocalStorageStore {
 			().xok()
 		})
 	}
+}
+
+impl BlobStoreProvider for LocalStorageStore {
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(LocalStorageStore {
+			store_name: self.store_name.clone(),
+			subdir: Some(match &self.subdir {
+				Some(existing) => existing.join(&path),
+				None => path,
+			}),
+		})
+	}
+
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(LocalStorageStore {
+			subdir: None,
+			..self.clone()
+		})
+	}
+
+	fn root_key(&self) -> SmolStr {
+		format!("localstorage:{}", self.store_name).into()
+	}
+
+	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
 
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let key = self.storage_key(path);
@@ -191,6 +195,8 @@ impl BlobStoreProvider for LocalStorageStore {
 			}
 		})
 	}
+
+	fn conditional_writes(&self) -> bool { true }
 
 	fn get_versioned(
 		&self,
@@ -360,9 +366,12 @@ mod test {
 
 	#[beet_core::test(browser)]
 	async fn table() {
-		table_test::run(TableStore::new(BlobStore::new(
-			LocalStorageStore::new("test-table"),
-		)))
+		table_test::run(
+			JsonTableStore::over(BlobStore::new(LocalStorageStore::new(
+				"test-table",
+			)))
+			.unwrap(),
+		)
 		.await;
 	}
 }

@@ -8,12 +8,18 @@
 //!
 //! What stays are the SHAPE-keyed rules, which cannot be expressed per type: a
 //! scalar into a single-field newtype, a string into a one-string-field struct,
+//! a string into the valued variant of an enum that holds a value or an entity,
 //! and a string naming a unit enum variant.
 
 use beet_core::prelude::*;
 use bevy::reflect::PartialReflect;
 use bevy::reflect::TypeInfo;
+use bevy::reflect::enums::DynamicEnum;
+use bevy::reflect::enums::DynamicVariant;
+use bevy::reflect::enums::EnumInfo;
+use bevy::reflect::enums::VariantInfo;
 use bevy::reflect::structs::DynamicStruct;
+use bevy::reflect::tuple::DynamicTuple;
 use bevy::reflect::tuple_struct::DynamicTupleStruct;
 use core::any::TypeId;
 
@@ -83,6 +89,14 @@ pub(super) fn scalar_to_reflect(
 	if let (Value::Str(string), Some(TypeInfo::Enum(enum_info))) =
 		(value, field_info)
 	{
+		// an enum holding a value or an entity takes the value bare, as a
+		// `$name` is taken (`entity_ref_to_reflect`)
+		if let Some((variant, type_id)) = valued_variant(enum_info)
+			&& enum_info.variant(string.as_str()).is_none()
+			&& let Some(inner) = LiteralParser::parse_type(type_id, value)?
+		{
+			return Ok(newtype_variant(variant, field_info, inner));
+		}
 		let mut unit =
 			reflect_ext::unit_variant_value(enum_info, string.as_str())?;
 		unit.set_represented_type(field_info);
@@ -118,6 +132,61 @@ pub(super) fn scalar_to_reflect(
 		other => bevybail!("cannot reflect scalar value `{other:?}`"),
 	};
 	Ok(reflected)
+}
+
+/// The type a single-field tuple variant holds, `None` for any other variant.
+fn newtype_of(variant: &'static VariantInfo) -> Option<TypeId> {
+	match variant {
+		VariantInfo::Tuple(tuple) if tuple.field_len() == 1 => {
+			tuple.field_at(0).map(|field| field.type_id())
+		}
+		_ => None,
+	}
+}
+
+/// The one variant of an enum holding an [`Entity`] alone, `None` where there
+/// is not exactly one.
+pub(super) fn entity_variant(info: &'static EnumInfo) -> Option<&'static str> {
+	let mut variants = info
+		.iter()
+		.filter(|variant| newtype_of(variant) == Some(TypeId::of::<Entity>()));
+	match (variants.next(), variants.next()) {
+		(Some(variant), None) => Some(variant.name()),
+		_ => None,
+	}
+}
+
+/// Beside an enum's [`entity_variant`], the one other variant holding a type
+/// with its own authored spelling, and that type. A plain string is not one,
+/// since it would take a misspelt variant name.
+fn valued_variant(info: &'static EnumInfo) -> Option<(&'static str, TypeId)> {
+	entity_variant(info)?;
+	let mut variants = info.iter().filter_map(|variant| {
+		newtype_of(variant)
+			.filter(|type_id| {
+				!is_string_target(*type_id)
+					&& LiteralParser::get(*type_id).is_some()
+			})
+			.map(|type_id| (variant.name(), type_id))
+	});
+	match (variants.next(), variants.next()) {
+		(Some(variant), None) => Some(variant),
+		_ => None,
+	}
+}
+
+/// The single-field tuple variant `name` of the enum `info` describes, holding
+/// `inner`.
+pub(super) fn newtype_variant(
+	name: &str,
+	info: Option<&'static TypeInfo>,
+	inner: Box<dyn PartialReflect>,
+) -> Box<dyn PartialReflect> {
+	let mut tuple = DynamicTuple::default();
+	tuple.insert_boxed(inner);
+	let mut dynamic = DynamicEnum::new(name, DynamicVariant::Tuple(tuple));
+	dynamic.set_represented_type(info);
+	Box::new(dynamic)
 }
 
 /// Whether `type_id` is one of the string types a markup attribute's text

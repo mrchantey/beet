@@ -8,14 +8,14 @@ use beet_net::prelude::*;
 const TABLE_PATH_PARAM: &str = "table_path";
 
 /// Mounts the [`TableWire`] protocol under `prefix`, serving the nearest
-/// self-or-ancestor [`TableStore`]: its rows and blobs, every partition of
-/// it, to a [`TableWireClient`] in another process.
+/// self-or-ancestor [`TableStore`], every row of every partition of it, to a
+/// [`TableWireClient`] in another process. Declaring none is an error naming
+/// how ([`TableStore::missing`]): a blob store is not one.
 ///
-/// Beside [`ServeBlobs`] rather than merged with it: that route serves a
-/// store as a static host does (an `index.html` for a directory, a redirect
-/// to a public url), this one serves rows and blobs exactly, every write
-/// guarded by its precondition, so the same bucket served both ways is a
-/// site and a database. Anything that can reach the mount can write the
+/// Beside [`ServeBlobs`] rather than merged with it: that route serves bytes
+/// as a static host does (an `index.html` for a directory, a redirect to a
+/// public url), this one serves rows exactly, every write guarded by its
+/// precondition. Anything that can reach the mount can write the
 /// store, so it belongs behind whatever authenticates its callers.
 ///
 /// ```html
@@ -44,12 +44,7 @@ pub fn ServeTables(
 pub(crate) async fn ServeTablesHandler(
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
-	let store = cx
-		.caller
-		.with_state::<AncestorQuery<&TableStore>, Result<TableStore>>(
-			|entity, stores| stores.get(entity).cloned(),
-		)
-		.await??;
+	let store = TableStore::nearest(&cx.caller, "`<ServeTables/>`").await?;
 	let path = cx
 		.input
 		.request_parts()
@@ -73,7 +68,7 @@ mod test {
 	async fn serves_the_protocol() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let router = world
-			.spawn((Router, InMemoryStore::new(), children![
+			.spawn((Router, TableStore::temp(), children![
 				ServeTables {
 					prefix: "tables".into()
 				}
@@ -111,5 +106,32 @@ mod test {
 			.await
 			.status()
 			.xpect_eq(StatusCode::NOT_FOUND);
+	}
+
+	/// A mount under a blob store alone is refused, naming itself and the fix,
+	/// rather than serving rows out of the wrong store.
+	#[beet_core::test]
+	async fn a_blob_store_is_not_served() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let router = world
+			.spawn((Router, InMemoryStore::new(), children![
+				ServeTables {
+					prefix: "tables".into()
+				}
+				.into_snippet_bundle()
+			]))
+			.flush();
+		let response = world
+			.entity_mut(router)
+			.exchange(Request::get("/tables/named_rows/k"))
+			.await;
+		response.status().is_success().xpect_false();
+		response
+			.into_result()
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`<ServeTables/>` needs a table store")
+			.xpect_contains("<SqliteStore");
 	}
 }

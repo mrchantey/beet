@@ -124,9 +124,10 @@ mod test {
 		)
 		.unwrap();
 		let router = app.world_mut().spawn_template(body).unwrap().id();
-		app.world_mut()
-			.entity_mut(router)
-			.insert((store.clone(), TableStore::new(store.clone())));
+		app.world_mut().entity_mut(router).insert((
+			store.clone(),
+			JsonTableStore::over(store.clone()).unwrap(),
+		));
 		app.world_mut()
 			.spawn((Notes::default(), ChildOf(router)))
 			.flush();
@@ -149,8 +150,10 @@ mod test {
 		let (mut app, router, store) =
 			url_space("notes?about={document}").await;
 		review(&mut app, router).await.0.xpect_eq(StatusCode::OK);
-		let records =
-			ThreadStore::new(TableStore::new(store), RelPath::new("threads"));
+		let records = ThreadStore::new(
+			JsonTableStore::over(store).unwrap(),
+			RelPath::new("threads"),
+		);
 		let thread = records.threads().await.unwrap()[0].id();
 		records.posts(thread).await.unwrap()[0]
 			.to_string()

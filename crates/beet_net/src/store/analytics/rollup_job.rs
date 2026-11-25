@@ -289,7 +289,12 @@ pub async fn AnalyticsRollupJob(
 	let world = cx.caller.world().clone();
 	let report = AnalyticsRollupRun::new(
 		AnalyticsStore::new(
-			StoreRef::resolve::<TableStore>(&world, analytics).await?,
+			TableStore::declared(
+				&world,
+				analytics,
+				"`AnalyticsRollupJob{analytics}`",
+			)
+			.await?,
 		),
 		Some(StoreRef::resolve::<BlobStore>(&world, archive).await?),
 	)
@@ -304,6 +309,7 @@ pub async fn AnalyticsRollupJob(
 #[cfg(test)]
 mod test {
 	use super::*;
+	#[cfg(feature = "sqlite")]
 	use beet_action::prelude::*;
 
 	const DAY_MS: u64 = 86_400_000;
@@ -517,10 +523,11 @@ mod test {
 	}
 
 	/// The job resolves its two stores by field and reports.
+	#[cfg(feature = "sqlite")]
 	#[beet_core::test]
 	async fn job_runs_from_its_fields() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
-		let analytics = world.spawn(InMemoryStore::new()).flush();
+		let analytics = world.spawn(TableStore::temp()).flush();
 		let archive = world.spawn(InMemoryStore::new()).flush();
 		let store = AnalyticsStore::new(
 			world.entity(analytics).get::<TableStore>().unwrap().clone(),

@@ -81,9 +81,29 @@ impl Row {
 		self.clone().into_json_form().into_json()
 	}
 
-	/// A row from its json form, every `$bytes` object a byte string again.
+	/// A row from its json form, every `$bytes` object among its fields a
+	/// byte string again.
 	pub fn from_json(json: serde_json::Value) -> Result<Self> {
-		Self::from_value(Self::decode_bytes(Value::from_json(json)))
+		Self::from_json_form(Value::from_json(json))
+	}
+
+	/// A row from its json form as a value, see [`from_json`](Self::from_json).
+	pub fn from_json_form(value: Value) -> Result<Self> {
+		// each field, never the row: a row of one `$bytes` field is a row
+		Self::from_value(value)?
+			.0
+			.into_iter()
+			.map(|(key, value)| (key, Self::decode_bytes(value)))
+			.collect::<Map>()
+			.xmap(Self)
+			.xok()
+	}
+
+	/// The row its [`to_json`](Self::to_json) text holds, every float exactly
+	/// as it was written ([`Value::parse_json`]), so its [`cid`](Self::cid)
+	/// survives the trip.
+	pub fn parse_json(text: &str) -> Result<Self> {
+		Self::from_json_form(Value::parse_json(text)?)
 	}
 
 	fn encode_bytes(value: Value) -> Value {
@@ -155,7 +175,7 @@ impl<'de> Deserialize<'de> for Row {
 	fn deserialize<D: serde::Deserializer<'de>>(
 		deserializer: D,
 	) -> Result<Self, D::Error> {
-		Self::from_value(Self::decode_bytes(Value::deserialize(deserializer)?))
+		Self::from_json_form(Value::deserialize(deserializer)?)
 			.map_err(serde::de::Error::custom)
 	}
 }
@@ -200,28 +220,6 @@ impl StoredRow {
 
 	/// The fields alone.
 	pub fn into_row(self) -> Row { self.row }
-
-	/// The stored text of a row whose key is its address: canonical json of
-	/// `{cid, row}`, keys sorted, so the same row is always the same text.
-	pub fn to_stored_json(&self) -> Result<String> {
-		serde_json::to_string(&serde_json::json!({
-			"cid": self.cid.as_str(),
-			"row": self.row.to_json(),
-		}))?
-		.xok()
-	}
-
-	/// A row read from its [`to_stored_json`](Self::to_stored_json) text at
-	/// `key`.
-	pub fn from_stored_json(key: TableKey, text: &str) -> Result<Self> {
-		let mut json = serde_json::from_str::<serde_json::Value>(text)?;
-		let Some(cid) = json.get("cid").and_then(|cid| cid.as_str()) else {
-			bevybail!("stored row `{key}` carries no cid");
-		};
-		let cid = Cid::parse(cid)?;
-		let row = Row::from_json(json["row"].take())?;
-		Self::from_parts(key, cid, row).xok()
-	}
 }
 
 /// A row's primary key within its table: a non-empty string, ordered by its
@@ -328,26 +326,58 @@ mod test {
 			.xpect_eq(AtprotoValue::from_wire(value).unwrap().cid());
 	}
 
-	/// The stored text carries the cid it was built with, never recomputing
-	/// it, and is the same text for the same row whatever its field order.
+	/// A row is itself after its json text, whatever its fields: every kind of
+	/// value, floats of every magnitude, and maps that read as bytes.
 	#[beet_core::test]
-	fn stored_json_is_canonical() {
-		let first = StoredRow::new(
-			"k",
-			Row::from_value(value!({ "b": 2, "a": 1 })).unwrap(),
-		)
-		.unwrap();
-		let second = StoredRow::new(
-			"k",
-			Row::from_value(value!({ "a": 1, "b": 2 })).unwrap(),
-		)
-		.unwrap();
-		let text = first.to_stored_json().unwrap();
-		text.clone().xpect_eq(second.to_stored_json().unwrap());
-		text.as_str().xpect_starts_with(r#"{"cid":"bafyrei"#);
-		StoredRow::from_stored_json("k".into(), &text)
-			.unwrap()
-			.xpect_eq(first);
+	fn json_text_keeps_the_cid() {
+		// xorshift, a fixed seed
+		let mut bits = 0x9e37_79b9_7f4a_7c15_u64;
+		let floats = (0..2_000)
+			.map(|_| {
+				bits ^= bits << 13;
+				bits ^= bits >> 7;
+				bits ^= bits << 17;
+				f64::from_bits(bits)
+			})
+			.filter(|float| float.is_finite())
+			.map(Value::Float);
+		for value in [
+			Value::Null,
+			Value::Bool(false),
+			Value::Int(i64::MIN),
+			Value::Int(3),
+			Value::Uint(3),
+			Value::Uint(u64::MAX),
+			Value::Float(0.0),
+			Value::Float(-0.0),
+			Value::Float(1.0),
+			Value::Float(1e16),
+			Value::Float(f64::MAX),
+			Value::Float(5e-324),
+			Value::Bytes(Vec::new()),
+			Value::Bytes(vec![0, 159, 255]),
+			Value::str(""),
+			Value::str("\u{0}\n\"\\/é日😀\u{2028}"),
+			value!([]),
+			value!({}),
+			value!([null, [1, { "a": (Value::Bytes(vec![1])) }]]),
+			value!({ "$bytes": "aGk" }),
+			value!({ "$bytes": "aGk=" }),
+			value!({ "$bytes": "not base64!" }),
+			value!({ "$bytes": 3 }),
+			value!({ "$bytes": "aGk", "more": 1 }),
+		]
+		.into_iter()
+		.chain(floats)
+		{
+			for field in ["field", "$bytes"] {
+				let row = Row::new(Map::new([(field, value.clone())]));
+				// a value no row holds is refused before it is written
+				let Ok(cid) = row.cid() else { continue };
+				let text = serde_json::to_string_pretty(&row).unwrap();
+				Row::parse_json(&text).unwrap().cid().unwrap().xpect_eq(cid);
+			}
+		}
 	}
 
 	/// A Tid's key orders by time, as raw bytes.

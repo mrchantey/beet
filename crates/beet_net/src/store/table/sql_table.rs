@@ -177,7 +177,7 @@ impl SqlTable {
 		StoredRow::from_parts(
 			key.into_text()?.into(),
 			Cid::parse(&cid.into_text()?)?,
-			Row::from_json(serde_json::from_str(&json.into_text()?)?)?,
+			Row::parse_json(&json.into_text()?)?,
 		)
 		.xok()
 	}

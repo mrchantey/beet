@@ -228,32 +228,10 @@ impl InMemoryStore {
 	}
 }
 
-impl BlobStoreProvider for InMemoryStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
-		Box::new(InMemoryStore {
-			name: self.name.clone(),
-			inner: self.inner.clone(),
-			subdir: Some(match &self.subdir {
-				Some(existing) => existing.join(&path),
-				None => path,
-			}),
-		})
-	}
-
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
-		Box::new(InMemoryStore {
-			subdir: None,
-			..self.clone()
-		})
-	}
-
+impl StoreBackend for InMemoryStore {
 	fn id(&self) -> &'static str { "memory" }
 
-	fn root_key(&self) -> SmolStr { format!("memory:{}", self.name).into() }
-
-	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
+	fn describe(&self) -> String { self.root_key().to_string() }
 
 	fn region(&self) -> Option<String> { None }
 
@@ -285,6 +263,32 @@ impl BlobStoreProvider for InMemoryStore {
 			Ok(())
 		})
 	}
+}
+
+impl BlobStoreProvider for InMemoryStore {
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(InMemoryStore {
+			name: self.name.clone(),
+			inner: self.inner.clone(),
+			subdir: Some(match &self.subdir {
+				Some(existing) => existing.join(&path),
+				None => path,
+			}),
+		})
+	}
+
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(InMemoryStore {
+			subdir: None,
+			..self.clone()
+		})
+	}
+
+	fn root_key(&self) -> SmolStr { format!("memory:{}", self.name).into() }
+
+	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
 
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
@@ -382,6 +386,8 @@ impl BlobStoreProvider for InMemoryStore {
 			Ok(())
 		})
 	}
+
+	fn conditional_writes(&self) -> bool { true }
 
 	fn get_versioned(
 		&self,

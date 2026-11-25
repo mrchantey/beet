@@ -146,7 +146,7 @@ fn stream_response(req: &Request) -> Response {
 
 	let stream = futures::stream::iter((0..count).map(|idx| {
 		let line = value!({"index": (idx), "data": "stream-chunk"});
-		Ok(Bytes::from(format!("{}\n", line.to_json_string()?)))
+		Ok(Bytes::from(format!("{}\n", line.to_json_string())))
 	}));
 
 	Response::ok()

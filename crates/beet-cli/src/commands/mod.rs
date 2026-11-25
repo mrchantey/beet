@@ -11,8 +11,8 @@ pub mod pdf_ext;
 mod qrcode;
 mod run_wasm;
 mod run_wasm_browser;
-mod s3_sync;
 mod screenshot;
+mod store_sync;
 // the committed page-driving browser checks and what they share: the
 // bootstrap (`just check-wasm-boot`) and the render boot
 // (`just check-wasm-render`).
@@ -31,8 +31,8 @@ pub use export_static::*;
 #[cfg(feature = "qrcode")]
 pub use qrcode::*;
 pub use run_wasm::*;
-pub use s3_sync::*;
 pub use screenshot::*;
+pub use store_sync::*;
 
 use beet::prelude::*;
 
@@ -50,7 +50,7 @@ impl Plugin for CliCommandsPlugin {
 			.register_type::<BuildWasm>()
 			.register_type::<BuildWasmAction>()
 			.register_type::<ExportPdf>()
-			.register_type::<SyncS3>()
+			.register_type::<SyncStores>()
 			.register_type::<CaptureScreenshot>();
 		#[cfg(feature = "qrcode")]
 		app.register_type::<QrCode>();

@@ -392,9 +392,10 @@ mod test {
 		)
 		.unwrap();
 		let router = app.world_mut().spawn_template(body).unwrap().id();
-		app.world_mut()
-			.entity_mut(router)
-			.insert((store.clone(), TableStore::new(store.clone())));
+		app.world_mut().entity_mut(router).insert((
+			store.clone(),
+			JsonTableStore::over(store.clone()).unwrap(),
+		));
 		(app, router, store)
 	}
 
@@ -411,7 +412,10 @@ mod test {
 
 	/// The records under `path` in `store`.
 	fn thread_store(store: &BlobStore, path: &str) -> ThreadStore {
-		ThreadStore::new(TableStore::new(store.clone()), RelPath::new(path))
+		ThreadStore::new(
+			JsonTableStore::over(store.clone()).unwrap(),
+			RelPath::new(path),
+		)
 	}
 
 	/// The text posts of `posts`, the tool calls and joins aside.

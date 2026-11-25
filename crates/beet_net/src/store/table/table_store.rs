@@ -10,11 +10,16 @@ use std::sync::Arc;
 
 /// Type-erased handle to one partition's tables, the table twin of
 /// [`BlobStore`]: wraps an [`Arc<dyn TableProvider>`] and is materialized onto
-/// every store entity by the provider component hooks
-/// ([`BlobStore::on_insert`] inserts the blob backed form, a table-native
-/// provider like [`SqliteStore`] overrides it with its own via
-/// [`TableStore::on_insert`]), so a consumer resolves `TableStore` from an
-/// entity and never names a backend.
+/// the entity of a table store component ([`SqliteStore`](crate::prelude::SqliteStore),
+/// `DynamoStore`, [`DurableObjectStore`], a [`JsonTableStore`]) by that
+/// component, so a consumer resolves `TableStore` from an entity and never
+/// names a backend.
+///
+/// A table store is declared. No blob store is one, and a consumer finding
+/// none is refused naming what asked and how to declare one
+/// ([`missing`](Self::missing)), never given a fallback: resolve with
+/// [`nearest`](Self::nearest) or, for the target of a [`StoreRef`],
+/// [`declared`](Self::declared).
 ///
 /// Typed access goes through [`Self::table`]; the erased methods here take
 /// [`StoredRow`]s. A table named by an NSID is a record table, and every
@@ -47,7 +52,8 @@ impl TableStore {
 		}
 	}
 
-	/// A temporary in-memory store, created and ready.
+	/// A temporary in-memory store, created and ready: a [`JsonTableStore`]
+	/// over [`BlobStore::temp`].
 	///
 	/// ```
 	/// # use beet_core::prelude::*;
@@ -58,12 +64,76 @@ impl TableStore {
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn temp() -> Self { Self::new(BlobStore::temp()) }
+	pub fn temp() -> Self {
+		JsonTableStore::over(BlobStore::temp())
+			.expect("an in-memory store has conditional writes")
+	}
 
 	/// The table store a [`StoreUri`] names, for a caller with no entity to
-	/// land the concrete component on, see [`StoreProvider::from_uri`].
+	/// land the concrete component on, see [`TableStoreProvider::from_uri`].
+	#[cfg(feature = "std")]
 	pub fn from_uri(uri: &StoreUri) -> Result<Self> {
-		StoreProvider::from_uri(uri)?.into_table_store().xok()
+		TableStoreProvider::from_uri(uri)?.into_table_store().xok()
+	}
+
+	/// The table store nearest `entity`, its own or an ancestor's, else the
+	/// error naming `asker`, ie `` `<ServeTables/>` ``.
+	pub async fn nearest(
+		entity: &AsyncEntity,
+		asker: impl core::fmt::Display,
+	) -> Result<Self> {
+		entity
+			.with_state::<AncestorQuery<&TableStore>, _>(|entity, stores| {
+				stores.get(entity).ok().cloned()
+			})
+			.await?
+			.ok_or_else(|| Self::missing(asker))
+	}
+
+	/// The table store `target` itself declares, the one a [`StoreRef`] names,
+	/// waiting for a declaration still landing, else the error naming
+	/// `asker`.
+	#[cfg(feature = "std")]
+	pub async fn declared(
+		world: &AsyncWorld,
+		target: Entity,
+		asker: impl core::fmt::Display,
+	) -> Result<Self> {
+		StoreRef::find::<Self>(world, target)
+			.await
+			.ok_or_else(|| Self::missing(asker))
+	}
+
+	/// The error of `asker` needing a table store where there is none.
+	pub fn missing(asker: impl core::fmt::Display) -> BevyError {
+		bevyhow!(
+			"{asker} needs a table store and none is declared for it: a blob \
+			 store is not one. Declare `<SqliteStore path=\"..\"/>` (the \
+			 `sqlite` feature), a `<DynamoTableBlock/>` or a \
+			 `<DurableObjectStore/>`, or to keep rows as json files in a blob \
+			 store opt into `JsonTableStore`, ie \
+			 `<FsStore path=\"..\" {{JsonTableStore}}/>`"
+		)
+	}
+
+	/// Land this as the entity's table store. An entity has one, so another
+	/// backend's already there is an error naming both, never replaced.
+	pub(crate) fn land(self, entity: &mut EntityWorldMut) {
+		if let Some(existing) = entity.get::<TableStore>()
+			&& existing.provider.id() != self.provider.id()
+		{
+			let err = bevyhow!(
+				"two table stores are declared on one entity, `{}` and `{}`: \
+				 declare each on its own",
+				existing.describe(),
+				self.describe()
+			);
+			entity.world_scope(|world| {
+				world.handle_command_error::<TableStore>(err)
+			});
+			return;
+		}
+		entity.insert(self);
 	}
 
 	/// The provider, for a caller serving it on (the wire server).
@@ -87,6 +157,12 @@ impl TableStore {
 	/// Whether this backend supports `capability`.
 	pub fn supports(&self, capability: Capability) -> bool {
 		self.provider.supports(capability)
+	}
+
+	/// Whether `event` is of a blob these tables are kept in, see
+	/// [`TableProvider::holds_blob`].
+	pub fn holds_blob(&self, event: &BlobEvent) -> bool {
+		self.provider.holds_blob(event)
 	}
 
 	/// Where this store lives, ie `dynamo:beet-site--prod--analytics
@@ -221,19 +297,18 @@ impl TableStore {
 
 	/// Component hook that reads a concrete table provider component from the
 	/// entity and inserts a [`TableStore`] wrapping it.
-	/// Use with `#[component(on_insert = TableStore::on_insert::<MyStore>)]`; run
-	/// after [`BlobStore::on_insert`] it overrides the blob backed table that
-	/// hook materializes.
+	/// Use with `#[component(on_insert = TableStore::on_insert::<MyStore>)]`.
 	pub fn on_insert<T: Component + Clone + TableProvider>(
 		mut world: DeferredWorld,
 		cx: HookContext,
 	) {
 		match world.entity(cx.entity).get_or_else::<T>().cloned() {
 			Ok(provider) => {
-				world
-					.commands()
-					.entity(cx.entity)
-					.insert(TableStore::new(provider));
+				world.commands().entity(cx.entity).queue_silenced(
+					move |mut entity: EntityWorldMut| {
+						TableStore::new(provider).land(&mut entity)
+					},
+				);
 			}
 			Err(err) => {
 				world.fallback_error_handler()(err, ErrorContext::Command {

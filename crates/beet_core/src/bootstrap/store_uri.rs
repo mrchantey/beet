@@ -36,8 +36,9 @@ use core::str::FromStr;
 ///    document it shipped with, so the window between publishing a new document
 ///    and swapping the binary that serves it is not a window where the old
 ///    binary reads the new document.
-/// 4. `dynamo://<table>[/<path_prefix>][?region=<region>]`: a DynamoDB table, the
-///    table-native store a declaration wanting indexed queries names.
+/// 4. `dynamo://<table>[?region=<region>]`: a DynamoDB table, the table store a
+///    declaration wanting indexed queries names. It holds rows alone, so there
+///    is no key prefix within it, and it is never a blob store.
 /// 5. `local-storage://<store>[/<path_prefix>]` / `indexed-db://<db>[/<path_prefix>]`:
 ///    browser storage (wasm), one named store or database per uri.
 /// 6. `r2://<binding>[/<path_prefix>]`: a Cloudflare R2 bucket reached through the
@@ -49,8 +50,8 @@ use core::str::FromStr;
 ///    the web: a browser reads it against `location.origin`, a native process
 ///    against its canonical loopback server. A process forks a remote repo
 ///    into a local store (`--store-fork`) rather than writing to it.
-/// 8. `sqlite:<path>`: a SQLite database file, the table-native store a local
-///    index names. Relative paths resolve against the context dir and `~`
+/// 8. `sqlite:<path>`: a SQLite database file, a table store or a blob store by
+///    which is asked for. Relative paths resolve against the context dir and `~`
 ///    expands exactly as for `fs:`. The file is a whole store: there is no key
 ///    prefix within it.
 ///
@@ -99,8 +100,6 @@ pub enum StoreUri {
 	Dynamo {
 		/// The table name.
 		name: SmolStr,
-		/// The key prefix the store roots at.
-		path_prefix: Option<RelPath>,
 		/// The table region, resolved at construction when absent.
 		region: Option<SmolStr>,
 	},
@@ -198,7 +197,7 @@ impl StoreUri {
 				"unknown store `{other}`, supported kinds: fs, fs:<path>, \
 				memory://<name>[/<path_prefix>], \
 				s3://<bucket>[/<path_prefix>][?endpoint=..][&region=..], \
-				dynamo://<table>[/<path_prefix>][?region=..], \
+				dynamo://<table>[?region=..], \
 				local-storage://<store>[/<path_prefix>] (wasm), \
 				indexed-db://<db>[/<path_prefix>] (wasm), \
 				r2://<binding>[/<path_prefix>] (cloudflare worker), \
@@ -269,10 +268,16 @@ impl StoreUri {
 			}
 			DYNAMO_SCHEME => {
 				let tail = ScopedTail::parse(scheme, rest, &["region"])?;
+				if let Some(path_prefix) = &tail.path_prefix {
+					bevybail!(
+						"store `{scheme}://{rest}` roots a table at \
+						 `{path_prefix}`: a table holds rows, which have no \
+						 key prefix"
+					);
+				}
 				Self::Dynamo {
 					region: tail.param("region"),
 					name: tail.name,
-					path_prefix: tail.path_prefix,
 				}
 			}
 			LOCAL_STORAGE_SCHEME => {
@@ -333,19 +338,18 @@ impl StoreUri {
 	/// The root within the backing, the prefix every key resolves under: a
 	/// filesystem path for `fs` (absolute, or relative to the context dir), a
 	/// key prefix for every other kind, `None` for a whole-store kind
-	/// (`sqlite:`).
+	/// (`dynamo:`, `sqlite:`).
 	pub fn path_prefix(&self) -> Option<&SmolPath> {
 		match self {
 			Self::Fs { path_prefix } => path_prefix.as_ref(),
 			Self::Memory { path_prefix, .. }
 			| Self::S3 { path_prefix, .. }
-			| Self::Dynamo { path_prefix, .. }
 			| Self::LocalStorage { path_prefix, .. }
 			| Self::IndexedDb { path_prefix, .. }
 			| Self::R2 { path_prefix, .. }
 			| Self::Http { path_prefix, .. } => path_prefix.as_deref(),
-			// a database file is a whole store
-			Self::Sqlite { .. } => None,
+			// a table or a database file is a whole store
+			Self::Dynamo { .. } | Self::Sqlite { .. } => None,
 		}
 	}
 
@@ -371,9 +375,9 @@ impl StoreUri {
 	/// This store rooted at `subdir` below its current root, the uri form of
 	/// `BlobStore::with_subdir`: every kind nests `subdir` under its path
 	/// prefix. A `subdir` is a key, so a leading `/` or an escaping `..`
-	/// cannot climb above the current root. A whole-store kind (`sqlite:`)
-	/// has no prefix to nest under and is returned as is: scope its provider
-	/// instead.
+	/// cannot climb above the current root. A whole-store kind
+	/// (`dynamo:`, `sqlite:`) has no prefix to nest under and is returned as
+	/// is.
 	pub fn with_subdir(&self, subdir: impl Into<RelPath>) -> Self {
 		let subdir = subdir.into();
 		let nest = |path_prefix: &Option<RelPath>| -> Option<RelPath> {
@@ -406,15 +410,6 @@ impl StoreUri {
 				endpoint: endpoint.clone(),
 				region: region.clone(),
 			},
-			Self::Dynamo {
-				name,
-				path_prefix,
-				region,
-			} => Self::Dynamo {
-				name: name.clone(),
-				path_prefix: nest(path_prefix),
-				region: region.clone(),
-			},
 			Self::LocalStorage { name, path_prefix } => Self::LocalStorage {
 				name: name.clone(),
 				path_prefix: nest(path_prefix),
@@ -434,7 +429,7 @@ impl StoreUri {
 				origin: origin.clone(),
 				path_prefix: nest(path_prefix),
 			},
-			Self::Sqlite { .. } => self.clone(),
+			Self::Dynamo { .. } | Self::Sqlite { .. } => self.clone(),
 		}
 	}
 
@@ -551,13 +546,9 @@ impl fmt::Display for StoreUri {
 				("endpoint", endpoint),
 				("region", region),
 			]),
-			Self::Dynamo {
-				name,
-				path_prefix,
-				region,
-			} => fmt_scoped(f, DYNAMO_SCHEME, name, path_prefix, &[(
-				"region", region,
-			)]),
+			Self::Dynamo { name, region } => {
+				fmt_scoped(f, DYNAMO_SCHEME, name, &None, &[("region", region)])
+			}
 			Self::LocalStorage { name, path_prefix } => {
 				fmt_scoped(f, LOCAL_STORAGE_SCHEME, name, path_prefix, &[])
 			}
@@ -631,7 +622,7 @@ mod test {
 			"indexed-db://beet",
 			"indexed-db://beet-site--dev--analytics/v1",
 			"dynamo://beet-site--prod--analytics",
-			"dynamo://beet-site--prod--analytics/v1?region=us-west-2",
+			"dynamo://beet-site--prod--analytics?region=us-west-2",
 			"r2://SITE_BUCKET",
 			"r2://SITE_BUCKET/v1",
 			"s3://my-bucket",
@@ -668,13 +659,16 @@ mod test {
 				endpoint: Some("http://e".into()),
 				region: Some("r".into()),
 			});
-		StoreUri::parse("dynamo://t/p?region=r").unwrap().xpect_eq(
+		StoreUri::parse("dynamo://t?region=r").unwrap().xpect_eq(
 			StoreUri::Dynamo {
 				name: "t".into(),
-				path_prefix: Some("p".into()),
 				region: Some("r".into()),
 			},
 		);
+		StoreUri::parse("dynamo://t/p")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("no key prefix");
 		StoreUri::parse("indexed-db://d/p").unwrap().xpect_eq(
 			StoreUri::IndexedDb {
 				name: "d".into(),
@@ -782,8 +776,7 @@ mod test {
 		parts("memory://m").xpect_eq((Some("m".into()), None));
 		parts("s3://b/p?region=r")
 			.xpect_eq((Some("b".into()), Some("p".into())));
-		parts("dynamo://t/a/b")
-			.xpect_eq((Some("t".into()), Some("a/b".into())));
+		parts("dynamo://t?region=r").xpect_eq((Some("t".into()), None));
 		parts("local-storage://s/p")
 			.xpect_eq((Some("s".into()), Some("p".into())));
 		parts("indexed-db://d").xpect_eq((Some("d".into()), None));
@@ -906,7 +899,6 @@ mod test {
 		nested("fs", "v1").xpect_eq("fs:v1");
 		nested("fs:../site", "v1").xpect_eq("fs:../site/v1");
 		nested("fs:/srv", "/v1").xpect_eq("fs:/srv/v1");
-		nested("dynamo://t?region=r", "v1").xpect_eq("dynamo://t/v1?region=r");
 		nested("indexed-db://d", "analytics")
 			.xpect_eq("indexed-db://d/analytics");
 		nested("local-storage://s/a", "b").xpect_eq("local-storage://s/a/b");
@@ -915,6 +907,7 @@ mod test {
 		nested("https://beet.org/repo", "v1")
 			.xpect_eq("https://beet.org/repo/v1");
 		// a whole store has no prefix to nest under
+		nested("dynamo://t?region=r", "v1").xpect_eq("dynamo://t?region=r");
 		nested("sqlite:data.db", "v1").xpect_eq("sqlite:data.db");
 	}
 

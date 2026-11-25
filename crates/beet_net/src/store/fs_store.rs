@@ -7,6 +7,15 @@ use bytes::Bytes;
 /// Stores objects as files on the local filesystem, with the configured
 /// path representing the full store directory.
 ///
+/// ## Conditional writes
+/// A conditional write holds against every other writer of the directory, in
+/// this process and any other: two processes rewriting one file never erase
+/// each other's changes. Between processes it is an advisory lock on the
+/// directory, which the kernel releases however a process ends, so it holds
+/// against other conditional writes alone, as an unconditional one takes no
+/// lock. It is in process alone where a directory cannot be opened to lock
+/// (Windows, wasm), and may be on a network filesystem.
+///
 /// ## Default
 /// The default store is relative to the workspace root.
 #[derive(Debug, Clone, Component, Reflect, Get)]
@@ -68,29 +77,94 @@ impl FsStore {
 }
 
 /// The locks a conditional write holds while it checks then writes a file,
-/// striped by path so unrelated files never wait on each other. In process
-/// only: two processes writing one file conditionally are not serialized.
+/// striped by its directory so unrelated directories never wait on each other.
+/// Another process is held off by the directory's own lock
+/// ([`fs_ext::lock_dir`]), taken inside this one.
 static CONDITIONAL_LOCKS: [async_lock::Mutex<()>; 64] =
 	[const { async_lock::Mutex::new(()) }; 64];
 
 impl FsStore {
-	/// The stripe of [`CONDITIONAL_LOCKS`] guarding `path`.
-	fn conditional_lock(path: &AbsPath) -> &'static async_lock::Mutex<()> {
+	/// The stripe of [`CONDITIONAL_LOCKS`] guarding `dir`.
+	fn conditional_lock(dir: &AbsPath) -> &'static async_lock::Mutex<()> {
 		use core::hash::BuildHasher;
-		let hash = bevy::platform::hash::FixedHasher.hash_one(path.as_str());
+		let hash = bevy::platform::hash::FixedHasher.hash_one(dir.as_str());
 		&CONDITIONAL_LOCKS[hash as usize % CONDITIONAL_LOCKS.len()]
 	}
 
 	/// The file at `path` with its digest, `None` when there is none.
-	async fn read_versioned(
-		path: &AbsPath,
-	) -> Result<Option<(Bytes, BlobVersion)>> {
-		if !fs_ext::exists_async(path).await? {
+	fn read_versioned(path: &AbsPath) -> Result<Option<(Bytes, BlobVersion)>> {
+		if !fs_ext::exists(path)? {
 			return Ok(None);
 		}
-		let bytes = Bytes::from(fs_ext::read_async(path).await?);
+		let bytes = Bytes::from(fs_ext::read(path)?);
 		let version = BlobVersion::of(&bytes);
 		Some((bytes, version)).xok()
+	}
+
+	/// Run `write` on the file at `path` when `condition` holds of it, checked
+	/// and written under its directory's locks.
+	///
+	/// One blocking step holds the process lock, so a caller dropped midway
+	/// leaves a write made or not made, never one landing after the lock is
+	/// free.
+	async fn conditional<T: 'static + Send>(
+		path: AbsPath,
+		rel: RelPath,
+		condition: BlobCondition,
+		write: impl 'static + Send + FnOnce(&AbsPath, bool) -> Result<T>,
+	) -> Result<T> {
+		let Some(dir) = path.parent() else {
+			bevybail!("`{path}` is no file in a directory");
+		};
+		let _guard = Self::conditional_lock(&dir).lock().await;
+		async_ext::unblock(move || {
+			// a missing directory holds no file, and nobody to race for it
+			// but a writer creating it, which locks it first
+			if !matches!(condition, BlobCondition::Matches(_)) {
+				fs_ext::create_dir_all(&dir)?;
+			}
+			let _lock = match fs_ext::exists(&dir)? {
+				true => Some(fs_ext::lock_dir(&dir)?),
+				false => None,
+			};
+			let found = Self::read_versioned(&path)?;
+			BlobConflict::check(
+				&condition,
+				&rel,
+				found.as_ref().map(|(_, version)| version),
+			)?;
+			write(&path, found.is_some())
+		})
+		.await
+	}
+}
+
+impl StoreBackend for FsStore {
+	fn id(&self) -> &'static str { "fs" }
+
+	fn describe(&self) -> String { self.root_key().to_string() }
+
+	fn region(&self) -> Option<String> { None }
+
+	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
+		let root = self.effective_root();
+		Box::pin(async move { fs_ext::exists_async(root).await?.xok() })
+	}
+
+	fn store_create(&self) -> SendBoxedFuture<Result> {
+		let root = self.effective_root();
+		Box::pin(async move {
+			fs_ext::create_dir_all_async(root).await?;
+			().xok()
+		})
+	}
+
+	fn store_remove(&self) -> SendBoxedFuture<Result> {
+		let root = self.effective_root();
+		Box::pin(async move {
+			fs_ext::remove_async(root).await?;
+			().xok()
+		})
 	}
 }
 
@@ -145,8 +219,6 @@ impl BlobStoreProvider for FsStore {
 			.xok()
 	}
 
-	fn id(&self) -> &'static str { "fs" }
-
 	fn root_key(&self) -> SmolStr { format!("fs:{}", self.path).into() }
 
 	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
@@ -154,29 +226,6 @@ impl BlobStoreProvider for FsStore {
 	fn watch_dir(&self) -> Option<AbsPath> { Some(self.effective_root()) }
 
 	fn base_dir(&self) -> Option<AbsPath> { Some(self.path.clone()) }
-
-	fn region(&self) -> Option<String> { None }
-
-	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
-		let root = self.effective_root();
-		Box::pin(async move { fs_ext::exists_async(root).await?.xok() })
-	}
-
-	fn store_create(&self) -> SendBoxedFuture<Result> {
-		let root = self.effective_root();
-		Box::pin(async move {
-			fs_ext::create_dir_all_async(root).await?;
-			().xok()
-		})
-	}
-
-	fn store_remove(&self) -> SendBoxedFuture<Result> {
-		let root = self.effective_root();
-		Box::pin(async move {
-			fs_ext::remove_async(root).await?;
-			().xok()
-		})
-	}
 
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let path = self.resolve_path(path);
@@ -288,17 +337,21 @@ impl BlobStoreProvider for FsStore {
 		Box::pin(async move { fs_ext::remove_async(path).await?.xok() })
 	}
 
+	fn conditional_writes(&self) -> bool { true }
+
 	fn get_versioned(
 		&self,
 		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 		let path = self.resolve_path(path);
-		Box::pin(async move { Self::read_versioned(&path).await })
+		Box::pin(async move {
+			async_ext::unblock(move || Self::read_versioned(&path)).await
+		})
 	}
 
-	/// Checked and written under the path's in-process lock, the version
-	/// the content's digest, the file replaced whole so an unlocked reader
-	/// never reads it torn.
+	/// Checked and written under the directory's locks, this process's and
+	/// every other's ([`FsStore`]'s docs), the version the content's digest,
+	/// the file replaced whole so an unlocked reader never reads it torn.
 	fn insert_if(
 		&self,
 		path: &RelPath,
@@ -307,18 +360,15 @@ impl BlobStoreProvider for FsStore {
 	) -> SendBoxedFuture<Result<BlobVersion>> {
 		let rel = path.clone();
 		let path = self.resolve_path(path);
-		Box::pin(async move {
-			let _guard = Self::conditional_lock(&path).lock().await;
-			let found = Self::read_versioned(&path).await?;
-			BlobConflict::check(
-				&condition,
-				&rel,
-				found.as_ref().map(|(_, version)| version),
-			)?;
-			let version = BlobVersion::of(&body);
-			fs_ext::write_replacing_async(&path, body).await?;
-			version.xok()
-		})
+		Box::pin(Self::conditional(
+			path,
+			rel,
+			condition,
+			move |path, _existed| {
+				fs_ext::write_replacing(path, &body)?;
+				BlobVersion::of(&body).xok()
+			},
+		))
 	}
 
 	fn remove_if(
@@ -328,19 +378,12 @@ impl BlobStoreProvider for FsStore {
 	) -> SendBoxedFuture<Result> {
 		let rel = path.clone();
 		let path = self.resolve_path(path);
-		Box::pin(async move {
-			let _guard = Self::conditional_lock(&path).lock().await;
-			let found = Self::read_versioned(&path).await?;
-			BlobConflict::check(
-				&condition,
-				&rel,
-				found.as_ref().map(|(_, version)| version),
-			)?;
-			if found.is_some() {
-				fs_ext::remove_async(&path).await?;
+		Box::pin(Self::conditional(path, rel, condition, |path, existed| {
+			if existed {
+				fs_ext::remove(path)?;
 			}
 			Ok(())
-		})
+		}))
 	}
 
 	/// Digested in chunks on the blocking pool, so a stat of a multi-gigabyte
@@ -383,6 +426,43 @@ impl BlobStoreProvider for FsStore {
 				return Ok(None);
 			}
 			fs_ext::file_size(&path)?.xsome().xok()
+		})
+	}
+
+	/// Every followed link at any depth, a directory's own links included.
+	fn empty_links(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+		let root = self.effective_root();
+		let follow = self.follow_symlinks;
+		Box::pin(async move {
+			if !follow {
+				return Vec::new().xok();
+			}
+			async_ext::unblock(move || {
+				let mut found = Vec::new();
+				let mut dirs = vec![root.clone()];
+				while let Some(dir) = dirs.pop() {
+					for link in fs_ext::symlinks(&dir)? {
+						// a link to a file is no directory, and not empty
+						if !fs_ext::exists(&link)?
+							|| (fs_ext::is_dir(&link)
+								&& fs_ext::is_dir_empty(&link)?)
+						{
+							let link =
+								AbsPath::new_unchecked(link.to_string_lossy());
+							found.push(
+								link.strip_prefix(&root)
+									.unwrap_or_else(|| RelPath::new(link)),
+							);
+						}
+					}
+					dirs.extend(ReadDir::dirs(&dir)?.into_iter().map(|dir| {
+						AbsPath::new_unchecked(dir.to_string_lossy())
+					}));
+				}
+				found.sort();
+				found.xok()
+			})
+			.await
 		})
 	}
 
@@ -451,5 +531,140 @@ mod test {
 			.as_utf8()
 			.unwrap()
 			.xpect_eq("shared");
+	}
+
+	/// Two processes rewriting one file never erase each other's changes: the
+	/// other is this binary again, running [`second_process`].
+	#[cfg(all(unix, feature = "json"))]
+	#[beet_core::test(timeout_ms = 60_000)]
+	async fn processes_share_a_file() {
+		let dir = TempDir::new_ws().unwrap();
+		let mut child = spawn_second_process(dir.path(), "counts");
+		count(dir.path()).await;
+		async_ext::unblock(move || child.wait().unwrap())
+			.await
+			.success()
+			.xpect_true();
+		JsonTableStore::over(BlobStore::new(FsStore::new(dir.path().clone())))
+			.unwrap()
+			.table::<table_test::NamedRow>()
+			.get("n")
+			.await
+			.unwrap()
+			.unwrap()
+			.value
+			.xpect_eq(COUNTS * 2);
+	}
+
+	/// A process holding the lock holds a write off, through a symlink to the
+	/// directory too, and the moment it is killed the write goes through.
+	#[cfg(unix)]
+	#[beet_core::test(timeout_ms = 60_000)]
+	async fn a_killed_process_leaves_no_lock() {
+		let dir = TempDir::new_ws().unwrap();
+		let links = TempDir::new_ws().unwrap();
+		std::os::unix::fs::symlink(dir.path(), links.join("link")).unwrap();
+		let mut child = spawn_second_process(dir.path(), "holds");
+		while !fs_ext::exists(dir.join("held")).unwrap() {
+			time_ext::sleep_millis(10).await;
+		}
+		let store = BlobStore::new(FsStore::new(links.join("link")));
+		let written = store.clone();
+		let write = async move {
+			written
+				.insert_if(
+					&RelPath::new("a.txt"),
+					"a".into(),
+					BlobCondition::Absent,
+				)
+				.await
+		};
+		let kill = async {
+			time_ext::sleep_millis(500).await;
+			// still held off, then let go by the kill alone
+			fs_ext::exists(dir.join("a.txt")).unwrap().xpect_false();
+			child.kill().unwrap();
+			child.wait().unwrap();
+		};
+		let (written, ()) =
+			beet_core::exports::futures_lite::future::zip(write, kill).await;
+		written.unwrap();
+		store
+			.exists(&RelPath::new("a.txt"))
+			.await
+			.unwrap()
+			.xpect_true();
+		// nothing to clean up
+		let mut paths = store.list().await.unwrap();
+		paths.sort();
+		paths.xpect_eq(vec![RelPath::new("a.txt"), RelPath::new("held")]);
+	}
+
+	/// How many each process counts.
+	#[cfg(all(unix, feature = "json"))]
+	const COUNTS: i64 = 40;
+
+	/// Count one row up, conditionally, yielding so writers interleave.
+	#[cfg(all(unix, feature = "json"))]
+	async fn count(dir: &AbsPath) {
+		let rows =
+			JsonTableStore::over(BlobStore::new(FsStore::new(dir.clone())))
+				.unwrap()
+				.table::<table_test::NamedRow>();
+		for _ in 0..COUNTS {
+			loop {
+				let (row, precondition) =
+					match rows.get_with_cid("n").await.unwrap() {
+						Some((row, cid)) => (row, Precondition::Matches(cid)),
+						None => (
+							table_test::NamedRow::new("n", 0),
+							Precondition::Absent,
+						),
+					};
+				let next = table_test::NamedRow::new("n", row.value + 1);
+				match rows.put_if(next, precondition).await {
+					Ok(_) => break,
+					Err(err) if TableError::is_conflict(&err) => {}
+					Err(err) => panic!("{err}"),
+				}
+			}
+		}
+	}
+
+	/// Where [`second_process`] is told its directory and its part.
+	#[cfg(unix)]
+	const SECOND_PROCESS: &str = "BEET_TEST_FS_STORE_SECOND_PROCESS";
+
+	#[cfg(unix)]
+	fn spawn_second_process(dir: &AbsPath, part: &str) -> std::process::Child {
+		std::process::Command::new(std::env::current_exe().unwrap())
+			.args(["second_process", "--ignored"])
+			.env(SECOND_PROCESS, format!("{part}:{dir}"))
+			.stdout(std::process::Stdio::null())
+			.spawn()
+			.unwrap()
+	}
+
+	/// The other process of the tests above, run by them alone.
+	#[cfg(unix)]
+	#[beet_core::test(timeout_ms = 60_000)]
+	#[ignore = "the second process of `processes_share_a_file` and `a_killed_process_leaves_no_lock`"]
+	async fn second_process() {
+		let Ok(told) = env_ext::var(SECOND_PROCESS) else {
+			return;
+		};
+		let (part, dir) = told.split_once(':').unwrap();
+		let dir = AbsPath::new(dir).unwrap();
+		match part {
+			#[cfg(feature = "json")]
+			"counts" => count(&dir).await,
+			_ => {
+				let lock = fs_ext::lock_dir(&dir).unwrap();
+				lock.is_held().xpect_true();
+				fs_ext::write(dir.join("held"), "").unwrap();
+				std::thread::sleep(Duration::from_secs(50));
+				drop(lock);
+			}
+		}
 	}
 }

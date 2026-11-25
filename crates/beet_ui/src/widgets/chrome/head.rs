@@ -140,7 +140,7 @@ pub fn Head(
 		image: social_image.clone(),
 		publisher: title.clone(),
 	}
-	.to_json()?;
+	.to_json();
 	// a card only fills the large preview when there is a card to fill it with.
 	let twitter_card = if social_image.is_some() {
 		"summary_large_image"

@@ -26,6 +26,9 @@ pub struct StoreUriBlock {
 	/// [`StoreBlock::deploy_versioned`]. Off by default: a store this deploy
 	/// does not own is not one it versions unless told to.
 	deploy_versioned: bool,
+	/// Whether the uri is read as blobs or as rows, ie `kind="Table"` for a
+	/// `dynamo:` table, which is nothing else, or the rows of a `sqlite:` file.
+	kind: StoreKind,
 }
 
 impl Default for StoreUriBlock {
@@ -38,6 +41,7 @@ impl StoreUriBlock {
 			label: label.into(),
 			uri,
 			deploy_versioned: false,
+			kind: StoreKind::Blob,
 		}
 	}
 }
@@ -50,6 +54,8 @@ impl StoreBlock for StoreUriBlock {
 	fn store_uri(&self, _stack: &ResolvedStack) -> Result<StoreUri> {
 		self.uri.clone().xok()
 	}
+
+	fn kind(&self) -> StoreKind { self.kind }
 
 	fn deploy_versioned(&self) -> bool { self.deploy_versioned }
 }

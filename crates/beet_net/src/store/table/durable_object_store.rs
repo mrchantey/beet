@@ -8,9 +8,8 @@ use beet_core::prelude::*;
 /// work; anything that reads then writes a partition runs in its object.
 ///
 /// A declaration of several backends, resolved once when it is inserted
-/// ([`client`](Self::client)) into the [`TableStore`] and [`BlobStore`] (the
-/// declaration's own partition's blob side) landing beside it, so nothing
-/// forwards one method at a time:
+/// ([`client`](Self::client)) into the [`TableStore`] landing beside it, so
+/// nothing forwards one method at a time:
 /// - in a Worker (`wasm32` with `cloudflare`), a [`TableWireClient`] sending
 ///   each request to its partition's object through the namespace `binding`;
 /// - natively, with local service access, the same client over an
@@ -34,7 +33,8 @@ use beet_core::prelude::*;
 /// <DurableObjectStore bx:ref="tables" binding="TABLES"/>
 /// ```
 ///
-/// A Durable Object's row is at most 2MB, a row and a blob alike.
+/// Rows alone: bytes belong in a bucket (`R2WorkersStore`), a Durable Object's
+/// row being at most 2MB.
 #[derive(Debug, Clone, Get, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_insert = DurableObjectStore::on_insert)]
@@ -128,15 +128,14 @@ impl DurableObjectStore {
 		.with_capabilities(Self::CAPABILITIES.to_vec())
 	}
 
-	/// Land the erased currencies: the [`TableStore`] over the client, and
-	/// the [`BlobStore`] of the declaration's own partition.
+	/// Land the [`TableStore`] over the client.
 	fn on_insert(mut world: DeferredWorld, cx: HookContext) {
 		if let Some(store) = world.entity(cx.entity).get::<Self>().cloned() {
-			let client = store.client();
-			world.commands().entity(cx.entity).insert((
-				TableStore::new(client.clone()),
-				BlobStore::new(client),
-			));
+			world.commands().entity(cx.entity).queue_silenced(
+				move |mut entity: EntityWorldMut| {
+					TableStore::new(store.client()).land(&mut entity)
+				},
+			);
 		}
 	}
 }
@@ -146,8 +145,9 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// Natively the declaration is a partition host: its currencies land on
-	/// the entity, and each partition is a file under its directory.
+	/// Natively the declaration is a partition host: its table store lands on
+	/// the entity and no blob store does, and each partition is a file under
+	/// its directory.
 	#[beet_core::test]
 	async fn resolves_to_a_partition_host() {
 		let dir = TempDir::new_ws().unwrap();
@@ -159,6 +159,7 @@ mod test {
 			.id();
 		world.flush();
 		let store = world.entity(entity).get::<TableStore>().unwrap().clone();
+		world.entity(entity).contains::<BlobStore>().xpect_false();
 		store.supports(Capability::AtomicApply).xpect_true();
 		store
 			.partition("lobby")

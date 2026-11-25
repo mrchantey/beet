@@ -544,7 +544,7 @@ binary serves the records and the comments (`atproto`).
 		<!-- the stage rides the `Stack` COMPONENT, so it is correct in every
 		     binary, including the lean one where the verbs around it are inert -->
 		<Stack stage="shared">
-			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false object_versioning=true/>
+			<S3BucketBlock bx:ref="shared_assets" label="assets" deploy_versioned=false public_read=true force_destroy=false object_versioning=true/>
 			<!-- one resource and no step outside terraform, so the deploy is an
 			     apply and the teardown is that read backwards. `force_destroy` is
 			     off, so `destroy` REFUSES while the bucket holds anything: that
@@ -560,7 +560,7 @@ binary serves the records and the comments (`atproto`).
 			<Route path="push" {ExchangeSequence}>
 				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb"/>
 				<Derive/>
-				<DirSync bucket="assets" local_dir="site/assets"/>
+				<StoreSync src="fs:site/assets" dest={$shared_assets}/>
 			</Route>
 			<!-- `push` made a mirror: what `site/assets` no longer holds is
 			     pruned from the bucket, for a rename or a removal. Guarded
@@ -569,10 +569,10 @@ binary serves the records and the comments (`atproto`).
 			<Route path="mirror" {ExchangeSequence}>
 				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb"/>
 				<Derive/>
-				<DirSync bucket="assets" local_dir="site/assets" {SyncS3Bucket{delete:true}}/>
+				<StoreSync src="fs:site/assets" dest={$shared_assets} delete=true/>
 			</Route>
 			<Route path="pull" {ExchangeSequence}>
-				<DirSync bucket="assets" local_dir="site/assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>
+				<StoreSync src={$shared_assets} dest="fs:site/assets" anonymous=true/>
 			</Route>
 		</Stack>
 	</Route>

@@ -83,7 +83,7 @@ fn scalar_value(item: &DataLiteral) -> Option<Value> {
 /// localpart, not a mailbox list that quietly stays empty.
 ///
 /// A field the target does not have is an error naming both: `FromReflect`
-/// would drop it in silence, which is a declaration (`{SyncS3Bucket{paths:".."}}`
+/// would drop it in silence, which is a declaration (a sync's `paths:".."`
 /// after the field moved) that quietly does something else.
 pub(super) fn struct_to_reflect(
 	fields: &[(SmolStr, DataLiteral)],
