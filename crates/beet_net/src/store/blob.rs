@@ -48,6 +48,45 @@ impl Blob {
 		self.store.matches_object(event, &self.path)
 	}
 
+	/// The file this names, its extension written: the file itself, else the
+	/// one file beside it of its name with an extension.
+	///
+	/// ## Errors
+	/// Errors when no file is, or several are.
+	pub async fn complete(&self) -> Result<Self> {
+		if self.exists().await? {
+			return self.clone().xok();
+		}
+		let dir = self.path.parent().unwrap_or_default();
+		let name = self.path.file_name().unwrap_or_default();
+		let found = self
+			.store
+			.list_dir(&dir)
+			.await?
+			.files
+			.into_iter()
+			.map(|file| dir.join(file))
+			.filter(|file| file.file_stem() == Some(name))
+			.collect::<Vec<_>>();
+		match found.as_slice() {
+			[found] => self.store.blob(found.clone()).xok(),
+			[] => bevybail!(
+				"no document at `{}` in `{}`",
+				self.path,
+				self.store.describe()
+			),
+			found => bevybail!(
+				"`{}` names several documents, write its extension: {}",
+				self.path,
+				found
+					.iter()
+					.map(|path| format!("`{path}`"))
+					.collect::<Vec<_>>()
+					.join(", ")
+			),
+		}
+	}
+
 	/// Insert (or overwrite) the blob's content.
 	///
 	/// # Example

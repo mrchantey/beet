@@ -106,9 +106,7 @@ impl BlobPage {
 		caller
 			.world()
 			.with(move |world: &mut World| -> Result<PageRequest> {
-				let content = world
-					.spawn((render_store, PackageStore::new(package)))
-					.id();
+				let content = world.spawn((render_store, package)).id();
 				// the entity owning this request's route tree, resolved from the
 				// in-tree route exactly as the layout middleware resolves it
 				let router = world

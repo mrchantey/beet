@@ -1,14 +1,10 @@
 //! The `<CodeSnippet src=.. language=..>` widget: include a source file as a
 //! syntax-highlighted code block (a BSX `include_str!`).
 //!
-//! Reads `src` through the nearest self-or-ancestor [`BlobStore`], the same
-//! IO-agnostic store serving the site's templates and routes, never the
-//! filesystem directly, so it reads identically from disk in dev, S3 in a
-//! deployed task, or an in-memory store. `src` is relative to the store's
-//! scope, ie a page's content directory, a leading `..` climbing above it
-//! ([`BlobStore::relative_blob`]). It then renders it as a
-//! `<pre><code class="language-X">` block, highlighting it inline. The inline
-//! highlight matters: the read lands a few ticks after parse,
+//! `src` is a [`DocPath`], a file of the package, read through its store and
+//! never the filesystem directly (so it reads identically from disk in dev, S3
+//! in a deployed task, or an in-memory store), then renders it as a `<pre><code class="language-X">` block, highlighting it
+//! inline. The inline highlight matters: the read lands a few ticks after parse,
 //! so the post-parse [`apply_syntax_highlighting`] pass has already run and would
 //! miss this subtree; building the spans here means the same `<span class="hl-..">`
 //! tree the post-parse pass emits, so the block renders identically on the web and
@@ -18,18 +14,18 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Include a source file as a syntax-highlighted code block. `src` resolves
-/// through the nearest self-or-ancestor [`BlobStore`], relative to its scope
-/// ([`BlobStore::relative_blob`]); `language` overrides the
+/// Include a source file of the package as a syntax-highlighted code block.
+/// `src` is relative to the document writing it when it leads with a `.`, else
+/// to the package; `language` overrides the
 /// highlighter language (otherwise inferred from the file extension, with a `.bsx`
 /// entry highlighted as `jsx`).
 ///
 /// `<CodeSnippet src="../../demo/01-scripting.bsx" language="jsx"/>`
 #[template]
 pub fn CodeSnippet(
-	/// The source file path, resolved through the nearest ancestor store.
-	#[prop]
-	src: String,
+	/// The source file.
+	#[prop(required)]
+	src: DocPath,
 	/// The highlighter language (eg `jsx`, `rust`, `sh`); inferred from the file
 	/// extension when empty.
 	#[prop(default)]
@@ -47,14 +43,14 @@ pub fn CodeSnippet(
 	// guarantees a poll completes on the runtime's local executor.
 	OnSpawn::new_async_local(move |snippet: AsyncEntity| async move {
 		let target = snippet.id();
-		// the nearest self-or-ancestor store backs the read; a render tree carries it
-		// on its root (see `BlobPage`), an entry tree inherits the repo store.
-		let store = snippet
-			.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
-				|entity, stores| stores.get(entity).cloned(),
+		let blob = snippet
+			.with_state::<PackageQuery, Result<Blob>>(
+				move |entity, packages| packages.resolve(entity, &src),
 			)
-			.await??;
-		let bytes = store.relative_blob(&src)?.get().await?;
+			.await??
+			.complete()
+			.await?;
+		let bytes = blob.get().await?;
 		let source = String::from_utf8(bytes.to_vec())?;
 		let source = if strip_doc {
 			strip_leading_doc(&source)
@@ -62,7 +58,7 @@ pub fn CodeSnippet(
 			source
 		};
 		let lang = if language.is_empty() {
-			infer_language(&src)
+			infer_language(blob.path().as_str())
 		} else {
 			language.clone()
 		};

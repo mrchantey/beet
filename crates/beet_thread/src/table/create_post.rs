@@ -9,8 +9,8 @@ use beet_core::prelude::*;
 /// thread discards it unread.
 ///
 /// With `src` rather than `text` it expands to a [`SeedSource`] reading the
-/// file at that path in the store at or above the thread, read by the entry
-/// creating the thread, so a long procedure has one source, ie
+/// file of the package it names, read by the entry creating the thread, so a
+/// long procedure has one source, ie
 /// `<CreatePost src="seeds/system.md"/>`.
 ///
 /// Set `intent` / `status` to author refusals ([`PostIntent::Refusal`]),
@@ -21,9 +21,9 @@ use beet_core::prelude::*;
 pub fn CreatePost(
 	/// The post's text.
 	text: String,
-	/// A file in the store above the thread holding the post's text, read
-	/// by the entry creating the thread, in place of `text`.
-	src: Option<RelPath>,
+	/// A file of the package holding the post's text, read by the entry
+	/// creating the thread, in place of `text`.
+	src: Option<DocPath>,
 	#[prop(default = PostIntent::Message)] intent: PostIntent,
 	#[prop(default = PostStatus::Completed)] status: PostStatus,
 ) -> impl Bundle {
@@ -34,7 +34,7 @@ pub fn CreatePost(
 				entity.insert(SeedSource {
 					intent,
 					status,
-					..SeedSource::blob(src)
+					..SeedSource::document(src)
 				});
 			}
 			#[cfg(not(feature = "action"))]

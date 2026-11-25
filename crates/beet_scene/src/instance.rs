@@ -167,14 +167,14 @@ pub(crate) fn activate_on_insert(
 		if is_held(world, site) {
 			return Ok(());
 		}
-		let path = instance.document.rel_path();
+		let document = instance.document;
 		// resolved here where the tree is whole, else in the task, where it
 		// will be
 		let loaded = world
-			.with_state::<PackageQuery, _>(|packages| packages.get(site).ok())
-			.and_then(|package| {
-				world.resource::<PrefabCache>().get(&package, &path)
-			});
+			.with_state::<PackageQuery, _>(|packages| {
+				packages.resolve(site, &document).ok()
+			})
+			.and_then(|blob| world.resource::<PrefabCache>().get(&blob));
 		if let Some(prefab) = loaded {
 			// a build reports its own failure; the document's is the tree's
 			if let Err(err) = Activation::activate(world, site, &prefab, author)
@@ -186,11 +186,11 @@ pub(crate) fn activate_on_insert(
 		let guard = TemplatePending::park_content(
 			world,
 			site,
-			format!("<Instance document=\"{path}\">"),
+			format!("<Instance document=\"{document}\">"),
 		);
 		world.entity_mut(site).run_async_local(
 			async move |entity: AsyncEntity| {
-				activate_when_loaded(entity, path, author, guard).await
+				activate_when_loaded(entity, document, author, guard).await
 			},
 		);
 		Ok(())
@@ -213,19 +213,20 @@ fn is_held(world: &World, entity: Entity) -> bool {
 /// Load the document a use names and activate it, then resolve `guard`.
 async fn activate_when_loaded(
 	entity: AsyncEntity,
-	path: RelPath,
+	document: DocPath,
 	author: Option<Entity>,
 	guard: PendingGuard,
 ) {
 	let site = entity.id();
 	let root = guard.root();
 	let loaded = async {
-		let package = entity
-			.with_state::<PackageQuery, Result<BlobStore>>(
-				|entity, packages| packages.get(entity),
+		let resolved = document.clone();
+		let blob = entity
+			.with_state::<PackageQuery, Result<Blob>>(
+				move |entity, packages| packages.resolve(entity, &resolved),
 			)
 			.await??;
-		PrefabCache::load(entity.world(), &package, &path).await
+		PrefabCache::load(entity.world(), &blob).await
 	}
 	.await;
 	entity
@@ -245,7 +246,7 @@ async fn activate_when_loaded(
 				fail(
 					world,
 					root,
-					bevyhow!("<Instance document=\"{path}\">: {err}"),
+					bevyhow!("<Instance document=\"{document}\">: {err}"),
 				);
 			}
 			guard.resolve(world);

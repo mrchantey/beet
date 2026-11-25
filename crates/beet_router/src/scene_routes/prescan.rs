@@ -8,11 +8,9 @@
 //! string attributes and no `bx:cfg`, beside the entry's root element or
 //! anywhere within it, acts before the build, and nothing else does.
 //!
-//! One beside the root element is consumed by the prescan rather than built,
-//! so a root admitting no such child (a `<Sequence>`, whose every child is a
-//! step) still declares what it needs, and the single-root rule counts what
-//! remains ([`EntryPrescan::body`]). A declaration the built tree must also find
-//! (the `<Secrets>` the `secrets` verbs default to) belongs inside the root.
+//! It is built like any other tag all the same, and the document it is in has
+//! as many roots as it likes: a root admitting no such child (a `<Sequence>`,
+//! whose every child is a step) has its declarations written beside it.
 
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -193,11 +191,9 @@ impl PrescanRegistration {
 }
 
 /// Everything entry resolution reads out of a raw entry document, from one
-/// registry-free walk: every registered [`Prescan`] declaration, and the
-/// document left once the declarations beside its root are consumed, which the
-/// build lowers ([`body`](Self::body)).
+/// registry-free walk: every registered [`Prescan`] declaration.
 ///
-/// One parse per bootstrap, versus the several the same bytes used to get. The
+/// One walk per bootstrap, whose result the load carries. The
 /// declarations remain the authoring vocabulary; this is only the extraction,
 /// against the [`PrescanRegistry`] the launch's plugins registered, so a
 /// downstream crate's declaration is collected by the same walk.
@@ -208,9 +204,8 @@ impl PrescanRegistration {
 /// defers work the build does anyway, while scanning an
 /// EXCLUDED branch would fire a `<RequireCfg>` this build was never meant to
 /// satisfy and fail the load over a requirement that does not apply. So the
-/// conditional case is left to the build, which is the stage that can answer it,
-/// and a conditional declaration beside the root is not consumed: it counts as
-/// a second root. An entry-level declaration is written unconditional.
+/// conditional case is left to the build, which is the stage that can answer
+/// it.
 ///
 /// What the entry *instantiates* is not read here: the built tree records each
 /// document it uses ([`Activation`](beet_scene::prelude::Activation)), which is
@@ -219,10 +214,6 @@ impl PrescanRegistration {
 pub struct EntryPrescan {
 	/// Every registered declaration found, in document order.
 	declarations: Vec<Arc<dyn Reflect>>,
-	/// A markup entry's top-level nodes less the declarations collected among
-	/// them. `None` for a serde entry, which declares nothing and builds from
-	/// its bytes.
-	document: Option<Vec<BsxNode>>,
 }
 
 impl EntryPrescan {
@@ -241,25 +232,7 @@ impl EntryPrescan {
 			BsxNode::parse_document(entry.as_utf8()?, &BsxParseConfig::bsx())?;
 		let mut prescan = Self::default();
 		prescan.collect(&nodes, registry)?;
-		// a declaration beside the root is the prescan's alone: consumed here
-		// rather than built, or counted as a second root
-		prescan.document = nodes
-			.into_iter()
-			.filter(|node| {
-				!matches!(node, BsxNode::Element(element)
-					if Self::declaration(element, registry).is_some())
-			})
-			.collect::<Vec<_>>()
-			.xsome();
 		prescan.xok()
-	}
-
-	/// The body a markup entry builds: its single root element
-	/// ([`BsxParser::lower_entry`]) once the declarations beside it are
-	/// consumed. `None` for a serde entry, which builds from its bytes.
-	pub fn body(self, parsers: &DocParsers) -> Option<Result<SceneBody>> {
-		self.document
-			.map(|nodes| BsxParser::lower_entry(nodes, parsers))
 	}
 
 	/// Every collected `T`, in document order.
@@ -305,23 +278,16 @@ impl EntryPrescan {
 			if Self::is_conditional(element) {
 				continue;
 			}
-			if let Some(registration) = Self::declaration(element, registry) {
+			// a spread names something the build resolves
+			if let Some(registration) = registry
+				.by_tag(&element.tag)
+				.filter(|_| !Self::has_spread(element))
+			{
 				self.declarations.push((registration.collect)(element)?);
 			}
 			self.collect(&element.children, registry)?;
 		}
 		Ok(())
-	}
-
-	/// The registration `element` is collected as: a registered tag carrying
-	/// no spread (which names something the build resolves) and no `bx:cfg`.
-	fn declaration<'a>(
-		element: &BsxElement,
-		registry: &'a PrescanRegistry,
-	) -> Option<&'a PrescanRegistration> {
-		registry.by_tag(&element.tag).filter(|_| {
-			!Self::has_spread(element) && !Self::is_conditional(element)
-		})
 	}
 
 	/// Whether the element carries a `bx:cfg`, leaving its subtree to the

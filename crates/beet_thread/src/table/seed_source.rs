@@ -9,8 +9,8 @@ use beet_net::prelude::*;
 /// entering.
 ///
 /// Authored as a child of its `<CreateActor>` like a [`SeedPost`], ie
-/// `<CreatePost src="seeds/system.md"/>`, which reads the file at `src` in the
-/// store at or above the thread. A downstream source is a template returning
+/// `<CreatePost src="seeds/system.md"/>`, which reads the file of the package
+/// `src` names. A downstream source is a template returning
 /// one, its action reading whatever it needs.
 ///
 /// Building the template reads nothing. [`Thread::enter`] resolves every
@@ -45,27 +45,24 @@ impl SeedSource {
 		}
 	}
 
-	/// A seed reading the text of the file at `path` in the store at or above
-	/// the thread.
-	pub fn blob(path: RelPath) -> Self {
-		let label = format!("<CreatePost src=\"{path}\">");
+	/// A seed reading the text of the file of the package `document` names.
+	pub fn document(document: DocPath) -> Self {
+		let label = format!("<CreatePost src=\"{document}\">");
 		Self::new(
 			label,
 			Action::new_async(
 				async move |cx: ActionContext<ThreadEntry>| -> Result<String> {
-					let store = cx
-						.caller
-						.with_state::<AncestorQuery<&BlobStore>, _>(
-							|entity, query| query.get(entity).cloned(),
+					let document = document.clone();
+					cx.caller
+						.with_state::<PackageQuery, _>(
+							move |entity, packages| {
+								packages.resolve(entity, &document)
+							},
 						)
+						.await??
+						.complete()
 						.await?
-						.map_err(|_| {
-							bevyhow!(
-								"no store above the thread to read the seed `{path}`"
-							)
-						})?;
-					store
-						.get(&path)
+						.get()
 						.await?
 						.to_vec()
 						.xmap(String::from_utf8)?

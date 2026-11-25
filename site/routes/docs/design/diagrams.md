@@ -117,9 +117,9 @@ graph LR
 
 ## Markup
 
-The `<Mermaid>` widget authors a diagram outside a fence: its source is the default slot's text, or a file read through the page's store, and `render` pins the form as the info word does.
+The `<Mermaid>` widget authors a diagram outside a fence: its source is the default slot's text, or a file of the package, and `render` pins the form as the info word does.
 
-<Mermaid src="docs/design/pipeline.mmd"/>
+<Mermaid src="./pipeline.mmd"/>
 
 ## Choosing the form
 

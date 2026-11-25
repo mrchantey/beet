@@ -42,16 +42,6 @@ pub(crate) fn document_media_type(path: &RelPath) -> MediaType {
 	path.media_type().unwrap_or(MediaType::Json)
 }
 
-/// The package of `entity`, or `None` while no store has arrived above it: one
-/// legitimately lands frames after the tree that reads it.
-async fn ancestor_package(entity: &AsyncEntity) -> Result<Option<BlobStore>> {
-	entity
-		.with_state::<PackageQuery, _>(|entity, packages| {
-			packages.get(entity).ok()
-		})
-		.await
-}
-
 /// Run condition for [`read_located_schemas`]: a document or a store arrived,
 /// the two orders in which a located schema becomes readable.
 pub(crate) fn located_schemas_may_be_readable(
@@ -78,8 +68,10 @@ pub(crate) fn read_located_schemas(
 		let ValueSchema::Ref(SchemaRef::Document(path)) = &schema.0 else {
 			continue;
 		};
-		let path = path.rel_path();
-		if registry.located(&path).is_some() || !Loading::may_read(loading) {
+		let document = path.clone();
+		if registry.located(&document.rel_path()).is_some()
+			|| !Loading::may_read(loading)
+		{
 			continue;
 		}
 		// the resolver cannot hold a `Res` across an await, so the task carries
@@ -90,7 +82,7 @@ pub(crate) fn read_located_schemas(
 			.entity(entity)
 			.queue_async(async move |entity| {
 				let outcome =
-					read_located_schema(&entity, snapshot, path).await;
+					read_located_schema(&entity, snapshot, document).await;
 				// settled whatever the outcome, so a transient failure is retried
 				// when the next document or store arrives rather than wedging
 				// this one
@@ -105,13 +97,23 @@ pub(crate) fn read_located_schemas(
 async fn read_located_schema(
 	entity: &AsyncEntity,
 	snapshot: SchemaRegistry,
-	path: RelPath,
+	document: DocPath,
 ) -> Result<Read> {
-	let Some(package) = ancestor_package(entity).await? else {
+	let path = document.rel_path();
+	// `None` while no store has arrived above it: one legitimately lands frames
+	// after the tree that reads it
+	let Some(blob) = entity
+		.with_state::<PackageQuery, _>(move |entity, packages| {
+			packages.resolve(entity, &document).ok()
+		})
+		.await?
+	else {
 		return Ok(Read::NoStore);
 	};
-	let full = package.complete_document(&path).await?;
-	let schema = package
+	let blob = blob.complete().await?;
+	let full = blob.path().clone();
+	let schema = blob
+		.store()
 		.get_document(SchemaResolver::default().with_schemas(&snapshot), &full)
 		.await?
 		.to_schema()?

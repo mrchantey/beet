@@ -51,58 +51,56 @@ struct PrefabKey {
 }
 
 impl PrefabKey {
-	fn new(package: &BlobStore, path: &RelPath) -> Self {
+	fn new(document: &Blob) -> Self {
 		Self {
-			root_key: package.root_key(),
-			subdir: package.subdir(),
-			path: path.clone(),
+			root_key: document.store().root_key(),
+			subdir: document.store().subdir(),
+			path: document.path().clone(),
 		}
 	}
 }
 
 #[derive(Clone)]
 struct CachedPrefab {
-	package: BlobStore,
+	document: Blob,
 	prefab: Arc<InstancePrefab>,
 }
 
 impl PrefabCache {
-	/// The prefab at `path` of `package`, if it is loaded. A path whose
-	/// extension was left off is answered once it has been loaded by it.
-	pub fn get(
-		&self,
-		package: &BlobStore,
-		path: &RelPath,
-	) -> Option<Arc<InstancePrefab>> {
+	/// The prefab of `document`, if it is loaded. One whose extension was left
+	/// off is answered once it has been loaded by it.
+	pub fn get(&self, document: &Blob) -> Option<Arc<InstancePrefab>> {
 		self.0
-			.get(&PrefabKey::new(package, path))
+			.get(&PrefabKey::new(document))
 			.map(|cached| cached.prefab.clone())
 	}
 
-	/// The prefab at `path` of `package` with every document it instantiates,
-	/// loading what is not loaded, so building it finds each at hand.
+	/// The prefab of `document`, as its package resolved it, with every
+	/// document it instantiates, loading what is not loaded, so building it finds each at hand.
 	///
 	/// ## Errors
 	/// Errors when a document is missing, ambiguous or does not parse, or when
 	/// a document instantiates itself, however indirectly.
 	pub async fn load(
 		world: &AsyncWorld,
-		package: &BlobStore,
-		path: &RelPath,
+		document: &Blob,
 	) -> Result<Arc<InstancePrefab>> {
-		Self::load_under(world, package, path, Vec::new()).await
+		Self::load_under(world, document, Vec::new()).await
 	}
 
-	/// Load every document `template`, the document at `path`, instantiates.
+	/// Load every document `template`, the document at `path` of `package`,
+	/// instantiates.
 	pub async fn load_instances(
 		world: &AsyncWorld,
-		package: &BlobStore,
+		package: &PackageStore,
 		path: &RelPath,
 		template: &DynamicTemplate,
 	) -> Result {
 		for document in template.instances() {
-			Self::load_under(world, package, &document, vec![path.clone()])
-				.await?;
+			Self::load_under(world, &package.resolve(&document.into()), vec![
+				path.clone(),
+			])
+			.await?;
 		}
 		Ok(())
 	}
@@ -111,23 +109,22 @@ impl PrefabCache {
 	/// first.
 	async fn load_under(
 		world: &AsyncWorld,
-		package: &BlobStore,
-		path: &RelPath,
+		document: &Blob,
 		above: Vec<RelPath>,
 	) -> Result<Arc<InstancePrefab>> {
 		let loaded = {
-			let (package, path) = (package.clone(), path.clone());
+			let document = document.clone();
 			world
 				.with(move |world: &mut World| {
 					world
 						.get_resource::<Self>()
-						.and_then(|cache| cache.get(&package, &path))
+						.and_then(|cache| cache.get(&document))
 				})
 				.await
 		};
 		let prefab = match loaded {
 			Some(prefab) => prefab,
-			None => Self::read(world, package, path).await?,
+			None => Self::read(world, document).await?,
 		};
 		if above.contains(&prefab.path) {
 			bevybail!(
@@ -143,12 +140,11 @@ impl PrefabCache {
 		}
 		let mut above = above;
 		above.push(prefab.path.clone());
-		for document in prefab.instances.clone() {
+		for path in prefab.instances.clone() {
 			// boxed, since a document's depth is no type
 			Box::pin(Self::load_under(
 				world,
-				package,
-				&document,
+				&document.store().blob(path),
 				above.clone(),
 			))
 			.await?;
@@ -156,18 +152,18 @@ impl PrefabCache {
 		prefab.xok()
 	}
 
-	/// Read the document at `path` and hold it.
+	/// Read `document` and hold it.
 	async fn read(
 		world: &AsyncWorld,
-		package: &BlobStore,
-		path: &RelPath,
+		document: &Blob,
 	) -> Result<Arc<InstancePrefab>> {
-		let full = package.complete_document(path).await?;
-		let bytes = package
-			.get_media(&full)
+		let complete = document.complete().await?;
+		let full = complete.path().clone();
+		let bytes = complete
+			.get_media()
 			.await
 			.map_err(|err| bevyhow!("`{full}`: {err}"))?;
-		let (package, path) = (package.clone(), path.clone());
+		let document = document.clone();
 		world
 			.with(move |world: &mut World| -> Result<Arc<InstancePrefab>> {
 				let body = DocParsers::of(world)
@@ -183,14 +179,11 @@ impl PrefabCache {
 					path: full.clone(),
 				});
 				let mut cache = world.get_resource_or_init::<Self>();
-				for path in [&path, &full] {
-					cache.0.insert(
-						PrefabKey::new(&package, path),
-						CachedPrefab {
-							package: package.clone(),
-							prefab: prefab.clone(),
-						},
-					);
+				for key in [&document, &complete] {
+					cache.0.insert(PrefabKey::new(key), CachedPrefab {
+						document: complete.clone(),
+						prefab: prefab.clone(),
+					});
 				}
 				prefab.xok()
 			})
@@ -200,9 +193,8 @@ impl PrefabCache {
 	/// Forget every document `event` changed, and every one read by a path
 	/// that now may name another file.
 	fn forget(&mut self, event: &BlobEvent) {
-		self.0.retain(|_, cached| {
-			!cached.package.matches_object(event, &cached.prefab.path)
-		});
+		self.0
+			.retain(|_, cached| !cached.document.matches_event(event));
 	}
 }
 

@@ -443,7 +443,10 @@ mod tests {
 		let server = server.with_pty_timeout(Duration::from_millis(200));
 		let addr = server.local_address();
 		let live = Store::<usize>::default();
-		let count = live.clone();
+		// whether any peer was ever seen, since a loaded machine may poll only
+		// after the reap
+		let seen = Store::<bool>::default();
+		let (count, ever) = (live.clone(), seen.clone());
 
 		std::thread::spawn(move || {
 			let mut app = App::new();
@@ -451,7 +454,10 @@ mod tests {
 				.add_systems(
 					Update,
 					move |peers: Query<(), With<SshPeerInfo>>| {
-						count.set(peers.iter().count())
+						count.set(peers.iter().count());
+						if !peers.is_empty() {
+							ever.set(true);
+						}
 					},
 				);
 			app.world_mut().spawn((server, on_spawn));
@@ -467,7 +473,7 @@ mod tests {
 			app.run();
 		});
 
-		poll_until(|| live.get() == 1, "server never saw the connection").await;
+		poll_until(|| seen.get(), "server never saw the connection").await;
 		poll_until(|| live.get() == 0, "connection with no pty was not reaped")
 			.await;
 	}

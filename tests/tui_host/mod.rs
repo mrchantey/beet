@@ -73,14 +73,7 @@ impl TuiHost {
 		// stdio terminal rather than to this suite's channel one.
 		let root = app.world_mut().spawn(DisableCallOnReady).id();
 		// a sibling declaration is consumed, as the binary's entry build does
-		let template = EntryPrescan::parse(
-			&entry,
-			app.world().resource::<PrescanRegistry>(),
-		)
-		.unwrap()
-		.body(&DocParsers::of(app.world()))
-		.unwrap()
-		.unwrap();
+		let template = DocParsers::of(app.world()).body(&entry).unwrap();
 		app.world_mut()
 			.entity_mut(root)
 			.insert(store.clone())

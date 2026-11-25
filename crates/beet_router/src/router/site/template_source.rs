@@ -55,8 +55,7 @@ impl TemplateSource {
 					.await??;
 				let prefab = PrefabCache::load(
 					&entity.world(),
-					&package,
-					&document.rel_path(),
+					&package.resolve(&document),
 				)
 				.await?;
 				LoadedTemplate::Document(package, prefab).xok()
@@ -72,8 +71,8 @@ impl TemplateSource {
 /// holder likes.
 #[derive(Clone)]
 pub enum LoadedTemplate {
-	/// A document and the store of the package it is of.
-	Document(BlobStore, Arc<InstancePrefab>),
+	/// A document and the package it is of.
+	Document(PackageStore, Arc<InstancePrefab>),
 	/// A rust template by its short or full type path.
 	Template(SmolStr),
 }
@@ -91,9 +90,11 @@ impl LoadedTemplate {
 	/// the template's own root is always its child.
 	pub fn build(&self, entity: &mut EntityWorldMut) -> Result {
 		match self {
-			Self::Document(package, prefab) => entity
-				.insert(PackageStore::new(package.clone()))
-				.insert_template(InstanceTemplate::new(prefab.clone()))?,
+			Self::Document(package, prefab) => {
+				entity
+					.insert(package.clone())
+					.insert_template(InstanceTemplate::new(prefab.clone()))?
+			}
 			Self::Template(name) => {
 				let template = SceneBody::invoking(entity.world(), name)?
 					.reflect(entity.world())?;

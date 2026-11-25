@@ -54,40 +54,6 @@ impl BsxParser {
 			.unwrap_or_default()
 			.xok()
 	}
-
-	/// Lower an entry document: exactly one root element, comments and blank
-	/// text beside it documenting the file.
-	///
-	/// An entry is booted where any other document is instantiated: its root is
-	/// the program, which a command loading the entry calls, so a second root
-	/// would silently demote the first to a child.
-	///
-	/// ## Errors
-	/// Errors naming every root found when there is not exactly one element.
-	pub fn lower_entry(
-		nodes: Vec<BsxNode>,
-		parsers: &DocParsers,
-	) -> Result<SceneBody> {
-		if BsxNode::single_root(&nodes).is_none() {
-			let found = nodes
-				.iter()
-				.filter(|node| node.is_significant())
-				.map(|node| match node {
-					BsxNode::Element(element) => format!("`<{}>`", element.tag),
-					BsxNode::Text(text) => format!("text `{}`", text.trim()),
-					_ => "non-element content".into(),
-				})
-				.collect::<Vec<_>>();
-			bevybail!(
-				"an entry document must have a single root element, found {}",
-				match found.is_empty() {
-					true => "none".to_string(),
-					false => found.join(", "),
-				}
-			);
-		}
-		Self::lower(nodes, parsers)
-	}
 }
 
 impl DocParser for BsxParser {

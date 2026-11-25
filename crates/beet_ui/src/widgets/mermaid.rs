@@ -30,44 +30,34 @@ use beet_net::prelude::*;
 /// `B{Decision}` node is authored through `src` or a fence.
 #[template]
 pub fn Mermaid(
-	/// A file holding the source, resolved through the nearest ancestor store;
-	/// the default slot's text when empty.
-	src: String,
+	/// A file of the package holding the source; the default slot's text when
+	/// absent.
+	src: Option<DocPath>,
 	/// The form this diagram takes, the declaration a fence info word makes.
 	render: Option<DiagramRender>,
 ) -> impl Bundle {
 	rsx! {
 		<figure
 			{Classes::new([DIAGRAM])}
-			{MermaidSource::new(src, render)}
+			{MermaidSource { src, render }}
 		><slot/></figure>
 	}
 }
 
 /// Where a `<Mermaid>` figure's source comes from, adopted on [`Ready`]: the
 /// build has settled and its slots resolved, so the slot's text sits under
-/// the figure and the store an `src` reads through is reachable by ancestry.
+/// the figure and the package an `src` is of is reachable by ancestry.
 #[derive(Debug, Component)]
 #[component(on_add = hook_ext::observe(adopt_source))]
 struct MermaidSource {
-	/// The store path of the source, `None` for the slot's text.
-	src: Option<SmolStr>,
+	/// The file holding the source, `None` for the slot's text.
+	src: Option<DocPath>,
 	/// The form to declare on the figure, `None` for the cascade's.
 	render: Option<DiagramRender>,
 }
 
-impl MermaidSource {
-	fn new(src: String, render: Option<DiagramRender>) -> Self {
-		Self {
-			src: (!src.is_empty()).then(|| src.into()),
-			render,
-		}
-	}
-}
-
 /// Observer: give the figure its source. The slot's text is under the figure
-/// now; a file is read through the nearest self-or-ancestor [`BlobStore`] off
-/// a task of the figure, cancelled with it.
+/// now; a file is read off a task of the figure, cancelled with it.
 fn adopt_source(
 	ev: On<Ready>,
 	sources: Query<&MermaidSource>,
@@ -97,12 +87,17 @@ fn adopt_source(
 		Some(src) => {
 			commands.entity(figure).queue_async_local(
 				move |figure| async move {
-					let store = figure
-						.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
-							|entity, stores| stores.get(entity).cloned(),
+					let bytes = figure
+						.with_state::<PackageQuery, Result<Blob>>(
+							move |entity, packages| {
+								packages.resolve(entity, &src)
+							},
 						)
-						.await??;
-					let bytes = store.get(&RelPath::from(src.as_str())).await?;
+						.await??
+						.complete()
+						.await?
+						.get()
+						.await?;
 					let text = String::from_utf8(bytes.to_vec())?;
 					figure
 						.with(move |mut entity| {
@@ -204,10 +199,10 @@ mod test {
 			.xpect_contains("graph LR");
 	}
 
-	/// `src` reads through the ancestor store, and the unset `render` leaves
+	/// `src` reads a file of the package, and the unset `render` leaves
 	/// the mode to the cascade.
 	#[beet_core::test]
-	async fn src_reads_the_ancestor_store() {
+	async fn src_reads_a_package_file() {
 		let store = BlobStore::temp();
 		store
 			.insert(
@@ -249,10 +244,13 @@ mod test {
 		let mut world = (AsyncPlugin, CharcellPlugin).into_world();
 		let root = world.spawn(BlobStore::new(FsStore::new(routes))).id();
 		// the diagrams are post-parse passes, which the media parse runs
-		DocParsers::parse(ParseContext::new(
-			&mut world.entity_mut(root),
-			&MediaBytes::new_markdown(&md),
-		))
+		DocParsers::parse(
+			ParseContext::new(
+				&mut world.entity_mut(root),
+				&MediaBytes::new_markdown(&md),
+			)
+			.with_path(RelPath::new("docs/design/diagrams.md")),
+		)
 		.unwrap();
 		// the include reads its file off a task
 		AsyncRunner::settle_async_tasks(&mut world).await;

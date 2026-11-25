@@ -47,7 +47,7 @@ pub struct ResolvedEntry {
 	pub repo_store: BlobStore,
 	pub entry_name: String,
 	/// The entry document's declarations, read by the same pass that resolved the
-	/// store, so the load never re-parses it.
+	/// store, so the load never re-scans it.
 	pub prescan: EntryPrescan,
 	#[cfg(not(target_arch = "wasm32"))]
 	pub watch_dir: Option<AbsPath>,
@@ -75,7 +75,7 @@ pub async fn resolve_in_repo_store(
 ) -> Result<ResolvedEntry> {
 	let prescan = read_prescan(&repo_store, prescans, &entry_name).await?;
 	// the rebased store holds the same entry document, so its pre-scan is the
-	// one already read: entry resolution parses the entry exactly once.
+	// one already read: entry resolution scans the entry exactly once.
 	let (repo_store, entry_name) = match prescan.first::<RepoRoot>() {
 		Some(root) => repo_store.rebase_repo(&entry_name, &root.src)?,
 		None => (repo_store, entry_name),
@@ -308,7 +308,7 @@ pub struct EntrySources {
 /// Read the entry document through `store`, awaited off the runtime (never
 /// blocked, so it runs on the single-threaded Worker too). The caller hands over
 /// the `prescan` entry resolution already produced, so the document is never
-/// re-parsed.
+/// re-scanned.
 pub async fn read_sources(
 	repo_store: &BlobStore,
 	entry_name: impl Into<String>,
@@ -364,12 +364,9 @@ pub fn build_root(
 	// in a binary that cannot support it, and the report holds even when the
 	// tree itself cannot build (eg its root tag is not registered here).
 	RequireCfg::assert_all(world, prescan.iter::<RequireCfg>())?;
-	// a markup entry builds the document its prescan left, the declarations
-	// beside its root consumed; any other builds from its bytes
-	let parsers = DocParsers::of(world);
-	let template = prescan
-		.body(&parsers)
-		.unwrap_or_else(|| parsers.body(&entry).map_err(BevyError::from))
+	let template = DocParsers::of(world)
+		.body(&entry)
+		.map_err(BevyError::from)
 		.and_then(|body| {
 			// its own path in its package, whose root is its directory
 			body.reflect_at(
@@ -672,11 +669,10 @@ mod test {
 		}
 	}
 
-	/// A declaration beside the root acts and is consumed rather than built,
-	/// before or after the root, so a root admitting no such child (a
-	/// `<Sequence>`) can still declare what it needs.
+	/// An entry is a document like any other, so it may have several roots, a
+	/// declaration beside the rest among them, each built under a bare root.
 	#[beet_core::test]
-	async fn declarations_beside_the_root_are_consumed() {
+	async fn several_roots_build() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.spawn(
 			CrateRegistration::new("beet-cli", "0.0.9")
@@ -685,49 +681,39 @@ mod test {
 		);
 		let root = build_source(
 			&mut world,
-			r#"<!-- a scene -->
-			<RequireCfg cfg="feature:extra"/>
+			r#"<RequireCfg cfg="feature:extra"/>
 			<Router><DefaultAppRoutes/></Router>
-			<RequireCfg cfg="version:0.0.1"/>"#,
+			<Sequence/>
+			<RequireCfg cfg="version:0.0.1" bx:cfg="version:0.0.1"/>"#,
 		)
 		.await
 		.unwrap();
-		world.entity(root).contains::<Router>().xpect_true();
-		world
-			.query_filtered::<(), With<RequireCfg>>()
-			.iter(&world)
-			.count()
-			.xpect_eq(0);
+		world.entity(root).contains::<Router>().xpect_false();
+		world.get::<Children>(root).unwrap().len().xpect_eq(4);
+		// the site is found under the root however many it has
+		RouteTree::of(&world, root)
+			.unwrap()
+			.find(&["app-info"])
+			.xpect_some();
 	}
 
-	/// Only a collected declaration is consumed: a second root, an
-	/// unregistered tag or a conditional declaration beside the root still
-	/// breaks the single-root rule, named in the error.
+	/// Every root declaring `CallOnReady` runs: nothing calls an entry's root.
 	#[beet_core::test]
-	async fn a_second_root_still_errors() {
-		for (source, found) in [
-			("<Router/><Router/>", "found `<Router>`, `<Router>`"),
-			// the consumed declaration leads the document, so is not listed
-			(
-				r#"<RequireCfg cfg="version:0.0.1"/><Router/><NotRegistered/>"#,
-				"found `<Router>`, `<NotRegistered>`",
-			),
-			(
-				r#"<RequireCfg cfg="version:0.0.1" bx:cfg="version:0.0.1"/><Router/>"#,
-				"found `<RequireCfg>`, `<Router>`",
-			),
-		] {
-			let mut world = (AsyncPlugin, RouterPlugin).into_world();
-			world.spawn(
-				CrateRegistration::new("beet-cli", "0.0.9").with_skip_prefix(),
-			);
-			build_source(&mut world, source)
-				.await
-				.unwrap_err()
-				.to_string()
-				.xpect_contains("single root element")
-				.xpect_contains(found);
-		}
+	async fn each_armed_root_runs() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		build_source(
+			&mut world,
+			"<Sequence {CallOnReady}/><Sequence/><Sequence {CallOnReady}/>",
+		)
+		.await
+		.unwrap();
+		let calls = world
+			.query_filtered::<(), With<CallOnReady>>()
+			.iter(&world)
+			.count();
+		calls.xpect_eq(2);
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		world.resource::<Messages<AppExit>>().len().xpect_eq(calls);
 	}
 
 	/// The entry's declared document lands in the process environment as the
@@ -1019,8 +1005,7 @@ mod test {
 		let store = repo_store.clone();
 		world
 			.run_async_local_then(move |world| async move {
-				// two roots is the parse error an entry cannot recover from
-				for source in ["<Router/>", "<Router/><Router/>", "<Router/>"] {
+				for source in ["<Router/>", "<Router {", "<Router/>"] {
 					store
 						.insert(&RelPath::from("main.bsx"), source)
 						.await

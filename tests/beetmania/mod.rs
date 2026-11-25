@@ -23,12 +23,7 @@ pub async fn build_site(world: &mut World) -> Entity {
 		AbsPath::new_workspace_rel("examples/beetmania").unwrap(),
 	));
 	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();
-	let template =
-		EntryPrescan::parse(&entry, world.resource::<PrescanRegistry>())
-			.unwrap()
-			.body(&DocParsers::of(world))
-			.unwrap()
-			.unwrap();
+	let template = DocParsers::of(world).body(&entry).unwrap();
 	let root = world.spawn_empty().id();
 	world
 		.entity_mut(root)

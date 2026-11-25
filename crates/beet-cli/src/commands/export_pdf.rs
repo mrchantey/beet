@@ -125,6 +125,25 @@ pub async fn ExportPdf(
 		bevybail!("no pages matched, nothing to export");
 	}
 
+	// what the entry's own load would have called for the site: the nearest
+	// `CallOnReady` at or above the router serving it, else the root.
+	let host = cx
+		.world()
+		.with(move |world: &mut World| -> Result<Entity> {
+			let router = world
+				.run_system_cached_with::<_, Result<Entity>, _, _>(
+					find_router,
+					root,
+				)??;
+			world
+				.with_state::<AncestorQuery<&CallOnReady>, _>(|armed| {
+					armed.get_entity(router)
+				})
+				.unwrap_or(root)
+				.xok()
+		})
+		.await?;
+
 	// boot the entry's declared http server on an ephemeral port so the headless
 	// browser fetches real, asset-resolved pages. the boot parks on the server's
 	// `Running` keep-alive, so launch it fire-and-forget (driven by the app loop)
@@ -132,7 +151,7 @@ pub async fn ExportPdf(
 	cx.world()
 		.run_async_local(move |world| async move {
 			CallOnReady::call(
-				world.entity(root),
+				world.entity(host),
 				Request::from_cli_str("--server=http --port=0"),
 			)
 			.await?;

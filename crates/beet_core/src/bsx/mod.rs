@@ -226,13 +226,10 @@
 //! `{ExchangeSequence}` reads them:
 //! `<Route path="deploy" {ExchangeSequence}><MyBlock/><MyAction/></Route>`.
 //!
-//! An entry document has a single root element. Beside it may sit only the
-//! declarations its launch pre-scans (`<RepoRoot>`, `<RequireCfg>`,
-//! `<Secrets>`, and whatever prescan type `app.install_types::<T>()`
-//! adds), with string attributes and no `bx:cfg`: each acts before the build
-//! and is consumed rather than built, so a root admitting no such child still
-//! states what it needs. Anything else there is a second root, an error
-//! naming every root found.
+//! The declarations an entry's launch pre-scans (`<RepoRoot>`, `<RequireCfg>`,
+//! `<Secrets>`, and whatever prescan type `app.install_types::<T>()` adds), with
+//! string attributes and no `bx:cfg`, each act before the build. A root
+//! admitting no such child has them beside it:
 //!
 //! ```text
 //! <RequireCfg cfg="feature:extra"/>
