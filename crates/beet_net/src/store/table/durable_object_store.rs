@@ -19,6 +19,12 @@ use beet_core::prelude::*;
 ///   requests to one partition answered one at a time as an object answers
 ///   its own: the objects' stand-in, as a local store is a Dynamo table's.
 ///
+/// Its fallback differs from that of a bucket or a Dynamo table, which any
+/// process can reach and so is a block, the launch's [`ServiceAccess`] picking
+/// the remote or its local form. A Durable Object's storage is reached only
+/// from a Worker, so a native build plainly is not using one: there it falls
+/// back to SQLite files, remote access being refused.
+///
 /// So a runtime moves between a native host and Cloudflare by where it runs,
 /// and nothing that reads the store knows which. The Worker's deploy renders
 /// the binding and its `new_sqlite_classes` migration for the one object
