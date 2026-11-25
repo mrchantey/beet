@@ -508,7 +508,7 @@ mod test {
 	) -> Result<(Thread, ThreadRecords)> {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		let thread = app
 			.world_mut()
 			.spawn((store.clone(), TableStore::new(store.clone()), children![

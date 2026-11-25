@@ -7,17 +7,17 @@
 //!   borrowed, never unique and needing no `'static`, `Send` or `Sync`, so it
 //!   can capture whatever the call site holds. Any `FnOnce(&mut App)` is one,
 //!   which a constructor returns as `impl Installer`.
-//! - [`TypeInstaller`], installed by type: `app.install_type::<Route>()`. A
+//! - [`TypeInstaller`], installed by type: `app.install_types::<Route>()`. A
 //!   template registers its type, type data and schema, a prescan registers
 //!   itself to act before the build.
 //!
 //! A bevy [`Plugin`], a collection of things to happen, is both, installed
 //! only when absent so a plugin pulling in what it needs composes with one
 //! already holding it: `app.install(MainSchedulePlugin)`, or for a default
-//! one `app.install_type::<TaskPoolPlugin>()`.
+//! one `app.install_types::<TaskPoolPlugin>()`.
 //!
 //! Both take tuples, installed in order:
-//! `app.install_type::<(Route, Redirect)>()`.
+//! `app.install_types::<(Route, Redirect)>()`.
 //!
 //! ```
 //! # use beet_core::prelude::*;
@@ -41,7 +41,7 @@
 //! }
 //!
 //! let mut app = App::new();
-//! app.install_type::<Counted>()
+//! app.install_types::<Counted>()
 //! 	.install((increment(2), increment(3)));
 //! app.world().resource::<Count>().0.xpect_eq(6);
 //! ```
@@ -121,12 +121,12 @@ all_tuples!(impl_installer_tuple, 1, 15, I, M);
 /// Installs an [`Installer`] or [`TypeInstaller`] on an [`App`].
 ///
 /// The marker sits on the trait rather than each method so a call infers it:
-/// `app.install_type::<Route>()` needs no turbofish beyond the type.
+/// `app.install_types::<Route>()` needs no turbofish beyond the type.
 pub trait AppInstallExt<M> {
 	/// Install `installer`, ie `app.install(PlainTextParser::default())`.
 	fn install(&mut self, installer: impl Installer<M>) -> &mut Self;
-	/// Install `T`, ie `app.install_type::<Route>()`.
-	fn install_type<T: TypeInstaller<M>>(&mut self) -> &mut Self;
+	/// Install `T`, ie `app.install_types::<Route>()`.
+	fn install_types<T: TypeInstaller<M>>(&mut self) -> &mut Self;
 }
 
 impl<M> AppInstallExt<M> for App {
@@ -134,7 +134,7 @@ impl<M> AppInstallExt<M> for App {
 		installer.install(self);
 		self
 	}
-	fn install_type<T: TypeInstaller<M>>(&mut self) -> &mut Self {
+	fn install_types<T: TypeInstaller<M>>(&mut self) -> &mut Self {
 		T::install(self);
 		self
 	}
@@ -155,8 +155,8 @@ mod test {
 	#[crate::test]
 	fn plugin_installs_once() {
 		let mut app = App::new();
-		app.install_type::<Counter>()
-			.install_type::<(Counter, Counter)>()
+		app.install_types::<Counter>()
+			.install_types::<(Counter, Counter)>()
 			.install(Counter);
 		app.get_added_plugins::<Counter>().len().xpect_eq(1);
 	}

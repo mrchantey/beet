@@ -43,8 +43,8 @@ impl Plugin for CharcellTuiPlugin {
 		// browser-like form behavior: editable controls and submit, so a live
 		// TUI's `<form>`/`<select>` work out of the box.
 		#[cfg(feature = "template")]
-		app.install_type::<crate::prelude::FormPlugin>();
-		app.install_type::<(
+		app.install_types::<crate::prelude::FormPlugin>();
+		app.install_types::<(
 			CharcellPlugin,
 			RealtimeParsePlugin,
 			crate::prelude::DocumentUiPlugin,
@@ -100,7 +100,7 @@ pub struct CharcellPlugin;
 
 impl Plugin for CharcellPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<StylePlugin>()
+		app.install_types::<StylePlugin>()
 			.register_type::<crate::prelude::ScrollPosition>()
 			.register_type::<MediaViewport>()
 			.register_type::<Medium>()
@@ -193,7 +193,7 @@ impl Plugin for CharcellPlugin {
 		// repeated here (idempotently) so a charcell app that runs without the
 		// widget set can still copy and expire the toast.
 		#[cfg(all(feature = "tui", feature = "template"))]
-		app.install_type::<crate::prelude::ToastPlugin>();
+		app.install_types::<crate::prelude::ToastPlugin>();
 	}
 }
 

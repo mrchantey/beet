@@ -13,7 +13,7 @@ use crate::prelude::*;
 /// reference as the data it is.
 ///
 /// ```html
-/// <Instance document="./Card" props={{title:"Intro", count:@doc:count}}>
+/// <Instance document="./Card.bsx" props={{title:"Intro", count:@doc:count}}>
 /// 	<p>slotted</p>
 /// </Instance>
 /// ```
@@ -57,8 +57,8 @@ impl Instance {
 }
 
 /// One named argument a document takes, an entity of its own in the document
-/// declaring it. The body reads it with `@prop:name`, which resolves to the
-/// nearest use site, and a use passing no such prop reads its default.
+/// declaring it. The body reads it with `@prop:name`, which resolves to the use
+/// site, and a use passing no such prop reads its default.
 ///
 /// ```html
 /// <Prop name="title" kind="string" description="The card's heading"/>

@@ -38,7 +38,7 @@ async fn reduce(source: &str) -> App {
 	ensure_auth_env();
 	let mut app = App::new();
 	app.add_plugins(MinimalPlugins)
-		.install_type::<(
+		.install_types::<(
 			ThreadPlugin,
 			// registers `{UserInput}` and the `CreatePostForm` template so the
 			// interactive chat scenes resolve

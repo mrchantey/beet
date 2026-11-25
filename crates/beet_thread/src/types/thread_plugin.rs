@@ -14,7 +14,7 @@ pub struct ThreadPlugin {}
 
 impl Plugin for ThreadPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<(AsyncPlugin, RouterPlugin, NetPlugin)>();
+		app.install_types::<(AsyncPlugin, RouterPlugin, NetPlugin)>();
 		// a `PostRef` and each id read from a flag, a param or markup
 		PostRef::register_literal();
 		ThreadId::register_literal();
@@ -22,7 +22,7 @@ impl Plugin for ThreadPlugin {
 		PostId::register_literal();
 
 		#[cfg(feature = "action")]
-		app.install_type::<ActionPlugin>()
+		app.install_types::<ActionPlugin>()
 			// agent-loop control flow, as markup. `StoreToolset` is registered
 			// upstream by `RouterPlugin` (init above).
 			.register_type::<RepeatWhileFunctionCallOutput>()
@@ -41,9 +41,9 @@ impl Plugin for ThreadPlugin {
 			// a route of the surrounding url space as an agent's tool,
 			// `<RouteTool path=".."/>`
 			.register_type::<RouteToolCall>()
-			.install_type::<RouteTool>()
+			.install_types::<RouteTool>()
 			// a seed post read from a route's answer
-			.install_type::<RoutePost>()
+			.install_types::<RoutePost>()
 			// the OpenResponses streamer is an action
 			.register_type::<O11sStreamer>()
 			// turns: a person's waits on the records, an agent's may be cut
@@ -67,7 +67,7 @@ impl Plugin for ThreadPlugin {
 			// the scripted mock, so a scene runs its agents with no network
 			.register_type::<MockPostStreamer>()
 			.register_type::<MockTurn>()
-			.install_type::<ModelStreamer>();
+			.install_types::<ModelStreamer>();
 
 		app
 			// ── Uuid7 instantiations ─────────────────────────────────────
@@ -99,7 +99,7 @@ impl Plugin for ThreadPlugin {
 			.register_type::<ToolChoice>()
 			.register_type::<StringEnumOptions>()
 			// ── Markup templates ──────────────────────────────────────────
-			.install_type::<(CreatePost, CreateActor)>()
+			.install_types::<(CreatePost, CreateActor)>()
 			.add_observer(reapply_string_enum_options)
 			// _
 			;

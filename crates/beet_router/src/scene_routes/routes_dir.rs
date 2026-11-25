@@ -162,7 +162,7 @@ impl RoutesDir {
 							Query<&BlobStore>,
 							PackageQuery,
 							AncestorQuery<&FrontmatterType>,
-						), Result<(BlobStore, PackageStore, FrontmatterType)>>(
+						), Result<(BlobStore, BlobStore, FrontmatterType)>>(
 							move |entity, (stores, packages, types)| {
 								Ok((
 									scoped_store(
@@ -428,7 +428,7 @@ impl RoutesDir {
 	/// frontmatter does not take the whole dir down on live reload.
 	async fn discover_routes(
 		parsers: &DocParsers,
-		package: &PackageStore,
+		package: &BlobStore,
 		store: &BlobStore,
 		filter: &GlobFilter,
 		frontmatter_type: &str,

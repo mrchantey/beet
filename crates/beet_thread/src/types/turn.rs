@@ -364,7 +364,7 @@ mod test {
 	fn run(root: impl Bundle) -> (App, Entity, Store<bool>) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		let root = app.world_mut().spawn(root).id();
 		ThreadRecords::reduce_now(app.world_mut());
 		let done = call(&mut app, root);
@@ -759,7 +759,7 @@ mod test {
 	async fn a_view_window_post_interrupts_the_canonical_agent() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		let root = app.world_mut().spawn(InMemoryStore::new()).id();
 		let gate = MockGate::default();
 		let mount = || MountThreadStore {

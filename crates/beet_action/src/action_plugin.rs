@@ -10,7 +10,7 @@ pub struct ActionPlugin;
 
 impl Plugin for ActionPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<(
+		app.install_types::<(
 			MinimalTypesPlugin,
 			// async actions queue work onto the AsyncWorld; without this
 			// plugin the runtime never drives them

@@ -859,7 +859,7 @@ mod test {
 	fn a_template_is_its_invocation() {
 		let mut app = App::new();
 		app.add_plugins((TemplatePlugin, DocumentPlugin))
-			.install_type::<Link>();
+			.install_types::<Link>();
 		let world = app.world_mut();
 		let body = SceneBody::parse_bsx(
 			world,
@@ -910,7 +910,7 @@ mod test {
 	fn a_bound_template_prop_is_refused() {
 		let mut app = App::new();
 		app.add_plugins((TemplatePlugin, DocumentPlugin))
-			.install_type::<Link>();
+			.install_types::<Link>();
 		SceneBody::parse_bsx(app.world(), "<Link href=@doc:url/>")
 			.unwrap_err()
 			.to_string()
@@ -938,11 +938,15 @@ mod test {
 				"props": { "title": "Intro", "count": 3 }
 			}));
 		let bound = entity("0/Instance.0/@count");
+		// its sink names the use site, as the key a body holds for an entity
 		bound
-			.get_typed::<FieldRef>()
+			.get(<FieldRef as bevy::reflect::TypePath>::type_path())
 			.unwrap()
-			.document
-			.xpect_eq(DocumentPath::Props);
+			.as_map()
+			.unwrap()
+			.get("document")
+			.unwrap()
+			.xpect_eq(value!({ "Entity": "0/Instance.0" }));
 		bound.contains_typed::<SourceFieldRef>().xpect_true();
 		// its children are its slot children
 		entity("0/Instance.0/p.0")

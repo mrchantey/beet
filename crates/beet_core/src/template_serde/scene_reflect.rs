@@ -781,7 +781,7 @@ mod test {
 	fn world(full: bool) -> World {
 		let mut app = App::new();
 		app.add_plugins((TemplatePlugin, MinimalTypesPlugin))
-			.install_type::<Badge>();
+			.install_types::<Badge>();
 		let world = core::mem::take(app.world_mut());
 		{
 			let mut registry = world.resource::<AppTypeRegistry>().write();

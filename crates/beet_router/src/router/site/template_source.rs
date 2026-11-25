@@ -10,8 +10,8 @@ use std::sync::Arc;
 /// its holder likes.
 #[derive(Clone)]
 pub enum TemplateSource {
-	/// A document and the package it is of.
-	Document(PackageStore, Arc<InstancePrefab>),
+	/// A document and the store of the package it is of.
+	Document(BlobStore, Arc<InstancePrefab>),
 	/// A rust template by its short or full type path.
 	Template(SmolStr),
 }
@@ -62,11 +62,9 @@ impl TemplateSource {
 	/// the template's own root is always its child.
 	pub fn build(&self, entity: &mut EntityWorldMut) -> Result {
 		match self {
-			Self::Document(package, prefab) => {
-				entity
-					.insert(package.clone())
-					.insert_template(InstanceTemplate::new(prefab.clone()))?
-			}
+			Self::Document(package, prefab) => entity
+				.insert(PackageStore::new(package.clone()))
+				.insert_template(InstanceTemplate::new(prefab.clone()))?,
 			Self::Template(name) => {
 				let template = SceneBody::invoking(entity.world(), name)?
 					.reflect(entity.world())?;

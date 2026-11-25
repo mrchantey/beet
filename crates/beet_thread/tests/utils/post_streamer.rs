@@ -289,7 +289,7 @@ async fn reply_after_joining(
 ) -> String {
 	let mut app = App::new();
 	app.add_plugins(MinimalPlugins)
-		.install_type::<ThreadPlugin>();
+		.install_types::<ThreadPlugin>();
 	let (person, agent) = (Actor::user(), Actor::agent());
 	let (person_id, agent_id) = (person.id(), agent.id());
 	let thread = app

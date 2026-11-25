@@ -18,7 +18,7 @@ pub struct TemplatePlugin;
 impl Plugin for TemplatePlugin {
 	fn build(&self, app: &mut App) {
 		app
-			// ensure the type registry exists for a template's `install_type`.
+			// ensure the type registry exists for a template's `install_types`.
 			.init_resource::<AppTypeRegistry>()
 			// the dropped-guard side channel, shared with every `PendingGuard`.
 			.init_resource::<PendingDropQueue>()
@@ -55,11 +55,11 @@ impl Plugin for TemplatePlugin {
 			.register_type::<Attributes>()
 			// a prefab's subtree is held out of every query that does not
 			// name it
-			.install_type::<Held>()
+			.install_types::<Held>()
 			.add_systems(Update, sweep_dropped_pending);
 		// what a markup document writes, so a world that reads one resolves it
 		#[cfg(feature = "bsx")]
-		app.install_type::<BsxPlugin>();
+		app.install_types::<BsxPlugin>();
 	}
 }
 

@@ -146,7 +146,7 @@ impl PluginGroup for BeetPlugins {
 		// the example capabilities (the spatial/render scenes, the example
 		// tools/templates, the cloudflare/aws deploy example templates), each
 		// self-selected by a `beet_extra` sub-feature. A regular `Plugin`, so it
-		// nests in this group; its inner plugins are idempotent (`install_type`),
+		// nests in this group; its inner plugins are idempotent (`install_types`),
 		// safe under a double-add.
 		#[cfg(feature = "extra")]
 		{
@@ -325,7 +325,7 @@ fn winit_default_plugins() -> PluginGroupBuilder {
 /// handler as an error with [`Severity::Panic`]. Both builds resume that unwind,
 /// see [`release_error_handler`].
 fn beet_runtime_plugin(app: &mut App) {
-	app.install_type::<(
+	app.install_types::<(
 		AsyncPlugin,
 		AppExitPlugin,
 		BootstrapPlugin,
@@ -362,7 +362,7 @@ fn release_error_handler(error: BevyError, cx: bevy::ecs::error::ErrorContext) {
 /// same navigator on every target the router builds for.
 #[cfg(any(feature = "router", feature = "router_render"))]
 fn router_plugin(app: &mut App) {
-	app.install_type::<(
+	app.install_types::<(
 		DocumentPlugin,
 		RouterPlugin,
 		ServerPlugin,
@@ -378,5 +378,5 @@ fn router_plugin(app: &mut App) {
 /// The navigable charcell host the `TuiServer` boots into, plus live-page repaint.
 #[cfg(all(not(target_arch = "wasm32"), feature = "tui_server"))]
 fn tui_server_plugin(app: &mut App) {
-	app.install_type::<(CharcellTuiPlugin, NavigatorPlugin, PageHostPlugin)>();
+	app.install_types::<(CharcellTuiPlugin, NavigatorPlugin, PageHostPlugin)>();
 }

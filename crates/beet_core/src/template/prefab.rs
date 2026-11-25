@@ -30,7 +30,7 @@ pub struct Prefab;
 
 /// Holds an entity under a [`Prefab`]: a disabling component beside Bevy's
 /// [`Disabled`], so a query skips a held entity unless it names `Held`.
-/// Installed by type, `app.install_type::<Held>()`, by every plugin a prefab
+/// Installed by type, `app.install_types::<Held>()`, by every plugin a prefab
 /// may appear under, before any query is built. Never reflected, so never
 /// saved: a load holds each prefab it spawns again, and a clone never carries
 /// it.
@@ -143,6 +143,15 @@ impl Prefab {
 				}),
 			),
 		};
+		// a use of a document builds as it is cloned, its slot children after
+		// it: what the row slots fills what the use built
+		if map
+			.values()
+			.any(|clone| world.get::<SlotChild>(*clone).is_some())
+		{
+			world.flush();
+			resolve_slots(world, root)?;
+		}
 		PrefabClone { root, keys }.xok()
 	}
 

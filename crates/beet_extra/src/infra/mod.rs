@@ -21,7 +21,7 @@ pub struct InfraExamplesPlugin;
 
 impl Plugin for InfraExamplesPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<(
+		app.install_types::<(
 			InfraPlugin,
 			// the `beet` binary build artifact (zigbuild), for binary-shipping deploys.
 			BeetBinaryBuild,
@@ -38,7 +38,7 @@ impl Plugin for InfraExamplesPlugin {
 		// `<Stack>` it resolves by ancestry. The resource declarations
 		// themselves are authored as their blocks (`<S3BucketBlock/>`,
 		// `<DynamoTableBlock/>`), registered upstream.
-		.install_type::<(
+		.install_types::<(
 			LightsailBeetSiteBlock,
 			LambdaSiteBlock,
 			// the invoke-only counterpart, the target a `<ScheduledJobBlock/>`

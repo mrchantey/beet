@@ -44,9 +44,7 @@ pub(crate) fn document_media_type(path: &RelPath) -> MediaType {
 
 /// The package of `entity`, or `None` while no store has arrived above it: one
 /// legitimately lands frames after the tree that reads it.
-async fn ancestor_package(
-	entity: &AsyncEntity,
-) -> Result<Option<PackageStore>> {
+async fn ancestor_package(entity: &AsyncEntity) -> Result<Option<BlobStore>> {
 	entity
 		.with_state::<PackageQuery, _>(|entity, packages| {
 			packages.get(entity).ok()
@@ -112,17 +110,18 @@ async fn read_located_schema(
 	let Some(package) = ancestor_package(entity).await? else {
 		return Ok(Read::NoStore);
 	};
+	let full = package.complete_document(&path).await?;
 	let schema = package
-		.get_document(SchemaResolver::default().with_schemas(&snapshot), &path)
+		.get_document(SchemaResolver::default().with_schemas(&snapshot), &full)
 		.await?
 		.to_schema()?
-		.resolve_documents(&path);
+		.resolve_documents(&full);
 	entity
 		.world()
 		.with(move |world: &mut World| {
-			world
-				.get_resource_or_init::<SchemaRegistry>()
-				.insert_located(path, schema);
+			let mut registry = world.get_resource_or_init::<SchemaRegistry>();
+			registry.alias_located(path, full.clone());
+			registry.insert_located(full, schema);
 		})
 		.await;
 	Ok(Read::Landed)
@@ -234,20 +233,25 @@ mod test {
 	}
 
 	/// The ECS half: a document under a store has its located schema read into
-	/// the registry without anything asking for it.
+	/// the registry without anything asking for it, by whichever of its names
+	/// the reference wrote.
 	#[beet_core::test]
 	async fn the_store_walk_fills_the_located_index() {
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, AsyncPlugin, StorePlugin));
-		let store = todo_store().await;
-		app.world_mut().spawn((store, children![DocumentSchema(
-			ValueSchema::document("schema.json")
-		)]));
-		app.update_async().await;
-		app.world()
-			.resource::<SchemaRegistry>()
-			.located(&RelPath::from("schema.json"))
-			.unwrap()
-			.xpect_eq(todo_schema());
+		for authored in ["schema.json", "schema"] {
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, AsyncPlugin, StorePlugin));
+			let store = todo_store().await;
+			app.world_mut().spawn((store, children![DocumentSchema(
+				ValueSchema::document(authored)
+			)]));
+			app.update_async().await;
+			let registry = app.world().resource::<SchemaRegistry>();
+			for path in [authored, "schema.json"] {
+				registry
+					.located(&RelPath::from(path))
+					.unwrap()
+					.xpect_eq(todo_schema());
+			}
+		}
 	}
 }

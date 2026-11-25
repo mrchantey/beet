@@ -3,7 +3,7 @@
 //! Bevy resolves a `Template` by its concrete Rust type. beet additionally
 //! needs to resolve one by name (a short type path from markup or a serialized
 //! tag), so it owns [`ReflectTemplate`]: reflect type-data that builds a
-//! template from a reflected data value. `app.install_type::<T>()` installs it, and
+//! template from a reflected data value. `app.install_types::<T>()` installs it, and
 //! [`ReflectTemplate::build_named`] looks it up from the [`AppTypeRegistry`].
 //!
 //! A schema attaches alongside this registration: the type-data stays a thin
@@ -177,7 +177,7 @@ where
 /// The [`TypeInstaller`] marker for a template.
 pub struct TemplateMarker;
 
-/// A template installs by type, `app.install_type::<Route>()`: its type and
+/// A template installs by type, `app.install_types::<Route>()`: its type and
 /// [`ReflectTemplate`] type-data, which brings its [`ReflectTemplateSchema`]
 /// along, so it resolves by short type path, and its schema in the
 /// [`SchemaRegistry`].
@@ -398,7 +398,7 @@ mod test {
 	#[crate::test]
 	fn builds_by_name() {
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin).install_type::<Label>();
+		app.add_plugins(TemplatePlugin).install_types::<Label>();
 		let world = app.world_mut();
 
 		// a partial patch over default, the loader's form.
@@ -468,7 +468,7 @@ mod test {
 	#[crate::test]
 	fn a_template_wins_an_ambiguous_short_path() {
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin).install_type::<Label>();
+		app.add_plugins(TemplatePlugin).install_types::<Label>();
 		let world = app.world_mut();
 		let app_registry = world.resource::<AppTypeRegistry>().clone();
 		{

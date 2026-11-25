@@ -35,6 +35,8 @@ pub struct SchemaRegistry {
 	/// A pointer into `schemas` rather than a second copy, so the by-name and
 	/// by-location views of one schema can never disagree.
 	located: HashMap<RelPath, SmolStr>,
+	/// A reference with its extension left off, to the document's path.
+	located_aliases: HashMap<RelPath, RelPath>,
 }
 
 impl Default for SchemaRegistry {
@@ -59,6 +61,7 @@ impl SchemaRegistry {
 			schemas: HashMap::default(),
 			aliases: HashMap::default(),
 			located: HashMap::default(),
+			located_aliases: HashMap::default(),
 		};
 		registry
 			.insert(ValueSchema::type_path(), ValueSchema::meta())
@@ -115,7 +118,7 @@ impl SchemaRegistry {
 		path: impl Into<RelPath>,
 		schema: ValueSchema,
 	) {
-		let path = path.into();
+		let path = self.full_path(&path.into()).clone();
 		let key = match schema.name() {
 			Some(name) => name.clone(),
 			None => SmolStr::from(path.as_str()),
@@ -126,7 +129,27 @@ impl SchemaRegistry {
 
 	/// The schema of the schema document at `path`, if it has arrived.
 	pub fn located(&self, path: &RelPath) -> Option<&ValueSchema> {
-		self.located.get(path).and_then(|key| self.schemas.get(key))
+		self.located
+			.get(self.full_path(path))
+			.and_then(|key| self.schemas.get(key))
+	}
+
+	/// Have `alias`, a reference with its extension left off, locate the
+	/// document at `path`.
+	pub fn alias_located(
+		&mut self,
+		alias: impl Into<RelPath>,
+		path: impl Into<RelPath>,
+	) {
+		let (alias, path) = (alias.into(), path.into());
+		if alias != path {
+			self.located_aliases.insert(alias, path);
+		}
+	}
+
+	/// The path `path` is [aliased](Self::alias_located) to, else itself.
+	fn full_path<'a>(&'a self, path: &'a RelPath) -> &'a RelPath {
+		self.located_aliases.get(path).unwrap_or(path)
 	}
 
 	/// The raw (still-referencing) schema registered under `name`, matching the

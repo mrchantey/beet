@@ -100,10 +100,10 @@ impl Lowering<'_> {
 	) -> Result {
 		let key = self.attribute(site, prop, default())?;
 		self.seed_value(&key)?;
-		self.insert(
-			&key,
-			&FieldRef::new(prop).with_document(DocumentPath::Props),
-		)?;
+		self.insert_linked(&key, |keys| {
+			FieldRef::new(prop)
+				.with_document(DocumentPath::Entity(keys.entity(site.clone())))
+		})?;
 		// the source resolves from the use site, the binding entity being
 		// outside the hierarchy; an `@comp` is a component beside the instance
 		match binding.source {

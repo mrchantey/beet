@@ -11,7 +11,7 @@
 //!   build target;
 //! - a generics-aware `Unpin` opt-out of Bevy's blanket
 //!   `Template for T: Clone + Unpin` impl, the `subtree_template!` pattern;
-//! - a [`GetTemplateSchema`] impl, so `app.install_type::<Name>()` exposes the
+//! - a [`GetTemplateSchema`] impl, so `app.install_types::<Name>()` exposes the
 //!   template by name to the loader.
 //!
 //! There is no `NameProps` struct and no marker component: the data struct *is*
@@ -458,7 +458,7 @@ mod test {
 			result.contains("let Self { label , variant } = self . clone ()")
 		);
 		// the prop schema, authored by the typed signature, through which
-		// `app.install_type::<Button>()` registers the template by name
+		// `app.install_types::<Button>()` registers the template by name
 		assert!(result.contains("GetTemplateSchema for Button"));
 		assert!(result.contains("fn template_schema"));
 		// no scene machinery

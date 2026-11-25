@@ -13,11 +13,11 @@ pub struct SecretsPlugin;
 
 impl Plugin for SecretsPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<VaultPlugin>()
+		app.install_types::<VaultPlugin>()
 			.register_type::<Secrets>()
 			.register_type::<SecretRole>()
 			.add_observer(load_on_insert)
-			.install_type::<SecretsRoutes>()
+			.install_types::<SecretsRoutes>()
 			.register_type::<SecretsCheck>()
 			.register_type::<SecretsLs>()
 			.register_type::<SecretsGet>()

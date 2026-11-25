@@ -12,12 +12,12 @@ pub struct NetPlugin;
 
 impl Plugin for NetPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<StorePlugin>();
+		app.install_types::<StorePlugin>();
 		// account declarations load in every build; their repos need `atproto`
 		#[cfg(feature = "dag_cbor")]
-		app.install_type::<AtprotoPlugin>();
+		app.install_types::<AtprotoPlugin>();
 		#[cfg(feature = "vault")]
-		app.install_type::<SecretsPlugin>();
+		app.install_types::<SecretsPlugin>();
 		// the read a route asks of a declared index, ie
 		// `<Route path="query/senders" {(SqlSelect{sql:".."}, StoreRef($index))}/>`
 		#[cfg(feature = "sqlite")]

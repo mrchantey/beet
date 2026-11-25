@@ -195,8 +195,10 @@ fn plan_slots(
 	slot_children: Query<&SlotChild>,
 	slot_targets: Query<&SlotTarget>,
 	elements: Query<(), With<Element>>,
+	instances: Query<(), With<Instance>>,
 ) -> SlotPlan {
-	// composition scopes: the distinct parents of routed `SlotChild` content.
+	// composition scopes: the distinct parents of routed `SlotChild` content, a
+	// use whose document has not been built keeping its content until it has.
 	let scopes: HashSet<Entity> = children
 		.iter_descendants_inclusive(*root)
 		.filter(|entity| slot_children.contains(*entity))
@@ -204,7 +206,11 @@ fn plan_slots(
 		.collect();
 
 	let mut plan = SlotPlan::default();
-	for scope in scopes.iter().copied() {
+	for scope in scopes
+		.iter()
+		.copied()
+		.filter(|scope| !instances.contains(*scope))
+	{
 		plan_scope(
 			scope,
 			&scopes,

@@ -263,6 +263,8 @@ impl DynamicTemplate {
 				)?;
 			}
 		}
+		// before anything lands, which may make the root a use site itself
+		let use_site = use_site(cx.entity.world(), cx.entity.id());
 		// this build's own, so what it nests (a template building a document)
 		// records nothing in it
 		// SAFETY: only used to take the sink resource.
@@ -289,6 +291,9 @@ impl DynamicTemplate {
 					.zip(built.iter().copied()),
 			);
 			world.insert_resource(sink);
+		}
+		if let Some(use_site) = use_site {
+			settle_props(world, use_site, &built);
 		}
 		self.forward_attributes(world, &built)?;
 		hold_prefabs(world, &built)
@@ -354,6 +359,36 @@ impl DynamicTemplate {
 			}
 		}
 		OK
+	}
+}
+
+/// The use site a document building at `root` was used at, if any.
+fn use_site(world: &World, root: Entity) -> Option<Entity> {
+	ElementTraverseQuery::world_ancestors_inclusive(world, root)
+		.skip(1)
+		.find(|entity| world.entity(*entity).contains::<PropsDocument>())
+}
+
+/// Settle every [`DocumentPath::Props`] binding among `built` to `use_site`, so
+/// one slotted into another document reads the props of the document that
+/// wrote it.
+fn settle_props(world: &mut World, use_site: Entity, built: &[Entity]) {
+	for entity in built {
+		let Ok(mut entity) = world.get_entity_mut(*entity) else {
+			continue;
+		};
+		if let Some(field) = entity
+			.get::<FieldRef>()
+			.filter(|field| field.document == DocumentPath::Props)
+			.cloned()
+		{
+			entity.insert(field.with_document(DocumentPath::Entity(use_site)));
+		}
+		if let Some(mut source) = entity.get_mut::<SourceFieldRef>()
+			&& source.document == DocumentPath::Props
+		{
+			source.document = DocumentPath::Entity(use_site);
+		}
 	}
 }
 
@@ -923,7 +958,7 @@ mod test {
 
 	fn world() -> World {
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin).install_type::<Label>();
+		app.add_plugins(TemplatePlugin).install_types::<Label>();
 		let world = core::mem::take(app.world_mut());
 		{
 			let registry = world.resource::<AppTypeRegistry>();

@@ -9,7 +9,7 @@ pub struct OoxmlPlugin;
 
 impl Plugin for OoxmlPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<StylePlugin>().install((
+		app.install_types::<StylePlugin>().install((
 			WordParser::default(),
 			WordRenderer,
 			WorkbookParser::default(),

@@ -168,7 +168,7 @@ mod test {
 			rsx! { <html><body><main><slot/></main></body></html> }
 		}
 		let mut app = App::new().with_plugins((AsyncPlugin, RouterPlugin));
-		app.install_type::<FixedShell>();
+		app.install_types::<FixedShell>();
 		let world = app.world_mut();
 		let root = world
 			.spawn((Router, Layout::of::<FixedShell>(), children![(

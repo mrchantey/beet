@@ -332,7 +332,7 @@ mod test {
 	/// router edge caching html for seven days.
 	fn site(builds: &Arc<AtomicUsize>) -> (World, Entity) {
 		let mut app = App::new().with_plugins((AsyncPlugin, RouterPlugin));
-		app.install_type::<(PagePath, IslandShell)>();
+		app.install_types::<(PagePath, IslandShell)>();
 		let mut world = core::mem::take(app.world_mut());
 		let (home, post, nested) =
 			(builds.clone(), builds.clone(), builds.clone());

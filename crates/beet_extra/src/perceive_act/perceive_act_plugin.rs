@@ -12,7 +12,7 @@ pub struct PerceiveActPlugin;
 
 impl Plugin for PerceiveActPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<(
+		app.install_types::<(
 				ThreadPlugin,
 				ThreadUiPlugin,
 				PerceiveActCorePlugin,
@@ -35,7 +35,7 @@ impl Plugin for PerceiveActPlugin {
 			.register_type::<SceneOrder>()
 			.register_type::<ScenePrompt>()
 			.add_systems(Update, sync_image_options)
-			.install_type::<(
+			.install_types::<(
 				MockHead,
 				MockBody,
 				RobotStreamer,
@@ -43,7 +43,7 @@ impl Plugin for PerceiveActPlugin {
 		// the wgpu render body (v2): the driven fox and its `drive` handler, so
 		// `<WgpuBody/>` resolves once the render stack is linked.
 		#[cfg(feature = "bevy_default")]
-		app.register_type::<DriveFox>().install_type::<WgpuBody>();
+		app.register_type::<DriveFox>().install_types::<WgpuBody>();
 	}
 }
 
@@ -57,7 +57,7 @@ mod test {
 	fn tools_resolve_to_definitions() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		app.world_mut().spawn(children![
 			RespondMultiModal::default(),
 			SpeakText,

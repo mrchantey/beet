@@ -166,7 +166,7 @@ mod test {
 	fn app() -> (App, Entity) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		let root = app.world_mut().spawn(InMemoryStore::new()).id();
 		(app, root)
 	}

@@ -218,6 +218,7 @@ pub(crate) fn component_id_by_short_path(
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub(crate) struct SourceFieldRef {
 	/// The path to the source document, resolved from [`subject`](Self::subject).
+	#[entities]
 	pub document: DocumentPath,
 	/// The path to the field within the source document.
 	pub field_path: FieldPath,

@@ -13,7 +13,7 @@ pub struct ServerPlugin;
 
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<AsyncPlugin>()
+		app.install_types::<AsyncPlugin>()
 			.register_type::<CliServer>()
 			.register_type::<HttpServer>()
 			.register_type::<ServerLimits>()

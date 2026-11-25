@@ -34,7 +34,7 @@ fn Badge(#[prop(required)] label: String, count: u32) -> impl Bundle {
 #[beet_core::test]
 fn rust_template_registers_schema() {
 	let mut app = world_ext::ui_app();
-	app.install_type::<Badge>();
+	app.install_types::<Badge>();
 	let world = app.world_mut();
 	// the prop schema is attached alongside the build bridge, derived from the
 	// typed signature: `label` required, `count` optional.
@@ -64,7 +64,7 @@ fn rust_template_registers_schema() {
 #[beet_core::test]
 fn missing_required_is_refused() {
 	let mut app = world_ext::ui_app();
-	app.install_type::<Badge>();
+	app.install_types::<Badge>();
 	for source in ["<Badge count=1/>", "<Badge label=\"hi\" count=\"lots\"/>"] {
 		parse_bsx(app.world_mut(), source)
 			.unwrap_err()
@@ -76,7 +76,7 @@ fn missing_required_is_refused() {
 #[beet_core::test]
 fn macro_required_prop_present_ok() {
 	let mut app = world_ext::ui_app();
-	app.install_type::<Badge>();
+	app.install_types::<Badge>();
 	let world = app.world_mut();
 	parse_bsx(world, "<Badge label=\"hi\" count=1/>").unwrap();
 }
@@ -101,7 +101,7 @@ fn render_html(world: &mut World, root: Entity) -> String {
 #[beet_core::test]
 fn rust_template_forwards_attributes() {
 	let mut app = world_ext::ui_app();
-	app.install_type::<Badge>();
+	app.install_types::<Badge>();
 	let world = app.world_mut();
 	let root = parse_bsx(world, r#"<Badge label="hi" class="extra" hidden/>"#)
 		.unwrap();

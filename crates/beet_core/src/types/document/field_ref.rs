@@ -20,17 +20,19 @@ use core::sync::atomic::Ordering;
 	Hash,
 	Reflect,
 	Component,
+	MapEntities,
 	Get,
 	SetWith,
 )]
 // `Default` so a partial reflect literal (`{FieldRef{field_path:..}}`) completes
 // over the default rather than failing `from_reflect`, which bevy raises as a
 // panic inside the build task, not a `TemplateError`.
-#[reflect(Component, Default)]
+#[reflect(Component, Default, MapEntities)]
 #[component(immutable, on_add=on_add)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldRef {
 	/// The path to the document
+	#[entities]
 	pub document: DocumentPath,
 	/// The path to the field within the document
 	pub field_path: FieldPath,

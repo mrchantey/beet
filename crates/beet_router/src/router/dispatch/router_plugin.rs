@@ -22,9 +22,9 @@ impl Plugin for RouterPlugin {
 		// the table wire protocol over a mounted route (`<ServeTables
 		// prefix="tables"/>`), the table twin of `ServeBlobs`
 		#[cfg(feature = "json")]
-		app.install_type::<ServeTables>()
+		app.install_types::<ServeTables>()
 			.register_type::<ServeTablesHandler>();
-		app.install_type::<(
+		app.install_types::<(
 			ActionPlugin,
 			AsyncPlugin,
 			// the `PackageConfig` a layout binds through
@@ -106,7 +106,7 @@ impl Plugin for RouterPlugin {
 				// resolution observers (`DirPath` / `BlobPath` -> scoped
 				// `BlobStore` / `Blob`), which `RoutesDir` and `ServeBlobs`
 				// resolve by ancestry, and the vault declarations.
-				.install_type::<(
+				.install_types::<(
 					NetPlugin,
 					// the server model: routers and servers go together, so a server
 					// spread on a router starts when its entity's start walk reaches it.
@@ -121,9 +121,9 @@ impl Plugin for RouterPlugin {
 				)>();
 			// the Office formats a route serves and writes
 			#[cfg(feature = "ooxml")]
-			app.install_type::<OoxmlPlugin>();
+			app.install_types::<OoxmlPlugin>();
 			// a router a `CardDeck` marks steps as a stack of cards
-			app.install_type::<CardStackPlugin>();
+			app.install_types::<CardStackPlugin>();
 			app
 				// the scene routes' render params and the media a request resolves
 				.register_type::<RenderRoot>()
@@ -131,12 +131,14 @@ impl Plugin for RouterPlugin {
 				// template routes render through the charcell layout/paint
 				// pipeline; without it the `PostParseTree` schedule has no systems
 				// and ANSI output is blank.
-				.install_type::<(
+				.install_types::<(
 					CharcellPlugin,
 					// per-request route content is built through the template
 					// substrate (`spawn_template`), which needs the template plugins.
 					TemplatePlugin,
 					DocumentPlugin,
+					// a page, a layout or an entry instantiating a document
+					beet_scene::prelude::ScenePlugin,
 				)>()
 				// the re-entrant stack of request-scoped render contexts the
 				// layout middleware pushes onto and layout widgets read the top of.
@@ -152,7 +154,7 @@ impl Plugin for RouterPlugin {
 				.install(ColorSchemeParams::declare_on::<HelpHandler>())
 				// the diagnostic pages: the help/not-found route list and the
 				// navigation-failure error page, both rendered through the layout.
-				.install_type::<(RouteList, NotFoundPage, ErrorPage)>()
+				.install_types::<(RouteList, NotFoundPage, ErrorPage)>()
 				// per-route metadata, bindable via the reserved ref, eg
 				// `@entity:PageRoot::DocMeta.title`
 				.register_type::<DocMeta>()
@@ -172,9 +174,9 @@ impl Plugin for RouterPlugin {
 				// the declared icon set `RouteHead` links, deriving its own files,
 				// and the social cards it points each page's preview at
 				.register_type::<IconSet>()
-				.install_type::<SocialCards>()
+				.install_types::<SocialCards>()
 				.install(ColorSchemeParams::declare_on::<Layout>())
-				.install_type::<(
+				.install_types::<(
 					RouteHead,
 					RouteSidebar,
 					// the generated page listing a content index page places instead
@@ -207,9 +209,9 @@ impl Plugin for RouterPlugin {
 					StoreToolset,
 				)>();
 			// the search index is a json document, so it rides the format's
-			// feature; a build without it holds `<SearchIndex/>` unregistered
+			// feature
 			#[cfg(feature = "json")]
-			app.install_type::<SearchIndex>();
+			app.install_types::<SearchIndex>();
 			// the markup-resolved `<RoutesDir src=".."/>`, registered on every std
 			// target so a no-code site loads. Its discovery observer scans the store
 			// asynchronously (off the runtime, see `RoutesDir::spawn_on_insert`), so it
@@ -224,37 +226,20 @@ impl Plugin for RouterPlugin {
 			// the declarations that act before the entry builds (see `Prescan`),
 			// in preload order: the entry-declared store root (`<RepoRoot
 			// src="../.."/>`) first, so nothing runs against a store it has not
-			// rebased, then the crate check, the entry's own template dirs and
-			// the secrets load.
-			app.install_type::<(RepoRoot, RequireCfg)>();
-			// the markup-resolved `<TemplateDir src="templates"/>`: its insert
-			// observer reads the dir through the nearest ancestor `BlobStore` and
-			// registers each `.bsx`/`.js` template by module path, off the runtime
-			// (so it runs on wasm too). An entry's own template dirs are also
-			// pre-scanned synchronously by the cli before the entry parses, so
-			// entry-level tags like `<Styles/>` resolve.
-			app.install_type::<TemplateDir>()
-				.add_observer(TemplateDir::register_on_insert)
-				.add_systems(
-					Update,
-					(
-						register_changed_template_files,
-						rescan_changed_dirs::<TemplateDir>,
-					)
-						.in_set(BlobReactions),
-				);
+			// rebased, then the crate check and the secrets load.
+			app.install_types::<(RepoRoot, RequireCfg)>();
 			// the declaration resolves in every build, so an entry loaded by
 			// a binary that never reads secrets (a cloud box's) builds it
 			// inert rather than warning it unregistered; `vault` adds the
 			// prescan load
 			app.register_type::<Secrets>();
 			#[cfg(feature = "vault")]
-			app.install_type::<Secrets>();
+			app.install_types::<Secrets>();
 			// the no-code static-asset mount: `ServeBlobs` owns its mount prefix and
 			// inserts its own greedy capture + handler, serving from the nearest
 			// self-or-ancestor store, eg `<AssetsDir src="assets"/>`.
 			// Cross-platform, so the wasm Worker resolves a served site's asset routes.
-			app.install_type::<(
+			app.install_types::<(
 				Route,
 				// the renamed-page redirect (`<Redirect path="post-1"
 				// redirect="full-stack-bevy"/>`), an ordinary GET route
@@ -267,12 +252,12 @@ impl Plugin for RouterPlugin {
 			// the document-field route (`<FieldRoute path=".." field=".."
 			// verb="push"/>`): a typed document action plus the
 			// `ExchangeOverload` that markup cannot spread for itself.
-			.install_type::<FieldRoute>()
+			.install_types::<FieldRoute>()
 			.register_type::<FieldVerb>()
 			// the persistent page route (`<Route path="/" {FixedPage}>`): its
 			// declared children are one live tree served by every request.
 			.register_type::<FixedPage>()
-			.install_type::<ServeBlobs>()
+			.install_types::<ServeBlobs>()
 			.register_type::<ServeBlobsHandler>()
 			// one store file served as a page (`<Route path="guide"
 			// {BlobPage{path:"guide.md"}}/>`)
@@ -282,7 +267,7 @@ impl Plugin for RouterPlugin {
 			.register_type::<DocumentView>()
 			// the markup-declared directory mount (`<AssetsDir src=.. prefix=..>`):
 			// `ServeBlobs` scoped to a subdir of the inherited store.
-			.install_type::<(
+			.install_types::<(
 				AssetsDir,
 				// the browser-wasm page template: the module loader plus the launch
 				// a served page boots a wasm `beet` binary with.
@@ -306,16 +291,7 @@ impl Plugin for RouterPlugin {
 						.run_if(any_with_component::<NeedsReload>)
 						.after(BlobReactions),
 				)
-				.install_type::<LiveReloadScript>();
-			// where client_io is compiled out (wasm Worker, no-dev-reload builds)
-			// mark `<LiveReloadScript/>` as a known featured-out tag, so a site
-			// layout that includes it still loads and renders nothing rather than
-			// failing template resolution.
-			#[cfg(not(all(
-				feature = "client_io",
-				not(target_arch = "wasm32")
-			)))]
-			app.install(Unregistered::allow("LiveReloadScript"));
+				.install_types::<LiveReloadScript>();
 			// the site widgets' own rules (the app shell's scroll region, the
 			// index heading link), extending the shared rule set the way the
 			// card-stack rules do, so they compose with the material set and
@@ -324,43 +300,30 @@ impl Plugin for RouterPlugin {
 				.get_resource_or_init::<RuleSet>()
 				.extend_rules(app_shell_rules())
 				.extend_rules(route_index_rules());
-			// the `<Template src>` include handler (local-file includes resolved
-			// against the nearest ancestor `BlobStore`), into the BSX tag seam.
-			#[cfg(all(feature = "bsx", feature = "template_serde"))]
-			register_template_include(app.world_mut());
 			// the browser's server, declarable beside the others
 			// (`<CallOnReady {(HttpServer, TuiServer, DomServer, ..)}>`) on every
 			// target so an entry keeps its shape; its facet boots the DOM host
 			// when the start walk selects `dom`, in a browser tab only.
 			app.register_type::<DomServer>();
-			// the live-TUI server, declarable in a router markup spread
-			// (`<Router {(TuiServer, ..)}>`); its `on_add` hook boots the
-			// terminal app when the start walk selects `tui`.
+			// the terminal servers, declarable in a markup spread
+			// (`<Router {(TuiServer, ..)}>`) on every target as `DomServer` is; the
+			// facet booting each, and the params it takes, ride the feature
+			// linking its transport.
+			app.register_type::<TuiServer>()
+				.register_type::<SshTuiServer>();
 			#[cfg(feature = "tui")]
-			app.register_type::<TuiServer>().install((
+			app.install((
 				SubtreeParams::declare_on::<
 					TuiServer,
 					(BootParams, ServerParams),
 				>(),
 				ColorSchemeParams::declare_on::<TuiServer>(),
 			));
-			// a binary without the terminal (the browser runtime) still loads
-			// an entry declaring it, the spread a known featured-out name
-			#[cfg(not(feature = "tui"))]
-			app.install(Unregistered::allow("TuiServer"));
-			// the multi-tenant SSH-TUI server, likewise declarable in a markup
-			// spread. Registered by feature rather than by `SshTuiPlugin` (which
-			// adds the per-connection behavior), so an entry naming it resolves in
-			// any binary that linked the transport.
 			#[cfg(feature = "ssh")]
-			app.register_type::<SshTuiServer>().install(
-				SubtreeParams::declare_on::<
-					SshTuiServer,
-					(BootParams, ServerParams),
-				>(),
-			);
-			#[cfg(not(feature = "ssh"))]
-			app.install(Unregistered::allow("SshTuiServer"));
+			app.install(SubtreeParams::declare_on::<
+				SshTuiServer,
+				(BootParams, ServerParams),
+			>());
 			// the scripted route marker in the one instantiation `<ScriptRoute>`
 			// builds: the whole request in, whatever the script returned out.
 			// `Script<Value, Value>` itself is registered upstream by
@@ -374,7 +337,7 @@ impl Plugin for RouterPlugin {
 				ScriptAnswerMarker,
 			>>()
 			// the markup-friendly `<ScriptRoute path=".." script=".."/>` front-end.
-			.install_type::<ScriptRoute>();
+			.install_types::<ScriptRoute>();
 
 			// the `ExchangeScriptElement` console-capturing entry action, so a
 			// `<script {ExchangeScriptElement}>` entry resolves it. The backend it
@@ -390,21 +353,15 @@ impl Plugin for RouterPlugin {
 			// opts in with that on-switch.
 			app.register_type::<AnalyticsMiddleware>();
 			// the publication declaration, its index and the well-known route
-			// it serves; a build without the data model loads it inert
+			// it serves
 			#[cfg(feature = "dag_cbor")]
-			app.install_type::<StandardSitePub>();
-			#[cfg(not(feature = "dag_cbor"))]
-			app.install(Unregistered::allow("StandardSitePub"));
+			app.install_types::<StandardSitePub>();
 			// an article's comments and the link to reply, registered with
 			// the records so a build without `atproto` fails the comments
 			// island over to its fallback rather than swapping in nothing
 			#[cfg(feature = "dag_cbor")]
-			app.install_type::<(StandardSiteComments, StandardSiteReplyLink)>();
-			#[cfg(not(feature = "dag_cbor"))]
-			app.install((
-				Unregistered::allow("StandardSiteComments"),
-				Unregistered::allow("StandardSiteReplyLink"),
-			));
+			app.install_types::<(StandardSiteComments, StandardSiteReplyLink)>(
+			);
 			// the publish sequence's steps, which write to a repo and fetch
 			// the live site; the route declaring them is gated on the same
 			// feature, so no build loads them inert
@@ -419,11 +376,9 @@ impl Plugin for RouterPlugin {
 			#[cfg(feature = "json")]
 			app.add_plugins(analytics_plugin);
 			// the visit count a server island reads back from the analytics
-			// store; a build without the store surface loads it inert
+			// store
 			#[cfg(feature = "json")]
-			app.install_type::<VisitCount>();
-			#[cfg(not(feature = "json"))]
-			app.install(Unregistered::allow("VisitCount"));
+			app.install_types::<VisitCount>();
 		}
 	}
 }
@@ -651,7 +606,7 @@ fn rebuild_dirty_route_trees(
 /// [`SpawnTemplate`] is the post-build boundary and fires exactly once per
 /// root, with slots resolved; [`rebuild_dirty_route_trees`] re-buckets every
 /// route under the settled ancestry. The one build it cannot speak for is a
-/// deferred one (an async `<Template src>` include), whose slots settle at the
+/// deferred one (a document instantiated), whose slots settle at the
 /// drain; that path already has its own rebuild through
 /// [`rebuild_route_trees_on_load`].
 ///

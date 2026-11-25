@@ -519,7 +519,7 @@ mod test {
 	#[beet_core::test]
 	fn projects_appended_posts() {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins).install_type::<(
+		app.add_plugins(MinimalPlugins).install_types::<(
 			DocumentPlugin,
 			ThreadPlugin,
 			ThreadUiPlugin,
@@ -549,7 +549,7 @@ mod test {
 	#[beet_core::test]
 	fn projects_appended_posts_through_template() {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins).install_type::<(
+		app.add_plugins(MinimalPlugins).install_types::<(
 			DocumentPlugin,
 			ThreadPlugin,
 			ThreadUiPlugin,
@@ -681,7 +681,7 @@ mod test {
 	fn thread_view_binds_to_referenced_thread() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<(ThreadPlugin, ThreadUiPlugin)>();
+			.install_types::<(ThreadPlugin, ThreadUiPlugin)>();
 		let source = r#"
 <Fragment>
 	<Thread bx:ref="thread" {Sequence}/>

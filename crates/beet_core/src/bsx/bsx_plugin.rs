@@ -40,6 +40,6 @@ impl Plugin for BsxPlugin {
 			.register_type::<RunScript>()
 			.register_type::<OnEvent>()
 			.register_type::<Prefab>()
-			.install_type::<Held>();
+			.install_types::<Held>();
 	}
 }

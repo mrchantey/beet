@@ -431,7 +431,7 @@ mod test {
 	fn setup(script: &str) -> (App, Entity, Entity) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		let router = app
 			.world_mut()
 			.spawn((Router, children![

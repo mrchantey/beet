@@ -53,7 +53,7 @@ impl Plugin for DocumentPlugin {
 			// a list's generator and the item template it clones
 			.register_type::<ReactiveChildren>()
 			.register_type::<Prefab>()
-			.install_type::<Held>()
+			.install_types::<Held>()
 			.register_type::<ResolvedFieldPath>()
 			.register_type::<Value>()
 			.register_type::<Map>()

@@ -221,7 +221,7 @@ async fn activate_when_loaded(
 	let root = guard.root();
 	let loaded = async {
 		let package = entity
-			.with_state::<PackageQuery, Result<PackageStore>>(
+			.with_state::<PackageQuery, Result<BlobStore>>(
 				|entity, packages| packages.get(entity),
 			)
 			.await??;
@@ -390,15 +390,15 @@ mod test {
 	}
 
 	/// A use within a document resolves from that document, its props its own,
-	/// bound ones from the use it is within; a prop is read from the nearest
-	/// use site, for slotted content as for any other.
+	/// bound ones from the use it is within; a prop is of the document that
+	/// wrote it, in content slotted into another as anywhere else.
 	#[beet_core::test]
 	async fn nested_instances() {
 		let (mut world, store) = package(&[
 			("widgets/Card.bsx", CARD),
 			(
 				"widgets/Pair.bsx",
-				r#"<div><Instance document="./Card" props={{title:@prop:left}}><em>{@prop:title}</em></Instance><slot/></div>"#,
+				r#"<div><Instance document="./Card" props={{title:@prop:left}}><em>{@prop:title}</em><Instance document="./Card" props={{title:@prop:title}}><i>{@prop:left}</i></Instance></Instance><slot/></div>"#,
 			),
 		])
 		.await;
@@ -406,12 +406,12 @@ mod test {
 			&mut world,
 			&store,
 			"routes/page.bsx",
-			r#"<main><Instance document="../widgets/Pair" props={{left:"L"}}><p>tail</p></Instance></main>"#,
+			r#"<main><Instance document="../widgets/Pair" props={{left:"L", title:"T"}}><p>tail</p></Instance></main>"#,
 		)
 		.await;
 		settle(&mut world).await;
 		outline(&world, root).xpect_eq(
-			"<main><div><section><h2>L</h2><em>L</em><footer>none</footer></section><p>tail</p></div></main>",
+			"<main><div><section><h2>L</h2><em>T</em><section><h2>T</h2><i>L</i><footer>none</footer></section><footer>none</footer></section><p>tail</p></div></main>",
 		);
 	}
 
@@ -574,21 +574,63 @@ mod test {
 		outline(&world, root).matches("<li>").count().xpect_eq(2);
 	}
 
-	/// A snapshot holds what an activation built and nothing of the reference.
+	/// A row's slot children fill the document its instance uses.
+	#[beet_core::test]
+	async fn a_row_fills_slots() {
+		for loaded in [false, true] {
+			let (mut world, store) = package(&[("Card.bsx", CARD)]).await;
+			if loaded {
+				spawn(
+					&mut world,
+					&store,
+					"main.bsx",
+					r#"<main><Instance document="./Card"/></main>"#,
+				)
+				.await;
+			}
+			let root = spawn(
+				&mut world,
+				&store,
+				"main.bsx",
+				r#"<ul {Document({items: [1, 2]})} bx:for="items"><Instance document="./Card" props={{title:"card"}}><b>row</b></Instance></ul>"#,
+			)
+			.await;
+			settle(&mut world).await;
+			settle(&mut world).await;
+			outline(&world, root)
+				.matches("<h2>card</h2><b>row</b><footer>")
+				.count()
+				.xpect_eq(2);
+		}
+	}
+
+	/// A snapshot holds what an activation built and nothing of the reference,
+	/// its bindings still reading the use they were built at.
 	#[beet_core::test]
 	async fn a_snapshot_holds_what_it_built() {
-		let (mut world, store) = package(&[("Card.bsx", CARD)]).await;
+		let documents = [
+			("Card.bsx", CARD),
+			(
+				"Pair.bsx",
+				r#"<Instance document="./Card" props={{title:"card"}}><em>{@prop:name}</em></Instance>"#,
+			),
+		];
+		let (mut world, store) = package(&documents).await;
 		let root = spawn(
 			&mut world,
 			&store,
 			"main.bsx",
-			r#"<main><Instance document="./Card" props={{title:"Hi"}}/></main>"#,
+			r#"<main><Instance document="./Pair" props={{name:"Ada"}}/></main>"#,
 		)
 		.await;
-		TemplateSaver::new()
+		settle(&mut world).await;
+		let expected = "<main><section><h2>card</h2><em>Ada</em><footer>none</footer></section></main>";
+		outline(&world, root).xpect_eq(expected);
+		let saved = TemplateSaver::new()
 			.with_entity_tree(&world, root)
 			.save(&world, MediaType::Json)
-			.unwrap()
+			.unwrap();
+		saved
 			.as_utf8()
 			.unwrap()
 			.xref()
@@ -596,5 +638,27 @@ mod test {
 			.xpect_contains("\"h2\"")
 			.xnot()
 			.xpect_contains("instance::Instance");
+
+		let (mut world, _) = package(&[]).await;
+		let template = DocParsers::of(&world)
+			.body(&saved)
+			.unwrap()
+			.reflect(&world)
+			.unwrap();
+		let root = world.spawn_template(template).unwrap().id();
+		settle(&mut world).await;
+		outline(&world, root).xpect_eq(expected);
+		// the binding, not only the value it last read
+		for mut document in world
+			.query_filtered::<&mut Document, With<PropsDocument>>()
+			.iter_mut(&mut world)
+		{
+			let props = document.0.as_map_mut().unwrap();
+			if props.contains("name") {
+				props.insert("name", "Grace");
+			}
+		}
+		world.update_local();
+		outline(&world, root).xpect_contains("<em>Grace</em>");
 	}
 }

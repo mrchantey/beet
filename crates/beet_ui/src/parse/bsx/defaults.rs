@@ -20,12 +20,12 @@ pub struct BsxDefaultsPlugin;
 
 impl Plugin for BsxDefaultsPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<BsxPlugin>().add_plugins(widget_plugin);
+		app.install_types::<BsxPlugin>().add_plugins(widget_plugin);
 		#[cfg(feature = "scripting")]
 		{
 			// every `world` call an event script makes is served at the async
 			// sync point, so the seat has to exist before one can fire.
-			app.install_type::<AsyncPlugin>()
+			app.install_types::<AsyncPlugin>()
 				.add_observer(super::event_script::run_click_scripts);
 		}
 	}

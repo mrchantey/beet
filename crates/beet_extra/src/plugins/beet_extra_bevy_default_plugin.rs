@@ -8,9 +8,9 @@ use beet_core::prelude::*;
 /// job; this only adds behaviour, so it composes under either runner.
 pub(crate) fn beet_extra_bevy_default_plugin(app: &mut App) {
 	// `ActionPlugin` may already be present (the router stack adds it via
-	// `install_type` on the CLI render path), so add it idempotently rather than
+	// `install_types` on the CLI render path), so add it idempotently rather than
 	// panic on the double-add when this group composes with a router-bearing app.
-	app.install_type::<ActionPlugin>()
+	app.install_types::<ActionPlugin>()
 		.add_plugins((
 			// drains deferred asset loads (clips, Bert) so a scene's `Ready`
 			// (and its `CallOnReady` gate) fires once every asset has settled.
@@ -60,7 +60,7 @@ pub(crate) fn beet_extra_ml_plugin(app: &mut App) {
 		// the markup ml scene templates, so `<NearestSentenceAgent/>` /
 		// `<SentenceOption/>` / `<ChatSentenceAgent/>` / `<FrozenLake/>` etc resolve
 		// in a `.bsx`.
-		.install_type::<(
+		.install_types::<(
 			NearestSentenceAgent,
 			SentenceOption,
 			ChatSentenceAgent,
@@ -90,7 +90,7 @@ fn plugin_2d(app: &mut App) {
 		.register_type::<FollowCursor2d>()
 		// the markup 2d scene templates, so `<Scene2d/>`/`<Sprite2d/>`/`<SpaceScene/>`/
 		// `<SeekAgent2d/>`/`<Flock/>` resolve in a `.bsx`.
-		.install_type::<(
+		.install_types::<(
 			Scene2d,
 			Sprite2d,
 			SpaceScene,
@@ -113,7 +113,7 @@ fn plugin_3d(app: &mut App) {
 		.register_type::<CameraDistance>()
 		// the markup scene templates, so `<AppWindow/>`/`<UiTerminal/>`/`<Scene3d/>`/
 		// `<Lighting3d/>`/`<Ground3d/>` resolve in a `.bsx`.
-		.install_type::<(
+		.install_types::<(
 			AppWindow,
 			UiTerminal,
 			Scene3d,

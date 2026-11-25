@@ -11,7 +11,7 @@ pub struct SshServerPlugin;
 
 impl Plugin for SshServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<AsyncPlugin>()
+		app.install_types::<AsyncPlugin>()
 			.register_type::<SshHostKeyRef>()
 			.register_type::<SshHostKeyConsumers>()
 			.add_observer(RequirePty::clear_on_pty)

@@ -169,6 +169,55 @@ impl BlobStore {
 		Blob::new(self.base(), RelPath::new(key)).xok()
 	}
 
+	/// The path of `blob` from this store's root, its path in its own store when
+	/// that store is elsewhere.
+	pub fn path_of(&self, blob: &Blob) -> RelPath {
+		let within = blob.store().root_key() == self.root_key();
+		let full = blob.store().subdir().join(blob.path());
+		within
+			.then(|| match self.subdir().is_empty() {
+				true => Some(full.clone()),
+				false => full.strip_prefix(&self.subdir()),
+			})
+			.flatten()
+			.unwrap_or_else(|| blob.path().clone())
+	}
+
+	/// The document `path` names, its extension written: the file itself, else
+	/// the one file beside it of its name with an extension.
+	///
+	/// ## Errors
+	/// Errors when no file is, or several are.
+	pub async fn complete_document(&self, path: &RelPath) -> Result<RelPath> {
+		if self.exists(path).await? {
+			return path.clone().xok();
+		}
+		let dir = path.parent().unwrap_or_default();
+		let name = path.file_name().unwrap_or_default().to_string();
+		let found = self
+			.list_dir(&dir)
+			.await?
+			.files
+			.into_iter()
+			.map(|file| dir.join(file))
+			.filter(|file| file.file_stem() == Some(name.as_str()))
+			.collect::<Vec<_>>();
+		match found.as_slice() {
+			[found] => found.clone().xok(),
+			[] => {
+				bevybail!("no document at `{path}` in `{}`", self.describe())
+			}
+			found => bevybail!(
+				"`{path}` names several documents, write its extension: {}",
+				found
+					.iter()
+					.map(|path| format!("`{path}`"))
+					.collect::<Vec<_>>()
+					.join(", ")
+			),
+		}
+	}
+
 	/// Get an object and infer the [`MediaType`] from its path extension.
 	pub async fn get_media(&self, path: &RelPath) -> Result<MediaBytes> {
 		let media_type = path.media_type().unwrap_or(MediaType::Bytes);

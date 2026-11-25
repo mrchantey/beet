@@ -363,7 +363,7 @@ mod test {
 	async fn url_space() -> (App, Entity, BlobStore) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>()
+			.install_types::<ThreadPlugin>()
 			.register_type::<Bail>()
 			.register_type::<Hold>();
 		let store = BlobStore::temp();

@@ -11,7 +11,7 @@ pub struct DocumentUiPlugin;
 
 impl Plugin for DocumentUiPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<DocumentPlugin>();
+		app.install_types::<DocumentPlugin>();
 
 		// Register action types when the action feature is enabled
 		#[cfg(feature = "action")]

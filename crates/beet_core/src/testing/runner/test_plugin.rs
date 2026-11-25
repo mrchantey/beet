@@ -95,7 +95,7 @@ impl Plugin for TestPlugin {
 		#[cfg(feature = "vault")]
 		Secrets::load_env_vars_nearest();
 
-		app.install_type::<(AsyncPlugin, TimePlugin)>()
+		app.install_types::<(AsyncPlugin, TimePlugin)>()
 			.init_resource::<RunnerStalls>()
 			.install(InsertSchedule::before(Update, RunTests))
 			// Force single-threaded execution so `spawn_local` in `run_tests_series`

@@ -51,7 +51,7 @@ struct PrefabKey {
 }
 
 impl PrefabKey {
-	fn new(package: &PackageStore, path: &RelPath) -> Self {
+	fn new(package: &BlobStore, path: &RelPath) -> Self {
 		Self {
 			root_key: package.root_key(),
 			subdir: package.subdir(),
@@ -62,7 +62,7 @@ impl PrefabKey {
 
 #[derive(Clone)]
 struct CachedPrefab {
-	package: PackageStore,
+	package: BlobStore,
 	prefab: Arc<InstancePrefab>,
 }
 
@@ -71,7 +71,7 @@ impl PrefabCache {
 	/// extension was left off is answered once it has been loaded by it.
 	pub fn get(
 		&self,
-		package: &PackageStore,
+		package: &BlobStore,
 		path: &RelPath,
 	) -> Option<Arc<InstancePrefab>> {
 		self.0
@@ -87,7 +87,7 @@ impl PrefabCache {
 	/// a document instantiates itself, however indirectly.
 	pub async fn load(
 		world: &AsyncWorld,
-		package: &PackageStore,
+		package: &BlobStore,
 		path: &RelPath,
 	) -> Result<Arc<InstancePrefab>> {
 		Self::load_under(world, package, path, Vec::new()).await
@@ -96,7 +96,7 @@ impl PrefabCache {
 	/// Load every document `template`, the document at `path`, instantiates.
 	pub async fn load_instances(
 		world: &AsyncWorld,
-		package: &PackageStore,
+		package: &BlobStore,
 		path: &RelPath,
 		template: &DynamicTemplate,
 	) -> Result {
@@ -111,7 +111,7 @@ impl PrefabCache {
 	/// first.
 	async fn load_under(
 		world: &AsyncWorld,
-		package: &PackageStore,
+		package: &BlobStore,
 		path: &RelPath,
 		above: Vec<RelPath>,
 	) -> Result<Arc<InstancePrefab>> {
@@ -159,10 +159,10 @@ impl PrefabCache {
 	/// Read the document at `path` and hold it.
 	async fn read(
 		world: &AsyncWorld,
-		package: &PackageStore,
+		package: &BlobStore,
 		path: &RelPath,
 	) -> Result<Arc<InstancePrefab>> {
-		let full = Self::complete(package, path).await?;
+		let full = package.complete_document(path).await?;
 		let bytes = package
 			.get_media(&full)
 			.await
@@ -195,41 +195,6 @@ impl PrefabCache {
 				prefab.xok()
 			})
 			.await
-	}
-
-	/// The document `path` names, its extension written: the file itself, else
-	/// the one file beside it of its name with an extension.
-	async fn complete(
-		package: &PackageStore,
-		path: &RelPath,
-	) -> Result<RelPath> {
-		if package.exists(path).await? {
-			return path.clone().xok();
-		}
-		let dir = path.parent().unwrap_or_default();
-		let name = path.file_name().unwrap_or_default().to_string();
-		let found = package
-			.list_dir(&dir)
-			.await?
-			.files
-			.into_iter()
-			.map(|file| dir.join(file))
-			.filter(|file| file.file_stem() == Some(name.as_str()))
-			.collect::<Vec<_>>();
-		match found.as_slice() {
-			[found] => found.clone().xok(),
-			[] => {
-				bevybail!("no document at `{path}` in `{}`", package.describe())
-			}
-			found => bevybail!(
-				"`{path}` names several documents, write its extension: {}",
-				found
-					.iter()
-					.map(|path| format!("`{path}`"))
-					.collect::<Vec<_>>()
-					.join(", ")
-			),
-		}
 	}
 
 	/// Forget every document `event` changed, and every one read by a path

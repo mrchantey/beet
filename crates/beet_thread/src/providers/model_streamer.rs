@@ -169,7 +169,7 @@ mod test {
 	) -> (App, Entity) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		let entity = app
 			.world_mut()
 			.spawn_template(ModelStreamer {
@@ -193,7 +193,7 @@ mod test {
 
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		let source = r#"
 <Thread>
 	<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama, instructions:"be terse"}}/>

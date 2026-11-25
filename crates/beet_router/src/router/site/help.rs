@@ -1136,7 +1136,7 @@ mod test {
 		}
 
 		let mut app = App::new().with_plugins((AsyncPlugin, RouterPlugin));
-		app.install_type::<HelpShell>();
+		app.install_types::<HelpShell>();
 		let world = app.world_mut();
 		let root = world
 			.spawn((

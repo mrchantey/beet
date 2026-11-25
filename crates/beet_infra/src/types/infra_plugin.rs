@@ -16,9 +16,9 @@ pub struct InfraPlugin;
 
 impl Plugin for InfraPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<AsyncPlugin>();
+		app.install_types::<AsyncPlugin>();
 		#[cfg(feature = "deploy")]
-		app.install_type::<beet_router::prelude::RouterPlugin>();
+		app.install_types::<beet_router::prelude::RouterPlugin>();
 
 		// the identity every declaration composes its name from, registered in
 		// every native build so `<Stack stage="shared"/>` authors anywhere, and
@@ -185,7 +185,7 @@ impl Plugin for InfraPlugin {
 		// the network whether each resolves. Definitions, so every target: a
 		// wasm consumer authors the stack it cannot apply.
 		#[cfg(feature = "atproto")]
-		app.install_type::<beet_net::prelude::AtprotoPlugin>()
+		app.install_types::<beet_net::prelude::AtprotoPlugin>()
 			.register_type::<crate::prelude::AtprotoHandleBlock>()
 			.register_type::<crate::prelude::AtprotoHandleProbe>()
 			.add_systems(
@@ -264,7 +264,7 @@ impl Plugin for InfraPlugin {
 		// the document store declaration (`<DocumentSecrets path=".."/>`), on
 		// every target the vault layer compiles.
 		#[cfg(feature = "vault")]
-		app.install_type::<beet_net::prelude::SecretsPlugin>()
+		app.install_types::<beet_net::prelude::SecretsPlugin>()
 			.register_type::<crate::prelude::DocumentSecrets>()
 			.add_observer(crate::types::attach_document_secrets);
 
@@ -346,7 +346,7 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::AdoptCurrentDeploy>()
 			// the IaC verb routes a `<Stack>` hosts, registered beside the verbs
 			// themselves rather than by whichever crate happens to author markup.
-			.install_type::<(
+			.install_types::<(
 				crate::prelude::DeployRoutes,
 				// the one thing about this launch's deploy mechanics an entry
 				// authors: where its state lives, a property of the operator rather
@@ -389,7 +389,7 @@ impl Plugin for InfraPlugin {
 				>,
 			)
 			// a person's Identity Center sign in, and the invite adding one
-			.install_type::<crate::prelude::SsoRoutes>()
+			.install_types::<crate::prelude::SsoRoutes>()
 			.register_type::<crate::prelude::SsoLogin>()
 			.register_type::<crate::prelude::SsoLogout>()
 			.register_type::<crate::prelude::SsoStatus>()
@@ -471,7 +471,7 @@ impl Plugin for InfraPlugin {
 			// the two paired declarations, each spawning its up-action and its
 			// down-action from one tag at one file position, so the deploy and
 			// teardown groups cannot drift apart.
-			.install_type::<(
+			.install_types::<(
 				crate::prelude::EipReverseRecord,
 				crate::prelude::MtaStsPolicyHost,
 			)>();

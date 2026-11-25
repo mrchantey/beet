@@ -11,7 +11,7 @@ impl Plugin for CssPlugin {
 			.get_resource_or_init::<CssTokenMap>()
 			.extend(common_props::token_map());
 		#[cfg(feature = "bsx")]
-		app.install_type::<BsxPlugin>();
+		app.install_types::<BsxPlugin>();
 		// the `<Rule>` markup tag declares a named rule into the `RuleSet` at
 		// build time, the no-code analogue of a typed `Rule` in Rust.
 		app.register_type::<DeclaredRule>();

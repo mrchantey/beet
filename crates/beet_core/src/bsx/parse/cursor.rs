@@ -2,9 +2,7 @@
 //! recursive-descent BSX parser is built on.
 //!
 //! It tracks a byte offset into the source and exposes the small peek/bump/eat
-//! vocabulary the markup, value, and spread parsers share. Spans are byte
-//! offsets so [`FileSpan`](beet_core::prelude::FileSpan) tracking can resolve
-//! them through a [`SpanLookup`](crate::prelude::SpanLookup) later.
+//! vocabulary the markup, value, and spread parsers share.
 
 /// A forward-only character cursor over the BSX source.
 pub(crate) struct Cursor<'a> {

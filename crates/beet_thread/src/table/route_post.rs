@@ -101,7 +101,7 @@ mod test {
 	fn url_space(path: &str) -> (App, Entity, BlobStore) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		app.world_mut()
 			.get_resource_or_init::<BsxTemplateRegistry>()
 			.insert_source(

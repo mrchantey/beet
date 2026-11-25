@@ -285,7 +285,16 @@ pub struct PropsDocument;
 ///
 /// Documents can be attached to ancestors, the root entity, or any specific entity.
 #[derive(
-	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	MapEntities,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DocumentPath {
@@ -301,14 +310,18 @@ pub enum DocumentPath {
 	/// The root entity.
 	Root,
 	/// The nearest ancestor (inclusive) props store, ie a [`Document`] marked
-	/// with [`PropsDocument`], a template's materialized props.
+	/// with [`PropsDocument`], what a use of a document passed it.
+	///
+	/// A document building under a use settles its own to that use
+	/// ([`Entity`](Self::Entity)), so content it passes to another document's
+	/// slot still reads the props of the document that wrote it.
 	Props,
 	/// A specific document by entity id.
 	///
 	/// Resolution's output, not an authored input: an entity id means nothing in
-	/// a file. Markup names a foreign document with a [`DocRef`], which resolves
-	/// to this for the whole subtree beneath it.
-	Entity(Entity),
+	/// a file, which holds its key. Markup names a foreign document with a
+	/// [`DocRef`], which resolves to this for the whole subtree beneath it.
+	Entity(#[entities] Entity),
 }
 
 impl core::fmt::Display for DocumentPath {

@@ -21,7 +21,7 @@ pub(super) fn render_app() -> App {
 		RealtimeParsePlugin,
 		PageHostPlugin,
 	))
-	.install_type::<(ThreadPlugin, ThreadUiPlugin)>();
+	.install_types::<(ThreadPlugin, ThreadUiPlugin)>();
 	app
 }
 

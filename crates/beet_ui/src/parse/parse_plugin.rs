@@ -72,7 +72,7 @@ impl Plugin for ParsePlugin {
 		// the default BSX event vocabulary, so every `bx:onclick="..."` runs
 		// its script on a click.
 		#[cfg(feature = "bsx")]
-		app.install_type::<crate::prelude::BsxDefaultsPlugin>();
+		app.install_types::<crate::prelude::BsxDefaultsPlugin>();
 		// a document's root metadata and its route's, which frontmatter
 		// declares and writes
 		app.register_type::<DocMeta>()
@@ -97,7 +97,7 @@ pub struct RealtimeParsePlugin;
 
 impl Plugin for RealtimeParsePlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<ParsePlugin>()
+		app.install_types::<ParsePlugin>()
 			.install(InsertSchedule::after(Update, PostParseTree));
 	}
 }

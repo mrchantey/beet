@@ -73,8 +73,9 @@
 //!   the names `BuildRoot`, `SnippetRoot`, `PageRoot` and `Router` are reserved
 //!   (`ReservedRef`) for well-known entities (the latter two resolved lazily
 //!   each sync pass) and may not be shadowed
-//! - `@prop:` the props of the nearest use of a document above, what its
-//!   [`Instance`] passed (a bound prop chains reactively)
+//! - `@prop:` the props of the document it is written in, what the [`Instance`]
+//!   using that document passed (a bound prop chains reactively), in content
+//!   slotted into another document as anywhere else
 //!
 //! Bindings work in attribute position (`value=@res:Theme.contrast`), text
 //! position (`{@doc:name}`), and as spread-tuple items
@@ -159,7 +160,7 @@
 //! *document* is never a tag: it is an [`Instance`], naming it by a [`DocPath`],
 //! relative to the document it is written in when it starts with `./` or `../`
 //! and to the package (the directory the entry is in) otherwise, the extension
-//! optional where one file matches.
+//! optional where one file matches and written by convention.
 //!
 //! ```text
 //! <!-- widgets/Card.bsx -->
@@ -167,7 +168,7 @@
 //! <section><h2>{@prop:title}</h2><slot/></section>
 //!
 //! <!-- a page -->
-//! <Instance document="widgets/Card" props={{title:"Intro"}}><p>hi</p></Instance>
+//! <Instance document="widgets/Card.bsx" props={{title:"Intro"}}><p>hi</p></Instance>
 //! ```
 //!
 //! The document is read once and held as data, and each use builds it under the
@@ -227,7 +228,7 @@
 //!
 //! An entry document has a single root element. Beside it may sit only the
 //! declarations its launch pre-scans (`<RepoRoot>`, `<RequireCfg>`,
-//! `<Secrets>`, and whatever prescan type `app.install_type::<T>()`
+//! `<Secrets>`, and whatever prescan type `app.install_types::<T>()`
 //! adds), with string attributes and no `bx:cfg`: each acts before the build
 //! and is consumed rather than built, so a root admitting no such child still
 //! states what it needs. Anything else there is a second root, an error

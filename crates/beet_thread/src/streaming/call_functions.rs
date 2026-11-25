@@ -113,7 +113,7 @@ mod test {
 	async fn read_only_toolset_cannot_write() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		let source = r#"
 <Thread {Sequence}>
 	<CreateActor name="User" kind="User"><CreatePost text="go"/></CreateActor>
@@ -206,7 +206,7 @@ mod test {
 	async fn tools_outside_a_router_fail_the_turn() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		let source = r#"
 <Router>
 	<Thread {Sequence}>

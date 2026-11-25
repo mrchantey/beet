@@ -72,7 +72,7 @@ pub impl App {
 	/// Awaits an IO task, updating the app while waiting.
 	#[cfg(feature = "std")]
 	async fn await_io_task<O>(&mut self, task: Task<O>) -> O {
-		self.install_type::<TaskPoolPlugin>();
+		self.install_types::<TaskPoolPlugin>();
 		// spin up async task pool
 		self.run_once();
 

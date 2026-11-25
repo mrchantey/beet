@@ -8,8 +8,8 @@ pub struct ScenePlugin;
 
 impl Plugin for ScenePlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<TemplatePlugin>()
-			.install_type::<AsyncPlugin>()
+		app.install_types::<TemplatePlugin>()
+			.install_types::<AsyncPlugin>()
 			.init_resource::<PrefabCache>()
 			.add_observer(crate::instance::activate_on_insert)
 			.add_observer(crate::prefab_cache::forget_changed_prefabs);

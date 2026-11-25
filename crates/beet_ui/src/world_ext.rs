@@ -7,7 +7,7 @@ use beet_core::prelude::*;
 pub fn ui_world() -> World { core::mem::take(ui_app().world_mut()) }
 
 /// The [`App`] a [`ui_world`] is taken from, for a caller adding its own
-/// templates first (`ui_app().install_type::<Badge>()`): the substrate's
+/// templates first (`ui_app().install_types::<Badge>()`): the substrate's
 /// [`TemplatePlugin`], the [`DocumentPlugin`] templates lean on, the built-in
 /// doc parsers and doc renderers ([`ParsePlugin`], [`RenderPlugin`]),
 /// the parse plugin bringing (when `bsx` is enabled) the default BSX event

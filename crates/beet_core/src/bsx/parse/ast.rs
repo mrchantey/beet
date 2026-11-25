@@ -399,7 +399,7 @@ pub enum BindingSource {
 	Res,
 	/// `@comp:` a reflected component field.
 	Comp,
-	/// `@prop:` the nearest use site above, what its [`Instance`] passed.
+	/// `@prop:` what the [`Instance`] using the document passed.
 	Prop,
 }
 

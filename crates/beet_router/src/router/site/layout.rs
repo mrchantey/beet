@@ -83,13 +83,13 @@ pub struct Layout {
 	/// The document, ie `templates/Layout.bsx`.
 	pub document: Option<DocPath>,
 	/// The rust template, ie `SiteLayout` or `path::to::SiteLayout`, registered
-	/// with `app.install_type::<SiteLayout>()`.
+	/// with `app.install_types::<SiteLayout>()`.
 	pub template: Option<SmolStr>,
 }
 
 impl Layout {
 	/// Wrap descendant routes in the rust template `T`, named by its short type
-	/// path, the name `app.install_type::<T>()` registers it under.
+	/// path, the name `app.install_types::<T>()` registers it under.
 	pub fn of<T: BuildTemplate>() -> Self {
 		Self::template(TypeName::of::<T>().short())
 	}
@@ -291,9 +291,9 @@ mod test {
 	/// `#[template]` layout needs to be nameable from a [`Layout`] declaration.
 	fn router_world() -> World {
 		let mut app = App::new().with_plugins((AsyncPlugin, RouterPlugin));
-		app.install_type::<(PageShell, NavLayout)>();
+		app.install_types::<(PageShell, NavLayout)>();
 		#[cfg(feature = "json")]
-		app.install_type::<MetaLayout>();
+		app.install_types::<MetaLayout>();
 		core::mem::take(app.world_mut())
 	}
 

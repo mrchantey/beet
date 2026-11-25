@@ -39,19 +39,8 @@ impl ClassName {
 		}
 	}
 
-	/// Create an inline class from a BSX source [`FileSpan`], the markup twin of
-	/// [`Self::new_inline`]: the `bx:style` directive's span maps one-to-one onto
-	/// the `panic::Location` a Rust `inline_class!` derives from.
-	pub fn from_span(span: &FileSpan) -> Self {
-		Self::Inline {
-			file: span.path().to_string().into(),
-			line: span.start_line(),
-			col: span.start_col(),
-		}
-	}
-
 	/// Create an inline class keyed on a `bx:style` directive's declaration
-	/// `source`, the content-addressed twin of [`Self::from_span`].
+	/// `source`, the content-addressed twin of [`Self::new_inline`].
 	///
 	/// A BSX source span is fragment-relative (markdown feeds each HTML block to
 	/// the parser as its own string starting at offset 0), so two `bx:style`

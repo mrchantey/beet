@@ -75,7 +75,7 @@ pub struct PerfLogPlugin;
 impl Plugin for PerfLogPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<PerfLog>()
-			.install_type::<(FrameTimeDiagnosticsPlugin, EntityCountDiagnosticsPlugin)>(
+			.install_types::<(FrameTimeDiagnosticsPlugin, EntityCountDiagnosticsPlugin)>(
 			)
 			.add_systems(Update, PerfLog::report);
 	}

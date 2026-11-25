@@ -46,8 +46,8 @@ fn spawn_bsx_under(
 /// entity its instances resolve from.
 async fn package(documents: &[(&str, &str)]) -> (World, Entity) {
 	let mut app = world_ext::ui_app();
-	app.install_type::<AsyncPlugin>()
-		.install_type::<ScenePlugin>();
+	app.install_types::<AsyncPlugin>()
+		.install_types::<ScenePlugin>();
 	let mut world = core::mem::take(app.world_mut());
 	let store = BlobStore::temp();
 	for (path, source) in documents {
@@ -913,8 +913,8 @@ async fn counter_bsx_repaints_in_live_tui() {
 
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, CharcellTuiPlugin))
-		.install_type::<AsyncPlugin>()
-		.install_type::<ScenePlugin>();
+		.install_types::<AsyncPlugin>()
+		.install_types::<ScenePlugin>();
 	// the site-local card the counter instantiates
 	let store = BlobStore::temp();
 	store
@@ -1400,7 +1400,7 @@ fn Greeting() -> impl Bundle {
 #[beet_core::test]
 fn mdx_resolves_embedded_template() {
 	let mut app = world_ext::ui_app();
-	app.install_type::<Greeting>();
+	app.install_types::<Greeting>();
 	let world = app.world_mut();
 	let bytes = MediaBytes::new_markdown("# Title\n\n<Greeting/>\n");
 	let mut entity = world.spawn_empty();
@@ -1441,7 +1441,7 @@ fn Wrap() -> impl Bundle {
 #[beet_core::test]
 fn mdx_resolves_component_with_children() {
 	let mut app = world_ext::ui_app();
-	app.install_type::<Wrap>();
+	app.install_types::<Wrap>();
 	let world = app.world_mut();
 	// the open tag, the markdown body, and the close arrive as separate events;
 	// the BSX build path resolves the whole subtree.

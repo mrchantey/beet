@@ -39,7 +39,7 @@ pub struct ThreadUiPlugin;
 
 impl Plugin for ThreadUiPlugin {
 	fn build(&self, app: &mut App) {
-		app.install_type::<RouterPlugin>();
+		app.install_types::<RouterPlugin>();
 		app.register_type::<ThreadView>()
 			.register_type::<ThreadScroll>()
 			.register_type::<CreatePostForm>()
@@ -48,7 +48,7 @@ impl Plugin for ThreadUiPlugin {
 			.register_type::<ThreadItems>()
 			// the composer posts on submit and stops on Escape, which reads
 			// the keyboard
-			.install_type::<bevy::input::InputPlugin>()
+			.install_types::<bevy::input::InputPlugin>()
 			.add_observer(input::post_on_submit)
 			.add_systems(Update, input::stop_on_escape);
 		// project each thread's records into its views' documents, then pin to the bottom

@@ -77,7 +77,7 @@ mod test {
 	fn bespoke_action_is_valid_sequence_child() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		app.register_type::<TickStep>();
 		app.register_type::<ProbeTool>();
 		let source = r#"
@@ -111,7 +111,7 @@ mod test {
 	fn kind_attribute_resolves_to_variant() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		let source = r#"
 <Thread>
 	<CreateActor name="Sys" kind="System"/>
@@ -150,7 +150,7 @@ mod test {
 	fn bsx_tool_tag_fires_requires() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		app.register_type::<ProbeTool>();
 
 		let source = r#"
@@ -181,7 +181,7 @@ mod test {
 	fn bsx_seed_preserves_multiline_prompt() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 		let source = "
 <Thread>
 	<CreateActor name=\"System\" kind=\"System\">
@@ -207,7 +207,7 @@ line three'/>
 	fn bsx_author_scene_reduces() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.install_type::<ThreadPlugin>();
+			.install_types::<ThreadPlugin>();
 
 		// the root carries `Thread` via a spread on a lowercase element (which
 		// nests children natively); actors are `<CreateActor>` tags that forward

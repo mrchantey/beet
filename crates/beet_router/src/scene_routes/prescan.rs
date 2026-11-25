@@ -32,7 +32,7 @@ use std::sync::Arc;
 /// names something the build resolves, ie another store), a `bx:cfg` subtree
 /// is left to the build, and a non-literal attribute is skipped.
 ///
-/// Installed by type, `app.install_type::<RepoRoot>()`, in the order its
+/// Installed by type, `app.install_types::<RepoRoot>()`, in the order its
 /// [`preload`](Self::preload) should run. Its [`TypeInstaller`] impl, a
 /// supertrait so no prescan skips it, forwards to
 /// [`PrescanRegistry::register_on`].
@@ -555,7 +555,7 @@ mod test {
 			}
 		}
 		let mut app = App::new();
-		app.install_type::<(Warm, Second)>();
+		app.install_types::<(Warm, Second)>();
 		let registry = app.world().resource::<PrescanRegistry>().clone();
 		registry.describe().xpect_eq(vec![
 			("Warm", "warms a cache"),
