@@ -1,5 +1,6 @@
-//! The reactive transcript widget: a [`ThreadRecords`] projected into a
-//! [`Document`] and rendered as a scrollable, keyed list of posts.
+//! The reactive transcript widget: a window's [`ThreadRecords`] rendered as a
+//! scrollable list of posts, one row entity a loaded post, each its own
+//! [`Document`].
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -14,15 +15,22 @@ use beet_ui::prelude::Declaration;
 use beet_ui::prelude::inline_class;
 use beet_ui::prelude::material::colors;
 use beet_ui::prelude::style;
+use std::collections::BTreeMap;
 
 // ═══════════════════════════════════════════════════════════════════════
 // ThreadView: the reactive chat widget
 // ═══════════════════════════════════════════════════════════════════════
 
 /// A reactive view of a window, rendering its [`ThreadRecords`] as a scrollable
-/// list of posts. Carries its own [`Document`] (seeded empty, filled by
-/// `project_records_to_document`), so the inner [`ReactiveChildren`] and the
-/// per-row [`FieldRef`]s resolve against it via `DocumentPath::Ancestor`.
+/// list of posts: one row entity a loaded post, in [`PostId`] order, each
+/// carrying its own [`Document`] `{author, kind, status, text}` that the row's
+/// fields bind to by ancestry. A change writes the documents of the posts that
+/// changed and nothing else ([`ThreadRecords::changed_since`]), so streaming a
+/// token costs one document however long the thread is, and a row keeps its
+/// entity while its post streams.
+///
+/// Scrolled near its oldest row, the view reads the window's older posts
+/// ([`ThreadStore::read_older`]), keeping the reader's place.
 ///
 /// Host-agnostic content, not a host: spawn it under any render surface (a
 /// charcell terminal host, a web page) and bind it to its window with an
@@ -39,33 +47,49 @@ use beet_ui::prelude::style;
 /// Log posts render as dividers, a join naming its actor.
 #[derive(Debug, Default, Clone, Copy, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(Document)]
+#[require(ThreadRows)]
 #[component(on_add = thread_view_on_add)]
 pub struct ThreadView;
 
 impl ThreadView {
-	/// A view bound to `thread`. Its reactive content is attached in `on_add`, so
-	/// the bundle works both as a direct spawn and as a markup spread.
+	/// A view bound to `thread`. Its scroll container is attached in `on_add`,
+	/// so the bundle works both as a direct spawn and as a markup spread.
 	pub fn new(thread: Entity) -> impl Bundle { (Self, OfThread(thread)) }
 }
 
-/// Attach the reactive post list when a [`ThreadView`] is added: a scroll
-/// container whose children are one row per `posts` item, keyed by post id so
-/// appends reuse settled rows.
+/// A [`ThreadView`]'s rows: the row entity of each loaded post, and the
+/// window and revision of its records the view last drew.
+#[derive(Debug, Default, Component)]
+pub struct ThreadRows {
+	/// The window drawn, so a view bound to another draws it afresh.
+	window: Option<Entity>,
+	/// The revision of the window's records last drawn.
+	read: Revision,
+	/// The row entity of each loaded post.
+	rows: BTreeMap<PostId, Entity>,
+}
+
+impl ThreadRows {
+	/// The row entity of `post`, if the view drew it.
+	pub fn row(&self, post: PostId) -> Option<Entity> {
+		self.rows.get(&post).copied()
+	}
+}
+
+/// One row of a [`ThreadView`], the post it shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Component)]
+pub struct ThreadRow(pub PostId);
+
+/// Merge the scroll container onto the view when a [`ThreadView`] is added,
+/// so the view *is* the scrolling transcript its rows are children of.
 fn thread_view_on_add(mut world: DeferredWorld, cx: HookContext) {
-	// `insert(rsx!{<div ..>})` merges the element onto the view entity, so the view
-	// *is* the scrolling transcript container. All styling goes through the cascade
-	// (`inline_class!`): `resolve_styles` rebuilds `LayoutStyle`/`BoxStyle` from the
-	// cascade for every node of a styled tree, so a set component would be clobbered.
-	// Rows are a `ReactiveChildren` over the document's `posts`, keyed by each
-	// post's `id` (a uuid string), so reconciliation reuses a row across
-	// appends and in-progress body growth.
+	// All styling goes through the cascade (`inline_class!`): `resolve_styles`
+	// rebuilds `LayoutStyle`/`BoxStyle` from the cascade for every node of a
+	// styled tree, so a set component would be clobbered.
 	world.commands().entity(cx.entity).insert(rsx! {
 		<div {(
 			ThreadScroll::default(),
 			ScrollPosition::default(),
-			FieldRef::new("posts"),
-			ReactiveChildren::from_fn(post_row).with_key(FieldPath::parse("id")),
 			transcript_style(),
 		)}/>
 	});
@@ -91,7 +115,8 @@ fn transcript_style() -> OnSpawn {
 }
 
 /// Marks a [`ThreadView`]'s transcript container, and carries the follow state
-/// `follow_thread_scroll` uses to keep the latest post in view.
+/// `follow_thread_scroll` uses to keep the latest post in view and a scrolled
+/// up reader's place.
 #[derive(Debug, Clone, Copy, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct ThreadScroll {
@@ -101,6 +126,9 @@ pub struct ThreadScroll {
 	/// Frames of pinning left to apply, counted down as the follow re-asserts
 	/// itself over the frames the new rows take to lay out.
 	pending_follow: u8,
+	/// Frames left to hold a scrolled up reader's place while older rows
+	/// land above it and lay out.
+	keep_place: u8,
 	/// The scrollable extent last seen, so growing content is not mistaken for
 	/// the reader scrolling.
 	last_max: i32,
@@ -111,40 +139,56 @@ impl Default for ThreadScroll {
 		Self {
 			following: true,
 			pending_follow: 0,
+			keep_place: 0,
 			last_max: 0,
 		}
 	}
 }
 
-/// Build one post row: a role-accented block holding the author label and the
-/// post body bound through a [`FieldRef`] so streamed text re-syncs in place. The
-/// row's terminating scope is `posts[index]`, so `text` resolves to
-/// `posts[index].text`. Styling is keyed on the projected `kind`
-/// (`system`/`user`/`agent`/`error`) so each speaker reads distinctly.
-fn post_row(_index: usize, item: &Value) -> OnSpawn {
+/// The document of the row showing `view`: `{author, kind, status, text}`,
+/// `kind` the row's display role ([`row_kind`]).
+fn row_document(view: &AuthoredPost) -> Document {
+	let status = match view.post.status() {
+		PostStatus::Completed => "completed",
+		PostStatus::Interrupted => "interrupted",
+		PostStatus::InProgress => "in_progress",
+	};
+	Document::new(Value::Map(
+		[
+			("author".into(), Value::new(view.actor.name())),
+			("kind".into(), Value::new(row_kind(view))),
+			("status".into(), Value::new(status)),
+			("text".into(), Value::new(row_text(view))),
+		]
+		.into_iter()
+		.collect(),
+	))
+}
+
+/// Build one post row from its document: a role-accented block holding the
+/// author label and the post body, each bound through a [`FieldRef`] to the
+/// row's own document, so streamed text re-syncs in place. Styling is keyed
+/// on the row's `kind` (`system`/`user`/`agent`/`error`), which a post never
+/// changes, so each speaker reads distinctly.
+fn post_row(document: &Document) -> OnSpawn {
 	let field = |name: &str| {
-		item.get(name)
+		document
+			.get(name)
 			.and_then(|value| value.as_str().ok())
 			.unwrap_or_default()
 			.to_string()
 	};
-	let author = field("author");
-	let text = field("text");
-	let kind = item
-		.get("kind")
-		.and_then(|kind| kind.as_str().ok())
-		.unwrap_or("agent")
-		.to_string();
+	let (author, kind, text) = (field("author"), field("kind"), field("text"));
+	// each seeded with its value at build time so a new row paints on the
+	// first frame, bound so a change re-syncs in place
 	if kind == LOG_ROW {
 		return OnSpawn::insert(rsx! {
-			<div {divider_style()}>{text}</div>
+			<div {divider_style()}>{(Value::new(text), FieldRef::new("text"))}</div>
 		});
 	}
 	OnSpawn::insert(rsx! {
 		<div {message_block(&kind)}>
-			<div {author_label(&kind)}>{author}</div>
-			// seeded with the body at build time so a new row paints its text on
-			// the first frame, bound so streamed growth re-syncs in place
+			<div {author_label(&kind)}>{(Value::new(author), FieldRef::new("author"))}</div>
 			<div {body_text()}>{(Value::new(text), FieldRef::new("text"))}</div>
 		</div>
 	})
@@ -266,62 +310,172 @@ fn body_text() -> impl Bundle {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Projection: ThreadRecords -> Document
+// Rows: ThreadRecords -> one Document a post
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Project every changed [`ThreadRecords`] into the [`Document`] of each
-/// [`ThreadView`] bound to its window, and into a [`Document`] on the window
-/// itself.
-///
-/// The document holds every post (display intent or not, so reasoning and tool
-/// traffic remain inspectable) as `{ "posts": [{ id, author, kind, text }, ..] }`.
-/// A view re-projects when its window's records change or it is bound to
-/// another window. Keyed reconciliation downstream means a
-/// grown in-progress body updates a row rather than rebuilding it, so
-/// streaming flows through the bound [`Value`].
-pub(crate) fn project_records_to_document(
+/// Draw what changed in each view's window since the view last looked: a
+/// changed post's row has its [`Document`] written, a new post gets a row in
+/// [`PostId`] order, and nothing else is touched. A view bound to another
+/// window draws it afresh.
+pub(crate) fn sync_thread_rows(
 	mut commands: Commands,
-	thread_records: Query<(Entity, Ref<ThreadRecords>)>,
-	views: Query<(Entity, Ref<OfThread>), With<ThreadView>>,
-	mut documents: Query<&mut Document>,
-) -> Result {
-	// the window's own document, inserted if absent
-	for (thread_entity, records) in thread_records
-		.iter()
-		.filter(|(_, records)| records.is_changed())
-	{
-		set_document(
-			&mut commands,
-			&mut documents,
-			thread_entity,
-			project_records(&records),
-		);
-	}
-	for (view, of_thread) in views.iter() {
-		let Ok((_, records)) = thread_records.get(of_thread.thread()) else {
+	windows: Query<&ThreadRecords>,
+	mut views: Query<
+		(
+			Entity,
+			&OfThread,
+			&mut ThreadRows,
+			Option<&mut ThreadScroll>,
+		),
+		With<ThreadView>,
+	>,
+	mut documents: Query<&mut Document, With<ThreadRow>>,
+) {
+	for (view, of_thread, mut rows, mut thread_scroll) in views.iter_mut() {
+		let window = of_thread.thread();
+		let Ok(records) = windows.get(window) else {
 			continue;
 		};
-		if !(records.is_changed() || of_thread.is_changed()) {
+		if rows.window != Some(window) {
+			for row in core::mem::take(&mut rows.rows).into_values() {
+				commands.entity(row).despawn();
+			}
+			rows.window = Some(window);
+			rows.read = Revision::default();
+		}
+		if rows.read == records.revision() {
 			continue;
 		}
-		set_document(
-			&mut commands,
-			&mut documents,
-			view,
-			project_records(&records),
-		);
+		let since = core::mem::replace(&mut rows.read, records.revision());
+		let mut spawned = Vec::new();
+		for (id, _) in records
+			.changed_since(since)
+			.filter(|(_, change)| change.post_after(since))
+		{
+			let Some(post) = records.authored(id) else {
+				continue;
+			};
+			let document = row_document(&post);
+			match rows.rows.get(&id) {
+				Some(row) => {
+					if let Ok(mut existing) = documents.get_mut(*row) {
+						existing.set_if_neq(document);
+					}
+				}
+				None => spawned.push((id, document)),
+			}
+		}
+		// a row landing above one already drawn shifts what a scrolled up
+		// reader sees
+		let newest_drawn = rows.rows.keys().next_back().copied();
+		if spawned
+			.iter()
+			.any(|(id, _)| newest_drawn.is_some_and(|newest| *id < newest))
+			&& let Some(thread_scroll) = thread_scroll.as_mut()
+		{
+			thread_scroll.keep_place = FOLLOW_FRAMES;
+		}
+		// newest first, so each row's successor is already in place
+		spawned.sort_by_key(|(id, _)| core::cmp::Reverse(*id));
+		for (id, document) in spawned {
+			let next = rows
+				.rows
+				.range((
+					core::ops::Bound::Excluded(id),
+					core::ops::Bound::Unbounded,
+				))
+				.next()
+				.map(|(_, row)| *row);
+			let row = commands
+				.spawn((ThreadRow(id), post_row(&document), document))
+				.id();
+			rows.rows.insert(id, row);
+			commands.queue(move |world: &mut World| {
+				place_row(world, view, row, next);
+			});
+		}
 	}
-	Ok(())
 }
 
-/// Follow-on-append: when a [`ThreadView`]'s document changes (a post was
-/// added or grew) *or* its keyed rows spawn in, arm a follow, then for the next
+/// Place `row` among `view`'s children before its successor `next`, else
+/// last.
+fn place_row(
+	world: &mut World,
+	view: Entity,
+	row: Entity,
+	next: Option<Entity>,
+) {
+	let index = next.and_then(|next| {
+		world.get::<Children>(view).and_then(|children| {
+			children.iter().position(|child| child == next)
+		})
+	});
+	let Ok(mut view) = world.get_entity_mut(view) else {
+		return;
+	};
+	match index {
+		Some(index) => view.insert_children(index, &[row]),
+		None => view.add_child(row),
+	};
+}
+
+/// Read a window's older posts once a view of it is scrolled near its oldest
+/// row, the reader not tailing the latest: one read at a time a window
+/// ([`ReadingOlder`]), and none while the rows of the last are still landing,
+/// before the view has drawn them and held the reader's place.
+pub(crate) fn read_older_on_scroll(
+	mut commands: AsyncCommands,
+	views: Query<
+		(Entity, &OfThread, &ThreadScroll, &ThreadRows),
+		With<ThreadView>,
+	>,
+	windows: Query<&ThreadRecords, (With<ThreadStore>, Without<ReadingOlder>)>,
+	tree: RenderTreeQuery,
+	scrolls: Query<&ScrollPosition>,
+) {
+	for (view, of_thread, thread_scroll, rows) in views.iter() {
+		let window = of_thread.thread();
+		if thread_scroll.keep_place > 0
+			|| !windows.get(window).is_ok_and(|records| {
+				records.has_older() && records.revision() == rows.read
+			}) {
+			continue;
+		}
+		// the innermost container with somewhere to scroll, as the follow
+		// finds it
+		let near_oldest = !thread_scroll.following
+			&& tree
+				.iter_ancestors_inclusive(view)
+				.filter_map(|entity| scrolls.get(entity).ok())
+				.find(|scroll| scroll.max.y > 0)
+				.is_some_and(|scroll| scroll.offset.y <= READ_OLDER_WITHIN);
+		if near_oldest {
+			commands.entity(window).insert(ReadingOlder);
+			commands.run(async move |world: AsyncWorld| -> Result {
+				let window = world.entity(window);
+				let read = ThreadStore::read_older_into(&window).await;
+				window.take::<ReadingOlder>().await?;
+				read.map(|_| ())
+			});
+		}
+	}
+}
+
+/// How near its top, in cells, a view's scroll reads older posts.
+const READ_OLDER_WITHIN: i32 = 2;
+
+/// Marks a window reading its older posts, so a view asks once at a time.
+#[derive(Debug, Default, Clone, Copy, Component)]
+pub struct ReadingOlder;
+
+/// Follow-on-append: when a [`ThreadView`]'s rows change (a post was added
+/// or grew) *or* its rows spawn in, arm a follow, then for the next
 /// few frames pin every scroll container showing the transcript to the bottom
 /// by parking its offset past the end. `clamp_scroll_positions` re-clamps that
 /// to the true max against the laid-out content.
 ///
 /// The follow spans frames rather than landing in one because the geometry
-/// trails the content: rows spawn a frame after the document is set, then lay
+/// trails the content: rows spawn, then lay
 /// out and clamp, so a container's extent only reflects them afterwards. It can
 /// even change hands in that window, since a transcript that outgrows its host
 /// takes over the scrolling from the host's scrollport. Pinning the whole path
@@ -333,10 +487,13 @@ pub(crate) fn project_records_to_document(
 /// position is theirs alone: at the bottom keeps the tail on, anywhere else
 /// turns it off until they scroll back. Sampling it while content lands would
 /// instead read a transcript that has simply outgrown the viewport as a reader
-/// who scrolled away, and stop following on the first burst.
+/// who scrolled away, and stop following on the first burst. Rows landing
+/// above such a reader, older posts read in, grow the extent above them, and
+/// the follow moves the reader's offset by that growth, so the rows they were
+/// reading stay put.
 pub(crate) fn follow_thread_scroll(
 	views: Query<
-		(Entity, Ref<Document>, Option<Ref<Children>>),
+		(Entity, Ref<ThreadRows>, Option<Ref<Children>>),
 		With<ThreadView>,
 	>,
 	children: Query<&Children>,
@@ -348,7 +505,7 @@ pub(crate) fn follow_thread_scroll(
 	mut transcripts: Query<&mut ThreadScroll>,
 	mut scrolls: Query<&mut ScrollPosition>,
 ) {
-	for (view, document, rows) in views.iter() {
+	for (view, drawn, rows) in views.iter() {
 		// the transcript container is the view entity itself (the `<div>` merges
 		// onto it on insert) or a descendant carrying `ThreadScroll`.
 		let Some(transcript) = std::iter::once(view)
@@ -369,10 +526,29 @@ pub(crate) fn follow_thread_scroll(
 		let max = scroller.map(|scroll| scroll.max.y).unwrap_or_default();
 		let at_bottom = scroller.is_none_or(|scroll| scroll.at_bottom());
 		let new_content =
-			document.is_changed() || rows.is_some_and(|rows| rows.is_changed());
+			drawn.is_changed() || rows.is_some_and(|rows| rows.is_changed());
 		let Ok(mut thread_scroll) = transcripts.get_mut(transcript) else {
 			continue;
 		};
+		// rows landed above a reader who scrolled up: move them by the growth
+		if !thread_scroll.following && thread_scroll.keep_place > 0 {
+			thread_scroll.keep_place -= 1;
+			let grown = max - thread_scroll.last_max;
+			if grown != 0
+				&& let Some(mut scroll) = path
+					.iter()
+					.find(|entity| {
+						scrolls
+							.get(**entity)
+							.is_ok_and(|scroll| scroll.max.y > 0)
+					})
+					.and_then(|entity| scrolls.get_mut(*entity).ok())
+			{
+				scroll.offset.y += grown;
+			}
+			thread_scroll.last_max = max;
+			continue;
+		}
 		// with the geometry stable and no new content, wherever the reader has
 		// left the scroll *is* their intent: at the bottom means keep tailing.
 		if !new_content && max == thread_scroll.last_max {
@@ -404,30 +580,9 @@ pub(crate) fn follow_thread_scroll(
 /// layout pass and the clamp that gives the containers their extent.
 const FOLLOW_FRAMES: u8 = 4;
 
-/// Build the document value for a window's records: a `posts` list of
-/// `{ id, author, kind, text }`.
-fn project_records(records: &ThreadRecords) -> Value {
-	let posts = records
-		.authored_posts()
-		.map(|view| {
-			Value::Map(
-				[
-					("id".into(), Value::new(view.post.id().to_string())),
-					("author".into(), Value::new(view.actor.name())),
-					("kind".into(), Value::new(post_kind(&view))),
-					("text".into(), Value::new(post_text(&view))),
-				]
-				.into_iter()
-				.collect(),
-			)
-		})
-		.collect::<Vec<_>>();
-	Value::Map([("posts".into(), Value::List(posts))].into_iter().collect())
-}
-
 /// The text a row shows: a log post as a divider line, a join naming its
 /// actor and any other kind by its name, and any other post as its body.
-fn post_text(view: &AuthoredPost) -> String {
+fn row_text(view: &AuthoredPost) -> String {
 	if SessionOpened::opens(view.post) {
 		return format!("── {} joined ──", view.actor.name());
 	}
@@ -437,14 +592,13 @@ fn post_text(view: &AuthoredPost) -> String {
 	view.post.to_string()
 }
 
-/// The row kind a log post projects as, which [`post_row`]
-/// renders as a divider.
+/// The row kind of a log post, which [`post_row`] renders as a divider.
 const LOG_ROW: &str = "log";
 
 /// The display role of a post, used by [`post_row`] for styling: a log post
 /// renders as [`LOG_ROW`], an error post as `error`, otherwise it follows the
 /// authoring actor's kind.
-fn post_kind(view: &AuthoredPost) -> &'static str {
+fn row_kind(view: &AuthoredPost) -> &'static str {
 	match view.post.kind() {
 		kind if kind.is_log() => return LOG_ROW,
 		PostKind::Error => return "error",
@@ -458,21 +612,6 @@ fn post_kind(view: &AuthoredPost) -> &'static str {
 	}
 }
 
-/// Update `entity`'s [`Document`] in place, or insert one if it has none yet.
-fn set_document(
-	commands: &mut Commands,
-	documents: &mut Query<&mut Document>,
-	entity: Entity,
-	value: Value,
-) {
-	match documents.get_mut(entity) {
-		Ok(mut document) => document.0 = value,
-		Err(_) => {
-			commands.entity(entity).insert(Document::new(value));
-		}
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -481,10 +620,10 @@ mod test {
 	use beet_scene::prelude::*;
 	use bevy::math::UVec2;
 
-	/// A log post projects as a divider row in its own words, beside the
-	/// posts of the conversation.
+	/// A log post's row is a divider in its own words, beside the posts of
+	/// the conversation.
 	#[beet_core::test]
-	fn projects_log_posts_as_dividers() {
+	fn log_posts_are_dividers() {
 		let mut records = ThreadRecords::new();
 		let thread = ThreadId::now();
 		let user = records.insert_actor(Actor::user());
@@ -496,14 +635,15 @@ mod test {
 		));
 		records.join(thread, [user], &default()).unwrap();
 		let rows = |field: &str| {
-			super::project_records(&records)
-				.get("posts")
-				.unwrap()
-				.as_list()
-				.unwrap()
-				.iter()
-				.map(|row| {
-					row.get(field).unwrap().as_str().unwrap().to_string()
+			records
+				.authored_posts()
+				.map(|view| {
+					super::row_document(&view)
+						.get(field)
+						.unwrap()
+						.as_str()
+						.unwrap()
+						.to_string()
 				})
 				.collect::<Vec<_>>()
 		};
@@ -514,11 +654,11 @@ mod test {
 		]);
 	}
 
-	/// The live tail: posts appended *after* the first projection must reach the
-	/// view too, both as document entries and as spawned rows. Regression for a
-	/// transcript that renders its first batch and then freezes.
+	/// The live tail: posts appended *after* the first rows are drawn reach
+	/// the view too, as spawned rows. Regression for a transcript that
+	/// renders its first batch and then freezes.
 	#[beet_core::test]
-	fn projects_appended_posts() {
+	fn draws_appended_posts() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins).install_types::<(
 			DocumentPlugin,
@@ -532,8 +672,7 @@ mod test {
 		let view = app.world_mut().spawn(ThreadView::new(thread)).id();
 		app.update();
 
-		// the projection runs in `Update` and the document chain in the next
-		// frame's `PreUpdate`, so a row lands one frame after its post
+		// rows are drawn in `Update`, their commands applied after it
 		push_post(&mut app, thread, "first");
 		app.update();
 		app.update();
@@ -548,7 +687,7 @@ mod test {
 	/// The same live tail, but with the view built through the template
 	/// substrate (`spawn_template`), the path a router page takes.
 	#[beet_core::test]
-	fn projects_appended_posts_through_template() {
+	fn draws_appended_posts_through_template() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins).install_types::<(
 			DocumentPlugin,
@@ -592,7 +731,7 @@ mod test {
 	}
 
 	/// The painted surface follows the tail: a post appended after the first
-	/// frame is repainted, not just projected.
+	/// frame is repainted, not just drawn as a row.
 	#[beet_core::test]
 	fn repaints_appended_posts() {
 		let (mut app, thread, host) = live_host();
@@ -606,12 +745,12 @@ mod test {
 	}
 
 	/// The tail stays visible when the transcript overflows its host, including
-	/// when the very first projection already overflows (a feed's opening page,
+	/// when the very first drawing already overflows (a feed's opening page,
 	/// rather than a chat's one-post-at-a-time growth).
 	#[beet_core::test]
 	fn follows_the_tail_when_overflowing() {
 		let (mut app, thread, host) = live_host();
-		// a burst that overflows the 12 row viewport in one projection
+		// a burst that overflows the 12 row viewport in one drawing
 		(0..20).for_each(|index| {
 			push_post(&mut app, thread, &format!("post {index}"))
 		});
@@ -622,6 +761,92 @@ mod test {
 		push_post(&mut app, thread, "newest post");
 		settle(&mut app);
 		frame(&app, host).xpect_contains("newest post");
+	}
+
+	/// A streamed token over 10,000 loaded posts writes the one document of
+	/// the post it grows, and the row keeps its entity as its post streams
+	/// and completes.
+	#[beet_core::test]
+	fn a_token_writes_one_document() {
+		let mut app = App::new();
+		app.add_plugins(MinimalPlugins).install_types::<(
+			DocumentPlugin,
+			ThreadPlugin,
+			ThreadUiPlugin,
+		)>();
+		let thread = app
+			.world_mut()
+			.spawn((Thread::default(), ThreadRecords::default()))
+			.id();
+		let view = app.world_mut().spawn(ThreadView::new(thread)).id();
+		for index in 0..10_000 {
+			push_post(&mut app, thread, &format!("post {index}"));
+		}
+		let start = Instant::now();
+		app.update();
+		app.update();
+		let drawn = start.elapsed();
+		row_count(&app, view).xpect_eq(10_000);
+
+		let thread_id = app.world().get::<Thread>(thread).unwrap().id();
+		let mut streaming = AgentPost::new_text(
+			ActorId::AGENT,
+			thread_id,
+			"hel",
+			PostStatus::InProgress,
+		);
+		let upsert = |app: &mut App, post: &Post| {
+			app.world_mut()
+				.get_mut::<ThreadRecords>(thread)
+				.unwrap()
+				.upsert_post(post.clone());
+		};
+		upsert(&mut app, &streaming);
+		app.update();
+		app.update();
+		let row = |app: &App, id| {
+			app.world()
+				.get::<ThreadRows>(view)
+				.unwrap()
+				.row(id)
+				.unwrap()
+		};
+		let streamed_row = row(&app, streaming.id());
+		// the tick each row's document last changed at, before the token
+		let ticks = |app: &mut App| {
+			app.world_mut()
+				.query_filtered::<(Entity, Ref<Document>), With<ThreadRow>>()
+				.iter(app.world())
+				.map(|(entity, document)| (entity, document.last_changed()))
+				.collect::<HashMap<_, _>>()
+		};
+		let before = ticks(&mut app);
+		streaming.set_text("hello");
+		upsert(&mut app, &streaming);
+		let start = Instant::now();
+		app.update();
+		let token = start.elapsed();
+		let after = ticks(&mut app);
+		after
+			.iter()
+			.filter(|(entity, tick)| before.get(*entity) != Some(*tick))
+			.map(|(entity, _)| *entity)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![streamed_row]);
+		info!("10,000 rows drawn in {drawn:?}, a token in {token:?}");
+
+		streaming.set_status(PostStatus::Completed);
+		upsert(&mut app, &streaming);
+		app.update();
+		row(&app, streaming.id()).xpect_eq(streamed_row);
+		app.world()
+			.get::<Document>(streamed_row)
+			.unwrap()
+			.get("status")
+			.unwrap()
+			.as_str()
+			.unwrap()
+			.xpect_eq("completed");
 	}
 
 	/// A page-bound view of a fresh thread in the live-TUI render stack: the
@@ -657,7 +882,7 @@ mod test {
 		));
 	}
 
-	/// The reactive rows the view has spawned for its posts.
+	/// The rows the view has spawned for its posts.
 	fn row_count(app: &App, view: Entity) -> usize {
 		app.world()
 			.entity(view)
@@ -666,7 +891,7 @@ mod test {
 				children
 					.iter()
 					.filter(|child| {
-						app.world().get::<ReactiveChild>(*child).is_some()
+						app.world().get::<ThreadRow>(*child).is_some()
 					})
 					.count()
 			})

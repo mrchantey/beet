@@ -67,8 +67,14 @@ pub(crate) fn release_bytes(
 			.max()
 			.unwrap_or(0);
 		let stored = store.is_some_and(|store| store.blobs().is_some());
+		// a post awaiting its flush keeps its bytes until they are written
+		let unwritten = synced
+			.map(|synced| synced.unwritten(&records).collect::<HashSet<_>>());
 		records.bypass_change_detection().release_bytes(keep, |id| {
-			!stored || synced.is_some_and(|synced| synced.contains(id))
+			!stored
+				|| unwritten
+					.as_ref()
+					.is_some_and(|unwritten| !unwritten.contains(&id))
 		});
 	}
 }
@@ -107,10 +113,7 @@ mod test {
 			],
 		));
 		if stored {
-			window.insert(MountThreadStore {
-				path: RelPath::new("threads"),
-				new: false,
-			});
+			window.insert(MountThreadStore::new("threads"));
 		}
 		let window = window.id();
 		match stored {

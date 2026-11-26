@@ -460,6 +460,24 @@ async fn scans(store: &TableStore) {
 			.copied()
 			.collect::<Vec<_>>(),
 	);
+	// the first few in either direction, paging only as far as they reach
+	key_of(
+		rows.scan_first(Scan::default().reverse().before("b"), 3)
+			.await
+			.unwrap(),
+	)
+	.xpect_eq(vec!["aa", "a", "_"]);
+	key_of(rows.scan_first(Scan::default(), 2).await.unwrap())
+		.xpect_eq(keys[..2].to_vec());
+	// bounds holding no key answer none
+	rows.scan_all(Scan::default().from("b").before("b"))
+		.await
+		.unwrap()
+		.xpect_empty();
+	rows.scan_all(Scan::default().from("b").through("B"))
+		.await
+		.unwrap()
+		.xpect_empty();
 	for key in keys {
 		rows.remove(key).await.unwrap();
 	}

@@ -166,10 +166,7 @@ mod test {
 			Thread::default(),
 			Sequence::new(),
 			RunThread,
-			MountThreadStore {
-				path: RelPath::new(RECORDS),
-				new: false,
-			},
+			MountThreadStore::new(RECORDS),
 			children![
 				(
 					Actor::new_with_id(system, "System", ActorKind::System),
@@ -225,10 +222,7 @@ mod test {
 		let window = |id: &'static str, name: &str| {
 			(
 				Thread::default(),
-				MountThreadStore {
-					path: RelPath::new(RECORDS),
-					new: false,
-				},
+				MountThreadStore::new(RECORDS),
 				children![Actor::new_with_id(
 					ActorId::from_static(id),
 					name,

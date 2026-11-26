@@ -3,6 +3,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::exports::bytes::Bytes;
 use beet_net::prelude::*;
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -24,6 +25,11 @@ use std::sync::atomic::Ordering;
 /// two leaves an unlisted orphan, which no read lists. A store without
 /// atomic batches and indexes is refused ([`Self::new`]).
 ///
+/// A window opens on the newest of a thread's posts and reads older ones as
+/// needed ([`Self::open`], [`Self::read_older`]), each read a range of keys
+/// in one partition after another along a branch's lineage, with the actors
+/// that authored them and their metadata, never a whole table.
+///
 /// A window's records flush into it as they change, each flush one atomic
 /// batch of the posts it has not written and their metadata, a task of its
 /// own; [`ThreadStore::flush`] awaits every one, so a window is torn down
@@ -40,8 +46,27 @@ pub struct ThreadStore {
 	blobs: Option<BlobStore>,
 	/// The mount's filled directory, the prefix of every index key.
 	dir: RelPath,
+	/// How many posts a window without an agent opens on, and how many
+	/// more each read of older posts takes.
+	load: usize,
 	/// The flushes spawned and not yet written.
 	in_flight: Arc<AtomicUsize>,
+}
+
+/// How far back a window opens onto its thread ([`ThreadStore::open`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reach {
+	/// Every post, for a window holding an agent, whose context is the
+	/// whole thread until a compaction bounds it.
+	Whole,
+	/// The newest `count` posts, back to the last word at least, and the
+	/// seed before them when `seed`, which a canonical window always holds.
+	Newest {
+		/// How many of the newest posts.
+		count: usize,
+		/// Whether the seed is held apart from the run.
+		seed: bool,
+	},
 }
 
 impl ThreadStore {
@@ -64,10 +89,22 @@ impl ThreadStore {
 			root,
 			blobs: None,
 			dir,
+			load: MountThreadStore::DEFAULT_LOAD,
 			in_flight: default(),
 		}
 		.xok()
 	}
+
+	/// Open windows on the newest `load` posts and read `load` more at a
+	/// time.
+	pub fn with_load(mut self, load: usize) -> Self {
+		self.load = load.max(1);
+		self
+	}
+
+	/// How many posts a window without an agent opens on, and how many more
+	/// each read of older posts takes.
+	pub fn load(&self) -> usize { self.load }
 
 	/// Write the bytes of posts' files to `blobs`.
 	pub fn with_blobs(mut self, blobs: BlobStore) -> Self {
@@ -119,8 +156,9 @@ impl ThreadStore {
 		}
 	}
 
-	/// The posts of `thread` alone, by [`PostId`]: a branch's inherited
-	/// posts are its parent's ([`Self::history`]).
+	/// Every post of `thread` alone, by [`PostId`], its whole table, for a
+	/// program reading everything: a window reads only as far as it needs
+	/// ([`Self::open`]), and a branch's inherited posts are its parent's.
 	pub async fn posts(&self, thread: ThreadId) -> Result<Vec<Post>> {
 		let mut posts =
 			self.partition(thread)?.table::<Post>().get_all().await?;
@@ -135,60 +173,274 @@ impl ThreadStore {
 		self.partition(thread)?.table::<Actor>().get_all().await
 	}
 
-	/// Every post of `thread`'s history in [`PostId`] order: for a branch, its
-	/// parent's history up to and including the post it branches from,
-	/// recursively, then its own, each read from its own partition.
+	/// Whether `post` is in `thread`'s history: its own, or for a branch its
+	/// parent's up to the branch point, recursively.
 	///
 	/// ## Errors
 	///
 	/// Errors when a branch names a thread the store lacks, or the branches
 	/// form a cycle.
-	pub async fn history(&self, thread: &Thread) -> Result<Vec<Post>> {
-		let mut posts = Vec::new();
+	pub async fn holds_post(
+		&self,
+		thread: &Thread,
+		post: PostId,
+	) -> Result<bool> {
 		for (id, until) in self.lineage(thread).await? {
-			posts.extend(
-				self.posts(id).await?.into_iter().filter(|post| {
-					until.is_none_or(|until| post.id() <= until)
-				}),
-			);
+			if until.is_none_or(|until| post <= until)
+				&& self.partition(id)?.table::<Post>().exists(post).await?
+			{
+				return Ok(true);
+			}
 		}
-		posts.sort_by_key(|post| post.id());
+		Ok(false)
+	}
+
+	/// The records a window opens `thread` with, as far back as `reach`:
+	/// posts in [`PostId`] order across a branch's lineage, each read from
+	/// its own partition, the actors that authored them and their metadata,
+	/// and the run's start where older posts exist
+	/// ([`ThreadRecords::has_older`]). The run reaches back to the last word
+	/// at least, so a person's turn reads it ([`ThreadRecords::last_word`]).
+	///
+	/// ## Errors
+	///
+	/// Errors when a branch names a thread the store lacks, or the branches
+	/// form a cycle.
+	pub async fn open(
+		&self,
+		thread: &Thread,
+		reach: Reach,
+	) -> Result<ThreadRecords> {
+		let lineage = self.lineage(thread).await?;
+		let (count, seed) = match reach {
+			Reach::Whole => (None, false),
+			Reach::Newest { count, seed } => (Some(count.max(1)), seed),
+		};
+		let mut posts = match seed {
+			true => self.seed_posts(&lineage).await?,
+			false => Vec::new(),
+		};
+		let floor = posts.last().map(Post::id);
+		// the newest `count`, then older runs of as many until one is said
+		let mut run = Vec::new();
+		let mut more = true;
+		while more {
+			let before = run.first().map(Post::id);
+			let (mut older, has_more) =
+				self.posts_back(&lineage, before, floor, count).await?;
+			more = has_more;
+			let said = older.iter().any(Post::is_word);
+			older.append(&mut run);
+			run = older;
+			if said {
+				break;
+			}
+		}
+		let run_start = more.then(|| run.first().map(Post::id)).flatten();
+		posts.append(&mut run);
+		self.records_of(&lineage, posts, run_start).await
+	}
+
+	/// The [`Self::load`] posts before the run of `records`, a window of
+	/// `thread`, as records to merge under them
+	/// ([`ThreadRecords::merge_stored`]): stopping at the seed it holds, and
+	/// with no posts and no run start once nothing older is left.
+	///
+	/// ## Errors
+	///
+	/// Errors as [`Self::open`].
+	pub async fn read_older(
+		&self,
+		thread: &Thread,
+		records: &ThreadRecords,
+	) -> Result<ThreadRecords> {
+		match records.run_start() {
+			Some(start) => {
+				self.read_before(thread, start, records.run_floor()).await
+			}
+			None => Ok(ThreadRecords::new()),
+		}
+	}
+
+	/// The [`Self::load`] posts of `thread` before `start` and after `floor`.
+	async fn read_before(
+		&self,
+		thread: &Thread,
+		start: PostId,
+		floor: Option<PostId>,
+	) -> Result<ThreadRecords> {
+		let lineage = self.lineage(thread).await?;
+		let (posts, more) = self
+			.posts_back(&lineage, Some(start), floor, Some(self.load))
+			.await?;
+		let run_start = more.then(|| posts.first().map(Post::id)).flatten();
+		self.records_of(&lineage, posts, run_start).await
+	}
+
+	/// Read the posts before the run of the window `entity` into its
+	/// records ([`Self::read_older`]), answering how many it read: none for a
+	/// window holding its whole thread or mounting no store. A window whose
+	/// run moved meanwhile keeps its own.
+	pub async fn read_older_into(entity: &AsyncEntity) -> Result<usize> {
+		let id = entity.id();
+		let Some((store, thread, start, floor)) = entity
+			.world()
+			.with(move |world: &mut World| {
+				let store = world.get::<ThreadStore>(id)?.clone();
+				let thread = world.get::<Thread>(id)?.clone();
+				let records = world.get::<ThreadRecords>(id)?;
+				(store, thread, records.run_start()?, records.run_floor())
+					.xsome()
+			})
+			.await
+		else {
+			return Ok(0);
+		};
+		let older = store.read_before(&thread, start, floor).await?;
+		let read = older.posts().len();
+		entity
+			.world()
+			.with(move |world: &mut World| {
+				if let Some(mut records) = world.get_mut::<ThreadRecords>(id)
+					&& records.run_start() == Some(start)
+				{
+					records.merge_stored(older);
+				}
+			})
+			.await;
+		read.xok()
+	}
+
+	/// Up to `count` posts before `before` along `lineage`, newest first in
+	/// the reading and answered in [`PostId`] order, never at or below
+	/// `floor`, and whether more are left; every post for `None`.
+	async fn posts_back(
+		&self,
+		lineage: &[(ThreadId, Option<PostId>)],
+		before: Option<PostId>,
+		floor: Option<PostId>,
+		count: Option<usize>,
+	) -> Result<(Vec<Post>, bool)> {
+		// one past the count says whether more are left
+		let wanted = count.map(|count| count + 1);
+		let mut found = Vec::new();
+		for (id, until) in lineage {
+			let remaining = wanted.map(|wanted| wanted - found.len());
+			if remaining == Some(0) {
+				break;
+			}
+			// the tighter of the segment's own end and `before`
+			let (end, inclusive) = match (before, until) {
+				(Some(before), Some(until)) if *until < before => {
+					(Some(*until), true)
+				}
+				(Some(before), _) => (Some(before), false),
+				(None, Some(until)) => (Some(*until), true),
+				(None, None) => (None, false),
+			};
+			if floor.zip(end).is_some_and(|(floor, end)| floor >= end) {
+				continue;
+			}
+			let mut scan = Scan::default().reverse();
+			scan = match (end, inclusive) {
+				(Some(end), true) => scan.through(end),
+				(Some(end), false) => scan.before(end),
+				(None, _) => scan,
+			};
+			if let Some(floor) = floor {
+				scan = scan.after(floor);
+			}
+			let table = self.partition(*id)?.table::<Post>();
+			let mut rows = match remaining {
+				Some(remaining) => table.scan_first(scan, remaining).await?,
+				None => table.scan_all(scan).await?,
+			};
+			for post in &mut rows {
+				post.set_thread(*id);
+			}
+			found.append(&mut rows);
+		}
+		let more = wanted.is_some_and(|wanted| found.len() >= wanted);
+		if let Some(count) = count {
+			found.truncate(count);
+		}
+		found.reverse();
+		(found, more).xok()
+	}
+
+	/// The seed of `lineage`, its root's posts through the root's seed
+	/// ([`Thread::seed`]), a branch's being its lineage root's.
+	async fn seed_posts(
+		&self,
+		lineage: &[(ThreadId, Option<PostId>)],
+	) -> Result<Vec<Post>> {
+		let Some((root, until)) = lineage.last() else {
+			return Ok(Vec::new());
+		};
+		let Some(seed) = self
+			.read_thread(*root)
+			.await?
+			.and_then(|thread| thread.seed())
+		else {
+			return Ok(Vec::new());
+		};
+		let through = until.map_or(seed, |until| until.min(seed));
+		let mut posts = self
+			.partition(*root)?
+			.table::<Post>()
+			.scan_all(Scan::default().through(through))
+			.await?;
+		for post in &mut posts {
+			post.set_thread(*root);
+		}
 		posts.xok()
 	}
 
-	/// The records `thread` enters with: its whole [`Self::history`], the
-	/// actors of each thread of its lineage and the response metadata of its
-	/// posts.
-	pub async fn load_records(&self, thread: &Thread) -> Result<ThreadRecords> {
+	/// Records holding `posts`, read along `lineage`, with the actors that
+	/// authored them and their metadata, each read from the partition of
+	/// the post over the span loaded from it, and the run starting at
+	/// `run_start`.
+	async fn records_of(
+		&self,
+		lineage: &[(ThreadId, Option<PostId>)],
+		posts: Vec<Post>,
+		run_start: Option<PostId>,
+	) -> Result<ThreadRecords> {
 		let mut records = ThreadRecords::new();
-		let mut posts = Vec::new();
-		for (id, until) in self.lineage(thread).await? {
-			for actor in self.actors(id).await? {
-				records.insert_actor(actor);
-			}
-			let kept = self
-				.posts(id)
-				.await?
-				.into_iter()
-				.filter(|post| until.is_none_or(|until| post.id() <= until))
+		for (id, _) in lineage {
+			let held = posts
+				.iter()
+				.filter(|post| post.thread() == *id)
 				.collect::<Vec<_>>();
-			let metas = self
-				.partition(id)?
-				.table::<ResponseMeta>()
-				.get_all()
-				.await?;
-			for meta in metas {
-				if kept.iter().any(|post| post.id() == meta.post_id) {
-					records.set_meta(meta);
+			let (Some(first), Some(last)) = (held.first(), held.last()) else {
+				continue;
+			};
+			let partition = self.partition(*id)?;
+			for post in &held {
+				if records.actor(post.author()).is_err()
+					&& let Some(actor) = partition
+						.table::<Actor>()
+						.get(post.author().clone())
+						.await?
+				{
+					records.insert_actor(actor);
 				}
 			}
-			posts.extend(kept);
+			let ids = held.iter().map(|post| post.id()).collect::<HashSet<_>>();
+			for meta in partition
+				.table::<ResponseMeta>()
+				.scan_all(Scan::default().from(first.id()).through(last.id()))
+				.await?
+				.into_iter()
+				.filter(|meta| ids.contains(&meta.post_id))
+			{
+				records.set_meta(meta);
+			}
 		}
-		let mut stored = ThreadRecords::new();
 		for post in posts {
-			stored.upsert_post(post);
+			records.upsert_post(post);
 		}
-		records.merge_stored(stored);
+		records.set_run_start(run_start);
 		records.xok()
 	}
 
@@ -478,58 +730,75 @@ impl Drop for InFlight {
 	fn drop(&mut self) { self.0.fetch_sub(1, Ordering::SeqCst); }
 }
 
-/// What a window's store already holds, or another window writes: posts
-/// loaded, received or flushed, metadata written, and each actor as last
-/// written, so a flush writes only the window's own new records.
+/// A window's flush progress: the revision of its records the flush last
+/// read, the window's own posts and metadata not yet written, and each actor
+/// as last written, so a flush writes only the window's own new records. It
+/// holds what is unwritten, never what is, so it does not grow with the
+/// thread; a post loaded or received is never the window's to write.
 #[derive(Debug, Default, Clone, Component)]
 pub struct SyncedRecords {
-	posts: HashSet<PostId>,
-	metas: HashSet<PostId>,
+	/// The revision of the records the flush last read.
+	read: Revision,
+	/// The window's own posts not yet written, ie still in progress.
+	posts: BTreeSet<PostId>,
+	/// The metadata set here not yet written.
+	metas: BTreeSet<PostId>,
+	/// Each actor as last written, or as loaded.
 	actors: HashMap<ActorId, Actor>,
 }
 
 impl SyncedRecords {
 	/// Every record of `records` held already, ie as loaded.
 	pub fn of(records: &ThreadRecords) -> Self {
-		let mut synced = Self::default();
-		synced.extend(records);
+		let mut synced = Self {
+			read: records.revision(),
+			..default()
+		};
+		synced.hold_actors(records.actors());
 		synced
 	}
 
-	/// Mark every record of `records` held already.
-	pub fn extend(&mut self, records: &ThreadRecords) {
-		self.posts.extend(records.posts().iter().map(Post::id));
-		self.metas.extend(records.metas().map(|meta| meta.post_id));
+	/// Mark `actors` written as they stand, ie as loaded.
+	pub fn hold_actors(&mut self, actors: &[Actor]) {
 		self.actors.extend(
-			records
-				.actors()
+			actors
 				.iter()
 				.map(|actor| (actor.id().clone(), actor.clone())),
 		);
 	}
 
-	/// Mark every record of `changes`, another window's, held already: its
-	/// author's window writes them.
+	/// Mark the actors of `changes`, another window's, written: its author's
+	/// window writes them.
 	pub fn receive(&mut self, changes: &ThreadChanges) {
-		for post in &changes.posts {
-			self.insert(post.id());
-		}
-		for actor in &changes.actors {
-			self.actors.insert(actor.id().clone(), actor.clone());
-		}
+		self.hold_actors(&changes.actors);
 	}
 
-	pub fn contains(&self, id: PostId) -> bool { self.posts.contains(&id) }
-
-	/// Mark the post `id` and its metadata held already.
-	pub fn insert(&mut self, id: PostId) {
-		self.posts.insert(id);
-		self.metas.insert(id);
+	/// The window's own posts `records` holds that are not yet written: those
+	/// queued, and those changed here since the flush last read.
+	pub fn unwritten<'a>(
+		&'a self,
+		records: &'a ThreadRecords,
+	) -> impl Iterator<Item = PostId> + 'a {
+		self.posts.iter().copied().chain(
+			records
+				.changed_since(self.read)
+				.filter(|(_, change)| change.local_after(self.read))
+				.map(|(id, _)| id),
+		)
 	}
 
-	/// Mark the metadata of `id` unwritten, so the next flush writes it
-	/// again.
-	pub fn remove_meta(&mut self, id: PostId) { self.metas.remove(&id); }
+	/// Queue what `records` changed here since the flush last read.
+	fn read(&mut self, records: &ThreadRecords) {
+		for (id, change) in records.changed_since(self.read) {
+			if change.local_after(self.read) {
+				self.posts.insert(id);
+			}
+			if change.meta_after(self.read) {
+				self.metas.insert(id);
+			}
+		}
+		self.read = records.revision();
+	}
 }
 
 /// The records a window holds that its store does not yet: its own completed
@@ -544,39 +813,47 @@ pub(crate) struct ThreadFlush {
 }
 
 impl ThreadFlush {
-	/// What the records hold that is not yet written, marking it synced, or
-	/// `None` when everything is. A post in progress stays in the records
-	/// until it completes.
+	/// What the records changed here that is not yet written, marking it
+	/// written, or `None` when everything is. Reads only what changed since
+	/// the last take. A post in progress stays queued until it completes,
+	/// and so does its metadata.
 	pub(crate) fn take(
 		thread: &Thread,
 		records: &ThreadRecords,
 		synced: &mut SyncedRecords,
 	) -> Option<Self> {
-		let posts = records
-			.posts()
+		synced.read(records);
+		let ready = synced
+			.posts
 			.iter()
-			.filter(|post| {
-				post.thread() == thread.id()
-					&& !post.in_progress()
-					&& !synced.posts.contains(&post.id())
+			.copied()
+			.filter(|id| {
+				records.post(*id).is_none_or(|post| !post.in_progress())
 			})
-			.cloned()
 			.collect::<Vec<_>>();
-		for post in &posts {
-			synced.posts.insert(post.id());
+		let mut posts = Vec::new();
+		for id in ready {
+			synced.posts.remove(&id);
+			if let Some(post) =
+				records.post(id).filter(|post| post.thread() == thread.id())
+			{
+				posts.push(post.clone());
+			}
 		}
-		// the metadata of written posts not yet written, ie a usage landing
-		// after its post flushed
-		let metas = records
-			.metas()
-			.filter(|meta| {
-				synced.posts.contains(&meta.post_id)
-					&& !synced.metas.contains(&meta.post_id)
-			})
-			.cloned()
+		// the metadata of posts written, ie a usage landing after its post
+		// flushed, or written now
+		let ready = synced
+			.metas
+			.iter()
+			.copied()
+			.filter(|id| !synced.posts.contains(id))
 			.collect::<Vec<_>>();
-		for meta in &metas {
-			synced.metas.insert(meta.post_id);
+		let mut metas = Vec::new();
+		for id in ready {
+			synced.metas.remove(&id);
+			if let Some(meta) = records.meta(id) {
+				metas.push(meta.clone());
+			}
 		}
 		let mut actors = Vec::new();
 		for post in &posts {
@@ -794,16 +1071,15 @@ pub(crate) mod thread_store_test {
 			usage: None,
 			read: Some(posts[1].id()),
 		};
-		let mut records = store.load_records(&thread).await.unwrap();
+		let mut records = store.open(&thread, Reach::Whole).await.unwrap();
 		let mut synced = SyncedRecords::of(&records);
 		records.set_meta(meta.clone());
-		synced.remove_meta(meta.post_id);
 		store
 			.write(ThreadFlush::take(&thread, &records, &mut synced).unwrap())
 			.await
 			.unwrap();
 		store
-			.load_records(&thread)
+			.open(&thread, Reach::Whole)
 			.await
 			.unwrap()
 			.meta(posts[2].id())
@@ -820,9 +1096,8 @@ pub(crate) mod thread_store_test {
 				text,
 			)])
 			.await;
-			texts(&store.history(&branch).await.unwrap())
-				.xpect_eq(vec!["post 0", "post 1", text]);
-			let records = store.load_records(&branch).await.unwrap();
+			let records = store.open(&branch, Reach::Whole).await.unwrap();
+			texts(records.posts()).xpect_eq(vec!["post 0", "post 1", text]);
 			records.posts().len().xpect_eq(3);
 			records.actor(&actor_id).unwrap();
 			records.meta(posts[2].id()).xpect_none();
@@ -971,6 +1246,185 @@ pub(crate) mod thread_store_test {
 				.to_vec()
 				.xpect_eq(vec![1, 2, 3]);
 		}
+	}
+
+	/// A store of `load` over memory, and `count` text posts by the user.
+	fn long_thread(load: usize) -> (ThreadStore, Actor) {
+		let store = ThreadStore::new(
+			TableStore::new(InMemoryTableStore::new()),
+			RelPath::new("threads"),
+		)
+		.unwrap()
+		.with_load(load);
+		(store, Actor::user())
+	}
+
+	/// `count` text posts by `actor` in `thread`, `post 0` first.
+	fn numbered(actor: &Actor, thread: ThreadId, count: usize) -> Vec<Post> {
+		(0..count)
+			.map(|i| post(actor.id(), thread, &format!("post {i}")))
+			.collect()
+	}
+
+	/// Read every older run into `records`, answering the ids in the order
+	/// they were read, newest first.
+	async fn read_back(
+		store: &ThreadStore,
+		thread: &Thread,
+		records: &mut ThreadRecords,
+	) -> Vec<PostId> {
+		let mut read = records
+			.posts()
+			.iter()
+			.rev()
+			.map(Post::id)
+			.collect::<Vec<_>>();
+		while records.has_older() {
+			let older = store.read_older(thread, records).await.unwrap();
+			read.extend(older.posts().iter().rev().map(Post::id));
+			records.merge_stored(older);
+		}
+		read
+	}
+
+	/// A window opens on the newest posts, and reading back to the first
+	/// post yields every post once: in order in the records, and in reverse
+	/// as it was read.
+	#[beet_core::test]
+	async fn reads_back_to_the_first_post() {
+		let (store, actor) = long_thread(7);
+		let thread = Thread::new("Long");
+		let posts = numbered(&actor, thread.id(), 50);
+		store
+			.store_thread(&thread, vec![actor.clone()], posts.clone())
+			.await
+			.unwrap();
+		let mut records = store
+			.open(&thread, Reach::Newest {
+				count: 7,
+				seed: false,
+			})
+			.await
+			.unwrap();
+		texts(records.posts()).xpect_eq(texts(&posts[43..]));
+		records.has_older().xpect_true();
+		records.actor(actor.id()).unwrap();
+		let read = read_back(&store, &thread, &mut records).await;
+		let ids = posts.iter().map(Post::id).collect::<Vec<_>>();
+		records
+			.posts()
+			.iter()
+			.map(Post::id)
+			.collect::<Vec<_>>()
+			.xpect_eq(ids.clone());
+		read.into_iter().rev().collect::<Vec<_>>().xpect_eq(ids);
+		// the whole thread reads at once, and nothing is older
+		let whole = store.open(&thread, Reach::Whole).await.unwrap();
+		whole.posts().len().xpect_eq(50);
+		whole.has_older().xpect_false();
+	}
+
+	/// A window holding the seed opens on it and the newest posts, and
+	/// reading back stops at the seed, every post held once.
+	#[beet_core::test]
+	async fn the_seed_is_held_apart_from_the_run() {
+		let (store, actor) = long_thread(5);
+		let mut thread = Thread::new("Seeded");
+		let posts = numbered(&actor, thread.id(), 30);
+		thread.set_seed(Some(posts[1].id()));
+		store
+			.store_thread(&thread, vec![actor.clone()], posts.clone())
+			.await
+			.unwrap();
+		let mut records = store
+			.open(&thread, Reach::Newest {
+				count: 5,
+				seed: true,
+			})
+			.await
+			.unwrap();
+		texts(records.posts()).xpect_eq(
+			[
+				"post 0", "post 1", "post 25", "post 26", "post 27", "post 28",
+				"post 29",
+			]
+			.map(String::from)
+			.to_vec(),
+		);
+		records.run_floor().xpect_eq(Some(posts[1].id()));
+		read_back(&store, &thread, &mut records).await;
+		texts(records.posts()).xpect_eq(texts(&posts));
+	}
+
+	/// A branch opens on a run crossing into its parent, and reads back
+	/// through the parent's posts up to the branch point.
+	#[beet_core::test]
+	async fn a_branchs_run_crosses_into_its_parent() {
+		let (store, actor) = long_thread(4);
+		let parent = Thread::new("Parent");
+		let parent_posts = numbered(&actor, parent.id(), 20);
+		store
+			.store_thread(&parent, vec![actor.clone()], parent_posts.clone())
+			.await
+			.unwrap();
+		let branch = Thread::new("Branch")
+			.with_branch_of(PostRef::new(parent.id(), parent_posts[9].id()));
+		let own = vec![
+			post(actor.id(), branch.id(), "mine 0"),
+			post(actor.id(), branch.id(), "mine 1"),
+		];
+		store
+			.store_thread(&branch, vec![actor.clone()], own.clone())
+			.await
+			.unwrap();
+		let mut records = store
+			.open(&branch, Reach::Newest {
+				count: 4,
+				seed: false,
+			})
+			.await
+			.unwrap();
+		texts(records.posts()).xpect_eq(
+			["post 8", "post 9", "mine 0", "mine 1"]
+				.map(String::from)
+				.to_vec(),
+		);
+		records.posts()[0].thread().xpect_eq(parent.id());
+		read_back(&store, &branch, &mut records).await;
+		let mut expected = texts(&parent_posts[..10]);
+		expected.extend(texts(&own));
+		texts(records.posts()).xpect_eq(expected);
+	}
+
+	/// A run reaches back to the last word, past any logs newer than it.
+	#[beet_core::test]
+	async fn a_run_holds_the_last_word() {
+		let (store, actor) = long_thread(3);
+		let thread = Thread::new("Joins");
+		let mut posts = vec![post(actor.id(), thread.id(), "said")];
+		for _ in 0..8 {
+			posts.push(
+				Post::new_log(
+					actor.id().clone(),
+					thread.id(),
+					&SessionOpened::default(),
+				)
+				.unwrap(),
+			);
+		}
+		store
+			.store_thread(&thread, vec![actor.clone()], posts)
+			.await
+			.unwrap();
+		let records = store
+			.open(&thread, Reach::Newest {
+				count: 3,
+				seed: false,
+			})
+			.await
+			.unwrap();
+		records.last_word().unwrap().to_string().xpect_eq("said");
+		records.has_older().xpect_false();
 	}
 
 	/// A store lacking atomic batches or indexes is refused, naming the fix.

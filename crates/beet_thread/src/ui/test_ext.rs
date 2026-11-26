@@ -51,7 +51,7 @@ pub(super) fn mount_page(
 	(host, page)
 }
 
-/// A few frames, enough for the projection, the document chain and the
+/// A few frames, enough for the rows, the document chain and the
 /// paint to settle.
 pub(super) fn settle(app: &mut App) { (0..4).for_each(|_| app.update()); }
 

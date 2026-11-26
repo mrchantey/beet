@@ -4,13 +4,16 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use std::collections::BTreeSet;
 
-/// A window's records: the actors, whole history and response metadata of
-/// the stored thread it is open onto, held in memory.
+/// A window's records: the actors, posts and response metadata of the
+/// stored thread it is open onto, held in memory.
 ///
-/// A copy of the [`ThreadStore`], never a truth of its own, loaded whole: the
-/// window's behavior streams into it, its view projects it, each model call
-/// derives its input from it ([`Self::model_posts`]) and window sync applies
-/// each change to the thread's other windows ([`ThreadChanges`]).
+/// A copy of the [`ThreadStore`], never a truth of its own: a contiguous run
+/// of the thread ending at its newest post, and the seed before it where the
+/// window holds one apart from the run ([`Self::has_older`]). The window's
+/// behavior streams into it, each model call derives its input from it
+/// ([`Self::model_posts`]), and its readers, a view, window sync and the
+/// flush, each ask what changed since they last looked
+/// ([`Self::changed_since`]), so each does work proportional to the change.
 ///
 /// Author resolution is in memory (`records.actor(post.author())`), with no
 /// entity walk; ordering is by [`PostId`], a time sortable [`Tid`]. Loading
@@ -25,11 +28,18 @@ pub struct ThreadRecords {
 	posts: Vec<Post>,
 	/// Per-post response metadata, used for `previous_response_id` chaining.
 	metas: HashMap<PostId, ResponseMeta>,
-	/// The posts pushed or updated here since window sync last took them, each
-	/// once, in the order they changed.
-	changed: Vec<PostId>,
+	/// How each post last changed, for the readers asking since when.
+	log: RevisionLog,
+	/// The revision window sync last took its changes at.
+	sent: Revision,
 	/// The posts holding their file's bytes in memory.
 	held: BTreeSet<PostId>,
+	/// The posts still in progress.
+	in_progress: BTreeSet<PostId>,
+	/// The oldest post of the run when the thread holds older posts the
+	/// records lack, `None` when the run reaches back to its first post or
+	/// to the seed held before it.
+	run_start: Option<PostId>,
 }
 
 impl ThreadRecords {
@@ -99,32 +109,77 @@ impl ThreadRecords {
 	/// sync to apply to the thread's other windows. New posts keep insertion
 	/// (ie [`PostId`]) order; modified posts update in place.
 	pub fn upsert_post(&mut self, post: Post) {
-		self.mark_changed(post.id());
+		self.log.local(post.id());
 		self.upsert_quiet(post);
 	}
 
-	/// Upsert `post` without marking it changed, found by its id and kept
-	/// in id order.
+	/// Upsert `post` loaded from the store or received from another window,
+	/// found by its id and kept in id order.
+	fn upsert_received(&mut self, post: Post) {
+		self.log.received(post.id());
+		self.upsert_quiet(post);
+	}
+
+	/// Upsert `post` without recording a change.
 	fn upsert_quiet(&mut self, post: Post) {
+		let id = post.id();
 		match post.bytes() {
-			Some(_) => self.held.insert(post.id()),
-			None => self.held.remove(&post.id()),
+			Some(_) => self.held.insert(id),
+			None => self.held.remove(&id),
 		};
-		match self.posts.binary_search_by_key(&post.id(), Post::id) {
+		match post.in_progress() {
+			true => self.in_progress.insert(id),
+			false => self.in_progress.remove(&id),
+		};
+		match self.posts.binary_search_by_key(&id, Post::id) {
 			Ok(index) => self.posts[index] = post,
 			Err(index) => self.posts.insert(index, post),
 		}
 	}
 
-	/// Mark `id` changed, for window sync.
-	fn mark_changed(&mut self, id: PostId) {
-		if !self.changed.contains(&id) {
-			self.changed.push(id);
-		}
+	// ── what changed ────────────────────────────────────────────────────
+
+	/// The revision of the newest change, which a reader keeps to ask what
+	/// changed since.
+	pub fn revision(&self) -> Revision { self.log.revision() }
+
+	/// Each post that changed after `since`, in the order it last changed,
+	/// with how: a range read, proportional to the change.
+	pub fn changed_since(
+		&self,
+		since: Revision,
+	) -> impl Iterator<Item = (PostId, PostRevision)> {
+		self.log.since(since)
+	}
+
+	// ── the run ─────────────────────────────────────────────────────────
+
+	/// Whether the thread holds posts older than the run the records lack,
+	/// which reading older posts fills in ([`ThreadStore::read_older`]).
+	pub fn has_older(&self) -> bool { self.run_start.is_some() }
+
+	/// The oldest post of the run when older posts exist.
+	pub fn run_start(&self) -> Option<PostId> { self.run_start }
+
+	/// The newest post held before the run, ie the seed's last, which
+	/// reading older posts stops at.
+	pub fn run_floor(&self) -> Option<PostId> {
+		let start = self.run_start?;
+		let index = self.posts.binary_search_by_key(&start, Post::id).ok()?;
+		index.checked_sub(1).map(|index| self.posts[index].id())
+	}
+
+	/// Whether a change to `post` reaches these records: a post they lack
+	/// older than the run is one the window has not loaded, so it is dropped.
+	fn reaches(&self, post: &Post) -> bool {
+		self.run_start.is_none_or(|start| post.id() >= start)
+			|| self.post(post.id()).is_some()
 	}
 
 	/// Join each post with its authoring [`Actor`] from the records.
-	pub fn authored_posts(&self) -> impl Iterator<Item = AuthoredPost<'_>> {
+	pub fn authored_posts(
+		&self,
+	) -> impl DoubleEndedIterator<Item = AuthoredPost<'_>> {
 		self.posts.iter().filter_map(|post| {
 			self.actor(post.author())
 				.ok()
@@ -132,15 +187,37 @@ impl ThreadRecords {
 		})
 	}
 
+	/// The posts after `since`, in [`PostId`] order, every post for `None`.
+	pub fn posts_since(&self, since: Option<PostId>) -> &[Post] {
+		let start = since.map_or(0, |since| {
+			self.posts.partition_point(|post| post.id() <= since)
+		});
+		&self.posts[start..]
+	}
+
+	/// The posts still in progress, oldest first.
+	pub fn in_progress(&self) -> impl Iterator<Item = &Post> {
+		self.in_progress.iter().filter_map(|id| self.post(*id))
+	}
+
+	/// The post `id` joined with its author, if the records hold both.
+	pub fn authored(&self, id: PostId) -> Option<AuthoredPost<'_>> {
+		let post = self.post(id)?;
+		let actor = self.actor(post.author()).ok()?;
+		AuthoredPost { post, actor }.xsome()
+	}
+
 	/// The authored posts after an exclusive cursor. A missing or unknown cursor
 	/// returns them all (the caller has seen none of these posts).
 	pub fn posts_after(&self, after: Option<PostId>) -> Vec<AuthoredPost<'_>> {
-		let views = self.authored_posts().collect::<Vec<_>>();
-		let Some(after) = after else { return views };
-		match views.iter().position(|view| view.post.id() == after) {
-			Some(i) => views[i + 1..].to_vec(),
-			None => views,
-		}
+		self.posts_since(after.filter(|after| self.post(*after).is_some()))
+			.iter()
+			.filter_map(|post| {
+				self.actor(post.author())
+					.ok()
+					.map(|actor| AuthoredPost { post, actor })
+			})
+			.collect()
 	}
 
 	/// Every authored post that is not a log: what was said, rather than
@@ -159,11 +236,7 @@ impl ThreadRecords {
 	/// that cut a tool call is the last word, though the output closing that
 	/// call was written after it.
 	pub fn last_word(&self) -> Option<&Post> {
-		self.posts.iter().rev().find(|post| {
-			let closed_call = post.status() == PostStatus::Interrupted
-				&& post.kind() == &PostKind::ToolOutput;
-			!post.is_log() && !closed_call
-		})
+		self.posts.iter().rev().find(|post| post.is_word())
 	}
 
 	/// What the agent `reader` reads, after an exclusive cursor, in model
@@ -250,11 +323,11 @@ impl ThreadRecords {
 	/// post still streaming, and every post after it, is sent again by the
 	/// next chained request.
 	pub fn read_through(&self) -> Option<PostId> {
-		self.posts
-			.iter()
-			.take_while(|post| !post.in_progress())
-			.last()
-			.map(Post::id)
+		let Some(first) = self.in_progress.first() else {
+			return self.posts.last().map(Post::id);
+		};
+		let index = self.posts.binary_search_by_key(first, Post::id).ok()?;
+		index.checked_sub(1).map(|index| self.posts[index].id())
 	}
 
 	/// The post `id`, if the records hold it.
@@ -318,25 +391,34 @@ impl ThreadRecords {
 		}
 	}
 
-	/// Merge stored records under these: the stored posts and metadata,
-	/// then every actor of these records over the stored ones, so
-	/// the authored definitions win while the stored authors still resolve.
+	/// Merge a stored run under these, as a window opens or reads older
+	/// posts ([`ThreadStore::open`], [`ThreadStore::read_older`]): its posts
+	/// and metadata as received, the actors these records lack, and its
+	/// start as the run's, the stored run reaching back from where these
+	/// records' did.
 	pub fn merge_stored(&mut self, stored: ThreadRecords) {
 		let ThreadRecords {
 			actors,
 			posts,
 			metas,
-			changed: _,
-			held: _,
+			run_start,
+			..
 		} = stored;
 		for actor in &actors {
 			self.insert_actor_absent(actor);
 		}
 		for post in posts {
-			self.upsert_quiet(post);
+			self.upsert_received(post);
 		}
 		self.metas.extend(metas);
+		self.run_start = run_start;
 		self.lift_minter();
+	}
+
+	/// Mark the run as starting at `start`, older posts existing before it,
+	/// or reaching the thread's first post with `None`.
+	pub(crate) fn set_run_start(&mut self, start: Option<PostId>) {
+		self.run_start = start;
 	}
 
 	/// Lift this process's minter past the newest post, so a post minted
@@ -359,21 +441,35 @@ impl ThreadRecords {
 		}
 	}
 
-	/// Take what changed since window sync last took it: each changed post as it
-	/// stands, its author and its metadata. Empty when nothing changed.
+	/// Take what this window changed since window sync last took it: each
+	/// changed post as it stands, its author and its metadata. Empty when
+	/// nothing changed.
 	pub fn take_changes(&mut self) -> ThreadChanges {
+		let sent = core::mem::replace(&mut self.sent, self.log.revision());
+		let ids = self
+			.log
+			.since(sent)
+			.filter(|(_, change)| {
+				change.local_after(sent) || change.meta_after(sent)
+			})
+			.map(|(id, _)| id)
+			.collect::<Vec<_>>();
+		self.changes_of(ids)
+	}
+
+	/// The posts `ids` as changes, with their authors and metadata.
+	fn changes_of(
+		&self,
+		ids: impl IntoIterator<Item = PostId>,
+	) -> ThreadChanges {
 		let mut changes = ThreadChanges::default();
-		for id in core::mem::take(&mut self.changed) {
-			let Some(post) = self.posts.iter().find(|post| post.id() == id)
-			else {
-				continue;
-			};
+		for post in ids.into_iter().filter_map(|id| self.post(id)) {
 			if let Ok(actor) = self.actor(post.author())
 				&& !changes.actors.iter().any(|known| known.id() == actor.id())
 			{
 				changes.actors.push(actor.clone());
 			}
-			if let Some(meta) = self.metas.get(&id) {
+			if let Some(meta) = self.metas.get(&post.id()) {
 				changes.metas.push(meta.clone());
 			}
 			changes.posts.push(post.clone());
@@ -381,39 +477,71 @@ impl ThreadRecords {
 		changes
 	}
 
-	/// Whether anything changed since window sync last took it.
-	pub fn has_changes(&self) -> bool { !self.changed.is_empty() }
+	/// Whether this window changed anything since window sync last took it.
+	pub fn has_changes(&self) -> bool {
+		self.log.since(self.sent).any(|(_, change)| {
+			change.local_after(self.sent) || change.meta_after(self.sent)
+		})
+	}
 
-	/// Apply `changes`, another window's, in [`PostId`] order and without
-	/// marking them changed again: an actor these records lack is added, the
-	/// rest are replaced.
+	/// Apply `changes`, another window's, as received: an actor these
+	/// records lack is added, the rest are replaced, and a post older than
+	/// the run that the records lack is dropped, the window not having
+	/// loaded it.
 	pub fn apply_changes(&mut self, changes: &ThreadChanges) {
 		for actor in &changes.actors {
 			self.insert_actor_absent(actor);
 		}
 		for post in &changes.posts {
-			self.upsert_quiet(post.clone());
+			if self.reaches(post) {
+				self.upsert_received(post.clone());
+			}
 		}
 		for meta in &changes.metas {
-			self.metas.insert(meta.post_id, meta.clone());
+			if self.post(meta.post_id).is_some() {
+				self.metas.insert(meta.post_id, meta.clone());
+			}
 		}
 		self.lift_minter();
 	}
 
-	/// Every record here as changes, for a window joining the thread.
-	pub fn as_changes(&self) -> ThreadChanges {
-		ThreadChanges {
-			actors: self.actors.clone(),
-			posts: self.posts.clone(),
-			metas: self.metas.values().cloned().collect(),
-		}
+	/// What a window joining this live one takes from it: the posts the
+	/// store may not hold yet, those after `loaded`, the newest post the
+	/// joining window read from the store, those in progress and those
+	/// `synced` has yet to write, the rest being read from the store. A
+	/// window with no store gives every post.
+	pub fn joining_changes(
+		&self,
+		loaded: Option<PostId>,
+		synced: Option<&SyncedRecords>,
+	) -> ThreadChanges {
+		let Some(synced) = synced else {
+			return ThreadChanges {
+				actors: self.actors.clone(),
+				posts: self.posts.clone(),
+				metas: self.metas.values().cloned().collect(),
+			};
+		};
+		let after = loaded.map_or(0, |loaded| {
+			self.posts.partition_point(|post| post.id() <= loaded)
+		});
+		let mut ids = self.posts[after..]
+			.iter()
+			.map(Post::id)
+			.chain(self.in_progress.iter().copied())
+			.chain(synced.unwritten(self))
+			.collect::<Vec<_>>();
+		ids.sort();
+		ids.dedup();
+		self.changes_of(ids)
 	}
 
 	// ── response metadata ───────────────────────────────────────────────
 
-	/// Set the metadata of its post, for window sync to apply.
+	/// Set the metadata of its post, for window sync to apply and the flush
+	/// to write, again where it already did.
 	pub fn set_meta(&mut self, meta: ResponseMeta) {
-		self.mark_changed(meta.post_id);
+		self.log.meta(meta.post_id);
 		self.metas.insert(meta.post_id, meta);
 	}
 	pub fn meta(&self, post_id: PostId) -> Option<&ResponseMeta> {
@@ -856,7 +984,6 @@ pub struct ThreadRecordsQuery<'w, 's> {
 	actor_refs: Query<'w, 's, &'static ActorRef>,
 	thread_records:
 		Query<'w, 's, (&'static Thread, &'static mut ThreadRecords)>,
-	synced: Query<'w, 's, &'static mut SyncedRecords>,
 }
 
 impl ThreadRecordsQuery<'_, '_> {
@@ -913,16 +1040,12 @@ impl ThreadRecordsQuery<'_, '_> {
 		post: PostId,
 		usage: Usage,
 	) -> Result {
-		let thread_entity = self.thread_entity(entity)?;
-		let mut records = self.thread_records.get_mut(thread_entity)?.1;
+		let mut records = self.records_mut(entity)?;
 		let Some(mut meta) = records.meta(post).cloned() else {
 			return Ok(());
 		};
 		meta.usage = Some(usage);
 		records.set_meta(meta);
-		if let Ok(mut synced) = self.synced.get_mut(thread_entity) {
-			synced.remove_meta(post);
-		}
 		Ok(())
 	}
 }

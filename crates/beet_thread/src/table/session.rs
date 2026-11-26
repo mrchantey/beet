@@ -230,10 +230,7 @@ mod test {
 		let mut window = app.world_mut().spawn((
 			ChildOf(root),
 			Thread::default(),
-			MountThreadStore {
-				path: RelPath::new("threads"),
-				new: false,
-			},
+			MountThreadStore::new("threads"),
 		));
 		for actor in actors.iter().cloned().map(actor) {
 			match actor.kind() {

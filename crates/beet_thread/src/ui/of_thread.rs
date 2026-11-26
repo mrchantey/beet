@@ -1,9 +1,8 @@
 //! The thread<->UI relationship: a [`ThreadView`](crate::prelude::ThreadView) or
 //! [`CreatePostForm`](crate::prelude::CreatePostForm) points at the window,
 //! a thread entity, it renders or posts to via [`OfThread`], and the window names
-//! all its UI items via [`ThreadItems`]. One relationship carries both kinds; the projection + input
-//! systems traverse `ThreadItems` (filtering by the item marker) rather than
-//! scanning every view/form for a stored entity.
+//! all its UI items via [`ThreadItems`]. One relationship carries both kinds,
+//! so a window lists its views and composers without a scan.
 
 use beet_core::prelude::*;
 
@@ -27,9 +26,8 @@ impl OfThread {
 }
 
 /// Every UI item (view, form) bound to a window: the target half of the
-/// [`OfThread`] relationship, on the window. The projection + input systems
-/// traverse this, filtering by `With<ThreadView>` / `With<CreatePostForm>`, rather
-/// than scanning by a stored entity.
+/// [`OfThread`] relationship, on the window, so the window names each item
+/// bound to it, a view or a composer by its marker.
 #[derive(Debug, Default, Reflect, Component)]
 #[reflect(Component)]
 #[relationship_target(relationship = OfThread)]

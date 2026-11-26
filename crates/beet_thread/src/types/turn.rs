@@ -176,29 +176,26 @@ impl ThreadRecords {
 		since: Option<PostId>,
 	) {
 		let in_progress = self
-			.posts()
-			.iter()
-			.filter(|post| post.author() == actor && post.in_progress())
+			.in_progress()
+			.filter(|post| post.author() == actor)
 			.cloned()
 			.collect::<Vec<_>>();
 		for mut post in in_progress {
 			post.set_status(PostStatus::Interrupted);
 			self.upsert_post(post);
 		}
-		// a call is answered by the output whose subject it is
-		let answered = self
-			.posts()
+		// a call is answered by the output whose subject it is, which follows
+		// it, so the turn's calls and their outputs are all after `since`
+		let turn = self.posts_since(since);
+		let answered = turn
 			.iter()
 			.filter(|post| post.kind() == &PostKind::ToolOutput)
 			.filter_map(Post::subject)
 			.collect::<HashSet<_>>();
-		let unanswered = self
-			.posts()
+		let unanswered = turn
 			.iter()
 			.filter(|post| {
-				post.author() == actor
-					&& since.is_none_or(|since| post.id() > since)
-					&& !answered.contains(&post.id())
+				post.author() == actor && !answered.contains(&post.id())
 			})
 			.filter_map(|post| match AgentPost::new(post)? {
 				AgentPost::FunctionCall(call) => (
@@ -761,10 +758,7 @@ mod test {
 			.spawn(TableStore::new(InMemoryTableStore::new()))
 			.id();
 		let gate = MockGate::default();
-		let mount = || MountThreadStore {
-			path: RelPath::new("threads"),
-			new: false,
-		};
+		let mount = || MountThreadStore::new("threads");
 		let canonical = app
 			.world_mut()
 			.spawn((ChildOf(root), Thread::default(), mount(), children![

@@ -300,6 +300,15 @@ impl Post {
 	/// Whether this post is a log ([`PostKind::is_log`]).
 	pub fn is_log(&self) -> bool { self.kind.is_log() }
 
+	/// Whether this post is something someone said, a candidate for the last
+	/// word ([`ThreadRecords::last_word`]): neither a log nor a
+	/// `tool_output` closing an interrupted call, which nobody said.
+	pub fn is_word(&self) -> bool {
+		let closed_call = self.status == PostStatus::Interrupted
+			&& self.kind == PostKind::ToolOutput;
+		!self.is_log() && !closed_call
+	}
+
 	/// Whether the post is still streaming.
 	pub fn in_progress(&self) -> bool { self.status == PostStatus::InProgress }
 

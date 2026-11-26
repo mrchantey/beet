@@ -251,16 +251,16 @@ impl ThreadRoute {
 		let records = world.get::<ThreadRecords>(thread)?;
 		records
 			.authored_posts()
+			.rev()
 			.filter(|authored| {
 				acting.contains(&authored.actor.id())
 					&& authored.actor.kind() != ActorKind::User
 					&& !authored.post.in_progress()
 			})
-			.filter_map(|authored| match authored.post.as_agent_post()? {
+			.find_map(|authored| match authored.post.as_agent_post()? {
 				AgentPost::Text(text) => Some(text.to_string()),
 				_ => None,
 			})
-			.last()
 	}
 }
 
@@ -622,7 +622,7 @@ mod test {
 			.xpect_true();
 		// two mock responses a request, each keeping its own usage
 		let records = thread_store(&store, "threads/product")
-			.load_records(&thread)
+			.open(&thread, Reach::Whole)
 			.await
 			.unwrap();
 		records

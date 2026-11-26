@@ -1,16 +1,11 @@
 //! Agnostic reactive chat UI for a [`ThreadRecords`](crate::prelude::ThreadRecords), built on `beet_ui`.
 //!
-//! The pipeline is two hops, each renderer-agnostic:
-//! 1. `project_records_to_document` projects a window's records into a
-//!    structured [`Document`] (`{ "posts": [{ id, author, text }, ..] }`),
-//! 2. [`ThreadView`] renders that document reactively: a scroll container whose
-//!    rows are a *keyed* [`ReactiveChildren`] over the `posts` field, each row's
-//!    body bound through a [`FieldRef`] so streamed text flows in without
-//!    rebuilding the row.
-//!
-//! Keying on the post id means an appended post reuses every settled row's
-//! entity and binding, and a growing in-progress body re-syncs that row's bound
-//! [`Value`] rather than respawning it. The view + composer are host-agnostic
+//! [`ThreadView`] renders a window's records as a scroll container holding one
+//! row entity a loaded post, each row its own [`Document`] its fields bind to
+//! through a [`FieldRef`]. The view draws only what changed since it last
+//! looked ([`ThreadRecords::changed_since`](crate::prelude::ThreadRecords::changed_since)),
+//! so an appended post spawns one row and a growing in-progress body writes
+//! that row's document alone, however long the thread. The view + composer are host-agnostic
 //! ([`ThreadView`] / [`CreatePostForm`]); hosting is the server's job, and a thread
 //! scene wraps its routes in `beet_router`'s chrome-free `AppShell`.
 //! `beet_ui` never depends on `beet_thread`; this layer is additive, behind the
@@ -31,8 +26,8 @@ pub use thread_view::*;
 use beet_core::prelude::*;
 use beet_router::prelude::*;
 
-/// Registers the records -> [`Document`] projection and the reactive
-/// UI types. Pairs with `beet_ui`'s [`CharcellTuiPlugin`](beet_ui::prelude::CharcellTuiPlugin) (or any renderer that
+/// Registers the views' row drawing, their scroll and the reactive UI
+/// types. Pairs with `beet_ui`'s [`CharcellTuiPlugin`](beet_ui::prelude::CharcellTuiPlugin) (or any renderer that
 /// drives the document chain) and the [`ThreadPlugin`](crate::prelude::ThreadPlugin).
 #[derive(Default)]
 pub struct ThreadUiPlugin;
@@ -51,10 +46,12 @@ impl Plugin for ThreadUiPlugin {
 			.install_types::<bevy::input::InputPlugin>()
 			.add_observer(input::post_on_submit)
 			.add_systems(Update, input::stop_on_escape);
-		// project each thread's records into its views' documents, then pin to the bottom
+		// draw what changed in each view's rows, pin to the bottom or hold a
+		// scrolled up reader's place, and read older posts near the top
 		app.add_systems(
 			Update,
-			(project_records_to_document, follow_thread_scroll).chain(),
+			(sync_thread_rows, follow_thread_scroll, read_older_on_scroll)
+				.chain(),
 		);
 	}
 }

@@ -36,6 +36,8 @@ pub struct ThreadWindows<'w, 's> {
 		(),
 		(With<ActionMeta>, Or<(With<Actor>, With<ActorRef>)>),
 	>,
+	#[cfg(feature = "action")]
+	actor_refs: Query<'w, 's, &'static ActorRef, With<ActionMeta>>,
 }
 
 impl ThreadWindows<'_, '_> {
@@ -60,6 +62,20 @@ impl ThreadWindows<'_, '_> {
 		self.children
 			.iter_descendants(entity)
 			.any(|child| self.behaviors.contains(child))
+	}
+
+	/// Whether the window `entity` holds an agent's behavior, an action on an
+	/// actor of kind Agent in its scene, whose context `records` resolve.
+	#[cfg(feature = "action")]
+	pub fn holds_agent(&self, entity: Entity, records: &ThreadRecords) -> bool {
+		self.children
+			.iter_descendants(entity)
+			.filter_map(|child| self.actor_refs.get(child).ok())
+			.any(|actor| {
+				records
+					.actor(actor)
+					.is_ok_and(|actor| actor.kind() == ActorKind::Agent)
+			})
 	}
 
 	/// The behavior entity of every actor in every window of the stored
@@ -176,10 +192,7 @@ mod test {
 		let mut window = app.world_mut().spawn((
 			ChildOf(root),
 			Thread::default(),
-			MountThreadStore {
-				path: RelPath::new("threads"),
-				new: false,
-			},
+			MountThreadStore::new("threads"),
 			children![Actor::new_with_id(
 				ActorId::from_static("actor-1"),
 				"Person",
@@ -197,6 +210,65 @@ mod test {
 			));
 		}
 		window.id()
+	}
+
+	/// A window as [`window`] makes it, reading `load` posts at a time and
+	/// its person waiting on the records, the window's behavior, when
+	/// `person_turn`.
+	fn window_loading(
+		app: &mut App,
+		root: Entity,
+		agent: bool,
+		person_turn: bool,
+		load: usize,
+	) -> Entity {
+		let entity = window(app, root, agent);
+		let mut mount = MountThreadStore::new("threads");
+		mount.load = load;
+		app.world_mut().entity_mut(entity).insert(mount);
+		if person_turn {
+			let person = app.world().get::<Children>(entity).unwrap()[0];
+			app.world_mut().entity_mut(person).insert(UserInput);
+		}
+		entity
+	}
+
+	/// The person of every window.
+	fn person() -> Actor {
+		Actor::new_with_id(
+			ActorId::from_static("actor-1"),
+			"Person",
+			ActorKind::User,
+		)
+	}
+
+	/// Store a thread under `threads` at `root`: a seed of two posts, then
+	/// `count` numbered posts, all by the person.
+	async fn store_long_thread(
+		app: &App,
+		root: Entity,
+		count: usize,
+	) -> Thread {
+		let table = app.world().get::<TableStore>(root).unwrap().clone();
+		let store = ThreadStore::new(table, RelPath::new("threads")).unwrap();
+		let mut thread = Thread::new("Long");
+		let id = thread.id();
+		let text = |text: String| {
+			AgentPost::new_text(
+				person().id().clone(),
+				id,
+				text,
+				PostStatus::Completed,
+			)
+		};
+		let mut posts = vec![text("seed 0".into()), text("seed 1".into())];
+		thread.set_seed(Some(posts[1].id()));
+		posts.extend((0..count).map(|i| text(format!("post {i}"))));
+		store
+			.store_thread(&thread, vec![person()], posts)
+			.await
+			.unwrap();
+		thread
 	}
 
 	/// Enter the window `entity`, answering the entry's outcome.
@@ -356,6 +428,95 @@ mod test {
 			.xpect_contains(format!(
 				"already runs its behavior in the window {canonical}, so the window {rival}"
 			));
+	}
+
+	/// A view's window opens on the newest posts, a canonical one holds the
+	/// seed too, and one holding an agent opens on the whole thread, its
+	/// agent's context.
+	#[beet_core::test]
+	async fn a_window_opens_as_far_back_as_it_reads() {
+		async fn opened(agent: bool, person_turn: bool) -> Vec<String> {
+			let (mut app, root) = app();
+			store_long_thread(&app, root, 30).await;
+			let entity = window_loading(&mut app, root, agent, person_turn, 3);
+			enter(&mut app, entity).await.unwrap();
+			let records = app.world().get::<ThreadRecords>(entity).unwrap();
+			records.has_older().xpect_eq(!agent);
+			texts(&app, entity)
+		}
+		opened(false, false).await.xpect_eq(
+			["post 27", "post 28", "post 29"].map(String::from).to_vec(),
+		);
+		opened(false, true).await.xpect_eq(
+			["seed 0", "seed 1", "post 27", "post 28", "post 29"]
+				.map(String::from)
+				.to_vec(),
+		);
+		opened(true, false).await.len().xpect_eq(32);
+	}
+
+	/// A change to a post a window has not loaded is dropped by it, while a
+	/// new post reaches it.
+	#[beet_core::test]
+	async fn a_window_drops_a_change_it_has_not_loaded() {
+		let (mut app, root) = app();
+		store_long_thread(&app, root, 30).await;
+		let whole = window_loading(&mut app, root, true, false, 3);
+		let view = window_loading(&mut app, root, false, false, 3);
+		enter(&mut app, whole).await.unwrap();
+		enter(&mut app, view).await.unwrap();
+		let mut changed = app
+			.world()
+			.get::<ThreadRecords>(whole)
+			.unwrap()
+			.content_posts()
+			.next()
+			.unwrap()
+			.post
+			.clone();
+		changed.set_text("seed 0, changed");
+		app.world_mut()
+			.get_mut::<ThreadRecords>(whole)
+			.unwrap()
+			.upsert_post(changed);
+		post(&mut app, whole, "new");
+		pump(&mut app);
+		// the newest three: the last post and the whole window's two joins
+		texts(&app, view)
+			.xpect_eq(["post 29", "new"].map(String::from).to_vec());
+		texts(&app, whole)[0].xpect_eq("seed 0, changed");
+	}
+
+	/// A window joining a live one takes the posts the store may not hold
+	/// yet, one still in progress among them, and reads the rest from the
+	/// store, never the live window's older posts.
+	#[beet_core::test]
+	async fn a_joining_window_takes_unstored_posts() {
+		let (mut app, root) = app();
+		let thread = store_long_thread(&app, root, 30).await;
+		let whole = window_loading(&mut app, root, true, false, 3);
+		enter(&mut app, whole).await.unwrap();
+		app.world_mut()
+			.get_mut::<ThreadRecords>(whole)
+			.unwrap()
+			.upsert_post(AgentPost::new_text(
+				person().id().clone(),
+				thread.id(),
+				"typing",
+				PostStatus::InProgress,
+			));
+		let view = window_loading(&mut app, root, false, false, 3);
+		enter(&mut app, view).await.unwrap();
+		texts(&app, view)
+			.xpect_eq(["post 29", "typing"].map(String::from).to_vec());
+		let store = app.world().get::<ThreadStore>(whole).unwrap().clone();
+		store
+			.posts(thread.id())
+			.await
+			.unwrap()
+			.iter()
+			.any(|post| post.to_string() == "typing")
+			.xpect_false();
 	}
 
 	/// The same person in two windows joins once, and an agent only the

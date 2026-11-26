@@ -2,7 +2,7 @@
 //! wrapped in the shipped [`AppShell`], booted into the live-TUI stack and
 //! driven with terminal bytes.
 //!
-//! What only this suite can show is that the pieces assemble: the projection
+//! What only this suite can show is that the pieces assemble: the rows
 //! reaching a painted frame, the composer's keystrokes posting and so passing a
 //! person's turn,
 //! and the transcript scrolling inside its own region rather than shoving the
@@ -150,7 +150,7 @@ mod test {
 	}
 
 	/// End to end through the served shape: calling the thread runs the agent's
-	/// turn (its `Sequence` child), which projects into the view's document and
+	/// turn (its `Sequence` child), which draws into the view's rows and
 	/// renders as charcell text on the surface, the agent's streamed echo included.
 	#[beet_core::test]
 	async fn renders_record_posts() {
@@ -483,10 +483,7 @@ mod test {
 			(
 				Thread::default(),
 				TableStore::new(InMemoryTableStore::new()),
-				MountThreadStore {
-					path: RelPath::new("group_chat"),
-					new: false,
-				},
+				MountThreadStore::new("group_chat"),
 				children![Actor::user()],
 			),
 		)
@@ -527,6 +524,156 @@ mod test {
 			.map(|post| post.to_string())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["hello all".to_string()]);
+	}
+
+	/// Serve a view and composer onto a window mounting `threads` over its own
+	/// table store, `load` posts at a time, its stored thread holding `count`
+	/// numbered posts by the user (`line 000000` first), and enter it.
+	/// Returns `(app, surface, window)` and how long the entry took.
+	async fn serve_stored(
+		count: usize,
+		load: usize,
+	) -> (App, Entity, Entity, std::time::Duration) {
+		let mut mount = MountThreadStore::new("threads");
+		mount.load = load;
+		let (mut app, surface, window) = serve_thread(
+			UVec2::new(48, 16),
+			(
+				Thread::default(),
+				TableStore::new(InMemoryTableStore::new()),
+				mount,
+				children![Actor::user()],
+			),
+		)
+		.await;
+		let table = app.world().get::<TableStore>(window).unwrap().clone();
+		let stored = Thread::new("Long");
+		let posts = (0..count)
+			.map(|index| {
+				AgentPost::new_text(
+					ActorId::USER,
+					stored.id(),
+					format!("line {index:06}"),
+					PostStatus::Completed,
+				)
+			})
+			.collect();
+		ThreadStore::new(table, RelPath::new("threads"))
+			.unwrap()
+			.store_thread(&stored, vec![Actor::user()], posts)
+			.await
+			.unwrap();
+		let start = Instant::now();
+		app.world_mut()
+			.run_async_local_then(async move |world: AsyncWorld| -> Result {
+				Thread::enter(
+					world.clone(),
+					window,
+					ThreadEntry::parse(
+						Request::get("threads").parts().clone(),
+					)?,
+				)
+				.await
+			})
+			.await
+			.unwrap();
+		let entered = start.elapsed();
+		(app, surface, window, entered)
+	}
+
+	/// Open a stored thread of `count` posts, paint its newest, post and
+	/// flush, answering how long each took.
+	async fn open_paint_post(count: usize) -> [std::time::Duration; 3] {
+		let (mut app, surface, window, opened) =
+			serve_stored(count, MountThreadStore::DEFAULT_LOAD).await;
+		let start = Instant::now();
+		drive_until(&mut app, surface, &format!("line {:06}", count - 1));
+		let painted = start.elapsed();
+		let start = Instant::now();
+		submit(&mut app, "hello all");
+		drive_until(&mut app, surface, "hello all");
+		app.world_mut()
+			.run_async_local_then(async move |world: AsyncWorld| {
+				ThreadStore::flush(&world.entity(window)).await
+			})
+			.await
+			.unwrap();
+		let posted = start.elapsed();
+		// the window holds the newest posts, its join and the new post
+		let records = app.world().get::<ThreadRecords>(window).unwrap();
+		records
+			.posts()
+			.len()
+			.xpect_eq(MountThreadStore::DEFAULT_LOAD + 2);
+		records.has_older().xpect_true();
+		[opened, painted, posted]
+	}
+
+	/// A thread of 100,000 posts opens, paints and posts in time independent
+	/// of its length: its window reads the newest posts and its view draws
+	/// only those.
+	#[beet_core::test(timeout_ms = 300_000)]
+	async fn a_long_thread_opens_in_time_independent_of_its_length() {
+		let short = open_paint_post(1_000).await;
+		let long = open_paint_post(100_000).await;
+		info!(
+			"open, paint, post: 1,000 posts {short:?}, 100,000 posts {long:?}"
+		);
+		for (short, long) in short.into_iter().zip(long) {
+			(long < short * 4 + std::time::Duration::from_millis(200))
+				.xpect_true();
+		}
+	}
+
+	/// Scrolled to its top, a view reads its window's older posts, keeping
+	/// the reader's place, and a view scrolled up stays put while posts
+	/// arrive.
+	#[beet_core::test]
+	async fn scrolling_up_reads_older_posts() {
+		let (mut app, surface, window, _) = serve_stored(200, 20).await;
+		drive_until(&mut app, surface, "line 000199");
+		for _ in 0..30 {
+			app.update();
+		}
+		let held = |app: &App| {
+			app.world()
+				.get::<ThreadRecords>(window)
+				.unwrap()
+				.posts()
+				.len()
+		};
+		// the newest twenty and the join
+		held(&app).xpect_eq(21);
+		let scroll = app
+			.world_mut()
+			.query_filtered::<Entity, With<ThreadScroll>>()
+			.single(app.world())
+			.unwrap();
+		app.world_mut()
+			.get_mut::<ScrollPosition>(scroll)
+			.unwrap()
+			.offset
+			.y = 0;
+		for _ in 0..10 {
+			app.update();
+			AsyncRunner::settle_async_tasks(app.world_mut()).await;
+		}
+		held(&app).xpect_eq(41);
+		// the reader still sees the row they scrolled to, not the older ones
+		// landing above it
+		let shown = frame(&mut app, surface);
+		shown.as_str().xpect_contains("line 000180");
+		shown.as_str().xnot().xpect_contains("line 000179");
+		// posts arriving below leave the reader in place
+		for text in ["below", "further below"] {
+			submit(&mut app, text);
+		}
+		for _ in 0..15 {
+			app.update();
+		}
+		frame(&mut app, surface)
+			.as_str()
+			.xpect_contains("line 000180");
 	}
 
 	/// A chat whose agent thinks until stopped: `Repeat[Sequence[person,

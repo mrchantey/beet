@@ -76,7 +76,7 @@ async fn push_error_post(caller: &AsyncEntity, err: BevyError) -> Result {
 }
 
 /// The streaming core: drive the model response into the window's records,
-/// which its view projects, window sync applies to other windows and its store
+/// which its view draws, window sync applies to other windows and its store
 /// persists, rather than spawning per-post entities.
 /// Completed function-call posts are collected and dispatched after the stream
 /// finishes. Errors propagate to [`post_streamer_action_stateful`], which renders

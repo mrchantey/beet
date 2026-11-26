@@ -502,6 +502,30 @@ impl<T: TableStoreRow> Table<T> {
 			.collect()
 	}
 
+	/// The first `count` rows within `scan`'s bounds in its order, paging
+	/// only as far as they reach, so a read of the newest few never reads
+	/// the whole table.
+	pub async fn scan_first(
+		&self,
+		mut scan: Scan,
+		count: usize,
+	) -> Result<Vec<T>> {
+		let mut rows = Vec::new();
+		while rows.len() < count {
+			scan.limit = Some(count - rows.len());
+			let page = self.store.scan(&self.spec, scan.clone()).await?;
+			for row in page.rows {
+				rows.push(Self::decode(row)?);
+			}
+			match page.cursor {
+				Some(cursor) => scan.cursor = Some(cursor),
+				None => break,
+			}
+		}
+		rows.truncate(count);
+		rows.xok()
+	}
+
 	/// Every stored row within `scan`'s bounds, paging until the last.
 	pub async fn scan_stored(&self, mut scan: Scan) -> Result<Vec<StoredRow>> {
 		let mut rows = Vec::new();

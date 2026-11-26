@@ -19,6 +19,10 @@ use beet_net::prelude::*;
 ///
 /// A thread may be both: a sub-thread opening with its parent's history is
 /// spawned by and branched from the same post.
+///
+/// [`Self::seed`] names the last of the posts it opened with, written at
+/// creation, so a canonical window holds the seed however little of the
+/// thread it loads; a branch has none, its seed its lineage root's.
 #[derive(
 	Debug,
 	Clone,
@@ -42,6 +46,9 @@ pub struct Thread {
 	/// The post this thread branches from, continuing its history.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	branch_of: Option<PostRef>,
+	/// The last post of the seed this thread opened with.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	seed: Option<PostId>,
 }
 
 impl Default for Thread {
@@ -65,6 +72,7 @@ impl Thread {
 			name: name.into(),
 			spawned_by: None,
 			branch_of: None,
+			seed: None,
 		}
 	}
 
@@ -95,4 +103,10 @@ impl Thread {
 		self.branch_of = Some(branch_of);
 		self
 	}
+
+	/// The last post of the seed this thread opened with, `None` for a
+	/// thread opening with none, and for a branch, whose seed is its lineage
+	/// root's.
+	pub fn seed(&self) -> Option<PostId> { self.seed }
+	pub fn set_seed(&mut self, seed: Option<PostId>) { self.seed = seed; }
 }

@@ -76,17 +76,20 @@ impl PartitionRows {
 		scan: &Scan,
 	) -> Result<ScanPage> {
 		let scan = scan.after_key_cursor();
-		let mut keys = self
-			.rows(table)
-			.filter(|(key, _)| scan.contains(key))
-			.collect::<Vec<_>>();
-		if scan.reverse {
-			keys.reverse();
-		}
+		// a range read, so a page costs its own rows rather than the table's
+		let range = self
+			.0
+			.get(&table.name)
+			.filter(|_| Self::is_range(&scan))
+			.map(|rows| rows.range((scan.start.as_ref(), scan.end.as_ref())))
+			.into_iter()
+			.flatten();
 		// one past the limit says whether there is another page
-		if let Some(limit) = scan.limit {
-			keys.truncate(limit + 1);
-		}
+		let take = scan.limit.map_or(usize::MAX, |limit| limit + 1);
+		let keys = match scan.reverse {
+			true => range.rev().take(take).collect::<Vec<_>>(),
+			false => range.take(take).collect::<Vec<_>>(),
+		};
 		let mut rows = keys
 			.into_iter()
 			.map(|(key, row)| StoredRow::new(key, row.clone()))
@@ -95,6 +98,19 @@ impl PartitionRows {
 			rows.reverse();
 		}
 		ScanPage::from_sorted(rows, &scan).xok()
+	}
+
+	/// Whether `scan`'s bounds hold any key, which [`BTreeMap::range`]
+	/// requires, panicking on an empty one.
+	fn is_range(scan: &Scan) -> bool {
+		use core::ops::Bound;
+		match (&scan.start, &scan.end) {
+			(Bound::Unbounded, _) | (_, Bound::Unbounded) => true,
+			(Bound::Included(start), Bound::Included(end)) => start <= end,
+			(Bound::Included(start), Bound::Excluded(end))
+			| (Bound::Excluded(start), Bound::Included(end))
+			| (Bound::Excluded(start), Bound::Excluded(end)) => start < end,
+		}
 	}
 
 	pub(crate) fn scan_index(

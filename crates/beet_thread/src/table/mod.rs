@@ -20,7 +20,8 @@
 //! - **Seed.** The posts a template opens a new thread with, authored as
 //!   [`<CreatePost>`](CreatePost) children of its actors. It is written once,
 //!   by the entry creating the thread, as the thread's first posts, and the
-//!   thread's row names the last of them; nothing else marks them. A template
+//!   thread's row names the last of them ([`Thread::seed`]); nothing else
+//!   marks them. A template
 //!   is built on every entry, so an entry continuing a thread discards its
 //!   seed unread, and an edited seed reaches a new thread only (`--new`).
 //!
@@ -148,20 +149,28 @@
 //!
 //! - **Window.** A thread entity, open onto one stored thread, which is the
 //!   truth. It holds a contiguous run of that thread's records ending at its
-//!   newest post ([`ThreadRecords`]) and reads older ones as needed, writes
-//!   what it posts to the store and receives what other windows post. A
-//!   view's window opens on enough posts to fill it and holds what its
-//!   reader has scrolled to; a canonical window holds at least its agents'
-//!   contexts, and always the seed. A post in progress stays in memory and
-//!   is stored when it completes. A view keeps one small document per loaded
-//!   post, written only when that post changes. A thread has any number of
-//!   windows, on any surfaces, each with its own view and composer.
+//!   newest post ([`ThreadRecords`]) and reads older ones as needed
+//!   ([`ThreadStore::read_older`]), writes what it posts to the store and
+//!   receives what other windows post. How far back it opens is its
+//!   [`Reach`]: a view's window opens on enough posts to fill it
+//!   ([`MountThreadStore::load`]) and holds what its reader has scrolled to;
+//!   a canonical window holds at least its agents' contexts, and always the
+//!   seed; every run reaches back to the last word. A post in progress stays
+//!   in memory and is stored when it completes. A view keeps one small
+//!   document per loaded post, written only when that post changes, and
+//!   every reader of the records, a view, window sync and the flush, asks
+//!   what changed since it last looked ([`ThreadRecords::changed_since`]),
+//!   so its work follows the change and never the thread's length. A thread
+//!   has any number of windows, on any surfaces, each with its own view and
+//!   composer.
 //! - **Window sync.** Within one runtime, a post pushed to one window's
 //!   records, and any change to it, is applied to every other window of the
 //!   same stored thread that loaded it at once ([`ThreadChanges`]), a post in
-//!   progress included, so a reply streams in every window. Only a completed
-//!   post is written to the store, once, by the window that authored it; a
-//!   window never writes a post it received.
+//!   progress included, so a reply streams in every window; a change to a
+//!   post older than a window's run is dropped by it. A window joining a
+//!   live one takes the posts the store may not hold yet and reads the rest
+//!   from the store. Only a completed post is written to the store, once, by
+//!   the window that authored it; a window never writes a post it received.
 //! - **Behavior.** A scene holding an action on an actor, ie a `Sequence`
 //!   over an agent's streamer and a person's [`UserInput`](crate::prelude::UserInput).
 //! - **Canonical window.** The window holding a thread's behavior; a thread
@@ -408,6 +417,7 @@ mod thread_records;
 mod thread_store;
 #[cfg(feature = "action")]
 pub use seed_source::*;
+pub use thread_store::Reach;
 pub use thread_store::SyncedRecords;
 #[cfg(feature = "action")]
 pub(crate) use thread_store::ThreadFlush;
@@ -433,6 +443,10 @@ pub use thread_records::*;
 pub use window::*;
 mod response_meta;
 pub use response_meta::*;
+mod revision;
+pub use revision::PostRevision;
+pub use revision::Revision;
+pub(crate) use revision::RevisionLog;
 mod keep_blobs;
 pub use keep_blobs::KeepBlobs;
 pub(crate) use keep_blobs::release_bytes;
