@@ -1394,7 +1394,7 @@ fn Greeting() -> impl Bundle {
 	rsx! { <strong>"Hi"</strong> }
 }
 
-#[cfg(feature = "markdown_parser")]
+#[cfg(feature = "markdown")]
 #[beet_core::test]
 fn mdx_resolves_embedded_template() {
 	let mut app = world_ext::ui_app();
@@ -1409,7 +1409,7 @@ fn mdx_resolves_embedded_template() {
 }
 
 /// Parse markdown into a freshly spawned entity and render it to HTML.
-#[cfg(feature = "markdown_parser")]
+#[cfg(feature = "markdown")]
 fn render_markdown(world: &mut World, md: &str) -> String {
 	let bytes = MediaBytes::new_markdown(md);
 	let mut entity = world.spawn_empty();
@@ -1418,7 +1418,7 @@ fn render_markdown(world: &mut World, md: &str) -> String {
 	render_html(world, root)
 }
 
-#[cfg(feature = "markdown_parser")]
+#[cfg(feature = "markdown")]
 #[beet_core::test]
 fn mdx_plain_html_unchanged() {
 	// a lowercase embedded element diffs as plain HTML, attributes intact.
@@ -1435,7 +1435,7 @@ fn Wrap() -> impl Bundle {
 	rsx! { <section><slot/></section> }
 }
 
-#[cfg(feature = "markdown_parser")]
+#[cfg(feature = "markdown")]
 #[beet_core::test]
 fn mdx_resolves_component_with_children() {
 	let mut app = world_ext::ui_app();

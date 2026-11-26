@@ -2,11 +2,11 @@
 //! [`Request`]/[`Response`], so a table store is reachable from another
 //! process exactly as it is in this one.
 use crate::prelude::*;
+use alloc::sync::Arc;
 use beet_core::prelude::*;
 use core::ops::Bound;
 use serde::Deserialize;
 use serde::Serialize;
-use std::sync::Arc;
 
 /// The table wire protocol, served by [`TableWire::serve`] and spoken by
 /// [`TableWireClient`]: a server facet over http (`<ServeTables/>`), a Durable
@@ -353,7 +353,9 @@ pub struct TableWireTransport {
 
 impl TableWireTransport {
 	/// Requests to the server mounted at `base`, ie
-	/// `http://127.0.0.1:8337/tables`, sent with [`Request::send`].
+	/// `http://127.0.0.1:8337/tables`, sent with [`Request::send`], whose
+	/// future is `Send` where an http client is.
+	#[cfg(feature = "std")]
 	pub fn http(base: impl AsRef<str>) -> Result<Self> {
 		let base = Url::parse(base.as_ref())?;
 		Self {
@@ -408,7 +410,7 @@ impl TableWireTransport {
 pub struct TableWireClient {
 	transport: TableWireTransport,
 	partition: Option<PartitionId>,
-	capabilities: Arc<std::sync::OnceLock<Vec<Capability>>>,
+	capabilities: Arc<bevy::platform::sync::OnceLock<Vec<Capability>>>,
 }
 
 impl core::fmt::Debug for TableWireClient {

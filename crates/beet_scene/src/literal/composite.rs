@@ -1,7 +1,7 @@
 //! Composite construction: a list, struct, enum or named literal to its dynamic
 //! reflected value, recursing into each item or field against the target's info.
 
-use super::literal::*;
+use super::literal_reflect::*;
 use beet_core::prelude::*;
 use bevy::reflect::PartialReflect;
 use bevy::reflect::TypeInfo;

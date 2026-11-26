@@ -168,6 +168,12 @@ impl GlobFilter {
 		self
 	}
 
+	/// Appends `rule`, matching ahead of every rule before it.
+	pub fn push(&mut self, rule: GlobRule) -> &mut Self {
+		self.rules.push(rule);
+		self
+	}
+
 	/// Appends an include rule and returns `&mut Self`.
 	pub fn include(&mut self, pattern: &str) -> &mut Self {
 		self.rules
@@ -224,31 +230,21 @@ impl GlobFilter {
 			.unwrap_or_else(|| !self.has_include())
 	}
 
-	/// Checks `text` against the include rules ALONE: it passes when there are
-	/// none, or when one of them matches.
-	///
-	/// This half and [`passes_exclude`](Self::passes_exclude) are for a consumer
-	/// matching a value that has several names (a component's full type path and
-	/// its short path), where the grant is any-of and the denial is all-of.
-	/// Everything else wants [`passes`](Self::passes), which resolves the rules
-	/// in order.
-	pub fn passes_include(&self, text: impl AsRef<str>) -> bool {
-		let text = text.as_ref();
-		!self.has_include()
-			|| self
-				.rules
-				.iter()
-				.any(|rule| rule.is_include() && rule.matches(text))
-	}
-
-	/// Checks `text` against the exclude rules ALONE: it passes when none of
-	/// them match, see [`passes_include`](Self::passes_include).
-	pub fn passes_exclude(&self, text: impl AsRef<str>) -> bool {
-		let text = text.as_ref();
-		!self
-			.rules
+	/// Checks a value with several names, ie a type's full and short paths:
+	/// the last rule matching ANY of them decides, so a rule reaches the value
+	/// however it is spelled and the rules keep their order.
+	pub fn passes_any<'a>(
+		&self,
+		names: impl IntoIterator<Item = &'a str> + Clone,
+	) -> bool {
+		self.rules
 			.iter()
-			.any(|rule| !rule.is_include() && rule.matches(text))
+			.rev()
+			.find(|rule| {
+				names.clone().into_iter().any(|name| rule.matches(name))
+			})
+			.map(GlobRule::is_include)
+			.unwrap_or_else(|| !self.has_include())
 	}
 }
 
@@ -297,6 +293,23 @@ impl GlobPattern {
 			idx = end + 1;
 		}
 		Self(pattern.into()).xok()
+	}
+
+	/// A pattern matching `text` exactly, its `*`, `?` and `[` escaped as
+	/// one-character classes, ie a type path holding `[u8; 4]`.
+	pub fn literal(text: &str) -> Self {
+		let mut pattern = String::with_capacity(text.len());
+		for ch in text.chars() {
+			match ch {
+				'*' | '?' | '[' => {
+					pattern.push('[');
+					pattern.push(ch);
+					pattern.push(']');
+				}
+				ch => pattern.push(ch),
+			}
+		}
+		Self(pattern.into())
 	}
 
 	/// A pattern written in code, ie `GlobPattern::new("*.rs")`; authored
@@ -507,13 +520,12 @@ mod test {
 
 		let filter = GlobFilter::default().with_include("*foo/bar*");
 
-		filter.passes_include("foo/bar").xpect_true();
-		filter.passes_exclude("foo/bar").xpect_true();
+		filter.passes("foo/bar").xpect_true();
 
 		let filter =
 			GlobFilter::default().with_exclude("*apply_style_id_attributes*");
 		filter
-			.passes_exclude(
+			.passes(
 				"templating::apply_style_id_attributes::test::nested_template",
 			)
 			.xpect_false();
@@ -573,17 +585,33 @@ mod test {
 			.xpect_false();
 	}
 
-	/// The include/exclude halves ignore order, for a consumer matching a value
-	/// that has several names (see [`GlobFilter::passes_include`]).
+	/// A value with several names is decided by the last rule matching any
+	/// of them, so a rule reaches it by either name and order still holds.
 	#[crate::test]
-	fn halves_ignore_order() {
+	fn any_name_keeps_the_order() {
 		let filter = GlobFilter::default()
-			.with_exclude("logs/*")
-			.with_include("logs/keep.txt");
-		filter.passes_include("logs/keep.txt").xpect_true();
-		filter.passes_exclude("logs/keep.txt").xpect_false();
-		filter.passes_include("src/lib.rs").xpect_false();
-		filter.passes_exclude("src/lib.rs").xpect_true();
+			.with_exclude("Name")
+			.with_include("bevy_ecs::*");
+		filter
+			.passes_any(["bevy_ecs::name::Name", "Name"])
+			.xpect_true();
+		let filter = GlobFilter::default()
+			.with_include("bevy_ecs::*")
+			.with_exclude("Name");
+		filter
+			.passes_any(["bevy_ecs::name::Name", "Name"])
+			.xpect_false();
+		// an allowlist no name reaches rejects
+		filter.passes_any(["a::B", "B"]).xpect_false();
+	}
+
+	/// A literal pattern matches its text exactly, glob characters and all.
+	#[crate::test]
+	fn literal_escapes() {
+		let pattern = GlobPattern::literal("a::Foo<[u8; 4]>*?");
+		pattern.matches("a::Foo<[u8; 4]>*?").xpect_true();
+		pattern.matches("a::Foo<[u8; 4]>xy").xpect_false();
+		pattern.matches("a::Foo<u>*?").xpect_false();
 	}
 
 	/// The rules in order, which is what a translated dialect and a log line

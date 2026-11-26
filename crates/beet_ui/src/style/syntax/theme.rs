@@ -163,7 +163,7 @@ pub(crate) fn dark_scheme() -> Rule {
 ///
 /// Capture names that contain a dot (eg `string.escape`) are written
 /// verbatim into the class name, matching the output of
-/// [`apply_syntax_highlighting`](crate::parse::apply_syntax_highlighting).
+/// [`apply_syntax_highlighting`](crate::formats::apply_syntax_highlighting).
 pub(crate) fn class_rules() -> Vec<Rule> {
 	vec![
 		hl_rule("attribute",             t::Attribute),

@@ -82,7 +82,7 @@ impl WorldRead {
 				)
 				.serialize(ValueSerializer)
 				.map_err(|err| {
-					bevyhow!("failed to serialize `{}`: {err}", ident.path)
+					bevyhow!("failed to serialize `{}`: {err}", ident.name)
 				})
 				.map(Some)
 			}
@@ -137,7 +137,7 @@ impl WorldRead {
 				.cloned()
 				.unwrap_or(ValueSchema::Any);
 			return Self::map([
-				("component", Value::str(ident.path.as_str())),
+				("component", Value::str(ident.name.as_str())),
 				("schema", Value::from_serde(&schema)?),
 			])
 			.xok();
@@ -145,13 +145,13 @@ impl WorldRead {
 		let registry = world.resource::<AppTypeRegistry>().read();
 		let info = registry
 			.get(type_id)
-			.ok_or_else(|| bevyhow!("`{}` left the registry", ident.path))?
+			.ok_or_else(|| bevyhow!("`{}` left the registry", ident.name))?
 			.type_info();
 		let mut schema = Self::describe(info);
 		schema
 			.as_map_mut()
 			.map_err(|err| bevyhow!("{err}"))?
-			.insert("component", ident.path.as_str());
+			.insert("component", ident.name.as_str());
 		schema.xok()
 	}
 

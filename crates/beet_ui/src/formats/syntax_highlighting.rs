@@ -464,7 +464,7 @@ mod test {
 			.xpect_eq(src);
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn syntax_highlighting_replaces_text_with_spans() {
 		use beet_scene::prelude::*;

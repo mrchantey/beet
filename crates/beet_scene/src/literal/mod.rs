@@ -1,5 +1,8 @@
-//! Literal to reflected value: type inference against a target's [`TypeInfo`],
-//! and prop verification.
+//! An authored literal ([`DataLiteral`]) to the value a scene body holds,
+//! shared by every authored source: markup, frontmatter, an office file's
+//! metadata. [`LiteralValues`] lowers a literal to its type's serde form, and
+//! [`LiteralReflect`] resolves it to a reflected value, its type inferred from
+//! a target's [`TypeInfo`].
 //!
 //! A type's authored spelling is not described here: it is one
 //! [`LiteralParser`](beet_core::prelude::LiteralParser) entry per type, and every
@@ -16,10 +19,10 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 mod composite;
-mod literal;
+mod literal_reflect;
+mod literal_values;
 mod scalar;
-mod schema;
 
-pub use literal::LiteralReflect;
-pub(in crate::bsx) use literal::*;
-pub(in crate::bsx) use schema::*;
+pub use literal_reflect::LiteralReflect;
+use literal_reflect::*;
+pub use literal_values::*;

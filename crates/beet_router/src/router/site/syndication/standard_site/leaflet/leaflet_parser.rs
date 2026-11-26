@@ -656,7 +656,7 @@ mod test {
 	}
 
 	/// A post exercising every block the renderer writes.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	const POST: &str = r#"# Full Stack Bevy
 
 A paragraph with *emphasis*, **strong *and nested***, `code` and [a link](../docs).
@@ -697,7 +697,7 @@ fn main() { println!("hello"); }
 	///   back as a `p > a` to its url titled by its alt
 	/// - a table, written as a pipe table in a code block
 	/// - a relative link, written absolute against the site's homepage
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn round_trips_a_markdown_post() {
 		let mut source = world();

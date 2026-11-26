@@ -12,15 +12,14 @@
 //! of it was written beside it ([`SourceMap`]), and everything after
 //! the body is one pipeline that knows nothing of the format it came from.
 //!
-//! The formats themselves are `beet_scene`'s, whose `ScenePlugin` registers
-//! the base ones, and `beet_ui` adds the office formats and mermaid. A file
-//! whose media type has no parser is loaded as its blob.
+//! [`ScenePlugin`] registers the base formats, and `beet_ui` adds the office
+//! formats and mermaid. A file whose media type has no parser is loaded as its
+//! blob.
 
 use crate::prelude::*;
 use alloc::sync::Arc;
-use bevy::ecs::schedule::ScheduleLabel;
+use beet_core::prelude::*;
 use core::any::Any;
-use core::any::TypeId;
 
 /// Reads the bytes of the media types it names into a [`ParsedDocument`],
 /// touching no world. Registered in [`DocParsers`] by installing it,
@@ -38,11 +37,23 @@ pub trait DocParser: 'static + Send + Sync + Clone + Installer {
 	/// The media types this parser reads, preferred first.
 	fn media_types(&self) -> Vec<MediaType>;
 
+	/// Whether a markdown fence naming this format is the document it holds
+	/// when it says neither `render` nor `render=false`, rather than a code
+	/// sample: a diagram is drawn, a sample of markup stays code.
+	fn renders_fence(&self) -> bool { false }
+
+	/// Configure this parse with what a fence says beyond its format and
+	/// `render`, ie `mode=text` of ```` ```mermaid mode=text ````, on the clone
+	/// that parses it. A format taking no params refuses any.
+	fn configure(&mut self, params: &FenceParams) -> Result {
+		params.assert_empty()
+	}
+
 	/// Bytes of one of those media types to a scene body and where it was
 	/// written, touching no world.
 	/// `parsers` is the registry this was chosen from, what a format that
-	/// names things lowers against: its [types](DocParsers::types) and its
-	/// [settings](DocParsers::setting).
+	/// names things lowers against: its [types](DocParsers::types) and the
+	/// formats it embeds ([`get`](DocParsers::get)).
 	fn parse(
 		&mut self,
 		bytes: &MediaBytes,
@@ -60,15 +71,14 @@ pub trait DocParser: 'static + Send + Sync + Clone + Installer {
 /// [`MediaType::Text`] parser, since any text reads as a single text entity.
 ///
 /// It carries what every lowering reads with no world: the type registry names
-/// resolve against, the component a document's unsectioned metadata declares,
-/// and the [settings](Self::setting) a format shares with another that embeds
-/// it.
+/// resolve against and the component a document's unsectioned metadata
+/// declares. What a format reads of another it embeds, ie markdown of BSX's
+/// directives, is that format's registered parser ([`get`](Self::get)).
 #[derive(Clone, Resource)]
 pub struct DocParsers {
 	parsers: Vec<Arc<dyn ErasedDocParser>>,
 	types: AppTypeRegistry,
-	metadata_type: SmolStr,
-	settings: HashMap<TypeId, Arc<dyn Any + Send + Sync>>,
+	metadata_type: TypeName,
 }
 
 /// No parsers and no types, so nothing reads and every name is unregistered
@@ -78,8 +88,7 @@ impl Default for DocParsers {
 		Self {
 			parsers: default(),
 			types: default(),
-			metadata_type: Self::METADATA_TYPE.into(),
-			settings: default(),
+			metadata_type: TypeName::new(Self::METADATA_TYPE),
 		}
 	}
 }
@@ -116,14 +125,14 @@ impl DocParsers {
 	pub fn types(&self) -> &AppTypeRegistry { &self.types }
 
 	/// The component a document's unsectioned metadata declares, ie a
-	/// markdown page's frontmatter keys, by short name:
+	/// markdown page's frontmatter keys:
 	/// [`METADATA_TYPE`](Self::METADATA_TYPE) until a plugin names one.
-	pub fn metadata_type(&self) -> &str { &self.metadata_type }
+	pub fn metadata_type(&self) -> &TypeName { &self.metadata_type }
 
 	/// Declare unsectioned metadata as the component `metadata_type` names.
 	pub fn with_metadata_type(
 		mut self,
-		metadata_type: impl Into<SmolStr>,
+		metadata_type: impl Into<TypeName>,
 	) -> Self {
 		self.set_metadata_type(metadata_type);
 		self
@@ -132,29 +141,41 @@ impl DocParsers {
 	/// Declare unsectioned metadata as the component `metadata_type` names.
 	pub fn set_metadata_type(
 		&mut self,
-		metadata_type: impl Into<SmolStr>,
+		metadata_type: impl Into<TypeName>,
 	) -> &mut Self {
 		self.metadata_type = metadata_type.into();
 		self
 	}
 
-	/// The setting of type `T`, what a format and those embedding it read
-	/// beside the types, ie BSX's directives. `None` until one is
-	/// [set](Self::edit_setting).
-	pub fn setting<T: 'static + Send + Sync>(&self) -> Option<&T> {
-		self.settings
-			.get(&TypeId::of::<T>())
-			.and_then(|setting| setting.downcast_ref())
+	/// The parser of type `T` registered last, ie the BSX parser whose
+	/// directives markdown's embedded markup reads.
+	pub fn get<T: DocParser>(&self) -> Option<&T> {
+		self.parsers
+			.iter()
+			.rev()
+			.find_map(|parser| parser.as_any().downcast_ref::<T>())
 	}
 
-	/// Edit the setting of type `T`, its default where none is set.
-	pub fn edit_setting<T: 'static + Send + Sync + Default + Clone>(
+	/// Edit the parser of type `T` registered last, registering its default as
+	/// a [base](Self::register_base) where there is none.
+	pub fn edit<T: DocParser + Default>(
 		&mut self,
 		edit: impl FnOnce(&mut T),
 	) -> &mut Self {
-		let mut setting = self.setting::<T>().cloned().unwrap_or_default();
-		edit(&mut setting);
-		self.settings.insert(TypeId::of::<T>(), Arc::new(setting));
+		let index = self
+			.parsers
+			.iter()
+			.rposition(|parser| parser.as_any().is::<T>());
+		let mut parser = index
+			.and_then(|index| {
+				self.parsers[index].as_any().downcast_ref::<T>().cloned()
+			})
+			.unwrap_or_default();
+		edit(&mut parser);
+		match index {
+			Some(index) => self.parsers[index] = Arc::new(parser),
+			None => self.parsers.insert(0, Arc::new(parser)),
+		}
 		self
 	}
 
@@ -179,13 +200,34 @@ impl DocParsers {
 			.any(|parser| parser.media_types().contains(media_type))
 	}
 
+	/// Whether a fence naming `media_type` is the document it holds when it
+	/// says neither `render` nor `render=false`, `None` when no parser reads
+	/// the type ([`DocParser::renders_fence`]).
+	pub fn renders_fence(&self, media_type: &MediaType) -> Option<bool> {
+		self.reads(media_type)
+			.then(|| self.choose(media_type).ok())
+			.flatten()
+			.map(|parser| parser.renders_fence())
+	}
+
 	/// `bytes` through the parser their media type selects, an error's place
 	/// an offset in them: what a document embedding another reads it by.
 	pub fn parse(
 		&self,
 		bytes: &MediaBytes,
 	) -> Result<ParsedDocument, ParseError> {
-		self.choose(bytes.media_type())?.parse(bytes, self)
+		self.choose(bytes.media_type())?.parse(bytes, self, None)
+	}
+
+	/// `bytes` as a fence holds them, the parser their media type selects
+	/// [configured](DocParser::configure) with `params`.
+	pub fn parse_fence(
+		&self,
+		bytes: &MediaBytes,
+		params: &FenceParams,
+	) -> Result<ParsedDocument, ParseError> {
+		self.choose(bytes.media_type())?
+			.parse(bytes, self, Some(params))
 	}
 
 	/// The document `bytes` are, the file at `path` of its package where it
@@ -232,7 +274,7 @@ impl DocParsers {
 	) -> Result<EntityBody> {
 		match self.choose(bytes.media_type()) {
 			Ok(parser) => parser
-				.parse(bytes, self)
+				.parse(bytes, self, None)
 				.map_err(|error| error.locate(bytes, path))?
 				.body
 				.entities
@@ -283,32 +325,38 @@ impl DocParsers {
 	}
 }
 
-/// The schedule run once a document has been parsed into a world (or, with
-/// `beet_ui`'s `RealtimeParsePlugin`, after every [`Update`]).
-///
-/// Hosts style resolution, syntax highlighting, charcell decorations and the
-/// layout and paint pipeline, ordered by their system sets.
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub struct PostParseTree;
-
 /// The object-safe face of a [`DocParser`], which a registry can hold.
 trait ErasedDocParser: 'static + Send + Sync {
+	fn as_any(&self) -> &dyn Any;
 	fn media_types(&self) -> Vec<MediaType>;
+	fn renders_fence(&self) -> bool;
+	/// Parse with a clone of this parser, configured by `params` where a
+	/// fence gives some.
 	fn parse(
 		&self,
 		bytes: &MediaBytes,
 		parsers: &DocParsers,
+		params: Option<&FenceParams>,
 	) -> Result<ParsedDocument, ParseError>;
 }
 
 impl<T: DocParser> ErasedDocParser for T {
+	fn as_any(&self) -> &dyn Any { self }
+
 	fn media_types(&self) -> Vec<MediaType> { DocParser::media_types(self) }
+
+	fn renders_fence(&self) -> bool { DocParser::renders_fence(self) }
 
 	fn parse(
 		&self,
 		bytes: &MediaBytes,
 		parsers: &DocParsers,
+		params: Option<&FenceParams>,
 	) -> Result<ParsedDocument, ParseError> {
-		DocParser::parse(&mut self.clone(), bytes, parsers)
+		let mut parser = self.clone();
+		if let Some(params) = params {
+			parser.configure(params)?;
+		}
+		DocParser::parse(&mut parser, bytes, parsers)
 	}
 }

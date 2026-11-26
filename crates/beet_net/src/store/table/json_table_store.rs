@@ -1,11 +1,11 @@
 //! Tables as json files in a [`BlobStore`], the naive one: see
 //! [`JsonTableStore`].
 use crate::prelude::*;
+use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
 use beet_core::prelude::*;
+use bevy::platform::sync::Mutex;
 use bytes::Bytes;
-use std::collections::BTreeMap;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 /// Tables over the nearest [`BlobStore`] at or above this entity, one json
 /// file per partition: for trying things in a small binary and in a browser

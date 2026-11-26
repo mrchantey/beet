@@ -1,12 +1,12 @@
 use crate::prelude::*;
+use alloc::sync::Arc;
 use beet_core::prelude::bevy_ecs::error::ErrorContext;
 use beet_core::prelude::*;
+use core::marker::PhantomData;
 use heck::ToSnakeCase;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use std::marker::PhantomData;
-use std::sync::Arc;
 
 /// Type-erased handle to one partition's tables, the table twin of
 /// [`BlobStore`]: wraps an [`Arc<dyn TableProvider>`] and is materialized onto

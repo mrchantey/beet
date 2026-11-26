@@ -54,7 +54,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_scene::prelude::*;
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 
 	/// A file a request names is parsed by its media type and rendered as the
 	/// request accepts.
@@ -91,7 +91,7 @@ mod test {
 	}
 
 	/// Stands in for a component a downstream crate declares frontmatter.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[derive(
 		Debug,
 		Default,
@@ -111,7 +111,7 @@ mod test {
 	/// A component declared outside beet_ui round-trips through a view asked
 	/// for frontmatter: its section declares it on the root, and the view
 	/// writes it back as its table beside the page's own keys.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	async fn views_a_declared_component_as_its_section() {
 		let store = BlobStore::temp();

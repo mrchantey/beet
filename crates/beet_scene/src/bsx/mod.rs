@@ -15,8 +15,9 @@
 //! `beet_core`'s (the cursor, the markup parser, the value grammar), so a
 //! crate below this one reads markup without lowering it, syntax tree to
 //! explicit syntax tree in `directive` (every `bx:` directive rewritten away),
-//! syntax tree to scene body in `lower`, and authored literal to reflected value
-//! in `reflect` (with prop-schema verification).
+//! syntax tree to scene body in `lower` (with prop-schema verification), and
+//! authored literal to the value it holds in the crate's `literal` module,
+//! which every authored format shares.
 //!
 //! # Syntax
 //!
@@ -192,7 +193,7 @@
 //!
 //! The remaining surface (bare-position component spreads `{(A, B)}`, the `$ref`
 //! entity references, enum/struct/list literals) lives in the value grammar
-//! (`beet_core`'s) and its reflection (`reflect`).
+//! (`beet_core`'s) and its reflection (`literal`).
 //!
 //!
 //! # Authoring
@@ -239,14 +240,14 @@
 //! precedence, and an unknown namespace is a hard error, never a silent false.
 
 #[cfg(doc)]
+use crate::prelude::*;
+#[cfg(doc)]
 use beet_core::prelude::*;
 
 mod bsx_parser;
 mod directive;
 mod lower;
-mod reflect;
 
 pub use bsx_parser::*;
 pub use directive::*;
 pub use lower::*;
-pub use reflect::LiteralReflect;

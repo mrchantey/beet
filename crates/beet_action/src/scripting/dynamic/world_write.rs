@@ -76,7 +76,7 @@ impl WorldWrite {
 					let registry = registry.read();
 					let registration =
 						registry.get(type_id).ok_or_else(|| {
-							bevyhow!("`{}` left the registry", ident.path)
+							bevyhow!("`{}` left the registry", ident.name)
 						})?;
 					// straight off the `Value`, no JSON hop: `ValueDeserializer`
 					// is a real serde data format, so the reflect boundary reads
@@ -86,7 +86,7 @@ impl WorldWrite {
 						.map_err(|err| {
 							bevyhow!(
 								"failed to read `{}` from {value}: {err}",
-								ident.path
+								ident.name
 							)
 						})?
 				};
@@ -97,7 +97,7 @@ impl WorldWrite {
 						registration.data::<ReflectComponent>()
 					})
 					.ok_or_else(|| {
-						bevyhow!("`{}` is not a component", ident.path)
+						bevyhow!("`{}` is not a component", ident.name)
 					})?
 					.clone();
 				let mut entity = Self::entity_mut(world, entity)?;

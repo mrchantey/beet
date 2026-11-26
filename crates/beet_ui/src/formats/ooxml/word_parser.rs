@@ -5,6 +5,7 @@ use super::office_style::*;
 use super::read_element::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 
 /// Reads a Word file into the elements its HTML analogy names: the default
 /// header, the body's blocks, the notes and the default footer, with nothing

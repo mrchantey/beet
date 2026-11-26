@@ -1,9 +1,9 @@
 use super::TemplateBuilder;
-use super::TemplateFilter;
 #[cfg(doc)]
 use super::TemplateLoader;
 use beet_core::prelude::*;
 use bevy::ecs::query::QueryFilter;
+use bevy::reflect::TypePath;
 
 /// Configures and runs a serialization of world state or a subtree to a serde
 /// format. The config (filters, entities, resource flag) is held independently
@@ -26,8 +26,8 @@ use bevy::ecs::query::QueryFilter;
 /// and no amount of key stability makes that recoverable.
 #[derive(Default)]
 pub struct TemplateSaver {
-	component_filter: TemplateFilter,
-	resource_filter: TemplateFilter,
+	component_filter: TypeFilter,
+	resource_filter: TypeFilter,
 	entities: Vec<Entity>,
 	extract_resources: bool,
 }
@@ -71,19 +71,19 @@ impl TemplateSaver {
 
 	/// Allows a resource type to be serialized, narrowing an unset filter to
 	/// the types allowed.
-	pub fn allow_resource<T: Resource>(mut self) -> Self {
+	pub fn allow_resource<T: Resource + TypePath>(mut self) -> Self {
 		self.resource_filter = self.resource_filter.allow::<T>();
 		self
 	}
 
 	/// Denies a resource type from being serialized.
-	pub fn deny_resource<T: Resource>(mut self) -> Self {
+	pub fn deny_resource<T: Resource + TypePath>(mut self) -> Self {
 		self.resource_filter = self.resource_filter.deny::<T>();
 		self
 	}
 
 	/// Denies a component type from being serialized.
-	pub fn deny_component<T: Component>(mut self) -> Self {
+	pub fn deny_component<T: Component + TypePath>(mut self) -> Self {
 		self.component_filter = self.component_filter.deny::<T>();
 		self
 	}

@@ -1,6 +1,6 @@
 use super::*;
 #[cfg(feature = "tui")]
-use crate::parse::RealtimeParsePlugin;
+use crate::formats::RealtimeParsePlugin;
 use crate::prelude::MediaViewport;
 use crate::prelude::Medium;
 use crate::style::DiagramSet;

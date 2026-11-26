@@ -365,7 +365,7 @@ mod test {
 	#[beet_core::test]
 	fn parsed_tables_read_their_grid() {
 		for (media_type, source) in [
-			#[cfg(feature = "markdown_parser")]
+			#[cfg(feature = "markdown")]
 			(MediaType::Markdown, "| a | b |\n|---|---|\n| c | d |\n"),
 			(
 				MediaType::Html,

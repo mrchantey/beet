@@ -135,7 +135,7 @@ fn user_agent_rules() -> Vec<Rule> {
 			.with_canonical(Display::Inline),
 		// an inline `<svg>` is a picture the web paints and a char grid cannot;
 		// its `<text>` would otherwise flow as prose. A diagram figure replaces
-		// its svg with text or a raster before this is reached (`parse/mermaid`).
+		// its svg with text or a raster before this is reached (`formats/mermaid`).
 		Rule::tags(&["svg"])
 			.with_media(MediaQuery::Terminal)
 			.with_canonical(Display::None),

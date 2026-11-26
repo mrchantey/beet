@@ -9,10 +9,24 @@ use beet_core::prelude::*;
 ///
 /// The syntax tree between is [`BsxNode::parse_document`]'s, for a tool that
 /// stops there.
+///
+/// It carries the [`BsxDirectives`] a document's `bx:` keys rewrite by, which
+/// markdown's embedded markup reads from the registered parser too, so the
+/// two read one set.
 #[derive(Debug, Clone, Default)]
-pub struct BsxParser;
+pub struct BsxParser {
+	directives: BsxDirectives,
+}
 
 impl BsxParser {
+	/// The directives this parser rewrites by.
+	pub fn directives(&self) -> &BsxDirectives { &self.directives }
+
+	/// The directives this parser rewrites by, to register more.
+	pub fn directives_mut(&mut self) -> &mut BsxDirectives {
+		&mut self.directives
+	}
+
 	/// Lower a document's nodes to a body, its directives rewritten first. A
 	/// document with one root element is that element, see the `lower` module
 	/// docs.
@@ -31,30 +45,6 @@ impl BsxParser {
 		parsers: &DocParsers,
 	) -> Result<ParsedDocument> {
 		Self::lower_nodes(nodes, LowerRoot::Container(root), parsers)
-	}
-
-	/// Lower `declarations` to the components they name, as the root spreads
-	/// of a document declaring them would: how a format with metadata of its
-	/// own (frontmatter, a file's properties) declares its root's components.
-	pub fn lower_declarations(
-		declarations: impl IntoIterator<Item = NamedLiteral>,
-		parsers: &DocParsers,
-	) -> Result<EntityBody> {
-		let items = declarations
-			.into_iter()
-			.map(SpreadItem::Named)
-			.collect::<Vec<_>>();
-		if items.is_empty() {
-			return EntityBody::default().xok();
-		}
-		let mut root = BsxElement::new("Fragment", Vec::new(), Vec::new());
-		root.push_spread_items(items);
-		Self::lower(vec![BsxNode::Element(root)], parsers)?
-			.body
-			.entities
-			.swap_remove(&EntityKey::ROOT)
-			.unwrap_or_default()
-			.xok()
 	}
 
 	/// A document invoking the template `name` names and nothing else, its
@@ -96,7 +86,7 @@ impl BsxParser {
 	/// `markup` as a `.bsx` document, lowered as `world`'s registry reads it.
 	pub fn body(world: &World, markup: &str) -> Result<SceneBody> {
 		let bytes = MediaBytes::new_bsx(markup);
-		match Self.parse(&bytes, &DocParsers::of(world)) {
+		match Self::default().parse(&bytes, &DocParsers::of(world)) {
 			Ok(document) => document.body.xok(),
 			Err(error) => Err(error.locate(&bytes, None).into()),
 		}

@@ -341,7 +341,7 @@
 //! `cp:lastModifiedBy`, `cp:revision` and `cp:lastPrinted`. `DocMeta`'s
 //! labels, image and video have no property and are not written.
 //!
-//! [`DocParser`]: crate::prelude::DocParser
+//! [`DocParser`]: beet_scene::prelude::DocParser
 //! [`DocRenderer`]: crate::prelude::DocRenderer
 //! [`DocMeta`]: crate::prelude::DocMeta
 //! [`XmlRenderer`]: crate::prelude::XmlRenderer

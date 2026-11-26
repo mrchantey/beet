@@ -229,10 +229,10 @@ mod test {
 
 	/// A markdown page's ranges are the file's, in prose, in markup embedded
 	/// in it and in a fence that is a document.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn markdown_spans() {
-		let source = "+++\ntitle = \"a\"\n+++\n\n# Hi\n\n<div class=\"b\">\n\n*em* {x}\n\n</div>\n\n- one\n- `two`\n\n```text/html\n<b>c</b>\n```\n";
+		let source = "+++\ntitle = \"a\"\n+++\n\n# Hi\n\n<div class=\"b\">\n\n*em* {x}\n\n</div>\n\n- one\n- `two`\n\n```text/html render\n<b>c</b>\n```\n";
 		written(&MediaBytes::new_markdown(source)).xpect_eq(pairs([
 			("0", source),
 			("0/h1.0", "# Hi\n"),
@@ -335,7 +335,7 @@ mod test {
 			.xpect_starts_with("2:1: `<Slot>`");
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn a_markdown_error_names_its_place_in_the_file() {
 		refused(
@@ -355,7 +355,7 @@ mod test {
 		refused(
 			"a.md",
 			MediaBytes::new_markdown(
-				"# Hi\n\n```application/vnd.beet.bsx\n<a>\n{@nope:x}</a>\n```",
+				"# Hi\n\n```application/vnd.beet.bsx render\n<a>\n{@nope:x}</a>\n```",
 			),
 		)
 		.xpect_starts_with("a.md:5:7: unknown binding source");

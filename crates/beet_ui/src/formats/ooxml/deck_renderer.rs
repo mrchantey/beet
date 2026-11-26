@@ -2295,7 +2295,7 @@ mod test {
 		let read = |bytes: &MediaBytes| {
 			let mut world = formats(themed);
 			world
-				.resource_mut::<DocParsers>()
+				.resource_mut::<beet_scene::prelude::DocParsers>()
 				.register(DeckParser::default().with_options(options));
 			parse_in(world, bytes).unwrap()
 		};

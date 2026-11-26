@@ -12,6 +12,7 @@ use super::cursor::Cursor;
 use super::span::*;
 use super::value::*;
 use crate::prelude::*;
+use core::ops::Range;
 
 /// Configuration selecting the dialect a markup source is read in.
 #[derive(Debug, Default, Clone)]
@@ -410,6 +411,24 @@ fn parse_tag_literal(
 		fields,
 	};
 	Ok((base, Some(literal)))
+}
+
+impl BsxAttribute {
+	/// The attributes the `range` of `source` lists, read as a BSX tag writes
+	/// them, ie a markdown fence's `render mode=text`: a bare key a flag,
+	/// `key="text"` a string and `key=value` the value grammar.
+	///
+	/// ## Errors
+	/// Errors on anything that is no attribute, placed in `source`.
+	pub fn parse_list(source: &str, range: Range<usize>) -> Result<Vec<Self>> {
+		Cursor::within(source, range).read(|cursor| {
+			let attributes = parse_attributes(cursor, &BsxParseConfig::bsx())?;
+			match cursor.is_eof() {
+				true => attributes.xok(),
+				false => bevybail!("expected an attribute"),
+			}
+		})
+	}
 }
 
 /// Parse the attribute list of an opening tag up to `>` or `/>`.

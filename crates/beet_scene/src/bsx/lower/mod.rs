@@ -17,7 +17,7 @@
 //! | an `@` binding | the sync components of its source |
 //! | `$name` | the key of the entity `bx:ref="name"` names |
 //! | `bx:cfg` | [`Cfg`], answered when the body spawns |
-//! | a fence a parser reads | that document's body, its root standing where the fence does |
+//! | a fence that renders | that document's body, its root standing where the fence does |
 //!
 //! A value is written as its type's own serde form, only the fields the
 //! markup authored, the rest filling from the type's default when the body
@@ -51,7 +51,7 @@ mod literal;
 mod lowering;
 mod markup;
 mod patch;
+mod schema;
 
 pub use element::*;
-pub(super) use literal::literal_to_value;
 pub(super) use lowering::*;

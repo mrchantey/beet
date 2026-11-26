@@ -86,7 +86,7 @@ atproto = ["dag_cbor", "json", "scene", "beet_net/atproto"]
 site_images = ["std", "json", "dep:image", "dep:resvg", "dep:skrifa"]
 postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
 serde = ["dep:serde", "beet_core/serde", "beet_action/serde", "beet_net/serde", "beet_ui?/serde"]
-markdown_parser = ["std", "beet_ui/markdown_parser"]
+markdown = ["std", "beet_ui/markdown"]
 # Word files, workbooks and slide decks as media (`beet_ui/ooxml`), every
 # router installing `OoxmlPlugin` so a route serves and writes them.
 ooxml = ["std", "beet_ui/ooxml"]
@@ -112,7 +112,7 @@ client_io = ["http", "beet_net/tungstenite"]
 # Scenes loaded, served and swapped (`SceneServer`, `ResetScene`) through
 # `beet_scene`, no_std as it is. `beet_core/rsx`: the `SceneServer` meta-route
 # bundle is a `#[template]`, whose attribute macro is rsx-gated.
-scene = ["dep:beet_scene", "beet_core/rsx", "beet_ui?/scene", "serde"]
+scene = ["dep:beet_scene", "beet_scene/bsx", "beet_core/rsx", "beet_ui?/scene", "serde"]
 # The scripting route registrations (the `Script`/`ExchangeScript`/
 # `ExchangeScriptElement` reflect types and the `<ScriptRoute>` template).
 # Backend-agnostic and self-sufficient: this compiles and registers on its own,
@@ -219,7 +219,7 @@ beet_net = { workspace = true, features = ["ureq", "server"] }
 name = "beetmania"
 path = "tests/beetmania.rs"
 harness = false
-required-features = ["markdown_parser"]
+required-features = ["markdown"]
 
 [lib]
 harness = false

@@ -755,7 +755,7 @@ mod test {
 
 	/// The `MediaBytes` → living tree primitive: parsed markdown becomes a page
 	/// that the host paints.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn parse_primitive_paints() {
 		let mut app = live_app();

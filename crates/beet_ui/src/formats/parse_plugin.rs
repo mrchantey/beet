@@ -37,7 +37,7 @@ impl ParsePlugin {
 	#[cfg(feature = "scene")]
 	pub fn parsers() -> DocParsers {
 		ScenePlugin::parsers()
-			.with_metadata_type(TypeName::of::<DocMeta>().short())
+			.with_metadata_type(TypeName::of_path::<DocMeta>())
 	}
 }
 
@@ -52,7 +52,7 @@ impl Plugin for ParsePlugin {
 		app.install_types::<ScenePlugin>()
 			.world_mut()
 			.get_resource_or_init::<DocParsers>()
-			.set_metadata_type(TypeName::of::<DocMeta>().short());
+			.set_metadata_type(TypeName::of_path::<DocMeta>());
 		// the default BSX event vocabulary, so every `bx:onclick="..."` runs
 		// its script on a click.
 		#[cfg(feature = "scene")]
@@ -87,7 +87,7 @@ impl Plugin for RealtimeParsePlugin {
 #[cfg(test)]
 mod test {
 	use super::*;
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	use beet_net::prelude::*;
 	use bevy::app::MainScheduleOrder;
 	use bevy::ecs::schedule::ScheduleLabel;
@@ -161,7 +161,7 @@ mod test {
 		tag(&world, entity).xpect_eq("div");
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn parse_markdown() {
 		let (world, entity) = parse(&MediaBytes::new_markdown("# Title"));
@@ -175,7 +175,7 @@ mod test {
 	#[beet_core::test]
 	fn text_fallback_reads_markdown_frontmatter() {
 		let mut parsers = DocParsers::default()
-			.with_metadata_type(TypeName::of::<DocMeta>().short());
+			.with_metadata_type(TypeName::of_path::<DocMeta>());
 		parsers.register(PlainTextParser::default());
 		parsers
 			.root_components(
@@ -188,7 +188,11 @@ mod test {
 			.keys()
 			.map(|name| name.as_str())
 			.collect::<Vec<_>>()
-			.xpect_eq(vec!["DocMeta", "RouteMeta"]);
+			// no registry, so each is held by the name it was declared by
+			.xpect_eq(vec![
+				TypeName::of_path::<DocMeta>().as_str(),
+				"RouteMeta",
+			]);
 		// a plain text document leading with a fence declares nothing
 		parsers
 			.root_components(
@@ -202,7 +206,7 @@ mod test {
 
 	/// A root carries its document's metadata, whichever markup declares it:
 	/// frontmatter and a root spread read alike off the body's first entity.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn metadata_is_the_roots_components() {
 		let world = world_ext::ui_world();
@@ -228,7 +232,7 @@ mod test {
 
 	/// Mdx is markdown whose text holds expressions, its embedded BSX one tree
 	/// with the prose around it.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn mdx_embeds_bsx() {
 		let (mut world, entity) = parse(&MediaBytes::new_str(
@@ -245,7 +249,7 @@ mod test {
 		world.query::<&FieldRef>().iter(&world).count().xpect_eq(1);
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn parse_yaml_frontmatter() {
 		let (world, entity) = parse(&MediaBytes::new_markdown(
@@ -260,7 +264,7 @@ mod test {
 	}
 
 	/// Parse markdown then render it back via [`HtmlRenderer`].
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	fn roundtrip(md: &str) -> String {
 		let (mut world, entity) = parse(&MediaBytes::new_markdown(md));
 		HtmlRenderer::new()
@@ -275,7 +279,7 @@ mod test {
 
 	/// An element one HTML block opens and a later one closes holds the
 	/// markdown between them, ie a disclosure's body.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn html_blocks_span_markdown() {
 		roundtrip(
@@ -286,32 +290,32 @@ mod test {
 		.xpect_contains("html_block");
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn roundtrip_paragraph() {
 		roundtrip("Hello world").xpect_eq("<p>Hello world</p>".to_string());
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn roundtrip_heading() {
 		roundtrip("# Title").xpect_eq("<h1>Title</h1>".to_string());
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn roundtrip_emphasis() {
 		roundtrip("*hello*").xpect_eq("<p><em>hello</em></p>".to_string());
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn roundtrip_strong() {
 		roundtrip("**hello**")
 			.xpect_eq("<p><strong>hello</strong></p>".to_string());
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn roundtrip_link() {
 		let html = roundtrip("[click](https://example.com)");
@@ -321,7 +325,7 @@ mod test {
 			.xpect_contains("</a>");
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn roundtrip_unordered_list() {
 		let html = roundtrip("- a\n- b");
@@ -331,7 +335,7 @@ mod test {
 			.xpect_contains("</ul>");
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn roundtrip_code_block() {
 		let html = roundtrip("```rust\nfn main() {}\n```");
@@ -341,7 +345,7 @@ mod test {
 			.xpect_contains("</pre>");
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn roundtrip_blockquote() {
 		let html = roundtrip("> quoted text");
@@ -350,11 +354,11 @@ mod test {
 			.xpect_contains("</blockquote>");
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn roundtrip_thematic_break() { roundtrip("---").xpect_contains("<hr />"); }
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn roundtrip_image() {
 		let html = roundtrip("![alt](image.png)");
@@ -362,7 +366,7 @@ mod test {
 			.xpect_contains("src=\"image.png\"");
 	}
 
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn roundtrip_inline_code() {
 		roundtrip("use `foo()` here").xpect_contains("<code>foo()</code>");

@@ -163,7 +163,7 @@ impl RoutesDir {
 							Query<&BlobStore>,
 							PackageQuery,
 							FrontmatterTypeQuery,
-						), Result<(BlobStore, PackageStore, SmolStr)>>(
+						), Result<(BlobStore, PackageStore, TypeName)>>(
 							move |entity, (stores, packages, types)| {
 								Ok((
 									scoped_store(

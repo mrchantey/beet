@@ -4,6 +4,7 @@ use super::office_style::*;
 use super::read_element::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 
 /// Reads a workbook into one `article data-worksheet` per worksheet in tab
 /// order, each holding one `table` dense from `A1` to its last used cell,

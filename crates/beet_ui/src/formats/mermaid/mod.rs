@@ -3,10 +3,11 @@
 //!
 //! ## Authoring
 //!
-//! - A fence in markdown, its info word the mode: ```` ```mermaid text ````.
+//! - A fence in markdown, its `mode` the form: ```` ```mermaid mode=text ````.
+//!   `render=false` keeps it a code sample.
 //! - The `<Mermaid>` widget (`widgets/mermaid.rs`, `net` + `mermaid`) in BSX
 //!   or markdown: the default slot's text as the source
-//!   (`<Mermaid render="Text">graph LR; A --> B</Mermaid>`) or a file read
+//!   (`<Mermaid mode="text">graph LR; A --> B</Mermaid>`) or a file read
 //!   through the nearest `BlobStore` (`<Mermaid src="docs/pipeline.mmd"/>`,
 //!   the path relative to the store, ie the routes dir). It builds the same
 //!   figure a fence does and materialises inline when its source lands, so it
@@ -21,7 +22,7 @@
 //! The form a diagram takes is the `diagram-render` cascade property
 //! ([`DiagramRender`]): `Auto`, `Svg` or `Text`. Inherited, so it is set per app
 //! (a `<Rule>`), per page (`bx:style="diagram-render=Text"` on the page root) or
-//! per diagram (the fence info word, ```` ```mermaid text ````).
+//! per diagram (a fence's `mode`, ```` ```mermaid mode=text ````).
 //!
 //! - `Text` is unicode box-drawing art through `mermaid-text` on every sink,
 //!   every family it lays out (flowchart, sequence, class, state, ER, pie,
@@ -39,7 +40,7 @@
 //! ## Passes
 //!
 //! A fence is read by [`MermaidParser`] into a `<figure class="diagram">`
-//! carrying [`MermaidDiagram`], an info word (`text | svg | auto`) its
+//! carrying [`MermaidDiagram`], a fence's `mode` (`text | svg | auto`) its
 //! [`InlineStyle`]. Drawing it is the one pass here, in [`DiagramSet`], ahead
 //! of the highlighter and the cascade:
 //!
@@ -114,7 +115,6 @@ mod theme;
 pub use diagram::*;
 pub(crate) use materialize::*;
 pub use parser::MermaidParser;
-pub(crate) use parser::declare_render;
 pub use style::*;
 #[cfg(all(feature = "mermaid_svg", not(target_arch = "wasm32")))]
 pub(crate) use svg::DiagramSvgCache;

@@ -1,4 +1,5 @@
 //! [`ScriptParser`], a javascript document as a script.
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Reads javascript as one entity carrying [`RunScript`] with its source as

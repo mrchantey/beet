@@ -1039,7 +1039,7 @@ mod test {
 	/// The conformance probe over prose: a markdown page with a table, a
 	/// fenced block and inline code, the shapes a browser's parser is most
 	/// tempted to reshape, adopts untouched.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test(browser)]
 	fn a_markdown_page_adopts_untouched() {
 		let mut app = dom_app();

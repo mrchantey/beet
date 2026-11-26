@@ -92,8 +92,8 @@ impl MarkdownParser {
 	}
 
 	/// The markup nodes of `text` and its frontmatter, for a tool that stops
-	/// before the body. A fence whose info string names a media type one of
-	/// `parsers` reads is the document it holds.
+	/// before the body. A fence that renders is the document it holds, see the
+	/// `markdown` module docs.
 	pub fn nodes(
 		&self,
 		text: &str,
@@ -395,12 +395,12 @@ mod test {
 		body.entities.keys().map(|key| key.as_str()).collect()
 	}
 
-	/// A fence naming a media type is that document, its root standing where
+	/// A fence that says `render` is that document, its root standing where
 	/// the fence does and every reference within it following its target.
 	#[beet_core::test]
-	fn a_fence_naming_a_media_type_is_its_document() {
+	fn a_rendered_fence_is_its_document() {
 		let body = body(
-			"# Hi\n\n```application/vnd.beet.bsx\n<main {Holds($there)}><i bx:ref=\"there\"/><b/></main>\n```\n\nafter",
+			"# Hi\n\n```application/vnd.beet.bsx render\n<main {Holds($there)}><i bx:ref=\"there\"/><b/></main>\n```\n\nafter",
 		);
 		keys(&body).xpect_eq(vec![
 			"0",
@@ -438,21 +438,54 @@ mod test {
 		let root = world.spawn_empty().id();
 		parse_md(
 			&mut world.entity_mut(root),
-			"```application/vnd.beet.bsx\n<main {Holds($there)}><i bx:ref=\"there\"/></main>\n```",
+			"```application/vnd.beet.bsx render\n<main {Holds($there)}><i bx:ref=\"there\"/></main>\n```",
 		);
 		let main = world.get::<Children>(root).unwrap()[0];
 		let there = world.get::<Children>(main).unwrap()[0];
 		world.get::<Holds>(main).unwrap().0.xpect_eq(there);
 	}
 
-	/// A language is no media type, so a sample of one is code.
+	/// A fence that does not say `render` is a code sample, whether it names
+	/// its format by language or by media type, and says what it likes after.
 	#[beet_core::test]
-	fn a_fence_naming_a_language_is_code() {
-		for language in ["html", "bsx", "json", "toml", "js", "md", "text", ""]
-		{
-			keys(&body(&format!("```{language}\n<b/>\n```")))
+	fn an_unrendered_fence_is_code() {
+		for info in [
+			"html",
+			"text/html",
+			"bsx",
+			"json",
+			"toml",
+			"js",
+			"md",
+			"text",
+			"",
+			"html render=false",
+			"json {1,3}",
+		] {
+			keys(&body(&format!("```{info}\n<b/>\n```")))
 				.contains(&"0/pre.0/code.0")
 				.xpect_true();
+		}
+	}
+
+	/// A language names its format as its media type does.
+	#[beet_core::test]
+	fn a_language_renders_as_its_media_type() {
+		for info in ["html render", "text/html render", "html render=true"] {
+			keys(&body(&format!("```{info}\n<b/>\n```")))
+				.xpect_eq(vec!["0", "0/b.0"]);
+		}
+	}
+
+	/// A format taking no params refuses one, and `render` is a flag.
+	#[beet_core::test]
+	fn a_rendered_fences_params_are_checked() {
+		for info in ["html render title=\"a\"", "html render=yes"] {
+			ScenePlugin::parsers()
+				.body(&MediaBytes::new_markdown(&format!(
+					"```{info}\n<b/>\n```"
+				)))
+				.xpect_err();
 		}
 	}
 
@@ -461,7 +494,7 @@ mod test {
 	fn a_malformed_fence_refuses_its_page() {
 		ScenePlugin::parsers()
 			.body(&MediaBytes::new_markdown(
-				"```application/vnd.beet.bsx\n<a>{@nope:x}</a>\n```",
+				"```application/vnd.beet.bsx render\n<a>{@nope:x}</a>\n```",
 			))
 			.xpect_err();
 	}

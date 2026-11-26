@@ -1,7 +1,6 @@
 //! [`Lowering`]: the walk state, the keys it mints and the nodes that are no
 //! element.
 use super::binding::ReservedRef;
-use super::literal::*;
 use crate::body::KeySentinels;
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -154,9 +153,20 @@ impl<'a> Lowering<'a> {
 		Ok(())
 	}
 
+	/// The literal values of this document, each `$name` resolved against its
+	/// `bx:ref`s.
+	pub fn values(&self) -> LiteralValues<'_> {
+		LiteralValues {
+			types: self.types,
+			references: self,
+		}
+	}
+}
+
+impl LiteralReferences for Lowering<'_> {
 	/// The key a `$name` references: the entity its `bx:ref` names, which may
 	/// come later, or the root for a name reserved for it.
-	pub fn reference(&self, name: &str) -> Result<EntityKey> {
+	fn reference(&self, name: &str) -> Result<EntityKey> {
 		match ReservedRef::parse(name) {
 			Some(ReservedRef::BuildRoot | ReservedRef::SnippetRoot) => {
 				self.root.clone().xok()
@@ -175,7 +185,9 @@ impl<'a> Lowering<'a> {
 			}
 		}
 	}
+}
 
+impl Lowering<'_> {
 	/// Add an entity written at `span`, after every one added so far.
 	pub fn push(
 		&mut self,
@@ -390,7 +402,7 @@ impl<'a> Lowering<'a> {
 	) -> Result {
 		match expr {
 			ValueExpr::Literal(literal) => {
-				let value = literal_to_value(literal)?;
+				let value = LiteralValues::plain(literal)?;
 				self.insert(key, &value)
 			}
 			ValueExpr::Binding(binding) => self.binding(binding, key, element),
@@ -641,6 +653,43 @@ mod test {
 		// the same shape a registered tag would build: root, tag, child.
 		entity_count("<NotRegistered><PackageConfig/></NotRegistered>")
 			.xpect_eq(entity_count("<div><PackageConfig/></div>"));
+	}
+
+	/// A type registered by reflection alone (bevy's `reflect_auto_register`,
+	/// a template whose installer never ran) means nothing on an entity, so
+	/// its tag is held as an unregistered one rather than refusing the
+	/// document.
+	#[beet_core::test]
+	fn a_type_that_is_no_component_is_held() {
+		#[derive(Debug, Default, Reflect)]
+		struct ReflectOnly {
+			name: String,
+		}
+		let mut world = (ScenePlugin, DocumentPlugin).into_world();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<ReflectOnly>();
+		let root = BsxParser::spawn(
+			&mut world,
+			r#"<ReflectOnly name="ada"><b/></ReflectOnly>"#,
+		)
+		.unwrap();
+		world
+			.entity(root)
+			.get::<Unregistered>()
+			.unwrap()
+			.clone()
+			.xpect_eq(Unregistered::new(
+				"ReflectOnly",
+				value!({ "name": "ada" }),
+			));
+		world
+			.entity(root)
+			.get::<Children>()
+			.unwrap()
+			.len()
+			.xpect_eq(1);
 	}
 
 	/// A string attribute fills a field, the shape an entry declares its cfg

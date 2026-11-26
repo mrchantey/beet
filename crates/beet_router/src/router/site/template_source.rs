@@ -17,21 +17,20 @@ pub enum TemplateSource {
 	/// A document of the package the declaration is in, ie
 	/// `templates/Layout.bsx`.
 	Document(DocPath),
-	/// A rust `#[template]` by its short or full type path, ie `SiteLayout`,
-	/// registered with `app.install_types::<SiteLayout>()`.
-	Template(SmolStr),
+	/// A rust `#[template]` by its type path, a document writing it short, ie
+	/// `SiteLayout`, registered with `app.install_types::<SiteLayout>()`.
+	Template(TypeName),
 }
 
 impl TemplateSource {
-	/// The rust template `T`, named by its short type path, the name
-	/// `app.install_types::<T>()` registers it under.
-	pub fn of<T: BuildTemplate>() -> Self {
-		Self::template(TypeName::of::<T>().short())
+	/// The rust template `T`, by its type path.
+	pub fn of<T: BuildTemplate + TypePath>() -> Self {
+		Self::template(TypeName::of_path::<T>())
 	}
 
 	/// The rust template named `template`. Prefer [`of`](Self::of), which
 	/// derives the name from the type.
-	pub fn template(template: impl Into<SmolStr>) -> Self {
+	pub fn template(template: impl Into<TypeName>) -> Self {
 		Self::Template(template.into())
 	}
 
@@ -73,8 +72,8 @@ impl TemplateSource {
 pub enum LoadedTemplate {
 	/// A document and the package it is of.
 	Document(PackageStore, Arc<InstancePrefab>),
-	/// A rust template by its short or full type path.
-	Template(SmolStr),
+	/// A rust template by its type path.
+	Template(TypeName),
 }
 
 impl LoadedTemplate {

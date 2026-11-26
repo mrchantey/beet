@@ -451,7 +451,7 @@ mod test {
 	}
 
 	/// Parse markdown then render back as markdown.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn render_markdown() {
 		let mut world = world_ext::ui_world();

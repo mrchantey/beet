@@ -847,7 +847,7 @@ mod test {
 	/// A page of two tables writes as a workbook of two sheets, one named by
 	/// its caption and the other `Sheet2`, its cells typed; a page holding
 	/// no table is refused.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn writes_a_page_of_tables() {
 		let page = |markdown: &str| {

@@ -1,4 +1,4 @@
-//! Fit a text diagram's art to its laid-out width (`parse/mermaid`).
+//! Fit a text diagram's art to its laid-out width (`formats/mermaid`).
 //!
 //! A `<pre class="diagram-text">` holds box art `mermaid-text` reflows to a
 //! column budget, and the right budget is the width layout assigns the
@@ -11,8 +11,8 @@
 //! later frame at the same width finds the art fitted and does nothing; a
 //! resize refits it the frame it lands.
 use super::*;
-use crate::parse::DiagramForm;
-use crate::parse::MermaidDiagram;
+use crate::formats::DiagramForm;
+use crate::formats::MermaidDiagram;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -102,7 +102,7 @@ fn fit_text_diagrams<B: Component + AsBuffer>(
 	changed
 }
 
-#[cfg(all(test, feature = "markdown_parser"))]
+#[cfg(all(test, feature = "markdown"))]
 mod test {
 	use super::*;
 	use crate::style::Length;

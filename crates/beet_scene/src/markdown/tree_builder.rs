@@ -197,8 +197,8 @@ struct MdTreeBuilder<'a> {
 /// A fence read as a document rather than as code.
 struct Fence {
 	media_type: MediaType,
-	/// What the info string says after the media type.
-	info: SmolStr,
+	/// What the info string says after the format and `render`.
+	params: Vec<(SmolStr, DataLiteral)>,
 	source: String,
 	/// Where the source stands in the page, `None` once it is in pieces, ie
 	/// within a quote.
@@ -242,25 +242,85 @@ struct StackFrame<'a> {
 }
 
 impl Fence {
-	/// The fence `info` opens, when its first word names a media type one of
-	/// `parsers` reads. A language (`json`, `html`) names none, so a code
-	/// sample stays code.
+	/// The fence `info` opens when it is the document it holds: its first
+	/// word names a format one of `parsers` reads, by media type or by
+	/// extension (`text/html`, `html`), and it says `render`, or that format
+	/// [renders a fence](DocParser::renders_fence) by default and it does not
+	/// say `render=false`. Anything else is a code sample.
+	///
+	/// ## Errors
+	/// Errors on a fence that renders, its params being no BSX attributes.
 	fn of(
 		info: &str,
 		parsers: &DocParsers,
 		span: impl Into<SourceSpan>,
-	) -> Option<Self> {
-		let (word, info) = match info.trim().split_once(char::is_whitespace) {
-			Some((word, info)) => (word, info.trim()),
-			None => (info.trim(), ""),
+	) -> Result<Option<Self>> {
+		let info = info.trim();
+		let (word, rest) = info
+			.split_once(char::is_whitespace)
+			.map(|(word, rest)| (word, rest.trim()))
+			.unwrap_or((info, ""));
+		let Some((media_type, renders)) = Self::format(word, parsers) else {
+			return Ok(None);
 		};
-		let media_type = MediaType::from_content_type(word);
-		(!word.is_empty() && parsers.reads(&media_type)).then(|| Self {
+		let span = span.into();
+		let attributes = match BsxAttribute::parse_list(rest, 0..rest.len()) {
+			Ok(attributes) => attributes,
+			// a code sample says what it likes after its language
+			Err(_) if !renders => return Ok(None),
+			Err(error) => return Err(span.locate(error)),
+		};
+		let render = match attributes.iter().find(|attr| attr.key == "render") {
+			None => renders,
+			Some(attr) => match attr.value.literal() {
+				Ok(DataLiteral::Scalar(Value::Bool(render))) => render,
+				_ => {
+					return Err(span.locate(bevyhow!(
+						"a fence's `render` is a flag, `render=true` or `render=false`"
+					)));
+				}
+			},
+		};
+		// what a code sample says is the highlighter's business
+		if !render {
+			return Ok(None);
+		}
+		let params = attributes
+			.into_iter()
+			.filter(|attr| attr.key != "render")
+			.map(|attr| {
+				attr.value
+					.literal()
+					.map(|literal| (SmolStr::from(attr.key), literal))
+			})
+			.collect::<Result<Vec<_>>>()
+			.map_err(|error| span.locate(error))?;
+		Self {
 			media_type,
-			info: info.into(),
+			params,
 			source: default(),
 			start: None,
-			span: span.into(),
+			span,
+		}
+		.xmap(Some)
+		.xok()
+	}
+
+	/// The media type `word` names a format by, its own name or a file
+	/// extension, and whether that format renders a fence by default.
+	fn format(word: &str, parsers: &DocParsers) -> Option<(MediaType, bool)> {
+		if word.is_empty() {
+			return None;
+		}
+		[
+			MediaType::from_content_type(word),
+			MediaType::from_extension(word),
+		]
+		.into_iter()
+		.find_map(|media_type| {
+			parsers
+				.renders_fence(&media_type)
+				.map(|renders| (media_type, renders))
 		})
 	}
 }
@@ -379,6 +439,12 @@ impl<'a> MdTreeBuilder<'a> {
 		let source = self.slice(&range);
 
 		match event {
+			Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(ref info)))
+				if let Some(fence) =
+					Fence::of(info, self.parsers, range.clone())? =>
+			{
+				self.fence = Some(fence);
+			}
 			Event::Start(tag) => self.handle_start(tag, source, range),
 			Event::End(TagEnd::CodeBlock) if self.fence.is_some() => {
 				self.finish_fence()
@@ -500,18 +566,12 @@ impl<'a> MdTreeBuilder<'a> {
 			Tag::BlockQuote(_) => {
 				self.push(StackFrame::new("blockquote", span));
 			}
-			Tag::CodeBlock(CodeBlockKind::Fenced(ref info))
-				if let Some(fence) =
-					Fence::of(info, self.parsers, range.clone()) =>
-			{
-				self.fence = Some(fence);
-			}
 			Tag::CodeBlock(kind) => {
 				// <pre><code class="{lang}"> — class is the bare language
 				// name (borrowed from source) rather than "language-X",
 				// since attributes must be zero-copy slices. An info string
-				// carrying more than the language (```mermaid text) is kept
-				// whole as `data-info`, so a consumer reads its extra words.
+				// carrying more than the language (```rust title="a.rs") is
+				// kept whole as `data-info`, so a consumer reads the rest.
 				self.push(StackFrame::new("pre", span.clone()));
 				let attrs = match kind {
 					CodeBlockKind::Fenced(info) => {
@@ -746,7 +806,7 @@ impl<'a> MdTreeBuilder<'a> {
 		};
 		let document = EmbeddedDocument {
 			media_type: fence.media_type,
-			info: fence.info,
+			params: fence.params,
 			source: fence.source,
 			start: fence.start,
 		};

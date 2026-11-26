@@ -209,10 +209,10 @@ fn make_responsive(world: &mut World, root: Entity, width: f32) -> Result {
 	register_inline_rule(&mut world.entity_mut(root), class, rule)
 }
 
-#[cfg(all(test, feature = "markdown_parser"))]
+#[cfg(all(test, feature = "markdown"))]
 mod test {
 	use super::*;
-	use crate::parse::mermaid::parser::test::parse_md;
+	use crate::formats::mermaid::parser::test::parse_md;
 	use crate::style::DiagramRender;
 	use crate::style::common_props::DiagramRenderProp;
 	use beet_net::prelude::*;
@@ -278,7 +278,7 @@ mod test {
 	#[beet_core::test]
 	fn honours_svg_mode_and_init_directive() {
 		render_md(
-			"```mermaid svg\n%%{init: {\"theme\": \"dark\"}}%%\nsequenceDiagram\nAlice->>Bob: hi\n```",
+			"```mermaid mode=svg\n%%{init: {\"theme\": \"dark\"}}%%\nsequenceDiagram\nAlice->>Bob: hi\n```",
 		)
 		.xpect_contains("<svg ")
 		.xpect_contains("Alice");

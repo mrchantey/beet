@@ -163,10 +163,10 @@ impl DocMeta {
 		.filter_map(|(key, value)| Some((SmolStr::new(key), value?)))
 		.collect::<Vec<_>>();
 		let declaration = (!fields.is_empty()).then(|| NamedLiteral {
-			name: parsers.metadata_type().into(),
+			name: parsers.metadata_type().as_str().into(),
 			fields: NamedFields::Struct(fields),
 		});
-		BsxParser::lower_declarations(declaration, parsers)
+		LiteralValues::new(&parsers.types().read()).declarations(declaration)
 	}
 }
 

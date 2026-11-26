@@ -15,9 +15,9 @@ use beet_core::prelude::*;
 /// text/javascript                         one entity carrying `RunScript`, the
 ///                                         source as its `Value`
 /// text/plain, any other text type         one entity holding the text
-/// application/vnd.beet.bsx, text/html,    a scene body
+/// application/vnd.beet.bsx, text/html,    a scene body (`bsx`)
 /// application/xml
-/// text/markdown, text/mdx                 a scene body (`markdown_parser`)
+/// text/markdown, text/mdx                 a scene body (`markdown`)
 /// ```
 ///
 /// An [`Instance`] builds nothing until [`SceneStorePlugin`] reads the document
@@ -35,12 +35,16 @@ impl ScenePlugin {
 
 	/// Register the base formats behind any `parsers` holds.
 	fn register_formats(parsers: &mut DocParsers) {
-		#[cfg(feature = "markdown_parser")]
+		#[cfg(feature = "markdown")]
 		parsers
 			.register_base(MarkdownParser::mdx())
 			.register_base(MarkdownParser::new());
+		// a directive installed first registered the parser it extends
+		#[cfg(feature = "bsx")]
+		if parsers.get::<BsxParser>().is_none() {
+			parsers.register_base(BsxParser::default());
+		}
 		parsers
-			.register_base(BsxParser)
 			.register_base(StructuredParser)
 			.register_base(ScriptParser)
 			.register_base(PlainTextParser::default());

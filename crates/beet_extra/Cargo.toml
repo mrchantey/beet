@@ -71,7 +71,7 @@ beet_net = { workspace = true, features = ["std", "serde", "json"], optional = t
 beet_router = { workspace = true, features = ["json"], optional = true }
 beet_infra = { workspace = true, optional = true }
 # the scenes the perceive-act agent pushes to its body
-beet_scene = { workspace = true, optional = true, features = ["std"] }
+beet_scene = { workspace = true, optional = true, features = ["std", "bsx"] }
 
 
 serde = { workspace = true, optional = true }
@@ -80,7 +80,7 @@ bevy = { workspace = true }
 # bevy-inspector-egui = "0.25.0"
 
 [dev-dependencies]
-beet_scene = { workspace = true, features = ["std"] }
+beet_scene = { workspace = true, features = ["std", "bsx"] }
 beet_core = { workspace = true, features = ["testing"] }
 # the forms a rolled ssh host key takes, for `the_host_key_never_renders`
 base64.workspace = true

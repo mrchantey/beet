@@ -203,11 +203,13 @@ impl MockPostStreamer {
 		if let Some(defs) = json.get("$defs").and_then(|defs| defs.as_object())
 		{
 			for (name, def) in defs {
-				registry
-					.insert(name.as_str(), ValueSchema::from_json_value(def)?);
+				registry.insert(
+					name.as_str(),
+					ValueSchema::from_value(&Value::from_serde(def)?)?,
+				);
 			}
 		}
-		ValueSchema::from_json_value(&json)?
+		ValueSchema::from_value(&Value::from_serde(&json)?)?
 			.default_value_in(SchemaResolver::default().with_schemas(&registry))
 			.into_json()
 			.xmap(|json| serde_json::to_string(&json))?

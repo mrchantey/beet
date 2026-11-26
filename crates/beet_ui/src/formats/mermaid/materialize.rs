@@ -220,10 +220,10 @@ pub(super) fn spawn_error(
 	]));
 }
 
-#[cfg(all(test, feature = "markdown_parser"))]
+#[cfg(all(test, feature = "markdown"))]
 mod test {
 	use super::*;
-	use crate::parse::mermaid::parser::test::parse_md;
+	use crate::formats::mermaid::parser::test::parse_md;
 	use crate::render::CharcellPlugin;
 	use crate::render::FlexBuffer;
 	use beet_net::prelude::*;
@@ -243,7 +243,7 @@ mod test {
 			.to_string()
 	}
 
-	/// The `text` info word is the box art on the web too.
+	/// A `mode=text` fence is the box art on the web too.
 	#[beet_core::test]
 	fn renders_text_on_the_string_sink() {
 		let mut app = App::new();
@@ -252,7 +252,7 @@ mod test {
 		parse_md(
 			app.world_mut(),
 			root,
-			&FLOWCHART.replace("mermaid", "mermaid text"),
+			&FLOWCHART.replace("mermaid", "mermaid mode=text"),
 		);
 		html(&mut app, root)
 			.xpect_contains("<figure class=\"diagram inline-style-")
@@ -380,14 +380,14 @@ mod test {
 /// raster lands through the real async attach.
 #[cfg(all(
 	test,
-	feature = "markdown_parser",
+	feature = "markdown",
 	feature = "tui",
 	feature = "mermaid_svg",
 	not(target_arch = "wasm32")
 ))]
 mod raster_test {
 	use super::*;
-	use crate::parse::mermaid::parser::test::parse_md;
+	use crate::formats::mermaid::parser::test::parse_md;
 	use crate::render::test_host::TestHost;
 	use bevy::math::UVec2;
 

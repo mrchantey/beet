@@ -64,9 +64,18 @@ pub struct Frontmatter {
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
 pub struct FrontmatterType {
-	/// Short type path of the component, resolved against the type registry
-	/// exactly as a BSX tag is.
-	pub component: SmolStr,
+	/// The component's type path, resolved against the type registry exactly
+	/// as a BSX tag is, so a document may write it short.
+	pub component: TypeName,
+}
+
+impl FrontmatterType {
+	/// Declare `T` as the component unsectioned frontmatter declares.
+	pub fn of<T: bevy::reflect::TypePath>() -> Self {
+		Self {
+			component: TypeName::of_path::<T>(),
+		}
+	}
 }
 
 /// The component the documents an entity discovers or is declare in their
@@ -78,17 +87,16 @@ pub struct FrontmatterTypeQuery<'w, 's> {
 }
 
 impl FrontmatterTypeQuery<'_, '_> {
-	/// The component's short name: that of the nearest [`FrontmatterType`] at
-	/// or above `entity`, else the registry's own.
-	pub fn get(&self, entity: Entity) -> SmolStr {
+	/// The component: that of the nearest [`FrontmatterType`] at or above
+	/// `entity`, else the registry's own.
+	pub fn get(&self, entity: Entity) -> TypeName {
 		match self.types.get(entity) {
 			Ok(declared) => declared.component.clone(),
 			Err(_) => self
 				.parsers
 				.as_ref()
-				.map(|parsers| parsers.metadata_type())
-				.unwrap_or(DocParsers::METADATA_TYPE)
-				.into(),
+				.map(|parsers| parsers.metadata_type().clone())
+				.unwrap_or_else(|| TypeName::new(DocParsers::METADATA_TYPE)),
 		}
 	}
 }
@@ -296,11 +304,12 @@ impl Frontmatter {
 				name: section
 					.component
 					.clone()
-					.unwrap_or_else(|| parsers.metadata_type().into()),
+					.unwrap_or_else(|| parsers.metadata_type().as_str().into()),
 				fields: NamedFields::Struct(fields),
 			})
 		});
-		BsxParser::lower_declarations(declarations, parsers)
+		LiteralValues::new(&parsers.types().read())
+			.declarations(declarations)
 			.map_err(|error| SourceError::at(error, self.offset))
 	}
 
@@ -315,7 +324,7 @@ impl Frontmatter {
 	pub fn write(
 		world: &World,
 		entity: Entity,
-		default_component: &str,
+		default_component: &TypeName,
 		media_type: &MediaType,
 	) -> Result<Option<String>> {
 		let fence = Self::fence(media_type)?;
@@ -343,7 +352,7 @@ impl Frontmatter {
 		world: &World,
 		entity: Entity,
 		registry: &TypeRegistry,
-		default_component: &str,
+		default_component: &TypeName,
 	) -> Result<WrittenBlock> {
 		let mut block = WrittenBlock::default();
 		for (_, info) in world.inspect_entity(entity)? {
@@ -360,10 +369,9 @@ impl Frontmatter {
 			else {
 				continue;
 			};
-			let name = SmolStr::new(
-				registration.type_info().type_path_table().short_path(),
-			);
-			match name == default_component {
+			let path = registration.type_info().type_path_table();
+			let name = SmolStr::new(path.short_path());
+			match default_component.names(path) {
 				true => block.fields = fields?,
 				false => block.sections.push((name, fields?)),
 			}
@@ -604,10 +612,14 @@ mod test {
 				 Course:\n  unit: BSBOPS404\n---\n",
 			),
 		] {
-			let block =
-				Frontmatter::write(world, entity, "DocMeta", &media_type)
-					.unwrap()
-					.unwrap();
+			let block = Frontmatter::write(
+				world,
+				entity,
+				&"DocMeta".into(),
+				&media_type,
+			)
+			.unwrap()
+			.unwrap();
 			block.clone().xpect_eq(expected);
 			let components = Frontmatter::extract(&block)
 				.unwrap()
@@ -627,10 +639,10 @@ mod test {
 		// nothing to declare writes no block, and no format but these two is
 		// a block's
 		let bare = world.spawn(DocMeta::default()).id();
-		Frontmatter::write(world, bare, "DocMeta", &MediaType::Toml)
+		Frontmatter::write(world, bare, &"DocMeta".into(), &MediaType::Toml)
 			.unwrap()
 			.xpect_none();
-		Frontmatter::write(world, entity, "DocMeta", &MediaType::Json)
+		Frontmatter::write(world, entity, &"DocMeta".into(), &MediaType::Json)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("is not a frontmatter format");

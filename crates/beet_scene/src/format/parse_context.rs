@@ -30,7 +30,7 @@ pub struct ParseContext<'a, 'w> {
 	pub path: Option<RelPath>,
 	/// The component the document's unsectioned metadata declares, the
 	/// registry's own by default ([`DocParsers::metadata_type`]).
-	pub metadata_type: Option<SmolStr>,
+	pub metadata_type: Option<TypeName>,
 }
 
 impl<'a, 'w> ParseContext<'a, 'w> {
@@ -57,7 +57,7 @@ impl<'a, 'w> ParseContext<'a, 'w> {
 	/// `metadata_type` names.
 	pub fn with_metadata_type(
 		mut self,
-		metadata_type: impl Into<SmolStr>,
+		metadata_type: impl Into<TypeName>,
 	) -> Self {
 		self.metadata_type = Some(metadata_type.into());
 		self

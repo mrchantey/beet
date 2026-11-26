@@ -288,7 +288,6 @@ cfg_if! {
 }
 
 /// Yields execution back to the async runtime.
-#[cfg(feature = "std")]
 pub fn yield_now() -> futures_lite::future::YieldNow {
 	futures_lite::future::yield_now()
 }

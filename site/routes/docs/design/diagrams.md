@@ -108,19 +108,19 @@ gitGraph
 
 ## Text form
 
-The info word after the language pins one fence, here to the box-drawing form on every sink:
+A fence's `mode` pins that one diagram, here to the box-drawing form on every sink, and `render=false` shows its source as code instead:
 
-```mermaid text
+```mermaid mode=text
 graph LR
     A[Author] --> B[Render] --> C[Read]
 ```
 
 ## Markup
 
-The `<Mermaid>` widget authors a diagram outside a fence: its source is the default slot's text, or a file of the package, and `render` pins the form as the info word does.
+The `<Mermaid>` widget authors a diagram outside a fence: its source is the default slot's text, or a file of the package, and `mode` pins the form as a fence's does.
 
 <Mermaid src="./pipeline.mmd"/>
 
 ## Choosing the form
 
-The form is the `diagram-render` cascade property, `Auto`, `Svg` or `Text`, inherited like a text property, so it is set at three grains: an app-wide `<Rule>` in the rule set, a page root's `bx:style="diagram-render=Text"`, or one diagram's fence info word (`mermaid text`) and `<Mermaid render="Text">` prop. `Auto` is the picture on the web; on a terminal a flowchart is text, since it reflows to the columns and selects, and every other type a raster where the session's terminal draws kitty graphics, else text. A build without the svg renderer shows the text form for every mode.
+The form is the `diagram-render` cascade property, `Auto`, `Svg` or `Text`, inherited like a text property, so it is set at three grains: an app-wide `<Rule>` in the rule set, a page root's `bx:style="diagram-render=Text"`, or one diagram's fence `mode` (`mermaid mode=text`) and `<Mermaid mode="text">` prop. `Auto` is the picture on the web; on a terminal a flowchart is text, since it reflows to the columns and selects, and every other type a raster where the session's terminal draws kitty graphics, else text. A build without the svg renderer shows the text form for every mode.

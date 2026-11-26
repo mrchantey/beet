@@ -43,8 +43,9 @@ use bevy::ecs::reflect::ReflectComponent;
 #[reflect(Component, MapEntities)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReflectFieldRef {
-	/// The target component's short type path, eg `MyComponent`.
-	pub component: SmolStr,
+	/// The target component, resolved as a tag is, so markup may write it
+	/// short, eg `MyComponent`.
+	pub component: TypeName,
 	/// The field path within the component, eg `value` or `style.width`. Empty
 	/// binds the whole component value.
 	pub field: SmolStr,
@@ -56,7 +57,7 @@ pub struct ReflectFieldRef {
 impl ReflectFieldRef {
 	/// Bind to `component`'s `field` on this entity.
 	pub fn new(
-		component: impl Into<SmolStr>,
+		component: impl Into<TypeName>,
 		field: impl Into<SmolStr>,
 	) -> Self {
 		Self {
@@ -70,8 +71,7 @@ impl ReflectFieldRef {
 	/// rather than by a string a rename would leave behind.
 	///
 	/// The typed counterpart of [`new`](Self::new), and the binding twin of
-	/// `Layout::of::<T>()`: the name comes from
-	/// [`TypeName::short`], which shortens generics the way the reflect registry indexes them. Keep
+	/// `Layout::of::<T>()`: the name is `T`'s full [`TypeName`]. Keep
 	/// [`new`](Self::new) for a name with no type behind it (a `.bsx`-declared
 	/// component, a dynamic selector).
 	///
@@ -84,7 +84,7 @@ impl ReflectFieldRef {
 	) -> Result<Self> {
 		let field = field.into();
 		validate_field_path(T::type_info(), &field)?;
-		Self::new(TypeName::of::<T>().short(), field).xok()
+		Self::new(TypeName::new(T::type_info().type_path()), field).xok()
 	}
 
 	/// Retarget the bound component: an entity, or a lazily resolved
@@ -232,12 +232,15 @@ fn resolve_component<'a>(
 	world: &World,
 	registry: &'a bevy::reflect::TypeRegistry,
 	cache: &mut reflect_value_ext::BindingTickCache,
-	component: &SmolStr,
+	component: &TypeName,
 ) -> Option<(&'a ReflectComponent, ComponentId)> {
-	let registration = registry.get_with_short_type_path(component)?;
+	let registration = component.registration(registry)?;
 	let reflect_component = registration.data::<ReflectComponent>()?;
-	let component_id =
-		cache.component_id(world, component, registration.type_id())?;
+	let component_id = cache.component_id(
+		world,
+		&SmolStr::new(component.as_str()),
+		registration.type_id(),
+	)?;
 	Some((reflect_component, component_id))
 }
 
@@ -268,8 +271,7 @@ mod test {
 		ReflectFieldRef::of::<Dial>("value")
 			.unwrap()
 			.component
-			.as_str()
-			.xpect_eq("Dial");
+			.xpect_eq(TypeName::of_path::<Dial>());
 		// the empty path binds the whole component
 		ReflectFieldRef::of::<Dial>("").unwrap();
 		ReflectFieldRef::of::<Dial>("nope")

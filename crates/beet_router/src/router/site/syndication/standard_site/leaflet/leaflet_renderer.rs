@@ -1204,7 +1204,7 @@ mod test {
 	/// render it, naming no media ingest policy so its media is linked and a
 	/// run needs no assets.
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1245,7 +1245,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1255,7 +1255,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1265,7 +1265,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1277,7 +1277,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1287,7 +1287,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1297,7 +1297,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1307,7 +1307,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1319,7 +1319,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1329,7 +1329,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1341,7 +1341,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1353,7 +1353,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1363,7 +1363,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1375,7 +1375,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1385,7 +1385,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]
@@ -1397,7 +1397,7 @@ mod test {
 	}
 
 	#[cfg(all(
-		feature = "markdown_parser",
+		feature = "markdown",
 		feature = "native",
 		not(target_arch = "wasm32")
 	))]

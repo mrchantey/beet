@@ -495,10 +495,13 @@ udp = ["net", "beet_net/udp"]
 native-tls = [
 "net", "beet_net/native-tls",
 ]
-# Documents read as scenes and instantiated in one another: the parsers (BSX,
-# HTML, the structured formats), the loader and saver, and `<Instance>`. no_std,
-# so firmware loads a pushed scene; every std router links it.
+# Documents read as scenes and instantiated in one another: the structured
+# formats, the loader and saver, and `<Instance>`. no_std, so firmware loads a
+# pushed scene; every std router links it.
 scene = ["net", "dep:beet_scene", "beet_router?/scene", "beet_ui?/scene"]
+# BSX, HTML and XML documents, which the router and `beet_ui` turn on with
+# `scene`.
+bsx = ["scene", "beet_scene?/bsx"]
 # beet_net is a hard dependency of beet_router. The facade pins beet_router to
 # `default-features = false`, so the std router must re-enable the std + http
 # surface it relied on (previously supplied by default features + net).
@@ -604,7 +607,7 @@ style = ["ui", "beet_ui?/style"]
 # Backend-agnostic keyboard input routed to the focused entity (`FocusPlugin`).
 keyboard = ["ui", "beet_ui?/keyboard"]
 tui = ["ui", "beet_ui?/tui"]
-markdown = ["beet_router?/markdown_parser", "beet_scene?/markdown_parser", "beet_ui?/markdown_parser"]
+markdown = ["beet_router?/markdown", "beet_scene?/markdown", "beet_ui?/markdown"]
 # Build-time route code generation (route tree, server/client actions, typed links).
 codegen = ["router", "beet_router?/codegen"]
 syntax_highlighting = ["ui", "style", "beet_ui?/syntax_highlighting"]

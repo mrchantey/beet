@@ -9,7 +9,9 @@ use smol_str::ToSmolStr;
 /// under.
 ///
 /// Identity is the full path, so `a::Foo` and `b::Foo` are distinct names that
-/// share the short name `Foo`.
+/// share the short name `Foo`. A name a document authors may be short, as a
+/// tag is: [`registration`](Self::registration) resolves either against a
+/// registry, and [`names`](Self::names) asks whether one names a type.
 ///
 /// ## Example
 ///
@@ -22,6 +24,7 @@ use smol_str::ToSmolStr;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
+#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub struct TypeName(SmolStr);
 
 impl TypeName {
@@ -30,11 +33,43 @@ impl TypeName {
 		Self(SmolStr::new_static(core::any::type_name::<T>()))
 	}
 
+	/// The name of `T` as reflection knows it, which a registry resolves: its
+	/// [`TypePath`](bevy::reflect::TypePath), equal to [`of`](Self::of) for
+	/// a type declared in a module and the module path where a function
+	/// declares it.
+	pub fn of_path<T: ?Sized + bevy::reflect::TypePath>() -> Self {
+		Self::new(T::type_path())
+	}
+
 	/// The name of the type of `val`.
 	pub fn of_val<T: ?Sized>(_val: &T) -> Self { Self::of::<T>() }
 
-	/// A name from its full type path, ie a reflected field's `type_path()`.
+	/// A name from its type path, ie a reflected field's `type_path()`, full
+	/// wherever it is known.
 	pub fn new(type_path: impl Into<SmolStr>) -> Self { Self(type_path.into()) }
+
+	/// The registration this names in `registry`, by full path or, as markup
+	/// writes a tag, by short path.
+	pub fn registration<'a>(
+		&self,
+		registry: &'a bevy::reflect::TypeRegistry,
+	) -> Option<&'a bevy::reflect::TypeRegistration> {
+		registry
+			.get_with_type_path(self.as_str())
+			.or_else(|| reflect_ext::registration_by_name(registry, self))
+			// a path only `core::any::type_name` writes, ie of a type a
+			// function declares, still names it by its short path
+			.or_else(|| {
+				reflect_ext::registration_by_name(registry, &self.short())
+			})
+	}
+
+	/// Whether this names the type at `type_path`: its full path, or the short
+	/// path of it a document authored.
+	pub fn names(&self, type_path: &bevy::reflect::TypePathTable) -> bool {
+		self.as_str() == type_path.path()
+			|| self.as_str() == type_path.short_path()
+	}
 
 	/// The full type path.
 	pub fn as_str(&self) -> &str { self.0.as_str() }
@@ -66,6 +101,14 @@ impl AsRef<str> for TypeName {
 
 impl From<TypeName> for SmolStr {
 	fn from(name: TypeName) -> Self { name.0 }
+}
+
+impl From<&str> for TypeName {
+	fn from(type_path: &str) -> Self { Self::new(type_path) }
+}
+
+impl From<SmolStr> for TypeName {
+	fn from(type_path: SmolStr) -> Self { Self(type_path) }
 }
 
 /// A [`TypeName`] paired with its [`TypeId`]: the id for comparison, the name

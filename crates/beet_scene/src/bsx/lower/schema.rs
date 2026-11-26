@@ -17,7 +17,7 @@ use core::any::TypeId;
 /// validates it. A template with no schema, or props that are not plain values
 /// (an entity reference), is left unverified, since those resolve by other
 /// means.
-pub(in crate::bsx) fn verify_props(
+pub(super) fn verify_props(
 	el: &BsxElement,
 	registration: &TypeRegistration,
 ) -> Result<()> {

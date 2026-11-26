@@ -5,7 +5,6 @@
 //! value. This is the save-game form.
 
 use super::scene_reflect::ReferenceSentinels;
-use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::component::ComponentId;
 use bevy::ecs::entity_disabling::DefaultQueryFilters;
@@ -13,6 +12,7 @@ use bevy::ecs::reflect::ReflectComponent;
 use bevy::ecs::reflect::ReflectResource;
 use bevy::ecs::relationship::RelationshipAccessor;
 use bevy::ecs::resource::IS_RESOURCE;
+use bevy::reflect::TypePath;
 use bevy_reflect::PartialReflect;
 use bevy_reflect::TypeRegistration;
 use bevy_reflect::TypeRegistry;
@@ -104,9 +104,12 @@ pub struct TemplateBuilder<'w> {
 	/// The set of already-extracted entities, for deduplication.
 	extracted_entity_ids: HashSet<Entity>,
 	/// The filter determining which components to extract.
-	component_filter: TemplateFilter,
+	component_filter: TypeFilter,
 	/// The filter determining which resources to extract.
-	resource_filter: TemplateFilter,
+	resource_filter: TypeFilter,
+	/// What the component filter answered for each type so far, since a glob
+	/// match per component of every entity is most of a filtered save.
+	component_verdicts: HashMap<TypeId, bool>,
 	/// The world the template is built from.
 	original_world: &'w World,
 	/// The type registry used to extract items through reflection.
@@ -131,8 +134,9 @@ impl<'w> TemplateBuilder<'w> {
 			body: default(),
 			error: None,
 			extracted_entity_ids: default(),
-			component_filter: TemplateFilter::default(),
-			resource_filter: TemplateFilter::default(),
+			component_filter: TypeFilter::default(),
+			resource_filter: TypeFilter::default(),
+			component_verdicts: default(),
 			original_world: world,
 			type_registry,
 			entity_map: default(),
@@ -152,44 +156,44 @@ impl<'w> TemplateBuilder<'w> {
 		self
 	}
 
-	/// Specify a custom component [`TemplateFilter`].
+	/// Specify a custom component [`TypeFilter`].
 	#[must_use]
-	pub fn with_component_filter(mut self, filter: TemplateFilter) -> Self {
+	pub fn with_component_filter(mut self, filter: TypeFilter) -> Self {
 		self.component_filter = filter;
 		self
 	}
 
-	/// Specify a custom resource [`TemplateFilter`].
+	/// Specify a custom resource [`TypeFilter`].
 	#[must_use]
-	pub fn with_resource_filter(mut self, filter: TemplateFilter) -> Self {
+	pub fn with_resource_filter(mut self, filter: TypeFilter) -> Self {
 		self.resource_filter = filter;
 		self
 	}
 
 	/// Allow all component and resource types.
 	pub fn allow_all(mut self) -> Self {
-		self.component_filter = TemplateFilter::allow_all();
-		self.resource_filter = TemplateFilter::allow_all();
+		self.component_filter = TypeFilter::allow_all();
+		self.resource_filter = TypeFilter::allow_all();
 		self
 	}
 
 	/// Deny all component and resource types.
 	pub fn deny_all(mut self) -> Self {
-		self.component_filter = TemplateFilter::deny_all();
-		self.resource_filter = TemplateFilter::deny_all();
+		self.component_filter = TypeFilter::deny_all();
+		self.resource_filter = TypeFilter::deny_all();
 		self
 	}
 
 	/// Allow the component type `T`, the inverse of [`deny_component`](Self::deny_component).
 	#[must_use]
-	pub fn allow_component<T: Component>(mut self) -> Self {
+	pub fn allow_component<T: Component + TypePath>(mut self) -> Self {
 		self.component_filter = self.component_filter.allow::<T>();
 		self
 	}
 
 	/// Deny the component type `T`, the inverse of [`allow_component`](Self::allow_component).
 	#[must_use]
-	pub fn deny_component<T: Component>(mut self) -> Self {
+	pub fn deny_component<T: Component + TypePath>(mut self) -> Self {
 		self.component_filter = self.component_filter.deny::<T>();
 		self
 	}
@@ -197,27 +201,27 @@ impl<'w> TemplateBuilder<'w> {
 	/// Allow all component types.
 	#[must_use]
 	pub fn allow_all_components(mut self) -> Self {
-		self.component_filter = TemplateFilter::allow_all();
+		self.component_filter = TypeFilter::allow_all();
 		self
 	}
 
 	/// Deny all component types.
 	#[must_use]
 	pub fn deny_all_components(mut self) -> Self {
-		self.component_filter = TemplateFilter::deny_all();
+		self.component_filter = TypeFilter::deny_all();
 		self
 	}
 
 	/// Allow the resource type `T`, the inverse of [`deny_resource`](Self::deny_resource).
 	#[must_use]
-	pub fn allow_resource<T: Resource>(mut self) -> Self {
+	pub fn allow_resource<T: Resource + TypePath>(mut self) -> Self {
 		self.resource_filter = self.resource_filter.allow::<T>();
 		self
 	}
 
 	/// Deny the resource type `T`, the inverse of [`allow_resource`](Self::allow_resource).
 	#[must_use]
-	pub fn deny_resource<T: Resource>(mut self) -> Self {
+	pub fn deny_resource<T: Resource + TypePath>(mut self) -> Self {
 		self.resource_filter = self.resource_filter.deny::<T>();
 		self
 	}
@@ -225,14 +229,14 @@ impl<'w> TemplateBuilder<'w> {
 	/// Allow all resource types.
 	#[must_use]
 	pub fn allow_all_resources(mut self) -> Self {
-		self.resource_filter = TemplateFilter::allow_all();
+		self.resource_filter = TypeFilter::allow_all();
 		self
 	}
 
 	/// Deny all resource types.
 	#[must_use]
 	pub fn deny_all_resources(mut self) -> Self {
-		self.resource_filter = TemplateFilter::deny_all();
+		self.resource_filter = TypeFilter::deny_all();
 		self
 	}
 
@@ -350,14 +354,15 @@ impl<'w> TemplateBuilder<'w> {
 						original_entity,
 						component_id,
 					),
-				) {
+				) && self
+					.component_filter
+					.passes(&TypeName::new(name.clone()))
+				{
 					resolved.insert(name.clone(), value.clone());
 				}
 				continue;
 			};
-			if type_id == TypeId::of::<Unregistered>()
-				|| self.component_filter.is_denied_by_id(type_id)
-			{
+			if type_id == TypeId::of::<Unregistered>() {
 				continue;
 			}
 			// an unregistered component cannot be dumped, so it is absent
@@ -366,6 +371,14 @@ impl<'w> TemplateBuilder<'w> {
 				*self.skipped.entry(component_id).or_default() += 1;
 				continue;
 			};
+			let passes =
+				*self.component_verdicts.entry(type_id).or_insert_with(|| {
+					self.component_filter
+						.passes_path(registration.type_info().type_path_table())
+				});
+			if !passes {
+				continue;
+			}
 			// derived state is never authored content, so it never dumps
 			if registration.data::<ReflectDerived>().is_some() {
 				continue;
@@ -488,11 +501,12 @@ impl<'w> TemplateBuilder<'w> {
 					.get_info(component_id)?
 					.type_id()?;
 
-				if self.resource_filter.is_denied_by_id(type_id) {
+				let type_registration = self.type_registry.get(type_id)?;
+				if !self.resource_filter.passes_path(
+					type_registration.type_info().type_path_table(),
+				) {
 					return None;
 				}
-
-				let type_registration = self.type_registry.get(type_id)?;
 				if type_registration.data::<ReflectDerived>().is_some() {
 					return None;
 				}

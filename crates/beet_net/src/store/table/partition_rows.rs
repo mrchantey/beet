@@ -1,8 +1,8 @@
 //! [`PartitionRows`]: one partition's rows as plain maps, the logic a table
 //! store held in one piece (a json file, process memory) shares.
 use crate::prelude::*;
+use alloc::collections::BTreeMap;
 use beet_core::prelude::*;
-use std::collections::BTreeMap;
 
 /// One partition's tables, each its rows in key order: reads, preconditions,
 /// writes and scans over rows a store holds whole.

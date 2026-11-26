@@ -2,18 +2,28 @@
 use crate::prelude::*;
 use crate::style::DiagramRender;
 use crate::style::InlineStyle;
-use crate::style::inline_style_rule;
 use beet_core::prelude::*;
 use beet_scene::prelude::*;
 
 /// Reads mermaid as a `<figure>` holding its [`MermaidDiagram`], drawn once it
-/// is on a surface: a ```` ```mermaid ```` fence, and a document of its own.
+/// is on a surface: a ```` ```mermaid ```` fence, which renders unless it says
+/// `render=false`, and a document of its own.
 ///
-/// The word after `mermaid` in a fence's info string
-/// (`text | svg | auto`, [`FenceInfo`]) is an [`InlineStyle`] declaring
-/// `diagram-render`, as `bx:style` would; any other word warns and is ignored.
+/// A fence's `mode` (`text | svg | auto`, [`MermaidFence`]) is an
+/// [`InlineStyle`] declaring `diagram-render`, as `bx:style` would.
 #[derive(Debug, Default, Clone)]
-pub struct MermaidParser;
+pub struct MermaidParser {
+	/// What the fence being read says, nothing for a document of its own.
+	fence: MermaidFence,
+}
+
+/// What a ```` ```mermaid ```` fence says beyond its format, ie
+/// ```` ```mermaid mode=text ````.
+#[derive(Debug, Default, Clone, PartialEq, Reflect)]
+pub struct MermaidFence {
+	/// The form this diagram takes, else the cascade's `diagram-render`.
+	pub mode: Option<DiagramRender>,
+}
 
 impl MermaidParser {
 	/// Mermaid's media type, and the word a fence names it by.
@@ -27,22 +37,24 @@ impl DocParser for MermaidParser {
 			.to_vec()
 	}
 
+	/// A diagram is drawn wherever it is written.
+	fn renders_fence(&self) -> bool { true }
+
+	fn configure(&mut self, params: &FenceParams) -> Result {
+		self.fence = params.read()?;
+		Ok(())
+	}
+
 	fn parse(
 		&mut self,
 		bytes: &MediaBytes,
-		parsers: &DocParsers,
+		_parsers: &DocParsers,
 	) -> Result<ParsedDocument, ParseError> {
 		let mut figure = EntityBody::default()
 			.with_typed(&Element::new("figure"))?
 			.with_typed(&MermaidDiagram::new(bytes.as_utf8()?))?;
-		if let Some(word) = FenceInfo::of(parsers).split_whitespace().next() {
-			match DiagramRender::parse_word(word) {
-				Some(render) => figure
-					.insert_typed(&InlineStyle::new(render.declaration()))?,
-				None => warn!(
-					"unknown mermaid fence info word `{word}`, expected `text`, `svg` or `auto`"
-				),
-			}
+		if let Some(mode) = self.fence.mode {
+			figure.insert_typed(&InlineStyle::new(mode.declaration()))?;
 		}
 		ParsedDocument::from(SceneBody::root(figure)).xok()
 	}
@@ -52,18 +64,7 @@ impl Installer for MermaidParser {
 	fn install(self, app: &mut App) { DocParsers::register_on(app, self); }
 }
 
-/// Declare `render` on `entity` exactly as `bx:style="diagram-render=.."`
-/// would: the content-keyed inline class and its one-off rule, so a fence info
-/// word, a `<Mermaid render=..>` prop and the directive all share one rule.
-pub(crate) fn declare_render(
-	entity: &mut EntityWorldMut,
-	render: DiagramRender,
-) -> Result {
-	let (class, rule) = inline_style_rule(&render.declaration())?;
-	register_inline_rule(entity, class, rule)
-}
-
-#[cfg(all(test, feature = "markdown_parser"))]
+#[cfg(all(test, feature = "markdown"))]
 pub(super) mod test {
 	use super::*;
 	use crate::style::common_props::DiagramRenderProp;
@@ -72,7 +73,7 @@ pub(super) mod test {
 
 	/// Parse markdown under `root` through the media parse, which runs the
 	/// post-parse passes.
-	pub(in crate::parse::mermaid) fn parse_md(
+	pub(in crate::formats::mermaid) fn parse_md(
 		world: &mut World,
 		root: Entity,
 		md: &str,
@@ -144,7 +145,7 @@ pub(super) mod test {
 	}
 
 	#[beet_core::test]
-	fn info_word_overrides_the_page_mode() {
+	fn fence_mode_overrides_the_page_mode() {
 		let mut app = App::new();
 		app.add_plugins(StylePlugin);
 		// the page asks for svg; the first fence insists on text
@@ -160,7 +161,7 @@ pub(super) mod test {
 			page,
 			&format!(
 				"{}\n\n{FLOWCHART}",
-				FLOWCHART.replace("mermaid", "mermaid text")
+				FLOWCHART.replace("mermaid", "mermaid mode=text")
 			),
 		);
 		let world = app.world_mut();
@@ -171,25 +172,34 @@ pub(super) mod test {
 	}
 
 	#[beet_core::test]
-	fn unknown_info_word_is_ignored() {
+	fn unknown_mode_refuses_the_page() {
+		let mut app = App::new();
+		app.add_plugins(StylePlugin);
+		let root = app.world_mut().spawn_empty().id();
+		ParseContext::new(
+			&mut app.world_mut().entity_mut(root),
+			&MediaBytes::new_markdown(
+				&FLOWCHART.replace("mermaid", "mermaid mode=banana"),
+			),
+		)
+		.parse()
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("banana");
+	}
+
+	#[beet_core::test]
+	fn render_false_is_a_code_sample() {
 		let mut app = App::new();
 		app.add_plugins(StylePlugin);
 		let root = app.world_mut().spawn_empty().id();
 		parse_md(
 			app.world_mut(),
 			root,
-			&FLOWCHART.replace("mermaid", "mermaid banana"),
+			&FLOWCHART.replace("mermaid", "mermaid render=false"),
 		);
-		let world = app.world_mut();
-		let figure = world.entity(root).get::<Children>().unwrap()[0];
-		// no inline rule was declared, the mode is the default and the form still builds
-		resolve_render(world, figure).xpect_eq(DiagramRender::Auto);
-		world
-			.entity(figure)
-			.get::<Classes>()
-			.unwrap()
-			.len()
-			.xpect_eq(1);
-		tags(world, root).len().xpect_greater_than(1);
+		let built = tags(app.world_mut(), root);
+		built.iter().any(|tag| tag == "figure").xpect_false();
+		built.iter().any(|tag| tag == "code").xpect_true();
 	}
 }

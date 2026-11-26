@@ -10,6 +10,7 @@
 //! The dispatch and the registry lookups live here; the coercions each arm
 //! reaches are [`super::scalar`] and [`super::composite`].
 
+use super::LiteralValues;
 use super::composite::*;
 use super::scalar::*;
 use beet_core::prelude::*;
@@ -24,7 +25,7 @@ use bevy::reflect::tuple::DynamicTuple;
 /// Resolves a `$name` entity reference to a concrete (possibly forward-mapped)
 /// [`Entity`], threaded through nested literals so a spread component's
 /// `Entity`-typed field resolves through the one entity model.
-pub(in crate::bsx) type EntityResolver<'a> = &'a mut dyn FnMut(&str) -> Entity;
+pub(crate) type EntityResolver<'a> = &'a mut dyn FnMut(&str) -> Entity;
 
 /// A [`DataLiteral`] resolved to a reflected value, its type inferred from
 /// the target's [`TypeInfo`].
@@ -66,13 +67,12 @@ impl LiteralReflect {
 		if let Some(info) = field_info
 			&& info.type_id() == core::any::TypeId::of::<Value>()
 		{
-			return Ok(Box::new(crate::bsx::lower::literal_to_value(literal)?));
+			return Ok(Box::new(LiteralValues::plain(literal)?));
 		}
 		// a map is data too, ie an `Instance`'s props
 		if let Some(info) = field_info
 			&& info.is::<Map>()
-			&& let Value::Map(map) =
-				crate::bsx::lower::literal_to_value(literal)?
+			&& let Value::Map(map) = LiteralValues::plain(literal)?
 		{
 			return Ok(Box::new(map));
 		}
@@ -239,26 +239,17 @@ fn tuple_scalar(literal: &DataLiteral) -> Option<&Value> {
 	}
 }
 
-/// Look up a registered type by short type path, the [`reflect_ext`] resolver
-/// under the name this module's callers use.
-pub(in crate::bsx) fn registration_by_name<'a>(
-	registry: &'a TypeRegistry,
-	name: &str,
-) -> Option<&'a TypeRegistration> {
-	reflect_ext::registration_by_name(registry, name)
-}
-
 /// Resolve a `Type::Variant` spread name (eg `SteerTarget::Entity`) to the
 /// *enum's* registration, so a `{SteerTarget::Entity($cheese)}` spread builds
 /// the variant through [`enum_to_reflect`] (which reduces the qualified name to
 /// its last segment). `None` when the prefix is not a registered enum carrying
 /// that variant, so a genuine miss still falls through to the unknown-name path.
-pub(in crate::bsx) fn enum_variant_registration<'a>(
+pub(crate) fn enum_variant_registration<'a>(
 	registry: &'a TypeRegistry,
 	name: &str,
 ) -> Option<&'a TypeRegistration> {
 	let (type_name, variant) = name.rsplit_once("::")?;
-	let registration = registration_by_name(registry, type_name)?;
+	let registration = reflect_ext::registration_by_name(registry, type_name)?;
 	let TypeInfo::Enum(enum_info) = registration.type_info() else {
 		return None;
 	};
@@ -268,6 +259,7 @@ pub(in crate::bsx) fn enum_variant_registration<'a>(
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_core::prelude::reflect_ext::registration_by_name;
 	use bevy::reflect::FromReflect;
 	use bevy::reflect::Typed;
 
@@ -597,12 +589,7 @@ mod test {
 		let source = r#"{"type":"array","items":{"type":"integer"}}"#;
 		resolve::<Declaration>(schema_literal(source))
 			.schema
-			.xpect_eq(
-				ValueSchema::from_json_value(
-					&MediaType::Json.deserialize(source.as_bytes()).unwrap(),
-				)
-				.unwrap(),
-			);
+			.xpect_eq(ValueSchema::from_json(source).unwrap());
 	}
 
 	/// A misspelled kind names the ones that exist rather than becoming a

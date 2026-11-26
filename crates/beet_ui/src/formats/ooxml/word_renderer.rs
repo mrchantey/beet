@@ -2780,7 +2780,7 @@ mod test {
 		let read = |bytes: &MediaBytes| {
 			let mut world = formats(themed);
 			world
-				.resource_mut::<DocParsers>()
+				.resource_mut::<beet_scene::prelude::DocParsers>()
 				.register(WordParser::default().with_options(options));
 			parse_in(world, bytes).unwrap()
 		};
@@ -2913,7 +2913,7 @@ mod test {
 	/// structure, and that read round trips. Its `rust` fence is highlighted
 	/// under `syntax_highlighting`, so only its text is asserted, the colours
 	/// it writes held to the round trip.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn writes_a_markdown_page() {
 		let image = Url::from_media_bytes(&MediaBytes::new(

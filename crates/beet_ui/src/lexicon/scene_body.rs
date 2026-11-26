@@ -63,7 +63,7 @@ impl Installer for SceneBodyLexicon {
 }
 
 // the fixture post is markdown
-#[cfg(all(test, feature = "markdown_parser"))]
+#[cfg(all(test, feature = "markdown"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

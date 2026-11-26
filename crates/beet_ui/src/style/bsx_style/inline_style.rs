@@ -81,7 +81,7 @@ impl InlineStyle {
 
 /// The one-off [`Rule`] an [`InlineStyle`]'s `source` declares and the class
 /// that keys it, for any pass that makes a declaration on an element's behalf
-/// (a fence info word) to register through [`register_inline_rule`] exactly as
+/// (a `<Mermaid mode>`) to register through [`register_inline_rule`] exactly as
 /// the component would, so identical declarations share one class and one
 /// rule.
 ///
@@ -193,7 +193,7 @@ mod test {
 	/// a matching one-off rule lands in the `RuleSet`. Regression for the markdown
 	/// path silently dropping the directive (the hero stayed unstyled on the
 	/// landing page), the `.md`/`.bsx` parity gap the A8 rehearsal surfaced.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn markdown_bx_style_lowers_to_inline_class() {
 		let mut world =
@@ -229,7 +229,7 @@ mod test {
 	/// directives shared one span-derived class and the second rule was dropped
 	/// by `try_insert_inline` (the `docs/design/grid` showcase lost its third
 	/// grid's column/row template).
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn markdown_distinct_bx_styles_get_distinct_classes() {
 		let mut world =

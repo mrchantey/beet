@@ -47,7 +47,7 @@ impl Plugin for StylePlugin {
 
 		#[cfg(feature = "mermaid")]
 		{
-			app.install(MermaidParser)
+			app.install(MermaidParser::default())
 				.register_type::<MermaidDiagram>()
 				.add_systems(
 					PostParseTree,

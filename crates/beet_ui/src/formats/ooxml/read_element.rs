@@ -3,6 +3,7 @@
 use super::office_style::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 use bevy::reflect::TypePath;
 
 /// An element a reader assembles in memory, then lowers whole into its

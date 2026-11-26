@@ -73,7 +73,7 @@ web-sys = { workspace = true, features = [
 
 
 [dev-dependencies]
-beet_scene = { workspace = true, features = ["std"] }
+beet_scene = { workspace = true, features = ["std", "bsx"] }
 beet_core = { workspace = true, features = ["testing", "fs", "rand"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

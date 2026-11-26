@@ -99,7 +99,7 @@ impl Installer for AnsiTermRenderer {
 }
 
 #[cfg(test)]
-#[cfg(feature = "markdown_parser")]
+#[cfg(feature = "markdown")]
 mod test {
 	use super::*;
 	use beet_net::prelude::*;

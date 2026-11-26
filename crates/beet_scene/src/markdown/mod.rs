@@ -6,26 +6,26 @@
 //! [`BsxNode`] tree every markup format lowers from. So a component, a `bx:`
 //! directive or a spread in markdown is the one it is in BSX, in one tree.
 //!
-//! A fence whose info string names a media type with a parser is that format's
-//! document, lowered in place ([`FenceInfo`]). The name is a media type
-//! (`text/html`, `mermaid`) and never a language (`html`), so a code sample is
-//! code.
+//! A fence is code, unless it is the document it holds: its first word names a
+//! format, by media type or by extension (`text/html`, `html`), and it says
+//! `render`, or the format renders a fence by default
+//! ([`DocParser::renders_fence`], a diagram) and it does not say
+//! `render=false`. What it says beyond that are [`FenceParams`], written as a
+//! BSX tag's attributes.
 //!
 //! A document's frontmatter is its root's components ([`Frontmatter`]), read by
-//! the plain text fallback too, so it needs no `markdown_parser` feature.
+//! the plain text fallback too, so it needs no `markdown` feature.
 #[cfg(doc)]
 use crate::prelude::*;
 #[cfg(doc)]
 use beet_core::prelude::*;
 
-mod fence_info;
 mod frontmatter;
-#[cfg(feature = "markdown_parser")]
+#[cfg(feature = "markdown")]
 mod markdown_parser;
-#[cfg(feature = "markdown_parser")]
+#[cfg(feature = "markdown")]
 mod tree_builder;
 
-pub use fence_info::*;
 pub use frontmatter::*;
-#[cfg(feature = "markdown_parser")]
+#[cfg(feature = "markdown")]
 pub use markdown_parser::*;

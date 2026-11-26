@@ -75,8 +75,8 @@ tui = ["style", "keyboard", "dep:vte", "dep:libc", "dep:base64", "dep:image", "d
 
 json = ["dep:serde_json", "serde", "beet_core/json", "beet_scene?/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
-# The markdown and mdx parser (`beet_scene/markdown_parser`).
-markdown_parser = ["scene", "beet_scene/markdown_parser"]
+# The markdown and mdx parser (`beet_scene/markdown`).
+markdown = ["scene", "beet_scene/markdown"]
 # Word files, workbooks and slide decks as media (`OoxmlPlugin`, which a
 # router installs): each read into the one document tree by a `DocParser` and
 # written from it by a `DocRenderer`, its looks through the style cascade,
@@ -87,7 +87,7 @@ testing = ["beet_core/testing"]
 # Documents read and scenes loaded, saved and edited through `beet_scene`: the
 # formats' styling side (a `<Rule>`, an inline style, a mermaid fence), the
 # default `bx:on<event>` handlers, the scene editor and the scene lexicon.
-scene = ["template", "serde", "dep:beet_scene"]
+scene = ["template", "serde", "dep:beet_scene", "beet_scene/bsx"]
 # The `bx:on<event>` script runner: an event handler's body is a JavaScript
 # program run through beet_action's world bridge, which is the whole event
 # vocabulary, so adding a behavior is authoring a document, not recompiling. Pulls

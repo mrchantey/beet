@@ -490,7 +490,7 @@ mod test {
 	/// Write a `published`/`secret` (frontmatter `visibility = "draft"`) content
 	/// dir in a fresh [`TempDir`], returning it.
 	// `RoutesDir` scans the filesystem store, so this is native-only.
-	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "markdown", not(target_arch = "wasm32")))]
 	fn draft_content_dir() -> TempDir {
 		let root = TempDir::new_ws().unwrap();
 		fs_ext::write(root.join("published.md"), "# Published").unwrap();
@@ -504,7 +504,7 @@ mod test {
 
 	/// Spawn a `RoutesDir` router over `root`, settling the async runtime so the
 	/// discovery scan (an async task) completes before the export walks the routes.
-	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "markdown", not(target_arch = "wasm32")))]
 	async fn spawn_routes_dir(world: &mut World, root: AbsPath) -> Entity {
 		// compose the repo store on the router root so `RoutesDir` resolves it by
 		// ancestry, then settle the discovery scan before the export walks the routes.
@@ -519,7 +519,7 @@ mod test {
 
 	/// The `RoutesDir` shape in dev: a scan-time `visibility = "draft"` route is
 	/// still exported for preview.
-	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "markdown", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn dev_keeps_draft_routes_dir() {
 		let mut world = draft_world();
@@ -532,7 +532,7 @@ mod test {
 
 	/// The `RoutesDir` shape in prod: scan-time frontmatter
 	/// `visibility = "draft"` excludes the discovered route from the export.
-	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "markdown", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn prod_drops_draft_routes_dir() {
 		let mut world = draft_world();

@@ -21,16 +21,20 @@ std = ["beet_core/std", "beet_net/std"]
 json = ["beet_core/json", "beet_net/json"]
 postcard = ["beet_core/postcard"]
 toml = ["beet_core/toml"]
+# BSX, HTML and XML documents lowered to scene bodies, their directives and
+# the literal grammar, over `beet_core`'s syntax tree. Without it a build reads
+# the structured formats, plain text and scripts alone.
+bsx = ["beet_core/bsx"]
 # The markdown and mdx parser, markup embedded in either read by the BSX
 # fragment primitive, so BSX is the single markup authority and an embedded
 # component, template or `bx:` directive is the one it is in BSX.
-markdown_parser = ["dep:pulldown-cmark"]
+markdown = ["bsx", "dep:pulldown-cmark"]
 
 [lib]
 harness = false
 
 [dependencies]
-beet_core = { workspace = true, features = ["serde", "bevy_async", "bsx"] }
+beet_core = { workspace = true, features = ["serde", "bevy_async"] }
 beet_net.workspace = true
 bevy.workspace = true
 indexmap.workspace = true
@@ -48,4 +52,4 @@ beet_action = { workspace = true, features = ["std", "reflect", "scripting"] }
 beet_core = { workspace = true, features = ["testing", "rsx", "json"] }
 beet_net = { workspace = true, features = ["atproto"] }
 # the formats the suite reads
-beet_scene = { path = ".", features = ["json", "toml", "postcard", "markdown_parser"] }
+beet_scene = { path = ".", features = ["json", "toml", "postcard", "bsx", "markdown"] }

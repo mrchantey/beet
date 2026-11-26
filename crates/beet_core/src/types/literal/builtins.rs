@@ -300,13 +300,10 @@ fn add_domain(table: &mut Table) {
 		// order the two words cannot express is authored as the rules
 		// themselves (`{GlobFilter{rules:[Exclude(".."),Include("..")]}}`),
 		// which declines to the structural walk.
-		.add_hinted("a glob pattern, repeatable", |value: &Value| match value {
-			Value::Str(pattern) => glob_filter([pattern.as_str()]).map(Some),
-			Value::List(items) => {
-				glob_patterns(items)?.xmap(glob_filter).map(Some)
-			}
-			Value::Map(map) => glob_filter_lists(map),
-			_ => Ok(None),
+		.add_hinted("a glob pattern, repeatable", authored_glob_filter)
+		// a filter over types is authored as the filter it holds
+		.add_hinted("a type path glob, repeatable", |value: &Value| {
+			authored_glob_filter(value).map(|filter| filter.map(TypeFilter::new))
 		})
 		// one validated pattern, the item form of the filter above.
 		.add_hinted("a glob pattern", |value: &Value| match value {
@@ -337,11 +334,14 @@ fn add_domain(table: &mut Table) {
 		);
 
 	// a bare word naming the shape a field accepts, so `<DynamicComponent
-	// name=".." schema="u64"/>` declares what a runtime component means.
+	// name=".." schema="u64"/>` declares what a runtime component means, or a
+	// JSON Schema, as its text or as the object it is.
 	// `ValueSchema` is reflect-opaque, so this is the only way markup can build
 	// one short of a rust expression.
 	table.add(|value: &Value| match value {
 		Value::Str(source) => value_schema(source.as_str()).map(Some),
+		// a JSON Schema written as the object it is, `schema={{type:"string"}}`
+		Value::Map(_) => ValueSchema::from_value(value).map(Some),
 		_ => Ok(None),
 	});
 
@@ -376,6 +376,18 @@ fn add_domain(table: &mut Table) {
 			),
 		}
 	});
+}
+
+/// A [`GlobFilter`] as markup authors one: a pattern or a list of them, the
+/// includes, or the two named lists. Anything else declines to the structural
+/// walk.
+fn authored_glob_filter(value: &Value) -> Result<Option<GlobFilter>> {
+	match value {
+		Value::Str(pattern) => glob_filter([pattern.as_str()]).map(Some),
+		Value::List(items) => glob_patterns(items)?.xmap(glob_filter).map(Some),
+		Value::Map(map) => glob_filter_lists(map),
+		_ => Ok(None),
+	}
 }
 
 /// A [`GlobFilter`] over `patterns`, as includes.
@@ -450,7 +462,7 @@ fn glob_patterns(items: &[Value]) -> Result<Vec<&str>> {
 fn value_schema(source: &str) -> Result<ValueSchema> {
 	let source = source.trim();
 	if source.starts_with('{') {
-		return json_schema(source);
+		return ValueSchema::from_json(source);
 	}
 	// unlike a JSON Schema descriptor, an unrecognized word here is an authoring
 	// typo rather than a reference to a schema by name, so it is named as one.
@@ -462,17 +474,6 @@ fn value_schema(source: &str) -> Result<ValueSchema> {
 	})
 }
 
-/// A [`ValueSchema`] from one JSON Schema descriptor.
-#[cfg(feature = "json")]
-fn json_schema(source: &str) -> Result<ValueSchema> {
-	ValueSchema::from_json_value(&serde_json::from_str(source)?)
-}
-
-/// Parsing a JSON schema requires the `json` feature.
-#[cfg(not(feature = "json"))]
-fn json_schema(_source: &str) -> Result<ValueSchema> {
-	bevybail!("parsing a JSON schema requires the `json` feature")
-}
 
 #[cfg(test)]
 mod test {

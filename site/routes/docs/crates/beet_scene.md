@@ -25,4 +25,4 @@ A body goes both ways. `TemplateLoader` builds one into a world, `TemplateSaver`
 
 One document uses another by naming it, `<Instance document="widgets/Card.bsx" props={{title:"Intro"}}/>`. The document is read once and held as data, and each use builds it with entities of its own, its props and slots filled by whoever uses it.
 
-The crate is `no_std`, so firmware loads a scene pushed to it. What names the data and nothing more, the scene body, its keys and schemas, the format registry and the template substrate, is [`beet_core`](/docs/crates/beet_core)'s, so a crate can declare a type that any document may use without linking a parser.
+The crate is `no_std`, so firmware loads a scene pushed to it, and BSX is its `bsx` feature, so a build reading only the structured formats links no markup grammar. What names the data and nothing more, the scene body, its keys and schemas and the template substrate, is [`beet_core`](/docs/crates/beet_core)'s, so a crate can declare a type that any document may use without linking a parser.

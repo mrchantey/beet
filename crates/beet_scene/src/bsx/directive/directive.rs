@@ -28,9 +28,8 @@ pub trait BsxDirective: 'static + Send + Sync + Clone + Installer {
 	fn rewrite(&self, key: &str, element: &mut BsxElement) -> Result;
 }
 
-/// Every [`BsxDirective`] a world's markup parsers read, a
-/// [setting](DocParsers::setting) of [`DocParsers`] so the BSX parser and
-/// markdown's embedded BSX read one set.
+/// Every [`BsxDirective`] a world's markup parsers read, carried by the
+/// registered [`BsxParser`] so it and markdown's embedded BSX read one set.
 ///
 /// The standard set ([`Default`]) is in every registry whatever the
 /// features, each rewrite naming its target type as text, so a lean binary
@@ -42,6 +41,12 @@ pub trait BsxDirective: 'static + Send + Sync + Clone + Installer {
 #[derive(Clone)]
 pub struct BsxDirectives {
 	directives: Vec<Arc<dyn ErasedBsxDirective>>,
+}
+
+impl core::fmt::Debug for BsxDirectives {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		f.debug_list().entries(self.available()).finish()
+	}
 }
 
 /// The standard set.
@@ -73,25 +78,24 @@ impl BsxDirectives {
 		self
 	}
 
-	/// The set `parsers` carries, the standard one until a directive is
-	/// registered.
+	/// The set the [`BsxParser`] of `parsers` carries, the standard one where
+	/// none is registered.
 	pub fn of(parsers: &DocParsers) -> Cow<'_, Self> {
-		match parsers.setting::<Self>() {
-			Some(directives) => Cow::Borrowed(directives),
+		match parsers.get::<BsxParser>() {
+			Some(parser) => Cow::Borrowed(parser.directives()),
 			None => Cow::Owned(Self::default()),
 		}
 	}
 
-	/// [`register`](Self::register) `directive` in the set `app`'s
-	/// [`DocParsers`] carries, creating the registry if absent and never
-	/// touching a parser: the body of every [`BsxDirective`]'s [`Installer`]
-	/// impl.
+	/// [`register`](Self::register) `directive` in the set the [`BsxParser`] of
+	/// `app`'s [`DocParsers`] carries, registering the parser where it is
+	/// absent: the body of every [`BsxDirective`]'s [`Installer`] impl.
 	pub fn register_on(app: &mut App, directive: impl BsxDirective) {
-		app.world_mut()
-			.get_resource_or_init::<DocParsers>()
-			.edit_setting(|directives: &mut Self| {
-				directives.register(directive);
-			});
+		app.world_mut().get_resource_or_init::<DocParsers>().edit(
+			|parser: &mut BsxParser| {
+				parser.directives_mut().register(directive);
+			},
+		);
 	}
 
 	/// The pattern of every registered directive, in registration order.

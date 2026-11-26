@@ -1,10 +1,8 @@
 //! Element lowering: the tag dispatch, and the seams a type opens in it.
-use super::literal::*;
 use super::lowering::*;
-use crate::bsx::reflect::*;
+use super::schema::*;
+use crate::literal::*;
 use beet_core::prelude::*;
-use bevy::ecs::reflect::ReflectComponent;
-use bevy::ecs::reflect::ReflectResource;
 use bevy::reflect::CreateTypeData;
 use bevy::reflect::Reflect;
 use bevy::reflect::TypeInfo;
@@ -33,34 +31,6 @@ impl<T: FromElement + Reflect> CreateTypeData<T> for ReflectFromElement {
 				T::from_element(element)
 					.map(|value| Box::new(value) as Box<dyn Reflect>)
 			},
-		}
-	}
-}
-
-/// What a name resolves to.
-enum NameKind {
-	/// A `#[template]` type, expanded when the body spawns.
-	Template,
-	/// A resource declaration.
-	Resource,
-	/// A component.
-	Component,
-}
-
-impl NameKind {
-	/// What `registration` is, refusing a type that is none.
-	fn of(registration: &TypeRegistration) -> Result<Self> {
-		if registration.data::<ReflectTemplate>().is_some() {
-			Self::Template.xok()
-		} else if registration.data::<ReflectResource>().is_some() {
-			Self::Resource.xok()
-		} else if registration.data::<ReflectComponent>().is_some() {
-			Self::Component.xok()
-		} else {
-			bevybail!(
-				"type `{}` is not a registered component",
-				registration.type_info().type_path()
-			)
 		}
 	}
 }
@@ -149,14 +119,17 @@ impl Lowering<'_> {
 	}
 
 	/// Lower an uppercase tag: a component, a template or a resource, else a
-	/// name nothing registered.
+	/// name held as nothing registered it.
 	fn named(&mut self, el: &BsxElement, key: &EntityKey) -> Result {
-		let Some(registration) =
-			registration_by_name(self.types, &el.tag).cloned()
-		else {
+		let Some((registration, kind)) = reflect_ext::registration_by_name(
+			self.types, &el.tag,
+		)
+		.and_then(|registration| {
+			NameKind::of(registration).map(|kind| (registration.clone(), kind))
+		}) else {
 			return self.unregistered(el, key);
 		};
-		match NameKind::of(&registration)? {
+		match kind {
 			NameKind::Template => self.template(el, &registration, key),
 			NameKind::Resource => self.resource(el, &registration, key),
 			NameKind::Component => self.component(el, &registration, key),
@@ -193,7 +166,7 @@ impl Lowering<'_> {
 			);
 		}
 		let value = match &el.tag_literal {
-			Some(named) => self.named_value(named, registration)?,
+			Some(named) => self.values().named_value(named, registration)?,
 			None => self.attributes_value(el, registration)?,
 		};
 		self.entity(key)
@@ -228,7 +201,7 @@ impl Lowering<'_> {
 			);
 		}
 		let value = match &el.tag_literal {
-			Some(named) => self.named_value(named, registration)?,
+			Some(named) => self.values().named_value(named, registration)?,
 			None => {
 				Self::assert_attributes_are_fields(
 					el,
@@ -266,11 +239,10 @@ impl Lowering<'_> {
 				self.types,
 			)?,
 			(None, Some(named)) => {
-				let registration = self
-					.registration(&named.name)
-					.cloned()
-					.unwrap_or_else(|| registration.clone());
-				self.named_value(named, &registration)?
+				let values = self.values();
+				let registration =
+					values.registration(&named.name).unwrap_or(registration);
+				values.named_value(named, registration)?
 			}
 			(None, None) => {
 				Self::assert_attributes_are_fields(el, info)?;
@@ -323,7 +295,7 @@ impl Lowering<'_> {
 				continue;
 			};
 			let seed = match &binding.init {
-				Some(init) => literal_to_value(init)?,
+				Some(init) => LiteralValues::plain(init)?,
 				None => Value::Null,
 			};
 			bound.push((prop.clone(), (**binding).clone()));
@@ -419,7 +391,7 @@ impl Lowering<'_> {
 	/// and only its behavior is missing.
 	fn unregistered(&mut self, el: &BsxElement, key: &EntityKey) -> Result {
 		let value = match &el.tag_literal {
-			Some(named) => self.named_to_held(named),
+			Some(named) => self.values().named_to_held(named),
 			None => self.attributes_to_held(el),
 		};
 		self.entity(key).insert(el.tag.as_str(), value);
@@ -459,16 +431,8 @@ impl Lowering<'_> {
 	/// Lower one named spread: a component, a template's invocation, a
 	/// resource, or a name nothing registered.
 	fn spread(&mut self, named: &NamedLiteral, key: &EntityKey) -> Result {
-		let Some(registration) = self.registration(&named.name).cloned() else {
-			let value = self.named_to_held(named);
-			self.entity(key).insert(named.name.clone(), value);
-			return Ok(());
-		};
-		// a type that is none of the three has no meaning on an entity
-		NameKind::of(&registration)?;
-		let value = self.named_value(named, &registration)?;
-		self.entity(key)
-			.insert(registration.type_info().type_path(), value);
+		let (name, value) = self.values().declaration(named)?;
+		self.entity(key).insert(name, value);
 		Ok(())
 	}
 }

@@ -9,11 +9,9 @@ extern crate alloc;
 extern crate std;
 
 mod document;
+mod formats;
 mod input;
 mod lexicon;
-#[cfg(feature = "ooxml")]
-pub mod ooxml;
-mod parse;
 mod render;
 #[cfg(feature = "style")]
 pub mod style;
@@ -35,16 +33,10 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::css_variable;
 	pub use crate::document::*;
+	pub use crate::formats::*;
 	pub use crate::inline_class;
 	pub use crate::input::*;
 	pub use crate::lexicon::*;
-	#[cfg(feature = "ooxml")]
-	pub use crate::ooxml::*;
-	#[cfg(feature = "template")]
-	pub use crate::world_ext;
-	// the `rsx!` / `#[template]` snippet runtime moved to `beet_core`; re-export it
-	// so the macro output and `use beet_ui::prelude::*` call sites resolve.
-	pub use crate::parse::*;
 	pub use crate::render::*;
 	#[cfg(feature = "style")]
 	pub use crate::style;
@@ -80,6 +72,8 @@ pub mod prelude {
 	pub use crate::style::material::classes;
 	pub use crate::token;
 	pub use crate::token::*;
+	#[cfg(feature = "template")]
+	pub use crate::world_ext;
 	#[cfg(feature = "template")]
 	pub use beet_core::types::snippet::*;
 

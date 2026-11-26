@@ -1,7 +1,7 @@
 //! `@` bindings: each to the sync components of its source.
-use super::literal::*;
 use super::lowering::*;
 use crate::body::KeySentinels;
+use crate::literal::*;
 use beet_core::prelude::*;
 
 /// The reserved selector names, targeting well-known entities rather than a
@@ -60,7 +60,7 @@ impl Lowering<'_> {
 			BindingSource::Doc => {
 				let mut field = FieldRef::new(binding.field_path.clone());
 				if let Some(init) = &binding.init {
-					field = field.with_init(literal_to_value(init)?);
+					field = field.with_init(LiteralValues::plain(init)?);
 				}
 				self.insert(key, &field)
 			}

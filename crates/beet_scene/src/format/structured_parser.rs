@@ -5,6 +5,7 @@
 //! them, deliberately: every shape beet shares with atproto carries a
 //! `$type` (a scene body names `org.beet.scene#body`), which is no field name
 //! RON accepts, and beet does not shape its types around one format.
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Reads the structured formats this build has a feature for (json,

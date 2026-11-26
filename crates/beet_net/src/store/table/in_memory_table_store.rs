@@ -1,9 +1,9 @@
 //! [`InMemoryTableStore`]: tables in process memory.
 use crate::prelude::*;
+use alloc::sync::Arc;
 use beet_core::prelude::*;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::sync::MutexGuard;
+use bevy::platform::sync::Mutex;
+use bevy::platform::sync::MutexGuard;
 
 /// Tables in process memory, gone with the last handle: for a test, or a
 /// runtime whose rows need not outlive it.

@@ -24,9 +24,11 @@ extern crate alloc;
 beet_core::test_main!();
 
 pub mod body;
+#[cfg(feature = "bsx")]
 pub mod bsx;
 mod format;
 mod instance;
+mod literal;
 mod markdown;
 #[cfg(feature = "json")]
 mod scene_blob;
@@ -35,9 +37,11 @@ mod scene_plugin;
 /// Exports the most commonly used items.
 pub mod prelude {
 	pub use crate::body::*;
+	#[cfg(feature = "bsx")]
 	pub use crate::bsx::*;
 	pub use crate::format::*;
 	pub use crate::instance::*;
+	pub use crate::literal::*;
 	pub use crate::markdown::*;
 	#[cfg(feature = "json")]
 	pub use crate::scene_blob::*;

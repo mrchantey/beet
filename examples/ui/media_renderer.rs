@@ -20,7 +20,7 @@ fn main() {
 	let md_bytes = MediaBytes::new_markdown(MARKDOWN);
 
 	// 1. Load the markdown into ecs — falls back to plain text without
-	// the `markdown_parser` feature.
+	// the `markdown` feature.
 	ParseContext::new(&mut entity, &md_bytes).parse().unwrap();
 
 	// 2. Get the requested media type

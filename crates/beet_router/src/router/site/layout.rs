@@ -83,11 +83,13 @@ pub struct Layout(pub TemplateSource);
 
 impl Layout {
 	/// Wrap descendant routes in the rust template `T` ([`TemplateSource::of`]).
-	pub fn of<T: BuildTemplate>() -> Self { Self(TemplateSource::of::<T>()) }
+	pub fn of<T: BuildTemplate + TypePath>() -> Self {
+		Self(TemplateSource::of::<T>())
+	}
 
 	/// Wrap descendant routes in the rust template named `template`. Prefer
 	/// [`of`](Self::of), which derives the name from the type.
-	pub fn template(template: impl Into<SmolStr>) -> Self {
+	pub fn template(template: impl Into<TypeName>) -> Self {
 		Self(TemplateSource::template(template))
 	}
 
@@ -244,7 +246,6 @@ mod test {
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-	use beet_scene::prelude::*;
 	use beet_ui::prelude::DocMeta;
 	// the `MetaLayout` test template's site-title link, gated like its only user.
 	// Named rather than glob-imported: `beet_net` has a `Header` trait too.
@@ -912,6 +913,7 @@ mod test {
 			.holders()
 			.xpect_eq(&[layout]);
 
+		use beet_scene::prelude::*;
 		let bytes = TemplateSaver::new()
 			.with_entity_tree(&world, root)
 			.save(&world, MediaType::Json)

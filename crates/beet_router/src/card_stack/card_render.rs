@@ -409,7 +409,7 @@ impl CardDeck {
 }
 
 #[cfg(test)]
-#[cfg(all(feature = "ooxml", feature = "markdown_parser"))]
+#[cfg(all(feature = "ooxml", feature = "markdown"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

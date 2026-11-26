@@ -1137,7 +1137,7 @@ impl Installer for MarkdownRenderer {
 }
 
 #[cfg(test)]
-#[cfg(feature = "markdown_parser")]
+#[cfg(feature = "markdown")]
 mod test {
 	use super::*;
 	use beet_net::prelude::*;
@@ -1364,7 +1364,7 @@ mod test {
 	/// A card article writes as markdown authors one, so a deck dumps card by
 	/// card and reads back as the same cards; asked for, a hidden one writes
 	/// too, keeping its `hidden`.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	fn writes_card_articles_as_authored() {
 		let deck = "<article data-card><h1>One</h1><hr/><p>Notes.</p></article>\

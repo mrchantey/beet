@@ -14,14 +14,9 @@ use core::any::TypeId;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentIdent {
 	/// The identifier as it appears on the wire: a registered component's full
-	/// type path, or a dynamic component's declared name.
-	pub path: SmolStr,
-	/// The short form a human writes: a registered component's short type path,
-	/// or, for a dynamic component, its declared name again.
-	///
-	/// Carried alongside [`path`](Self::path) because a [`ScriptConfig`] is
-	/// written either way and must match either way.
-	pub short: SmolStr,
+	/// type path, or a dynamic component's declared name, which a
+	/// [`ScriptConfig`] matches by either of its names.
+	pub name: TypeName,
 	/// The live component.
 	pub id: ComponentId,
 	/// The reflected type, absent for a dynamic component, which has none.
@@ -40,8 +35,7 @@ impl ComponentIdent {
 	pub fn resolve(world: &mut World, ident: &str) -> Result<Self> {
 		if let Some(id) = DynamicComponents::get(world, ident) {
 			return Self {
-				path: ident.into(),
-				short: ident.into(),
+				name: TypeName::new(ident),
 				id,
 				type_id: None,
 			}
@@ -54,10 +48,7 @@ impl ComponentIdent {
 			let registry = registry.read();
 			match reflect_ext::registration_by_name(&registry, ident) {
 				Some(registration) => Some((
-					SmolStr::new(registration.type_info().type_path()),
-					SmolStr::new(
-						registration.type_info().type_path_table().short_path(),
-					),
+					TypeName::new(registration.type_info().type_path()),
 					registration.type_id(),
 					registration
 						.data::<ReflectComponent>()
@@ -72,12 +63,11 @@ it is missing `#[reflect(Component)]`"
 				None => None,
 			}
 		};
-		let Some((path, short, type_id, reflect_component)) = resolved else {
+		let Some((name, type_id, reflect_component)) = resolved else {
 			return Err(Self::unknown(&registry.read(), ident));
 		};
 		Self {
-			path,
-			short,
+			name,
 			id: reflect_component.register_component(world),
 			type_id: Some(type_id),
 		}
@@ -134,8 +124,8 @@ mod test {
 		let mut world = test_world();
 		ComponentIdent::resolve(&mut world, "Name")
 			.unwrap()
-			.path
-			.xpect_eq(SmolStr::new("bevy_ecs::name::Name"));
+			.name
+			.xpect_eq(TypeName::new("bevy_ecs::name::Name"));
 	}
 
 	#[beet_core::test]

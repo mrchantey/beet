@@ -157,7 +157,11 @@ impl DynamicTemplate {
 		let mut entries = body.iter().collect::<Vec<_>>();
 		entries.sort_by_key(|(name, _)| name.as_str());
 		for (name, value) in entries {
-			let Some(registration) = Self::registration(registry, name) else {
+			// a type registered as none of the three an entity holds is held
+			// as a name nothing registered
+			let Some(registration) = Self::registration(registry, name)
+				.filter(|registration| NameKind::of(registration).is_some())
+			else {
 				debug!(
 					"entity `{key}`: no type registered for `{name}`, left off and held unregistered"
 				);

@@ -860,7 +860,7 @@ mod test {
 	/// Editing a card repaints the live terminal: after the watched change
 	/// respawns the routes, the in-world navigator re-fetches its current card and
 	/// the page host paints the edited content, with the `CardDeck` marker intact.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	async fn tui_reload_repaints_current_card() {
 		use bevy::math::UVec2;
@@ -921,7 +921,7 @@ mod test {
 	/// second card, and prev returns to the first. Regression for prev stepping
 	/// "past" the first card (onto the home or an error page) and a following next
 	/// then skipping it.
-	#[cfg(feature = "markdown_parser")]
+	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	async fn card_nav_clamps_at_first_and_steps_without_skip() {
 		use bevy::input::ButtonState;

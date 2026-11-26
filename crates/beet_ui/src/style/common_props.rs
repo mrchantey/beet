@@ -178,7 +178,7 @@ canonical_property!(DiagramRenderProp, DiagramRender, TokenInheritance::Inherite
 // role: custom properties on the figure, which the stylesheet builder never
 // renames as it does a token variable, so an inline svg's
 // `fill="var(--diagram-node-fill)"` resolves against whatever the cascade
-// declares for its figure: the material `:root` defaults (`parse/mermaid`), a
+// declares for its figure: the material `:root` defaults (`formats/mermaid`), a
 // page root's `bx:style`, or a `<Rule>`. Inherited, like every text prop.
 css_property!(DiagramSurfaceProp, Color, TokenInheritance::Inherited, "--diagram-surface");
 css_property!(DiagramNodeFillProp, Color, TokenInheritance::Inherited, "--diagram-node-fill");

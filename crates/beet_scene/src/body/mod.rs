@@ -63,7 +63,7 @@
 //!   a deferred template.
 //! - [`TemplateBuilder`] - Extracts a [`SceneBody`] from a
 //!   [`World`].
-//! - [`TemplateFilter`] - Allow/deny lists controlling which types are extracted.
+//! - [`TypeFilter`] - the rules for which types are extracted.
 //! - [`TemplateEntityMap`] - The file-key to world-entity map a loaded document
 //!   retains, so a re-save writes every entity back under the key it loaded from.
 //! - [`SceneDocument`] - A loaded scene as an editable [`Document`] the world
@@ -83,7 +83,6 @@ mod scene_document;
 mod scene_reflect;
 mod scene_source;
 mod template_builder;
-mod template_filter;
 
 pub use body_components::*;
 pub(self) use cfg_prune::*;
@@ -95,8 +94,8 @@ pub use saver::*;
 pub use scene_document::SceneDocument;
 pub use scene_document::SceneFork;
 pub(crate) use scene_document::sync_scene_documents;
+#[cfg(feature = "bsx")]
 pub(crate) use scene_reflect::EntityKeys;
 pub(crate) use scene_reflect::KeySentinels;
 pub use scene_source::*;
 pub use template_builder::*;
-pub use template_filter::*;

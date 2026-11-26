@@ -5,6 +5,7 @@ use super::office_style::*;
 use super::read_element::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 use bevy::math::Affine2;
 
 /// Reads a slide deck into one `article data-card` per listed slide in

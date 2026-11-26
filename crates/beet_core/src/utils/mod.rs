@@ -33,6 +33,7 @@ mod glob_filter;
 /// HTML vocabulary: element kinds and character references.
 pub mod html_ext;
 mod into_option;
+mod type_filter;
 // LazyPool is built on async_lock (std-only).
 #[cfg(feature = "rand")]
 mod fast_random;
@@ -108,4 +109,5 @@ pub(crate) use panic_context::*;
 pub use secure_random::*;
 pub use timestamp::*;
 pub use tree::*;
+pub use type_filter::*;
 pub use xtend::*;

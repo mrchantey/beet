@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 /// The form a diagram (a ```` ```mermaid ```` fence, a `<Mermaid>`) takes: the
 /// `diagram-render` cascade property. Inherited like a text prop, so it is set
 /// per app (a rule), per page (`bx:style` on the page root) or per diagram (the
-/// fence info word, ```` ```mermaid text ````).
+/// fence's `mode`, ```` ```mermaid mode=text ````).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum DiagramRender {
@@ -22,16 +22,6 @@ pub enum DiagramRender {
 }
 
 impl DiagramRender {
-	/// Parse a fence info word (`text`, `svg`, `auto`, any case).
-	pub fn parse_word(word: &str) -> Option<Self> {
-		match word.to_ascii_lowercase().as_str() {
-			"auto" => Some(Self::Auto),
-			"svg" => Some(Self::Svg),
-			"text" => Some(Self::Text),
-			_ => None,
-		}
-	}
-
 	/// This mode as the declaration `bx:style` would write.
 	pub fn declaration(&self) -> String { format!("diagram-render={self:?}") }
 }
@@ -50,7 +40,7 @@ impl AsCssValue for DiagramRender {
 
 /// A paint role of a diagram: one of the `--diagram-*` custom properties the
 /// cascade declares for a figure (`common_props`, the material defaults in
-/// `parse/mermaid`). The svg theme writes each role as its `var()`, so the
+/// `formats/mermaid`). The svg theme writes each role as its `var()`, so the
 /// picture follows the colour scheme live; a terminal resolves the same
 /// properties to hex. Custom properties rather than the token variables because
 /// the stylesheet builder renames those (`FormatVariables`) and an inline svg

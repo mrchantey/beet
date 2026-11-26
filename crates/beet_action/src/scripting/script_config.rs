@@ -23,7 +23,7 @@ use serde::Serialize;
 /// refusal rejects the awaiting promise naming the identifier, so the script can
 /// catch it.
 ///
-/// Both halves are a [`GlobFilter`], so a pattern reaches a family of
+/// Both halves are a [`TypeFilter`], so a pattern reaches a family of
 /// components and an exclude carves one out of an otherwise open grant:
 ///
 /// ```ignore
@@ -32,11 +32,11 @@ use serde::Serialize;
 /// </script>
 /// ```
 ///
-/// A component passes a filter if *any* of its names (full type path, short
-/// path, or a runtime component's declared name) matches an include, and *none*
-/// of them matches an exclude. So a human writes `"Name"` and the canonical
-/// `bevy_ecs::name::Name` still passes, while an exclude cannot be sidestepped
-/// by spelling the same component the other way.
+/// A rule reaches a component by any of its names (full type path, short path,
+/// or a runtime component's declared name), the last rule reaching it deciding.
+/// So a human writes `"Name"` and the canonical `bevy_ecs::name::Name` still
+/// passes, while an exclude cannot be sidestepped by spelling the same
+/// component the other way: the component is tested, never the spelling.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct ScriptConfig {
@@ -46,9 +46,9 @@ pub struct ScriptConfig {
 	/// Whether to install the `console` global. Default true.
 	pub console: bool,
 	/// Components and resources the script may read. Empty includes read everything.
-	pub read: GlobFilter,
+	pub read: TypeFilter,
 	/// Components and resources the script may write. Empty includes write everything.
-	pub write: GlobFilter,
+	pub write: TypeFilter,
 	/// The resources this script may consume before it is cut off.
 	pub limits: ScriptLimits,
 }
@@ -58,8 +58,8 @@ impl Default for ScriptConfig {
 		Self {
 			world: true,
 			console: true,
-			read: GlobFilter::default(),
-			write: GlobFilter::default(),
+			read: TypeFilter::default(),
+			write: TypeFilter::default(),
 			limits: ScriptLimits::default(),
 		}
 	}
@@ -100,8 +100,12 @@ impl ScriptConfig {
 			.map(|component| component.as_ref().to_string())
 			.collect::<Vec<_>>();
 		Self {
-			read: GlobFilter::default().extend_include(&components),
-			write: GlobFilter::default().extend_include(&components),
+			read: TypeFilter::new(
+				GlobFilter::default().extend_include(&components),
+			),
+			write: TypeFilter::new(
+				GlobFilter::default().extend_include(&components),
+			),
 			..default()
 		}
 	}
@@ -111,11 +115,13 @@ impl ScriptConfig {
 		mut self,
 		components: impl IntoIterator<Item = S>,
 	) -> Self {
-		self.write = GlobFilter::default().extend_include(
-			components
-				.into_iter()
-				.map(|component| component.as_ref().to_string())
-				.collect::<Vec<_>>(),
+		self.write = TypeFilter::new(
+			GlobFilter::default().extend_include(
+				components
+					.into_iter()
+					.map(|component| component.as_ref().to_string())
+					.collect::<Vec<_>>(),
+			),
 		);
 		self
 	}
@@ -126,7 +132,7 @@ impl ScriptConfig {
 	/// and has no business changing it. Spelled as an exclude of everything, so
 	/// it is the same one mechanism rather than a second flag.
 	pub fn read_only(mut self) -> Self {
-		self.write = GlobFilter::default().with_exclude("*");
+		self.write = TypeFilter::deny_all();
 		self
 	}
 
@@ -153,11 +159,11 @@ impl ScriptConfig {
 	/// # Errors
 	/// Errors naming the identifier when this config excludes it.
 	pub fn assert_readable(&self, ident: &ComponentIdent) -> Result {
-		match Self::passes(&self.read, ident) {
+		match self.read.passes(&ident.name) {
 			true => Ok(()),
 			false => bevybail!(
 				"script may not read `{}`: its read filter is {}",
-				ident.path,
+				ident.name,
 				Self::describe(&self.read)
 			),
 		}
@@ -172,23 +178,20 @@ impl ScriptConfig {
 	pub fn assert_writable(&self, ident: &ComponentIdent) -> Result {
 		// generics are stripped so a carrier is refused under every
 		// instantiation: `Script<Value, Value>` is a `Script`.
-		let base = ident
-			.short
-			.split('<')
-			.next()
-			.unwrap_or(ident.short.as_str());
+		let short = ident.name.short();
+		let base = short.split('<').next().unwrap_or(short.as_str());
 		if Self::PROTECTED.contains(&base) {
 			bevybail!(
 				"no script may write `{}`: it is what grants the script its reach, \
 so writing it would let a script widen its own",
-				ident.path
+				ident.name
 			);
 		}
-		match Self::passes(&self.write, ident) {
+		match self.write.passes(&ident.name) {
 			true => Ok(()),
 			false => bevybail!(
 				"script may not write `{}`: its write filter is {}",
-				ident.path,
+				ident.name,
 				Self::describe(&self.write)
 			),
 		}
@@ -196,23 +199,11 @@ so writing it would let a script widen its own",
 
 	/// A filter on one line, for the error a script reads back. A filter with no
 	/// rules is the open grant it is.
-	fn describe(filter: &GlobFilter) -> String {
+	fn describe(filter: &TypeFilter) -> String {
 		match filter.is_empty() {
 			true => "everything".to_string(),
 			false => filter.to_string(),
 		}
-	}
-
-	/// Whether `ident` passes `filter` under any of its names.
-	///
-	/// Include is any-of and exclude is none-of, deliberately asymmetric: a
-	/// grant should be easy to spell (`"Name"` reaches the canonical path),
-	/// while a denial must not be escapable by spelling the same component
-	/// differently.
-	fn passes(filter: &GlobFilter, ident: &ComponentIdent) -> bool {
-		let names = [ident.path.as_str(), ident.short.as_str()];
-		names.iter().any(|name| filter.passes_include(name))
-			&& names.iter().all(|name| filter.passes_exclude(name))
 	}
 }
 
@@ -319,7 +310,7 @@ mod test {
 	#[beet_core::test]
 	fn an_exclude_holds_under_either_name() {
 		let config = ScriptConfig {
-			write: GlobFilter::default().with_exclude("*name::Name"),
+			write: TypeFilter::default().with_exclude("*name::Name"),
 			..default()
 		};
 		writable(&config, "Name")

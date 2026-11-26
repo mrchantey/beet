@@ -7,7 +7,7 @@
 //! blob store), exactly as a browser resolves it against the document origin, so
 //! there is no filesystem dependency on the render host (Lambda/Fargate). The
 //! bytes then go through [`attach_raster`], shared with the diagram raster
-//! (`parse/mermaid`): PNG bytes transmit directly, an svg (an `<img src=*.svg>`,
+//! (`formats/mermaid`): PNG bytes transmit directly, an svg (an `<img src=*.svg>`,
 //! a rendered diagram) is rasterised to PNG (resvg), any other raster format
 //! decodes and re-encodes to PNG, then a [`KittyImage`] and the `graphics`
 //! element state attach so the terminal-gated user-agent rule gives an `<img>`
