@@ -14,7 +14,7 @@ use super::parse::refuse_reserved_tag;
 use super::parse::take_braced;
 use super::span::*;
 use super::value::*;
-use beet_core::prelude::*;
+use crate::prelude::*;
 use core::ops::Range;
 
 /// One lenient, fragment-safe markup token produced by [`BsxFragmentToken::parse_fragment`].
@@ -410,7 +410,6 @@ fn starts_with_close_tag(input: &str, tag: &str) -> bool {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 
 	/// The tokens of the whole of `source`.
 	fn tokens<'a>(
@@ -428,7 +427,7 @@ mod test {
 		tokens(source, &BsxFragmentConfig::default()).unwrap()
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_open_close() {
 		fragment("<div>hi</div>").xpect_eq(vec![
 			BsxFragmentToken::Open {
@@ -441,7 +440,7 @@ mod test {
 		]);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_lone_open_is_safe() {
 		// the key fragment property: an unbalanced open tag is a single token, not
 		// an error, so a markdown builder can pair it with a later close event.
@@ -454,7 +453,7 @@ mod test {
 			.xpect_eq(vec![BsxFragmentToken::Close { tag: "span" }]);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_void_and_self_closing() {
 		matches!(fragment("<br>")[0], BsxFragmentToken::Open {
 			self_closing: true,
@@ -468,7 +467,7 @@ mod test {
 		.xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_quoted_and_flag_attrs() {
 		let BsxFragmentToken::Open { attributes, .. } =
 			&fragment("<iframe src=\"x\" allowfullscreen>")[0]
@@ -482,7 +481,7 @@ mod test {
 		attributes[1].value.clone().xpect_eq(AttrValue::Flag);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_unquoted_value_is_plain_string() {
 		// an unquoted HTML URL is a string, not a value-grammar enum, and its
 		// trailing slash survives (the `/` does not self-close the tag).
@@ -497,7 +496,7 @@ mod test {
 			.xpect_eq(AttrValue::Str("https://bevy.org//".to_string()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_unquoted_qualified_path_is_value_expr() {
 		// an unquoted Rust qualified path (`::`) resolves through the value grammar
 		// so an embedded-markup component prop like `variant=ButtonVariant::Filled`
@@ -519,7 +518,7 @@ mod test {
 		named.name.as_str().xpect_eq("ButtonVariant::Outlined");
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_unquoted_bool_is_value_expr() {
 		// an unquoted `true`/`false` resolves through the value grammar so an
 		// embedded-markup component prop like `vertical_lines=true` reaches the
@@ -545,7 +544,7 @@ mod test {
 			.xpect_eq(AttrValue::Str("lazy".to_string()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_braced_attr_uses_value_grammar() {
 		let BsxFragmentToken::Open { attributes, .. } =
 			&fragment("<button bx:onclick={count.increment}>")[0]
@@ -555,7 +554,7 @@ mod test {
 		matches!(attributes[0].value, AttrValue::Expr(_)).xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_spread() {
 		let BsxFragmentToken::Open { attributes, .. } =
 			&fragment("<el {MyComponent}>")[0]
@@ -565,7 +564,7 @@ mod test {
 		matches!(attributes[0].value, AttrValue::Spread(_)).xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_comment_and_doctype() {
 		fragment("<!DOCTYPE html><!-- hi -->").xpect_eq(vec![
 			BsxFragmentToken::Doctype("html"),
@@ -573,7 +572,7 @@ mod test {
 		]);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_script_raw_text() {
 		// `<` inside raw text is not a tag, so the script body stays one text run.
 		tokens(
@@ -592,7 +591,7 @@ mod test {
 		]);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_expressions() {
 		let config = BsxFragmentConfig {
 			expressions: true,
@@ -610,7 +609,7 @@ mod test {
 		]);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn fragment_raw_text_expressions() {
 		let config = BsxFragmentConfig {
 			raw_text_expressions: true,
@@ -642,7 +641,7 @@ mod test {
 		element.children
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn drops_formatting_whitespace_between_blocks() {
 		// the indentation between block children is insignificant, like `rsx!` trims
 		// and the browser collapses, so only the two elements survive.
@@ -652,7 +651,7 @@ mod test {
 		matches!(children[1], BsxNode::Element(_)).xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn keeps_significant_inline_whitespace() {
 		// the whitespace separating prose from an inline link is significant, so it
 		// stays (collapsing to a single space at render).
@@ -666,7 +665,7 @@ mod test {
 		lead.ends_with(char::is_whitespace).xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn keeps_whitespace_between_inline_tags() {
 		// `<b>a</b> <i>b</i>` reads "a b": the space between two phrasing tags
 		// on one line is a word break, not formatting.
@@ -679,7 +678,7 @@ mod test {
 			.xpect_eq(1);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn preserves_pre_whitespace() {
 		// `<pre>` content is whitespace-significant, so its newlines/indent survive.
 		let children = children_of("<pre>\n  line one\n  line two\n</pre>");

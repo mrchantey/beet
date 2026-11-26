@@ -208,7 +208,7 @@ impl AwsClient {
 		&self,
 		action: &str,
 		params: impl IntoIterator<Item = (impl AsRef<str>, impl AsRef<str>)>,
-	) -> Result<XmlElement> {
+	) -> Result<BsxElement> {
 		self.query_request(action, params, None).await
 	}
 
@@ -219,7 +219,7 @@ impl AwsClient {
 		action: &str,
 		params: impl IntoIterator<Item = (impl AsRef<str>, impl AsRef<str>)>,
 		secret: &str,
-	) -> Result<XmlElement> {
+	) -> Result<BsxElement> {
 		self.query_request(action, params, Some(secret)).await
 	}
 
@@ -228,7 +228,7 @@ impl AwsClient {
 		action: &str,
 		params: impl IntoIterator<Item = (impl AsRef<str>, impl AsRef<str>)>,
 		secret: Option<&str>,
-	) -> Result<XmlElement> {
+	) -> Result<BsxElement> {
 		let version = match self.service.protocol {
 			AwsProtocol::AwsQuery { version }
 			| AwsProtocol::Ec2Query { version } => version,
@@ -258,7 +258,7 @@ impl AwsClient {
 			.with_body(body);
 		request.secret = secret.map(ToString::to_string);
 		let response = self.send(request).await?;
-		let root = XmlElement::parse(&response.text().await?)?;
+		let root = BsxElement::parse_xml(&response.text().await?)?;
 		let result = format!("{action}Result");
 		match root.child(&result) {
 			Some(result) => result.clone(),
@@ -285,8 +285,8 @@ impl AwsClient {
 	}
 
 	/// Send a `restXml` request, answering the response's root element.
-	pub async fn send_xml(&self, request: AwsRequest) -> Result<XmlElement> {
-		XmlElement::parse(&self.send(request).await?.text().await?)
+	pub async fn send_xml(&self, request: AwsRequest) -> Result<BsxElement> {
+		BsxElement::parse_xml(&self.send(request).await?.text().await?)
 	}
 
 	async fn json_of(response: Response) -> Result<Value> {

@@ -5,12 +5,12 @@
 //! raw tag, its attributes (each a key plus an [`AttrValue`]), and its children.
 //! The value grammar ([`DataLiteral`], [`ValueExpr`]) is shared by attribute
 //! values, text-position `{..}` blocks, and bare-position spreads. The lowering
-//! ([`BsxParser::lower`]) walks this tree; type inference happens there, against
+//! (`beet_scene`'s `BsxParser`) walks this tree; type inference happens there, against
 //! the target's `TypeInfo`, not here.
 
 use super::span::*;
+use crate::prelude::*;
 use alloc::boxed::Box;
-use beet_core::prelude::*;
 
 /// A single node in the BSX tree.
 #[derive(Debug, Clone, PartialEq)]
@@ -61,9 +61,76 @@ pub struct BsxElement {
 	pub span: SourceSpan,
 }
 
-/// Reading an element whose directives are rewritten.
+/// Read access over a parsed tree, for a caller that reads a document without
+/// building it, ie an Office package's relationships or a protocol's xml
+/// answer. A name is matched by its local part, whatever prefix it was written
+/// with, and a prefix is never resolved against a namespace, so a document is
+/// read by [`child`](Self::child) and [`text_at`](Self::text_at) rather than a
+/// schema, and a field a service adds later is simply not looked at.
 impl BsxElement {
-	/// The string value of the attribute written `key`.
+	/// The document element of `xml`, read in the XML dialect
+	/// ([`BsxParseConfig::xml`]).
+	///
+	/// ## Errors
+	/// Errors when `xml` does not read or holds no element.
+	pub fn parse_xml(xml: &str) -> Result<Self> {
+		BsxNode::parse_document(xml, &BsxParseConfig::xml())?
+			.into_iter()
+			.find_map(|node| match node {
+				BsxNode::Element(element) => Some(element),
+				_ => None,
+			})
+			.ok_or_else(|| bevyhow!("the xml has no root element"))
+	}
+
+	/// The tag without its prefix, ie `p` for `w:p`.
+	pub fn local_name(&self) -> &str {
+		self.tag
+			.split_once(':')
+			.map_or(self.tag.as_str(), |(_, local)| local)
+	}
+
+	/// The element children, in order.
+	pub fn elements(&self) -> impl Iterator<Item = &BsxElement> {
+		self.children.iter().filter_map(|node| match node {
+			BsxNode::Element(element) => Some(element),
+			_ => None,
+		})
+	}
+
+	/// The element children whose local name is `local`, in order.
+	pub fn children_named<'a>(
+		&'a self,
+		local: &'a str,
+	) -> impl Iterator<Item = &'a BsxElement> {
+		self.elements()
+			.filter(move |element| element.local_name() == local)
+	}
+
+	/// The first element child whose local name is `local`.
+	pub fn child(&self, local: &str) -> Option<&BsxElement> {
+		self.elements()
+			.find(|element| element.local_name() == local)
+	}
+
+	/// Every descendant element whose local name is `local`, in document
+	/// order.
+	pub fn descendants_named(&self, local: &str) -> Vec<&BsxElement> {
+		let mut out = Vec::new();
+		self.collect_named(local, &mut out);
+		out
+	}
+
+	fn collect_named<'a>(&'a self, local: &str, out: &mut Vec<&'a BsxElement>) {
+		for element in self.elements() {
+			if element.local_name() == local {
+				out.push(element);
+			}
+			element.collect_named(local, out);
+		}
+	}
+
+	/// The string value of the attribute written `key`, ie `r:id`.
 	pub fn attribute(&self, key: &str) -> Option<&str> {
 		self.attributes.iter().find_map(|attribute| {
 			match (&attribute.value, attribute.key == key) {
@@ -73,6 +140,89 @@ impl BsxElement {
 		})
 	}
 
+	/// The string value of the attribute whose local name is `local`,
+	/// whatever its prefix, ie `val` for `w:val`.
+	pub fn attribute_local(&self, local: &str) -> Option<&str> {
+		self.attributes.iter().find_map(|attribute| {
+			let name = attribute
+				.key
+				.split_once(':')
+				.map_or(attribute.key.as_str(), |(_, name)| name);
+			match (&attribute.value, name == local) {
+				(AttrValue::Str(value), true) => Some(value.as_str()),
+				_ => None,
+			}
+		})
+	}
+
+	/// The string value of the prefixed attribute whose local name is
+	/// `local`, ie `r:id`, never an unprefixed one, ie a slide's own `id`.
+	pub fn prefixed_attribute(&self, local: &str) -> Option<&str> {
+		self.attributes.iter().find_map(|attribute| {
+			let (_, name) = attribute.key.split_once(':')?;
+			match (&attribute.value, name == local) {
+				(AttrValue::Str(value), true) => Some(value.as_str()),
+				_ => None,
+			}
+		})
+	}
+
+	/// The element at the `/` separated `path` of local names below this one.
+	pub fn at(&self, path: &str) -> Option<&BsxElement> {
+		path.split('/')
+			.filter(|name| !name.is_empty())
+			.try_fold(self, |element, name| element.child(name))
+	}
+
+	/// The first element whose local name is `local` anywhere below this one,
+	/// depth first.
+	pub fn find(&self, local: &str) -> Option<&BsxElement> {
+		self.elements()
+			.find_map(|child| match child.local_name() == local {
+				true => Some(child),
+				false => child.find(local),
+			})
+	}
+
+	/// The trimmed text of the element at `path` (see [`at`](Self::at)), empty
+	/// for an empty element, ie a field's value in a protocol answer.
+	pub fn text_at(&self, path: &str) -> Option<&str> {
+		self.at(path).map(|element| {
+			element
+				.children
+				.iter()
+				.find_map(|node| match node {
+					BsxNode::Text(text) | BsxNode::CData(text) => {
+						Some(text.trim())
+					}
+					_ => None,
+				})
+				.unwrap_or_default()
+		})
+	}
+
+	/// The text of every descendant text and CDATA node, joined.
+	pub fn text(&self) -> String {
+		let mut out = String::new();
+		self.collect_text(&mut out);
+		out
+	}
+
+	fn collect_text(&self, out: &mut String) {
+		for node in &self.children {
+			match node {
+				BsxNode::Element(element) => element.collect_text(out),
+				BsxNode::Text(text) | BsxNode::CData(text) => {
+					out.push_str(text)
+				}
+				_ => {}
+			}
+		}
+	}
+}
+
+/// Reading an element whose directives are rewritten.
+impl BsxElement {
 	/// The slot routing attribute, HTML's own.
 	const SLOT: &'static str = "slot";
 
@@ -184,6 +334,14 @@ impl BsxElement {
 }
 
 impl BsxNode {
+	/// The first element of a parsed document, its document element.
+	pub fn document_element(nodes: &[BsxNode]) -> Option<&BsxElement> {
+		nodes.iter().find_map(|node| match node {
+			BsxNode::Element(element) => Some(element),
+			_ => None,
+		})
+	}
+
 	/// Where the node was written.
 	pub fn span(&self) -> &SourceSpan {
 		match self {
@@ -510,4 +668,51 @@ pub enum NamedFields {
 	Tuple(Vec<DataLiteral>),
 	/// Named fields, ie a struct variant `Point { x: 1, y: 2 }`.
 	Struct(Vec<(SmolStr, DataLiteral)>),
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+
+	/// A protocol answer reads by local names and paths, its text unescaped
+	/// and trimmed, an undeclared prefix read all the same.
+	#[crate::test]
+	fn reads_an_xml_answer() {
+		let xml = BsxElement::parse_xml(
+			r#"<?xml version="1.0" encoding="UTF-8"?>
+			<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+				<Name>bucket</Name>
+				<Contents><Key>a &amp; b</Key><Size>3</Size></Contents>
+				<Contents><Key>c&#47;d</Key><Size>4</Size></Contents>
+				<s3:IsTruncated/>
+				<Note><![CDATA[x < y]]></Note>
+			</ListBucketResult>"#,
+		)
+		.unwrap();
+		xml.local_name().xpect_eq("ListBucketResult");
+		xml.text_at("Name").xpect_eq(Some("bucket"));
+		xml.children_named("Contents")
+			.map(|contents| contents.text_at("Key").unwrap().to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["a & b".to_string(), "c/d".to_string()]);
+		xml.text_at("IsTruncated").xpect_eq(Some(""));
+		xml.text_at("Note").xpect_eq(Some("x < y"));
+		xml.find("Size").unwrap().text().xpect_eq("3");
+		BsxElement::parse_xml("<?xml version=\"1.0\"?>")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("no root element");
+	}
+
+	/// An attribute is found as written, by its local name, or by its local
+	/// name behind a prefix alone.
+	#[crate::test]
+	fn reads_attributes_by_name() {
+		let element =
+			BsxElement::parse_xml("<w:p a=\"1\" w:val=\"v\"/>").unwrap();
+		element.attribute("a").xpect_eq(Some("1"));
+		element.attribute_local("val").xpect_eq(Some("v"));
+		element.prefixed_attribute("val").xpect_eq(Some("v"));
+		element.prefixed_attribute("a").xpect_none();
+	}
 }

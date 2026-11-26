@@ -83,8 +83,6 @@ pub mod uuid_ext;
 pub use lazy_pool::*;
 pub use units::*;
 mod tree;
-/// An xml document read as a plain tree ([`XmlElement`]).
-mod xml_element;
 mod xtend;
 pub use as_any::*;
 
@@ -110,5 +108,4 @@ pub(crate) use panic_context::*;
 pub use secure_random::*;
 pub use timestamp::*;
 pub use tree::*;
-pub use xml_element::*;
 pub use xtend::*;

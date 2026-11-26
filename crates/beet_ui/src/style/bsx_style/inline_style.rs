@@ -18,7 +18,6 @@
 use crate::prelude::*;
 use crate::style::apply_declarations;
 use beet_core::prelude::*;
-use beet_scene::prelude::*;
 use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::world::DeferredWorld;
 

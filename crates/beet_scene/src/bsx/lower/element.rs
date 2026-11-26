@@ -2,7 +2,6 @@
 use super::literal::*;
 use super::lowering::*;
 use crate::bsx::reflect::*;
-use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::reflect::ReflectComponent;
 use bevy::ecs::reflect::ReflectResource;

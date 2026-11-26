@@ -2,7 +2,6 @@
 //! reflected value, recursing into each item or field against the target's info.
 
 use super::literal::*;
-use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::PartialReflect;
 use bevy::reflect::TypeInfo;
@@ -47,7 +46,7 @@ pub(super) fn list_to_reflect(
 	let values = items
 		.iter()
 		.map(|item| {
-			DataLiteral::to_reflect(item, item_info, registry, resolver)
+			LiteralReflect::resolve(item, item_info, registry, resolver)
 		})
 		.collect::<Result<Vec<_>>>()?;
 	if let Some(info @ TypeInfo::Array(_)) = field_info {
@@ -103,7 +102,7 @@ pub(super) fn struct_to_reflect(
 		let nested = struct_field_info(struct_info, name)?;
 		dynamic.insert_boxed(
 			name.as_str(),
-			DataLiteral::to_reflect(literal, nested, registry, resolver)?,
+			LiteralReflect::resolve(literal, nested, registry, resolver)?,
 		);
 	}
 	dynamic.set_represented_type(field_info);
@@ -244,7 +243,7 @@ pub(super) fn enum_to_reflect(
 					}
 					_ => None,
 				};
-				tuple.insert_boxed(DataLiteral::to_reflect(
+				tuple.insert_boxed(LiteralReflect::resolve(
 					item, nested, registry, resolver,
 				)?);
 			}
@@ -262,7 +261,7 @@ pub(super) fn enum_to_reflect(
 				};
 				dynamic.insert_boxed(
 					name.as_str(),
-					DataLiteral::to_reflect(
+					LiteralReflect::resolve(
 						literal, nested, registry, resolver,
 					)?,
 				);
@@ -345,7 +344,7 @@ pub(super) fn named_struct_to_reflect(
 			let nested = struct_field_info(struct_info, name)?;
 			dynamic.insert_boxed(
 				name.as_str(),
-				DataLiteral::to_reflect(literal, nested, registry, resolver)?,
+				LiteralReflect::resolve(literal, nested, registry, resolver)?,
 			);
 		}
 	}
@@ -406,7 +405,7 @@ pub(super) fn named_tuple_struct_to_reflect(
 			let nested = tuple_info
 				.and_then(|info| info.field_at(index))
 				.and_then(|field| field.type_info());
-			dynamic.insert_boxed(DataLiteral::to_reflect(
+			dynamic.insert_boxed(LiteralReflect::resolve(
 				item, nested, registry, resolver,
 			)?);
 		}

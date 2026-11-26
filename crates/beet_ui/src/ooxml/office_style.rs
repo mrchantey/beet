@@ -335,9 +335,9 @@ impl Default for OfficeTheme {
 impl OfficeTheme {
 	/// The theme a theme part's `a:clrScheme` declares, a slot it omits
 	/// keeping Office's default.
-	pub fn parse(nodes: &[XmlNode]) -> Self {
+	pub fn parse(nodes: &[BsxNode]) -> Self {
 		let mut theme = Self::default();
-		let Some(scheme) = XmlNode::document_element(nodes).and_then(|root| {
+		let Some(scheme) = BsxNode::document_element(nodes).and_then(|root| {
 			root.descendants_named("clrScheme").first().copied()
 		}) else {
 			return theme;

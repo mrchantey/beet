@@ -183,13 +183,13 @@ impl OpcPackage {
 
 	/// The part at `path` read as XML through the markup parser, a UTF-16
 	/// part decoded, `None` when the package has no such part.
-	pub fn xml(&self, path: &str) -> Result<Option<Vec<XmlNode>>> {
+	pub fn xml(&self, path: &str) -> Result<Option<Vec<BsxNode>>> {
 		self.part(path).map(Self::read_xml).transpose()
 	}
 
 	/// A part's bytes read as XML, a UTF-16 part decoded.
-	pub fn read_xml(bytes: &[u8]) -> Result<Vec<XmlNode>> {
-		XmlNode::parse_document(&Self::decode(bytes)?)
+	pub fn read_xml(bytes: &[u8]) -> Result<Vec<BsxNode>> {
+		BsxNode::parse_document(&Self::decode(bytes)?, &BsxParseConfig::xml())
 	}
 
 	/// The relationships of `source`, a part's path or `None` for the
@@ -389,7 +389,7 @@ impl OpcPackage {
 		data: &[u8],
 	) -> Result<Vec<(String, SmolStr)>> {
 		let nodes = Self::read_xml(data)?;
-		let Some(types) = XmlNode::document_element(&nodes) else {
+		let Some(types) = BsxNode::document_element(&nodes) else {
 			return Ok(Vec::new());
 		};
 		self.defaults = types
@@ -451,7 +451,7 @@ impl OpcPackage {
 		data: &[u8],
 	) -> Result<Vec<OpcRelationship>> {
 		let nodes = Self::read_xml(data)?;
-		let Some(root) = XmlNode::document_element(&nodes) else {
+		let Some(root) = BsxNode::document_element(&nodes) else {
 			return Ok(Vec::new());
 		};
 		let base = Self::directory(source);
@@ -691,7 +691,7 @@ mod test {
 			.unwrap()
 			.unwrap()
 			.xmap(|nodes| {
-				XmlNode::document_element(&nodes)
+				BsxNode::document_element(&nodes)
 					.map(|root| root.tag.to_string())
 			})
 			.xpect_eq(Some("w".to_string()));

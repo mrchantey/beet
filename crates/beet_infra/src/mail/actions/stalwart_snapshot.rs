@@ -138,7 +138,7 @@ struct Snapshot {
 
 impl Snapshot {
 	/// The snapshot an `item` of a `snapshotSet` describes.
-	fn parse(item: &XmlElement) -> Option<Self> {
+	fn parse(item: &BsxElement) -> Option<Self> {
 		Self {
 			id: item.text_at("snapshotId")?.to_string(),
 			start_time: item.text_at("startTime")?.to_string(),
@@ -191,7 +191,7 @@ impl Ebs {
 		&self,
 		action: &str,
 		params: Vec<(String, String)>,
-	) -> Result<Vec<XmlElement>> {
+	) -> Result<Vec<BsxElement>> {
 		let mut pages = Vec::new();
 		let mut next_token: Option<String> = None;
 		loop {
@@ -238,7 +238,7 @@ impl Ebs {
 			.xok()
 	}
 
-	fn parse_snapshots(pages: &[XmlElement]) -> Vec<Snapshot> {
+	fn parse_snapshots(pages: &[BsxElement]) -> Vec<Snapshot> {
 		pages
 			.iter()
 			.flat_map(|page| page.at("snapshotSet").into_iter())

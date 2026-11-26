@@ -11,8 +11,9 @@
 //! scene body every other format reads to. No world is touched until that body
 //! spawns: [`BsxParser`] is a [`DocParser`] like any other.
 //!
-//! Internal split, one directory per stage: source text to syntax tree in
-//! `parse` (the cursor, the markup parser, the value grammar), syntax tree to
+//! Internal split, one directory per stage: source text to syntax tree is
+//! `beet_core`'s (the cursor, the markup parser, the value grammar), so a
+//! crate below this one reads markup without lowering it, syntax tree to
 //! explicit syntax tree in `directive` (every `bx:` directive rewritten away),
 //! syntax tree to scene body in `lower`, and authored literal to reflected value
 //! in `reflect` (with prop-schema verification).
@@ -191,7 +192,7 @@
 //!
 //! The remaining surface (bare-position component spreads `{(A, B)}`, the `$ref`
 //! entity references, enum/struct/list literals) lives in the value grammar
-//! (`parse`) and its reflection (`reflect`).
+//! (`beet_core`'s) and its reflection (`reflect`).
 //!
 //!
 //! # Authoring
@@ -243,10 +244,9 @@ use beet_core::prelude::*;
 mod bsx_parser;
 mod directive;
 mod lower;
-mod parse;
 mod reflect;
 
 pub use bsx_parser::*;
 pub use directive::*;
 pub use lower::*;
-pub use parse::*;
+pub use reflect::LiteralReflect;

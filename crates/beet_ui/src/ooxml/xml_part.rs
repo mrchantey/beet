@@ -67,7 +67,7 @@ impl XmlPart {
 
 	/// Writes `text`, escaped.
 	pub fn text(&mut self, text: &str) -> &mut Self {
-		self.out.push_str(&XmlElement::escape_text(text));
+		self.out.push_str(&html_ext::escape_xml_text(text));
 		self
 	}
 

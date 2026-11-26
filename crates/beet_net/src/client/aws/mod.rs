@@ -13,7 +13,7 @@
 //!   `restJson1`, `restXml` and the query protocols, with retries, the S3
 //!   bucket addressing rules and an [`AwsError`] parsed from whichever shape
 //!   an error arrives in. [`AwsSts`] is the identity calls on top of it.
-//! - `beet_core`'s [`XmlElement`] reads the `restXml` and query protocols'
+//! - [`BsxElement::parse_xml`] reads the `restXml` and query protocols'
 //!   answers.
 //!
 //! No SDK, no async runtime and no `aws` cli: the same code signs from a

@@ -20,5 +20,6 @@ mod literal;
 mod scalar;
 mod schema;
 
+pub use literal::LiteralReflect;
 pub(in crate::bsx) use literal::*;
 pub(in crate::bsx) use schema::*;

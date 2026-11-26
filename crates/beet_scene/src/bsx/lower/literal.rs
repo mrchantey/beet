@@ -1,7 +1,6 @@
 //! Leaf lowering: an attribute or text literal to the [`Value`] or
 //! [`DataLiteral`] it stands for.
 use super::lowering::*;
-use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Lower a literal in text or attribute position to a concrete [`Value`].

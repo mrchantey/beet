@@ -228,8 +228,8 @@ impl S3Store {
 	}
 
 	/// `request` against this store's bucket, answering its xml.
-	async fn send_xml(&self, request: AwsRequest) -> Result<XmlElement> {
-		XmlElement::parse(&self.send(request).await?.text().await?)
+	async fn send_xml(&self, request: AwsRequest) -> Result<BsxElement> {
+		BsxElement::parse_xml(&self.send(request).await?.text().await?)
 	}
 
 
@@ -239,7 +239,7 @@ impl S3Store {
 		&self,
 		prefix: Option<&str>,
 		delimiter: Option<&str>,
-	) -> Result<Vec<XmlElement>> {
+	) -> Result<Vec<BsxElement>> {
 		let mut pages = Vec::new();
 		let mut continuation_token: Option<String> = None;
 		loop {
@@ -370,7 +370,7 @@ impl S3Store {
 				.map(|key| {
 					format!(
 						"<Object><Key>{}</Key></Object>",
-						XmlElement::escape_text(key)
+						html_ext::escape_xml_text(key)
 					)
 				})
 				.collect::<String>();
@@ -514,7 +514,7 @@ impl StoreBackend for S3Store {
 					xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
 					<LocationConstraint>{}</LocationConstraint>\
 					</CreateBucketConfiguration>",
-					XmlElement::escape_text(region)
+					html_ext::escape_xml_text(region)
 				)),
 			};
 			this.send(request).await?;

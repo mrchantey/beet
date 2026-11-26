@@ -21,7 +21,7 @@ pub struct Listing(pub Vec<ListedObject>);
 
 impl Listing {
 	/// The objects of every `ListObjectsV2` page, in page order.
-	fn from_pages<'a>(pages: impl IntoIterator<Item = &'a XmlElement>) -> Self {
+	fn from_pages<'a>(pages: impl IntoIterator<Item = &'a BsxElement>) -> Self {
 		pages
 			.into_iter()
 			.flat_map(|page| page.children_named("Contents"))
@@ -307,9 +307,11 @@ mod tests {
 	/// nothing rather than an error.
 	#[beet_core::test]
 	fn an_empty_page_is_an_empty_listing() {
-		Listing::from_pages(&[XmlElement::parse(&page(&[], None)).unwrap()])
-			.0
-			.len()
-			.xpect_eq(0);
+		Listing::from_pages(
+			&[BsxElement::parse_xml(&page(&[], None)).unwrap()],
+		)
+		.0
+		.len()
+		.xpect_eq(0);
 	}
 }

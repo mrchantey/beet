@@ -153,7 +153,7 @@ impl ElasticAddress {
 
 impl PtrRecord {
 	/// The first address of a `DescribeAddressesAttribute` response.
-	fn parse(response: &XmlElement) -> Self {
+	fn parse(response: &BsxElement) -> Self {
 		let text = |path: &str| {
 			response
 				.text_at(&format!("addressSet/item/{path}"))

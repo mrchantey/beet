@@ -6,7 +6,6 @@
 //! mismatch is an error of the document, naming the tag, before anything
 //! spawns.
 
-use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::TypeRegistration;

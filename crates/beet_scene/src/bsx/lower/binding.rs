@@ -2,7 +2,6 @@
 use super::literal::*;
 use super::lowering::*;
 use crate::body::KeySentinels;
-use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// The reserved selector names, targeting well-known entities rather than a

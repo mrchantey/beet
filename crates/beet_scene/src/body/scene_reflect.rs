@@ -381,7 +381,7 @@ impl EntityKeys {
 		registry: &TypeRegistry,
 		value: &Value,
 	) -> Result<Box<dyn PartialReflect>> {
-		DataLiteral::to_reflect(
+		LiteralReflect::resolve(
 			&DataLiteral::from(value.clone()),
 			Some(registration.type_info()),
 			registry,

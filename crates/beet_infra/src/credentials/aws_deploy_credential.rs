@@ -1102,7 +1102,7 @@ impl AwsAdmin {
 		&self,
 		action: &str,
 		params: &[(&str, &str)],
-	) -> Result<Option<XmlElement>> {
+	) -> Result<Option<BsxElement>> {
 		match self.iam().call_query(action, params.iter().copied()).await {
 			Ok(result) => Some(result).xok(),
 			Err(err) if AwsError::is(&err, &["NoSuchEntity"]) => None.xok(),
@@ -1116,7 +1116,7 @@ impl AwsAdmin {
 		action: &str,
 		params: &[(&str, &str)],
 		list: &str,
-	) -> Result<Vec<XmlElement>> {
+	) -> Result<Vec<BsxElement>> {
 		let iam = self.iam();
 		let mut members = Vec::new();
 		let mut marker: Option<String> = None;
@@ -1143,9 +1143,9 @@ impl AwsAdmin {
 
 	/// The `<member>`s of the query list `list` in `result`.
 	fn members<'a>(
-		result: &'a XmlElement,
+		result: &'a BsxElement,
 		list: &str,
-	) -> impl Iterator<Item = &'a XmlElement> {
+	) -> impl Iterator<Item = &'a BsxElement> {
 		result
 			.child(list)
 			.into_iter()
@@ -1153,7 +1153,7 @@ impl AwsAdmin {
 	}
 
 	/// The `field` of each of `members` that has one.
-	fn fields(members: &[XmlElement], field: &str) -> Vec<SmolStr> {
+	fn fields(members: &[BsxElement], field: &str) -> Vec<SmolStr> {
 		members
 			.iter()
 			.filter_map(|member| member.text_at(field))

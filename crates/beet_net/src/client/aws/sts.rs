@@ -135,7 +135,7 @@ impl AwsSts {
 	}
 
 	/// The credential an `AssumeRole` result carries.
-	fn credentials_of(result: &XmlElement) -> Result<AwsCredentials> {
+	fn credentials_of(result: &BsxElement) -> Result<AwsCredentials> {
 		let field =
 			|name: &str| {
 				result.text_at(&format!("Credentials/{name}")).ok_or_else(

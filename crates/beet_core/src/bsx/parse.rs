@@ -5,15 +5,13 @@
 //! [`BsxParseConfig`] gates the value grammar, `{..}` blocks, and `bx:`
 //! directives, so the HTML-only and XML modes are real, tested configurations.
 //! The parser produces a [`BsxNode`] tree, each node with the range it was
-//! written at, which [`BsxParser::lower`] takes from there.
+//! written at, which `beet_scene`'s `BsxParser` lowers into a scene.
 
 use super::ast::*;
 use super::cursor::Cursor;
 use super::span::*;
 use super::value::*;
-#[cfg(doc)]
-use crate::prelude::BsxParser;
-use beet_core::prelude::*;
+use crate::prelude::*;
 
 /// Configuration selecting the dialect a markup source is read in.
 #[derive(Debug, Default, Clone)]
@@ -493,7 +491,10 @@ fn parse_attribute(
 			)
 		}
 		_ => {
-			bevybail!("attribute `{key}` requires a quoted value in html mode")
+			bevybail!(
+				"attribute `{key}` requires a quoted value in {:?} mode",
+				config.dialect
+			)
 		}
 	};
 	BsxAttribute::new(key, value)
@@ -572,7 +573,7 @@ fn is_unbraced_value_char(ch: char) -> bool {
 mod test {
 	use super::*;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn simple_element() {
 		let nodes =
 			BsxNode::parse_document("<div>hi</div>", &BsxParseConfig::bsx())
@@ -584,7 +585,7 @@ mod test {
 		el.children.len().xpect_eq(1);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn nested_and_text() {
 		let nodes = BsxNode::parse_document(
 			"<div><span>inner</span></div>",
@@ -600,7 +601,7 @@ mod test {
 		span.tag.clone().xpect_eq("span".to_string());
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn attributes() {
 		let nodes = BsxNode::parse_document(
 			"<div class=\"card\" disabled/>",
@@ -618,7 +619,7 @@ mod test {
 		el.attributes[1].value.clone().xpect_eq(AttrValue::Flag);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn void_element() {
 		let nodes =
 			BsxNode::parse_document("<br>after", &BsxParseConfig::bsx())
@@ -630,7 +631,7 @@ mod test {
 		matches!(nodes[1], BsxNode::Text(_)).xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn text_block_expr() {
 		let nodes = BsxNode::parse_document(
 			"<p>{@doc:count}</p>",
@@ -643,7 +644,7 @@ mod test {
 		matches!(el.children[0], BsxNode::Expr(_)).xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn tag_position_literal() {
 		// a tuple/struct/enum tag-position literal parses into `tag_literal`, with
 		// `tag` reduced to the base component name (the segment before `::`).
@@ -683,7 +684,7 @@ mod test {
 		element("<div/>").tag_literal.xpect_none();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn comment_and_doctype() {
 		let nodes = BsxNode::parse_document(
 			"<!DOCTYPE html><!-- hi -->",
@@ -694,13 +695,13 @@ mod test {
 		nodes[1].clone().xpect_eq(BsxNode::Comment(" hi ".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn html_mode_rejects_braces() {
 		BsxNode::parse_document("<div {Foo}/>", &BsxParseConfig::html())
 			.xpect_err();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn html_mode_rejects_bx() {
 		BsxNode::parse_document(
 			"<div bx:scope=\"x\"/>",
@@ -713,7 +714,7 @@ mod test {
 	/// references decoded in text and attributes, a literal line break in an
 	/// attribute normalized to a space while a referenced one is kept, no
 	/// void element, and CDATA and processing instructions as nodes.
-	#[beet_core::test]
+	#[crate::test]
 	fn xml_mode_reads_as_written() {
 		let nodes = BsxNode::parse_document(
 			"\u{FEFF}<?xml version=\"1.0\"?>\r\n<w:p a=\"x&#xA;y\" b=\"x\ny\" w14.c=\"1\">\n\t<br>one &amp; <Two/></br>\n<![CDATA[a < b]]></w:p>",
@@ -755,7 +756,27 @@ mod test {
 			.xpect_eq(BsxNode::CData("a < b".into()));
 	}
 
-	#[beet_core::test]
+	/// XML reads none of the BSX surface: a spread, a braced or unbraced
+	/// value and a `bx:` directive are refused, while a brace in text is the
+	/// text XML says it is.
+	#[crate::test]
+	fn xml_mode_refuses_the_bsx_surface() {
+		let refused = |source: &str| {
+			BsxNode::parse_document(source, &BsxParseConfig::xml())
+				.unwrap_err()
+				.to_string()
+		};
+		refused("<a {Foo}/>").xpect_contains("spreads require bsx");
+		refused("<a b={1}/>").xpect_contains("quoted value in Xml mode");
+		refused("<a b=c/>").xpect_contains("quoted value in Xml mode");
+		refused("<a bx:scope=\"x\"/>").xpect_contains("directives require bsx");
+		BsxElement::parse_xml("<a>{x} y</a>")
+			.unwrap()
+			.text()
+			.xpect_eq("{x} y");
+	}
+
+	#[crate::test]
 	fn xml_mode_refuses_malformed_closes() {
 		BsxNode::parse_document("<a><b></a>", &BsxParseConfig::xml())
 			.unwrap_err()
@@ -770,7 +791,7 @@ mod test {
 
 	/// HTML decodes an attribute's references, so a renderer escaping it on
 	/// the way out round-trips it.
-	#[beet_core::test]
+	#[crate::test]
 	fn html_mode_decodes_attributes() {
 		let nodes = BsxNode::parse_document(
 			"<a href=\"?a=1&amp;b=2\">x</a>",
@@ -786,7 +807,7 @@ mod test {
 			.xpect_eq(AttrValue::Str("?a=1&b=2".into()));
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn html_mode_plain_html() {
 		let nodes = BsxNode::parse_document(
 			"<div class=\"a\">hi</div>",

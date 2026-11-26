@@ -14,7 +14,6 @@
 
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_scene::prelude::*;
 use bevy::reflect::FromReflect;
 use bevy::reflect::GetTypeRegistration;
 use bevy::reflect::Typed;

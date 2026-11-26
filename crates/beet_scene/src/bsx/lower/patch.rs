@@ -3,7 +3,6 @@ use super::literal::*;
 use super::lowering::*;
 use crate::body::KeySentinels;
 use crate::bsx::reflect::*;
-use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::PartialReflect;
 use bevy::reflect::TypeInfo;
@@ -26,7 +25,7 @@ impl Lowering<'_> {
 		registration: &TypeRegistration,
 	) -> Result<Value> {
 		let mut keys = KeySentinels::default();
-		let patch = DataLiteral::to_reflect(
+		let patch = LiteralReflect::resolve(
 			&DataLiteral::Enum(named.clone()),
 			Some(registration.type_info()),
 			self.types,
@@ -60,7 +59,7 @@ impl Lowering<'_> {
 		for attr in &fields {
 			let reflected = attr_to_literal(&attr.value)
 				.and_then(|literal| {
-					DataLiteral::to_reflect(
+					LiteralReflect::resolve(
 						&literal,
 						info.and_then(|info| info.field(&attr.key))
 							.and_then(|field| field.type_info()),

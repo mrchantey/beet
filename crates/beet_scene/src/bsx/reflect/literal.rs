@@ -12,7 +12,6 @@
 
 use super::composite::*;
 use super::scalar::*;
-use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::PartialReflect;
 use bevy::reflect::TypeInfo;
@@ -27,11 +26,15 @@ use bevy::reflect::tuple::DynamicTuple;
 /// `Entity`-typed field resolves through the one entity model.
 pub(in crate::bsx) type EntityResolver<'a> = &'a mut dyn FnMut(&str) -> Entity;
 
-impl DataLiteral {
-	/// Resolve this literal to a reflected value against `field_info` (the target
+/// A [`DataLiteral`] resolved to a reflected value, its type inferred from
+/// the target's [`TypeInfo`].
+pub struct LiteralReflect;
+
+impl LiteralReflect {
+	/// Resolve `literal` to a reflected value against `field_info` (the target
 	/// field's [`TypeInfo`], when known), looking nested types up in `registry` and
 	/// resolving any nested `$name` through `resolver`.
-	pub fn to_reflect(
+	pub fn resolve(
 		literal: &DataLiteral,
 		field_info: Option<&'static TypeInfo>,
 		registry: &TypeRegistry,
@@ -44,7 +47,7 @@ impl DataLiteral {
 			field_info.and_then(reflect_ext::option_some_inner)
 			&& !is_option_literal(literal)
 		{
-			let inner = DataLiteral::to_reflect(
+			let inner = LiteralReflect::resolve(
 				literal,
 				Some(some_info),
 				registry,
@@ -451,7 +454,7 @@ mod test {
 		}
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		DataLiteral::to_reflect(
+		LiteralReflect::resolve(
 			&DataLiteral::Enum(NamedLiteral {
 				name: "Sync".into(),
 				fields: NamedFields::Struct(vec![
@@ -496,7 +499,7 @@ mod test {
 		) -> Result<Box<dyn PartialReflect>> {
 			let registry = TypeRegistry::default();
 			let mut resolver = |_: &str| Entity::PLACEHOLDER;
-			DataLiteral::to_reflect(
+			LiteralReflect::resolve(
 				&DataLiteral::Enum(NamedLiteral {
 					name: name.into(),
 					fields,
@@ -548,7 +551,7 @@ mod test {
 		}
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		DataLiteral::to_reflect(
+		LiteralReflect::resolve(
 			&DataLiteral::Scalar(Value::Str("[".into())),
 			Exposure::type_info()
 				.as_struct()
@@ -624,7 +627,7 @@ mod test {
 
 	/// The message a literal that cannot resolve against `T` reports.
 	fn resolve_err<T: Typed>(literal: DataLiteral) -> String {
-		DataLiteral::to_reflect(
+		LiteralReflect::resolve(
 			&literal,
 			Some(T::type_info()),
 			&TypeRegistry::default(),
@@ -637,7 +640,7 @@ mod test {
 	fn resolve<T: FromReflect + Typed>(literal: DataLiteral) -> T {
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		let reflected = DataLiteral::to_reflect(
+		let reflected = LiteralReflect::resolve(
 			&literal,
 			Some(T::type_info()),
 			&registry,
@@ -760,7 +763,7 @@ mod test {
 				),
 			]),
 		});
-		let reflected = DataLiteral::to_reflect(
+		let reflected = LiteralReflect::resolve(
 			&literal,
 			Some(Host::type_info()),
 			&registry,
@@ -819,7 +822,7 @@ mod test {
 		});
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		DataLiteral::to_reflect(
+		LiteralReflect::resolve(
 			&partial,
 			Some(Provider::type_info()),
 			&registry,
@@ -964,7 +967,7 @@ mod test {
 		// silently falling through to a value that cannot apply
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		DataLiteral::to_reflect(
+		LiteralReflect::resolve(
 			&DataLiteral::Scalar(Value::Uint(50)),
 			Some(Duration::type_info()),
 			&registry,
@@ -983,7 +986,7 @@ mod test {
 			.xpect_eq(false);
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		DataLiteral::to_reflect(
+		LiteralReflect::resolve(
 			&DataLiteral::Scalar(Value::str("yes")),
 			Some(bool::type_info()),
 			&registry,
@@ -1009,7 +1012,7 @@ mod test {
 			.xpect_eq(Speed(60.0));
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		DataLiteral::to_reflect(
+		LiteralReflect::resolve(
 			&DataLiteral::Scalar(Value::str("nope")),
 			Some(u16::type_info()),
 			&registry,
@@ -1043,7 +1046,7 @@ mod test {
 			.xpect_eq(Records::IdentityOnly);
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		DataLiteral::to_reflect(
+		LiteralReflect::resolve(
 			&DataLiteral::Scalar(Value::str("identity-only")),
 			Some(Records::type_info()),
 			&registry,
@@ -1068,7 +1071,7 @@ mod test {
 			.xpect_eq(Casing::draft);
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		DataLiteral::to_reflect(
+		LiteralReflect::resolve(
 			&DataLiteral::Scalar(Value::str("DRAFT")),
 			Some(Casing::type_info()),
 			&registry,
@@ -1091,7 +1094,7 @@ mod test {
 			.xpect_eq(Color::Srgba(Srgba::hex("#006c4f").unwrap()));
 		resolve::<Option<Color>>(DataLiteral::Scalar(Value::str("#f028a8")))
 			.xpect_eq(Some(Color::Srgba(Srgba::hex("#f028a8").unwrap())));
-		DataLiteral::to_reflect(
+		LiteralReflect::resolve(
 			&DataLiteral::Scalar(Value::str("beetroot")),
 			Some(Color::type_info()),
 			&TypeRegistry::default(),
@@ -1172,7 +1175,7 @@ mod test {
 		};
 		let build =
 			|src: DataLiteral, dest: DataLiteral, resolver: EntityResolver| {
-				DataLiteral::to_reflect(
+				LiteralReflect::resolve(
 					&DataLiteral::Enum(NamedLiteral {
 						name: "Sync".into(),
 						fields: NamedFields::Struct(vec![
@@ -1228,7 +1231,7 @@ mod test {
 			Uri(StoreUri),
 		}
 		for info in [Both::type_info(), Plain::type_info()] {
-			DataLiteral::to_reflect(
+			LiteralReflect::resolve(
 				&DataLiteral::EntityRef("assets".into()),
 				Some(info),
 				&TypeRegistry::default(),

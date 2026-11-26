@@ -198,6 +198,21 @@ pub fn escape_text(input: &str) -> String {
 	result
 }
 
+/// `text` escaped for xml character data: `&`, `<` and `>` alone, so every
+/// other character, a typographic one included, is written as itself.
+pub fn escape_xml_text(text: &str) -> String {
+	let mut out = String::with_capacity(text.len());
+	for char in text.chars() {
+		match char {
+			'&' => out.push_str("&amp;"),
+			'<' => out.push_str("&lt;"),
+			'>' => out.push_str("&gt;"),
+			char => out.push(char),
+		}
+	}
+	out
+}
+
 /// Escape characters that are special inside HTML attribute values.
 ///
 /// Attributes require escaping `&`, `"`, and `'` but do **not** need
@@ -374,5 +389,11 @@ mod test {
 		fn double_escaped_ampersand() {
 			unescape_text("&amp;amp;").xpect_eq("&amp;".to_string());
 		}
+	}
+
+	#[crate::test]
+	fn escapes_xml_text() {
+		escape_xml_text("<a & b> \u{2013}")
+			.xpect_eq("&lt;a &amp; b&gt; \u{2013}");
 	}
 }

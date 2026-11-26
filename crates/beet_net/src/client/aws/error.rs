@@ -88,7 +88,7 @@ impl AwsError {
 
 	/// An xml error's code and message, wherever its `Error` element sits.
 	fn from_xml(body: &str) -> (Option<SmolStr>, Option<String>) {
-		let Ok(xml) = XmlElement::parse(body) else {
+		let Ok(xml) = BsxElement::parse_xml(body) else {
 			return (None, None);
 		};
 		let error = match xml.local_name() == "Error" {

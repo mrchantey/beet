@@ -127,7 +127,7 @@ impl WorkbookParser {
 				.unwrap_or_default(),
 		};
 		let nodes = package.xml(&workbook)?.unwrap_or_default();
-		let sheets = XmlNode::document_element(&nodes)
+		let sheets = BsxNode::document_element(&nodes)
 			.and_then(|root| root.child("sheets"))
 			.map(|sheets| {
 				sheets
@@ -155,7 +155,7 @@ impl WorkbookParser {
 		let mut total = 0;
 		for (name, hidden, path) in sheets {
 			let nodes = package.xml(&path)?.unwrap_or_default();
-			let Some(sheet_root) = XmlNode::document_element(&nodes) else {
+			let Some(sheet_root) = BsxNode::document_element(&nodes) else {
 				continue;
 			};
 			let sheet = Self::read_sheet(
@@ -200,8 +200,8 @@ impl WorkbookParser {
 
 	/// The shared strings, each its text or its runs' text joined, a
 	/// phonetic run left out.
-	fn shared_strings(nodes: &[XmlNode]) -> Vec<String> {
-		XmlNode::document_element(nodes)
+	fn shared_strings(nodes: &[BsxNode]) -> Vec<String> {
+		BsxNode::document_element(nodes)
 			.map(|root| {
 				root.children_named("si").map(Self::rich_text).collect()
 			})
@@ -209,7 +209,7 @@ impl WorkbookParser {
 	}
 
 	/// The text of a string item, `si` or `is`: its `t`, else its runs'.
-	fn rich_text(item: &XmlElement) -> String {
+	fn rich_text(item: &BsxElement) -> String {
 		match item.child("t") {
 			Some(text) => text.text(),
 			None => item
@@ -222,8 +222,8 @@ impl WorkbookParser {
 
 	/// The cell formats of a styles part, `cellXfs`, each with its font and
 	/// fill resolved.
-	fn cell_formats(nodes: &[XmlNode]) -> Vec<CellFormat> {
-		let Some(root) = XmlNode::document_element(nodes) else {
+	fn cell_formats(nodes: &[BsxNode]) -> Vec<CellFormat> {
+		let Some(root) = BsxNode::document_element(nodes) else {
 			return Vec::new();
 		};
 		let fonts = root
@@ -252,7 +252,7 @@ impl WorkbookParser {
 					.collect::<Vec<_>>()
 			})
 			.unwrap_or_default();
-		let index = |format: &XmlElement, key: &str| {
+		let index = |format: &BsxElement, key: &str| {
 			format
 				.attribute(key)
 				.and_then(|id| id.parse::<usize>().ok())
@@ -299,7 +299,7 @@ impl WorkbookParser {
 	}
 
 	/// A font element's look.
-	fn font(font: &XmlElement) -> FontRead {
+	fn font(font: &BsxElement) -> FontRead {
 		let flag = |local: &str| {
 			font.child(local).is_some_and(|element| {
 				!matches!(
@@ -324,7 +324,7 @@ impl WorkbookParser {
 	/// A SpreadsheetML colour: its own value, a theme slot tinted, or an
 	/// entry of the legacy indexed palette; `auto` and the system colours
 	/// none.
-	fn color(color: &XmlElement) -> Option<OfficeColor> {
+	fn color(color: &BsxElement) -> Option<OfficeColor> {
 		if let Some(rgb) = color.attribute("rgb") {
 			return OfficeColor::parse_hex(rgb).map(OfficeColor::Rgb);
 		}
@@ -370,7 +370,7 @@ impl WorkbookParser {
 		path: &str,
 		name: SmolStr,
 		hidden: bool,
-		root: &XmlElement,
+		root: &BsxElement,
 		shared: &WorkbookRead,
 	) -> Result<SheetRead> {
 		let mut sheet = SheetRead {
@@ -387,7 +387,7 @@ impl WorkbookParser {
 			merges: Vec::new(),
 			links: Vec::new(),
 		};
-		let number = |element: &XmlElement, key: &str| {
+		let number = |element: &BsxElement, key: &str| {
 			element
 				.attribute(key)
 				.and_then(|value| value.parse::<u32>().ok())

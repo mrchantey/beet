@@ -1,5 +1,5 @@
 //! [`SourceSpan`] and [`Spanned`]: where a piece of markup was written.
-use beet_core::prelude::*;
+use crate::prelude::*;
 use core::ops::Range;
 
 /// The byte range a piece of markup was written at in its document, unknown

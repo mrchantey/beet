@@ -5,7 +5,7 @@
 //! vocabulary the markup, value, and spread parsers share.
 
 use super::span::SourceSpan;
-use beet_core::prelude::*;
+use crate::prelude::*;
 use core::ops::Range;
 
 /// A forward-only character cursor over a range of a document's source, its
@@ -142,7 +142,7 @@ impl<'a> Cursor<'a> {
 mod test {
 	use super::*;
 
-	#[beet_core::test]
+	#[crate::test]
 	fn peek_and_bump() {
 		let mut cursor = Cursor::new("ab");
 		cursor.peek().unwrap().xpect_eq('a');
@@ -151,7 +151,7 @@ mod test {
 		cursor.is_eof().xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn eat_and_take() {
 		let mut cursor = Cursor::new("<div>hi</div>");
 		cursor.eat("<").xpect_true();
@@ -160,7 +160,7 @@ mod test {
 		cursor.take_until("</").xpect_eq("hi");
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn skip_whitespace() {
 		let mut cursor = Cursor::new("   x");
 		cursor.skip_ws();

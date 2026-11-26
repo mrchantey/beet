@@ -73,7 +73,7 @@ where
 	// the value types are self-describing, so nested-type lookups never hit the
 	// (empty) registry; `$name` entity refs are meaningless in a rule value.
 	let registry = TypeRegistry::empty();
-	let reflected = DataLiteral::to_reflect(
+	let reflected = LiteralReflect::resolve(
 		literal,
 		Some(V::type_info()),
 		&registry,

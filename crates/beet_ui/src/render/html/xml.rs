@@ -35,12 +35,12 @@ impl Installer for XmlRenderer {
 /// root or a fragment, is written through, its children in place, and a [`Portal`] as the tree it transcludes.
 #[derive(SystemParam)]
 pub(crate) struct XmlWriter<'w, 's> {
-	nodes: Query<'w, 's, XmlNode<'static>>,
+	nodes: Query<'w, 's, BsxNode<'static>>,
 	attributes: Query<'w, 's, (&'static Attribute, Option<&'static Value>)>,
 	tree: RenderTreeQuery<'w, 's>,
 }
 
-type XmlNode<'a> = (
+type BsxNode<'a> = (
 	Option<&'a Element>,
 	Option<&'a Attributes>,
 	Option<&'a Value>,
@@ -108,7 +108,7 @@ impl XmlWriter<'_, '_> {
 				self.close_children(element.tag(), entity, out);
 			}
 			(None, Some(value)) => {
-				out.push_str(&XmlElement::escape_text(&value.to_string()))
+				out.push_str(&html_ext::escape_xml_text(&value.to_string()))
 			}
 			(None, None) => {
 				for child in self.tree.children(entity) {
