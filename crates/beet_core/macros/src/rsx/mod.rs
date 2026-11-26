@@ -5,7 +5,7 @@
 //! - [`lower`]: [`ast`] -> a `Bundle` token stream.
 //! - [`rsx_macro`]: the `rsx!` entry tying the two together.
 //!
-//! This mirrors the runtime BSX parser in `beet_scene/src/bsx` (`ast` / `parse`)
+//! This mirrors the runtime BSX parser in `beet_core/src/bsx` (`ast` / `parse`)
 //! but stays a separate codebase: BSX consumes `&str`, this consumes
 //! `proc_macro2::TokenStream`. Shared vocabulary, not shared code.
 mod ast;

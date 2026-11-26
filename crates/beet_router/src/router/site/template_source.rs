@@ -19,18 +19,18 @@ pub enum TemplateSource {
 	Document(DocPath),
 	/// A rust `#[template]` by its type path, a document writing it short, ie
 	/// `SiteLayout`, registered with `app.install_types::<SiteLayout>()`.
-	Template(TypeName),
+	Template(ReflectName),
 }
 
 impl TemplateSource {
 	/// The rust template `T`, by its type path.
 	pub fn of<T: BuildTemplate + TypePath>() -> Self {
-		Self::template(TypeName::of_path::<T>())
+		Self::template(ReflectName::of::<T>())
 	}
 
 	/// The rust template named `template`. Prefer [`of`](Self::of), which
 	/// derives the name from the type.
-	pub fn template(template: impl Into<TypeName>) -> Self {
+	pub fn template(template: impl Into<ReflectName>) -> Self {
 		Self::Template(template.into())
 	}
 
@@ -73,7 +73,7 @@ pub enum LoadedTemplate {
 	/// A document and the package it is of.
 	Document(PackageStore, Arc<InstancePrefab>),
 	/// A rust template by its type path.
-	Template(TypeName),
+	Template(ReflectName),
 }
 
 impl LoadedTemplate {

@@ -244,9 +244,9 @@ struct StackFrame<'a> {
 impl Fence {
 	/// The fence `info` opens when it is the document it holds: its first
 	/// word names a format one of `parsers` reads, by media type or by
-	/// extension (`text/html`, `html`), and it says `render`, or that format
-	/// [renders a fence](DocParser::renders_fence) by default and it does not
-	/// say `render=false`. Anything else is a code sample.
+	/// extension (`text/html`, `html`), and its `render` says `scene`, or it
+	/// does not say and that format's [default](DocParser::fence_render) does.
+	/// Anything else is a code sample.
 	///
 	/// ## Errors
 	/// Errors on a fence that renders, its params being no BSX attributes.
@@ -260,29 +260,26 @@ impl Fence {
 			.split_once(char::is_whitespace)
 			.map(|(word, rest)| (word, rest.trim()))
 			.unwrap_or((info, ""));
-		let Some((media_type, renders)) = Self::format(word, parsers) else {
+		let Some((media_type, unsaid)) = Self::format(word, parsers) else {
 			return Ok(None);
 		};
 		let span = span.into();
 		let attributes = match BsxAttribute::parse_list(rest, 0..rest.len()) {
 			Ok(attributes) => attributes,
 			// a code sample says what it likes after its language
-			Err(_) if !renders => return Ok(None),
+			Err(_) if unsaid == FenceRender::Code => return Ok(None),
 			Err(error) => return Err(span.locate(error)),
 		};
 		let render = match attributes.iter().find(|attr| attr.key == "render") {
-			None => renders,
-			Some(attr) => match attr.value.literal() {
-				Ok(DataLiteral::Scalar(Value::Bool(render))) => render,
-				_ => {
-					return Err(span.locate(bevyhow!(
-						"a fence's `render` is a flag, `render=true` or `render=false`"
-					)));
-				}
-			},
+			None => unsaid,
+			Some(attr) => attr
+				.value
+				.literal()
+				.and_then(|literal| FenceRender::from_literal(&literal))
+				.map_err(|error| span.locate(error))?,
 		};
 		// what a code sample says is the highlighter's business
-		if !render {
+		if render == FenceRender::Code {
 			return Ok(None);
 		}
 		let params = attributes
@@ -307,8 +304,11 @@ impl Fence {
 	}
 
 	/// The media type `word` names a format by, its own name or a file
-	/// extension, and whether that format renders a fence by default.
-	fn format(word: &str, parsers: &DocParsers) -> Option<(MediaType, bool)> {
+	/// extension, and what a fence of that format becomes by default.
+	fn format(
+		word: &str,
+		parsers: &DocParsers,
+	) -> Option<(MediaType, FenceRender)> {
 		if word.is_empty() {
 			return None;
 		}
@@ -319,8 +319,8 @@ impl Fence {
 		.into_iter()
 		.find_map(|media_type| {
 			parsers
-				.renders_fence(&media_type)
-				.map(|renders| (media_type, renders))
+				.fence_render(&media_type)
+				.map(|render| (media_type, render))
 		})
 	}
 }

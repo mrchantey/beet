@@ -1,13 +1,52 @@
-//! [`FenceParams`]: what a markdown fence says beyond the format it holds.
+//! What a markdown fence says beyond the format it holds: [`FenceRender`],
+//! what it becomes, and [`FenceParams`], how its format reads it.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::FromReflect;
 use bevy::reflect::TypeRegistry;
 use bevy::reflect::Typed;
 
-/// What a markdown fence says beyond the format it holds and whether it
-/// renders, each param written as a BSX attribute, ie `mode=text` of
-/// ```` ```mermaid mode=text ````. A parser [configured](DocParser::configure)
+/// What a markdown fence becomes, its `render` attribute: ```` ```html ````
+/// is code and ```` ```html render ```` the document it holds. A format
+/// declares its own default ([`DocParser::fence_render`]), so a diagram is
+/// drawn unless it says `render=code`.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum FenceRender {
+	/// A code sample, as written.
+	#[default]
+	Code,
+	/// The document it holds, read in its format and standing where the
+	/// fence does.
+	Scene,
+}
+
+impl FenceRender {
+	/// The `render` attribute's value: a bare `render` is `scene`.
+	///
+	/// ## Errors
+	/// Errors on any other value.
+	pub fn from_literal(literal: &DataLiteral) -> Result<Self> {
+		let word = match literal {
+			DataLiteral::Scalar(Value::Bool(true)) => return Self::Scene.xok(),
+			DataLiteral::Scalar(Value::Str(word)) => word.as_str(),
+			DataLiteral::Enum(named) if named.fields == NamedFields::Unit => {
+				named.name.as_str()
+			}
+			_ => "",
+		};
+		match word {
+			"code" => Self::Code.xok(),
+			"scene" => Self::Scene.xok(),
+			_ => bevybail!(
+				"a fence's `render` is `code` or `scene`, or bare for `scene`"
+			),
+		}
+	}
+}
+
+/// What a markdown fence says beyond the format it holds and what it
+/// becomes, each param written as a BSX attribute, ie `form=text` of
+/// ```` ```mermaid form=text ````. A parser [configured](DocParser::configure)
 /// with them reads them into a params type of its own
 /// ([`read`](Self::read)), as a tag's attributes are read into its component.
 #[derive(Debug, Default, Clone, PartialEq)]

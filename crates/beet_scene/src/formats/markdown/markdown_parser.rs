@@ -459,7 +459,7 @@ mod test {
 			"md",
 			"text",
 			"",
-			"html render=false",
+			"html render=code",
 			"json {1,3}",
 		] {
 			keys(&body(&format!("```{info}\n<b/>\n```")))
@@ -471,7 +471,7 @@ mod test {
 	/// A language names its format as its media type does.
 	#[beet_core::test]
 	fn a_language_renders_as_its_media_type() {
-		for info in ["html render", "text/html render", "html render=true"] {
+		for info in ["html render", "text/html render", "html render=scene"] {
 			keys(&body(&format!("```{info}\n<b/>\n```")))
 				.xpect_eq(vec!["0", "0/b.0"]);
 		}

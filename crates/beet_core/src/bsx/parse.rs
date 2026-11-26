@@ -415,7 +415,7 @@ fn parse_tag_literal(
 
 impl BsxAttribute {
 	/// The attributes the `range` of `source` lists, read as a BSX tag writes
-	/// them, ie a markdown fence's `render mode=text`: a bare key a flag,
+	/// them, ie a markdown fence's `render form=text`: a bare key a flag,
 	/// `key="text"` a string and `key=value` the value grammar.
 	///
 	/// ## Errors

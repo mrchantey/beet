@@ -9,7 +9,7 @@ use bevy::reflect::TypeRegistry;
 
 /// How a document's roots become its first entity.
 #[derive(Debug, Default, Clone, PartialEq)]
-pub(in crate::bsx) enum LowerRoot {
+pub(in crate::formats::bsx) enum LowerRoot {
 	/// A single root element is the root itself, else a bare root holds the
 	/// roots as its children.
 	#[default]
@@ -39,7 +39,7 @@ pub(super) struct Lowering<'a> {
 
 impl BsxParser {
 	/// Lower `nodes`, rewriting their directives first.
-	pub(in crate::bsx) fn lower_nodes(
+	pub(in crate::formats::bsx) fn lower_nodes(
 		mut nodes: Vec<BsxNode>,
 		root: LowerRoot,
 		parsers: &DocParsers,

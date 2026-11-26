@@ -107,9 +107,6 @@ pub struct TemplateBuilder<'w> {
 	component_filter: TypeFilter,
 	/// The filter determining which resources to extract.
 	resource_filter: TypeFilter,
-	/// What the component filter answered for each type so far, since a glob
-	/// match per component of every entity is most of a filtered save.
-	component_verdicts: HashMap<TypeId, bool>,
 	/// The world the template is built from.
 	original_world: &'w World,
 	/// The type registry used to extract items through reflection.
@@ -136,7 +133,6 @@ impl<'w> TemplateBuilder<'w> {
 			extracted_entity_ids: default(),
 			component_filter: TypeFilter::default(),
 			resource_filter: TypeFilter::default(),
-			component_verdicts: default(),
 			original_world: world,
 			type_registry,
 			entity_map: default(),
@@ -356,7 +352,7 @@ impl<'w> TemplateBuilder<'w> {
 					),
 				) && self
 					.component_filter
-					.passes(&TypeName::new(name.clone()))
+					.passes(&ReflectName::new(name.clone()))
 				{
 					resolved.insert(name.clone(), value.clone());
 				}
@@ -371,12 +367,10 @@ impl<'w> TemplateBuilder<'w> {
 				*self.skipped.entry(component_id).or_default() += 1;
 				continue;
 			};
-			let passes =
-				*self.component_verdicts.entry(type_id).or_insert_with(|| {
-					self.component_filter
-						.passes_path(registration.type_info().type_path_table())
-				});
-			if !passes {
+			if !self
+				.component_filter
+				.passes_path(registration.type_info().type_path_table())
+			{
 				continue;
 			}
 			// derived state is never authored content, so it never dumps

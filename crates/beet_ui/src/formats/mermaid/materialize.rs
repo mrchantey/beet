@@ -243,7 +243,7 @@ mod test {
 			.to_string()
 	}
 
-	/// A `mode=text` fence is the box art on the web too.
+	/// A `form=text` fence is the box art on the web too.
 	#[beet_core::test]
 	fn renders_text_on_the_string_sink() {
 		let mut app = App::new();
@@ -252,7 +252,7 @@ mod test {
 		parse_md(
 			app.world_mut(),
 			root,
-			&FLOWCHART.replace("mermaid", "mermaid mode=text"),
+			&FLOWCHART.replace("mermaid", "mermaid form=text"),
 		);
 		html(&mut app, root)
 			.xpect_contains("<figure class=\"diagram inline-style-")

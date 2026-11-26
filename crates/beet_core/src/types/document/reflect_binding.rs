@@ -45,7 +45,7 @@ use bevy::ecs::reflect::ReflectComponent;
 pub struct ReflectFieldRef {
 	/// The target component, resolved as a tag is, so markup may write it
 	/// short, eg `MyComponent`.
-	pub component: TypeName,
+	pub component: ReflectName,
 	/// The field path within the component, eg `value` or `style.width`. Empty
 	/// binds the whole component value.
 	pub field: SmolStr,
@@ -57,7 +57,7 @@ pub struct ReflectFieldRef {
 impl ReflectFieldRef {
 	/// Bind to `component`'s `field` on this entity.
 	pub fn new(
-		component: impl Into<TypeName>,
+		component: impl Into<ReflectName>,
 		field: impl Into<SmolStr>,
 	) -> Self {
 		Self {
@@ -71,7 +71,7 @@ impl ReflectFieldRef {
 	/// rather than by a string a rename would leave behind.
 	///
 	/// The typed counterpart of [`new`](Self::new), and the binding twin of
-	/// `Layout::of::<T>()`: the name is `T`'s full [`TypeName`]. Keep
+	/// `Layout::of::<T>()`: the name is `T`'s [`ReflectName`]. Keep
 	/// [`new`](Self::new) for a name with no type behind it (a `.bsx`-declared
 	/// component, a dynamic selector).
 	///
@@ -84,7 +84,7 @@ impl ReflectFieldRef {
 	) -> Result<Self> {
 		let field = field.into();
 		validate_field_path(T::type_info(), &field)?;
-		Self::new(TypeName::new(T::type_info().type_path()), field).xok()
+		Self::new(ReflectName::new(T::type_info().type_path()), field).xok()
 	}
 
 	/// Retarget the bound component: an entity, or a lazily resolved
@@ -232,7 +232,7 @@ fn resolve_component<'a>(
 	world: &World,
 	registry: &'a bevy::reflect::TypeRegistry,
 	cache: &mut reflect_value_ext::BindingTickCache,
-	component: &TypeName,
+	component: &ReflectName,
 ) -> Option<(&'a ReflectComponent, ComponentId)> {
 	let registration = component.registration(registry)?;
 	let reflect_component = registration.data::<ReflectComponent>()?;
@@ -271,7 +271,7 @@ mod test {
 		ReflectFieldRef::of::<Dial>("value")
 			.unwrap()
 			.component
-			.xpect_eq(TypeName::of_path::<Dial>());
+			.xpect_eq(ReflectName::of::<Dial>());
 		// the empty path binds the whole component
 		ReflectFieldRef::of::<Dial>("").unwrap();
 		ReflectFieldRef::of::<Dial>("nope")

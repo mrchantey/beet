@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 /// The form a diagram (a ```` ```mermaid ```` fence, a `<Mermaid>`) takes: the
 /// `diagram-render` cascade property. Inherited like a text prop, so it is set
 /// per app (a rule), per page (`bx:style` on the page root) or per diagram (the
-/// fence's `mode`, ```` ```mermaid mode=text ````).
+/// fence's `form`, ```` ```mermaid form=text ````).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum DiagramRender {

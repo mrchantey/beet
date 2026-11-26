@@ -89,7 +89,7 @@ impl Layout {
 
 	/// Wrap descendant routes in the rust template named `template`. Prefer
 	/// [`of`](Self::of), which derives the name from the type.
-	pub fn template(template: impl Into<TypeName>) -> Self {
+	pub fn template(template: impl Into<ReflectName>) -> Self {
 		Self(TemplateSource::template(template))
 	}
 

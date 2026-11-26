@@ -41,8 +41,8 @@ pub enum BsxNode {
 pub struct EmbeddedDocument {
 	/// The format it is written in.
 	pub media_type: MediaType,
-	/// What it says beyond its format, ie `mode=text` of
-	/// ```` ```mermaid mode=text ````, each param a literal by name.
+	/// What it says beyond its format, ie `form=text` of
+	/// ```` ```mermaid form=text ````, each param a literal by name.
 	pub params: Vec<(SmolStr, DataLiteral)>,
 	/// The source as written.
 	pub source: String,

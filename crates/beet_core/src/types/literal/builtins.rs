@@ -301,10 +301,6 @@ fn add_domain(table: &mut Table) {
 		// themselves (`{GlobFilter{rules:[Exclude(".."),Include("..")]}}`),
 		// which declines to the structural walk.
 		.add_hinted("a glob pattern, repeatable", authored_glob_filter)
-		// a filter over types is authored as the filter it holds
-		.add_hinted("a type path glob, repeatable", |value: &Value| {
-			authored_glob_filter(value).map(|filter| filter.map(TypeFilter::new))
-		})
 		// one validated pattern, the item form of the filter above.
 		.add_hinted("a glob pattern", |value: &Value| match value {
 			Value::Str(pattern) => GlobPattern::parse(pattern.as_str()).map(Some),

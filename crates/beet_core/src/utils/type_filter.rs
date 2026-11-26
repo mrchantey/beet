@@ -1,96 +1,114 @@
-//! [`TypeFilter`]: a [`GlobFilter`] over types.
+//! [`TypeFilter`]: which types pass, by exact name.
 use crate::prelude::*;
 use bevy::reflect::TypePath;
 use bevy::reflect::TypePathTable;
 
-/// A [`GlobFilter`] over types, each tested by every name it has: its full
-/// path and its short path, or a runtime component's declared name. The last
-/// rule matching any of them decides, so a rule reaches a type however it is
-/// spelled, `"Name"` and `"bevy_ecs::name::Name"` alike, and an exclude cannot
-/// be dodged by spelling the type the other way.
+/// Which types pass, by [`ReflectName`]: every type, the types allowed, or
+/// every type but those denied. A lookup per type, matched against its full
+/// path or the short one a document wrote, and a runtime component by the
+/// name it was declared under.
 ///
-/// Authored as a [`GlobFilter`] is, the allowlist a human writes
-/// (`read=["guestbook.*","Text"]`) or the two named lists; built in code from
-/// the types themselves, each a literal of its full path:
+/// Allowing narrows an unset filter to what is allowed and takes a type off a
+/// denylist; denying does the reverse:
 ///
 /// ```
 /// # use beet_core::prelude::*;
 /// let filter = TypeFilter::deny_all().allow::<Name>();
 /// filter.passes_type::<Name>().xpect_true();
 /// filter.passes_type::<ChildOf>().xpect_false();
-/// // a short pattern reaches the type by its short name
-/// let filter = TypeFilter::default().with_exclude("Name");
-/// filter.passes(&TypeName::new("bevy_ecs::name::Name")).xpect_false();
+/// TypeFilter::default()
+/// 	.deny::<Name>()
+/// 	.passes(&ReflectName::of::<Name>())
+/// 	.xpect_false();
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Reflect)]
-#[reflect(Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(transparent))]
-pub struct TypeFilter(GlobFilter);
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub enum TypeFilter {
+	/// Every type passes.
+	#[default]
+	All,
+	/// Only these types pass.
+	Allow(HashSet<ReflectName>),
+	/// Every type but these passes.
+	Deny(HashSet<ReflectName>),
+}
 
 impl TypeFilter {
-	/// A filter of these rules.
-	pub fn new(filter: GlobFilter) -> Self { Self(filter) }
+	/// Every type passes.
+	pub fn allow_all() -> Self { Self::All }
 
-	/// Every type passes, the empty filter.
-	pub fn allow_all() -> Self { Self::default() }
+	/// No type passes until one is allowed.
+	pub fn deny_all() -> Self { Self::Allow(default()) }
 
-	/// No type passes until one is allowed after this.
-	pub fn deny_all() -> Self { Self(GlobFilter::default().with_exclude("*")) }
+	/// Allow `T`.
+	#[must_use]
+	pub fn allow<T: ?Sized + TypePath>(self) -> Self {
+		self.allow_name(ReflectName::of::<T>())
+	}
 
-	/// The rules.
-	pub fn filter(&self) -> &GlobFilter { &self.0 }
+	/// Deny `T`.
+	#[must_use]
+	pub fn deny<T: ?Sized + TypePath>(self) -> Self {
+		self.deny_name(ReflectName::of::<T>())
+	}
 
-	/// Whether there are no rules, so every type passes.
-	pub fn is_empty(&self) -> bool { self.0.is_empty() }
-
-	/// Allow `T`, ahead of every rule before this.
-	pub fn allow<T: ?Sized + TypePath>(mut self) -> Self {
-		self.0
-			.push(GlobRule::Include(GlobPattern::literal(T::type_path())));
+	/// Allow the type `name` names.
+	#[must_use]
+	pub fn allow_name(mut self, name: impl Into<ReflectName>) -> Self {
+		let name = name.into();
+		match &mut self {
+			Self::All => self = Self::Allow([name].into_iter().collect()),
+			Self::Allow(names) => {
+				names.insert(name);
+			}
+			Self::Deny(names) => {
+				names.remove(&name);
+			}
+		}
 		self
 	}
 
-	/// Deny `T`, ahead of every rule before this.
-	pub fn deny<T: ?Sized + TypePath>(mut self) -> Self {
-		self.0
-			.push(GlobRule::Exclude(GlobPattern::literal(T::type_path())));
+	/// Deny the type `name` names.
+	#[must_use]
+	pub fn deny_name(mut self, name: impl Into<ReflectName>) -> Self {
+		let name = name.into();
+		match &mut self {
+			Self::All => self = Self::Deny([name].into_iter().collect()),
+			Self::Allow(names) => {
+				names.remove(&name);
+			}
+			Self::Deny(names) => {
+				names.insert(name);
+			}
+		}
 		self
 	}
 
-	/// Allow every type a name of which matches `pattern`.
-	pub fn with_include(mut self, pattern: &str) -> Self {
-		self.0.include(pattern);
-		self
-	}
-
-	/// Deny every type a name of which matches `pattern`.
-	pub fn with_exclude(mut self, pattern: &str) -> Self {
-		self.0.exclude(pattern);
-		self
-	}
-
-	/// Whether the type `name` names passes, by its full path or its short
-	/// one.
-	pub fn passes(&self, name: &TypeName) -> bool {
-		self.is_empty() || self.0.passes_any([name.as_str(), &name.short()])
+	/// Whether the type or runtime component `name` names passes.
+	pub fn passes(&self, name: &ReflectName) -> bool {
+		self.decide(|names| names.contains(name))
 	}
 
 	/// Whether `T` passes.
 	pub fn passes_type<T: ?Sized + TypePath>(&self) -> bool {
-		self.passes(&TypeName::of_path::<T>())
+		self.passes(&ReflectName::of::<T>())
 	}
 
 	/// Whether the reflected type at `path` passes, by its full path or its
 	/// short one.
 	pub fn passes_path(&self, path: &TypePathTable) -> bool {
-		self.is_empty() || self.0.passes_any([path.path(), path.short_path()])
+		self.decide(|names| {
+			names.contains(&ReflectName::new(path.path()))
+				|| names.contains(&ReflectName::new(path.short_path()))
+		})
 	}
-}
 
-impl core::fmt::Display for TypeFilter {
-	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		self.0.fmt(f)
+	/// Whether a type passes, `listed` saying whether a set names it.
+	fn decide(&self, listed: impl Fn(&HashSet<ReflectName>) -> bool) -> bool {
+		match self {
+			Self::All => true,
+			Self::Allow(names) => listed(names),
+			Self::Deny(names) => !listed(names),
+		}
 	}
 }
 
@@ -98,35 +116,23 @@ impl core::fmt::Display for TypeFilter {
 mod test {
 	use crate::prelude::*;
 
-	#[derive(Reflect)]
-	struct Wrap<T>(T);
-
-	/// A rule by either name reaches the type, and the rules keep their order.
+	/// Allowing and denying take each other back, and a set names a type by
+	/// either of its paths.
 	#[crate::test]
-	fn any_name_last_match() {
-		let filter = TypeFilter::default().with_exclude("Name");
-		filter.passes_type::<Name>().xpect_false();
-		filter
-			.passes(&TypeName::new("bevy_ecs::name::Name"))
-			.xpect_false();
-		filter.passes_type::<ChildOf>().xpect_true();
-		// a later rule takes an earlier one back
+	fn allow_and_deny() {
 		TypeFilter::deny_all()
-			.allow::<Name>()
-			.passes_type::<Name>()
-			.xpect_true();
-		TypeFilter::default()
 			.allow::<Name>()
 			.deny::<Name>()
 			.passes_type::<Name>()
 			.xpect_false();
-	}
-
-	/// A generic type's path holds glob characters, matched literally.
-	#[crate::test]
-	fn generic_paths_are_literal() {
-		let filter = TypeFilter::deny_all().allow::<Wrap<[u8; 4]>>();
-		filter.passes_type::<Wrap<[u8; 4]>>().xpect_true();
-		filter.passes_type::<Wrap<[u8; 3]>>().xpect_false();
+		let filter = TypeFilter::default().deny::<Name>().allow::<Name>();
+		filter.passes_type::<Name>().xpect_true();
+		filter.passes_type::<ChildOf>().xpect_true();
+		TypeFilter::default()
+			.deny_name("Name")
+			.passes_path(
+				<Name as bevy::reflect::Typed>::type_info().type_path_table(),
+			)
+			.xpect_false();
 	}
 }

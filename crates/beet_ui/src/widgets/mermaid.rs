@@ -19,11 +19,11 @@ use beet_net::prelude::*;
 /// A mermaid diagram authored in markup. The source is the default slot's
 /// text, or the file `src` names read through the nearest self-or-ancestor
 /// [`BlobStore`] (a `.mmd` beside the page, never the filesystem directly).
-/// `mode` pins the form as a fence's `mode` does; unset, the figure takes the
+/// `form` pins it as a fence's `form` does; unset, the figure takes the
 /// cascade's `diagram-render`.
 ///
 /// ```html
-/// <Mermaid mode="text">graph LR; A[Parse] --> B[Paint]</Mermaid>
+/// <Mermaid form="text">graph LR; A[Parse] --> B[Paint]</Mermaid>
 /// <Mermaid src="./pipeline.mmd"/>
 /// ```
 ///
@@ -34,13 +34,13 @@ pub fn Mermaid(
 	/// A file of the package holding the source; the default slot's text when
 	/// absent.
 	src: Option<DocPath>,
-	/// The form this diagram takes, the declaration a fence's `mode` makes.
-	mode: Option<DiagramRender>,
+	/// The form this diagram takes, the declaration a fence's `form` makes.
+	form: Option<DiagramRender>,
 ) -> impl Bundle {
 	rsx! {
 		<figure
 			{Classes::new([DIAGRAM])}
-			{MermaidSource { src, mode }}
+			{MermaidSource { src, form }}
 		><slot/></figure>
 	}
 }
@@ -54,7 +54,7 @@ struct MermaidSource {
 	/// The file holding the source, `None` for the slot's text.
 	src: Option<DocPath>,
 	/// The form to declare on the figure, `None` for the cascade's.
-	mode: Option<DiagramRender>,
+	form: Option<DiagramRender>,
 }
 
 /// Observer: give the figure its source. The slot's text is under the figure
@@ -70,7 +70,7 @@ fn adopt_source(
 	let Ok(source) = sources.get(figure) else {
 		return;
 	};
-	let mode = source.mode;
+	let form = source.form;
 	match source.src.clone() {
 		None => {
 			let text: String = children
@@ -82,7 +82,7 @@ fn adopt_source(
 			commands
 				.entity(figure)
 				.queue(move |mut entity: EntityWorldMut| {
-					materialize(&mut entity, text, mode)
+					materialize(&mut entity, text, form)
 				});
 		}
 		Some(src) => {
@@ -102,7 +102,7 @@ fn adopt_source(
 					let text = String::from_utf8(bytes.to_vec())?;
 					figure
 						.with(move |mut entity| {
-							materialize(&mut entity, text, mode)
+							materialize(&mut entity, text, form)
 						})
 						.await?
 				},
@@ -111,15 +111,15 @@ fn adopt_source(
 	}
 }
 
-/// Declare `mode`, replace whatever the figure held (the slot's text, an
+/// Declare `form`, replace whatever the figure held (the slot's text, an
 /// unfilled slot) with [`MermaidDiagram`], and build its form now.
 fn materialize(
 	figure: &mut EntityWorldMut,
 	source: String,
-	mode: Option<DiagramRender>,
+	form: Option<DiagramRender>,
 ) -> Result {
-	if let Some(mode) = mode {
-		declare_render(figure, mode)?;
+	if let Some(form) = form {
+		declare_render(figure, form)?;
 	}
 	figure
 		.remove::<MermaidSource>()
@@ -130,11 +130,11 @@ fn materialize(
 	Ok(())
 }
 
-/// Declare `mode` on `entity` exactly as `bx:style="diagram-render=.."`
+/// Declare `form` on `entity` exactly as `bx:style="diagram-render=.."`
 /// would: the content-keyed inline class and its one-off rule, the one a
-/// fence's `mode` and the directive declare too.
-fn declare_render(entity: &mut EntityWorldMut, mode: DiagramRender) -> Result {
-	let (class, rule) = inline_style_rule(&mode.declaration())?;
+/// fence's `form` and the directive declare too.
+fn declare_render(entity: &mut EntityWorldMut, form: DiagramRender) -> Result {
+	let (class, rule) = inline_style_rule(&form.declaration())?;
 	register_inline_rule(entity, class, rule)
 }
 
@@ -187,7 +187,7 @@ mod test {
 	async fn slot_text_is_the_source() {
 		let (mut world, root) = spawn(
 			None,
-			"<Mermaid mode=\"text\">\ngraph LR\n  A[Parse] --> B[Paint]\n</Mermaid>",
+			"<Mermaid form=\"text\">\ngraph LR\n  A[Parse] --> B[Paint]\n</Mermaid>",
 		)
 		.await;
 		let figure = figure(&mut world, root);
@@ -211,7 +211,7 @@ mod test {
 			.xpect_contains("graph LR");
 	}
 
-	/// `src` reads a file of the package, and the unset `mode` leaves
+	/// `src` reads a file of the package, and the unset `form` leaves
 	/// the mode to the cascade.
 	#[beet_core::test]
 	async fn src_reads_a_package_file() {
@@ -341,7 +341,7 @@ mod test {
 		ParseContext::new(
 			&mut app.world_mut().entity_mut(root),
 			&MediaBytes::new_markdown(
-				"# Flow\n\n<Mermaid mode=\"text\">graph LR; A --> B</Mermaid>\n",
+				"# Flow\n\n<Mermaid form=\"text\">graph LR; A --> B</Mermaid>\n",
 			),
 		)
 		.parse()

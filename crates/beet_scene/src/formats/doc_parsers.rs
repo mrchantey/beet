@@ -37,13 +37,12 @@ pub trait DocParser: 'static + Send + Sync + Clone + Installer {
 	/// The media types this parser reads, preferred first.
 	fn media_types(&self) -> Vec<MediaType>;
 
-	/// Whether a markdown fence naming this format is the document it holds
-	/// when it says neither `render` nor `render=false`, rather than a code
-	/// sample: a diagram is drawn, a sample of markup stays code.
-	fn renders_fence(&self) -> bool { false }
+	/// What a markdown fence naming this format becomes when it does not say:
+	/// a diagram is drawn, a sample of markup stays code.
+	fn fence_render(&self) -> FenceRender { FenceRender::Code }
 
 	/// Configure this parse with what a fence says beyond its format and
-	/// `render`, ie `mode=text` of ```` ```mermaid mode=text ````, on the clone
+	/// `render`, ie `form=text` of ```` ```mermaid form=text ````, on the clone
 	/// that parses it. A format taking no params refuses any.
 	fn configure(&mut self, params: &FenceParams) -> Result {
 		params.assert_empty()
@@ -78,7 +77,7 @@ pub trait DocParser: 'static + Send + Sync + Clone + Installer {
 pub struct DocParsers {
 	parsers: Vec<Arc<dyn ErasedDocParser>>,
 	types: AppTypeRegistry,
-	metadata_type: TypeName,
+	metadata_type: ReflectName,
 }
 
 /// No parsers and no types, so nothing reads and every name is unregistered
@@ -88,7 +87,7 @@ impl Default for DocParsers {
 		Self {
 			parsers: default(),
 			types: default(),
-			metadata_type: TypeName::new(Self::METADATA_TYPE),
+			metadata_type: ReflectName::new(Self::METADATA_TYPE),
 		}
 	}
 }
@@ -127,12 +126,12 @@ impl DocParsers {
 	/// The component a document's unsectioned metadata declares, ie a
 	/// markdown page's frontmatter keys:
 	/// [`METADATA_TYPE`](Self::METADATA_TYPE) until a plugin names one.
-	pub fn metadata_type(&self) -> &TypeName { &self.metadata_type }
+	pub fn metadata_type(&self) -> &ReflectName { &self.metadata_type }
 
 	/// Declare unsectioned metadata as the component `metadata_type` names.
 	pub fn with_metadata_type(
 		mut self,
-		metadata_type: impl Into<TypeName>,
+		metadata_type: impl Into<ReflectName>,
 	) -> Self {
 		self.set_metadata_type(metadata_type);
 		self
@@ -141,7 +140,7 @@ impl DocParsers {
 	/// Declare unsectioned metadata as the component `metadata_type` names.
 	pub fn set_metadata_type(
 		&mut self,
-		metadata_type: impl Into<TypeName>,
+		metadata_type: impl Into<ReflectName>,
 	) -> &mut Self {
 		self.metadata_type = metadata_type.into();
 		self
@@ -200,14 +199,13 @@ impl DocParsers {
 			.any(|parser| parser.media_types().contains(media_type))
 	}
 
-	/// Whether a fence naming `media_type` is the document it holds when it
-	/// says neither `render` nor `render=false`, `None` when no parser reads
-	/// the type ([`DocParser::renders_fence`]).
-	pub fn renders_fence(&self, media_type: &MediaType) -> Option<bool> {
+	/// What a fence naming `media_type` becomes when it does not say, `None`
+	/// when no parser reads the type ([`DocParser::fence_render`]).
+	pub fn fence_render(&self, media_type: &MediaType) -> Option<FenceRender> {
 		self.reads(media_type)
 			.then(|| self.choose(media_type).ok())
 			.flatten()
-			.map(|parser| parser.renders_fence())
+			.map(|parser| parser.fence_render())
 	}
 
 	/// `bytes` through the parser their media type selects, an error's place
@@ -329,7 +327,7 @@ impl DocParsers {
 trait ErasedDocParser: 'static + Send + Sync {
 	fn as_any(&self) -> &dyn Any;
 	fn media_types(&self) -> Vec<MediaType>;
-	fn renders_fence(&self) -> bool;
+	fn fence_render(&self) -> FenceRender;
 	/// Parse with a clone of this parser, configured by `params` where a
 	/// fence gives some.
 	fn parse(
@@ -345,7 +343,7 @@ impl<T: DocParser> ErasedDocParser for T {
 
 	fn media_types(&self) -> Vec<MediaType> { DocParser::media_types(self) }
 
-	fn renders_fence(&self) -> bool { DocParser::renders_fence(self) }
+	fn fence_render(&self) -> FenceRender { DocParser::fence_render(self) }
 
 	fn parse(
 		&self,

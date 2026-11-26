@@ -168,12 +168,6 @@ impl GlobFilter {
 		self
 	}
 
-	/// Appends `rule`, matching ahead of every rule before it.
-	pub fn push(&mut self, rule: GlobRule) -> &mut Self {
-		self.rules.push(rule);
-		self
-	}
-
 	/// Appends an include rule and returns `&mut Self`.
 	pub fn include(&mut self, pattern: &str) -> &mut Self {
 		self.rules
@@ -293,23 +287,6 @@ impl GlobPattern {
 			idx = end + 1;
 		}
 		Self(pattern.into()).xok()
-	}
-
-	/// A pattern matching `text` exactly, its `*`, `?` and `[` escaped as
-	/// one-character classes, ie a type path holding `[u8; 4]`.
-	pub fn literal(text: &str) -> Self {
-		let mut pattern = String::with_capacity(text.len());
-		for ch in text.chars() {
-			match ch {
-				'*' | '?' | '[' => {
-					pattern.push('[');
-					pattern.push(ch);
-					pattern.push(']');
-				}
-				ch => pattern.push(ch),
-			}
-		}
-		Self(pattern.into())
 	}
 
 	/// A pattern written in code, ie `GlobPattern::new("*.rs")`; authored
@@ -603,15 +580,6 @@ mod test {
 			.xpect_false();
 		// an allowlist no name reaches rejects
 		filter.passes_any(["a::B", "B"]).xpect_false();
-	}
-
-	/// A literal pattern matches its text exactly, glob characters and all.
-	#[crate::test]
-	fn literal_escapes() {
-		let pattern = GlobPattern::literal("a::Foo<[u8; 4]>*?");
-		pattern.matches("a::Foo<[u8; 4]>*?").xpect_true();
-		pattern.matches("a::Foo<[u8; 4]>xy").xpect_false();
-		pattern.matches("a::Foo<u>*?").xpect_false();
 	}
 
 	/// The rules in order, which is what a translated dialect and a log line

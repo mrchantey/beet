@@ -7,10 +7,11 @@ use beet_scene::prelude::*;
 
 /// Reads mermaid as a `<figure>` holding its [`MermaidDiagram`], drawn once it
 /// is on a surface: a ```` ```mermaid ```` fence, which renders unless it says
-/// `render=false`, and a document of its own.
+/// `render=code`, and a document of its own.
 ///
-/// A fence's `mode` (`text | svg | auto`, [`MermaidFence`]) is an
-/// [`InlineStyle`] declaring `diagram-render`, as `bx:style` would.
+/// A fence's `form` (`text | svg | auto`, [`MermaidFence`]) is an
+/// [`InlineStyle`] declaring `diagram-render`, as `bx:style` would: a
+/// preference each sink resolves, never a choice made as the page parses.
 #[derive(Debug, Default, Clone)]
 pub struct MermaidParser {
 	/// What the fence being read says, nothing for a document of its own.
@@ -18,11 +19,11 @@ pub struct MermaidParser {
 }
 
 /// What a ```` ```mermaid ```` fence says beyond its format, ie
-/// ```` ```mermaid mode=text ````.
+/// ```` ```mermaid form=text ````.
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
 pub struct MermaidFence {
 	/// The form this diagram takes, else the cascade's `diagram-render`.
-	pub mode: Option<DiagramRender>,
+	pub form: Option<DiagramRender>,
 }
 
 impl MermaidParser {
@@ -38,7 +39,7 @@ impl DocParser for MermaidParser {
 	}
 
 	/// A diagram is drawn wherever it is written.
-	fn renders_fence(&self) -> bool { true }
+	fn fence_render(&self) -> FenceRender { FenceRender::Scene }
 
 	fn configure(&mut self, params: &FenceParams) -> Result {
 		self.fence = params.read()?;
@@ -53,8 +54,8 @@ impl DocParser for MermaidParser {
 		let mut figure = EntityBody::default()
 			.with_typed(&Element::new("figure"))?
 			.with_typed(&MermaidDiagram::new(bytes.as_utf8()?))?;
-		if let Some(mode) = self.fence.mode {
-			figure.insert_typed(&InlineStyle::new(mode.declaration()))?;
+		if let Some(form) = self.fence.form {
+			figure.insert_typed(&InlineStyle::new(form.declaration()))?;
 		}
 		ParsedDocument::from(SceneBody::root(figure)).xok()
 	}
@@ -145,7 +146,7 @@ pub(super) mod test {
 	}
 
 	#[beet_core::test]
-	fn fence_mode_overrides_the_page_mode() {
+	fn fence_form_overrides_the_page_mode() {
 		let mut app = App::new();
 		app.add_plugins(StylePlugin);
 		// the page asks for svg; the first fence insists on text
@@ -161,7 +162,7 @@ pub(super) mod test {
 			page,
 			&format!(
 				"{}\n\n{FLOWCHART}",
-				FLOWCHART.replace("mermaid", "mermaid mode=text")
+				FLOWCHART.replace("mermaid", "mermaid form=text")
 			),
 		);
 		let world = app.world_mut();
@@ -172,14 +173,14 @@ pub(super) mod test {
 	}
 
 	#[beet_core::test]
-	fn unknown_mode_refuses_the_page() {
+	fn unknown_form_refuses_the_page() {
 		let mut app = App::new();
 		app.add_plugins(StylePlugin);
 		let root = app.world_mut().spawn_empty().id();
 		ParseContext::new(
 			&mut app.world_mut().entity_mut(root),
 			&MediaBytes::new_markdown(
-				&FLOWCHART.replace("mermaid", "mermaid mode=banana"),
+				&FLOWCHART.replace("mermaid", "mermaid form=banana"),
 			),
 		)
 		.parse()
@@ -189,14 +190,14 @@ pub(super) mod test {
 	}
 
 	#[beet_core::test]
-	fn render_false_is_a_code_sample() {
+	fn render_code_is_a_code_sample() {
 		let mut app = App::new();
 		app.add_plugins(StylePlugin);
 		let root = app.world_mut().spawn_empty().id();
 		parse_md(
 			app.world_mut(),
 			root,
-			&FLOWCHART.replace("mermaid", "mermaid render=false"),
+			&FLOWCHART.replace("mermaid", "mermaid render=code"),
 		);
 		let built = tags(app.world_mut(), root);
 		built.iter().any(|tag| tag == "figure").xpect_false();

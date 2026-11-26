@@ -66,14 +66,14 @@ pub struct Frontmatter {
 pub struct FrontmatterType {
 	/// The component's type path, resolved against the type registry exactly
 	/// as a BSX tag is, so a document may write it short.
-	pub component: TypeName,
+	pub component: ReflectName,
 }
 
 impl FrontmatterType {
 	/// Declare `T` as the component unsectioned frontmatter declares.
 	pub fn of<T: bevy::reflect::TypePath>() -> Self {
 		Self {
-			component: TypeName::of_path::<T>(),
+			component: ReflectName::of::<T>(),
 		}
 	}
 }
@@ -89,14 +89,14 @@ pub struct FrontmatterTypeQuery<'w, 's> {
 impl FrontmatterTypeQuery<'_, '_> {
 	/// The component: that of the nearest [`FrontmatterType`] at or above
 	/// `entity`, else the registry's own.
-	pub fn get(&self, entity: Entity) -> TypeName {
+	pub fn get(&self, entity: Entity) -> ReflectName {
 		match self.types.get(entity) {
 			Ok(declared) => declared.component.clone(),
 			Err(_) => self
 				.parsers
 				.as_ref()
 				.map(|parsers| parsers.metadata_type().clone())
-				.unwrap_or_else(|| TypeName::new(DocParsers::METADATA_TYPE)),
+				.unwrap_or_else(|| ReflectName::new(DocParsers::METADATA_TYPE)),
 		}
 	}
 }
@@ -324,7 +324,7 @@ impl Frontmatter {
 	pub fn write(
 		world: &World,
 		entity: Entity,
-		default_component: &TypeName,
+		default_component: &ReflectName,
 		media_type: &MediaType,
 	) -> Result<Option<String>> {
 		let fence = Self::fence(media_type)?;
@@ -352,7 +352,7 @@ impl Frontmatter {
 		world: &World,
 		entity: Entity,
 		registry: &TypeRegistry,
-		default_component: &TypeName,
+		default_component: &ReflectName,
 	) -> Result<WrittenBlock> {
 		let mut block = WrittenBlock::default();
 		for (_, info) in world.inspect_entity(entity)? {

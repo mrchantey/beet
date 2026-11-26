@@ -23,7 +23,7 @@ use serde::Serialize;
 /// refusal rejects the awaiting promise naming the identifier, so the script can
 /// catch it.
 ///
-/// Both halves are a [`TypeFilter`], so a pattern reaches a family of
+/// Both halves are a [`GlobFilter`], so a pattern reaches a family of
 /// components and an exclude carves one out of an otherwise open grant:
 ///
 /// ```ignore
@@ -46,9 +46,9 @@ pub struct ScriptConfig {
 	/// Whether to install the `console` global. Default true.
 	pub console: bool,
 	/// Components and resources the script may read. Empty includes read everything.
-	pub read: TypeFilter,
+	pub read: GlobFilter,
 	/// Components and resources the script may write. Empty includes write everything.
-	pub write: TypeFilter,
+	pub write: GlobFilter,
 	/// The resources this script may consume before it is cut off.
 	pub limits: ScriptLimits,
 }
@@ -58,8 +58,8 @@ impl Default for ScriptConfig {
 		Self {
 			world: true,
 			console: true,
-			read: TypeFilter::default(),
-			write: TypeFilter::default(),
+			read: GlobFilter::default(),
+			write: GlobFilter::default(),
 			limits: ScriptLimits::default(),
 		}
 	}
@@ -100,12 +100,8 @@ impl ScriptConfig {
 			.map(|component| component.as_ref().to_string())
 			.collect::<Vec<_>>();
 		Self {
-			read: TypeFilter::new(
-				GlobFilter::default().extend_include(&components),
-			),
-			write: TypeFilter::new(
-				GlobFilter::default().extend_include(&components),
-			),
+			read: GlobFilter::default().extend_include(&components),
+			write: GlobFilter::default().extend_include(&components),
 			..default()
 		}
 	}
@@ -115,13 +111,11 @@ impl ScriptConfig {
 		mut self,
 		components: impl IntoIterator<Item = S>,
 	) -> Self {
-		self.write = TypeFilter::new(
-			GlobFilter::default().extend_include(
-				components
-					.into_iter()
-					.map(|component| component.as_ref().to_string())
-					.collect::<Vec<_>>(),
-			),
+		self.write = GlobFilter::default().extend_include(
+			components
+				.into_iter()
+				.map(|component| component.as_ref().to_string())
+				.collect::<Vec<_>>(),
 		);
 		self
 	}
@@ -132,7 +126,7 @@ impl ScriptConfig {
 	/// and has no business changing it. Spelled as an exclude of everything, so
 	/// it is the same one mechanism rather than a second flag.
 	pub fn read_only(mut self) -> Self {
-		self.write = TypeFilter::deny_all();
+		self.write = GlobFilter::default().with_exclude("*");
 		self
 	}
 
@@ -159,7 +153,7 @@ impl ScriptConfig {
 	/// # Errors
 	/// Errors naming the identifier when this config excludes it.
 	pub fn assert_readable(&self, ident: &ComponentIdent) -> Result {
-		match self.read.passes(&ident.name) {
+		match Self::passes(&self.read, ident) {
 			true => Ok(()),
 			false => bevybail!(
 				"script may not read `{}`: its read filter is {}",
@@ -187,7 +181,7 @@ so writing it would let a script widen its own",
 				ident.name
 			);
 		}
-		match self.write.passes(&ident.name) {
+		match Self::passes(&self.write, ident) {
 			true => Ok(()),
 			false => bevybail!(
 				"script may not write `{}`: its write filter is {}",
@@ -199,11 +193,18 @@ so writing it would let a script widen its own",
 
 	/// A filter on one line, for the error a script reads back. A filter with no
 	/// rules is the open grant it is.
-	fn describe(filter: &TypeFilter) -> String {
+	fn describe(filter: &GlobFilter) -> String {
 		match filter.is_empty() {
 			true => "everything".to_string(),
 			false => filter.to_string(),
 		}
+	}
+
+	/// Whether `ident` passes `filter`: the last rule matching any of its
+	/// names (full type path, short path, or a runtime component's declared
+	/// name) decides, so the component is tested and never its spelling.
+	fn passes(filter: &GlobFilter, ident: &ComponentIdent) -> bool {
+		filter.passes_any([ident.name.as_str(), &ident.name.short()])
 	}
 }
 
@@ -310,7 +311,7 @@ mod test {
 	#[beet_core::test]
 	fn an_exclude_holds_under_either_name() {
 		let config = ScriptConfig {
-			write: TypeFilter::default().with_exclude("*name::Name"),
+			write: GlobFilter::default().with_exclude("*name::Name"),
 			..default()
 		};
 		writable(&config, "Name")

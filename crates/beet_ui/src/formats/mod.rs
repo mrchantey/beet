@@ -1,5 +1,11 @@
-//! The document formats whose reading needs this crate's vocabulary, and what
-//! extends a parsed tree.
+//! The document formats that build this crate's own types, and what extends a
+//! parsed tree.
+//!
+//! A format that builds a plain scene (elements, values, the components a
+//! document names) is `beet_scene`'s, in its `formats` module; one that builds
+//! a UI type, a style rule, a diagram, an office file's looks, is here, since
+//! `beet_scene` sits below this crate. Both register into the one
+//! `DocParsers` registry, so a document never knows which crate read it.
 //!
 //! A document is read by `beet_scene`, whose `ScenePlugin` registers the base
 //! formats; [`ParsePlugin`] installs it, names [`DocMeta`] as what a

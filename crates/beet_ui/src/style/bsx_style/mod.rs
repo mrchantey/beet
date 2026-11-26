@@ -11,7 +11,7 @@ mod inline_style;
 mod prop_name;
 mod rule_markup;
 pub use inline_style::InlineStyle;
-// a `<Mermaid mode>` declares on its figure's behalf exactly as `bx:style` does
+// a `<Mermaid form>` declares on its figure's behalf exactly as `bx:style` does
 #[cfg(feature = "mermaid")]
 pub(crate) use inline_style::inline_style_rule;
 pub use prop_name::*;

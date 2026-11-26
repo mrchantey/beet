@@ -9,6 +9,8 @@ pub use field_path::*;
 /// [`TypeName`], the one way a rust type is named, and [`TypeMeta`].
 mod type_name;
 pub use type_name::*;
+mod reflect_name;
+pub use reflect_name::*;
 mod on_missing;
 pub use on_missing::*;
 mod write_policy;

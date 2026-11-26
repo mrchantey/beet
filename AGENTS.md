@@ -94,7 +94,7 @@ Situational cheatsheets, read before touching the subsystem:
 
 ## BSX Cheatsheet
 
-Full authoring rules: `crates/beet_scene/src/bsx/mod.rs`. The ones every session needs:
+Full authoring rules: `crates/beet_scene/src/formats/bsx/mod.rs`. The ones every session needs:
 
 - **Every entity is authored under the tag of the type it most *is***, never a `<div>` with the real type in a spread: `<Route path="deploy" {ExchangeSequence}>`, not `<div {(Route{path:"deploy"}, ExchangeSequence)}>`. Between co-located types the entity's action wins (`<Repeat {RunThread}>`), absent an action the noun it names. `<Fragment>` is the plain grouping, `<Tag/>` spawns its own entity, `{Spread}` adds to the current one. A bare attribute or tag means what HTML means, `bx:` marks beet's: a prefab is `<template>`, a slot `<slot>`, a script beet runs `<script bx:run>`.
 - **A `bx:` directive is sugar for explicit BSX**, rewritten as a document lowers to a scene body, with no world (`bx:onclick` is a child `<script bx:event="click">`); a `#[template]` needs one, run at spawn. `app.install(MyDirective)` adds one; an unmatched `bx:` key refuses the document.

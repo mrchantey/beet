@@ -16,7 +16,7 @@ pub struct ComponentIdent {
 	/// The identifier as it appears on the wire: a registered component's full
 	/// type path, or a dynamic component's declared name, which a
 	/// [`ScriptConfig`] matches by either of its names.
-	pub name: TypeName,
+	pub name: ReflectName,
 	/// The live component.
 	pub id: ComponentId,
 	/// The reflected type, absent for a dynamic component, which has none.
@@ -35,7 +35,7 @@ impl ComponentIdent {
 	pub fn resolve(world: &mut World, ident: &str) -> Result<Self> {
 		if let Some(id) = DynamicComponents::get(world, ident) {
 			return Self {
-				name: TypeName::new(ident),
+				name: ReflectName::new(ident),
 				id,
 				type_id: None,
 			}
@@ -48,7 +48,7 @@ impl ComponentIdent {
 			let registry = registry.read();
 			match reflect_ext::registration_by_name(&registry, ident) {
 				Some(registration) => Some((
-					TypeName::new(registration.type_info().type_path()),
+					ReflectName::new(registration.type_info().type_path()),
 					registration.type_id(),
 					registration
 						.data::<ReflectComponent>()
@@ -125,7 +125,7 @@ mod test {
 		ComponentIdent::resolve(&mut world, "Name")
 			.unwrap()
 			.name
-			.xpect_eq(TypeName::new("bevy_ecs::name::Name"));
+			.xpect_eq(ReflectName::new("bevy_ecs::name::Name"));
 	}
 
 	#[beet_core::test]

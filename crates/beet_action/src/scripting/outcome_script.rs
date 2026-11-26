@@ -272,7 +272,7 @@ mod test {
 			// everything but the name, so the catch block can still record what
 			// it was refused
 			ScriptConfig {
-				write: TypeFilter::default().with_exclude("*Name"),
+				write: GlobFilter::default().with_exclude("*Name"),
 				..default()
 			},
 		)

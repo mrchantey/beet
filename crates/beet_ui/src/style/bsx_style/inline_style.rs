@@ -81,7 +81,7 @@ impl InlineStyle {
 
 /// The one-off [`Rule`] an [`InlineStyle`]'s `source` declares and the class
 /// that keys it, for any pass that makes a declaration on an element's behalf
-/// (a `<Mermaid mode>`) to register through [`register_inline_rule`] exactly as
+/// (a `<Mermaid form>`) to register through [`register_inline_rule`] exactly as
 /// the component would, so identical declarations share one class and one
 /// rule.
 ///

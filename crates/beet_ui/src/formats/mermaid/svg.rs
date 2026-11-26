@@ -278,7 +278,7 @@ mod test {
 	#[beet_core::test]
 	fn honours_svg_mode_and_init_directive() {
 		render_md(
-			"```mermaid mode=svg\n%%{init: {\"theme\": \"dark\"}}%%\nsequenceDiagram\nAlice->>Bob: hi\n```",
+			"```mermaid form=svg\n%%{init: {\"theme\": \"dark\"}}%%\nsequenceDiagram\nAlice->>Bob: hi\n```",
 		)
 		.xpect_contains("<svg ")
 		.xpect_contains("Alice");

@@ -12,7 +12,7 @@ impl BsxParser {
 	/// written with its attributes as [`Attribute`] entities, text a
 	/// [`Value`], and every other node its own component, all under a bare
 	/// root. An expression has no xml form.
-	pub(in crate::bsx) fn lower_markup(
+	pub(in crate::formats::bsx) fn lower_markup(
 		nodes: &[BsxNode],
 	) -> Result<ParsedDocument> {
 		let parsers = DocParsers::default();

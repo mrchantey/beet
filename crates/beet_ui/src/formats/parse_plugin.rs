@@ -36,8 +36,7 @@ impl ParsePlugin {
 	/// codegen scan.
 	#[cfg(feature = "scene")]
 	pub fn parsers() -> DocParsers {
-		ScenePlugin::parsers()
-			.with_metadata_type(TypeName::of_path::<DocMeta>())
+		ScenePlugin::parsers().with_metadata_type(ReflectName::of::<DocMeta>())
 	}
 }
 
@@ -52,7 +51,7 @@ impl Plugin for ParsePlugin {
 		app.install_types::<ScenePlugin>()
 			.world_mut()
 			.get_resource_or_init::<DocParsers>()
-			.set_metadata_type(TypeName::of_path::<DocMeta>());
+			.set_metadata_type(ReflectName::of::<DocMeta>());
 		// the default BSX event vocabulary, so every `bx:onclick="..."` runs
 		// its script on a click.
 		#[cfg(feature = "scene")]
@@ -175,7 +174,7 @@ mod test {
 	#[beet_core::test]
 	fn text_fallback_reads_markdown_frontmatter() {
 		let mut parsers = DocParsers::default()
-			.with_metadata_type(TypeName::of_path::<DocMeta>());
+			.with_metadata_type(ReflectName::of::<DocMeta>());
 		parsers.register(PlainTextParser::default());
 		parsers
 			.root_components(
@@ -189,10 +188,7 @@ mod test {
 			.map(|name| name.as_str())
 			.collect::<Vec<_>>()
 			// no registry, so each is held by the name it was declared by
-			.xpect_eq(vec![
-				TypeName::of_path::<DocMeta>().as_str(),
-				"RouteMeta",
-			]);
+			.xpect_eq(vec![ReflectName::of::<DocMeta>().as_str(), "RouteMeta"]);
 		// a plain text document leading with a fence declares nothing
 		parsers
 			.root_components(
