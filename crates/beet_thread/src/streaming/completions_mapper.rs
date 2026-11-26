@@ -36,23 +36,33 @@ use beet_core::prelude::*;
 // Request Mapping: ModelPost -> ChatCompletionRequestMessage
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Maps a [`ModelPost`] into a [`ChatCompletionRequestMessage`]: a note as
-/// it is in the user role, a post by its author. The `agent_id` determines
-/// which agent posts become `Assistant` messages vs `User` messages.
+/// Maps a [`ModelPost`] into a [`ChatCompletionRequestMessage`] by the one
+/// rule every protocol shares (the model page, [`crate::table`], "Posts"):
+/// a note as it is in the user role, another actor's call with its output as
+/// one user message, the reading agent's own posts native, a System or
+/// Developer post its role's message unwrapped, and anyone else's a user
+/// message wrapped in `<post author=..>`. A tool message is text alone, so a
+/// file that is neither an image nor text is one line naming it
+/// ([`MediaView::line`]). A `media` post's bytes come from `blobs`, read
+/// before.
 pub fn post_to_completions_message(
-	agent_id: ActorId,
+	agent_id: &ActorId,
 	post: ModelPost,
+	blobs: &RequestBlobs,
 ) -> Result<ChatCompletionRequestMessage> {
+	let user = |text: String, name: Option<String>| {
+		ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+			content: ChatCompletionRequestUserMessageContent::Text(text),
+			name,
+		})
+	};
 	let post = match post {
 		ModelPost::Post(post) => post,
-		ModelPost::Note(note) => {
-			return ChatCompletionRequestMessage::User(
-				ChatCompletionRequestUserMessage {
-					content: ChatCompletionRequestUserMessageContent::Text(
-						note,
-					),
-					name: None,
-				},
+		ModelPost::Note(note) => return user(note, None).xok(),
+		ModelPost::Call { call, output } => {
+			return user(
+				call.call_text(output.as_ref()),
+				Some(call.actor.name().to_string()),
 			)
 			.xok();
 		}
@@ -64,8 +74,7 @@ pub fn post_to_completions_message(
 	})?;
 
 	let msg = match &agent_post {
-		AgentPost::FunctionCall(fc) if is_self && kind == ActorKind::Agent => {
-			// Assistant-originated tool call
+		AgentPost::FunctionCall(fc) => {
 			#[allow(deprecated)]
 			let assistant = ChatCompletionRequestAssistantMessage {
 				content: None,
@@ -97,49 +106,53 @@ pub fn post_to_completions_message(
 				},
 			)
 		}
-		AgentPost::Url(url_view) if post.post.media_type().is_image() => {
-			build_image_user_message(&post, url_view.url().to_string(), kind)
+		AgentPost::Url(view) if view.media_type().is_image() => {
+			build_image_user_message(&post, view.url().to_string())
 		}
-		AgentPost::Bytes(bytes_view) if post.post.media_type().is_image() => {
-			let data_url = format!(
-				"data:{};base64,{}",
-				post.post.media_type().as_str(),
-				bytes_view.body_base64()
-			);
-			build_image_user_message(&post, data_url, kind)
-		}
-		AgentPost::Url(url_view) if post.post.media_type().is_video() => {
-			// Video URLs: include as a reference since completions API
-			// doesn't natively support inline video
-			let wrapped =
-				post.wrap_user_text(&format!("[Video: {}]", url_view.url()));
-			ChatCompletionRequestMessage::User(
-				ChatCompletionRequestUserMessage {
-					content: ChatCompletionRequestUserMessageContent::Text(
-						wrapped,
-					),
-					name: Some(post.actor.name().to_string()),
-				},
+		AgentPost::Url(view) if view.media_type().is_video() => {
+			build_text_message(
+				&post,
+				&format!("[Video: {}]", view.url()),
+				kind,
+				is_self,
 			)
 		}
-		AgentPost::Bytes(_bytes_view) if post.post.media_type().is_video() => {
-			// Video bytes: reference as placeholder since completions API
-			// doesn't natively support inline video data
-			let wrapped = post.wrap_user_text("[Video attachment]");
-			ChatCompletionRequestMessage::User(
-				ChatCompletionRequestUserMessage {
-					content: ChatCompletionRequestUserMessageContent::Text(
-						wrapped,
-					),
-					name: Some(post.actor.name().to_string()),
-				},
-			)
+		AgentPost::Url(view) => {
+			build_text_message(&post, view.url(), kind, is_self)
 		}
-		// Text-like posts: Text, Refusal, ReasoningContent, ReasoningSummary, Error
-		// Also non-image/non-video Url/Bytes fall through here.
-		_ => {
-			let value = post.body_str()?;
-			build_text_message(&post, value, kind, is_self)
+		AgentPost::Media(view) => match blobs.bytes(post.post) {
+			None => build_text_message(
+				&post,
+				RequestBlobs::UNAVAILABLE,
+				kind,
+				is_self,
+			),
+			Some(_) if view.media_type().is_image() => {
+				build_image_user_message(
+					&post,
+					format!(
+						"data:{};base64,{}",
+						view.media_type().as_str(),
+						blobs.base64(post.post).unwrap_or_default()
+					),
+				)
+			}
+			Some(bytes) if view.media_type().is_text() => {
+				match std::str::from_utf8(&bytes) {
+					Ok(text) => build_text_message(&post, text, kind, is_self),
+					Err(_) => {
+						build_text_message(&post, &view.line(), kind, is_self)
+					}
+				}
+			}
+			Some(_) => build_text_message(&post, &view.line(), kind, is_self),
+		},
+		AgentPost::Text(view)
+		| AgentPost::Refusal(view)
+		| AgentPost::Error(view)
+		| AgentPost::ReasoningContent(view)
+		| AgentPost::ReasoningSummary(view) => {
+			build_text_message(&post, view.text(), kind, is_self)
 		}
 	};
 	msg.xok()
@@ -206,7 +219,6 @@ fn build_text_message(
 fn build_image_user_message(
 	post: &AuthoredPost,
 	image_url: String,
-	_kind: ActorKind,
 ) -> ChatCompletionRequestMessage {
 	ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
 		content: ChatCompletionRequestUserMessageContent::Array(vec![
@@ -582,5 +594,110 @@ fn finish_reason_to_post_status(reason: Option<FinishReason>) -> PostStatus {
 		Some(FinishReason::Length) | Some(FinishReason::ContentFilter) => {
 			PostStatus::Interrupted
 		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use async_openai::types::chat::ChatCompletionRequestMessage;
+	use async_openai::types::chat::ChatCompletionRequestUserMessageContent;
+	use beet_core::prelude::*;
+
+	/// The text of the user message a post by a person maps to.
+	fn user_text(post: Post) -> String {
+		let mut records = ThreadRecords::new();
+		records.insert_actor(Actor::user());
+		records.upsert_post(post);
+		let item = records
+			.model_posts(&ActorId::AGENT, None)
+			.into_iter()
+			.next()
+			.unwrap();
+		match completions_mapper::post_to_completions_message(
+			&ActorId::AGENT,
+			item,
+			&RequestBlobs::default(),
+		)
+		.unwrap()
+		{
+			ChatCompletionRequestMessage::User(message) => {
+				match message.content {
+					ChatCompletionRequestUserMessageContent::Text(text) => text,
+					other => panic!("expected text, found {other:?}"),
+				}
+			}
+			other => panic!("expected a user message, found {other:?}"),
+		}
+	}
+
+	/// A tool message is text alone, so a file that is neither an image nor
+	/// text is one line naming it, a text file its text.
+	#[beet_core::test]
+	fn a_file_completions_cannot_carry_is_a_line() {
+		let file = |media_type: MediaType, bytes: &[u8], stem: &str| {
+			AgentPost::new_media(
+				ActorId::USER,
+				ThreadId::now(),
+				media_type,
+				bytes.to_vec(),
+				Some(stem.into()),
+				PostStatus::Completed,
+			)
+		};
+		user_text(file(MediaType::Pdf, &[0; 2048], "report")).xpect_contains(
+			">[file: report.pdf, application/pdf, 2 KB]</post>",
+		);
+		user_text(file(MediaType::Markdown, b"# notes", "notes"))
+			.xpect_contains("># notes</post>");
+	}
+
+	/// A url names its media type, so an image url reaches each protocol as
+	/// an image, and a video url completions as its line.
+	#[beet_core::test]
+	fn an_image_url_is_an_image() {
+		let url = |url: &str| {
+			AgentPost::new_url(
+				ActorId::USER,
+				ThreadId::now(),
+				url,
+				MediaType::from_path(url),
+				None,
+				PostStatus::Completed,
+			)
+		};
+		let mut records = ThreadRecords::new();
+		records.insert_actor(Actor::user());
+		records.upsert_post(url("https://example.com/cat.png"));
+		let item = || {
+			records
+				.model_posts(&ActorId::AGENT, None)
+				.into_iter()
+				.next()
+				.unwrap()
+		};
+		let blobs = RequestBlobs::default();
+		Value::from_serde(
+			&completions_mapper::post_to_completions_message(
+				&ActorId::AGENT,
+				item(),
+				&blobs,
+			)
+			.unwrap(),
+		)
+		.unwrap()["content"][0]["image_url"]["url"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("https://example.com/cat.png");
+		Value::from_serde(
+			&o11s_mapper::post_to_o11s_input(&ActorId::AGENT, item(), &blobs)
+				.unwrap(),
+		)
+		.unwrap()["content"][0]["type"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("input_image");
+		user_text(url("https://example.com/clip.mp4"))
+			.xpect_contains(">[Video: https://example.com/clip.mp4]</post>");
 	}
 }

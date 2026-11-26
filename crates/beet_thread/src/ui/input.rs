@@ -27,16 +27,16 @@ use bevy::input::keyboard::KeyboardInput;
 /// Host-agnostic content bound to a window with an [`OfThread`] relationship.
 /// From markup the two spread together onto one entity:
 /// `<CreatePostForm {OfThread($thread)}/>`, or
-/// `<CreatePostForm actor=3 {OfThread($thread)}/>` to post as the actor `3`.
+/// `<CreatePostForm actor="ann" {OfThread($thread)}/>` to post as `ann`.
 ///
 /// Surface scoping is the host's job: the charcell host carries
 /// `RenderSurface(self)`, so this widget's whole subtree (its `<input>`, included)
 /// resolves to it through [`SurfaceQuery`] with no per-widget wiring.
-#[derive(Debug, Default, Clone, Copy, Component, Reflect)]
+#[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_add = create_post_form_on_add)]
 pub struct CreatePostForm {
-	/// The author of its posts, else the thread's first User actor.
+	/// The author of its posts, else the first User actor the scene authors.
 	pub actor: Option<ActorId>,
 }
 
@@ -95,7 +95,7 @@ pub(super) fn post_on_submit(
 				of_thread.thread()
 			)
 		})?;
-	let author = records.author(form.actor)?;
+	let author = records.author(form.actor.as_ref())?;
 	let post =
 		AgentPost::new_text(author, thread.id(), text, PostStatus::Completed);
 	records.upsert_post(post);

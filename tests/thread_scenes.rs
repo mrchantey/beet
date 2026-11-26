@@ -178,11 +178,7 @@ fn actor_kinds(app: &mut App) -> Vec<ActorKind> {
 	let mut threads = app.world_mut().query_filtered::<Entity, With<Thread>>();
 	let thread = threads.iter(app.world()).next().unwrap();
 	let records = app.world().get::<ThreadRecords>(thread).unwrap();
-	records
-		.actors()
-		.values()
-		.map(|actor| actor.kind())
-		.collect()
+	records.actors().iter().map(|actor| actor.kind()).collect()
 }
 
 /// Count of reduced agents: an `ActorRef` carrying a model streamer.
@@ -317,10 +313,14 @@ async fn group_chat_scene_opens_two_windows() {
 	app.world_mut()
 		.query_once::<&CreatePostForm>()
 		.into_iter()
-		.filter_map(|form| form.actor)
+		.filter_map(|form| form.actor.as_ref().map(ActorId::to_string))
 		.collect::<HashSet<_>>()
-		.len()
-		.xpect_eq(2);
+		.xpect_eq(
+			["ann", "bob"]
+				.map(String::from)
+				.into_iter()
+				.collect::<HashSet<_>>(),
+		);
 }
 
 #[beet::test]

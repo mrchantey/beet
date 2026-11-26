@@ -1,0 +1,10 @@
+{"author":"user","body":{"text":"hi"},"kind":"text","status":"completed"}
+{"author":"user","body":{"file_stem":"cat","media_type":"image/png","url":"https://example.com/cat.png"},"kind":"url","status":"completed"}
+{"author":"user","body":{"blob":{"$type":"blob","mimeType":"image/png","ref":{"$link":"bafkreiadsbmmn4waznesyuz3bjgrj33xzqhxrk6mz3ksq7meugrachh3qe"},"size":3}},"kind":"media","status":"completed"}
+{"author":"agent","body":{"text":"no"},"kind":"refusal","status":"completed"}
+{"author":"agent","body":{"text":"failed"},"kind":"error","status":"interrupted"}
+{"author":"agent","body":{"text":"hmm"},"kind":"reasoning","status":"completed"}
+{"author":"agent","body":{"text":"thought"},"kind":"reasoning_summary","status":"in_progress"}
+{"author":"agent","body":{"arguments":"{}","call_id":"c1","name":"search"},"kind":"tool_call","status":"completed"}
+{"author":"agent","body":{"call_id":"c1","text":"found"},"kind":"tool_output","status":"completed","subject":"<call>"}
+{"author":"user","body":{},"kind":"session_opened","status":"completed"}

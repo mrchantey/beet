@@ -19,42 +19,56 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Maps a [`ModelPost`] into an OpenResponses [`InputItem`] for request
-/// building: a note as it is in the user role, a post by its [`AgentPost`]
-/// classification.
+/// building, by the one rule every protocol shares (the model page,
+/// [`crate::table`], "Posts"): a note as it is in the user role, another
+/// actor's call with its output as one user message, the reading agent's own
+/// posts native, a System or Developer post its role's message unwrapped, and
+/// anyone else's a user message wrapped in `<post author=..>`. A `media`
+/// post's bytes come from `blobs`, read before.
 pub fn post_to_o11s_input(
-	agent_id: ActorId,
+	agent_id: &ActorId,
 	post: ModelPost,
+	blobs: &RequestBlobs,
 ) -> Result<o11s::request::InputItem> {
+	let message = |role: MessageRole, content: MessageContent| {
+		InputItem::Message(MessageParam {
+			id: None,
+			role,
+			content,
+			status: None,
+		})
+	};
 	let post = match post {
 		ModelPost::Post(post) => post,
 		ModelPost::Note(note) => {
-			return InputItem::Message(MessageParam {
-				id: None,
-				role: MessageRole::User,
-				content: MessageContent::Text(note),
-				status: None,
-			})
+			return message(MessageRole::User, MessageContent::Text(note))
+				.xok();
+		}
+		ModelPost::Call { call, output } => {
+			return message(
+				MessageRole::User,
+				MessageContent::Text(call.call_text(output.as_ref())),
+			)
 			.xok();
 		}
 	};
 	let role = match post.actor.kind() {
 		ActorKind::System => MessageRole::System,
 		ActorKind::Developer => MessageRole::Developer,
-		ActorKind::Agent => {
-			if post.actor_id() == agent_id {
-				MessageRole::Assistant
-			} else {
-				MessageRole::User
-			}
-		}
-		ActorKind::User => MessageRole::User,
+		_ if post.actor_id() == agent_id => MessageRole::Assistant,
+		_ => MessageRole::User,
 	};
-
+	let parts = |part: ContentPart| MessageContent::Parts(vec![part]);
+	// only another person's or agent's text is wrapped
+	let text = |value: &str| match role {
+		MessageRole::User => MessageContent::Text(post.wrap_user_text(value)),
+		_ => MessageContent::Text(value.to_string()),
+	};
 	let agent_post = post.post.as_agent_post().ok_or_else(|| {
 		bevyhow!("log post {} is no model input", post.post.id())
 	})?;
 
-	let input_item = match &agent_post {
+	match &agent_post {
 		AgentPost::FunctionCall(fc) => {
 			InputItem::FunctionCall(FunctionCallParam {
 				id: None,
@@ -72,100 +86,45 @@ pub fn post_to_o11s_input(
 				status: None,
 			})
 		}
-		AgentPost::Url(url_view) if post.post.media_type().is_image() => {
-			InputItem::Message(MessageParam {
-				id: None,
-				role,
-				content: MessageContent::Parts(vec![ContentPart::InputImage(
-					o11s::InputImage::from_url(url_view.url()),
-				)]),
-				status: None,
-			})
-		}
-		AgentPost::Url(url_view) if post.post.media_type().is_video() => {
-			InputItem::Message(MessageParam {
-				id: None,
-				role,
-				content: MessageContent::Parts(vec![ContentPart::InputFile(
-					o11s::InputFile {
-						filename: url_view.filename(),
-						file_data: None,
-						file_url: Some(url_view.url().to_string()),
-					},
-				)]),
-				status: None,
-			})
-		}
-		AgentPost::Url(url_view) => InputItem::Message(MessageParam {
-			id: None,
+		AgentPost::Url(view) if view.media_type().is_image() => message(
 			role,
-			content: MessageContent::Parts(vec![ContentPart::InputFile(
-				o11s::InputFile {
-					filename: url_view.filename(),
-					file_data: None,
-					file_url: Some(url_view.url().to_string()),
-				},
-			)]),
-			status: None,
-		}),
-		AgentPost::Bytes(bytes_view) if post.post.media_type().is_image() => {
-			InputItem::Message(MessageParam {
-				id: None,
-				role,
-				content: MessageContent::Parts(vec![ContentPart::InputImage(
-					o11s::InputImage::from_base64(
-						post.post.media_type().as_str(),
-						&bytes_view.body_base64(),
-					),
-				)]),
-				status: None,
-			})
-		}
-		AgentPost::Bytes(bytes_view) if post.post.media_type().is_video() => {
-			InputItem::Message(MessageParam {
-				id: None,
-				role,
-				content: MessageContent::Parts(vec![ContentPart::InputFile(
-					o11s::InputFile {
-						filename: bytes_view.filename(),
-						file_data: Some(bytes_view.body_base64()),
-						file_url: None,
-					},
-				)]),
-				status: None,
-			})
-		}
-		AgentPost::Bytes(bytes_view) => InputItem::Message(MessageParam {
-			id: None,
+			parts(ContentPart::InputImage(o11s::InputImage::from_url(
+				view.url(),
+			))),
+		),
+		AgentPost::Url(view) => message(
 			role,
-			content: MessageContent::Parts(vec![ContentPart::InputFile(
-				o11s::InputFile {
-					filename: bytes_view.filename(),
-					file_data: Some(bytes_view.body_base64()),
+			parts(ContentPart::InputFile(o11s::InputFile {
+				filename: Some(view.filename()),
+				file_data: None,
+				file_url: Some(view.url().to_string()),
+			})),
+		),
+		AgentPost::Media(view) => match blobs.base64(post.post) {
+			None => message(role, text(RequestBlobs::UNAVAILABLE)),
+			Some(data) if view.media_type().is_image() => message(
+				role,
+				parts(ContentPart::InputImage(o11s::InputImage::from_base64(
+					view.media_type().as_str(),
+					&data,
+				))),
+			),
+			Some(data) => message(
+				role,
+				parts(ContentPart::InputFile(o11s::InputFile {
+					filename: Some(view.filename()),
+					file_data: Some(data),
 					file_url: None,
-				},
-			)]),
-			status: None,
-		}),
-		// Text-like posts: Text, Refusal, ReasoningContent, ReasoningSummary, Error
-		_ => {
-			let value = post.body_str()?;
-			// using xml on assistant messages is likely to confuse them,
-			// ie they start using them in their own responses
-			let text = if role != MessageRole::Assistant {
-				post.wrap_user_text(value)
-			} else {
-				value.to_string()
-			};
-			InputItem::Message(MessageParam {
-				id: None,
-				role,
-				content: MessageContent::Text(text),
-				status: None,
-			})
-		}
-	};
-	input_item.xok()
+				})),
+			),
+		},
+		AgentPost::Text(view)
+		| AgentPost::Refusal(view)
+		| AgentPost::Error(view)
+		| AgentPost::ReasoningContent(view)
+		| AgentPost::ReasoningSummary(view) => message(role, text(view.text())),
+	}
+	.xok()
 }
 
 pub fn ev_to_response_partial(

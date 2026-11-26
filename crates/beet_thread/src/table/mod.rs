@@ -97,24 +97,28 @@
 //! | --- | --- | --- | --- |
 //! | `text` | `text` | its text, in its author's role | its text |
 //! | `url` | `url`, `media_type`, `file_stem`? | an image as an image by url; on open responses any other as a file by url, on completions a video as `[Video: <url>]` and any other as its url in text | its url |
-//! | `media` | `blob`, `file_stem`? | its bytes (Bytes, below): an image as an image; on open responses any other as a file, on completions a video as `[Video attachment]` and any other as its text, failing where that is not utf-8 | its media type and size |
+//! | `media` | `blob`, `file_stem`? | its bytes (Bytes, below): an image as an image; on open responses any other as a file, on completions a text file as its text and any other as a line naming it | its media type and size |
 //! | `refusal` | `text` | its text, in its author's role | its text |
 //! | `error` | `text` | its text, in its author's role | its text, as an error |
-//! | `reasoning` | `text` | its text, in its author's role | its text |
-//! | `reasoning_summary` | `text` | its text, in its author's role | its text |
-//! | `tool_call` | `name`, `call_id`, `arguments` | a call; on completions only the reading agent's own, another's being its arguments in text | its arguments |
-//! | `tool_output` | `call_id`, `text`, `blob`?; `subject` its call | its call's output, at once after the call; a `blob` as content parts on open responses, on completions as the output's text then a user message holding it | its text |
+//! | `reasoning` | `text` | nothing, whoever wrote it | its text |
+//! | `reasoning_summary` | `text` | nothing, whoever wrote it | its text |
+//! | `tool_call` | `name`, `call_id`, `arguments` | the reading agent's own as a call; another's with its output as one message in the author's role | its arguments |
+//! | `tool_output` | `call_id`, `text`, `blob`?; `subject` its call | for the reading agent's own call, its output at once after the call, a `blob` as content parts on open responses and on completions as the output's text then a user message holding it; for another's, part of the call's message | its text |
 //! | `session_opened` | `spawned_by`? | a join's note (Sessions) | `── Coach joined ──` |
 //! | `edited` | `was`, the original body; `subject` the post | a note where the change was made, `<system>Ann edited a post from 09:10.</system>` | no row: the post shows its new body and that it was edited |
 //! | `deleted` | none; `subject` the post | a note as an edit's | no row: the post shows that it was deleted, with no body |
 //! | `compaction` | `text`, `from`, `previous`, `seed`; `subject` the last post it covers | its author's newest, unless stale, as a note opening its context (Contexts and compaction); no other | a divider saying how much it covers |
 //! | any other log | that kind's fields | nothing | a divider naming its kind |
 //!
-//! A post's **role** is relative to the agent reading it: a System actor's
-//! is a system message, a Developer's a developer message, the reading
-//! agent's own an assistant message, and anyone else's a user message
-//! wrapped in a `<post author=..>` naming its author. A note is a user
-//! message whoever it is about.
+//! A post's **role** is relative to the agent reading it, the same on every
+//! protocol: a System actor's is a system message and a Developer's a
+//! developer message, neither wrapped; the reading agent's own is native, an
+//! assistant message and its calls and their outputs call items; anyone
+//! else's is a user message wrapped in a `<post author=..>` naming its
+//! author, so a group chat's people read apart. Another actor's call is never
+//! sent as a call, since the reader did not make it. A note is a user message
+//! whoever it is about. A blob a provider cannot carry is one line naming it,
+//! ie `[file: report.pdf, application/pdf, 12 KB]`.
 //!
 //! # Bytes
 //!
@@ -385,7 +389,8 @@ mod actor;
 mod create_actor;
 pub use create_actor::*;
 mod create_post;
-mod document;
+mod record_id;
+pub use record_id::*;
 mod load_thread;
 pub use create_post::*;
 pub use load_thread::*;
@@ -399,10 +404,11 @@ mod thread;
 mod thread_query;
 mod thread_records;
 mod thread_store;
-pub use document::*;
 #[cfg(feature = "action")]
 pub use seed_source::*;
-pub use thread_store::SyncedPosts;
+pub use thread_store::SyncedRecords;
+#[cfg(feature = "action")]
+pub(crate) use thread_store::ThreadFlush;
 pub use thread_store::ThreadStore;
 pub(crate) use thread_store::sync_records_to_store;
 mod agent_post;

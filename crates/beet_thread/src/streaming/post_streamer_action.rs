@@ -24,7 +24,7 @@ where
 /// a swallowed error.
 ///
 /// On any streaming failure (missing/invalid key, network error, or a mid-stream
-/// error event) the message is appended to the records as a [`PostIntent::Error`] post, so it
+/// error event) the message is appended to the records as a `error` post, so it
 /// renders in the thread view as an `Error` node (TUI mode hides stderr), and the
 /// turn [`Pass`]es so a finite program still completes instead of hanging.
 ///

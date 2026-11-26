@@ -28,7 +28,7 @@ use beet_router::prelude::*;
 ///    path, filled from the request, naming the thread it continues, and
 ///    the request's [`ThreadEntryParams`] overriding it; then posts
 ///    `message`, each `{param}` filled from the request, by `actor`, else
-///    the thread's first User actor by id;
+///    the first User actor the scene authors;
 /// 3. runs the template's behavior to its [`Outcome`], writing nothing for
 ///    its end;
 /// 4. waits for every completed post to reach its [`ThreadStore`]
@@ -53,8 +53,8 @@ pub async fn ThreadRoute(
 	#[field]
 	#[reflect(default)]
 	message: Option<SmolStr>,
-	/// The message's author, by id, else the thread's first User actor by
-	/// id.
+	/// The message's author, by id, ie `actor:"ann"`, else the first User
+	/// actor the scene authors.
 	#[field]
 	#[reflect(default)]
 	actor: Option<ActorId>,
@@ -244,7 +244,7 @@ impl ThreadRoute {
 					children
 						.iter_descendants(thread)
 						.filter_map(|entity| actor_refs.get(entity).ok())
-						.map(|actor_ref| **actor_ref)
+						.map(|actor_ref| actor_ref.0.clone())
 						.collect::<Vec<_>>()
 				},
 			);
@@ -274,14 +274,14 @@ mod test {
 	use beet_scene::prelude::*;
 
 	/// The thread a review builds per request, one per document: two people
-	/// with pinned ids, and a reading agent with tools of its own that reads
+	/// and a reading agent with tools of its own that reads
 	/// once then answers.
 	const REVIEW_THREAD: &str = r#"
 <RepeatWhileFunctionCallOutput>
 	<Thread {(Sequence, MountThreadStore{path:"threads/{document}"})}>
-		<CreateActor name="Author" kind="User" id=1/>
-		<CreateActor name="Editor" kind="User" id=3/>
-		<CreateActor name="Agent" kind="Agent" id=2 {MockPostStreamer{script:[Call{tool:"read-blob", arguments:{path:"notes.md"}}]}}>
+		<CreateActor name="Author" kind="User"/>
+		<CreateActor name="Editor" kind="User"/>
+		<CreateActor name="Agent" kind="Agent" {MockPostStreamer{script:[Call{tool:"read-blob", arguments:{path:"notes.md"}}]}}>
 			<Router><StoreToolset read_only=true/></Router>
 		</CreateActor>
 	</Thread>
@@ -293,9 +293,9 @@ mod test {
 	const DELEGATE_THREAD: &str = r#"
 <RepeatWhileFunctionCallOutput>
 	<Thread {(Sequence, MountThreadStore{path:"delegates"})}>
-		<CreateActor name="Agent" kind="Agent" id=3 {MockPostStreamer{script:[Call{tool:"review", arguments:{
+		<CreateActor name="Agent" kind="Agent" {MockPostStreamer{script:[Call{tool:"review", arguments:{
 			document:"product",
-			spawned_by:"00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000002",
+			spawned_by:"2222222222222/2222222222223",
 		}}]}}>
 			<Router><RouteTool path="review"/></Router>
 		</CreateActor>
@@ -305,20 +305,20 @@ mod test {
 
 	/// The post [`DELEGATE_THREAD`]'s call names.
 	fn delegating_post() -> PostRef {
-		PostRef::new(ThreadId::from_u128(1), PostId::from_u128(2))
+		PostRef::parse("2222222222222/2222222222223").unwrap()
 	}
 
 	/// A thread with no person in it, whose behavior errors once entered.
 	const FAILING_THREAD: &str = r#"
 <Thread {(Sequence, MountThreadStore{path:"failures"})}>
-	<CreateActor name="Agent" kind="Agent" id=2 {Bail}/>
+	<CreateActor name="Agent" kind="Agent" {Bail}/>
 </Thread>
 "#;
 
 	/// A thread whose agent holds its turn until the test releases it.
 	const HOLDING_THREAD: &str = r#"
 <Thread {(Sequence, MountThreadStore{path:"held"})}>
-	<CreateActor name="Agent" kind="Agent" id=2 {Hold}/>
+	<CreateActor name="Agent" kind="Agent" {Hold}/>
 </Thread>
 "#;
 
@@ -382,7 +382,7 @@ mod test {
 			app.world(),
 			r#"<Router>
 	<Route path="review/:document" {ThreadRoute{source:Document("ReviewThread.bsx"), message:"review {document}"}}/>
-	<Route path="edit/:document" {ThreadRoute{source:Document("ReviewThread.bsx"), message:"edit {document}", actor:3}}/>
+	<Route path="edit/:document" {ThreadRoute{source:Document("ReviewThread.bsx"), message:"edit {document}", actor:"editor"}}/>
 	<Route path="delegate" {ThreadRoute{source:Document("DelegateThread.bsx")}}/>
 	<Route path="fail" {ThreadRoute{source:Document("FailingThread.bsx")}}/>
 	<Route path="hold" {ThreadRoute{source:Document("HoldingThread.bsx")}}/>
@@ -416,6 +416,7 @@ mod test {
 			JsonTableStore::over(store.clone()).unwrap(),
 			RelPath::new(path),
 		)
+		.unwrap()
 	}
 
 	/// The text posts of `posts`, the tool calls and joins aside.
@@ -494,7 +495,7 @@ mod test {
 	}
 
 	/// A request's message lands once per request, after its entry's joins,
-	/// by the named actor, else the thread's first User actor by id.
+	/// by the named actor, else the first User actor the scene authors.
 	#[beet_core::test]
 	async fn posts_the_message_by_its_actor() {
 		let (mut app, router, store) = url_space().await;
@@ -511,11 +512,11 @@ mod test {
 				post.to_string() == "review product"
 					|| post.to_string() == "edit product"
 			})
-			.map(|post| (post.to_string(), post.author()))
+			.map(|post| (post.to_string(), post.author().to_string()))
 			.collect::<Vec<_>>();
 		messages.xpect_eq(vec![
-			("review product".to_string(), ActorId::from_u128(1)),
-			("edit product".to_string(), ActorId::from_u128(3)),
+			("review product".to_string(), "author".to_string()),
+			("edit product".to_string(), "editor".to_string()),
 		]);
 		// each message directly follows its own entry's joins
 		for (index, post) in posts.iter().enumerate() {
@@ -581,7 +582,7 @@ mod test {
 	async fn each_request_joins_its_actors() {
 		let (mut app, router, store) = url_space().await;
 		let creator = delegating_post();
-		let second = PostRef::new(ThreadId::from_u128(1), PostId::from_u128(3));
+		let second = PostRef::new(ThreadId::now(), PostId::now());
 		for spawned_by in [&creator, &second] {
 			review(
 				&mut app,
@@ -600,15 +601,15 @@ mod test {
 			.iter()
 			.filter_map(|post| {
 				post.log::<SessionOpened>()
-					.map(|opened| (post.author(), opened.spawned_by))
+					.map(|opened| (post.author().clone(), opened.spawned_by))
 			})
 			.collect::<Vec<_>>()
 			.xpect_eq(
 				[&creator, &second]
 					.into_iter()
 					.flat_map(|cause| {
-						[1, 2, 3].map(|actor| {
-							(ActorId::from_u128(actor), Some(cause.clone()))
+						["author", "editor", "agent"].map(|actor| {
+							(ActorId::from_static(actor), Some(cause.clone()))
 						})
 					})
 					.collect::<Vec<_>>(),
@@ -616,7 +617,7 @@ mod test {
 		// a join is the only log post: no request wrote one for its end
 		posts
 			.iter()
-			.filter(|post| post.intent() == PostIntent::Log)
+			.filter(|post| post.is_log())
 			.all(SessionOpened::opens)
 			.xpect_true();
 		// two mock responses a request, each keeping its own usage
@@ -632,7 +633,7 @@ mod test {
 			.xpect_eq(40);
 		// the model reads each request's joins as one note
 		records
-			.model_posts(None)
+			.model_posts(&ActorId::AGENT, None)
 			.iter()
 			.filter(|item| matches!(item, ModelPost::Note(_)))
 			.count()
@@ -677,9 +678,9 @@ mod test {
 			.await
 			.1
 			.iter()
-			.map(|post| (post.author(), SessionOpened::opens(post)))
+			.map(|post| (post.author().clone(), SessionOpened::opens(post)))
 			.collect::<Vec<_>>()
-			.xpect_eq(vec![(ActorId::from_u128(2), true)]);
+			.xpect_eq(vec![(ActorId::AGENT, true)]);
 	}
 
 	/// A request for a thread whose canonical window is live, a request

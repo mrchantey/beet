@@ -83,8 +83,14 @@ impl CompletionsStreamer {
 	pub(crate) async fn build_request(
 		&self,
 		caller: AsyncEntity,
-	) -> Result<(CreateChatCompletionRequest, ActorId, ThreadId)> {
+	) -> Result<(
+		CreateChatCompletionRequest,
+		ActorId,
+		ThreadId,
+		Option<PostId>,
+	)> {
 		let this = self.clone();
+		let blobs = RequestBlobs::for_agent(&caller).await?;
 
 		caller
 			.with_state::<ThreadQuery, _>(
@@ -94,6 +100,7 @@ impl CompletionsStreamer {
 					CreateChatCompletionRequest,
 					ActorId,
 					ThreadId,
+					Option<PostId>,
 				)> {
 					let (_, thread, records) =
 						query.thread_and_records(actor_entity)?;
@@ -119,13 +126,13 @@ impl CompletionsStreamer {
 
 					// Convert the thread's posts to completions messages
 					let post_messages = records
-						.model_posts(None)
+						.request_posts(&agent_id, None)
 						.into_iter()
 						.xtry_map(|post| {
-						completions_mapper::post_to_completions_message(
-							agent_id, post,
-						)
-					})?;
+							completions_mapper::post_to_completions_message(
+								&agent_id, post, &blobs,
+							)
+						})?;
 					messages.extend(post_messages);
 
 					// Collect tools
@@ -200,7 +207,7 @@ impl CompletionsStreamer {
 						metadata: None,
 					};
 
-					(req, agent_id, thread.id()).xok()
+					(req, agent_id, thread.id(), records.read_through()).xok()
 				},
 			)
 			.await
@@ -217,7 +224,8 @@ impl PostStreamer for CompletionsStreamer {
 		caller: AsyncEntity,
 	) -> BoxedFuture<'_, Result<PostStream>> {
 		Box::pin(async move {
-			let (req_body, agent, thread) = self.build_request(caller).await?;
+			let (req_body, agent, thread, read) =
+				self.build_request(caller).await?;
 
 			let mut request = Request::post(self.model.url.as_str())
 				.with_json_body(&req_body)?;
@@ -244,6 +252,7 @@ impl PostStreamer for CompletionsStreamer {
 				thread,
 				typed_stream,
 			)
+			.with_read(read)
 			.xok()
 		})
 	}

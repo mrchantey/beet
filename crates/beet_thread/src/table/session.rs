@@ -29,7 +29,7 @@ impl LogKind for SessionOpened {
 impl SessionOpened {
 	/// Whether `post` is a join.
 	pub fn opens(post: &Post) -> bool {
-		post.log_kind().as_deref() == Some(Self::KIND)
+		post.kind() == &PostKind::SessionOpened
 	}
 }
 
@@ -47,7 +47,7 @@ impl ThreadRecords {
 		opened: &SessionOpened,
 	) -> Result {
 		for actor in actors {
-			if self.actor(actor)?.kind() == ActorKind::System {
+			if self.actor(&actor)?.kind() == ActorKind::System {
 				continue;
 			}
 			self.upsert_post(Post::new_log(actor, thread, opened)?);
@@ -70,7 +70,7 @@ impl ThreadRecords {
 			self.posts()
 				.iter()
 				.take_while(|post| post.id() != first.post.id())
-				.filter(|post| post.intent() != PostIntent::Log)
+				.filter(|post| !post.is_log())
 				.last()
 				.map(Post::created)
 		});
@@ -127,9 +127,9 @@ mod test {
 	const DAY: i64 = 24 * HOUR;
 	/// How long ago the stored thread of [`away`] was last posted in.
 	const AWAY: i64 = 2 * DAY + 3 * HOUR + MINUTE;
-	const PERSON: u128 = 1;
-	const COACH: u128 = 2;
-	const EDITOR: u128 = 3;
+	const PERSON: ActorId = ActorId::from_static("person");
+	const COACH: ActorId = ActorId::from_static("coach");
+	const EDITOR: ActorId = ActorId::from_static("editor");
 
 	#[beet_core::test]
 	fn gaps_read_in_two_units() {
@@ -146,22 +146,27 @@ mod test {
 		gap_text(2 * DAY + 5 * MINUTE).unwrap().xpect_eq("2 days");
 	}
 
-	fn actor(id: u128) -> Actor {
-		let (name, kind) = match id {
-			PERSON => ("Person", ActorKind::User),
-			COACH => ("Coach", ActorKind::Agent),
+	fn actor(id: ActorId) -> Actor {
+		let (name, kind) = match id.as_str() {
+			"person" => ("Person", ActorKind::User),
+			"coach" => ("Coach", ActorKind::Agent),
 			_ => ("Editor", ActorKind::User),
 		};
-		Actor::new_with_id(ActorId::from_u128(id), name, kind)
+		Actor::new_with_id(id, name, kind)
 	}
 
-	/// `post`, created `millis` earlier.
+	/// `post`, created `millis` earlier: its id, which carries its time,
+	/// minted that long ago.
 	fn aged(post: Post, millis: i64) -> Post {
-		let mut value = Value::from_serde(&post).unwrap();
-		value
-			.insert("created", post.created().millis() - millis)
-			.unwrap();
-		value.into_serde().unwrap()
+		let id = PostId::from(Tid::from_parts(
+			post.id().tid().micros() - millis as u64 * 1000,
+			0,
+		));
+		let mut aged =
+			Post::from_row(&id.into(), post.clone().into_row().unwrap())
+				.unwrap();
+		aged.set_thread(post.thread());
+		aged
 	}
 
 	/// An app over a store.
@@ -185,7 +190,7 @@ mod test {
 			.iter()
 			.map(|actor| {
 				Post::new_log(
-					actor.id(),
+					actor.id().clone(),
 					thread.id(),
 					&SessionOpened::default(),
 				)
@@ -193,7 +198,7 @@ mod test {
 			})
 			.collect::<Vec<_>>();
 		posts.push(AgentPost::new_text(
-			ActorId::from_u128(PERSON),
+			PERSON,
 			thread.id(),
 			"see you",
 			PostStatus::Completed,
@@ -202,11 +207,11 @@ mod test {
 			app.world().get::<TableStore>(root).unwrap().clone(),
 			RelPath::new("threads"),
 		)
-		.insert(
+		.unwrap()
+		.store_thread(
 			&thread,
 			actors,
 			posts.into_iter().map(|post| aged(post, AWAY)).collect(),
-			default(),
 		)
 		.await
 		.unwrap();
@@ -217,7 +222,7 @@ mod test {
 	async fn enter(
 		app: &mut App,
 		root: Entity,
-		actors: &[u128],
+		actors: &[ActorId],
 	) -> (Entity, Entity) {
 		let mut window = app.world_mut().spawn((
 			ChildOf(root),
@@ -227,7 +232,7 @@ mod test {
 				new: false,
 			},
 		));
-		for actor in actors.iter().copied().map(actor) {
+		for actor in actors.iter().cloned().map(actor) {
 			match actor.kind() {
 				ActorKind::Agent => {
 					window.with_child((actor, MockPostStreamer::default()))
@@ -251,7 +256,7 @@ mod test {
 			.world_mut()
 			.query::<(Entity, &ActorRef)>()
 			.iter(app.world())
-			.find(|(_, actor)| ***actor == ActorId::from_u128(COACH))
+			.find(|(_, actor)| actor.0 == COACH)
 			.unwrap()
 			.0;
 		(window, coach)
@@ -318,6 +323,24 @@ mod test {
 			.0;
 		messages(&completions, "messages").xpect_eq(responses.clone());
 		responses
+	}
+
+	/// The meta of `post`, of the stored `response` whose request read
+	/// through `read`.
+	fn stored_meta(
+		post: &Post,
+		response: &str,
+		read: Option<PostId>,
+	) -> ResponseMeta {
+		ResponseMeta {
+			post_id: post.id(),
+			provider_slug: "provider".into(),
+			model_slug: "model".into(),
+			response_id: response.into(),
+			response_stored: true,
+			usage: None,
+			read,
+		}
 	}
 
 	/// The lines of the one note `message` is, sent in the user role.
@@ -414,20 +437,15 @@ mod test {
 			let mut window = app.world_mut().entity_mut(window);
 			let thread = window.get::<Thread>().unwrap().id();
 			let post = AgentPost::new_text(
-				ActorId::from_u128(COACH),
+				COACH,
 				thread,
 				"hello",
 				PostStatus::Completed,
 			);
 			let mut records = window.get_mut::<ThreadRecords>().unwrap();
-			records.set_meta(ResponseMeta {
-				post_id: post.id(),
-				provider_slug: "provider".into(),
-				model_slug: "model".into(),
-				response_id: response.into(),
-				response_stored: true,
-				usage: None,
-			});
+			// the request read every post before its answer
+			let read = records.read_through();
+			records.set_meta(stored_meta(&post, response, read));
 			records.upsert_post(post);
 			thread
 		};
@@ -435,7 +453,7 @@ mod test {
 		app.world_mut()
 			.get_mut::<ThreadRecords>(window)
 			.unwrap()
-			.join(thread, [ActorId::from_u128(PERSON)], &default())
+			.join(thread, [PERSON], &default())
 			.unwrap();
 		let second = responses_request(&mut app, coach, streamer()).await;
 		second
@@ -450,5 +468,134 @@ mod test {
 		answer(&mut app, "response-2");
 		let third = responses_request(&mut app, coach, streamer()).await;
 		messages(&third, "input").xpect_empty();
+	}
+
+	/// A note typed while a response streams lands before the response's
+	/// last post, so a chain resuming after that post skipped it; it resumes
+	/// after what the response read, leaving out the response's own posts.
+	#[beet_core::test]
+	async fn a_note_mid_response_reaches_the_next_chained_request() {
+		let (mut app, root) = app();
+		let (window, coach) = enter(&mut app, root, &[PERSON, COACH]).await;
+		{
+			let mut window = app.world_mut().entity_mut(window);
+			let thread = window.get::<Thread>().unwrap().id();
+			let mut records = window.get_mut::<ThreadRecords>().unwrap();
+			let read = records.read_through();
+			let text = |author: ActorId, text: &str| {
+				AgentPost::new_text(author, thread, text, PostStatus::Completed)
+			};
+			for post in [
+				text(COACH, "let me"),
+				text(PERSON, "by the way"),
+				text(COACH, "think"),
+			] {
+				if post.author() == &COACH {
+					records.set_meta(stored_meta(&post, "response-1", read));
+				}
+				records.upsert_post(post);
+			}
+		}
+		let request = responses_request(
+			&mut app,
+			coach,
+			O11sStreamer::new(model()).with_use_previous_response_id(),
+		)
+		.await;
+		request
+			.previous_response_id
+			.as_deref()
+			.xpect_eq(Some("response-1"));
+		messages(&request, "input").xpect_eq(vec![(
+			"user".to_string(),
+			"<post author=Person author_kind=human author_id=person>by the way</post>"
+				.to_string(),
+		)]);
+	}
+
+	/// One rule for both protocols: a System post its role's message
+	/// unwrapped, another person's wrapped, another agent's call with its
+	/// output one wrapped user message, and reasoning, anyone's, left out.
+	#[beet_core::test]
+	async fn both_protocols_read_by_one_rule() {
+		let (mut app, root) = app();
+		let (window, coach) = enter(&mut app, root, &[PERSON, COACH]).await;
+		{
+			let mut window = app.world_mut().entity_mut(window);
+			let thread = window.get::<Thread>().unwrap().id();
+			let mut records = window.get_mut::<ThreadRecords>().unwrap();
+			let other = ActorId::from_static("other");
+			records.insert_actor(Actor::system());
+			records.insert_actor(Actor::new_with_id(
+				other.clone(),
+				"Other",
+				ActorKind::Agent,
+			));
+			// each minted in turn, so ids follow the conversation
+			let said = [
+				AgentPost::new_text(
+					ActorId::SYSTEM,
+					thread,
+					"be brief",
+					PostStatus::Completed,
+				),
+				AgentPost::new_text(
+					PERSON,
+					thread,
+					"hi",
+					PostStatus::Completed,
+				),
+				AgentPost::new_reasoning(
+					other.clone(),
+					thread,
+					"their thoughts",
+					PostStatus::Completed,
+				),
+			];
+			let call = AgentPost::new_function_call(
+				other.clone(),
+				thread,
+				"search",
+				"c1",
+				r#"{"q":"cats"}"#,
+				PostStatus::Completed,
+			);
+			let output = AgentPost::new_function_call_output(
+				other.clone(),
+				thread,
+				call.id(),
+				"c1",
+				"found",
+				PostStatus::Completed,
+			);
+			for post in said.into_iter().chain([
+				call,
+				output,
+				AgentPost::new_reasoning(
+					COACH,
+					thread,
+					"my thoughts",
+					PostStatus::Completed,
+				),
+			]) {
+				records.upsert_post(post);
+			}
+		}
+		let reads = model_reads(&mut app, coach).await;
+		reads[1..].to_vec().xpect_eq(
+			[
+				("system", "be brief"),
+				(
+					"user",
+					"<post author=Person author_kind=human author_id=person>hi</post>",
+				),
+				(
+					"user",
+					r#"<post author=Other author_kind=agent author_id=other>called `search` with {"q":"cats"}, which answered found</post>"#,
+				),
+			]
+			.map(|(role, content)| (role.to_string(), content.to_string()))
+			.to_vec(),
+		);
 	}
 }

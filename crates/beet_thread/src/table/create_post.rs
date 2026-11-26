@@ -13,10 +13,9 @@ use beet_core::prelude::*;
 /// long procedure has one source, ie
 /// `<CreatePost src="seeds/system.md"/>`.
 ///
-/// Set `intent` / `status` to author refusals ([`PostIntent::Refusal`]),
-/// reasoning ([`PostIntent::Reasoning`]), or in-progress posts
-/// ([`PostStatus::InProgress`]); the default is a completed
-/// [`PostIntent::Message`].
+/// Set `kind` / `status` to author a refusal (`kind="refusal"`), reasoning
+/// (`kind="reasoning"`) or an in-progress post ([`PostStatus::InProgress`]),
+/// any kind whose body is `{text}`; the default is completed text.
 #[template]
 pub fn CreatePost(
 	/// The post's text.
@@ -24,7 +23,7 @@ pub fn CreatePost(
 	/// A file of the package holding the post's text, read by the entry
 	/// creating the thread, in place of `text`.
 	src: Option<DocPath>,
-	#[prop(default = PostIntent::Message)] intent: PostIntent,
+	#[prop(default = PostKind::Text)] kind: PostKind,
 	#[prop(default = PostStatus::Completed)] status: PostStatus,
 ) -> impl Bundle {
 	OnSpawn::new(move |entity| {
@@ -32,7 +31,7 @@ pub fn CreatePost(
 			#[cfg(feature = "action")]
 			Some(src) => {
 				entity.insert(SeedSource {
-					intent,
+					kind,
 					status,
 					..SeedSource::document(src)
 				});
@@ -44,7 +43,7 @@ pub fn CreatePost(
 				)
 			}
 			None => {
-				entity.insert(Post::spawn_with(text, intent, status));
+				entity.insert(Post::spawn_with(text, kind, status));
 			}
 		}
 		Ok(())

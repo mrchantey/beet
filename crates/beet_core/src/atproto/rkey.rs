@@ -31,7 +31,13 @@ impl Rkey {
 	pub const MAX_LEN: usize = 512;
 
 	/// The key of a one-per-repo record, ie a profile.
-	pub const SELF: Self = Self(SmolStr::new_static("self"));
+	pub const SELF: Self = Self::from_static("self");
+
+	/// An rkey from text written in the source, for a constant: unchecked,
+	/// so each constant's test parses its text ([`Self::parse`]).
+	pub const fn from_static(text: &'static str) -> Self {
+		Self(SmolStr::new_static(text))
+	}
 
 	/// Parse an rkey, refusing any character a repo path could not hold.
 	pub fn parse(text: &str) -> Result<Self> {
@@ -75,5 +81,12 @@ mod test {
 			.xpect_contains("` `");
 		Rkey::parse(&"a".repeat(513)).unwrap_err();
 		Rkey::parse("nsid:app.bsky.feed.post~1").unwrap();
+	}
+
+	#[crate::test]
+	fn constants_parse() {
+		Rkey::parse(Rkey::SELF.as_str())
+			.unwrap()
+			.xpect_eq(Rkey::SELF);
 	}
 }

@@ -47,7 +47,8 @@ fn assert_and_exit(
 		.records(input.id())?
 		.authored_posts()
 		.find(|view| {
-			view.intent().is_display() && view.actor.kind() == ActorKind::Agent
+			matches!(view.kind(), PostKind::Text | PostKind::Refusal)
+				&& view.actor.kind() == ActorKind::Agent
 		})
 		.unwrap()
 		.to_string()

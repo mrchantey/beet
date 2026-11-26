@@ -15,8 +15,7 @@ async fn has_pending_function_call_output(
 				.last_content_post()
 				.is_some_and(|post| {
 					post.status() == PostStatus::Completed
-						&& AgentPost::new(post)
-							.is_some_and(|post| post.is_function_call_output())
+						&& post.kind() == &PostKind::ToolOutput
 				})
 				.xok()
 		})

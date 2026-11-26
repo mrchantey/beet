@@ -431,13 +431,13 @@ fn post_text(view: &AuthoredPost) -> String {
 	if SessionOpened::opens(view.post) {
 		return format!("── {} joined ──", view.actor.name());
 	}
-	if let Some(kind) = view.post.log_kind() {
-		return format!("── {kind} ──");
+	if view.post.is_log() {
+		return format!("── {} ──", view.post.kind());
 	}
 	view.post.to_string()
 }
 
-/// The row kind a [`PostIntent::Log`] post projects as, which [`post_row`]
+/// The row kind a log post projects as, which [`post_row`]
 /// renders as a divider.
 const LOG_ROW: &str = "log";
 
@@ -445,9 +445,9 @@ const LOG_ROW: &str = "log";
 /// renders as [`LOG_ROW`], an error post as `error`, otherwise it follows the
 /// authoring actor's kind.
 fn post_kind(view: &AuthoredPost) -> &'static str {
-	match view.post.intent() {
-		PostIntent::Log => return LOG_ROW,
-		PostIntent::Error => return "error",
+	match view.post.kind() {
+		kind if kind.is_log() => return LOG_ROW,
+		PostKind::Error => return "error",
 		_ => {}
 	}
 	match view.actor.kind() {
@@ -486,10 +486,10 @@ mod test {
 	#[beet_core::test]
 	fn projects_log_posts_as_dividers() {
 		let mut records = ThreadRecords::new();
-		let thread = ThreadId::new_now();
+		let thread = ThreadId::now();
 		let user = records.insert_actor(Actor::user());
 		records.upsert_post(AgentPost::new_text(
-			user,
+			user.clone(),
 			thread,
 			"hello",
 			PostStatus::Completed,

@@ -20,6 +20,7 @@ impl Plugin for ThreadPlugin {
 		ThreadId::register_literal();
 		ActorId::register_literal();
 		PostId::register_literal();
+		PostKind::register_literal();
 
 		#[cfg(feature = "action")]
 		app.install_types::<ActionPlugin>()
@@ -70,16 +71,17 @@ impl Plugin for ThreadPlugin {
 			.install_types::<ModelStreamer>();
 
 		app
-			// ── Uuid7 instantiations ─────────────────────────────────────
-			.register_type::<Uuid7<Thread>>()
-			.register_type::<Uuid7<Actor>>()
-			.register_type::<Uuid7<Post>>()
+			// ── Ids ───────────────────────────────────────────────────────
+			.register_type::<ThreadId>()
+			.register_type::<ActorId>()
+			.register_type::<PostId>()
 			// ── Table types ───────────────────────────────────────────────
 			.register_type::<Thread>()
 			.register_type::<Actor>()
 			.register_type::<ActorKind>()
 			.register_type::<Post>()
-			.register_type::<PostIntent>()
+			.register_type::<PostKind>()
+			.register_type::<PostStatus>()
 			.register_type::<Timestamp>()
 			.register_type::<ResponseMeta>()
 			.register_type::<ActorRef>()

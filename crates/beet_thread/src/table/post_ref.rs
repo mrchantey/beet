@@ -79,8 +79,8 @@ mod test {
 
 	#[beet_core::test]
 	fn round_trips_its_text() {
-		let thread = ThreadId::new_now();
-		let post = PostId::new_now();
+		let thread = ThreadId::now();
+		let post = PostId::now();
 		let post_ref = PostRef::new(thread, post);
 		PostRef::parse(&post_ref.to_string())
 			.unwrap()

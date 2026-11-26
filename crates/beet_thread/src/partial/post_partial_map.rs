@@ -27,8 +27,8 @@ impl PostPartialMap {
 	/// Also registers call_id and response_item mappings for new posts.
 	pub fn apply_posts(
 		&mut self,
-		posts: &mut TableMap<Post>,
-		author: ActorId,
+		posts: &mut HashMap<PostId, Post>,
+		author: &ActorId,
 		thread: ThreadId,
 		partial_items: impl IntoIterator<Item = PostPartial>,
 	) -> Result<PostChanges> {
@@ -40,19 +40,24 @@ impl PostPartialMap {
 				content,
 			} = partial_item;
 			if let Some(&post_id) = self.post_key_map.get(&key) {
-				let post = posts.get_mut(post_id)?;
-				let before_mutation = post.hash_self();
-
+				let post = posts.get_mut(&post_id).ok_or_else(|| {
+					bevyhow!("no post {post_id} for the response item {key:?}")
+				})?;
+				let before = post.clone();
 				post.set_status(status);
 				self.apply_partial_content(&key, content, post)?;
-				let after_mutation = post.hash_self();
-				if before_mutation != after_mutation {
+				if *post != before {
 					changes.modified.push(post.clone());
 				}
 			} else {
 				// create new post
 				let post = self.partial_content_into_post(
-					posts, &key, content, author, thread, status,
+					posts,
+					&key,
+					content,
+					author.clone(),
+					thread,
+					status,
 				)?;
 				let post_id = post.id();
 
@@ -60,7 +65,7 @@ impl PostPartialMap {
 				self.set_post_key(key, post_id)?;
 
 				changes.created.push(post.clone());
-				posts.insert(post);
+				posts.insert(post_id, post);
 			}
 		}
 		changes.xok()
@@ -106,7 +111,7 @@ impl PostPartialMap {
 	/// like [`PartialContent::Delta`].
 	fn partial_content_into_post(
 		&self,
-		posts: &mut TableMap<Post>,
+		posts: &mut HashMap<PostId, Post>,
 		key: &PostPartialKey,
 		partial: PartialContent,
 		author: ActorId,
@@ -154,13 +159,25 @@ impl PostPartialMap {
 				)
 			}
 			PartialContent::ContentPart(ContentPart::InputImage(img)) => {
+				let media_type = MediaType::from_path(&img.image_url);
 				AgentPost::new_url(
-					author, thread, img.image_url, None, status,
+					author,
+					thread,
+					img.image_url,
+					media_type,
+					None,
+					status,
 				)
 			}
 			PartialContent::ContentPart(ContentPart::InputVideo(vid)) => {
+				let media_type = MediaType::from_path(&vid.video_url);
 				AgentPost::new_url(
-					author, thread, vid.video_url, None, status,
+					author,
+					thread,
+					vid.video_url,
+					media_type,
+					None,
+					status,
 				)
 			}
 			PartialContent::ContentPart(ContentPart::InputFile(file)) => {
@@ -177,7 +194,7 @@ impl PostPartialMap {
 				});
 				if let Some(url) = file.file_url {
 					AgentPost::new_url(
-						author, thread, url, file_stem, status,
+						author, thread, url, media_type, file_stem, status,
 					)
 				} else if let Some(data) = file.file_data {
 					use base64::Engine;
@@ -188,7 +205,7 @@ impl PostPartialMap {
 								"Failed to decode base64 file data: {err}"
 							)
 						})?;
-					AgentPost::new_bytes(
+					AgentPost::new_media(
 						author, thread, media_type, bytes, file_stem, status,
 					)
 				} else {
@@ -203,8 +220,21 @@ impl PostPartialMap {
 				author, thread, name, call_id, arguments, status,
 			),
 			PartialContent::FunctionCallOutput { call_id, output } => {
+				// the call this response made, the output's subject
+				let call = posts
+					.values()
+					.find(|post| {
+						post.kind() == &PostKind::ToolCall
+							&& post.field("call_id") == Some(call_id.as_str())
+					})
+					.map(Post::id)
+					.ok_or_else(|| {
+						bevyhow!(
+							"an output for the call `{call_id}`, which this response did not make"
+						)
+					})?;
 				AgentPost::new_function_call_output(
-					author, thread, call_id, output, None, status,
+					author, thread, call, call_id, output, status,
 				)
 			}
 			PartialContent::ReasoningContent(text) => {
@@ -227,14 +257,14 @@ impl PostPartialMap {
 						// Single-key items are function calls; look up the
 						// existing post to get the call_id.
 						let post_id = self.get_response_item(key)?;
-						let post = posts.get(post_id)?;
-						let fc =
-							FunctionCallView::try_new(post).ok_or_else(|| {
-								bevyhow!(
-									"Expected FunctionCall post for key {:?}",
-									key,
-								)
-							})?;
+						let post = posts.get(&post_id).ok_or_else(|| {
+							bevyhow!("no post {post_id} for the response item {key:?}")
+						})?;
+						let Some(AgentPost::FunctionCall(fc)) =
+							post.as_agent_post()
+						else {
+							bevybail!("Expected FunctionCall post for key {key:?}")
+						};
 						AgentPost::new_function_call(
 							author,
 							thread,
@@ -326,13 +356,13 @@ impl PostPartialMap {
 				call_id: _,
 			} => {
 				post.set_text(arguments);
-				post.metadata_mut().insert("fc_name", name);
+				post.set_field("name", name);
 			}
 
 			// ── FunctionCallOutput updates output and call_id ───────
 			PartialContent::FunctionCallOutput { output, call_id } => {
 				post.set_text(output);
-				post.metadata_mut().insert("fc_id", call_id);
+				post.set_field("call_id", call_id);
 			}
 
 			// ── ReasoningContent/Summary replace in place ───────────

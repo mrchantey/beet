@@ -41,7 +41,7 @@ fn main() {
 					children![
 						(Actor::system(), children![Post::spawn(PROMPT)]),
 						(
-							Actor::new("Tester", ActorKind::Agent),
+							Actor::new("Tester", ActorKind::Agent).unwrap(),
 							OpenAiProvider::gpt_5_4_mini().unwrap(),
 							// the agent's tools: the routes of its own url space
 							children![(Router, children![

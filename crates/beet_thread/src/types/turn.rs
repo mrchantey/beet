@@ -136,7 +136,7 @@ impl TurnGuard {
 			let thread = query.thread_id(entity)?;
 			query
 				.records_mut(entity)?
-				.close_interrupted(actor, thread, turn.since);
+				.close_interrupted(&actor, thread, turn.since);
 			Ok(())
 		})
 	}
@@ -171,7 +171,7 @@ impl ThreadRecords {
 	/// itself interrupted, so a provider still reads every call answered.
 	fn close_interrupted(
 		&mut self,
-		actor: ActorId,
+		actor: &ActorId,
 		thread: ThreadId,
 		since: Option<PostId>,
 	) {
@@ -185,15 +185,12 @@ impl ThreadRecords {
 			post.set_status(PostStatus::Interrupted);
 			self.upsert_post(post);
 		}
+		// a call is answered by the output whose subject it is
 		let answered = self
 			.posts()
 			.iter()
-			.filter_map(|post| match AgentPost::new(post)? {
-				AgentPost::FunctionCallOutput(output) => {
-					output.call_id().to_string().xsome()
-				}
-				_ => None,
-			})
+			.filter(|post| post.kind() == &PostKind::ToolOutput)
+			.filter_map(Post::subject)
 			.collect::<HashSet<_>>();
 		let unanswered = self
 			.posts()
@@ -201,26 +198,27 @@ impl ThreadRecords {
 			.filter(|post| {
 				post.author() == actor
 					&& since.is_none_or(|since| post.id() > since)
+					&& !answered.contains(&post.id())
 			})
 			.filter_map(|post| match AgentPost::new(post)? {
-				AgentPost::FunctionCall(call)
-					if !answered.contains(call.call_id()) =>
-				{
-					(call.call_id().to_string(), call.name().to_string())
-						.xsome()
-				}
+				AgentPost::FunctionCall(call) => (
+					post.id(),
+					call.call_id().to_string(),
+					call.name().to_string(),
+				)
+					.xsome(),
 				_ => None,
 			})
 			.collect::<Vec<_>>();
-		for (call_id, name) in unanswered {
+		for (call, call_id, name) in unanswered {
 			self.upsert_post(AgentPost::new_function_call_output(
-				actor,
+				actor.clone(),
 				thread,
+				call,
 				call_id,
 				format!(
 					"Function call interrupted '{name}': the turn was cut short before it answered"
 				),
-				name.xsome(),
 				PostStatus::Interrupted,
 			));
 		}
@@ -230,16 +228,14 @@ impl ThreadRecords {
 	/// after `since`.
 	fn posted_by_other_since(
 		&self,
-		actor: ActorId,
+		actor: &ActorId,
 		since: Option<PostId>,
 	) -> bool {
 		self.posts()
 			.iter()
 			.rev()
 			.take_while(|post| since.is_none_or(|since| post.id() > since))
-			.any(|post| {
-				post.author() != actor && post.intent() != PostIntent::Log
-			})
+			.any(|post| post.author() != actor && !post.is_log())
 	}
 }
 
@@ -266,7 +262,7 @@ pub(crate) fn interrupt_on_post(
 	for (entity, actor, turn) in turns.iter() {
 		if turn.interrupt.is_some()
 			&& query.records(entity).is_ok_and(|records| {
-				records.posted_by_other_since(**actor, turn.since)
+				records.posted_by_other_since(actor, turn.since)
 			}) {
 			commands.trigger(InterruptTurn::new(entity));
 		}
@@ -283,7 +279,7 @@ pub(crate) fn pass_person_turns(
 		let passed = query.records(entity).is_ok_and(|records| {
 			records
 				.last_word()
-				.is_some_and(|post| post.author() == **actor)
+				.is_some_and(|post| post.author() == &actor.0)
 		});
 		if passed && let Some(signal) = turn.0.take() {
 			signal.signal(());
@@ -305,7 +301,7 @@ mod test {
 		let seed = seed.map(String::from);
 		(
 			Actor::new_with_id(
-				ActorId::from_u128(1),
+				ActorId::from_static("actor-1"),
 				"Person",
 				ActorKind::User,
 			),
@@ -322,13 +318,13 @@ mod test {
 
 	/// An agent `id` playing `script`, held by `gate`.
 	fn agent(
-		id: u128,
+		id: &'static str,
 		gate: &MockGate,
 		script: impl IntoIterator<Item = MockTurn>,
 	) -> impl Bundle {
 		(
 			Actor::new_with_id(
-				ActorId::from_u128(id),
+				ActorId::from_static(id),
 				"Agent",
 				ActorKind::Agent,
 			),
@@ -438,7 +434,7 @@ mod test {
 		let id = entity.get::<Thread>().unwrap().id();
 		entity.get_mut::<ThreadRecords>().unwrap().upsert_post(
 			AgentPost::new_text(
-				ActorId::from_u128(1),
+				ActorId::from_static("actor-1"),
 				id,
 				text,
 				PostStatus::Completed,
@@ -455,11 +451,11 @@ mod test {
 	}
 
 	/// The behavior entity of the actor `id`.
-	fn actor_entity(app: &mut App, id: u128) -> Entity {
+	fn actor_entity(app: &mut App, id: &'static str) -> Entity {
 		app.world_mut()
 			.query::<(Entity, &ActorRef)>()
 			.iter(app.world())
-			.find(|(_, actor)| ***actor == ActorId::from_u128(id))
+			.find(|(_, actor)| actor.0 == ActorId::from_static(id))
 			.unwrap()
 			.0
 	}
@@ -474,9 +470,9 @@ mod test {
 			RepeatWhileFunctionCallOutput,
 			children![(Thread::default(), Sequence::new(), children![
 				person(Some("go"), false),
-				(agent(2, &gate, [call_wait()]), children![wait_tool(
-					&gate, landed
-				)]),
+				(agent("agent-2", &gate, [call_wait()]), children![
+					wait_tool(&gate, landed)
+				]),
 			])],
 		));
 		pump_until(&mut app, "called the tool", |world| holds(world, "call"));
@@ -491,7 +487,7 @@ mod test {
 				.to_vec(),
 		);
 		records(app.world())
-			.model_posts(None)
+			.model_posts(&ActorId::from_static("agent-2"), None)
 			.iter()
 			.filter_map(ModelPost::post)
 			.map(|view| describe(view.post))
@@ -519,7 +515,9 @@ mod test {
 	async fn the_person_passes_at_once_after_posting_mid_stream() {
 		let gate = MockGate::default();
 		let (mut app, ..) =
-			run(chat(agent(2, &gate, [MockTurn::Hold("thinking".into())])));
+			run(chat(agent("agent-2", &gate, [MockTurn::Hold(
+				"thinking".into(),
+			)])));
 		pump_until(&mut app, "began thinking", |world| {
 			holds(world, "thinking (InProgress)")
 		});
@@ -544,7 +542,7 @@ mod test {
 	async fn semi_duplex_cuts_the_turn_and_answers_next() {
 		let gate = MockGate::default();
 		let (mut app, ..) = run(chat((
-			agent(2, &gate, [
+			agent("agent-2", &gate, [
 				MockTurn::Hold("thinking".into()),
 				MockTurn::Text("answered".into()),
 			]),
@@ -574,13 +572,13 @@ mod test {
 			RepeatWhileFunctionCallOutput,
 			children![(Thread::default(), Sequence::new(), children![
 				person(Some("go"), false),
-				(agent(2, &gate, [call_wait()]), children![wait_tool(
-					&gate, landed
-				)]),
+				(agent("agent-2", &gate, [call_wait()]), children![
+					wait_tool(&gate, landed)
+				]),
 			])],
 		));
 		pump_until(&mut app, "called the tool", |world| holds(world, "call"));
-		let agent = actor_entity(&mut app, 2);
+		let agent = actor_entity(&mut app, "agent-2");
 		app.world_mut().trigger(InterruptTurn::new(agent));
 		pump_until(&mut app, "finished", |_| done.get());
 		gate.release();
@@ -606,7 +604,7 @@ mod test {
 		script: impl IntoIterator<Item = MockTurn>,
 	) -> impl Bundle {
 		chat((RepeatWhileFunctionCallOutput, children![(
-			agent(2, gate, script),
+			agent("agent-2", gate, script),
 			InterruptOnPost,
 			children![wait_tool(gate, landed)]
 		)]))
@@ -653,7 +651,7 @@ mod test {
 			MockTurn::Text("answered".into()),
 		]));
 		pump_until(&mut app, "called the tool", |world| holds(world, "call"));
-		let agent = actor_entity(&mut app, 2);
+		let agent = actor_entity(&mut app, "agent-2");
 		app.world_mut().trigger(InterruptTurn::new(agent));
 		pump_until(&mut app, "cut the call", |world| {
 			holds(world, "output (Interrupted)")
@@ -674,8 +672,8 @@ mod test {
 		let (mut app, _, done) =
 			run((Thread::default(), Parallel::new(), children![
 				person(Some("go"), false),
-				agent(2, &first, [MockTurn::Hold("one".into())]),
-				agent(3, &second, [MockTurn::Hold("two".into())]),
+				agent("agent-2", &first, [MockTurn::Hold("one".into())]),
+				agent("agent-3", &second, [MockTurn::Hold("two".into())]),
 			]));
 		pump_until(&mut app, "streamed both", |world| {
 			holds(world, "one (InProgress)") && holds(world, "two (InProgress)")
@@ -698,11 +696,11 @@ mod test {
 		let (mut app, _, done) =
 			run((Thread::default(), Parallel::new(), children![
 				person(Some("go"), false),
-				(agent(2, &first, [call_wait()]), children![wait_tool(
-					&first, landed
-				)]),
+				(agent("agent-2", &first, [call_wait()]), children![
+					wait_tool(&first, landed)
+				]),
 				(
-					agent(3, &second, [MockTurn::Hold("two".into())]),
+					agent("agent-3", &second, [MockTurn::Hold("two".into())]),
 					InterruptOnPost
 				),
 			]));
@@ -730,8 +728,8 @@ mod test {
 		let (mut app, _, done) =
 			run((Thread::default(), Race::new(), children![
 				person(Some("go"), false),
-				agent(2, &first, [MockTurn::Hold("one".into())]),
-				agent(3, &second, [MockTurn::Hold("two".into())]),
+				agent("agent-2", &first, [MockTurn::Hold("one".into())]),
+				agent("agent-3", &second, [MockTurn::Hold("two".into())]),
 			]));
 		pump_until(&mut app, "streamed both", |world| {
 			holds(world, "one (InProgress)") && holds(world, "two (InProgress)")
@@ -772,7 +770,9 @@ mod test {
 			.spawn((ChildOf(root), Thread::default(), mount(), children![
 				person(None, false),
 				(
-					agent(2, &gate, [MockTurn::Hold("thinking".into())]),
+					agent("agent-2", &gate, [MockTurn::Hold(
+						"thinking".into()
+					)]),
 					InterruptOnPost
 				),
 			]))
@@ -800,7 +800,7 @@ mod test {
 				.await
 				.unwrap();
 		}
-		let agent = actor_entity(&mut app, 2);
+		let agent = actor_entity(&mut app, "agent-2");
 		let done = call(&mut app, agent);
 		let texts = move |world: &World, window: Entity| {
 			world

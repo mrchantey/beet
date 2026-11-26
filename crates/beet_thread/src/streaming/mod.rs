@@ -13,6 +13,8 @@ mod o11s_streamer;
 #[cfg(feature = "action")]
 mod oneshot;
 mod post_streamer;
+mod request_blobs;
+pub use request_blobs::*;
 #[cfg(feature = "action")]
 mod post_streamer_action;
 #[cfg(feature = "action")]

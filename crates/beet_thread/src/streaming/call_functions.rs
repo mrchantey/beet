@@ -41,9 +41,9 @@ pub(crate) async fn call_functions(
 					let post = AgentPost::new_function_call_output(
 						actor_id,
 						thread_id,
+						call.post(),
 						call.call_id().to_string(),
 						output,
-						call.name().to_string().xsome(),
 						PostStatus::Completed,
 					);
 					records_mut.push_post(entity, post)

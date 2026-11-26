@@ -14,7 +14,10 @@ use beet_net::prelude::*;
 /// entering it ([`ThreadEntry::fill_path`]), and the newest thread in the
 /// filled directory continues, so `threads/coach/{claim}` continues a thread
 /// per claim. The records are rows of the [`TableStore`] at or above the
-/// thread, keyed under the filled path ([`ThreadStore`]). A deferred mount:
+/// thread, each thread its own partition, listed under the filled path
+/// ([`ThreadStore`]); a `media` post's bytes go to the nearest [`BlobStore`]
+/// at or above it, so where that is the repo store the thread is as public
+/// as the repo. A deferred mount:
 /// [`Thread::enter`] fills it, picks the stored thread and only then inserts
 /// the [`ThreadStore`], so the persistence sync never flushes a thread before
 /// it knows which one it is.
@@ -41,10 +44,7 @@ impl MountThreadStore {
 		table: &TableStore,
 		entry: &ThreadEntry,
 	) -> Result<ThreadStore> {
-		entry
-			.fill_path(&self.path)?
-			.xmap(|path| ThreadStore::new(table.clone(), path))
-			.xok()
+		ThreadStore::new(table.clone(), entry.fill_path(&self.path)?)
 	}
 }
 
@@ -78,7 +78,8 @@ pub struct ThreadEntry {
 	params: ThreadEntryParams,
 	/// The request's message, filled, posted once the thread is entered.
 	message: Option<String>,
-	/// The author of the message, else the thread's first User actor by id.
+	/// The author of the message, else the first User actor the scene
+	/// authors.
 	actor: Option<ActorId>,
 }
 
@@ -103,8 +104,8 @@ impl ThreadEntry {
 	pub fn params(&self) -> &ThreadEntryParams { &self.params }
 
 	/// Post `message` once the thread is entered, each `{param}` filled from
-	/// the request, authored by `actor`, else the thread's first User actor
-	/// by id.
+	/// the request, authored by `actor`, else the first User actor the scene
+	/// authors.
 	///
 	/// ## Errors
 	///
@@ -317,7 +318,7 @@ impl ThreadEntry {
 		let Some(message) = &self.message else {
 			return Ok(());
 		};
-		let author = records.author(self.actor)?;
+		let author = records.author(self.actor.as_ref())?;
 		records.upsert_post(AgentPost::new_text(
 			author,
 			thread,
@@ -380,7 +381,16 @@ impl Thread {
 					format!("the thread mounted at `{}`", mount.path),
 				)
 				.await?;
-				let thread_store = mount.build(&table, &mount_entry)?;
+				let blobs = world
+					.entity(entity)
+					.with_state::<AncestorQuery<&BlobStore>, _>(
+						|entity, blobs| blobs.get(entity).ok().cloned(),
+					)
+					.await?;
+				let mut thread_store = mount.build(&table, &mount_entry)?;
+				if let Some(blobs) = blobs {
+					thread_store = thread_store.with_blobs(blobs);
+				}
 				Some((mount, thread_store))
 			}
 			None => None,
@@ -399,6 +409,7 @@ impl Thread {
 		};
 		// a branch opens with its parent's posts, so only a fresh thread seeds
 		let keep_seeds = stored.is_none() && entry.params.branch_of.is_none();
+		let stored_thread = stored.clone();
 		let creator = entry.clone();
 		let record = world
 			.with(move |world: &mut World| -> Result<Thread> {
@@ -426,23 +437,24 @@ impl Thread {
 			})
 			.await?;
 
+		let record_id = record.id();
 		// 5. load the stored records, apply a live window's, join each absent
 		// actor, then post the request's message
 		let loaded = match &mounted {
 			Some((_, store)) => store.load_records(&record).await?,
 			None => ThreadRecords::new(),
 		};
-		world
-			.with(move |world: &mut World| -> Result {
+		let creating = stored_thread.is_none() && mounted.is_some();
+		let flush = world
+			.with(move |world: &mut World| -> Result<Option<ThreadFlush>> {
 				let id = record.id();
-				let mut present = world
+				let present = world
 					.get::<ThreadRecords>(entity)
 					.ok_or_else(|| bevyhow!("thread {entity} despawned"))?
 					.actors()
-					.keys()
-					.copied()
+					.iter()
+					.map(|actor| actor.id().clone())
 					.collect::<Vec<_>>();
-				present.sort();
 				let (live, absent) =
 					world
 						.with_state::<(ThreadWindows, Query<&ThreadRecords>), _>(
@@ -453,38 +465,55 @@ impl Thread {
 									.map(ThreadRecords::as_changes);
 								let absent = present
 									.iter()
-									.copied()
 									.filter(|actor| {
-										!windows.holds_actor(id, entity, *actor)
+										!windows.holds_actor(id, entity, actor)
 									})
+									.cloned()
 									.collect::<Vec<_>>();
 								(live, absent)
 							},
 						);
-				let mut synced =
-					loaded.posts().iter().map(Post::id).collect::<HashSet<_>>();
+				let mut synced = SyncedRecords::of(&loaded);
 				let mut records = world
 					.get_mut::<ThreadRecords>(entity)
 					.ok_or_else(|| bevyhow!("thread {entity} despawned"))?;
 				records.merge_stored(loaded);
 				if let Some(live) = live {
-					synced.extend(live.posts.iter().map(Post::id));
+					synced.receive(&live);
 					records.apply_changes(&live);
 				}
 				records.join(id, absent, &entry.opened())?;
 				entry.post_message(&mut records, id)?;
-				let mut entity = world.entity_mut(entity);
-				entity.insert((
-					PresentActors::new(present),
-					SyncedPosts::new(synced),
-				));
-				if let Some((_, store)) = mounted {
-					entity.insert(store);
-				}
-				Ok(())
+				// a thread created here is written whole, then listed
+				let flush = creating
+					.then(|| ThreadFlush::all(&record, &records, &mut synced));
+				world
+					.entity_mut(entity)
+					.insert((PresentActors::new(present), synced));
+				flush.xok()
 			})
 			.await?;
-		// written at once, so the next entry finds the thread it created
+		let Some((_, store)) = mounted else {
+			return Ok(());
+		};
+		if let Some(mut flush) = flush {
+			store.create(&mut flush).await?;
+			// a thread whose id another took was minted again
+			let created = flush.thread().clone();
+			world
+				.with(move |world: &mut World| -> Result {
+					let mut entity = world.entity_mut(entity);
+					if let Some(mut records) = entity.get_mut::<ThreadRecords>()
+					{
+						records.rename_thread(record_id, created.id());
+					}
+					entity.insert(created);
+					Ok(())
+				})
+				.await?;
+		}
+		world.entity(entity).insert(store).await?;
+		// written at once, so the next entry finds the thread it continues
 		ThreadStore::flush(&world.entity(entity)).await
 	}
 }
@@ -516,14 +545,14 @@ mod test {
 				children![(Thread::default(), mount, children![
 					(
 						Actor::new_with_id(
-							ActorId::from_u128(1),
+							ActorId::from_static("actor-1"),
 							"System",
 							ActorKind::System,
 						),
 						children![seed],
 					),
 					Actor::new_with_id(
-						ActorId::from_u128(2),
+						ActorId::from_static("actor-2"),
 						"Person",
 						ActorKind::User,
 					),
@@ -581,6 +610,7 @@ mod test {
 			JsonTableStore::over(store.clone()).unwrap(),
 			RelPath::new(path),
 		)
+		.unwrap()
 	}
 
 	/// A continued thread reads no seed file and calls no seed route: both
@@ -741,7 +771,7 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(first);
-		enter(&[("thread", &ThreadId::from_u128(9).to_string())])
+		enter(&[("thread", &ThreadId::now().to_string())])
 			.await
 			.unwrap_err()
 			.to_string()
@@ -799,6 +829,11 @@ mod test {
 	#[beet_core::test]
 	async fn a_branch_is_refused() {
 		let store = BlobStore::temp();
+		let enter_helper = async |store: &BlobStore, path: &str| {
+			enter(store, mount(path), Post::spawn("hi"), request(&[]))
+				.await
+				.unwrap()
+		};
 		let (parent, _) =
 			enter(&store, mount("threads"), Post::spawn("hi"), request(&[]))
 				.await
@@ -809,13 +844,19 @@ mod test {
 				.unwrap_err()
 				.to_string()
 		};
-		let lost_post = PostRef::new(parent.id(), PostId::from_u128(7));
+		let lost_post = PostRef::new(parent.id(), PostId::now());
 		enter(&[("branch-of", &lost_post.to_string())])
 			.await
 			.xpect_contains("names a post the thread");
-		let lost_thread =
-			PostRef::new(ThreadId::from_u128(7), PostId::from_u128(7));
+		let lost_thread = PostRef::new(ThreadId::now(), PostId::now());
 		enter(&[("branch-of", &lost_thread.to_string())])
+			.await
+			.xpect_contains("names a thread the mount `threads` lacks");
+		// a thread of the same store, but listed in another directory: its
+		// partition reads as any other, so the index is what refuses it
+		let (elsewhere, records) = enter_helper(&store, "elsewhere").await;
+		let unlisted = PostRef::new(elsewhere.id(), records.posts()[0].id());
+		enter(&[("branch-of", &unlisted.to_string())])
 			.await
 			.xpect_contains("names a thread the mount `threads` lacks");
 		enter(&[

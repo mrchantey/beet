@@ -3,11 +3,11 @@ use beet_core::prelude::*;
 
 /// Author an [`Actor`] in markup, ie `<CreateActor name="Agent" kind="Agent"/>`.
 ///
-/// A plain [`Actor`] cannot be a BSX tag because its [`ActorId`] (a [`Uuid7`])
-/// is not attribute-coercible; this template wraps it. Set `id` to pin a stable
-/// identity (required for persisted threads, where each entry's [`ActorRef`]
-/// bindings and the stored posts depend on it); omit it for an ephemeral,
-/// freshly-minted id.
+/// Its id is its name in kebab-case ([`ActorId::from_name`]): set `id` where
+/// the name gives none, or two actors share a name, ie
+/// `<CreateActor name="Ann" id="ann-2"/>`. The id is what its posts, its
+/// joins and an entry's [`ActorRef`] name it by, so it stays when the name
+/// changes.
 ///
 /// Spread behavior and nest seeds as children, and an agent's tools as the
 /// routes of the one `<Router>` beneath it, its own url space, ie
@@ -19,16 +19,14 @@ use beet_core::prelude::*;
 pub fn CreateActor(
 	#[prop] name: String,
 	kind: ActorKind,
-	id: Option<u64>,
-) -> impl Bundle {
+	id: Option<ActorId>,
+) -> Result<impl Bundle> {
 	let actor = match id {
-		Some(id) => {
-			Actor::new_with_id(ActorId::from_u128(id as u128), name, kind)
-		}
-		None => Actor::new(name, kind),
+		Some(id) => Actor::new_with_id(id, name, kind),
+		None => Actor::new(name, kind)?,
 	};
 	// forward seed posts / tools as children of the actor entity via `<slot/>`
-	rsx! { <span {actor}><slot/></span> }
+	rsx! { <span {actor}><slot/></span> }.xok()
 }
 
 #[cfg(test)]
@@ -134,7 +132,7 @@ mod test {
 			.get::<ThreadRecords>(thread)
 			.unwrap()
 			.actors()
-			.values()
+			.iter()
 			.map(|actor| actor.kind())
 			.collect::<Vec<_>>();
 		kinds.contains(&ActorKind::System).xpect_true();

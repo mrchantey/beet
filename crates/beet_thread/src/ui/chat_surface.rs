@@ -203,7 +203,7 @@ mod test {
 		scheme_class(&mut app, &classes::DARK_SCHEME).xpect_false();
 	}
 
-	/// Push an error post ([`PostIntent::Error`]) authored by the thread's agent into its
+	/// Push an error post (of kind `error`) authored by the thread's agent into its
 	/// records, so the transcript snapshot exercises the `error` role styling
 	/// without a failing network call.
 	fn push_error_post(app: &mut App, thread: Entity) {
@@ -226,10 +226,11 @@ mod test {
 			.get::<ThreadRecords>(thread)
 			.unwrap()
 			.actors()
-			.values()
+			.iter()
 			.find(|actor| actor.kind() == ActorKind::Agent)
 			.unwrap()
 			.id()
+			.clone()
 	}
 
 	/// Append numbered text posts (`line NN`) authored by the thread's agent over
@@ -246,7 +247,7 @@ mod test {
 				.get_mut::<ThreadRecords>(thread)
 				.unwrap()
 				.upsert_post(AgentPost::new_text(
-					agent_id,
+					agent_id.clone(),
 					thread_id,
 					format!("line {index:02}"),
 					PostStatus::Completed,
@@ -262,13 +263,13 @@ mod test {
 		let (mut app, surface, thread) = serve_thread(
 			UVec2::new(56, 24),
 			(Thread::default(), Sequence::new(), children![
-				(Actor::new("System", ActorKind::System), children![
+				(Actor::new("System", ActorKind::System).unwrap(), children![
 					Post::spawn("you are a friendly robot")
 				],),
-				(Actor::new("Billy", ActorKind::User), children![
+				(Actor::new("Billy", ActorKind::User).unwrap(), children![
 					Post::spawn("hello there robot")
 				],),
-				(Actor::new("BeepBot", ActorKind::Agent), children![
+				(Actor::new("BeepBot", ActorKind::Agent).unwrap(), children![
 					Post::spawn("Beep boop! Greetings, human.")
 				],),
 			]),
@@ -291,10 +292,10 @@ mod test {
 		let (mut app, surface, thread) = serve_thread(
 			UVec2::new(48, 16),
 			(Thread::default(), Sequence::new(), children![
-				(Actor::new("System", ActorKind::System), children![
+				(Actor::new("System", ActorKind::System).unwrap(), children![
 					Post::spawn("be brief")
 				],),
-				(Actor::new("Agent", ActorKind::Agent),),
+				(Actor::new("Agent", ActorKind::Agent).unwrap(),),
 			]),
 		)
 		.await;
@@ -320,10 +321,10 @@ mod test {
 		let (mut app, surface, thread) = serve_thread(
 			UVec2::new(48, 16),
 			(Thread::default(), Sequence::new(), children![
-				(Actor::new("System", ActorKind::System), children![
+				(Actor::new("System", ActorKind::System).unwrap(), children![
 					Post::spawn("be brief")
 				],),
-				(Actor::new("Agent", ActorKind::Agent),),
+				(Actor::new("Agent", ActorKind::Agent).unwrap(),),
 			]),
 		)
 		.await;
@@ -522,7 +523,7 @@ mod test {
 			.await
 			.unwrap()
 			.into_iter()
-			.filter(|post| post.intent() != PostIntent::Log)
+			.filter(|post| !post.is_log())
 			.map(|post| post.to_string())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["hello all".to_string()]);

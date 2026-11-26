@@ -20,7 +20,7 @@ pub async fn basic_text_response(
 	.await
 	.unwrap()
 	.into_iter()
-	.find(|post| post.intent().is_display())
+	.find(|post| matches!(post.kind(), PostKind::Text | PostKind::Refusal))
 	.unwrap()
 	.to_string()
 	.xpect_contains("four");
@@ -37,7 +37,7 @@ pub async fn streaming_response(
 	.await
 	.unwrap()
 	.into_iter()
-	.find(|post| post.intent().is_display())
+	.find(|post| matches!(post.kind(), PostKind::Text | PostKind::Refusal))
 	.unwrap()
 	.to_string()
 	.is_empty()
@@ -58,7 +58,7 @@ pub async fn system_prompt(streamer: impl Component + PostStreamer + Clone) {
 	.await
 	.unwrap()
 	.into_iter()
-	.filter(|post| post.intent().is_display())
+	.filter(|post| matches!(post.kind(), PostKind::Text | PostKind::Refusal))
 	.map(|post| post.to_string())
 	.collect::<String>()
 	.to_lowercase()
@@ -140,7 +140,7 @@ pub async fn image_input(streamer: impl Component + PostStreamer + Clone) {
 	.await
 	.unwrap()
 	.into_iter()
-	.filter(|post| post.intent().is_display())
+	.filter(|post| matches!(post.kind(), PostKind::Text | PostKind::Refusal))
 	.map(|post| post.to_string())
 	.collect::<String>()
 	.to_lowercase()
@@ -151,20 +151,25 @@ pub async fn image_input(streamer: impl Component + PostStreamer + Clone) {
 pub async fn multi_turn_conversation(
 	streamer: impl Component + PostStreamer + Clone,
 ) {
-	Post::run_oneshot(children![
-		(Actor::user(), children![Post::spawn("My name is Alice.")]),
-		(Actor::agent(), children![Post::spawn(
-			"Hello Alice! Nice to meet you. How can I help you today?"
-		)]),
-		(Actor::user(), children![Post::spawn("What is my name?")]),
-		(Actor::agent(), streamer),
-	])
+	reply_after_joining(streamer, |records, thread, person, agent| {
+		for (author, text) in [
+			(&person, "My name is Alice."),
+			(
+				&agent,
+				"Hello Alice! Nice to meet you. How can I help you today?",
+			),
+			(&person, "What is my name?"),
+		] {
+			records.upsert_post(AgentPost::new_text(
+				author.clone(),
+				thread,
+				text,
+				PostStatus::Completed,
+			));
+		}
+		Ok(())
+	})
 	.await
-	.unwrap()
-	.into_iter()
-	.filter(|post| post.intent().is_display())
-	.map(|post| post.to_string())
-	.collect::<String>()
 	.xpect_contains("Alice");
 }
 
@@ -191,11 +196,15 @@ pub async fn image_roundtrip(streamer: impl Component + PostStreamer + Clone) {
 	// if the model or pipeline doesn't support image generation responses yet
 	let image_post = posts
 		.iter()
-		.find(|post| post.media_type().is_image())
-		.map(|post| IntoPost::Bytes {
-			media_type: post.media_type().clone(),
-			bytes: post.body_bytes().to_vec(),
-			file_stem: None,
+		.find_map(|post| match post.as_agent_post()? {
+			AgentPost::Media(view) if view.media_type().is_image() => {
+				Some(IntoPost::Bytes {
+					media_type: view.media_type(),
+					bytes: post.bytes()?.to_vec(),
+					file_stem: None,
+				})
+			}
+			_ => None,
 		})
 		.unwrap_or_else(|| IntoPost::Bytes {
 			media_type: MediaType::Png,
@@ -223,7 +232,7 @@ pub async fn image_roundtrip(streamer: impl Component + PostStreamer + Clone) {
 	.await
 	.unwrap()
 	.into_iter()
-	.find(|post| post.intent().is_display())
+	.find(|post| matches!(post.kind(), PostKind::Text | PostKind::Refusal))
 	.unwrap()
 	.to_string()
 	.to_lowercase()
@@ -255,17 +264,17 @@ pub async fn note_between_turns(
 ) {
 	reply_after_joining(streamer, |records, thread, person, agent| {
 		for (author, text) in [
-			(person, "My name is Alice."),
-			(agent, "Hello Alice! Nice to meet you."),
+			(&person, "My name is Alice."),
+			(&agent, "Hello Alice! Nice to meet you."),
 		] {
 			records.upsert_post(AgentPost::new_text(
-				author,
+				author.clone(),
 				thread,
 				text,
 				PostStatus::Completed,
 			));
 		}
-		records.join(thread, [person], &default())?;
+		records.join(thread, [person.clone()], &default())?;
 		records.upsert_post(AgentPost::new_text(
 			person,
 			thread,
@@ -291,7 +300,7 @@ async fn reply_after_joining(
 	app.add_plugins(MinimalPlugins)
 		.install_types::<ThreadPlugin>();
 	let (person, agent) = (Actor::user(), Actor::agent());
-	let (person_id, agent_id) = (person.id(), agent.id());
+	let (person_id, agent_id) = (person.id().clone(), agent.id().clone());
 	let thread = app
 		.world_mut()
 		.spawn((
@@ -325,7 +334,9 @@ async fn reply_after_joining(
 	window.call::<(), Outcome>(()).await.unwrap();
 	app.world().get::<ThreadRecords>(thread).unwrap().posts()[asked..]
 		.iter()
-		.filter(|post| post.intent().is_display())
+		.filter(|post| {
+			matches!(post.kind(), PostKind::Text | PostKind::Refusal)
+		})
 		.map(|post| post.to_string())
 		.collect()
 }

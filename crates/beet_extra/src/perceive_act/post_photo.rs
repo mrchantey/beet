@@ -57,7 +57,7 @@ pub async fn PostPhoto(
 				let actor_id = thread_records.actor_id(entity)?;
 				let thread_id = thread_records.thread_id(entity)?;
 				let mut records = thread_records.records_mut(entity)?;
-				records.upsert_post(AgentPost::new_bytes(
+				records.upsert_post(AgentPost::new_media(
 					actor_id,
 					thread_id,
 					media.media_type().clone(),
@@ -180,6 +180,10 @@ mod test {
 
 		let records = app.world().get::<ThreadRecords>(thread).unwrap();
 		records.posts().len().xpect_eq(1);
-		records.posts()[0].media_type().is_image().xpect_true();
+		matches!(
+			records.posts()[0].as_agent_post(),
+			Some(AgentPost::Media(view)) if view.media_type().is_image()
+		)
+		.xpect_true();
 	}
 }

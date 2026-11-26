@@ -247,7 +247,7 @@ impl PostStreamer for MockPostStreamer {
 							.content_posts()
 							.filter(|view| view.actor.kind() == ActorKind::User)
 							.last()
-							.and_then(|view| view.post.body_str().ok())
+							.and_then(|view| view.post.text())
 							.unwrap_or_default()
 							.to_string();
 
@@ -443,7 +443,7 @@ mod test {
 		.await
 		.unwrap()
 		.into_iter()
-		.find(|post| post.intent().is_display())
+		.find(|post| matches!(post.kind(), PostKind::Text | PostKind::Refusal))
 		.unwrap()
 		.to_string()
 		.xpect_eq("you said: Hello world!");
@@ -583,7 +583,7 @@ mod test {
 		.await
 		.unwrap()
 		.into_iter()
-		.find(|post| post.intent().is_display())
+		.find(|post| matches!(post.kind(), PostKind::Text | PostKind::Refusal))
 		.unwrap()
 		.to_string()
 		.xpect_eq("Custom answer");

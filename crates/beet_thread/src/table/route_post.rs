@@ -110,8 +110,8 @@ mod test {
 				format!(
 					r#"
 <Thread {{(Sequence, MountThreadStore{{path:"threads"}})}}>
-	<CreateActor name="System" kind="System" id=1><RoutePost path="{path}"/></CreateActor>
-	<CreateActor name="Agent" kind="Agent" id=2 {{MockPostStreamer{{custom_response:"ok"}}}}/>
+	<CreateActor name="System" kind="System"><RoutePost path="{path}"/></CreateActor>
+	<CreateActor name="Agent" kind="Agent" {{MockPostStreamer{{custom_response:"ok"}}}}/>
 </Thread>
 "#
 				),
@@ -153,7 +153,8 @@ mod test {
 		let records = ThreadStore::new(
 			JsonTableStore::over(store).unwrap(),
 			RelPath::new("threads"),
-		);
+		)
+		.unwrap();
 		let thread = records.threads().await.unwrap()[0].id();
 		records.posts(thread).await.unwrap()[0]
 			.to_string()

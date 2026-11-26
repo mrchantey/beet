@@ -337,26 +337,20 @@ async fn apply_scene(
 			move |entity, (mut thread_records, mut actives)| -> Result {
 				let thread_id = thread_records.thread_id(entity)?;
 				// author as this entity's actor when it runs inside one (an
-				// `ActorRef`), else as the thread's first user-kind actor: the
+				// `ActorRef`), else as the first user-kind actor the scene authors: the
 				// standalone `<RotateScene/>` step appends scene characters as
 				// user turns, the camera's role.
 				let author = thread_records.actor_id(entity).ok();
 				let mut records = thread_records.records_mut(entity)?;
-				let author = author
-					.or_else(|| {
-						records
-							.actors()
-							.values()
-							.filter(|actor| actor.kind() == ActorKind::User)
-							.map(|actor| actor.id())
-							.min()
-					})
-					.ok_or_else(|| {
+				let author = match author {
+					Some(author) => author,
+					None => records.author(None).map_err(|_| {
 						bevyhow!(
 							"scene rotation needs an author: no ActorRef on \
 							the caller and no user-kind actor in the records"
 						)
-					})?;
+					})?,
+				};
 				records.upsert_post(AgentPost::new_text(
 					author,
 					thread_id,

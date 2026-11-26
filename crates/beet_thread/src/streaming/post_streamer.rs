@@ -35,13 +35,15 @@ pub struct PostStream {
 	thread: ThreadId,
 	// store partial posts as they are built,
 	// cloning and returning on each stream part
-	posts: TableMap<Post>,
+	posts: HashMap<PostId, Post>,
 	post_partial_map: PostPartialMap,
 	provider_slug: SmolStr,
 	model_slug: SmolStr,
 	/// store the response partial with all posts drained,
 	/// for using metadata.
 	response: Option<ResponsePartial>,
+	/// The newest post the request read, see [`ResponseMeta::read`].
+	read: Option<PostId>,
 }
 
 impl PostStream {
@@ -61,11 +63,18 @@ impl PostStream {
 			posts: default(),
 			post_partial_map: default(),
 			response: None,
+			read: None,
 		}
 	}
 
+	/// Record the newest post the request read on each response's meta.
+	pub fn with_read(mut self, read: Option<PostId>) -> Self {
+		self.read = read;
+		self
+	}
+
 	/// Returns an iterator over the collected posts.
-	pub fn posts(&self) -> &TableMap<Post> { &self.posts }
+	pub fn posts(&self) -> &HashMap<PostId, Post> { &self.posts }
 
 	/// The final response's token usage, once the stream has finished. Useful to
 	/// log prompt-cache hit rate (`cached_input_tokens / input_tokens`).
@@ -88,6 +97,7 @@ impl PostStream {
 			model_slug: self.model_slug.clone(),
 			response_id: response.response_id.clone().into(),
 			response_stored: response.response_stored,
+			read: self.read,
 		}
 		.xok()
 	}
@@ -98,6 +108,7 @@ pub struct MetaBuilder {
 	model_slug: SmolStr,
 	response_id: SmolStr,
 	response_stored: bool,
+	read: Option<PostId>,
 }
 impl MetaBuilder {
 	pub fn build(&self, post_id: PostId) -> ResponseMeta {
@@ -108,6 +119,7 @@ impl MetaBuilder {
 			response_id: self.response_id.clone(),
 			response_stored: self.response_stored,
 			usage: None,
+			read: self.read,
 		}
 	}
 }
@@ -145,7 +157,7 @@ impl Stream for PostStream {
 				// get next state without the posts
 				let changes = this.post_partial_map.apply_posts(
 					&mut this.posts,
-					this.agent,
+					&this.agent,
 					this.thread,
 					post_partials,
 				)?;

@@ -222,7 +222,7 @@ mod test {
 	#[beet_core::test]
 	fn holds_two_windows_with_no_behavior() {
 		let store = BlobStore::temp();
-		let window = |id: u128, name: &str| {
+		let window = |id: &'static str, name: &str| {
 			(
 				Thread::default(),
 				MountThreadStore {
@@ -230,7 +230,7 @@ mod test {
 					new: false,
 				},
 				children![Actor::new_with_id(
-					ActorId::from_u128(id),
+					ActorId::from_static(id),
 					name,
 					ActorKind::User,
 				)],
@@ -243,8 +243,8 @@ mod test {
 				store.clone(),
 				JsonTableStore::over(store.clone()).unwrap(),
 				children![(RunThread, children![
-					window(1, "Ann"),
-					window(2, "Bob")
+					window("ann", "Ann"),
+					window("bob", "Bob")
 				])],
 			))
 			.trigger(|entity| StartRunning::new(entity, Request::default()));
@@ -256,9 +256,9 @@ mod test {
 			records
 				.posts()
 				.iter()
-				.map(Post::author)
+				.map(|post| post.author().as_str())
 				.collect::<Vec<_>>()
-				.xpect_eq(vec![ActorId::from_u128(1), ActorId::from_u128(2)]);
+				.xpect_eq(vec!["ann", "bob"]);
 		}
 	}
 
@@ -282,6 +282,7 @@ mod test {
 			JsonTableStore::over(store.clone()).unwrap(),
 			RelPath::new(RECORDS),
 		)
+		.unwrap()
 		.threads()
 		.await
 		.unwrap()
@@ -298,14 +299,14 @@ mod test {
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn reload_continues_without_duplicating() {
 		let store = BlobStore::temp();
-		let system = ActorId::from_u128(1);
-		let agent = ActorId::from_u128(2);
+		let system = ActorId::from_static("actor-1");
+		let agent = ActorId::from_static("actor-2");
 
-		run_once(&store, system, agent);
+		run_once(&store, system.clone(), agent.clone());
 		stored_threads(&store).await.xpect_eq(1);
 
 		// reload: the same path continues the stored thread, no duplicate
-		run_once(&store, system, agent);
+		run_once(&store, system.clone(), agent.clone());
 		stored_threads(&store).await.xpect_eq(1);
 	}
 
@@ -315,11 +316,11 @@ mod test {
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn a_direct_call_enters_before_running() {
 		let store = BlobStore::temp();
-		let system = ActorId::from_u128(3);
-		let agent = ActorId::from_u128(4);
+		let system = ActorId::from_static("actor-3");
+		let agent = ActorId::from_static("actor-4");
 
 		// seed the store through a normal start: the system seed plus one reply
-		run_once(&store, system, agent);
+		run_once(&store, system.clone(), agent.clone());
 		stored_threads(&store).await.xpect_eq(1);
 
 		// .. then re-run it by calling the entity itself. A thread not entered
@@ -343,7 +344,7 @@ mod test {
 			.unwrap()
 			.posts()
 			.iter()
-			.filter(|post| post.intent() != PostIntent::Log)
+			.filter(|post| !post.is_log())
 			.count()
 			.xpect_eq(3);
 		stored_threads(&store).await.xpect_eq(1);

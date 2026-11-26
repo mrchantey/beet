@@ -25,14 +25,14 @@ pub struct SeedSource {
 	/// Reads the seed's text for the entry creating the thread, called on
 	/// the source's entity.
 	pub action: Action<ThreadEntry, String>,
-	/// The seed post's intent.
-	pub intent: PostIntent,
+	/// The seed post's kind, one whose body is `{text}`.
+	pub kind: PostKind,
 	/// The seed post's status.
 	pub status: PostStatus,
 }
 
 impl SeedSource {
-	/// A completed [`PostIntent::Message`] seed whose text `action` reads, named by `label`.
+	/// A completed text seed whose text `action` reads, named by `label`.
 	pub fn new(
 		label: impl Into<SmolStr>,
 		action: Action<ThreadEntry, String>,
@@ -40,7 +40,7 @@ impl SeedSource {
 		Self {
 			label: label.into(),
 			action,
-			intent: PostIntent::Message,
+			kind: PostKind::Text,
 			status: PostStatus::Completed,
 		}
 	}
@@ -112,7 +112,7 @@ impl SeedSource {
 			.with(move |mut entity: EntityWorldMut| {
 				entity.remove::<SeedSource>().insert(Post::spawn_with(
 					text,
-					source.intent,
+					source.kind,
 					source.status,
 				));
 			})

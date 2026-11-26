@@ -12,12 +12,14 @@ use beet_core::prelude::*;
 /// each change to the thread's other windows ([`ThreadChanges`]).
 ///
 /// Author resolution is in memory (`records.actor(post.author())`), with no
-/// entity walk; ordering is by [`PostId`] (a time-sortable [`Uuid7`]).
+/// entity walk; ordering is by [`PostId`], a time sortable [`Tid`]. Loading
+/// another runtime's posts lifts this process's minter past the newest of
+/// them, so a post minted after is after every post the window knows.
 #[derive(Debug, Default, Clone, Component)]
 pub struct ThreadRecords {
-	/// The actors the window's scene authors and those that authored a post,
-	/// keyed by [`ActorId`].
-	actors: HashMap<ActorId, Actor>,
+	/// The actors the window's scene authors, in author order, then those
+	/// that authored a stored post.
+	actors: Vec<Actor>,
 	/// Ordered list of posts (by [`PostId`]).
 	posts: Vec<Post>,
 	/// Per-post response metadata, used for `previous_response_id` chaining.
@@ -32,39 +34,50 @@ impl ThreadRecords {
 
 	// ── actors ──────────────────────────────────────────────────────────
 
-	pub fn actors(&self) -> &HashMap<ActorId, Actor> { &self.actors }
+	/// The actors, the scene's in author order first.
+	pub fn actors(&self) -> &[Actor] { &self.actors }
 
 	/// Resolve an actor by id, in memory.
 	#[track_caller]
-	pub fn actor(&self, id: ActorId) -> Result<&Actor> {
+	pub fn actor(&self, id: &ActorId) -> Result<&Actor> {
 		self.actors
-			.get(&id)
+			.iter()
+			.find(|actor| actor.id() == id)
 			.ok_or_else(|| bevyhow!("No actor {id} in records"))
 	}
 
-	/// Insert (or replace) an actor in the records.
+	/// Insert an actor, replacing one of its id in place.
 	pub fn insert_actor(&mut self, actor: Actor) -> ActorId {
-		let id = actor.id();
-		self.actors.insert(id, actor);
+		let id = actor.id().clone();
+		match self.actors.iter_mut().find(|existing| existing.id() == &id) {
+			Some(existing) => *existing = actor,
+			None => self.actors.push(actor),
+		}
 		id
 	}
 
+	/// Insert `actor` unless one of its id is already here.
+	fn insert_actor_absent(&mut self, actor: &Actor) {
+		if self.actor(actor.id()).is_err() {
+			self.actors.push(actor.clone());
+		}
+	}
+
 	/// The author of a post naming `actor` or none: the named actor, else the
-	/// thread's first actor of kind User by id.
+	/// first actor of kind User the scene authors.
 	///
 	/// ## Errors
 	///
 	/// Errors when the named actor is not in the records, or none is named
 	/// and the records hold no User actor.
-	pub fn author(&self, actor: Option<ActorId>) -> Result<ActorId> {
+	pub fn author(&self, actor: Option<&ActorId>) -> Result<ActorId> {
 		match actor {
-			Some(actor) => self.actor(actor)?.id().xok(),
+			Some(actor) => self.actor(actor)?.id().clone().xok(),
 			None => self
 				.actors
-				.values()
-				.filter(|actor| actor.kind() == ActorKind::User)
-				.map(Actor::id)
-				.min()
+				.iter()
+				.find(|actor| actor.kind() == ActorKind::User)
+				.map(|actor| actor.id().clone())
 				.ok_or_else(|| {
 					bevyhow!(
 						"no actor is named to author the post, and the thread holds no User actor"
@@ -87,15 +100,12 @@ impl ThreadRecords {
 		self.upsert_quiet(post);
 	}
 
-	/// Upsert `post` without marking it changed.
+	/// Upsert `post` without marking it changed, found by its id and kept
+	/// in id order.
 	fn upsert_quiet(&mut self, post: Post) {
-		match self
-			.posts
-			.iter_mut()
-			.find(|existing| existing.id() == post.id())
-		{
-			Some(existing) => *existing = post,
-			None => self.posts.push(post),
+		match self.posts.binary_search_by_key(&post.id(), Post::id) {
+			Ok(index) => self.posts[index] = post,
+			Err(index) => self.posts.insert(index, post),
 		}
 	}
 
@@ -109,8 +119,8 @@ impl ThreadRecords {
 	/// Join each post with its authoring [`Actor`] from the records.
 	pub fn authored_posts(&self) -> impl Iterator<Item = AuthoredPost<'_>> {
 		self.posts.iter().filter_map(|post| {
-			self.actors
-				.get(&post.author())
+			self.actor(post.author())
+				.ok()
 				.map(|actor| AuthoredPost { post, actor })
 		})
 	}
@@ -126,88 +136,156 @@ impl ThreadRecords {
 		}
 	}
 
-	/// Every authored post that is not a [`PostIntent::Log`]: what was said,
-	/// rather than what happened.
+	/// Every authored post that is not a log: what was said, rather than
+	/// what happened.
 	pub fn content_posts(&self) -> impl Iterator<Item = AuthoredPost<'_>> {
-		self.authored_posts()
-			.filter(|view| view.post.intent() != PostIntent::Log)
+		self.authored_posts().filter(|view| !view.post.is_log())
 	}
 
-	/// The newest post that is not a [`PostIntent::Log`].
+	/// The newest post that is not a log.
 	pub fn last_content_post(&self) -> Option<&Post> {
-		self.posts
-			.iter()
-			.rev()
-			.find(|post| post.intent() != PostIntent::Log)
+		self.posts.iter().rev().find(|post| !post.is_log())
 	}
 
-	/// The thread's last word: the newest post that is neither a
-	/// [`PostIntent::Log`] nor the output of a call an interrupt closed, which
-	/// nobody said. A note that cut a tool call is the last word, though the
-	/// output closing that call was written after it.
+	/// The thread's last word: the newest post that is neither a log nor a
+	/// `tool_output` closing an interrupted call, which nobody said. A note
+	/// that cut a tool call is the last word, though the output closing that
+	/// call was written after it.
 	pub fn last_word(&self) -> Option<&Post> {
 		self.posts.iter().rev().find(|post| {
 			let closed_call = post.status() == PostStatus::Interrupted
-				&& AgentPost::new(post)
-					.is_some_and(|post| post.is_function_call_output());
-			post.intent() != PostIntent::Log && !closed_call
+				&& post.kind() == &PostKind::ToolOutput;
+			!post.is_log() && !closed_call
 		})
 	}
 
-	/// What a model reads, after an exclusive cursor, in model order (a
-	/// function call followed at once by its output): every authored post that is not a log, and
-	/// each run of joins between them as one note ([`Self::join_note`]). Any
-	/// other log kind stays out, so it never splits a run.
-	pub fn model_posts(&self, after: Option<PostId>) -> Vec<ModelPost<'_>> {
+	/// What the agent `reader` reads, after an exclusive cursor, in model
+	/// order (a call followed at once by its output): its own posts and
+	/// anyone else's that is not a log, another actor's call and its output
+	/// as one item, and each run of joins between them as one note
+	/// ([`Self::join_note`]). Reasoning, whoever wrote it, and any other log
+	/// stay out, so neither splits a run.
+	pub fn model_posts(
+		&self,
+		reader: &ActorId,
+		after: Option<PostId>,
+	) -> Vec<ModelPost<'_>> {
 		let ordered = self.model_order();
 		let start = after
 			.and_then(|after| {
 				ordered.iter().position(|view| view.post.id() == after)
 			})
 			.map_or(0, |index| index + 1);
+		let outputs = ordered
+			.iter()
+			.filter_map(|view| Some((view.post.subject()?, *view)))
+			.filter(|(_, view)| view.post.kind() == &PostKind::ToolOutput)
+			.collect::<HashMap<_, _>>();
 		let mut items = Vec::new();
 		let mut joins = Vec::new();
 		for view in ordered.into_iter().skip(start) {
 			if SessionOpened::opens(view.post) {
 				joins.push(view);
-			} else if view.post.intent() != PostIntent::Log {
-				self.push_note(&mut items, &mut joins);
-				items.push(ModelPost::Post(view));
+				continue;
 			}
+			let Some(content) = view.post.as_agent_post() else {
+				continue;
+			};
+			let foreign = view.post.author() != reader;
+			let item = match content {
+				_ if !content.is_model_input() => continue,
+				AgentPost::FunctionCall(_) if foreign => ModelPost::Call {
+					call: view,
+					output: outputs.get(&view.post.id()).copied(),
+				},
+				// part of its call's item
+				AgentPost::FunctionCallOutput(output)
+					if output.call().is_some_and(|call| {
+						self.post(call)
+							.is_some_and(|call| call.author() != reader)
+					}) =>
+				{
+					continue;
+				}
+				_ => ModelPost::Post(view),
+			};
+			self.push_note(&mut items, &mut joins);
+			items.push(item);
 		}
 		self.push_note(&mut items, &mut joins);
 		items
 	}
 
+	/// What a request of `reader` sends, chained to the stored response
+	/// `chained` if any: the posts after the newest that response read, less
+	/// that response's own posts, which the provider holds.
+	pub fn request_posts(
+		&self,
+		reader: &ActorId,
+		chained: Option<&ResponseMeta>,
+	) -> Vec<ModelPost<'_>> {
+		let Some(chained) = chained else {
+			return self.model_posts(reader, None);
+		};
+		self.model_posts(reader, chained.read)
+			.into_iter()
+			.filter(|item| {
+				item.post().is_none_or(|post| {
+					self.meta(post.post.id()).is_none_or(|meta| {
+						meta.response_id != chained.response_id
+					})
+				})
+			})
+			.collect()
+	}
+
+	/// The newest post a request reads: every post up to it complete, so a
+	/// post still streaming, and every post after it, is sent again by the
+	/// next chained request.
+	pub fn read_through(&self) -> Option<PostId> {
+		self.posts
+			.iter()
+			.take_while(|post| !post.in_progress())
+			.last()
+			.map(Post::id)
+	}
+
+	/// The post `id`, if the records hold it.
+	pub fn post(&self, id: PostId) -> Option<&Post> {
+		self.posts
+			.binary_search_by_key(&id, Post::id)
+			.ok()
+			.map(|index| &self.posts[index])
+	}
+
 	/// The authored posts in the order a model reads them: by [`PostId`],
-	/// except that a function call is followed at once by its output, so a
-	/// post landing between the two, ie a person's note typed mid tool call,
-	/// is read after the output and never breaks a provider's pairing of
-	/// call and output. A call with no output yet holds nothing back.
+	/// except that a call is followed at once by the output whose subject it
+	/// is, so a post landing between the two, ie a person's note typed mid
+	/// tool call, is read after the output and never breaks a provider's
+	/// pairing of call and output. A call with no output yet holds nothing
+	/// back.
 	fn model_order(&self) -> Vec<AuthoredPost<'_>> {
 		let answered = self
 			.posts
 			.iter()
-			.filter_map(|post| match AgentPost::new(post)? {
-				AgentPost::FunctionCallOutput(output) => {
-					output.call_id().to_string().xsome()
-				}
-				_ => None,
-			})
+			.filter(|post| post.kind() == &PostKind::ToolOutput)
+			.filter_map(Post::subject)
 			.collect::<HashSet<_>>();
 		let mut ordered = Vec::with_capacity(self.posts.len());
 		let mut held = Vec::new();
-		let mut pending = HashSet::<String>::default();
+		let mut pending = HashSet::<PostId>::default();
 		for view in self.authored_posts() {
-			match AgentPost::new(view.post) {
-				Some(AgentPost::FunctionCall(call)) => {
-					if answered.contains(call.call_id()) {
-						pending.insert(call.call_id().to_string());
+			match view.post.kind() {
+				PostKind::ToolCall => {
+					if answered.contains(&view.post.id()) {
+						pending.insert(view.post.id());
 					}
 					ordered.push(view);
 				}
-				Some(AgentPost::FunctionCallOutput(output)) => {
-					pending.remove(output.call_id());
+				PostKind::ToolOutput => {
+					if let Some(call) = view.post.subject() {
+						pending.remove(&call);
+					}
 					ordered.push(view);
 					if pending.is_empty() {
 						ordered.append(&mut held);
@@ -243,14 +321,34 @@ impl ThreadRecords {
 			metas,
 			changed: _,
 		} = stored;
-		for (id, actor) in actors {
-			self.actors.entry(id).or_insert(actor);
+		for actor in &actors {
+			self.insert_actor_absent(actor);
 		}
 		for post in posts {
 			self.upsert_quiet(post);
 		}
 		self.metas.extend(metas);
-		self.posts.sort_by_key(|post| post.id());
+		self.lift_minter();
+	}
+
+	/// Lift this process's minter past the newest post, so a post minted
+	/// after is after every post these records know ([`Tid::after`]).
+	fn lift_minter(&self) {
+		if let Some(newest) = self.posts.last() {
+			PostId::after(newest.id());
+		}
+	}
+
+	/// Rename the thread of the posts of `from` to `to`, as a thread created
+	/// under an id another had taken is minted again.
+	#[cfg(feature = "action")]
+	pub(crate) fn rename_thread(&mut self, from: ThreadId, to: ThreadId) {
+		if from == to {
+			return;
+		}
+		for post in self.posts.iter_mut().filter(|post| post.thread() == from) {
+			post.set_thread(to);
+		}
 	}
 
 	/// Take what changed since window sync last took it: each changed post as it
@@ -262,7 +360,7 @@ impl ThreadRecords {
 			else {
 				continue;
 			};
-			if let Some(actor) = self.actors.get(&post.author())
+			if let Ok(actor) = self.actor(post.author())
 				&& !changes.actors.iter().any(|known| known.id() == actor.id())
 			{
 				changes.actors.push(actor.clone());
@@ -283,9 +381,7 @@ impl ThreadRecords {
 	/// rest are replaced.
 	pub fn apply_changes(&mut self, changes: &ThreadChanges) {
 		for actor in &changes.actors {
-			self.actors
-				.entry(actor.id())
-				.or_insert_with(|| actor.clone());
+			self.insert_actor_absent(actor);
 		}
 		for post in &changes.posts {
 			self.upsert_quiet(post.clone());
@@ -293,13 +389,13 @@ impl ThreadRecords {
 		for meta in &changes.metas {
 			self.metas.insert(meta.post_id, meta.clone());
 		}
-		self.posts.sort_by_key(|post| post.id());
+		self.lift_minter();
 	}
 
 	/// Every record here as changes, for a window joining the thread.
 	pub fn as_changes(&self) -> ThreadChanges {
 		ThreadChanges {
-			actors: self.actors.values().cloned().collect(),
+			actors: self.actors.clone(),
 			posts: self.posts.clone(),
 			metas: self.metas.values().cloned().collect(),
 		}
@@ -323,7 +419,7 @@ impl ThreadRecords {
 	/// matches the provider and model, for `previous_response_id` patterns.
 	pub fn stored_response(
 		&self,
-		agent_id: ActorId,
+		agent_id: &ActorId,
 		provider_slug: &str,
 		model_slug: &str,
 	) -> Option<(PostId, &ResponseMeta)> {
@@ -334,8 +430,9 @@ impl ThreadRecords {
 			let meta = self.metas.get(&post.id())?;
 			(meta.provider_slug == provider_slug
 				&& meta.model_slug == model_slug
-				&& meta.response_stored)
-				.then_some((post.id(), meta))
+				&& meta.response_stored
+				&& meta.read.is_some())
+			.then_some((post.id(), meta))
 		})
 	}
 
@@ -352,26 +449,36 @@ impl ThreadRecords {
 	/// Call between turns, once the turn's new image has landed. [`StubOldImages`]
 	/// is the standalone action form.
 	pub fn stub_old_images(&mut self, keep: usize) {
+		let is_image = |post: &Post| match post.as_agent_post() {
+			Some(AgentPost::Media(view)) => view.media_type().is_image(),
+			_ => false,
+		};
 		let stub_count = self
 			.posts
 			.iter()
-			.filter(|post| post.media_type().is_image())
+			.filter(|post| is_image(post))
 			.count()
 			.saturating_sub(keep);
 		if stub_count == 0 {
 			return;
 		}
-		for post in self
+		let stubbed = self
 			.posts
-			.iter_mut()
-			.filter(|post| post.media_type().is_image())
+			.iter()
+			.filter(|post| is_image(post))
 			.take(stub_count)
-		{
-			post.set_media_type(MediaType::Text);
-			post.set_text(STUBBED_IMAGE);
-			if !self.changed.contains(&post.id()) {
-				self.changed.push(post.id());
+			.map(Post::id)
+			.collect::<Vec<_>>();
+		for id in stubbed {
+			if let Ok(index) = self.posts.binary_search_by_key(&id, Post::id) {
+				self.posts[index].replace_content(
+					PostKind::Text,
+					[(SmolStr::from("text"), Value::from(STUBBED_IMAGE))]
+						.into_iter()
+						.collect(),
+				);
 			}
+			self.mark_changed(id);
 		}
 	}
 }
@@ -413,7 +520,7 @@ impl std::ops::Deref for AuthoredPost<'_> {
 }
 
 impl AuthoredPost<'_> {
-	pub fn actor_id(&self) -> ActorId { self.actor.id() }
+	pub fn actor_id(&self) -> &ActorId { self.actor.id() }
 
 	/// Wraps text in XML metadata tags so models can distinguish speakers.
 	/// Used for non-assistant, non-system, non-developer messages.
@@ -425,6 +532,25 @@ impl AuthoredPost<'_> {
 			self.actor.id(),
 			text
 		)
+	}
+
+	/// The text of this call and its `output`, as another actor's call reads
+	/// to an agent that did not make it: one function, so no mapper chooses
+	/// it.
+	pub fn call_text(&self, output: Option<&AuthoredPost>) -> String {
+		let call = match self.post.as_agent_post() {
+			Some(AgentPost::FunctionCall(call)) => call,
+			_ => return self.post.to_string(),
+		};
+		let mut text =
+			format!("called `{}` with {}", call.name(), call.arguments());
+		match output.and_then(|output| output.post.as_agent_post()) {
+			Some(AgentPost::FunctionCallOutput(output)) => {
+				text.push_str(&format!(", which answered {}", output.output()));
+			}
+			_ => text.push_str(", not yet answered"),
+		}
+		self.wrap_user_text(&text)
 	}
 }
 
@@ -438,6 +564,13 @@ pub enum ModelPost<'a> {
 	/// it is in the user role whoever joined, the reading agent included:
 	/// something that happened, never something the agent said.
 	Note(String),
+	/// Another actor's call and its output, if answered: one message in the
+	/// caller's role ([`AuthoredPost::call_text`]), since the reader never
+	/// made the call.
+	Call {
+		call: AuthoredPost<'a>,
+		output: Option<AuthoredPost<'a>>,
+	},
 }
 
 impl<'a> ModelPost<'a> {
@@ -445,7 +578,7 @@ impl<'a> ModelPost<'a> {
 	pub fn post(&self) -> Option<AuthoredPost<'a>> {
 		match self {
 			Self::Post(post) => Some(*post),
-			Self::Note(_) => None,
+			Self::Note(_) | Self::Call { .. } => None,
 		}
 	}
 }
@@ -460,7 +593,7 @@ impl<'a> ModelPost<'a> {
 ///
 /// Produced by the author-to-behavior reduction, which swaps every in-place
 /// `Actor` carrying behavior for an `ActorRef`.
-#[derive(Debug, Clone, Copy, Deref, Component, Reflect)]
+#[derive(Debug, Clone, Deref, Component, Reflect)]
 #[reflect(Component)]
 pub struct ActorRef(pub ActorId);
 
@@ -488,17 +621,26 @@ pub struct ActorRef(pub ActorId);
 #[derive(Debug, Clone, Component)]
 pub struct SeedPost {
 	pub content: IntoPost,
-	pub intent: PostIntent,
+	/// The kind of a text seed, ie a refusal, its content's own by default.
+	pub kind: Option<PostKind>,
 	pub status: PostStatus,
 }
 
 impl SeedPost {
 	/// Resolve into a [`Post`] for the given author and thread.
 	pub fn into_post(self, author: ActorId, thread: ThreadId) -> Post {
-		let mut post = self.content.into_post(author, thread);
-		post.set_intent(self.intent);
-		post.set_status(self.status);
-		post
+		match (self.kind, self.content) {
+			(Some(kind), IntoPost::Text(text)) => Post::new(
+				author,
+				thread,
+				kind,
+				self.status,
+				[(SmolStr::from("text"), Value::from(text))]
+					.into_iter()
+					.collect(),
+			),
+			(_, content) => content.into_post(author, thread, self.status),
+		}
 	}
 }
 
@@ -641,6 +783,16 @@ impl Reduction<'_, '_> {
 
 		for actor_entity in actor_entities {
 			let actor = self.actors.get(actor_entity)?.clone();
+			// two actors of one id would share every post and turn
+			if let Ok(existing) = records.actor(actor.id()) {
+				bevybail!(
+					"the actors `{}` and `{}` share the id `{}`: give one an id of its own, ie `<CreateActor name=\"{}\" id=\"..\"/>`",
+					existing.name(),
+					actor.name(),
+					actor.id(),
+					actor.name()
+				);
+			}
 			let actor_id = records.insert_actor(actor);
 
 			// hoist or drop this actor's seed posts, despawning their entities.
@@ -653,7 +805,9 @@ impl Reduction<'_, '_> {
 				if let Ok(seed_post) = self.seeds.get(child) {
 					if keep_seeds {
 						records.upsert_post(
-							seed_post.clone().into_post(actor_id, thread),
+							seed_post
+								.clone()
+								.into_post(actor_id.clone(), thread),
 						);
 					}
 					commands.entity(child).despawn();
@@ -673,13 +827,12 @@ impl Reduction<'_, '_> {
 				commands
 					.entity(actor_entity)
 					.remove::<Actor>()
-					.insert(ActorRef(actor_id));
+					.insert(ActorRef(actor_id.clone()));
 			} else {
 				commands.entity(actor_entity).despawn();
 			}
 		}
 
-		records.posts.sort_by_key(|post| post.id());
 		commands.entity(entity).insert(records);
 		Ok(())
 	}
@@ -698,7 +851,7 @@ pub struct ThreadRecordsQuery<'w, 's> {
 	actor_refs: Query<'w, 's, &'static ActorRef>,
 	thread_records:
 		Query<'w, 's, (&'static Thread, &'static mut ThreadRecords)>,
-	synced: Query<'w, 's, &'static mut SyncedPosts>,
+	synced: Query<'w, 's, &'static mut SyncedRecords>,
 }
 
 impl ThreadRecordsQuery<'_, '_> {
@@ -716,7 +869,7 @@ impl ThreadRecordsQuery<'_, '_> {
 	pub fn actor_id(&self, entity: Entity) -> Result<ActorId> {
 		self.actor_refs
 			.get(entity)
-			.map(|actor_ref| **actor_ref)
+			.map(|actor_ref| actor_ref.0.clone())
 			.map_err(|_| bevyhow!("entity {entity} has no ActorRef"))
 	}
 
@@ -763,7 +916,7 @@ impl ThreadRecordsQuery<'_, '_> {
 		meta.usage = Some(usage);
 		records.set_meta(meta);
 		if let Ok(mut synced) = self.synced.get_mut(thread_entity) {
-			synced.remove(post);
+			synced.remove_meta(post);
 		}
 		Ok(())
 	}
@@ -818,18 +971,43 @@ mod test {
 			.xpect_eq(1);
 	}
 
+	/// Two actors of one id in a scene are refused, naming both.
+	#[beet_core::test]
+	fn refuses_two_actors_of_one_id() {
+		let mut world = World::new();
+		world.spawn((Thread::default(), children![
+			Actor::new("Ann", ActorKind::User).unwrap(),
+			Actor::new_with_id(
+				ActorId::from_static("ann"),
+				"Annie",
+				ActorKind::User,
+			),
+		]));
+		world
+			.run_system_cached::<Result, _, _>(ThreadRecords::reduce)
+			.unwrap()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`Ann` and `Annie` share the id `ann`");
+	}
+
 	/// Bounding replaces older images with a text stub in place: the post count
 	/// and every id are untouched (the records stay append-only), only the newest
 	/// `keep` images still carry bytes.
 	#[beet_core::test]
 	fn stub_old_images_bounds_the_records() {
-		let thread = ThreadId::new_now();
-		let user = ActorId::new_now();
+		let thread = ThreadId::now();
+		let user = ActorId::from_static("user");
 		let mut records = ThreadRecords::new();
-		records.insert_actor(Actor::new_with_id(user, "Cam", ActorKind::User));
+		records.insert_actor(Actor::new_with_id(
+			user.clone(),
+			"Cam",
+			ActorKind::User,
+		));
+		let is_image = |post: &Post| post.kind() == &PostKind::Media;
 		for cycle in 0..3 {
-			records.upsert_post(AgentPost::new_bytes(
-				user,
+			records.upsert_post(AgentPost::new_media(
+				user.clone(),
 				thread,
 				MediaType::Jpeg,
 				vec![cycle as u8],
@@ -841,7 +1019,7 @@ mod test {
 
 		records.stub_old_images(1);
 
-		// nothing dropped, nothing reordered: only the media types changed
+		// nothing dropped, nothing reordered: only the kinds changed
 		records.posts().len().xpect_eq(3);
 		records
 			.posts()
@@ -852,11 +1030,11 @@ mod test {
 		records
 			.posts()
 			.iter()
-			.filter(|post| post.media_type().is_image())
+			.filter(|post| is_image(post))
 			.count()
 			.xpect_eq(1);
 		// the surviving image is the newest, the stubbed ones carry the stub text
-		records.posts()[2].media_type().is_image().xpect_true();
+		is_image(&records.posts()[2]).xpect_true();
 		records.posts()[0]
 			.to_string()
 			.xpect_eq(STUBBED_IMAGE.to_string());
@@ -866,7 +1044,7 @@ mod test {
 		records
 			.posts()
 			.iter()
-			.filter(|post| post.media_type().is_image())
+			.filter(|post| is_image(post))
 			.count()
 			.xpect_eq(1);
 	}
@@ -875,10 +1053,14 @@ mod test {
 	/// existing ones in place, ordered by id.
 	#[beet_core::test]
 	fn upsert_appends_then_replaces() {
-		let thread = ThreadId::new_now();
-		let author = ActorId::new_now();
+		let thread = ThreadId::now();
+		let author = ActorId::from_static("author");
 		let mut records = ThreadRecords::new();
-		records.insert_actor(Actor::new_with_id(author, "A", ActorKind::Agent));
+		records.insert_actor(Actor::new_with_id(
+			author.clone(),
+			"A",
+			ActorKind::Agent,
+		));
 
 		let mut post =
 			AgentPost::new_text(author, thread, "hel", PostStatus::InProgress);
@@ -904,26 +1086,31 @@ mod test {
 	/// reads on from its place in that order.
 	#[beet_core::test]
 	fn model_order_pairs_each_call_with_its_output() {
-		let thread = ThreadId::new_now();
-		let person = ActorId::new_now();
-		let agent = ActorId::new_now();
+		let thread = ThreadId::now();
+		let person = ActorId::from_static("person");
+		let agent = ActorId::from_static("agent");
 		let mut records = ThreadRecords::new();
 		records.insert_actor(Actor::new_with_id(
-			person,
+			person.clone(),
 			"Cam",
 			ActorKind::User,
 		));
 		records.insert_actor(Actor::new_with_id(
-			agent,
+			agent.clone(),
 			"Bot",
 			ActorKind::Agent,
 		));
-		let text = |author, text: &str| {
-			AgentPost::new_text(author, thread, text, PostStatus::Completed)
+		let text = |author: &ActorId, text: &str| {
+			AgentPost::new_text(
+				author.clone(),
+				thread,
+				text,
+				PostStatus::Completed,
+			)
 		};
 		let call = |call_id: &str| {
 			AgentPost::new_function_call(
-				agent,
+				agent.clone(),
 				thread,
 				"wait",
 				call_id,
@@ -931,35 +1118,39 @@ mod test {
 				PostStatus::Completed,
 			)
 		};
-		let output = |call_id: &str| {
+		let output = |call: &Post| {
 			AgentPost::new_function_call_output(
-				agent,
+				agent.clone(),
 				thread,
-				call_id.to_string(),
-				"done".to_string(),
-				None,
+				call.id(),
+				call.field("call_id").unwrap_or_default(),
+				"done",
 				PostStatus::Completed,
 			)
 		};
+		// each minted in turn, so ids follow the conversation
+		let go = text(&person, "go");
 		let first_call = call("first");
 		let cursor = first_call.id();
 		for post in [
-			text(person, "go"),
-			first_call,
-			text(person, "by the way"),
-			Post::new_log(person, thread, &SessionOpened::default()).unwrap(),
-			output("first"),
+			go,
+			first_call.clone(),
+			text(&person, "by the way"),
+			Post::new_log(person.clone(), thread, &SessionOpened::default())
+				.unwrap(),
+			output(&first_call),
 			call("unanswered"),
-			text(person, "still there?"),
+			text(&person, "still there?"),
 		] {
 			records.upsert_post(post);
 		}
 		let read = |after| {
 			records
-				.model_posts(after)
+				.model_posts(&agent, after)
 				.into_iter()
 				.map(|item| match item {
 					ModelPost::Note(_) => "note".to_string(),
+					ModelPost::Call { .. } => "another's call".to_string(),
 					ModelPost::Post(view) => match AgentPost::new(view.post) {
 						Some(AgentPost::FunctionCall(_)) => "call".into(),
 						Some(AgentPost::FunctionCallOutput(_)) => {
@@ -990,28 +1181,89 @@ mod test {
 		);
 	}
 
-	/// A post's author is the named actor, else the first User actor by id,
-	/// and with neither there is none.
+	/// Another actor's call and its output are one item, reasoning stays out
+	/// whoever wrote it, and the reader's own call is its own.
+	#[beet_core::test]
+	fn another_actors_call_is_one_item() {
+		let thread = ThreadId::now();
+		let mut records = ThreadRecords::new();
+		for actor in [Actor::agent(), Actor::user()] {
+			records.insert_actor(actor);
+		}
+		let other = Actor::new("Other", ActorKind::Agent).unwrap();
+		records.insert_actor(other.clone());
+		let call = AgentPost::new_function_call(
+			other.id().clone(),
+			thread,
+			"search",
+			"c1",
+			"{}",
+			PostStatus::Completed,
+		);
+		for post in [
+			AgentPost::new_reasoning(
+				other.id().clone(),
+				thread,
+				"thinking",
+				PostStatus::Completed,
+			),
+			call.clone(),
+			AgentPost::new_function_call_output(
+				other.id().clone(),
+				thread,
+				call.id(),
+				"c1",
+				"found",
+				PostStatus::Completed,
+			),
+			AgentPost::new_reasoning(
+				ActorId::AGENT,
+				thread,
+				"mine",
+				PostStatus::Completed,
+			),
+		] {
+			records.upsert_post(post);
+		}
+		let items = records.model_posts(&ActorId::AGENT, None);
+		items.len().xpect_eq(1);
+		let ModelPost::Call { call, output } = &items[0] else {
+			panic!("expected a call, found {:?}", items[0]);
+		};
+		call.call_text(output.as_ref()).xpect_eq(
+			"<post author=Other author_kind=agent author_id=other>called `search` with {}, which answered found</post>",
+		);
+		// the caller reads its own call as a call
+		records
+			.model_posts(other.id(), None)
+			.into_iter()
+			.filter(|item| matches!(item, ModelPost::Post(_)))
+			.count()
+			.xpect_eq(2);
+	}
+
+	/// A post's author is the named actor, else the first User actor the
+	/// scene authors, and with neither there is none.
 	#[beet_core::test]
 	fn author_falls_back_to_the_first_user() {
-		let first = ActorId::from_u128(1);
-		let second = ActorId::from_u128(2);
-		let agent = ActorId::from_u128(3);
 		let mut records = ThreadRecords::new();
-		records.insert_actor(Actor::new_with_id(
-			agent,
-			"Bot",
-			ActorKind::Agent,
-		));
+		records.insert_actor(Actor::agent());
 		records
 			.author(None)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("holds no User actor");
-		records.insert_actor(Actor::new_with_id(second, "B", ActorKind::User));
-		records.insert_actor(Actor::new_with_id(first, "A", ActorKind::User));
-		records.author(None).unwrap().xpect_eq(first);
-		records.author(Some(agent)).unwrap().xpect_eq(agent);
-		records.author(Some(ActorId::from_u128(4))).unwrap_err();
+		let second = Actor::new("Zed", ActorKind::User).unwrap();
+		records.insert_actor(second.clone());
+		records.insert_actor(Actor::new("Ann", ActorKind::User).unwrap());
+		// authored first, though `ann` sorts before `zed`
+		records.author(None).unwrap().xpect_eq(second.id().clone());
+		records
+			.author(Some(&ActorId::AGENT))
+			.unwrap()
+			.xpect_eq(ActorId::AGENT);
+		records
+			.author(Some(&ActorId::from_static("nobody")))
+			.unwrap_err();
 	}
 }

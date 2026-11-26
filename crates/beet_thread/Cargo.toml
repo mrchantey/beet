@@ -14,7 +14,6 @@ keywords.workspace = true
 
 [features]
 default = ["fs","action","agent"]
-nightly = []
 rustls-tls = ["beet_net/rustls-tls"]
 native-tls = ["beet_net/native-tls"]
 fs = ["beet_core/fs"]
@@ -35,7 +34,7 @@ beet_router = { workspace = true, features = ["json"] }
 beet_action = { workspace = true, optional = true, features = ["std", "reflect", "json"] }
 beet_ui = { workspace = true, optional = true, features = ["tui", "template", "json"] }
 bevy.workspace = true
-uuid = { workspace = true, features = ["std", "v7", "js"] }
+heck.workspace = true
 async-openai = { version = "0.41", optional=true, default-features=false, features=["chat-completion-types"] }
 serde.workspace = true
 futures.workspace = true
@@ -77,7 +76,7 @@ beet_core = { workspace = true, features = ["testing", "fs", "rand"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet_thread = { path = ".", features = ["native-tls"] }
-beet_net = { workspace = true, features = ["sqlite"] }
+beet_net = { workspace = true, features = ["sqlite", "aws"] }
 
 [lib]
 harness = false

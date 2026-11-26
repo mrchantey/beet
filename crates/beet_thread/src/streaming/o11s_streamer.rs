@@ -94,15 +94,21 @@ impl O11sStreamer {
 	pub(crate) async fn build_request(
 		&self,
 		caller: AsyncEntity,
-	) -> Result<(o11s::RequestBody, ActorId, ThreadId)> {
+	) -> Result<(o11s::RequestBody, ActorId, ThreadId, Option<PostId>)> {
 		// with_state takes a 'static FnOnce, so move a clone in
 		let this = self.clone();
+		let blobs = RequestBlobs::for_agent(&caller).await?;
 
 		caller
 			.with_state::<ThreadQuery, _>(
 				move |actor_entity,
 				      query|
-				      -> Result<(o11s::RequestBody, ActorId, ThreadId)> {
+				      -> Result<(
+					o11s::RequestBody,
+					ActorId,
+					ThreadId,
+					Option<PostId>,
+				)> {
 					let (_, thread, records) =
 						query.thread_and_records(actor_entity)?;
 					let agent_id = query.actor_id(actor_entity)?;
@@ -110,7 +116,7 @@ impl O11sStreamer {
 					// get last received response meta
 					let last_received = if this.use_previous_response_id {
 						records.stored_response(
-							agent_id,
+							&agent_id,
 							&this.model.provider_slug,
 							&this.model.model_slug,
 						)
@@ -120,10 +126,15 @@ impl O11sStreamer {
 
 					// get input items (from last received if caching)
 					let items = records
-						.model_posts(last_received.map(|(post_id, _)| post_id))
+						.request_posts(
+							&agent_id,
+							last_received.map(|(_, meta)| meta),
+						)
 						.into_iter()
 						.xtry_map(|post| {
-							o11s_mapper::post_to_o11s_input(agent_id, post)
+							o11s_mapper::post_to_o11s_input(
+								&agent_id, post, &blobs,
+							)
 						})?;
 
 					trace!("openresponses items: \n{items:#?}");
@@ -162,7 +173,8 @@ impl O11sStreamer {
 					if let Some(instructions) = this.instructions {
 						req_body = req_body.with_instructions(instructions);
 					}
-					(req_body, agent_id, thread.id()).xok()
+					(req_body, agent_id, thread.id(), records.read_through())
+						.xok()
 				},
 			)
 			.await
@@ -179,7 +191,8 @@ impl PostStreamer for O11sStreamer {
 		caller: AsyncEntity,
 	) -> BoxedFuture<'_, Result<PostStream>> {
 		Box::pin(async move {
-			let (req_body, agent, thread) = self.build_request(caller).await?;
+			let (req_body, agent, thread, read) =
+				self.build_request(caller).await?;
 
 			// 5. build and send request
 			let mut request = Request::post(self.model.url.as_str())
@@ -207,6 +220,7 @@ impl PostStreamer for O11sStreamer {
 				thread,
 				typed_stream,
 			)
+			.with_read(read)
 			.xok()
 		})
 	}

@@ -1,10 +1,10 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 
-pub type ThreadId = Uuid7<Thread>;
-
-/// A conversation's record, for its whole life, named by its [`ThreadId`]: one
-/// row in its store, and a component on each window open onto it.
+/// A conversation's record, for its whole life, named by its [`ThreadId`]: the
+/// one row of its partition's `thread` table, and a component on each window
+/// open onto it. Its id carries the time it was created.
 ///
 /// Two relations name another thread's post, each by [`PostRef`] and neither
 /// mirrored by an entity relationship, so the tree of threads reads from
@@ -32,8 +32,9 @@ pub type ThreadId = Uuid7<Thread>;
 )]
 #[reflect(Default, Serialize, Deserialize, Component)]
 pub struct Thread {
+	/// The row's key, never in its body.
+	#[serde(skip)]
 	id: ThreadId,
-	created: Timestamp,
 	name: String,
 	/// The post whose action started this thread.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
@@ -47,23 +48,32 @@ impl Default for Thread {
 	fn default() -> Self { Self::new("New Thread") }
 }
 
-impl ThreadRecord for Thread {
-	type Id = ThreadId;
-	fn id(&self) -> Self::Id { self.id }
+impl TableStoreRow for Thread {
+	fn table_name() -> SmolStr { "thread".into() }
+	fn key(&self) -> TableKey { self.id.into() }
+	fn from_row(key: &TableKey, row: Row) -> Result<Self> {
+		let mut thread = row.into_serde::<Self>()?;
+		thread.id = ThreadId::parse(key)?;
+		thread.xok()
+	}
 }
 
 impl Thread {
 	pub fn new(name: impl Into<String>) -> Self {
 		Self {
-			id: Uuid7::new_now(),
-			created: Timestamp::now(),
+			id: ThreadId::now(),
 			name: name.into(),
 			spawned_by: None,
 			branch_of: None,
 		}
 	}
 
-	pub fn created(&self) -> Timestamp { self.created }
+	pub fn id(&self) -> ThreadId { self.id }
+	/// The instant the thread was created, its id's.
+	pub fn created(&self) -> Timestamp { self.id.created() }
+	/// Mint this record a new id, for a thread whose id another already took.
+	#[cfg(any(test, feature = "action"))]
+	pub(crate) fn remint(&mut self) { self.id = ThreadId::now(); }
 	pub fn name(&self) -> &str { &self.name }
 
 	/// The post whose action started this thread.

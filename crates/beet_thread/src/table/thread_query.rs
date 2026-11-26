@@ -63,7 +63,7 @@ impl<'w, 's> ThreadQuery<'w, 's> {
 	pub fn actor_id(&self, entity: Entity) -> Result<ActorId> {
 		self.actor_refs
 			.get(entity)
-			.map(|actor_ref| **actor_ref)
+			.map(|actor_ref| actor_ref.0.clone())
 			.map_err(|_| bevyhow!("entity {entity} has no ActorRef"))
 	}
 

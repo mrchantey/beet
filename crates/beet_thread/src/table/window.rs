@@ -15,7 +15,7 @@ pub struct PresentActors(Vec<ActorId>);
 
 impl PresentActors {
 	pub fn new(actors: Vec<ActorId>) -> Self { Self(actors) }
-	pub fn contains(&self, actor: ActorId) -> bool { self.0.contains(&actor) }
+	pub fn contains(&self, actor: &ActorId) -> bool { self.0.contains(actor) }
 }
 
 /// The windows of the world, found by the id of the stored thread they are
@@ -87,7 +87,7 @@ impl ThreadWindows<'_, '_> {
 		&self,
 		id: ThreadId,
 		except: Entity,
-		actor: ActorId,
+		actor: &ActorId,
 	) -> bool {
 		self.of(id, except).any(|window| {
 			self.windows
@@ -129,7 +129,7 @@ pub(crate) fn sync_windows(
 		Entity,
 		&Thread,
 		&mut ThreadRecords,
-		Option<&mut SyncedPosts>,
+		Option<&mut SyncedRecords>,
 	)>,
 ) {
 	let mut sent = Vec::new();
@@ -146,9 +146,7 @@ pub(crate) fn sync_windows(
 			}) {
 			records.apply_changes(&changes);
 			if let Some(mut synced) = synced {
-				for post in &changes.posts {
-					synced.insert(post.id());
-				}
+				synced.receive(&changes);
 			}
 		}
 	}
@@ -183,7 +181,7 @@ mod test {
 				new: false,
 			},
 			children![Actor::new_with_id(
-				ActorId::from_u128(1),
+				ActorId::from_static("actor-1"),
 				"Person",
 				ActorKind::User,
 			)],
@@ -191,7 +189,7 @@ mod test {
 		if agent {
 			window.with_child((
 				Actor::new_with_id(
-					ActorId::from_u128(2),
+					ActorId::from_static("actor-2"),
 					"Agent",
 					ActorKind::Agent,
 				),
@@ -221,7 +219,7 @@ mod test {
 		let id = entity.get::<Thread>().unwrap().id();
 		entity.get_mut::<ThreadRecords>().unwrap().upsert_post(
 			AgentPost::new_text(
-				ActorId::from_u128(1),
+				ActorId::from_static("actor-1"),
 				id,
 				text,
 				PostStatus::Completed,
@@ -280,7 +278,7 @@ mod test {
 			.await
 			.unwrap()
 			.into_iter()
-			.filter(|post| post.intent() != PostIntent::Log)
+			.filter(|post| !post.is_log())
 			.map(|post| post.to_string())
 			.collect::<Vec<_>>()
 			.xpect_eq(expected);
@@ -297,7 +295,7 @@ mod test {
 		enter(&mut app, second).await.unwrap();
 		let id = app.world().get::<Thread>(first).unwrap().id();
 		let mut streaming = AgentPost::new_text(
-			ActorId::from_u128(1),
+			ActorId::from_static("actor-1"),
 			id,
 			"hel",
 			PostStatus::InProgress,
@@ -377,9 +375,12 @@ mod test {
 				.posts()
 				.iter()
 				.filter(|post| SessionOpened::opens(post))
-				.map(Post::author)
+				.map(|post| post.author().clone())
 				.collect::<Vec<_>>()
-				.xpect_eq(vec![ActorId::from_u128(1), ActorId::from_u128(2)]);
+				.xpect_eq(vec![
+					ActorId::from_static("actor-1"),
+					ActorId::from_static("actor-2"),
+				]);
 		}
 	}
 }

@@ -36,7 +36,27 @@ impl Tid {
 
 	/// Mint a fresh TID from the wall clock, monotonic within this process.
 	#[cfg(feature = "rand")]
-	pub fn now() -> Self {
+	pub fn now() -> Self { Self::mint(0) }
+
+	/// Mint a TID no earlier than one microsecond past `previous`, monotonic
+	/// within this process as [`Self::now`] is, so a TID minted by another
+	/// process with a clock ahead of this one is still followed. Every later
+	/// mint of this process is after it too.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// // minted by a process whose clock runs a minute ahead
+	/// let ahead = Tid::from_parts(Tid::now().micros() + 60_000_000, 0);
+	/// (Tid::after(ahead) > ahead).xpect_true();
+	/// (Tid::now() > ahead).xpect_true();
+	/// ```
+	#[cfg(feature = "rand")]
+	pub fn after(previous: Tid) -> Self { Self::mint(previous.micros() + 1) }
+
+	/// The minter: the wall clock, past the last mint and no earlier than
+	/// `floor` microseconds.
+	#[cfg(feature = "rand")]
+	fn mint(floor: u64) -> Self {
 		/// `(clock id, last minted microseconds)`, the clock id chosen once.
 		static MINTER: RwLock<Option<(u16, u64)>> = RwLock::new(None);
 		let now = time_ext::now().as_micros() as u64;
@@ -49,7 +69,7 @@ impl Tid {
 				0,
 			)
 		});
-		let micros = now.max(last + 1);
+		let micros = now.max(last + 1).max(floor);
 		*minter = Some((clock_id, micros));
 		Self::from_parts(micros, clock_id)
 	}

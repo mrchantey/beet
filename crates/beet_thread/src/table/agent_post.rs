@@ -1,92 +1,19 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::exports::bytes::Bytes;
 
-// ═══════════════════════════════════════════════════════════════════════
-// PostStatus
-// ═══════════════════════════════════════════════════════════════════════
-
-/// Whether a post is complete, in-progress, or interrupted.
-///
-/// Encoded in post metadata. Default (no fields) = [`Completed`](PostStatus::Completed).
-#[derive(
-	Debug,
-	Clone,
-	Copy,
-	Default,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Serialize,
-	Deserialize,
-	Reflect,
-)]
-#[reflect(Default, Serialize, Deserialize)]
-pub enum PostStatus {
-	#[default]
-	Completed,
-	Interrupted,
-	InProgress,
-}
-
-/// Reads [`PostStatus`] from post metadata.
-pub(crate) fn post_status(post: &Post) -> PostStatus {
-	let interrupted = post
-		.metadata()
-		.get("interrupted")
-		.and_then(|val| val.as_bool())
-		.unwrap_or(false);
-	let in_progress = post
-		.metadata()
-		.get("in_progress")
-		.and_then(|val| val.as_bool())
-		.unwrap_or(false);
-	if interrupted {
-		PostStatus::Interrupted
-	} else if in_progress {
-		PostStatus::InProgress
-	} else {
-		PostStatus::Completed
-	}
-}
-
-/// Writes [`PostStatus`] into post metadata.
-fn set_post_status(post: &mut Post, status: PostStatus) {
-	let map = post.metadata_mut();
-	match status {
-		PostStatus::Completed => {
-			map.remove("interrupted");
-			map.remove("in_progress");
-		}
-		PostStatus::Interrupted => {
-			map.insert("interrupted", true);
-			map.remove("in_progress");
-		}
-		PostStatus::InProgress => {
-			map.insert("in_progress", true);
-			map.remove("interrupted");
-		}
-	}
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// AgentPost
-// ═══════════════════════════════════════════════════════════════════════
-
-/// A typed projection of a [`Post`] that is not a log, whoever its author,
-/// into one of the content variants a model reads or writes. Checks for
-/// validity are performed during construction.
+/// A typed view of a [`Post`] that is not a log, whoever its author, by its
+/// [`PostKind`]: the content a model reads or writes.
 pub enum AgentPost<'a> {
 	Text(TextView<'a>),
-	Refusal(RefusalView<'a>),
+	Refusal(TextView<'a>),
 	Url(UrlView<'a>),
-	Bytes(BytesView<'a>),
-	Error(ErrorView<'a>),
+	Media(MediaView<'a>),
+	Error(TextView<'a>),
 	FunctionCall(FunctionCallView<'a>),
 	FunctionCallOutput(FunctionCallOutputView<'a>),
-	ReasoningContent(ReasoningContentView<'a>),
-	ReasoningSummary(ReasoningSummaryView<'a>),
+	ReasoningContent(TextView<'a>),
+	ReasoningSummary(TextView<'a>),
 }
 
 impl std::ops::Deref for AgentPost<'_> {
@@ -94,204 +21,47 @@ impl std::ops::Deref for AgentPost<'_> {
 	fn deref(&self) -> &Self::Target { self.post() }
 }
 
-// ── Classification constructor ──────────────────────────────────────
-
 impl<'a> AgentPost<'a> {
-	/// Classifies the post into the most specific view variant, falling
-	/// back to [`Text`](AgentPost::Text) for text-like posts and
-	/// [`Bytes`](AgentPost::Bytes) for everything else, or `None` for a
-	/// [`PostIntent::Log`] post, which is not content.
+	/// The view of `post` by its kind, `None` for a log, which is not
+	/// content.
 	pub fn new(post: &'a Post) -> Option<Self> {
-		// metadata-based kinds first
-		if let Some(fc) = FunctionCallView::try_new(post) {
-			return AgentPost::FunctionCall(fc).xsome();
+		let text = TextView { post };
+		match post.kind() {
+			PostKind::Text => Self::Text(text),
+			PostKind::Refusal => Self::Refusal(text),
+			PostKind::Error => Self::Error(text),
+			PostKind::Reasoning => Self::ReasoningContent(text),
+			PostKind::ReasoningSummary => Self::ReasoningSummary(text),
+			PostKind::Url => Self::Url(UrlView { post }),
+			PostKind::Media => Self::Media(MediaView { post }),
+			PostKind::ToolCall => Self::FunctionCall(FunctionCallView { post }),
+			PostKind::ToolOutput => {
+				Self::FunctionCallOutput(FunctionCallOutputView { post })
+			}
+			_ => return None,
 		}
-		if let Some(fco) = FunctionCallOutputView::try_new(post) {
-			return AgentPost::FunctionCallOutput(fco).xsome();
-		}
-		// intent-based kinds, reasoning before generic text since it is also
-		// text-like
-		match post.intent() {
-			PostIntent::Log => None,
-			PostIntent::Error => AgentPost::Error(ErrorView { post }).xsome(),
-			PostIntent::Refusal => {
-				AgentPost::Refusal(RefusalView { post }).xsome()
-			}
-			PostIntent::Reasoning => {
-				AgentPost::ReasoningContent(ReasoningContentView { post })
-					.xsome()
-			}
-			PostIntent::ReasoningSummary => {
-				AgentPost::ReasoningSummary(ReasoningSummaryView { post })
-					.xsome()
-			}
-			PostIntent::Message => if let Some(view) = UrlView::try_new(post) {
-				AgentPost::Url(view)
-			} else if post.media_type().is_text() {
-				AgentPost::Text(TextView { post })
-			} else {
-				AgentPost::Bytes(BytesView { post })
-			}
-			.xsome(),
-		}
+		.xsome()
 	}
 
 	/// Returns the underlying post reference.
 	pub fn post(&self) -> &'a Post {
 		match self {
-			AgentPost::Text(view) => view.post(),
-			AgentPost::Refusal(view) => view.post(),
-			AgentPost::Url(view) => view.post(),
-			AgentPost::Bytes(view) => view.post(),
-			AgentPost::Error(view) => view.post(),
-			AgentPost::FunctionCall(view) => view.post(),
-			AgentPost::FunctionCallOutput(view) => view.post(),
-			AgentPost::ReasoningContent(view) => view.post(),
-			AgentPost::ReasoningSummary(view) => view.post(),
+			Self::Text(view)
+			| Self::Refusal(view)
+			| Self::Error(view)
+			| Self::ReasoningContent(view)
+			| Self::ReasoningSummary(view) => view.post,
+			Self::Url(view) => view.post,
+			Self::Media(view) => view.post,
+			Self::FunctionCall(view) => view.post,
+			Self::FunctionCallOutput(view) => view.post,
 		}
 	}
 
-	/// Whether this post is usually shown to a person.
-	pub fn is_display(&self) -> bool { self.post().intent().is_display() }
-}
-
-// ── Classification methods ──────────────────────────────────────────
-
-impl AgentPost<'_> {
-	/// Returns `true` if this is a text post (a [`PostIntent::Message`] of a text-like media type).
-	pub fn is_text(&self) -> bool { matches!(self, AgentPost::Text(_)) }
-
-	/// Returns `true` if this is a refusal post.
-	pub fn is_refusal(&self) -> bool { matches!(self, AgentPost::Refusal(_)) }
-
-	/// Returns `true` if this is a URL post.
-	pub fn is_url(&self) -> bool { matches!(self, AgentPost::Url(_)) }
-
-	/// Returns `true` if this is a binary/media post.
-	pub fn is_bytes(&self) -> bool { matches!(self, AgentPost::Bytes(_)) }
-
-	/// Returns `true` if this is an error post.
-	pub fn is_error(&self) -> bool { matches!(self, AgentPost::Error(_)) }
-
-	/// Returns `true` if this is a reasoning content post.
-	pub fn is_reasoning_content(&self) -> bool {
-		matches!(self, AgentPost::ReasoningContent(_))
-	}
-
-	/// Returns `true` if this is a reasoning summary post.
-	pub fn is_reasoning_summary(&self) -> bool {
-		matches!(self, AgentPost::ReasoningSummary(_))
-	}
-
-	/// Returns `true` if this is a function call post.
-	pub fn is_function_call(&self) -> bool {
-		matches!(self, AgentPost::FunctionCall(_))
-	}
-
-	/// Returns `true` if this is a function call output post.
-	pub fn is_function_call_output(&self) -> bool {
-		matches!(self, AgentPost::FunctionCallOutput(_))
-	}
-}
-
-// ── Accessor methods ────────────────────────────────────────────────
-
-impl<'a> AgentPost<'a> {
-	/// Returns a [`TextView`] if this is a text post.
-	pub fn as_text(&self) -> Option<&TextView<'a>> {
-		match self {
-			AgentPost::Text(view) => Some(view),
-			_ => None,
-		}
-	}
-
-	/// Returns a [`RefusalView`] if this is a refusal post.
-	pub fn as_refusal(&self) -> Option<&RefusalView<'a>> {
-		match self {
-			AgentPost::Refusal(view) => Some(view),
-			_ => None,
-		}
-	}
-
-	/// Returns a [`UrlView`] if this is a URL post.
-	pub fn as_url(&self) -> Option<&UrlView<'a>> {
-		match self {
-			AgentPost::Url(view) => Some(view),
-			_ => None,
-		}
-	}
-
-	/// Returns a [`BytesView`] if this is a binary/media post.
-	pub fn as_bytes(&self) -> Option<&BytesView<'a>> {
-		match self {
-			AgentPost::Bytes(view) => Some(view),
-			_ => None,
-		}
-	}
-
-	/// Returns an [`ErrorView`] if this is an error post.
-	pub fn as_error(&self) -> Option<&ErrorView<'a>> {
-		match self {
-			AgentPost::Error(view) => Some(view),
-			_ => None,
-		}
-	}
-
-	/// Returns a [`FunctionCallView`] if this is a function call post.
-	pub fn as_function_call(&self) -> Option<&FunctionCallView<'a>> {
-		match self {
-			AgentPost::FunctionCall(view) => Some(view),
-			_ => None,
-		}
-	}
-
-	/// Returns a [`FunctionCallOutputView`] if this is a function call
-	/// output post.
-	pub fn as_function_call_output(
-		&self,
-	) -> Option<&FunctionCallOutputView<'a>> {
-		match self {
-			AgentPost::FunctionCallOutput(view) => Some(view),
-			_ => None,
-		}
-	}
-
-	/// Returns a [`ReasoningContentView`] if this is a reasoning content post.
-	pub fn as_reasoning_content(&self) -> Option<&ReasoningContentView<'a>> {
-		match self {
-			AgentPost::ReasoningContent(view) => Some(view),
-			_ => None,
-		}
-	}
-
-	/// Returns a [`ReasoningSummaryView`] if this is a reasoning summary post.
-	pub fn as_reasoning_summary(&self) -> Option<&ReasoningSummaryView<'a>> {
-		match self {
-			AgentPost::ReasoningSummary(view) => Some(view),
-			_ => None,
-		}
-	}
-
-	/// Returns the URL string if this is a URL post.
-	pub fn as_url_str(&self) -> Option<&str> {
-		self.as_url().map(|view| view.url())
-	}
-
-	/// Constructs a filename from metadata `file_stem` and the media type
-	/// extension.
-	pub fn filename(&self) -> Option<String> {
-		match self {
-			AgentPost::Url(view) => view.filename(),
-			AgentPost::Bytes(view) => view.filename(),
-			_ => {
-				let file_stem = self.post().file_stem().unwrap_or("file");
-				if let Some(ext) = self.post().media_type().extension() {
-					Some(format!("{file_stem}.{ext}"))
-				} else {
-					Some(file_stem.to_string())
-				}
-			}
-		}
+	/// Whether a model reads this post: every kind but reasoning, which stays
+	/// in the records and the view whoever wrote it.
+	pub fn is_model_input(&self) -> bool {
+		!matches!(self, Self::ReasoningContent(_) | Self::ReasoningSummary(_))
 	}
 }
 
@@ -300,70 +70,65 @@ impl<'a> AgentPost<'a> {
 // ═══════════════════════════════════════════════════════════════════════
 
 impl AgentPost<'static> {
-	/// Creates a new text post.
+	/// A post of `kind` whose body is `{text}`.
+	fn new_text_kind(
+		author: ActorId,
+		thread: ThreadId,
+		kind: PostKind,
+		text: impl Into<String>,
+		status: PostStatus,
+	) -> Post {
+		Post::new(
+			author,
+			thread,
+			kind,
+			status,
+			fields([("text", text.into())]),
+		)
+	}
+
+	/// Something said.
 	pub fn new_text(
 		author: ActorId,
 		thread: ThreadId,
 		text: impl Into<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut post = Post::new_raw(
-			author,
-			thread,
-			PostIntent::Message,
-			MediaType::Text,
-			text.into().into_bytes(),
-			Map::default(),
-		);
-		post.set_status(status);
-		post
+		Self::new_text_kind(author, thread, PostKind::Text, text, status)
 	}
 
-	/// Creates a new refusal post.
+	/// A model's refusal.
 	pub fn new_refusal(
 		author: ActorId,
 		thread: ThreadId,
 		text: impl Into<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut post = Post::new_raw(
-			author,
-			thread,
-			PostIntent::Refusal,
-			MediaType::Text,
-			text.into().into_bytes(),
-			Map::default(),
-		);
-		post.set_status(status);
-		post
+		Self::new_text_kind(author, thread, PostKind::Refusal, text, status)
 	}
 
-	/// Creates a new URL post.
+	/// A link to a file of `media_type` elsewhere.
 	pub fn new_url(
 		author: ActorId,
 		thread: ThreadId,
 		url: impl Into<String>,
+		media_type: MediaType,
 		file_stem: Option<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut metadata = Map::default();
+		let mut body = fields([
+			("url", url.into()),
+			("media_type", media_type.as_str().to_string()),
+		]);
 		if let Some(stem) = file_stem {
-			metadata.insert("file_stem", stem);
+			body.insert("file_stem", stem);
 		}
-		let mut post = Post::new_raw(
-			author,
-			thread,
-			PostIntent::Message,
-			MediaType::Url,
-			url.into().into_bytes(),
-			metadata,
-		);
-		post.set_status(status);
-		post
+		Post::new(author, thread, PostKind::Url, status, body)
 	}
 
-	/// Creates a new binary/media post.
-	pub fn new_bytes(
+	/// A file: its row holds a [`BlobRef`] to `bytes`, which the post holds
+	/// in memory until they are written to the blob store.
+	pub fn new_media(
 		author: ActorId,
 		thread: ThreadId,
 		media_type: MediaType,
@@ -371,80 +136,57 @@ impl AgentPost<'static> {
 		file_stem: Option<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut metadata = Map::default();
-		if let Some(stem) = file_stem {
-			metadata.insert("file_stem", stem);
+		let blob = BlobRef::of(&bytes, media_type);
+		let mut body = Map::default();
+		// a blob reference always serializes
+		if let Ok(blob) = Value::from_serde(&blob) {
+			body.insert("blob", blob);
 		}
-		let mut post = Post::new_raw(
-			author,
-			thread,
-			PostIntent::Message,
-			media_type,
-			bytes,
-			metadata,
-		);
-		post.set_status(status);
+		if let Some(stem) = file_stem {
+			body.insert("file_stem", stem);
+		}
+		let mut post = Post::new(author, thread, PostKind::Media, status, body);
+		post.set_bytes(Bytes::from(bytes));
 		post
 	}
 
-	/// Creates a new error post.
+	/// A response's failure.
 	pub fn new_error(
 		author: ActorId,
 		thread: ThreadId,
 		message: impl Into<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut post = Post::new_raw(
-			author,
-			thread,
-			PostIntent::Error,
-			MediaType::Text,
-			message.into().into_bytes(),
-			Map::default(),
-		);
-		post.set_status(status);
-		post
+		Self::new_text_kind(author, thread, PostKind::Error, message, status)
 	}
 
-	/// Creates a new reasoning content post.
+	/// A model's reasoning.
 	pub fn new_reasoning(
 		author: ActorId,
 		thread: ThreadId,
 		text: impl Into<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut post = Post::new_raw(
-			author,
-			thread,
-			PostIntent::Reasoning,
-			MediaType::Text,
-			text.into().into_bytes(),
-			Map::default(),
-		);
-		post.set_status(status);
-		post
+		Self::new_text_kind(author, thread, PostKind::Reasoning, text, status)
 	}
 
-	/// Creates a new reasoning summary post.
+	/// A summary of a model's reasoning.
 	pub fn new_reasoning_summary(
 		author: ActorId,
 		thread: ThreadId,
 		text: impl Into<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut post = Post::new_raw(
+		Self::new_text_kind(
 			author,
 			thread,
-			PostIntent::ReasoningSummary,
-			MediaType::Text,
-			text.into().into_bytes(),
-			Map::default(),
-		);
-		post.set_status(status);
-		post
+			PostKind::ReasoningSummary,
+			text,
+			status,
+		)
 	}
 
-	/// Creates a new function call post.
+	/// A tool called with `arguments`, a json string.
 	pub fn new_function_call(
 		author: ActorId,
 		thread: ThreadId,
@@ -453,228 +195,153 @@ impl AgentPost<'static> {
 		arguments: impl Into<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut metadata = Map::default();
-		metadata.insert("post_kind", "function_call");
-		metadata.insert("fc_name", name.into());
-		metadata.insert("fc_id", call_id.into());
-		let mut post = Post::new_raw(
+		Post::new(
 			author,
 			thread,
-			PostIntent::Message,
-			MediaType::Json,
-			arguments.into().into_bytes(),
-			metadata,
-		);
-		post.set_status(status);
-		post
+			PostKind::ToolCall,
+			status,
+			fields([
+				("name", name.into()),
+				("call_id", call_id.into()),
+				("arguments", arguments.into()),
+			]),
+		)
 	}
 
-	/// Creates a new function call output post.
+	/// What a tool answered the call `call`, its subject.
 	pub fn new_function_call_output(
 		author: ActorId,
 		thread: ThreadId,
+		call: PostId,
 		call_id: impl Into<String>,
 		output: impl Into<String>,
-		name: Option<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut metadata = Map::default();
-		metadata.insert("post_kind", "function_call_output");
-		metadata.insert("fc_id", call_id.into());
-		if let Some(fc_name) = name {
-			metadata.insert("fc_name", fc_name);
-		}
-		let mut post = Post::new_raw(
+		Post::new(
 			author,
 			thread,
-			PostIntent::Message,
-			MediaType::Json,
-			output.into().into_bytes(),
-			metadata,
-		);
-		post.set_status(status);
-		post
+			PostKind::ToolOutput,
+			status,
+			fields([("call_id", call_id.into()), ("text", output.into())]),
+		)
+		.with_subject(call)
 	}
+}
+
+/// A body of string fields.
+fn fields(pairs: impl IntoIterator<Item = (&'static str, String)>) -> Map {
+	pairs
+		.into_iter()
+		.map(|(name, value)| (SmolStr::from(name), Value::from(value)))
+		.collect()
 }
 
 // ═══════════════════════════════════════════════════════════════════════
 // View types
 // ═══════════════════════════════════════════════════════════════════════
 
-/// A text content post (a [`PostIntent::Message`] of a text-like media type).
+/// A post whose body is `{text}`: text, a refusal, an error or reasoning.
 #[derive(Deref)]
 pub struct TextView<'a> {
 	post: &'a Post,
 }
 
 impl<'a> TextView<'a> {
-	pub fn try_new(post: &'a Post) -> Option<Self> {
-		if post.media_type().is_text() && post.intent() == PostIntent::Message {
-			Some(Self { post })
-		} else {
-			None
-		}
-	}
-	pub fn text(&self) -> &str {
-		self.post
-			.body_str()
-			.expect("text view validated on construction")
+	pub fn text(&self) -> &'a str {
+		self.post.field("text").unwrap_or_default()
 	}
 	pub fn post(&self) -> &'a Post { self.post }
 }
 
-/// A refusal post ([`PostIntent::Refusal`]).
-#[derive(Deref)]
-pub struct RefusalView<'a> {
-	post: &'a Post,
+/// Construct a filename from a stem and a media type's extension.
+fn filename(file_stem: Option<&str>, media_type: &MediaType) -> String {
+	let file_stem = file_stem.unwrap_or("file");
+	match media_type.extension() {
+		Some(ext) => format!("{file_stem}.{ext}"),
+		None => file_stem.to_string(),
+	}
 }
 
-impl<'a> RefusalView<'a> {
-	pub fn try_new(post: &'a Post) -> Option<Self> {
-		(post.intent() == PostIntent::Refusal).then_some(Self { post })
-	}
-	pub fn text(&self) -> &str {
-		self.post
-			.body_str()
-			.expect("refusal view validated on construction")
-	}
-	pub fn post(&self) -> &'a Post { self.post }
-}
-
-/// A URL post (URL media type).
+/// A link to a file elsewhere.
 #[derive(Deref)]
 pub struct UrlView<'a> {
 	post: &'a Post,
 }
 
 impl<'a> UrlView<'a> {
-	pub fn try_new(post: &'a Post) -> Option<Self> {
-		(post.media_type() == &MediaType::Url).then_some(Self { post })
-	}
-	pub fn url(&self) -> &str {
+	pub fn url(&self) -> &'a str { self.post.field("url").unwrap_or_default() }
+	/// The linked file's media type.
+	pub fn media_type(&self) -> MediaType {
 		self.post
-			.body_str()
-			.expect("url view validated on construction")
+			.field("media_type")
+			.map(MediaType::from)
+			.unwrap_or_default()
 	}
-	pub fn file_stem(&self) -> Option<&str> {
-		self.post
-			.metadata()
-			.get("file_stem")
-			.and_then(|val| val.as_str())
-			.ok()
-	}
-	/// Constructs a filename from metadata `file_stem` and the media type
-	/// extension.
-	pub fn filename(&self) -> Option<String> {
-		let file_stem = self.file_stem().unwrap_or("file");
-		if let Some(ext) = self.post.media_type().extension() {
-			Some(format!("{file_stem}.{ext}"))
-		} else {
-			Some(file_stem.to_string())
-		}
+	pub fn file_stem(&self) -> Option<&'a str> { self.post.field("file_stem") }
+	/// The stem and the media type's extension.
+	pub fn filename(&self) -> String {
+		filename(self.file_stem(), &self.media_type())
 	}
 	pub fn post(&self) -> &'a Post { self.post }
 }
 
-/// A binary/media post.
+/// A file, its bytes by reference.
 #[derive(Deref)]
-pub struct BytesView<'a> {
+pub struct MediaView<'a> {
 	post: &'a Post,
 }
 
-impl<'a> BytesView<'a> {
-	pub fn try_new(post: &'a Post) -> Option<Self> {
-		(!post.media_type().is_text() && post.media_type() != &MediaType::Url)
-			.then_some(Self { post })
+impl<'a> MediaView<'a> {
+	/// The reference to the file's bytes, `None` for a malformed row.
+	pub fn blob(&self) -> Option<BlobRef> {
+		self.post.body().get("blob").ok()?.clone().into_serde().ok()
 	}
-	pub fn bytes(&self) -> &[u8] { self.post.body_bytes() }
-	pub fn file_stem(&self) -> Option<&str> {
-		self.post
-			.metadata()
-			.get("file_stem")
-			.and_then(|val| val.as_str())
-			.ok()
+	pub fn media_type(&self) -> MediaType {
+		self.blob().map(|blob| blob.mime_type).unwrap_or_default()
 	}
-	/// Constructs a filename from metadata `file_stem` and the media type
-	/// extension.
-	pub fn filename(&self) -> Option<String> {
-		let file_stem = self.file_stem().unwrap_or("file");
-		if let Some(ext) = self.post.media_type().extension() {
-			Some(format!("{file_stem}.{ext}"))
-		} else {
-			Some(file_stem.to_string())
-		}
+	/// The file's length in bytes.
+	pub fn size(&self) -> u64 { self.blob().map_or(0, |blob| blob.size) }
+	pub fn file_stem(&self) -> Option<&'a str> { self.post.field("file_stem") }
+	/// The stem and the media type's extension.
+	pub fn filename(&self) -> String {
+		filename(self.file_stem(), &self.media_type())
 	}
-	/// Returns the body as base64.
-	pub fn body_base64(&self) -> String {
-		base64::Engine::encode(
-			&base64::prelude::BASE64_STANDARD,
-			self.post.body_bytes(),
-		)
+	/// The one line naming this file, what a reader that cannot carry it
+	/// reads, ie `[file: report.pdf, application/pdf, 12 KB]`.
+	pub fn line(&self) -> String {
+		let size = match self.size() {
+			size if size < 1024 => format!("{size} B"),
+			size if size < 1024 * 1024 => format!("{} KB", size / 1024),
+			size => format!("{} MB", size / (1024 * 1024)),
+		};
+		format!("[file: {}, {}, {size}]", self.filename(), self.media_type())
 	}
 	pub fn post(&self) -> &'a Post { self.post }
 }
 
-/// An error post ([`PostIntent::Error`]).
-#[derive(Deref)]
-pub struct ErrorView<'a> {
-	post: &'a Post,
-}
-
-impl<'a> ErrorView<'a> {
-	pub fn try_new(post: &'a Post) -> Option<Self> {
-		(post.intent() == PostIntent::Error).then_some(Self { post })
-	}
-	pub fn message(&self) -> &str {
-		self.post.body_str().unwrap_or("[non-utf8 error]")
-	}
-	pub fn post(&self) -> &'a Post { self.post }
-}
-
-/// A function call post. Validated by `post_kind: "function_call"` metadata.
+/// A tool called.
 #[derive(Deref)]
 pub struct FunctionCallView<'a> {
 	post: &'a Post,
 }
 
 impl<'a> FunctionCallView<'a> {
-	/// Attempts to create a view, returning `None` if the post
-	/// is not a function call.
-	pub fn try_new(post: &'a Post) -> Option<Self> {
-		post.metadata()
-			.get("post_kind")
-			.and_then(|val| val.as_str())
-			.ok()
-			.filter(|kind| *kind == "function_call")
-			.map(|_| Self { post })
-	}
 	/// The function name.
-	pub fn name(&self) -> &str {
-		self.post
-			.metadata()
-			.get("fc_name")
-			.and_then(|val| val.as_str())
-			.ok()
-			.expect("checked on construction")
+	pub fn name(&self) -> &'a str {
+		self.post.field("name").unwrap_or_default()
 	}
-	/// The unique call identifier.
-	pub fn call_id(&self) -> &str {
-		self.post
-			.metadata()
-			.get("fc_id")
-			.and_then(|val| val.as_str())
-			.ok()
-			.expect("checked on construction")
+	/// The provider's identifier of the call.
+	pub fn call_id(&self) -> &'a str {
+		self.post.field("call_id").unwrap_or_default()
 	}
-	/// The arguments as a JSON string (the body).
-	pub fn arguments(&self) -> &str {
-		self.post
-			.body_str()
-			.expect("function call body should be valid utf-8")
+	/// The arguments as a JSON string.
+	pub fn arguments(&self) -> &'a str {
+		self.post.field("arguments").unwrap_or_default()
 	}
 	pub fn post(&self) -> &'a Post { self.post }
 	pub fn into_owned(self) -> OwnedFunctionCall {
 		OwnedFunctionCall {
+			post: self.post.id(),
 			name: self.name().to_string(),
 			call_id: self.call_id().to_string(),
 			arguments: self.arguments().to_string(),
@@ -682,116 +349,44 @@ impl<'a> FunctionCallView<'a> {
 	}
 }
 
-/// Used for executing function calls
+/// A call to execute, named by its post so its output can name it back.
 pub struct OwnedFunctionCall {
+	post: PostId,
 	name: String,
 	call_id: String,
 	arguments: String,
 }
 impl OwnedFunctionCall {
+	/// The call's post, its output's subject.
+	pub fn post(&self) -> PostId { self.post }
 	pub fn name(&self) -> &str { &self.name }
 	pub fn call_id(&self) -> &str { &self.call_id }
 	pub fn arguments(&self) -> &str { &self.arguments }
 }
 
-/// A function call output post. Validated by `post_kind: "function_call_output"` metadata.
+/// What a tool answered.
 #[derive(Deref)]
 pub struct FunctionCallOutputView<'a> {
 	post: &'a Post,
 }
 
 impl<'a> FunctionCallOutputView<'a> {
-	/// Attempts to create a view, returning `None` if the post
-	/// is not a function call output.
-	pub fn try_new(post: &'a Post) -> Option<Self> {
-		post.metadata()
-			.get("post_kind")
-			.and_then(|val| val.as_str())
-			.ok()
-			.filter(|kind| *kind == "function_call_output")
-			.map(|_| Self { post })
+	/// The provider's identifier of the call answered.
+	pub fn call_id(&self) -> &'a str {
+		self.post.field("call_id").unwrap_or_default()
 	}
-	/// The unique call identifier.
-	pub fn call_id(&self) -> &str {
-		self.post
-			.metadata()
-			.get("fc_id")
-			.and_then(|val| val.as_str())
-			.ok()
-			.expect("checked on construction")
-	}
-	/// The function name, if available.
-	pub fn name(&self) -> Option<&str> {
-		self.post
-			.metadata()
-			.get("fc_name")
-			.and_then(|val| val.as_str())
-			.ok()
-	}
-	/// The output string (the body).
-	pub fn output(&self) -> &str {
-		self.post
-			.body_str()
-			.expect("function call output body should be valid utf-8")
+	/// The call answered, the post's subject.
+	pub fn call(&self) -> Option<PostId> { self.post.subject() }
+	/// The output.
+	pub fn output(&self) -> &'a str {
+		self.post.field("text").unwrap_or_default()
 	}
 	pub fn post(&self) -> &'a Post { self.post }
 }
-
-/// A reasoning content post ([`PostIntent::Reasoning`]).
-#[derive(Deref)]
-pub struct ReasoningContentView<'a> {
-	post: &'a Post,
-}
-
-impl<'a> ReasoningContentView<'a> {
-	pub fn try_new(post: &'a Post) -> Option<Self> {
-		(post.intent() == PostIntent::Reasoning).then_some(Self { post })
-	}
-	pub fn text(&self) -> &str {
-		self.post
-			.body_str()
-			.expect("reasoning content view validated on construction")
-	}
-	pub fn post(&self) -> &'a Post { self.post }
-}
-
-/// A reasoning summary post ([`PostIntent::ReasoningSummary`]).
-pub struct ReasoningSummaryView<'a> {
-	post: &'a Post,
-}
-
-impl<'a> ReasoningSummaryView<'a> {
-	pub fn try_new(post: &'a Post) -> Option<Self> {
-		(post.intent() == PostIntent::ReasoningSummary).then_some(Self { post })
-	}
-	pub fn text(&self) -> &str {
-		self.post
-			.body_str()
-			.expect("reasoning summary view validated on construction")
-	}
-	pub fn post(&self) -> &'a Post { self.post }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Post convenience methods
-// ═══════════════════════════════════════════════════════════════════════
 
 impl Post {
-	/// Reads [`PostStatus`] from metadata.
-	pub fn status(&self) -> PostStatus { post_status(self) }
-
-	/// Returns `true` if the post is in-progress (not completed or interrupted).
-	pub fn in_progress(&self) -> bool {
-		self.status() == PostStatus::InProgress
-	}
-
-	/// Writes [`PostStatus`] into metadata.
-	pub fn set_status(&mut self, status: PostStatus) {
-		set_post_status(self, status)
-	}
-
 	/// Classifies this post into a typed [`AgentPost`] view, `None` for a
-	/// [`PostIntent::Log`] post.
+	/// log.
 	pub fn as_agent_post(&self) -> Option<AgentPost<'_>> {
 		AgentPost::new(self)
 	}

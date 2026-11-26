@@ -1,8 +1,9 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 
-pub type ActorId = Uuid7<Actor>;
-
+/// A participant in a thread, a person, an agent or the system, all on equal
+/// footing: one row of its thread's `actor` table, keyed by its [`ActorId`].
 #[derive(
 	Debug,
 	Clone,
@@ -16,34 +17,26 @@ pub type ActorId = Uuid7<Actor>;
 )]
 #[reflect(Serialize, Deserialize, Component)]
 pub struct Actor {
+	/// The row's key, never in its body.
+	#[serde(skip)]
 	id: ActorId,
 	/// The name of the actor used when building context
 	name: String,
 	kind: ActorKind,
-	/// Extensible key-value metadata.
-	metadata: Map,
-}
-
-impl ThreadRecord for Actor {
-	type Id = ActorId;
-	fn id(&self) -> Self::Id { self.id }
 }
 
 impl Actor {
-	/// Create an actor with a freshly-minted id, for ephemeral / oneshot
-	/// threads. A persisted author scene must pin each actor's id with
-	/// [`Self::new_with_id`] (or a BSX `id=` attribute) so it survives reloads.
-	pub fn new(name: impl Into<String>, kind: ActorKind) -> Self {
-		Self {
-			id: default(),
-			name: name.into(),
-			kind,
-			metadata: default(),
-		}
+	/// An actor whose id is its name in kebab-case ([`ActorId::from_name`]).
+	///
+	/// ## Errors
+	///
+	/// Errors when nothing of the name can be an id, asking for one.
+	pub fn new(name: impl Into<String>, kind: ActorKind) -> Result<Self> {
+		let name = name.into();
+		Self::new_with_id(ActorId::from_name(&name)?, name, kind).xok()
 	}
-	/// Create an actor with a pinned, stable [`ActorId`] carried in the scene.
-	/// Required for persisted threads, where each entry's [`ActorRef`]
-	/// bindings and the stored posts depend on stable actor identity.
+	/// An actor with an id of its own, where its name gives none or two
+	/// actors share a name.
 	pub fn new_with_id(
 		id: ActorId,
 		name: impl Into<String>,
@@ -53,18 +46,45 @@ impl Actor {
 			id,
 			name: name.into(),
 			kind,
-			metadata: default(),
 		}
 	}
-	pub fn system() -> Self { Self::new("System", ActorKind::System) }
-	pub fn developer() -> Self { Self::new("Developer", ActorKind::Developer) }
-	pub fn user() -> Self { Self::new("User", ActorKind::User) }
-	pub fn agent() -> Self { Self::new("Agent", ActorKind::Agent) }
+	pub fn system() -> Self {
+		Self::new_with_id(ActorId::SYSTEM, "System", ActorKind::System)
+	}
+	pub fn developer() -> Self {
+		Self::new_with_id(ActorId::DEVELOPER, "Developer", ActorKind::Developer)
+	}
+	pub fn user() -> Self {
+		Self::new_with_id(ActorId::USER, "User", ActorKind::User)
+	}
+	pub fn agent() -> Self {
+		Self::new_with_id(ActorId::AGENT, "Agent", ActorKind::Agent)
+	}
 
+	pub fn id(&self) -> &ActorId { &self.id }
 	pub fn name(&self) -> &str { &self.name }
 	pub fn kind(&self) -> ActorKind { self.kind }
-	pub fn metadata(&self) -> &Map { &self.metadata }
-	pub fn metadata_mut(&mut self) -> &mut Map { &mut self.metadata }
+}
+
+impl ActorId {
+	/// The id of [`Actor::system`].
+	pub const SYSTEM: Self = Self::from_static("system");
+	/// The id of [`Actor::developer`].
+	pub const DEVELOPER: Self = Self::from_static("developer");
+	/// The id of [`Actor::user`].
+	pub const USER: Self = Self::from_static("user");
+	/// The id of [`Actor::agent`].
+	pub const AGENT: Self = Self::from_static("agent");
+}
+
+impl TableStoreRow for Actor {
+	fn table_name() -> SmolStr { "actor".into() }
+	fn key(&self) -> TableKey { self.id.clone().into() }
+	fn from_row(key: &TableKey, row: Row) -> Result<Self> {
+		let mut actor = row.into_serde::<Self>()?;
+		actor.id = ActorId::parse(key)?;
+		actor.xok()
+	}
 }
 
 /// The kind of an actor.
@@ -121,6 +141,24 @@ impl ActorKind {
 			ActorKind::Developer => "developer",
 			ActorKind::User => "human",
 			ActorKind::Agent => "agent",
+		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	#[beet_core::test]
+	fn builtin_ids_parse() {
+		for id in [
+			ActorId::SYSTEM,
+			ActorId::DEVELOPER,
+			ActorId::USER,
+			ActorId::AGENT,
+		] {
+			ActorId::parse(id.as_str()).unwrap().xpect_eq(id);
 		}
 	}
 }

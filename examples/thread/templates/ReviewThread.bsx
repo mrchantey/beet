@@ -6,11 +6,11 @@ is the route's, never the template's. The agent loop is `{RepeatWhileFunctionCal
 -->
 <RepeatWhileFunctionCallOutput>
 	<Thread {(Sequence, MountThreadStore{path:"reviews/{document}"})}>
-		<CreateActor id=1 name="System" kind="System">
+		<CreateActor name="System" kind="System">
 			<CreatePost text="You review documents. Read the document you are asked about with the read-blob tool, then answer with one thing it does well and one thing to improve, in under sixty words."/>
 		</CreateActor>
-		<CreateActor id=2 name="Reader" kind="User"/>
-		<CreateActor id=3 name="Reviewer" kind="Agent" {ModelStreamer{provider:OpenAi}}>
+		<CreateActor name="Reader" kind="User"/>
+		<CreateActor name="Reviewer" kind="Agent" {ModelStreamer{provider:OpenAi}}>
 			<Router><RouteTool path="read-blob"/></Router>
 		</CreateActor>
 	</Thread>

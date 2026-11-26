@@ -16,26 +16,27 @@ renders the window as it stands, and a served page's composer posts nothing.
 
 One `{RunThread}` holds both windows and enters them in order, so the second finds
 the thread the first created. There is nothing to run: people post whenever they
-like. The actor ids are pinned so each run's actors are the stored thread's.
+like. Each actor's id is its name in kebab-case, `ann` and `bob`, which is how each
+composer names its author and each run's actors find the stored thread's.
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
 	<RequireCfg cfg="feature:thread && feature:tui && feature:ssh"/>
 	<Router {Layout(Template("AppShell"))}>
 		<Route path="/" {FixedPage}>
 			<ThreadView {OfThread($home)}/>
-			<CreatePostForm actor=1 {OfThread($home)}/>
+			<CreatePostForm actor="ann" {OfThread($home)}/>
 		</Route>
 		<Route path="guest" {FixedPage}>
 			<ThreadView {OfThread($guest)}/>
-			<CreatePostForm actor=2 {OfThread($guest)}/>
+			<CreatePostForm actor="bob" {OfThread($guest)}/>
 		</Route>
 		<FsStore path="target/group_chat" {JsonTableStore}>
 			<Fragment {RunThread}>
 				<Thread bx:ref="home" {MountThreadStore{path:"group_chat"}}>
-					<CreateActor id=1 name="Ann" kind="User"/>
+					<CreateActor name="Ann" kind="User"/>
 				</Thread>
 				<Thread bx:ref="guest" {MountThreadStore{path:"group_chat"}}>
-					<CreateActor id=2 name="Bob" kind="User"/>
+					<CreateActor name="Bob" kind="User"/>
 				</Thread>
 			</Fragment>
 		</FsStore>
