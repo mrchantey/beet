@@ -481,7 +481,7 @@ mod test {
 			UVec2::new(40, 12),
 			(
 				Thread::default(),
-				TableStore::temp(),
+				TableStore::new(InMemoryTableStore::new()),
 				MountThreadStore {
 					path: RelPath::new("group_chat"),
 					new: false,

@@ -888,6 +888,7 @@ mod test {
 
 	/// Minimal PNG header bytes for a `width`x`height` image: enough for the
 	/// loader (magic + IHDR dimensions); the terminal never sees it in tests.
+	#[cfg(feature = "tui")]
 	fn png_bytes(width: u32, height: u32) -> Vec<u8> {
 		let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
 		bytes.extend(13u32.to_be_bytes());

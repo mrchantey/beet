@@ -614,7 +614,7 @@ mod test {
 	#[cfg(feature = "json")]
 	#[beet_core::test]
 	async fn rows_order_by_day() {
-		let table = Table::<AnalyticsRollup>::temp();
+		let table = Table::<AnalyticsRollup>::new(InMemoryTableStore::new());
 		table.name().xpect_eq("analytics_rollup");
 		let later = AnalyticsRollup::new("2026-08-02", AnalyticsScope::Site);
 		let earlier = AnalyticsRollup::new(

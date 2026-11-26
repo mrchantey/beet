@@ -7,14 +7,6 @@ impl Value {
 
 	/// Converts into a [`serde_json::Value`].
 	pub fn into_json(self) -> serde_json::Value { value_to_json(self) }
-
-	/// Converts into a pretty-printed JSON string.
-	pub fn to_string_pretty(&self) -> Result<String> {
-		MediaType::Json
-			.serialize_with_options(self, SerializeOptions { pretty: true })?
-			.xmap(String::from_utf8)?
-			.xok()
-	}
 }
 
 /// Converts a [`serde_json::Value`] to a [`Value`], preserving numeric precision.

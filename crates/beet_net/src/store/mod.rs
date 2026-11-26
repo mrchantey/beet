@@ -15,6 +15,8 @@
 //! - [`SqliteBlobStore`]: blobs in a SQLite database file (requires `sqlite`)
 //! - [`JsonTableStore`]: tables as json files in any blob store, for trying
 //!   things in a small binary and for a browser tab (requires `json`)
+//! - [`InMemoryTableStore`]: tables in process memory, for a test or a
+//!   runtime whose rows need not outlive it (requires `json`)
 //! - [`DurableObjectStore`]: tables whose every partition is a Cloudflare
 //!   Durable Object, natively a [`PartitionHost`] of SQLite files (requires
 //!   `json`)

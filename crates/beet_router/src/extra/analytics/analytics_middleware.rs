@@ -371,7 +371,7 @@ mod test {
 		});
 		// without `json` there are no tables and nothing records
 		#[cfg(feature = "json")]
-		let store = world.spawn(TableStore::temp()).flush();
+		let store = world.spawn(InMemoryTableStore::new()).flush();
 		#[cfg(not(feature = "json"))]
 		let store = world.spawn_empty().flush();
 		world

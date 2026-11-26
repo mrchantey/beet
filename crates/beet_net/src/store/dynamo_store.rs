@@ -215,7 +215,7 @@ impl DynamoStore {
 		let mut item = json!({
 			"pk": {"S": self.pk()},
 			"sk": {"S": Self::row_sk(table, row.key())},
-			"row": {"S": serde_json::to_string(&row.row().to_json())?},
+			"row": {"S": row.row().to_json_string()},
 			"cid": {"S": row.cid().as_str()},
 		});
 		for (slot, index) in table.indexes.iter().enumerate() {

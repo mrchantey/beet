@@ -52,23 +52,6 @@ impl TableStore {
 		}
 	}
 
-	/// A temporary in-memory store, created and ready: a [`JsonTableStore`]
-	/// over [`BlobStore::temp`].
-	///
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::temp().table::<TableItem<String>>();
-	/// table.push(TableItem::new("Hello, world!".to_string())).await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	pub fn temp() -> Self {
-		JsonTableStore::over(BlobStore::temp())
-			.expect("an in-memory store has conditional writes")
-	}
-
 	/// The table store a [`StoreUri`] names, for a caller with no entity to
 	/// land the concrete component on, see [`TableStoreProvider::from_uri`].
 	#[cfg(feature = "std")]
@@ -330,7 +313,7 @@ impl TableStore {
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// # async fn run() -> Result<()> {
-/// let table = Table::<TableItem<u32>>::temp();
+/// let table = Table::<TableItem<u32>>::new(InMemoryTableStore::new());
 /// let item = TableItem::new(7);
 /// let cid = table.push(item.clone()).await?;
 /// // read, modify, write back only if nothing else wrote meanwhile
@@ -361,9 +344,6 @@ impl<T: TableStoreRow> Table<T> {
 	pub fn new(provider: impl TableProvider) -> Self {
 		TableStore::new(provider).table()
 	}
-
-	/// A temporary in-memory table.
-	pub fn temp() -> Self { TableStore::temp().table() }
 
 	/// The table's name, [`TableStoreRow::table_name`].
 	pub fn name(&self) -> &str { &self.spec.name }

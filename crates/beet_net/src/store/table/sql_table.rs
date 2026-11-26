@@ -247,7 +247,7 @@ impl SqlTable {
 		self.ensure(sql)?;
 		let args = [
 			SqlArg::Text(row.key().to_string()),
-			SqlArg::Text(serde_json::to_string(&row.row().to_json())?),
+			SqlArg::Text(row.row().to_json_string()),
 			SqlArg::Text(row.cid().to_string()),
 		];
 		let ident = &self.ident;

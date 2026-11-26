@@ -343,7 +343,7 @@ impl Response {
 		if let Some(Ok(MediaType::Json)) =
 			self.headers().get::<headers::ContentType>()
 		{
-			let value = self.json::<Value>().await?.to_string_pretty()?;
+			let value = self.json::<Value>().await?.to_json_pretty();
 			Ok(value)
 		} else {
 			self.text().await

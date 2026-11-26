@@ -76,18 +76,15 @@ impl Row {
 		Self::encode_bytes(Value::Map(self.0))
 	}
 
-	/// The json form, see [`into_json_form`](Self::into_json_form).
-	pub fn to_json(&self) -> serde_json::Value {
-		self.clone().into_json_form().into_json()
+	/// The json form as compact text, see
+	/// [`into_json_form`](Self::into_json_form), which
+	/// [`parse_json`](Self::parse_json) reads back.
+	pub fn to_json_string(&self) -> String {
+		self.clone().into_json_form().to_json_string()
 	}
 
-	/// A row from its json form, every `$bytes` object among its fields a
-	/// byte string again.
-	pub fn from_json(json: serde_json::Value) -> Result<Self> {
-		Self::from_json_form(Value::from_json(json))
-	}
-
-	/// A row from its json form as a value, see [`from_json`](Self::from_json).
+	/// A row from its json form as a value, every `$bytes` object among its
+	/// fields a byte string again.
 	pub fn from_json_form(value: Value) -> Result<Self> {
 		// each field, never the row: a row of one `$bytes` field is a row
 		Self::from_value(value)?
@@ -99,9 +96,9 @@ impl Row {
 			.xok()
 	}
 
-	/// The row its [`to_json`](Self::to_json) text holds, every float exactly
-	/// as it was written ([`Value::parse_json`]), so its [`cid`](Self::cid)
-	/// survives the trip.
+	/// The row its [`to_json_string`](Self::to_json_string) text holds,
+	/// every float exactly as it was written ([`Value::parse_json`]), so its
+	/// [`cid`](Self::cid) survives the trip.
 	pub fn parse_json(text: &str) -> Result<Self> {
 		Self::from_json_form(Value::parse_json(text)?)
 	}
@@ -310,7 +307,7 @@ mod test {
 			"nested": [{ "c": (Value::Bytes(b"hi".to_vec())) }]
 		}))
 		.unwrap();
-		let back = Row::from_json(row.to_json()).unwrap();
+		let back = Row::parse_json(&row.to_json_string()).unwrap();
 		back.clone().xpect_eq(row.clone());
 		back.cid().unwrap().xpect_eq(row.cid().unwrap());
 	}
@@ -374,8 +371,11 @@ mod test {
 				let row = Row::new(Map::new([(field, value.clone())]));
 				// a value no row holds is refused before it is written
 				let Ok(cid) = row.cid() else { continue };
-				let text = serde_json::to_string_pretty(&row).unwrap();
-				Row::parse_json(&text).unwrap().cid().unwrap().xpect_eq(cid);
+				Row::parse_json(&row.to_json_string())
+					.unwrap()
+					.cid()
+					.unwrap()
+					.xpect_eq(cid);
 			}
 		}
 	}

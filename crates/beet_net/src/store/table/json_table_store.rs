@@ -143,7 +143,7 @@ impl JsonTableProvider {
 
 	/// The partition as it is now, and the version it was read at, `None` for
 	/// a partition never written.
-	async fn read(&self) -> Result<(JsonPartition, Option<BlobVersion>)> {
+	async fn read(&self) -> Result<(PartitionRows, Option<BlobVersion>)> {
 		let file = self.file();
 		self.opened
 			.lock()
@@ -151,7 +151,7 @@ impl JsonTableProvider {
 			.insert(file.clone());
 		match self.blobs.get_versioned(&file).await? {
 			Some((bytes, version)) => (
-				JsonPartition::parse(&bytes).map_err(|err| {
+				PartitionRows::parse_json(&bytes).map_err(|err| {
 					bevyhow!(
 						"`{file}` in `{}` is not a table partition: {err}",
 						self.blobs.describe()
@@ -169,7 +169,7 @@ impl JsonTableProvider {
 	/// writer's change in between reads it again.
 	async fn update(
 		&self,
-		func: impl Fn(&mut JsonPartition) -> Result<bool>,
+		func: impl Fn(&mut PartitionRows) -> Result<bool>,
 	) -> Result {
 		let file = self.file();
 		loop {
@@ -185,7 +185,7 @@ impl JsonTableProvider {
 				true => self.blobs.remove_if(&file, condition).await,
 				false => self
 					.blobs
-					.insert_if(&file, partition.to_bytes()?, condition)
+					.insert_if(&file, partition.to_json_bytes(), condition)
 					.await
 					.map(drop),
 			};
@@ -222,9 +222,8 @@ impl StoreBackend for JsonTableProvider {
 			let files = blobs.list().await?;
 			for file in &files {
 				let partition = match Self::is_partition(file) {
-					true => {
-						JsonPartition::parse(&blobs.get(file).await?).is_ok()
-					}
+					true => PartitionRows::parse_json(&blobs.get(file).await?)
+						.is_ok(),
 					false => false,
 				};
 				if !partition {
@@ -365,13 +364,10 @@ impl TableProvider for JsonTableProvider {
 	}
 }
 
-/// One partition's tables, each its rows in key order.
-#[derive(Debug, Default, Clone, PartialEq)]
-struct JsonPartition(BTreeMap<SmolStr, BTreeMap<TableKey, Row>>);
-
-impl JsonPartition {
+/// A partition as its json file.
+impl PartitionRows {
 	/// The partition a file holds.
-	fn parse(bytes: &[u8]) -> Result<Self> {
+	fn parse_json(bytes: &[u8]) -> Result<Self> {
 		let Value::Map(tables) =
 			Value::parse_json(core::str::from_utf8(bytes)?)?
 		else {
@@ -401,7 +397,7 @@ impl JsonPartition {
 	}
 
 	/// The file this partition is written as.
-	fn to_bytes(&self) -> Result<Bytes> {
+	fn to_json_bytes(&self) -> Bytes {
 		let mut text = self
 			.0
 			.iter()
@@ -419,123 +415,9 @@ impl JsonPartition {
 			})
 			.collect::<Map>()
 			.xmap(Value::Map)
-			.to_string_pretty()?;
+			.to_json_pretty();
 		text.push('\n');
-		Bytes::from(text).xok()
-	}
-
-	fn is_empty(&self) -> bool { self.0.is_empty() }
-
-	/// The rows of `table`, in key order.
-	fn rows(
-		&self,
-		table: &TableSpec,
-	) -> impl Iterator<Item = (&TableKey, &Row)> {
-		self.0.get(&table.name).into_iter().flatten()
-	}
-
-	/// The row at `key`, its cid computed here.
-	fn get(
-		&self,
-		table: &TableSpec,
-		key: &TableKey,
-	) -> Result<Option<StoredRow>> {
-		self.0
-			.get(&table.name)
-			.and_then(|rows| rows.get(key))
-			.map(|row| StoredRow::new(key, row.clone()))
-			.transpose()
-	}
-
-	/// Make one write when its precondition holds, answering whether it
-	/// changed anything.
-	fn apply(&mut self, write: &TableWrite) -> Result<bool> {
-		let (table, key) = (write.table(), write.key());
-		// only a precondition on the row reads its cid
-		if *write.precondition() != Precondition::Any {
-			let found = self.get(table, key)?;
-			write.precondition().check(
-				&table.name,
-				key,
-				found.as_ref().map(StoredRow::cid),
-			)?;
-		}
-		match write {
-			TableWrite::Put { table, row, .. } => {
-				for index in &table.indexes {
-					index.values(row.row())?;
-				}
-				let rows = self.0.entry(table.name.clone()).or_default();
-				let before = rows.insert(key.clone(), row.row().clone());
-				(before.as_ref() != Some(row.row())).xok()
-			}
-			TableWrite::Remove { .. } => {
-				let Some(rows) = self.0.get_mut(&table.name) else {
-					return Ok(false);
-				};
-				let removed = rows.remove(key).is_some();
-				if rows.is_empty() {
-					self.0.remove(&table.name);
-				}
-				removed.xok()
-			}
-		}
-	}
-
-	fn scan(&self, table: &TableSpec, scan: &Scan) -> Result<ScanPage> {
-		let scan = scan.after_key_cursor();
-		let mut keys = self
-			.rows(table)
-			.filter(|(key, _)| scan.contains(key))
-			.collect::<Vec<_>>();
-		if scan.reverse {
-			keys.reverse();
-		}
-		// one past the limit says whether there is another page
-		if let Some(limit) = scan.limit {
-			keys.truncate(limit + 1);
-		}
-		let mut rows = keys
-			.into_iter()
-			.map(|(key, row)| StoredRow::new(key, row.clone()))
-			.collect::<Result<Vec<_>>>()?;
-		if scan.reverse {
-			rows.reverse();
-		}
-		ScanPage::from_sorted(rows, &scan).xok()
-	}
-
-	fn scan_index(
-		&self,
-		table: &TableSpec,
-		index: &TableIndex,
-		scan: &IndexScan,
-	) -> Result<ScanPage> {
-		let range = scan.entry_range()?;
-		let mut entries = self
-			.rows(table)
-			.map(|(key, row)| (index.entry(key, row)?, key, row).xok())
-			.collect::<Result<Vec<_>>>()?;
-		entries.retain(|(entry, ..)| IndexScan::contains(&range, entry));
-		entries.sort_by(|(left, ..), (right, ..)| left.cmp(right));
-		if scan.reverse {
-			entries.reverse();
-		}
-		let more = scan.limit.is_some_and(|limit| entries.len() > limit);
-		if let Some(limit) = scan.limit {
-			entries.truncate(limit);
-		}
-		ScanPage {
-			cursor: match more {
-				true => entries.last().map(|(entry, ..)| entry.to_cursor()),
-				false => None,
-			},
-			rows: entries
-				.into_iter()
-				.map(|(_, key, row)| StoredRow::new(key, row.clone()))
-				.collect::<Result<_>>()?,
-		}
-		.xok()
+		Bytes::from(text)
 	}
 }
 
@@ -670,7 +552,8 @@ mod test {
 	/// record tables, so they are checked before a PDS runs them.
 	#[beet_core::test]
 	async fn record_cases() {
-		table_test::run_records(TableStore::temp()).await
+		table_test::run_records(TableStore::new(InMemoryTableStore::new()))
+			.await
 	}
 
 	/// A PDS as a backend ([`TableProvider`]'s "A PDS as a backend") runs the
@@ -825,7 +708,7 @@ mod test {
 	/// every value a row holds (`Row`'s own suite is the exhaustive one).
 	#[beet_core::test]
 	async fn cids_survive_the_file() {
-		let tables = TableStore::temp();
+		let tables = TableStore::new(InMemoryTableStore::new());
 		let mut bits = 0x2545_f491_4f6c_dd1d_u64;
 		for idx in 0..200 {
 			bits ^= bits << 13;

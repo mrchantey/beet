@@ -66,7 +66,7 @@ async fn write_manifest(world: &AsyncWorld, root: Entity, out: &str) -> Result {
 		.await?;
 	// serialize through the codebase's `Value` JSON path rather than depending on
 	// `serde_json` directly.
-	let json = Value::from_serde(&manifest)?.to_string_pretty()?;
+	let json = Value::from_serde(&manifest)?.to_json_pretty();
 	// `-` streams the manifest to stdout (the program's actual output, never a log
 	// prefix); any other value is a file path written via the cross-platform fs.
 	if out == "-" {

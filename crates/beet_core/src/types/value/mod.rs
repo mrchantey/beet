@@ -23,3 +23,6 @@ pub use value::*;
 mod write_json;
 // reading json text exactly, floats included.
 mod read_json;
+// the reader and writer against `serde_json`'s exact mode
+#[cfg(all(test, feature = "json"))]
+mod json_conformance;

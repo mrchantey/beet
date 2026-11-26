@@ -68,12 +68,16 @@ mod test {
 	async fn serves_the_protocol() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let router = world
-			.spawn((Router, TableStore::temp(), children![
-				ServeTables {
-					prefix: "tables".into()
-				}
-				.into_snippet_bundle()
-			]))
+			.spawn((
+				Router,
+				TableStore::new(InMemoryTableStore::new()),
+				children![
+					ServeTables {
+						prefix: "tables".into()
+					}
+					.into_snippet_bundle()
+				],
+			))
 			.flush();
 		let row = StoredRow::new(
 			"k",

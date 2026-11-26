@@ -144,7 +144,7 @@ fn record_counts(app: &mut App) -> (usize, usize) {
 /// Declare one temp table store on every thread mounting one, nearer than the
 /// one its example declares, which is on disk, answering those threads.
 fn declare_temp_tables(app: &mut App) -> Vec<Entity> {
-	let tables = TableStore::temp();
+	let tables = TableStore::new(InMemoryTableStore::new());
 	let threads = app
 		.world_mut()
 		.query_filtered_once::<Entity, With<MountThreadStore>>()

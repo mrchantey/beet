@@ -276,7 +276,8 @@ mod test {
 	/// An event is a row the moment it is recorded, read back by its day.
 	#[beet_core::test]
 	async fn records_a_row() {
-		let analytics = AnalyticsStore::new(TableStore::temp());
+		let analytics =
+			AnalyticsStore::new(TableStore::new(InMemoryTableStore::new()));
 		let event = request("/about");
 		let id = event.id;
 		analytics.record(event).await.unwrap();
@@ -295,7 +296,8 @@ mod test {
 	/// events land.
 	#[beet_core::test]
 	async fn retries_a_taken_key() {
-		let analytics = AnalyticsStore::new(TableStore::temp());
+		let analytics =
+			AnalyticsStore::new(TableStore::new(InMemoryTableStore::new()));
 		let first = request("/first");
 		let mut second = request("/second");
 		second.key = first.key;
@@ -307,7 +309,8 @@ mod test {
 	/// A page view's heartbeats share its id and keep only the newest.
 	#[beet_core::test]
 	async fn heartbeats_dedupe() {
-		let analytics = AnalyticsStore::new(TableStore::temp());
+		let analytics =
+			AnalyticsStore::new(TableStore::new(InMemoryTableStore::new()));
 		let first = request("/view");
 		let mut later = first
 			.clone()
@@ -324,7 +327,8 @@ mod test {
 	/// events after them, each day from one source.
 	#[beet_core::test]
 	async fn summary_composes_rollups_and_events() {
-		let analytics = AnalyticsStore::new(TableStore::temp());
+		let analytics =
+			AnalyticsStore::new(TableStore::new(InMemoryTableStore::new()));
 		analytics.record(request("/today")).await.unwrap();
 		let old = request("/old")
 			.with_timestamp(Timestamp::now() - Duration::from_secs(2 * 86_400));
@@ -340,7 +344,10 @@ mod test {
 	#[beet_core::test]
 	async fn config_entity_carries_the_store() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
-		let (config, _) = config_with_store(&mut world, TableStore::temp());
+		let (config, _) = config_with_store(
+			&mut world,
+			TableStore::new(InMemoryTableStore::new()),
+		);
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		world
 			.entity(config)
@@ -351,8 +358,10 @@ mod test {
 	#[beet_core::test]
 	async fn records_to_the_declared_store() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
-		let (_, store_entity) =
-			config_with_store(&mut world, TableStore::temp());
+		let (_, store_entity) = config_with_store(
+			&mut world,
+			TableStore::new(InMemoryTableStore::new()),
+		);
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		world.trigger(request("/about"));
 		AsyncRunner::settle_async_tasks(&mut world).await;

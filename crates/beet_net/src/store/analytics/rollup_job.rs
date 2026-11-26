@@ -326,7 +326,8 @@ mod test {
 	}
 
 	async fn recorded(events: &[AnalyticsEvent]) -> AnalyticsStore {
-		let store = AnalyticsStore::new(TableStore::temp());
+		let store =
+			AnalyticsStore::new(TableStore::new(InMemoryTableStore::new()));
 		for event in events {
 			store.record(event.clone()).await.unwrap();
 		}
@@ -527,7 +528,7 @@ mod test {
 	#[beet_core::test]
 	async fn job_runs_from_its_fields() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
-		let analytics = world.spawn(TableStore::temp()).flush();
+		let analytics = world.spawn(InMemoryTableStore::new()).flush();
 		let archive = world.spawn(InMemoryStore::new()).flush();
 		let store = AnalyticsStore::new(
 			world.entity(analytics).get::<TableStore>().unwrap().clone(),

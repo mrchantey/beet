@@ -3,6 +3,10 @@
 //! other: each is declared.
 // the naive table, json files in any blob store
 mod json_table_store;
+// tables in process memory, for tests and scratch runtimes
+mod in_memory_table_store;
+// one partition's rows held whole, shared by the two above
+mod partition_rows;
 mod row;
 // the SQL every SQLite table backend runs, whatever engine runs it
 mod sql_table;
@@ -27,9 +31,11 @@ pub mod table_test;
 pub use durable_object_store::*;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub use durable_object_worker::*;
+pub use in_memory_table_store::*;
 pub use json_table_store::*;
 #[cfg(feature = "sqlite")]
 pub use partition_host::*;
+pub(crate) use partition_rows::*;
 pub use row::*;
 pub use sql_table::*;
 #[cfg(feature = "sqlite")]

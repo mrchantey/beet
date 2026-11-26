@@ -410,6 +410,8 @@ web-sys = {workspace = true, features = [
 
 [dev-dependencies]
 md-5 = { workspace = true }
+# the reference the json reader and writer are tested against, in its exact mode
+serde_json = { workspace = true, features = ["std", "float_roundtrip"] }
 # A feature-activation shim, and nothing else: it is the only way to turn on the
 # features the unit tests and doctests need without forcing them on every
 # consumer. Nothing under `src/` may name `beet_core::` (write `crate::`, which

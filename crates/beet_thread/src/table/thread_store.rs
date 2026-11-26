@@ -645,7 +645,7 @@ pub(crate) mod thread_store_test {
 	}
 
 	#[beet_core::test]
-	async fn memory() { run(TableStore::temp()).await; }
+	async fn memory() { run(TableStore::new(InMemoryTableStore::new())).await; }
 
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn fs() {

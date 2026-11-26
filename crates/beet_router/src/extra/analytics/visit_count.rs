@@ -139,7 +139,7 @@ mod test {
 	/// of the rest, and is worded as visits.
 	#[beet_core::test]
 	async fn counts_rollups_and_raw_events() {
-		let store = TableStore::temp();
+		let store = TableStore::new(InMemoryTableStore::new());
 		let analytics = AnalyticsStore::new(store.clone());
 		// two visits today, one of them reading two pages
 		let (left, right) = (uuid_ext::now_v7(), uuid_ext::now_v7());
@@ -171,7 +171,8 @@ mod test {
 	/// declaration it needs.
 	#[beet_core::test]
 	async fn needs_an_analytics_config() {
-		let (mut world, router) = site(TableStore::temp());
+		let (mut world, router) =
+			site(TableStore::new(InMemoryTableStore::new()));
 		world.entity_mut(router).remove::<AnalyticsConfig>();
 		world
 			.entity_mut(router)

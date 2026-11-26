@@ -1,9 +1,11 @@
 //! Reading JSON text as a [`Value`] exactly, the other half of
 //! [`write_json`](super::write_json).
 //!
-//! `serde_json` rounds a float it reads unless built with its
-//! `float_roundtrip` feature, so a document whose content is hashed, where one
-//! last digit is another hash, is read here instead.
+//! The grammar is RFC 8259's, which fits on a page; the two hard parts of JSON
+//! are converting floats to and from text, and both are `core`'s, correct for
+//! every float. `serde_json` reads a float with a faster, inexact algorithm
+//! unless built with its `float_roundtrip` feature, so a hashed document, where
+//! one last digit is another hash, is read here.
 
 use crate::prelude::*;
 
@@ -17,7 +19,9 @@ impl Value {
 	///
 	/// # Errors
 	/// Errors on anything that is not one JSON document, naming the line and
-	/// column.
+	/// column, and on an object naming a key twice, which RFC 8259 leaves to
+	/// each reader and I-JSON (RFC 7493) refuses: two readers taking different
+	/// values from one document is how a signed or hashed one is forged.
 	///
 	/// ```
 	/// # use beet_core::prelude::*;
@@ -43,9 +47,9 @@ struct JsonReader<'a> {
 }
 
 impl JsonReader<'_> {
-	/// How deep a document may nest, so hostile text cannot exhaust the
-	/// stack: `serde_json`'s own limit.
-	const MAX_DEPTH: usize = 128;
+	/// How many arrays and objects may nest, so hostile text cannot exhaust
+	/// the stack: `serde_json`'s own limit.
+	const MAX_DEPTH: usize = 127;
 
 	fn peek(&self) -> Option<u8> { self.text.as_bytes().get(self.at).copied() }
 
@@ -85,11 +89,13 @@ impl JsonReader<'_> {
 		}
 	}
 
+	/// The value here, inside `depth` arrays and objects.
 	fn value(&mut self, depth: usize) -> Result<Value> {
-		if depth > Self::MAX_DEPTH {
+		self.skip_space();
+		if matches!(self.peek(), Some(b'[' | b'{')) && depth >= Self::MAX_DEPTH
+		{
 			return Err(self.error("nested too deeply"));
 		}
-		self.skip_space();
 		match self.peek() {
 			Some(b'n') => self.expect("null").map(|_| Value::Null),
 			Some(b't') => self.expect("true").map(|_| Value::Bool(true)),
@@ -107,10 +113,17 @@ impl JsonReader<'_> {
 				let mut map = Map::default();
 				self.items(b'}', |reader| {
 					reader.skip_space();
+					let start = reader.at;
 					let key = reader.string()?;
 					reader.skip_space();
 					reader.expect(":")?;
-					map.insert(key, reader.value(depth + 1)?);
+					let value = reader.value(depth + 1)?;
+					if map.insert(key.clone(), value).is_some() {
+						reader.at = start;
+						return Err(reader.error(&format!(
+							"the key `{key}` is named twice"
+						)));
+					}
 					Ok(())
 				})?;
 				Value::Map(map).xok()
@@ -152,30 +165,43 @@ impl JsonReader<'_> {
 		}
 	}
 
-	/// Step past any digits, answering whether there were some.
-	fn digits(&mut self) -> bool {
+	/// Step past any digits, answering how many there were.
+	fn digits(&mut self) -> usize {
 		let start = self.at;
 		while matches!(self.peek(), Some(b'0'..=b'9')) {
 			self.at += 1;
 		}
-		self.at > start
+		self.at - start
 	}
 
 	fn number(&mut self) -> Result<Value> {
 		let start = self.at;
-		if self.peek() == Some(b'-') {
+		let negative = self.peek() == Some(b'-');
+		if negative {
 			self.at += 1;
 		}
-		let leading_zero = self.peek() == Some(b'0');
+		// the integer accumulates as it is read, `None` once past a `u64`
 		let digits_start = self.at;
-		if !self.digits() || (leading_zero && self.at - digits_start > 1) {
+		let mut magnitude = Some(0u64);
+		while let Some(byte @ b'0'..=b'9') = self.peek() {
+			magnitude = magnitude
+				.and_then(|magnitude| magnitude.checked_mul(10))
+				.and_then(|magnitude| {
+					magnitude.checked_add((byte - b'0') as u64)
+				});
+			self.at += 1;
+		}
+		let count = self.at - digits_start;
+		if count == 0
+			|| (count > 1 && self.text.as_bytes()[digits_start] == b'0')
+		{
 			return Err(self.error("invalid number"));
 		}
 		let mut integer = true;
 		if self.peek() == Some(b'.') {
 			self.at += 1;
 			integer = false;
-			if !self.digits() {
+			if self.digits() == 0 {
 				return Err(self.error("expected a digit after the point"));
 			}
 		}
@@ -185,21 +211,23 @@ impl JsonReader<'_> {
 			if matches!(self.peek(), Some(b'+' | b'-')) {
 				self.at += 1;
 			}
-			if !self.digits() {
+			if self.digits() == 0 {
 				return Err(self.error("expected an exponent"));
 			}
 		}
-		let text = &self.text[start..self.at];
-		// `-0` has no integer form: it is the float, as serde reads it
-		if integer && text != "-0" {
-			if let Ok(uint) = text.parse::<u64>() {
-				return Value::Uint(uint).xok();
+		match (integer, negative, magnitude) {
+			(true, false, Some(magnitude)) => {
+				return Value::Uint(magnitude).xok();
 			}
-			if let Ok(int) = text.parse::<i64>() {
-				return Value::Int(int).xok();
+			// `-0` has no integer form: it is the float, as serde reads it
+			(true, true, Some(magnitude)) if magnitude > 0 => {
+				if let Some(int) = 0i64.checked_sub_unsigned(magnitude) {
+					return Value::Int(int).xok();
+				}
 			}
+			_ => {}
 		}
-		match text.parse::<f64>() {
+		match self.text[start..self.at].parse::<f64>() {
 			Ok(float) if float.is_finite() => Value::Float(float).xok(),
 			_ => Err(self.error("number out of range")),
 		}
@@ -207,20 +235,28 @@ impl JsonReader<'_> {
 
 	fn string(&mut self) -> Result<SmolStr> {
 		self.expect("\"")?;
+		let first = self.at;
 		let mut out = String::new();
 		loop {
 			let start = self.at;
 			// every byte stopped at is ascii, so each slice is whole chars
-			while !matches!(
-				self.peek(),
-				None | Some(b'"' | b'\\' | 0x00..=0x1f)
-			) {
-				self.at += 1;
-			}
-			out.push_str(&self.text[start..self.at]);
+			self.at += self.text.as_bytes()[start..]
+				.iter()
+				.position(|byte| matches!(byte, b'"' | b'\\' | 0x00..=0x1f))
+				.unwrap_or(self.text.len() - start);
 			match self.next() {
-				Some(b'"') => return SmolStr::from(out).xok(),
-				Some(b'\\') => out.push(self.escape()?),
+				// no escape, so the text is the string
+				Some(b'"') if start == first => {
+					return SmolStr::from(&self.text[start..self.at - 1]).xok();
+				}
+				Some(b'"') => {
+					out.push_str(&self.text[start..self.at - 1]);
+					return SmolStr::from(out).xok();
+				}
+				Some(b'\\') => {
+					out.push_str(&self.text[start..self.at - 1]);
+					out.push(self.escape()?);
+				}
 				Some(_) => {
 					return Err(self.error("unescaped control character"));
 				}
@@ -324,23 +360,6 @@ mod test {
 		}
 	}
 
-	/// Hand written text reads as serde reads it: whitespace, escapes and
-	/// each number form.
-	#[cfg(feature = "json")]
-	#[crate::test]
-	fn agrees_with_serde() {
-		let text = r#" {
-			"escapes": "\" \\ \/ \b\f\n\r\t é 😀",
-			"numbers": [0, -0, -1, 1.50, 1e3, 1E-2, 18446744073709551616],
-			"empty": [{}, [], ""]
-		} "#;
-		Value::parse_json(text).unwrap().xpect_eq(
-			serde_json::from_str::<serde_json::Value>(text)
-				.unwrap()
-				.xmap(Value::from_json),
-		);
-	}
-
 	#[crate::test]
 	fn refuses_what_is_not_json() {
 		for text in [
@@ -371,6 +390,10 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("nested too deeply");
+		Value::parse_json(r#"{"a": 1, "b": {"a": 1, "a": 2}}"#)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("column 24: the key `a` is named twice");
 		Value::parse_json("{\n  \"a\": x}")
 			.unwrap_err()
 			.to_string()

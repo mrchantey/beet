@@ -173,7 +173,7 @@ mod test {
 	async fn several_configs_need_a_store() {
 		let temp = TempDir::new().unwrap();
 		let mut world = recording_world(&temp);
-		let other = world.spawn(TableStore::temp()).id();
+		let other = world.spawn(InMemoryTableStore::new()).id();
 		world.spawn((AnalyticsConfig::default(), StoreRef(other)));
 		exchange(&mut world, "analytics summary")
 			.await
