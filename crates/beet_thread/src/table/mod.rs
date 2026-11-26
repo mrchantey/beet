@@ -1,5 +1,5 @@
-//! Threads: conversations kept as records, and the windows that show and
-//! run them.
+//! Threads: conversations kept as rows, and the windows that show and run
+//! them.
 //!
 //! A thread is a conversation the way a group chat is one: people post to
 //! each other and open sub-threads whether or not an agent is around, and an
@@ -9,22 +9,20 @@
 //!
 //! # Records
 //!
-//! - **Thread.** A conversation: a sequence of posts, kept as records in a
+//! - **Thread.** A conversation: a sequence of posts, kept as rows in a table
 //!   store ([`Thread`], named by its [`ThreadId`]).
 //! - **Actor.** A participant, a person, an agent or the system, all on equal
 //!   footing ([`Actor`], its [`ActorKind`]). An actor is a record; it is an
 //!   entity only as behavior, the action that takes its turn.
 //! - **Post.** One event of a thread, authored by one actor ([`Post`]): a
 //!   message, a reasoning step, a tool call, its output, or a log of
-//!   something that happened. Its [`PostIntent`] is closed and a log's kind
-//!   is open ([`LogKind`]), a downstream kind prefixing its crate.
+//!   something that happened, which is its kind (Posts, below).
 //! - **Seed.** The posts a template opens a new thread with, authored as
 //!   [`<CreatePost>`](CreatePost) children of its actors. It is written once,
-//!   by the entry creating the thread, as the thread's first posts, and
-//!   nothing in the store marks them: a stored thread has posts, not a seed.
-//!   A template is built on every entry, so an entry continuing a thread
-//!   discards its seed unread, and an edited seed reaches a new thread only
-//!   (`--new`).
+//!   by the entry creating the thread, as the thread's first posts, and the
+//!   thread's row names the last of them; nothing else marks them. A template
+//!   is built on every entry, so an entry continuing a thread discards its
+//!   seed unread, and an edited seed reaches a new thread only (`--new`).
 //!
 //! Anything persisted names another thread or post by id, never by `Entity`.
 //!
@@ -40,37 +38,134 @@
 //! outside the mount's own prefix. A mount declaring `new:true` persists and
 //! never continues: every entry behaves as `--new`.
 //!
-//! The store is the `TableStore` declared at or above the thread, never one a
-//! blob store implies, its rows keyed under
-//! the mount's filled path ([`ThreadStore`], which gives the layout): the
-//! thread, each actor, each post and each response's metadata
-//! ([`ResponseMeta`]) is its own row, keyed by its id. A write is a row, never
-//! a rewrite of the thread, so two writers on one thread never erase each
-//! other, and whatever backs the table, json files, sqlite or dynamo, backs
-//! the thread.
+//! Tables and blobs are separate stores and neither implies the other. A
+//! thread's rows live in the table store declared at or above it, which a
+//! mount refuses without atomic batches and indexes, naming it and the fix,
+//! as it refuses a missing one, never falling back. `JsonTableStore` is the
+//! naive one, for trying things in a small binary and for a browser tab; a
+//! thread that grows wants a native database. Which end of a declared store
+//! a launch reaches is `beet_net`'s and `beet_infra`'s to say, in their
+//! READMEs.
+//!
+//! A thread is a partition of that store ([`ThreadStore`]), named by its
+//! thread id, its own isolated database. The root partition holds each
+//! directory's index. No query or atomic batch spans two threads.
+//!
+//! | partition | table | key | holds |
+//! | --- | --- | --- | --- |
+//! | root | `thread_index` | `{dir}//{thread}` | the thread is listed in the directory |
+//! | thread | `thread` | thread id | the [`Thread`] row |
+//! | thread | `actor` | actor id | an [`Actor`] |
+//! | thread | `post` | post id | a [`Post`] |
+//! | thread | `response_meta` | post id | a [`ResponseMeta`] |
+//!
+//! A directory never holds an empty segment, so no param can spell the `//`,
+//! and a directory's own threads are contiguous in the index, apart from a
+//! nested directory's: its newest is one reverse scan of one row. Creating a
+//! thread writes its actors, seed and thread row in one batch, then its index
+//! row, so a listed thread is whole and a crash between the two leaves an
+//! unlisted orphan. A write is a row, never a rewrite of the thread, so two
+//! writers on one thread never erase each other.
+//!
+//! - **Keys.** A `ThreadId` and a `PostId` are typed `Tid`s, so an id carries
+//!   its time and orders by it; a post's is minted after the newest post its
+//!   window knows. An `ActorId` is an rkey, by default the actor's name in
+//!   kebab-case, and two actors of one id in a scene are refused.
+//!
+//! # Posts
+//!
+//! A post's row is a small envelope every kind shares and one body per kind.
+//! Its id carries its time and its partition is its thread, so it stores
+//! neither:
+//!
+//! ```json
+//! {"author":"ann",  "kind":"text",        "status":"completed", "body":{"text":"hi"}}
+//! {"author":"coach","kind":"tool_output", "status":"completed", "subject":"3mw..", "body":{"call_id":"c1","text":".."}}
+//! ```
+//!
+//! - **Status.** `in_progress` while it streams, then `completed`,
+//!   `interrupted` where an interrupt closed it, or `deleted`.
+//! - **Subject.** The post this one is about: the call an output answers, the
+//!   post edited or deleted, the last post a compaction covers. Two indexes
+//!   serve the reads, `by_subject` over `subject` and `by_kind` over `kind`
+//!   then `author`.
+//! - **Kind.** What the post is, from the closed list below. A post of any
+//!   other kind is a log, a downstream's kind prefixing its crate, ie
+//!   `beet_eval/decision`, its body that kind's fields ([`LogKind`]).
+//!
+//! | kind | body | a model reads | a view shows |
+//! | --- | --- | --- | --- |
+//! | `text` | `text` | its text, in its author's role | its text |
+//! | `url` | `url`, `media_type`, `file_stem`? | an image as an image by url; on open responses any other as a file by url, on completions a video as `[Video: <url>]` and any other as its url in text | its url |
+//! | `media` | `blob`, `file_stem`? | its bytes (Bytes, below): an image as an image; on open responses any other as a file, on completions a video as `[Video attachment]` and any other as its text, failing where that is not utf-8 | its media type and size |
+//! | `refusal` | `text` | its text, in its author's role | its text |
+//! | `error` | `text` | its text, in its author's role | its text, as an error |
+//! | `reasoning` | `text` | its text, in its author's role | its text |
+//! | `reasoning_summary` | `text` | its text, in its author's role | its text |
+//! | `tool_call` | `name`, `call_id`, `arguments` | a call; on completions only the reading agent's own, another's being its arguments in text | its arguments |
+//! | `tool_output` | `call_id`, `text`, `blob`?; `subject` its call | its call's output, at once after the call; a `blob` as content parts on open responses, on completions as the output's text then a user message holding it | its text |
+//! | `session_opened` | `spawned_by`? | a join's note (Sessions) | `── Coach joined ──` |
+//! | `edited` | `was`, the original body; `subject` the post | a note where the change was made, `<system>Ann edited a post from 09:10.</system>` | no row: the post shows its new body and that it was edited |
+//! | `deleted` | none; `subject` the post | a note as an edit's | no row: the post shows that it was deleted, with no body |
+//! | `compaction` | `text`, `from`, `previous`, `seed`; `subject` the last post it covers | its author's newest, unless stale, as a note opening its context (Contexts and compaction); no other | a divider saying how much it covers |
+//! | any other log | that kind's fields | nothing | a divider naming its kind |
+//!
+//! A post's **role** is relative to the agent reading it: a System actor's
+//! is a system message, a Developer's a developer message, the reading
+//! agent's own an assistant message, and anyone else's a user message
+//! wrapped in a `<post author=..>` naming its author. A note is a user
+//! message whoever it is about.
+//!
+//! # Bytes
+//!
+//! Bytes are never in a row. A `media` post holds a `BlobRef`, its bytes at
+//! `blobs/<cid>` in the nearest `BlobStore` at or above the thread, as a PDS
+//! holds them. They are written before the post, so a stored reference always
+//! resolves, and addressed by content, so the same bytes twice are one blob.
+//! Where that blob store is the repo store, the thread is as public as the
+//! repo, which is intended. A thread with no store above it holds bytes in
+//! memory on its window, bounded to what its contexts keep. A deleted or
+//! edited post's blob is kept, as its row is.
+//!
+//! A request is built in two steps: the records answer its posts, then the
+//! bytes they reference are read, so neither mapper reads a store. A missing
+//! blob is the text `[file unavailable]` to the model and the view, never a
+//! failed turn. `KeepBlobs{count}` on an agent carries the newest `count`
+//! blobs in its context and lists each older one as a line naming its post,
+//! media type, name and size; without it every blob is carried. A tool may
+//! answer with bytes, kept as its output's `blob`, so any route answering
+//! media is a tool an agent can look through. Encoding bytes for a provider,
+//! base64 included, is that provider's mapper's own, and a reference is never
+//! sent as a url, since a provider could not fetch it.
 //!
 //! # Windows
 //!
 //! - **Window.** A thread entity, open onto one stored thread, which is the
-//!   truth: it holds that thread's records in memory ([`ThreadRecords`],
-//!   loaded whole), writes what it posts to the store and receives what other
-//!   windows post. A thread has any number of windows, on any surfaces, each
-//!   with its own view and composer.
+//!   truth. It holds a contiguous run of that thread's records ending at its
+//!   newest post ([`ThreadRecords`]) and reads older ones as needed, writes
+//!   what it posts to the store and receives what other windows post. A
+//!   view's window opens on enough posts to fill it and holds what its
+//!   reader has scrolled to; a canonical window holds at least its agents'
+//!   contexts, and always the seed. A post in progress stays in memory and
+//!   is stored when it completes. A view keeps one small document per loaded
+//!   post, written only when that post changes. A thread has any number of
+//!   windows, on any surfaces, each with its own view and composer.
 //! - **Window sync.** Within one runtime, a post pushed to one window's
-//!   records is applied to every other window of the same stored thread at
-//!   once ([`ThreadChanges`]), a post in progress included, so a reply streams in
-//!   every window. Only a completed post is written to the store, once, by
-//!   the window that authored it; a window never writes a post it received.
+//!   records, and any change to it, is applied to every other window of the
+//!   same stored thread that loaded it at once ([`ThreadChanges`]), a post in
+//!   progress included, so a reply streams in every window. Only a completed
+//!   post is written to the store, once, by the window that authored it; a
+//!   window never writes a post it received.
 //! - **Behavior.** A scene holding an action on an actor, ie a `Sequence`
 //!   over an agent's streamer and a person's [`UserInput`](crate::prelude::UserInput).
 //! - **Canonical window.** The window holding a thread's behavior; a thread
 //!   has at most one in a runtime ([`ThreadWindows`]), and every other window
-//!   is a view and a composer with no behavior. Entering a thread with behavior while another
-//!   window holds behavior for it is refused, naming both: two agents
-//!   answering is a mistake in what was installed, never a race to resolve.
-//!   A post from any window reaches the canonical window by window sync, so a
-//!   person typing in a browser tab is answered, or interrupts, exactly as one
-//!   typing beside it.
+//!   is a view and a composer with no behavior. Entering a thread with
+//!   behavior while another window holds behavior for it is refused, naming
+//!   both: two agents answering is a mistake in what was installed, never a
+//!   race to resolve. A post from any window reaches the canonical window by
+//!   window sync, so a person typing in a browser tab is answered, or
+//!   interrupts, exactly as one typing beside it.
 //!
 //! A window lives as long as the scene holding it.
 //! [`RunThread`](crate::prelude::RunThread) holds a
@@ -96,18 +191,19 @@
 //! 4. continuing, or branching, which continues its parent's history: drop
 //!    the scene's seed posts, reading no seed source and calling no seed
 //!    route;
-//! 5. load the stored records, apply a live window's, post a join for each actor
-//!    present that no other window of the runtime holds ([`PresentActors`]),
-//!    then post the request's message if the entry carries one.
+//! 5. load the newest stored posts the window opens on, take a live window's
+//!    unstored ones, post a join for each actor present that no other window
+//!    of the runtime holds ([`PresentActors`]), then post the request's
+//!    message if the entry carries one.
 //!
 //! A seed source is resolved by the entry creating its thread and by nothing
 //! else, so building a template reads no file and calls no route.
 //!
 //! A request's message belongs to the request:
-//! `ThreadRoute{source:Document(".."), message:"review {document}", actor:2}`, each
+//! `ThreadRoute{source:Document(".."), message:"review {document}", actor:"ann"}`, each
 //! `{param}` filled from the request and posted after the joins, on every
-//! request. Without `actor` its author is the thread's first actor of kind
-//! User by id, and a thread holding none fails the request.
+//! request. Without `actor` its author is the first actor of kind User the
+//! scene authors, and a thread holding none fails the request.
 //!
 //! # Sessions
 //!
@@ -131,7 +227,8 @@
 //!   message, a line each inside one `<system>`. A note is sent in the user
 //!   role whoever joined, the reading agent's own join included
 //!   ([`ModelPost::Note`]): it is something that happened, never something
-//!   the agent said. No other log reaches a model.
+//!   the agent said. An edit, a deletion and a compaction are read as notes
+//!   too (Posts); no other log reaches a model.
 //!
 //! # Posting and turns
 //!
@@ -139,8 +236,8 @@
 //! posting never requires holding a turn: a composer appends its post the
 //! moment it is submitted.
 //!
-//! - **Last word.** The newest post that is neither a log nor the output
-//!   closing an interrupted call, which nobody said
+//! - **Last word.** The newest post that is neither a log nor a
+//!   `tool_output` closing an interrupted call, which nobody said
 //!   ([`ThreadRecords::last_word`]).
 //! - **Turn.** An action. A thread's behavior decides when each actor's
 //!   action runs, and that is the whole of turn taking; a thread with no
@@ -155,10 +252,10 @@
 //!   that agent's manners: any post by another actor that is not a log
 //!   interrupts it, so a join interrupts nobody.
 //!
-//! A model reads the records in model order ([`ThreadRecords::model_posts`]):
-//! a function call is followed at once by its output, and a post landing
-//! between them is read after the output, so a post made mid tool call never
-//! breaks a provider's pairing of the two.
+//! A model reads its context in model order ([`ThreadRecords::model_posts`]):
+//! a `tool_call` is followed at once by the `tool_output` whose subject it is,
+//! and a post landing between them is read after the output, so a post made
+//! mid tool call never breaks a provider's pairing of the two.
 //!
 //! A thread has one of three **shapes**, each the shape of its behavior and
 //! its actors, never a mode of the thread, and each independent of whether an
@@ -166,8 +263,8 @@
 //!
 //! - **Turn based.** A `Sequence` of actors, one acting at a time. A post made
 //!   while an agent works stops nothing and is not lost: every model call
-//!   reads the whole records, so the agent reads it at its next call, ie
-//!   between two tool calls of the same turn.
+//!   reads the agent's whole context, so the agent reads it at its next
+//!   call, ie between two tool calls of the same turn.
 //! - **Semi duplex.** Turn based with interrupts: its agents carry
 //!   `InterruptOnPost`, so a post, or the composer's stop control, cuts the
 //!   running turn and the `Sequence` moves on, answering the person now. It
@@ -176,6 +273,66 @@
 //! - **Full duplex.** Actors under a `Parallel` act at once and may speak over
 //!   each other. Nothing interrupts anybody on another's behalf: whether an
 //!   actor yields when another speaks is its own `InterruptOnPost`.
+//!
+//! # Editing and deleting
+//!
+//! Only its author may edit or delete a post, and only a completed `text` or
+//! `media` post of the thread itself, never one a branch inherits. An edit
+//! replaces the row's body and appends an `edited` log holding the original.
+//! A deletion is a tombstone: the row's status becomes `deleted` and its body
+//! stays, with a `deleted` log saying when. Each is one atomic batch, the row
+//! replaced under the cid it was read at, so a conflicting change is refused
+//! to whoever made it, never retried over another's. Nothing is scrubbed,
+//! and a post changed twice has two logs, so its history reads by
+//! `by_subject`.
+//!
+//! # Everything and shown
+//!
+//! The store and a window's records hold everything. **Shown** is a thread
+//! without what was edited away or deleted: `ShownPosts`, derived from the
+//! records in memory and stored nowhere, the same posts with a deleted post's
+//! body, an edit's original and a compaction that may no longer be read each
+//! emptied. A deleted post stays in it, so a view can say it was there. It is
+//! the whole list as one immutable type, made in one place
+//! (`ThreadRecords::shown`), so a list in hand is known clean and no reader
+//! judges a post at a time.
+//!
+//! | reader | reads |
+//! | --- | --- |
+//! | a view, a composer, a browser tab, a `ThreadRoute` answer | shown |
+//! | an agent in the conversation, its context and its tools | shown |
+//! | a compaction thread, its message and its `<ReadPosts/>` | everything |
+//! | `ServeTables`, a program asking for `posts` by name | everything |
+//!
+//! Who reads what is decided by where a reader sits, never by a flag an
+//! author could set.
+//!
+//! # Contexts and compaction
+//!
+//! - **Context.** What one model call reads: the seed unless a compaction
+//!   holds it, the reading agent's newest compaction as a note, then every
+//!   shown post after that compaction's subject, with the notes among them.
+//!   With no compaction it is the whole shown thread.
+//! - **Chaining.** A request continuing a provider's stored response sends
+//!   only what follows the newest post that response read (its
+//!   [`ResponseMeta`]'s `read`), never chaining to one whose `read` covers a
+//!   post changed since; a compaction starts a new chain.
+//! - **Compaction.** A stored summary of everything up to one post, a
+//!   `compaction` post authored by the agent whose context it is. It is opt
+//!   in, on the agent (`Compact{template, ..}`), and done by another: a
+//!   thread of its own, built from the named template for one compaction,
+//!   run as a function and despawned, its model named there and never
+//!   assumed to be the conversation's. It is told the newest summary, what
+//!   changed under it and what to fold in, may read the thread's posts
+//!   through its one tool (`<ReadPosts/>`), and answers the new summary.
+//!   Every post is summarised or read verbatim, with no gap.
+//! - **Stale.** A compaction covering a post edited or deleted after it was
+//!   made. Only an agent's newest compaction is read, and never a stale one:
+//!   it is refreshed before the agent's next model call.
+//!
+//! What was edited away or deleted is sensitive: a compaction thread reads
+//! it, to know what to take out, and a summary holds none of it. People see
+//! the original posts wherever nobody edited or deleted them.
 //!
 //! # Tools
 //!
@@ -194,11 +351,11 @@
 //!   thread, ie a delegate call, a loop's decision or a person opening a
 //!   sub-thread from a post. Causal only, no context comes with it.
 //! - **Branch** (`--branch-of`): a thread continuing another's history up to
-//!   a post, then going its own way, referencing its ancestors' posts rather
+//!   a post, then going its own way, reading its ancestors' partitions rather
 //!   than copying them. A branch lives in its parent's store, so
-//!   `--branch-of` naming a post the mount's store lacks is refused, as is
-//!   `--branch-of` beside `--thread`. It opens with its parent's posts, so
-//!   creating a branch reads no seed.
+//!   `--branch-of` naming a post the mount's store does not list is refused,
+//!   as is `--branch-of` beside `--thread`. It opens with its parent's posts,
+//!   so creating a branch reads no seed, and its seed is its lineage root's.
 //!
 //! # Limits
 //!
@@ -208,10 +365,22 @@
 //!   identity yet;
 //! - no route lists the threads of a store;
 //! - window sync is one runtime's, so windows in two runtimes see each other's
-//!   posts only on entering, and a backend's own change feed is unused;
+//!   posts, and an edit, only on entering, and a backend's own change feed is
+//!   unused;
 //! - an actor's leaving is not recorded: presence is a status nothing keeps;
-//! - compaction: nothing bounds a thread by post count, and fitting a long
-//!   thread to a model's context is not built.
+//! - nothing erases for good, a deletion being a tombstone, and what another
+//!   post repeats of a deleted one stays, an agent's own reply included,
+//!   until its author removes it;
+//! - an agent holding a tool over the blob store a `JsonTableStore` sits in,
+//!   or one reaching `ServeTables`, reads the rows themselves, so such a
+//!   thread is declared over a directory of its own;
+//! - a summary leaves out what was deleted because its model is told to,
+//!   which nothing can prove;
+//! - a `JsonTableStore` rewrites its partition on each write, and a browser's
+//!   local storage holds about 5 MB in all;
+//! - compaction, as Contexts and compaction gives it, is not built: nothing
+//!   bounds a thread by post count, and a long thread outgrows its model's
+//!   context.
 mod actor;
 mod create_actor;
 pub use create_actor::*;

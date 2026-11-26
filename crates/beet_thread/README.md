@@ -2,9 +2,9 @@
 
 Conversations between actors, kept as records.
 
-A [`Thread`] is a conversation: [`Post`]s by [`Actor`]s, people, agents or the system on equal footing, kept in a store. People post to each other with no agent around, and an agent is one more actor whose turn is an action, so the same machinery is a group chat, a person working with an agent or a fleet of agents working together. Every word of the model, from thread and seed to window, session, turn, the three shapes and lineage, is defined once in the [`table`] module docs.
+A [`Thread`] is a conversation: [`Post`]s by [`Actor`]s, people, agents or the system on equal footing, kept as rows in a table store. People post to each other with no agent around, and an agent is one more actor whose turn is an action, so the same machinery is a group chat, a person working with an agent or a fleet of agents working together. Every word of the model, from thread and seed to the store's partitions, a post's kinds, window, session, turn, the three shapes, editing, compaction and lineage, is defined once in the [`table`] module docs.
 
-A thread entity is a window onto one stored thread, named by its store path: `<Thread {(Sequence, MountThreadStore{path:"threads/chat"})}>`. A [`RunThread`] holds one for a runtime's life, and a [`ThreadRoute`] runs one as a function, a request in and an answer out. An agent's tools are the routes of its own [`Router`], each named by its route path, and a [`RouteTool`] makes a tool of a route in the surrounding url space.
+A thread entity is a window onto one stored thread, named by its store path, `<Thread {(Sequence, MountThreadStore{path:"threads/chat"})}>`, its rows in the table store declared above it, ie `<FsStore path="target/chat" {JsonTableStore}>`. A [`RunThread`] holds one for a runtime's life, and a [`ThreadRoute`] runs one as a function, a request in and an answer out. An agent's tools are the routes of its own [`Router`], each named by its route path, and a [`RouteTool`] makes a tool of a route in the surrounding url space.
 
 Providers: OpenAI, Gemini, Bedrock, Ollama, plus a mock provider for tests. Replies can be streamed or collected.
 
