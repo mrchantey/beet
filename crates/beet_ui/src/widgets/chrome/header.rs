@@ -5,9 +5,10 @@ use beet_core::prelude::*;
 /// A page `<header>` with a title link to `home_route` (defaults to `/`) and
 /// a `<nav>` slot for navigation links.
 ///
-/// The title is always the site name ([`PackageConfig::title`]), bound through a
-/// `@res:PackageConfig.title` [`ResourceFieldRef`] rather than snapshotted, so it
-/// stays live with the resource and never picks up a per-route title.
+/// The title defaults to the site name ([`PackageConfig::title`]), bound through
+/// a `@res:PackageConfig.title` [`ResourceFieldRef`] rather than snapshotted, so
+/// it stays live with the resource and never picks up a per-route title. The
+/// `title` slot replaces it inside the link, ie with a logo.
 ///
 /// The `leading` slot holds an optional control left of the title (eg a
 /// [`MenuButton`](crate::prelude::MenuButton)); the default slot sits between
@@ -28,7 +29,7 @@ pub fn Header(
 			<div {Classes::new([classes::APP_BAR_LEADING])}>
 				<slot name="leading"/>
 				<a {Classes::new(["app-bar-title"])} href={home_route}>
-					{site_title(&title)}
+					<slot name="title">{site_title(&title)}</slot>
 				</a>
 			</div>
 			<slot/>

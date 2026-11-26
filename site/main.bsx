@@ -65,7 +65,8 @@ which the Cloudflare proxy honors and the deploy/sync purge refreshes).
 `<DefaultAppRoutes/>` adds the default app routes (`/app-info`, `/health`, …),
 `<RoutesDir/>` discovers the `routes/` pages, and `<AssetsDir
 src="assets" cache="1h"/>` mounts the assets the site and blog reference,
-browser-cacheable for an hour.
+browser-cacheable for an hour, beside `scripts`, the site's own tracked
+scripts.
 
 `<Sitemap/>`, `<Robots/>` and `<SearchIndex/>` are the machine-readable faces of
 the site, and `<RssFeed/>` the blog's. They are ordinary static routes scoped by
@@ -309,11 +310,19 @@ binary serves the records and the comments (`atproto`).
 		version="0.0.9-dev.16"
 		homepage="https://beet.org"
 		repository="https://github.com/mrchantey/beet"/>
+	<!-- the logo, drawn in the theme's tones by `scripts/logo.js` (the
+	     designer at /docs/design/logo loads the same file) and written into
+	     `site/assets/logo` by `<Derive/>`: `logo.svg` following the viewer's
+	     scheme, and `logo-light.svg` and `logo-dark.svg` for the layout to
+	     show by the page's. Declared before the icon set, which reads it. -->
+	<ScriptDerivation src="scripts/logo.js" call="BeetLogo.files" dir="assets/logo"/>
 	<!-- the site's icons, every size a browser or a PWA asks for derived from
 	     the one source image and written beside it in `site/assets/logo`
 	     by `<Derive/>`; `<Head>` links them from this declaration, and
-	     `beet check` fails a set that is missing or incomplete -->
-	<IconSet src="assets/logo/logo.png"/>
+	     `beet check` fails a set that is missing or incomplete. The svg
+	     source is served as the favicon itself, so a tab follows the
+	     viewer's scheme. -->
+	<IconSet src="assets/logo/logo.svg"/>
 	<!-- the tag vocabulary every page's metadata draws from, each tag earning
 	     its place by sitting on two or more posts; `beet check` fails a page
 	     carrying any other, or breaking a limit `DocMetaRules` carries -->
@@ -406,6 +415,9 @@ binary serves the records and the comments (`atproto`).
 				<Redirect path="post-15" redirect="bevy-standardizes-malleable-software"/>
 			</Route>
 			<AssetsDir src="assets" cache="1h"/>
+			<!-- the site's own scripts, tracked source unlike `assets`: the
+			     logo generator and the theme and logo editors -->
+			<AssetsDir src="scripts" cache="1h"/>
 		</Router>
 	</Route>
 	<!-- the nightly job host: its own url space and its own process. The rollup

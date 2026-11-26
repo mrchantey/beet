@@ -31,14 +31,20 @@ pub struct BakedStylesheet {
 	minify: bool,
 }
 
+impl BakedStylesheet {
+	/// The builder a sheet bakes with, which also names its variables
+	/// ([`CssBuilder::variable_names`]).
+	pub(crate) fn builder(minify: bool) -> CssBuilder {
+		CssBuilder::default()
+			.with_minify(minify)
+			.with_format_variables(FormatVariables::short())
+	}
+}
+
 /// The rule set as css, empty on a build failure (logged).
 fn bake(style: &StyleQuery, minify: bool) -> String {
 	style
-		.build_css(
-			&CssBuilder::default()
-				.with_minify(minify)
-				.with_format_variables(FormatVariables::short()),
-		)
+		.build_css(&BakedStylesheet::builder(minify))
 		.unwrap_or_else(|err| {
 			error!("Stylesheet: failed to build css: {err}");
 			String::new()

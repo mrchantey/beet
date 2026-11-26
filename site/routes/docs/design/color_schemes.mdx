@@ -5,6 +5,17 @@ visibility = "unlisted"
 
 <article>
 	<h1>Color Schemes</h1>
+	<p>
+		Every role below is a tone of a palette seeded by one of the theme's key colours. Change a key to recolour the whole site in this browser: the keys and the tones they derive are kept in your colour preferences and applied on every page before it paints, and the header's scheme button cycles between auto, light and dark.
+	</p>
+	<ThemeData/>
+	<form id="palette-editor" style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem"></form>
+	<div class="design-row">
+		<button id="palette-reset" type="button" class="btn btn-outlined">Reset to the site theme</button>
+	</div>
+	<p id="palette-note" class="text-label-medium"></p>
+	<script src="/scripts/theme.js"></script>
+	<script src="/scripts/palette-editor.js"></script>
 	<h2>Light</h2>
 	<div class="light-scheme">
 		<div>

@@ -71,6 +71,41 @@ impl CssBuilder {
 		rule_set: &RuleSet,
 		keep: impl Fn(&Rule) -> bool,
 	) -> Result<String> {
+		let (formatted, _) = self.format_all(css_map, rule_set, keep)?;
+		if self.minify {
+			formatted.join("")
+		} else {
+			String::from("\n").xtend(formatted.join("\n\n"))
+		}
+		.xok()
+	}
+
+	/// The name each variable the whole sheet declares or reads takes in it,
+	/// keyed by its full name ([`CssVariable::from_token_key`]): how a script
+	/// addresses a token's variable, ie to override a tone in the browser,
+	/// whatever the [`FormatVariables`] and its collision widening chose.
+	pub fn variable_names(
+		&self,
+		css_map: &CssTokenMap,
+		rule_set: &RuleSet,
+	) -> Result<HashMap<CssVariable, CssVariable>> {
+		let (_, declared) = self.format_all(css_map, rule_set, |_| true)?;
+		declared
+			.into_iter()
+			.map(|(formatted, original)| (original, formatted))
+			.collect::<HashMap<_, _>>()
+			.xok()
+	}
+
+	/// Every rule `keep` admits formatted, and the variable names the
+	/// formatting chose, formatted to full, widening the format on a
+	/// collision.
+	fn format_all(
+		&self,
+		css_map: &CssTokenMap,
+		rule_set: &RuleSet,
+		keep: impl Fn(&Rule) -> bool,
+	) -> Result<(Vec<String>, HashMap<CssVariable, CssVariable>)> {
 		let (kept, css_rules): (Vec<bool>, Vec<CssRule>) = rule_set
 			.iter()
 			// rules gated on a query with no CSS condition (`Terminal`) never reach
@@ -107,12 +142,7 @@ impl CssBuilder {
 						.zip(&kept)
 						.filter_map(|(rule, kept)| kept.then_some(rule))
 						.collect::<Vec<_>>();
-					return if self.minify {
-						formatted.join("")
-					} else {
-						String::from("\n").xtend(formatted.join("\n\n"))
-					}
-					.xok();
+					return (formatted, declared).xok();
 				}
 				Err(CollisionFound {
 					original,

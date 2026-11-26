@@ -25,6 +25,8 @@ use beet_core::prelude::*;
 /// default), so consumers read `Res<Theme>` directly.
 #[derive(Debug, Clone, PartialEq, Resource, Reflect)]
 #[reflect(Resource, Default)]
+// a short stable path, since a browser preferences document keys it by path
+#[type_path = "beet_ui"]
 pub struct Theme {
 	/// The seed colour every unset palette key derives from.
 	pub color: Color,

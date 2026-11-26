@@ -348,6 +348,9 @@ impl Plugin for RouterPlugin {
 			// the backend-agnostic `scripting` feature.
 			#[cfg(feature = "scripting")]
 			app.register_type::<ExchangeScriptElement>();
+			// files a script derives from the brand colours, ie the logo svgs
+			#[cfg(feature = "scripting")]
+			app.install_types::<ScriptDerivation>();
 
 			// cross-transport analytics: the request-middleware type is serde/std,
 			// registered so `<AnalyticsMiddleware/>` can author it. The storage +

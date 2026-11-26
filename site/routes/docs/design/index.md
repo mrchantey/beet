@@ -14,6 +14,7 @@ tokens, never raw CSS.
 ## Brand
 
 - [Beet Branding](/docs/design/beet-branding)
+- [Logo](/docs/design/logo)
 
 ## Color
 

@@ -3,6 +3,8 @@ pub mod colors;
 pub mod geometry;
 pub mod material_plugin;
 pub mod motion;
+mod theme_palettes;
+pub use theme_palettes::*;
 pub mod themes;
 pub mod tones;
 pub mod typography;

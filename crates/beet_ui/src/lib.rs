@@ -66,7 +66,13 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::style::material::Theme;
 	#[cfg(feature = "style")]
+	pub use crate::style::material::ThemePalette;
+	#[cfg(feature = "style")]
+	pub use crate::style::material::ThemePalettes;
+	#[cfg(feature = "style")]
 	pub use crate::style::material::ThemeTints;
+	#[cfg(feature = "style")]
+	pub use crate::style::material::ThemeTones;
 	/// The shared class-name vocabulary, reached through the `classes::` prefix.
 	#[cfg(feature = "style")]
 	pub use crate::style::material::classes;

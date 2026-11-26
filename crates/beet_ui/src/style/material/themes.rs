@@ -2,8 +2,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use material_colors::color::Argb;
-use material_colors::palette::CorePalette;
-use material_colors::palette::TonalPalette;
 use crate::style::material::colors;
 use crate::style::material::tones;
 use crate::style::material::classes;
@@ -129,134 +127,16 @@ fn fixed_roles() -> Rule {
 		.with_token(colors::OnTertiaryFixedVariant, tones::Tertiary30).unwrap()
 }
 
-/// Returns color values for every palette tone in a [`Theme`].
-///
-/// Each key colour holds its own hue and chroma across its ramp, and an unset key
-/// falls back to the seed-derived [`CorePalette`], so a bare `<Theme color=../>`
-/// still generates exactly the Material palette the seed always produced. The
-/// neutral key is split per mode: [`Theme::neutral_light`] seeds the light
-/// scheme's surfaces and the dark scheme's inverse surfaces, and
-/// [`Theme::neutral_dark`] seeds the reverse.
+/// Returns color values for every palette tone in a [`Theme`], each tone
+/// token of [`ThemePalettes::TOKENS`] at its palette's tone.
 pub(crate) fn from_theme(theme: &Theme) -> Vec<(TokenKey, TokenValue)> {
-	let core = CorePalette::of(theme.color.to_argb());
-	// a key colour holds its own hue and chroma, rather than being pushed through
-	// a Material variant, so a low-chroma key (the cream, a tinted ink)
-	// keeps the cast it was picked for.
-	let key = |color: Option<Color>, seeded: TonalPalette| match color {
-		Some(color) => TonalPalette::from_hct(color.to_argb().into()),
-		None => seeded,
-	};
-	let primary = key(theme.primary, core.primary);
-	let secondary = key(theme.secondary, core.secondary);
-	let tertiary = key(theme.tertiary, core.tertiary);
-	let neutral_light = key(theme.neutral_light, core.neutral);
-	let neutral_dark = key(theme.neutral_dark, core.neutral);
-	let nv = key(theme.neutral_variant, core.neutral_variant);
-	let error = key(theme.error, core.error);
-
-	Rule::new()
-		// ── Primary tones ─────────────────────────────────────────────────────────────
-		.with_value(tones::Primary0,Color::from_argb(primary.tone(0)))
-		.with_value(tones::Primary10,Color::from_argb(primary.tone(10)))
-		.with_value(tones::Primary20,Color::from_argb(primary.tone(20)))
-		.with_value(tones::Primary30,Color::from_argb(primary.tone(30)))
-		.with_value(tones::Primary40,Color::from_argb(primary.tone(40)))
-		.with_value(tones::Primary50,Color::from_argb(primary.tone(50)))
-		.with_value(tones::Primary60,Color::from_argb(primary.tone(60)))
-		.with_value(tones::Primary70,Color::from_argb(primary.tone(70)))
-		.with_value(tones::Primary80,Color::from_argb(primary.tone(80)))
-		.with_value(tones::Primary90,Color::from_argb(primary.tone(90)))
-		.with_value(tones::Primary95,Color::from_argb(primary.tone(95)))
-		.with_value(tones::Primary99,Color::from_argb(primary.tone(99)))
-		.with_value(tones::Primary100,Color::from_argb(primary.tone(100)))
-		// ── Secondary tones ───────────────────────────────────────────────────────────
-		.with_value(tones::Secondary0,Color::from_argb(secondary.tone(0)))
-		.with_value(tones::Secondary10,Color::from_argb(secondary.tone(10)))
-		.with_value(tones::Secondary20,Color::from_argb(secondary.tone(20)))
-		.with_value(tones::Secondary30,Color::from_argb(secondary.tone(30)))
-		.with_value(tones::Secondary40,Color::from_argb(secondary.tone(40)))
-		.with_value(tones::Secondary50,Color::from_argb(secondary.tone(50)))
-		.with_value(tones::Secondary60,Color::from_argb(secondary.tone(60)))
-		.with_value(tones::Secondary70,Color::from_argb(secondary.tone(70)))
-		.with_value(tones::Secondary80,Color::from_argb(secondary.tone(80)))
-		.with_value(tones::Secondary90,Color::from_argb(secondary.tone(90)))
-		.with_value(tones::Secondary95,Color::from_argb(secondary.tone(95)))
-		.with_value(tones::Secondary99,Color::from_argb(secondary.tone(99)))
-		.with_value(tones::Secondary100,Color::from_argb(secondary.tone(100)))
-		// ── Tertiary tones ────────────────────────────────────────────────────────────
-		.with_value(tones::Tertiary0,Color::from_argb(tertiary.tone(0)))
-		.with_value(tones::Tertiary10,Color::from_argb(tertiary.tone(10)))
-		.with_value(tones::Tertiary20,Color::from_argb(tertiary.tone(20)))
-		.with_value(tones::Tertiary30,Color::from_argb(tertiary.tone(30)))
-		.with_value(tones::Tertiary40,Color::from_argb(tertiary.tone(40)))
-		.with_value(tones::Tertiary50,Color::from_argb(tertiary.tone(50)))
-		.with_value(tones::Tertiary60,Color::from_argb(tertiary.tone(60)))
-		.with_value(tones::Tertiary70,Color::from_argb(tertiary.tone(70)))
-		.with_value(tones::Tertiary80,Color::from_argb(tertiary.tone(80)))
-		.with_value(tones::Tertiary90,Color::from_argb(tertiary.tone(90)))
-		.with_value(tones::Tertiary95,Color::from_argb(tertiary.tone(95)))
-		.with_value(tones::Tertiary99,Color::from_argb(tertiary.tone(99)))
-		.with_value(tones::Tertiary100,Color::from_argb(tertiary.tone(100)))
-		// ── Neutral tones, light mode ─────────────────────────────────────────────────
-		.with_value(tones::NeutralLight0,Color::from_argb(neutral_light.tone(0)))
-		.with_value(tones::NeutralLight8,Color::from_argb(neutral_light.tone(8)))
-		.with_value(tones::NeutralLight10,Color::from_argb(neutral_light.tone(10)))
-		.with_value(tones::NeutralLight20,Color::from_argb(neutral_light.tone(20)))
-		.with_value(tones::NeutralLight30,Color::from_argb(neutral_light.tone(30)))
-		.with_value(tones::NeutralLight40,Color::from_argb(neutral_light.tone(40)))
-		.with_value(tones::NeutralLight50,Color::from_argb(neutral_light.tone(50)))
-		.with_value(tones::NeutralLight60,Color::from_argb(neutral_light.tone(60)))
-		.with_value(tones::NeutralLight70,Color::from_argb(neutral_light.tone(70)))
-		.with_value(tones::NeutralLight80,Color::from_argb(neutral_light.tone(80)))
-		.with_value(tones::NeutralLight90,Color::from_argb(neutral_light.tone(90)))
-		.with_value(tones::NeutralLight94,Color::from_argb(neutral_light.tone(94)))
-		.with_value(tones::NeutralLight95,Color::from_argb(neutral_light.tone(95)))
-		.with_value(tones::NeutralLight99,Color::from_argb(neutral_light.tone(99)))
-		.with_value(tones::NeutralLight100,Color::from_argb(neutral_light.tone(100)))
-		// ── Neutral tones, dark mode ──────────────────────────────────────────────────
-		.with_value(tones::NeutralDark0,Color::from_argb(neutral_dark.tone(0)))
-		.with_value(tones::NeutralDark8,Color::from_argb(neutral_dark.tone(8)))
-		.with_value(tones::NeutralDark10,Color::from_argb(neutral_dark.tone(10)))
-		.with_value(tones::NeutralDark20,Color::from_argb(neutral_dark.tone(20)))
-		.with_value(tones::NeutralDark30,Color::from_argb(neutral_dark.tone(30)))
-		.with_value(tones::NeutralDark40,Color::from_argb(neutral_dark.tone(40)))
-		.with_value(tones::NeutralDark50,Color::from_argb(neutral_dark.tone(50)))
-		.with_value(tones::NeutralDark60,Color::from_argb(neutral_dark.tone(60)))
-		.with_value(tones::NeutralDark70,Color::from_argb(neutral_dark.tone(70)))
-		.with_value(tones::NeutralDark80,Color::from_argb(neutral_dark.tone(80)))
-		.with_value(tones::NeutralDark90,Color::from_argb(neutral_dark.tone(90)))
-		.with_value(tones::NeutralDark94,Color::from_argb(neutral_dark.tone(94)))
-		.with_value(tones::NeutralDark95,Color::from_argb(neutral_dark.tone(95)))
-		.with_value(tones::NeutralDark99,Color::from_argb(neutral_dark.tone(99)))
-		.with_value(tones::NeutralDark100,Color::from_argb(neutral_dark.tone(100)))
-		// ── NeutralVariant tones ──────────────────────────────────────────────────────
-		.with_value(tones::NeutralVariant0,Color::from_argb(nv.tone(0)))
-		.with_value(tones::NeutralVariant10,Color::from_argb(nv.tone(10)))
-		.with_value(tones::NeutralVariant20,Color::from_argb(nv.tone(20)))
-		.with_value(tones::NeutralVariant30,Color::from_argb(nv.tone(30)))
-		.with_value(tones::NeutralVariant40,Color::from_argb(nv.tone(40)))
-		.with_value(tones::NeutralVariant50,Color::from_argb(nv.tone(50)))
-		.with_value(tones::NeutralVariant60,Color::from_argb(nv.tone(60)))
-		.with_value(tones::NeutralVariant70,Color::from_argb(nv.tone(70)))
-		.with_value(tones::NeutralVariant80,Color::from_argb(nv.tone(80)))
-		.with_value(tones::NeutralVariant90,Color::from_argb(nv.tone(90)))
-		.with_value(tones::NeutralVariant95,Color::from_argb(nv.tone(95)))
-		.with_value(tones::NeutralVariant99,Color::from_argb(nv.tone(99)))
-		.with_value(tones::NeutralVariant100,Color::from_argb(nv.tone(100)))
-		// ── Error tones ───────────────────────────────────────────────────────────────
-		.with_value(tones::Error0,Color::from_argb(error.tone(0)))
-		.with_value(tones::Error10,Color::from_argb(error.tone(10)))
-		.with_value(tones::Error20,Color::from_argb(error.tone(20)))
-		.with_value(tones::Error30,Color::from_argb(error.tone(30)))
-		.with_value(tones::Error40,Color::from_argb(error.tone(40)))
-		.with_value(tones::Error50,Color::from_argb(error.tone(50)))
-		.with_value(tones::Error60,Color::from_argb(error.tone(60)))
-		.with_value(tones::Error70,Color::from_argb(error.tone(70)))
-		.with_value(tones::Error80,Color::from_argb(error.tone(80)))
-		.with_value(tones::Error90,Color::from_argb(error.tone(90)))
-		.with_value(tones::Error95,Color::from_argb(error.tone(95)))
-		.with_value(tones::Error99,Color::from_argb(error.tone(99)))
-		.with_value(tones::Error100,Color::from_argb(error.tone(100)))
+	let palettes = ThemePalettes::new(theme);
+	ThemePalettes::tokens()
+		.into_iter()
+		.fold(Rule::new(), |rule, (palette, tone, token)| {
+			rule.with_value_untyped(token, palettes.tone(palette, tone))
+				.expect("a colour serializes")
+		})
 		.into_iter().collect()
 }
 

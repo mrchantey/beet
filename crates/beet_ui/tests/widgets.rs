@@ -678,14 +678,15 @@ fn color_scheme_script_emits_scheme_classes() {
 			.iter_descendant_values(root)
 			.filter_map(|v| v.as_str().ok())
 			.collect::<String>();
-		// the seed script references both scheme classes and stores nothing
+		// the script references both scheme classes and keeps its pin in
+		// the `preferences` store's layout, keyed by the short theme path
 		body.as_str()
 			.xpect_contains(&*classes::LIGHT_SCHEME.as_selector())
 			.xpect_contains(&*classes::DARK_SCHEME.as_selector())
 			.xpect_contains("prefers-color-scheme")
 			.xpect_contains("setColorScheme")
-			.xnot()
-			.xpect_contains("localStorage");
+			.xpect_contains("store:preferences:")
+			.xpect_contains(Theme::type_path());
 	});
 }
 

@@ -16,6 +16,15 @@ impl StyleQuery<'_, '_> {
 		builder.build(&self.css_map, &self.rule_set)
 	}
 
+	/// The name each variable takes in the sheet `builder` builds from the
+	/// global [`RuleSet`], keyed by its full name.
+	pub fn variable_names(
+		&self,
+		builder: &CssBuilder,
+	) -> Result<HashMap<CssVariable, CssVariable>> {
+		builder.variable_names(&self.css_map, &self.rule_set)
+	}
+
 	/// The CSS of only the rules selecting one of `classes`: the sheet a
 	/// fragment rendered apart from its page carries, the page's own sheet
 	/// holding the `:root` variables and every other rule. Variable names

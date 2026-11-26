@@ -52,7 +52,7 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		MenuButton,
 		Table,
 	)>()
-	.install_types::<RepositoryLink>();
+	.install_types::<(RepositoryLink, ColorSchemeToggle)>();
 	// a baked `<Stylesheet/>` follows rules registered after it baked; gated on
 	// a sheet existing, as a sheet only bakes where the style resources are
 	// (a world without them, ie a bare markdown parse, has no `StyleQuery`)
@@ -114,5 +114,5 @@ pub(crate) fn widget_plugin(app: &mut App) {
 	#[cfg(all(feature = "net", feature = "mermaid"))]
 	app.install_types::<super::mermaid::Mermaid>();
 	#[cfg(feature = "style")]
-	app.install_types::<Stylesheet>();
+	app.install_types::<(Stylesheet, ThemeData)>();
 }
