@@ -87,14 +87,16 @@ async fn verifies_client() {
 	.await
 	.unwrap()
 	.as_u64()
-	.xpect_eq(Some(0));
+	.unwrap()
+	.xpect_eq(0);
 	page.evaluate_value(
 		r#"fetch('/sitemap.xml').then(res => res.text()).then(text => text.includes('/docs'))"#,
 	)
 	.await
 	.unwrap()
 	.as_bool()
-	.xpect_eq(Some(false));
+	.unwrap()
+	.xpect_false();
 	page.navigate(&format!("{base}/docs")).await.unwrap();
 	page.evaluate_value(
 		r#"document.querySelector('meta[name=robots]')?.content ?? null"#,
@@ -102,8 +104,8 @@ async fn verifies_client() {
 	.await
 	.unwrap()
 	.as_str()
-	.map(str::to_string)
-	.xpect_eq(Some("noindex".to_string()));
+	.unwrap()
+	.xpect_eq("noindex");
 
 	// the beacon runs on content pages, where the client error class
 	// was originally reported
@@ -132,7 +134,7 @@ async fn verifies_client() {
 		.await
 		.unwrap();
 	statuses
-		.as_array()
+		.as_list()
 		.unwrap()
 		.iter()
 		.filter(|entry| !entry.as_str().unwrap_or_default().starts_with("200 "))
@@ -174,10 +176,10 @@ async fn verifies_client() {
 			.unwrap();
 		layout_faults.extend(
 			swatch_faults
-				.as_array()
+				.as_list()
 				.unwrap()
 				.iter()
-				.filter_map(|fault| fault.as_str())
+				.filter_map(|fault| fault.as_str().ok())
 				.map(|fault| format!("{width}px color swatch {fault}")),
 		);
 		let prose =
@@ -273,7 +275,7 @@ impl DesktopLayout {
 		Self {
 			sidebar: layout["sidebar"].as_f64().unwrap(),
 			escapes: layout["escapes"]
-				.as_array()
+				.as_list()
 				.unwrap()
 				.iter()
 				.map(|escape| escape.as_str().unwrap().to_string())
