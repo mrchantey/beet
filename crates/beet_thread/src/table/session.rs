@@ -120,6 +120,9 @@ fn gap_text(millis: i64) -> Option<String> {
 #[cfg(all(test, feature = "agent"))]
 mod test {
 	use super::*;
+	use crate::streaming::request_test;
+	use crate::streaming::request_test::model;
+	use crate::streaming::request_test::responses_request;
 	use beet_net::prelude::*;
 
 	const MINUTE: i64 = 60_000;
@@ -241,34 +244,8 @@ mod test {
 			};
 		}
 		let window = window.id();
-		app.world_mut()
-			.run_async_local_then(async move |world: AsyncWorld| -> Result {
-				Thread::enter(
-					world.clone(),
-					window,
-					ThreadEntry::parse(Request::get("chat").parts().clone())?,
-				)
-				.await
-			})
-			.await
-			.unwrap();
-		let coach = app
-			.world_mut()
-			.query::<(Entity, &ActorRef)>()
-			.iter(app.world())
-			.find(|(_, actor)| actor.0 == COACH)
-			.unwrap()
-			.0;
-		(window, coach)
-	}
-
-	fn model() -> ModelDef {
-		ModelDef {
-			provider_slug: "provider".into(),
-			model_slug: "model".into(),
-			url: "http://localhost".into(),
-			auth: None,
-		}
+		request_test::enter(app, window).await;
+		(window, request_test::actor_entity(app, &COACH))
 	}
 
 	/// The `(role, content)` of each message under `key` of a request.
@@ -286,41 +263,14 @@ mod test {
 			.collect()
 	}
 
-	/// The request `streamer` builds for the `coach`.
-	async fn responses_request(
-		app: &mut App,
-		coach: Entity,
-		streamer: O11sStreamer,
-	) -> o11s::RequestBody {
-		app.world_mut()
-			.run_async_local_then(async move |world: AsyncWorld| {
-				streamer.build_request(world.entity(coach)).await
-			})
-			.await
-			.unwrap()
-			.0
-	}
-
 	/// The `(role, content)` of each message the coach's model reads, the
 	/// same by the responses protocol and by completions.
 	async fn model_reads(
 		app: &mut App,
 		coach: Entity,
 	) -> Vec<(String, String)> {
-		let responses =
-			responses_request(app, coach, O11sStreamer::new(model()))
-				.await
-				.xmap(|request| messages(&request, "input"));
-		let completions = app
-			.world_mut()
-			.run_async_local_then(async move |world: AsyncWorld| {
-				CompletionsStreamer::new(model())
-					.build_request(world.entity(coach))
-					.await
-			})
-			.await
-			.unwrap()
-			.0;
+		let [responses, completions] = request_test::requests(app, coach).await;
+		let responses = messages(&responses, "input");
 		messages(&completions, "messages").xpect_eq(responses.clone());
 		responses
 	}

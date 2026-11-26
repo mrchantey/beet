@@ -8,26 +8,19 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-/// The camera actor's behavior: capture a photo, post it as this actor's turn, and
-/// stub older photos to text so the request stays bounded. Scene rotation is its
-/// own preceding step ([`RotateScene`](super::RotateScene)).
+/// The camera actor's behavior: capture a photo and post it as this actor's
+/// turn. Scene rotation is its own preceding step
+/// ([`RotateScene`](super::RotateScene)).
 ///
 /// Spread onto a `User`-kind `<CreateActor>` before the agent actor, so each
 /// `Sequence` iteration begins with a fresh photo in the records as a user-role
-/// image message. Bounding is [`ThreadRecords::stub_old_images`], run inline here so
-/// a captured photo is bounded in the same turn it lands; a thread whose images
-/// arrive some other way sequences the standalone [`StubOldImages`] action instead.
+/// image message. The records keep every photo: the agent's [`KeepBlobs`]
+/// bounds how many it carries, listing the older ones, and with them what the
+/// window holds in memory.
 #[action]
-#[derive(Debug, Component, Reflect)]
+#[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn PostPhoto(
-	/// How many recent photos to keep as real images; older ones are stubbed to
-	/// text. Defaults to the current + previous photo (photos dominate request
-	/// bytes; two are enough to see what changed since the last turn).
-	#[field(default = 2usize)]
-	keep_media: usize,
-	cx: ActionContext,
-) -> Result<Outcome> {
+pub async fn PostPhoto(cx: ActionContext) -> Result<Outcome> {
 	let started = Instant::now();
 	// capture through the router: a bound head serves it, else the local handler.
 	// The loop's heartbeat: a failed capture (eg no head connected yet, so no
@@ -49,24 +42,24 @@ pub async fn PostPhoto(
 	let capture_secs = started.elapsed().as_secs_f32();
 	let size_kb = media.bytes().len() / 1024;
 
-	// append the photo as this actor's turn, then stub older photos to bound bytes
-	// without dropping posts (append-only keeps the LLM prompt-cache prefix stable).
+	// append the photo as this actor's turn
 	cx.caller
 		.with_state::<ThreadRecordsQuery, _>(
 			move |entity, mut thread_records| -> Result {
 				let actor_id = thread_records.actor_id(entity)?;
 				let thread_id = thread_records.thread_id(entity)?;
-				let mut records = thread_records.records_mut(entity)?;
-				records.upsert_post(AgentPost::new_media(
-					actor_id,
-					thread_id,
-					media.media_type().clone(),
-					media.bytes().to_vec(),
-					None,
-					PostStatus::Completed,
-				));
-				records.stub_old_images(keep_media);
-				Ok(())
+				let (media_type, bytes) = media.take();
+				thread_records.push_post(
+					entity,
+					AgentPost::new_media(
+						actor_id,
+						thread_id,
+						media_type,
+						bytes,
+						None,
+						PostStatus::Completed,
+					),
+				)
 			},
 		)
 		.await??;

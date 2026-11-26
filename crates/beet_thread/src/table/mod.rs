@@ -103,7 +103,7 @@
 //! | `reasoning` | `text` | nothing, whoever wrote it | its text |
 //! | `reasoning_summary` | `text` | nothing, whoever wrote it | its text |
 //! | `tool_call` | `name`, `call_id`, `arguments` | the reading agent's own as a call; another's with its output as one message in the author's role | its arguments |
-//! | `tool_output` | `call_id`, `text`, `blob`?; `subject` its call | for the reading agent's own call, its output at once after the call, a `blob` as content parts on open responses and on completions as the output's text then a user message holding it; for another's, part of the call's message | its text |
+//! | `tool_output` | `call_id`, `text`, `blob`?, `file_stem`?; `subject` its call | for the reading agent's own call, its output at once after the call, a `blob` as content parts on open responses and on completions as the output's text then a user message holding it; for another's, part of the call's message | its text, for a `blob` the file's line |
 //! | `session_opened` | `spawned_by`? | a join's note (Sessions) | `── Coach joined ──` |
 //! | `edited` | `was`, the original body; `subject` the post | a note where the change was made, `<system>Ann edited a post from 09:10.</system>` | no row: the post shows its new body and that it was edited |
 //! | `deleted` | none; `subject` the post | a note as an edit's | no row: the post shows that it was deleted, with no body |
@@ -117,28 +117,30 @@
 //! else's is a user message wrapped in a `<post author=..>` naming its
 //! author, so a group chat's people read apart. Another actor's call is never
 //! sent as a call, since the reader did not make it. A note is a user message
-//! whoever it is about. A blob a provider cannot carry is one line naming it,
-//! ie `[file: report.pdf, application/pdf, 12 KB]`.
+//! whoever it is about. A blob a provider cannot carry is one line naming it
+//! ([`PostFile::line`]), ie `[file: report.pdf, application/pdf, 12 KB]`.
 //!
 //! # Bytes
 //!
-//! Bytes are never in a row. A `media` post holds a `BlobRef`, its bytes at
-//! `blobs/<cid>` in the nearest `BlobStore` at or above the thread, as a PDS
-//! holds them. They are written before the post, so a stored reference always
+//! Bytes are never in a row. A `media` post holds a `BlobRef` ([`PostFile`]),
+//! its bytes at `blobs/<cid>` in the nearest `BlobStore` at or above the
+//! thread, as a PDS holds them. They are written before the post, so a stored reference always
 //! resolves, and addressed by content, so the same bytes twice are one blob.
 //! Where that blob store is the repo store, the thread is as public as the
 //! repo, which is intended. A thread with no store above it holds bytes in
 //! memory on its window, bounded to what its contexts keep. A deleted or
 //! edited post's blob is kept, as its row is.
 //!
-//! A request is built in two steps: the records answer its posts, then the
-//! bytes they reference are read, so neither mapper reads a store. A missing
-//! blob is the text `[file unavailable]` to the model and the view, never a
-//! failed turn. `KeepBlobs{count}` on an agent carries the newest `count`
-//! blobs in its context and lists each older one as a line naming its post,
-//! media type, name and size; without it every blob is carried. A tool may
-//! answer with bytes, kept as its output's `blob`, so any route answering
-//! media is a tool an agent can look through. Encoding bytes for a provider,
+//! A request is built in two steps ([`RequestBlobs`](crate::prelude::RequestBlobs)): the records answer its
+//! posts, then the bytes they reference are read, so neither mapper reads a
+//! store. A missing blob is the text `[file unavailable]` to the model, never
+//! a failed turn. [`KeepBlobs`]`{count}` on an agent carries the newest
+//! `count` blobs in its context and lists each older one as a line naming its
+//! post, media type, name and size; without it every blob is carried. Records
+//! are never rewritten to shrink a request. A tool may answer with bytes,
+//! kept as its output's `blob`, so any route answering media is a tool an
+//! agent can look through, and a listed blob a tool reads back is the newest,
+//! carried again. Encoding bytes for a provider,
 //! base64 included, is that provider's mapper's own, and a reference is never
 //! sent as a url, since a provider could not fetch it.
 //!
@@ -414,6 +416,8 @@ pub(crate) use thread_store::sync_records_to_store;
 mod agent_post;
 pub use agent_post::*;
 mod post;
+mod post_file;
+pub use post_file::*;
 mod post_log;
 mod post_ref;
 pub use post_ref::*;
@@ -429,7 +433,6 @@ pub use thread_records::*;
 pub use window::*;
 mod response_meta;
 pub use response_meta::*;
-#[cfg(feature = "action")]
-mod stub_old_images;
-#[cfg(feature = "action")]
-pub use stub_old_images::*;
+mod keep_blobs;
+pub use keep_blobs::KeepBlobs;
+pub(crate) use keep_blobs::release_bytes;

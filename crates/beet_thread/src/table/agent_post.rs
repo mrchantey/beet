@@ -132,22 +132,12 @@ impl AgentPost<'static> {
 		author: ActorId,
 		thread: ThreadId,
 		media_type: MediaType,
-		bytes: Vec<u8>,
+		bytes: impl Into<Bytes>,
 		file_stem: Option<String>,
 		status: PostStatus,
 	) -> Post {
-		let blob = BlobRef::of(&bytes, media_type);
-		let mut body = Map::default();
-		// a blob reference always serializes
-		if let Ok(blob) = Value::from_serde(&blob) {
-			body.insert("blob", blob);
-		}
-		if let Some(stem) = file_stem {
-			body.insert("file_stem", stem);
-		}
-		let mut post = Post::new(author, thread, PostKind::Media, status, body);
-		post.set_bytes(Bytes::from(bytes));
-		post
+		Post::new(author, thread, PostKind::Media, status, Map::default())
+			.with_file(media_type, bytes.into(), file_stem)
 	}
 
 	/// A response's failure.
@@ -226,6 +216,34 @@ impl AgentPost<'static> {
 		)
 		.with_subject(call)
 	}
+
+	/// A tool's answer of bytes to the call `call`: the output holds them by
+	/// reference as a `media` post does, its text the file's line
+	/// ([`PostFile::line`]) for a reader that cannot carry it.
+	pub fn new_function_call_output_file(
+		author: ActorId,
+		thread: ThreadId,
+		call: PostId,
+		call_id: impl Into<String>,
+		media: MediaBytes,
+		file_stem: Option<String>,
+		status: PostStatus,
+	) -> Post {
+		let (media_type, bytes) = media.take();
+		let mut post = Self::new_function_call_output(
+			author,
+			thread,
+			call,
+			call_id,
+			String::new(),
+			status,
+		)
+		.with_file(media_type, bytes, file_stem);
+		if let Some(file) = post.file() {
+			post.set_text(file.line());
+		}
+		post
+	}
 }
 
 /// A body of string fields.
@@ -253,15 +271,6 @@ impl<'a> TextView<'a> {
 	pub fn post(&self) -> &'a Post { self.post }
 }
 
-/// Construct a filename from a stem and a media type's extension.
-fn filename(file_stem: Option<&str>, media_type: &MediaType) -> String {
-	let file_stem = file_stem.unwrap_or("file");
-	match media_type.extension() {
-		Some(ext) => format!("{file_stem}.{ext}"),
-		None => file_stem.to_string(),
-	}
-}
-
 /// A link to a file elsewhere.
 #[derive(Deref)]
 pub struct UrlView<'a> {
@@ -280,7 +289,7 @@ impl<'a> UrlView<'a> {
 	pub fn file_stem(&self) -> Option<&'a str> { self.post.field("file_stem") }
 	/// The stem and the media type's extension.
 	pub fn filename(&self) -> String {
-		filename(self.file_stem(), &self.media_type())
+		PostFile::filename_of(self.file_stem(), &self.media_type())
 	}
 	pub fn post(&self) -> &'a Post { self.post }
 }
@@ -292,29 +301,13 @@ pub struct MediaView<'a> {
 }
 
 impl<'a> MediaView<'a> {
-	/// The reference to the file's bytes, `None` for a malformed row.
-	pub fn blob(&self) -> Option<BlobRef> {
-		self.post.body().get("blob").ok()?.clone().into_serde().ok()
-	}
+	/// The file the post holds, `None` for a malformed row.
+	pub fn file(&self) -> Option<PostFile> { self.post.file() }
+	/// The file's media type.
 	pub fn media_type(&self) -> MediaType {
-		self.blob().map(|blob| blob.mime_type).unwrap_or_default()
-	}
-	/// The file's length in bytes.
-	pub fn size(&self) -> u64 { self.blob().map_or(0, |blob| blob.size) }
-	pub fn file_stem(&self) -> Option<&'a str> { self.post.field("file_stem") }
-	/// The stem and the media type's extension.
-	pub fn filename(&self) -> String {
-		filename(self.file_stem(), &self.media_type())
-	}
-	/// The one line naming this file, what a reader that cannot carry it
-	/// reads, ie `[file: report.pdf, application/pdf, 12 KB]`.
-	pub fn line(&self) -> String {
-		let size = match self.size() {
-			size if size < 1024 => format!("{size} B"),
-			size if size < 1024 * 1024 => format!("{} KB", size / 1024),
-			size => format!("{} MB", size / (1024 * 1024)),
-		};
-		format!("[file: {}, {}, {size}]", self.filename(), self.media_type())
+		self.file()
+			.map(|file| file.media_type())
+			.unwrap_or_default()
 	}
 	pub fn post(&self) -> &'a Post { self.post }
 }
@@ -362,6 +355,14 @@ impl OwnedFunctionCall {
 	pub fn name(&self) -> &str { &self.name }
 	pub fn call_id(&self) -> &str { &self.call_id }
 	pub fn arguments(&self) -> &str { &self.arguments }
+	/// The stem of a file the tool answers: the last segment of its route
+	/// path, ie `take-photo`.
+	pub fn file_stem(&self) -> Option<String> {
+		FunctionToolDefinition::decode_name(&self.name)
+			.rsplit('/')
+			.find(|segment| !segment.is_empty())
+			.map(str::to_string)
+	}
 }
 
 /// What a tool answered.
@@ -377,10 +378,12 @@ impl<'a> FunctionCallOutputView<'a> {
 	}
 	/// The call answered, the post's subject.
 	pub fn call(&self) -> Option<PostId> { self.post.subject() }
-	/// The output.
+	/// The output, for an answer of bytes its file's line.
 	pub fn output(&self) -> &'a str {
 		self.post.field("text").unwrap_or_default()
 	}
+	/// The file the tool answered, if it answered bytes.
+	pub fn file(&self) -> Option<PostFile> { self.post.file() }
 	pub fn post(&self) -> &'a Post { self.post }
 }
 

@@ -2,6 +2,7 @@ use crate::prelude::*;
 #[cfg(feature = "action")]
 use beet_action::prelude::*;
 use beet_core::prelude::*;
+use std::collections::BTreeSet;
 
 /// A window's records: the actors, whole history and response metadata of
 /// the stored thread it is open onto, held in memory.
@@ -27,6 +28,8 @@ pub struct ThreadRecords {
 	/// The posts pushed or updated here since window sync last took them, each
 	/// once, in the order they changed.
 	changed: Vec<PostId>,
+	/// The posts holding their file's bytes in memory.
+	held: BTreeSet<PostId>,
 }
 
 impl ThreadRecords {
@@ -103,6 +106,10 @@ impl ThreadRecords {
 	/// Upsert `post` without marking it changed, found by its id and kept
 	/// in id order.
 	fn upsert_quiet(&mut self, post: Post) {
+		match post.bytes() {
+			Some(_) => self.held.insert(post.id()),
+			None => self.held.remove(&post.id()),
+		};
 		match self.posts.binary_search_by_key(&post.id(), Post::id) {
 			Ok(index) => self.posts[index] = post,
 			Err(index) => self.posts.insert(index, post),
@@ -320,6 +327,7 @@ impl ThreadRecords {
 			posts,
 			metas,
 			changed: _,
+			held: _,
 		} = stored;
 		for actor in &actors {
 			self.insert_actor_absent(actor);
@@ -436,51 +444,52 @@ impl ThreadRecords {
 		})
 	}
 
-	/// Bound the image bytes of these records: replace every image post older than the
-	/// most recent `keep` with a short text stub, in place (same [`PostId`] and
-	/// position).
-	///
-	/// The records stay append-only, which is the point: no post is ever dropped,
-	/// so the provider's prompt-cache prefix stays stable and only the last few
-	/// turns churn. Image posts are oldest-first (posts are id-ordered) and a
-	/// given image is stubbed exactly once, so the prefix grows with the
-	/// conversation rather than being rewritten by each call.
-	///
-	/// Call between turns, once the turn's new image has landed. [`StubOldImages`]
-	/// is the standalone action form.
-	pub fn stub_old_images(&mut self, keep: usize) {
-		let is_image = |post: &Post| match post.as_agent_post() {
-			Some(AgentPost::Media(view)) => view.media_type().is_image(),
-			_ => false,
-		};
-		let stub_count = self
-			.posts
-			.iter()
-			.filter(|post| is_image(post))
-			.count()
-			.saturating_sub(keep);
-		if stub_count == 0 {
+	// ── bytes ───────────────────────────────────────────────────────────
+
+	/// The file of every post holding one, oldest first: what a context
+	/// carries or lists ([`KeepBlobs`]).
+	pub fn files(&self) -> impl DoubleEndedIterator<Item = PostFile> {
+		self.posts.iter().filter_map(Post::file)
+	}
+
+	/// The posts of the newest `keep` files, the ones a context keeping
+	/// `keep` carries.
+	pub fn carried_files(&self, keep: usize) -> HashSet<PostId> {
+		self.files()
+			.rev()
+			.take(keep)
+			.map(|file| file.post())
+			.collect()
+	}
+
+	/// Drop the bytes held in memory of every post but those of the newest
+	/// `keep` files, and those `releasable` refuses, ie not yet written to
+	/// the blob store. Nothing is marked changed: the row is untouched.
+	pub fn release_bytes(
+		&mut self,
+		keep: usize,
+		releasable: impl Fn(PostId) -> bool,
+	) {
+		if self.held.len() <= keep {
 			return;
 		}
-		let stubbed = self
-			.posts
+		let carried = self.carried_files(keep);
+		let released = self
+			.held
 			.iter()
-			.filter(|post| is_image(post))
-			.take(stub_count)
-			.map(Post::id)
+			.copied()
+			.filter(|id| !carried.contains(id) && releasable(*id))
 			.collect::<Vec<_>>();
-		for id in stubbed {
+		for id in released {
 			if let Ok(index) = self.posts.binary_search_by_key(&id, Post::id) {
-				self.posts[index].replace_content(
-					PostKind::Text,
-					[(SmolStr::from("text"), Value::from(STUBBED_IMAGE))]
-						.into_iter()
-						.collect(),
-				);
+				self.posts[index].release_bytes();
 			}
-			self.mark_changed(id);
+			self.held.remove(&id);
 		}
 	}
+
+	/// How many posts hold their file's bytes in memory.
+	pub fn held_bytes(&self) -> usize { self.held.len() }
 }
 
 /// One window's changes to its records, applied to every other window of
@@ -498,10 +507,6 @@ pub struct ThreadChanges {
 impl ThreadChanges {
 	pub fn is_empty(&self) -> bool { self.posts.is_empty() }
 }
-
-/// The text a stubbed-out older image is replaced with by
-/// [`ThreadRecords::stub_old_images`].
-const STUBBED_IMAGE: &str = "[earlier image, no longer shown]";
 
 // ═══════════════════════════════════════════════════════════════════════
 // AuthoredPost
@@ -534,21 +539,21 @@ impl AuthoredPost<'_> {
 		)
 	}
 
-	/// The text of this call and its `output`, as another actor's call reads
-	/// to an agent that did not make it: one function, so no mapper chooses
-	/// it.
-	pub fn call_text(&self, output: Option<&AuthoredPost>) -> String {
+	/// The text of this call and its `output`, the text its answer reads
+	/// as ([`RequestBlobs::output_text`]), as another actor's call reads to
+	/// an agent that did not make it: one function, so no mapper chooses it.
+	pub fn call_text(&self, output: Option<String>) -> String {
 		let call = match self.post.as_agent_post() {
 			Some(AgentPost::FunctionCall(call)) => call,
 			_ => return self.post.to_string(),
 		};
 		let mut text =
 			format!("called `{}` with {}", call.name(), call.arguments());
-		match output.and_then(|output| output.post.as_agent_post()) {
-			Some(AgentPost::FunctionCallOutput(output)) => {
-				text.push_str(&format!(", which answered {}", output.output()));
+		match output {
+			Some(output) => {
+				text.push_str(&format!(", which answered {output}"));
 			}
-			_ => text.push_str(", not yet answered"),
+			None => text.push_str(", not yet answered"),
 		}
 		self.wrap_user_text(&text)
 	}
@@ -924,7 +929,6 @@ impl ThreadRecordsQuery<'_, '_> {
 
 #[cfg(test)]
 mod test {
-	use super::STUBBED_IMAGE;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
@@ -989,64 +993,6 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("`Ann` and `Annie` share the id `ann`");
-	}
-
-	/// Bounding replaces older images with a text stub in place: the post count
-	/// and every id are untouched (the records stay append-only), only the newest
-	/// `keep` images still carry bytes.
-	#[beet_core::test]
-	fn stub_old_images_bounds_the_records() {
-		let thread = ThreadId::now();
-		let user = ActorId::from_static("user");
-		let mut records = ThreadRecords::new();
-		records.insert_actor(Actor::new_with_id(
-			user.clone(),
-			"Cam",
-			ActorKind::User,
-		));
-		let is_image = |post: &Post| post.kind() == &PostKind::Media;
-		for cycle in 0..3 {
-			records.upsert_post(AgentPost::new_media(
-				user.clone(),
-				thread,
-				MediaType::Jpeg,
-				vec![cycle as u8],
-				None,
-				PostStatus::Completed,
-			));
-		}
-		let ids = records.posts().iter().map(Post::id).collect::<Vec<_>>();
-
-		records.stub_old_images(1);
-
-		// nothing dropped, nothing reordered: only the kinds changed
-		records.posts().len().xpect_eq(3);
-		records
-			.posts()
-			.iter()
-			.map(Post::id)
-			.collect::<Vec<_>>()
-			.xpect_eq(ids);
-		records
-			.posts()
-			.iter()
-			.filter(|post| is_image(post))
-			.count()
-			.xpect_eq(1);
-		// the surviving image is the newest, the stubbed ones carry the stub text
-		is_image(&records.posts()[2]).xpect_true();
-		records.posts()[0]
-			.to_string()
-			.xpect_eq(STUBBED_IMAGE.to_string());
-
-		// stubbing again is idempotent: a given image is only ever stubbed once
-		records.stub_old_images(1);
-		records
-			.posts()
-			.iter()
-			.filter(|post| is_image(post))
-			.count()
-			.xpect_eq(1);
 	}
 
 	/// Streaming-shaped records mutation: upsert appends new posts and replaces
@@ -1230,7 +1176,12 @@ mod test {
 		let ModelPost::Call { call, output } = &items[0] else {
 			panic!("expected a call, found {:?}", items[0]);
 		};
-		call.call_text(output.as_ref()).xpect_eq(
+		call.call_text(
+			output
+				.as_ref()
+				.map(|output| RequestBlobs::default().output_text(output)),
+		)
+		.xpect_eq(
 			"<post author=Other author_kind=agent author_id=other>called `search` with {}, which answered found</post>",
 		);
 		// the caller reads its own call as a call

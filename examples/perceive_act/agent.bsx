@@ -19,8 +19,9 @@ and posts the photo straight into the thread, then the `Robot` agent answers wit
 single forced `respond-multi-modal` tool call ({ToolChoice::RequiredAny},
 `<RespondMultiModal/>` its only tool, the one route of its own `<Router>`), which
 fans out to the surrounding url space's `show-image`/`speak-text`/`drive` and awaits them all (by default speaking before it
-drives), so the next photo waits for the body to stop moving. The records are append-only;
-`{PostPhoto}` stubs older photos to text to keep the request small while the prompt cache holds.
+drives), so the next photo waits for the body to stop moving. The records keep every photo;
+the Robot's `{KeepBlobs{count:2}}` carries the newest two and lists the older ones by
+post, so the request, and what the window holds in memory, stay small.
 
 `{Repeat}` loops the thread until the process is killed (Ctrl+C); the boot call parks
 rather than writing `AppExit`. Needs `OPENAI_API_KEY`.
@@ -56,7 +57,7 @@ esp body) are unaffected, and managed deployments (lambda/Fargate) serve plainte
 			<RotateScene/>
 			<CreateActor name="Camera" kind="User" {PostPhoto}/>
 			<CreateActor name="Robot" kind="Agent"
-				{(RobotStreamer{effort:ReasoningEffort::None}, ToolChoice::RequiredAny)}>
+				{(RobotStreamer{effort:ReasoningEffort::None}, ToolChoice::RequiredAny, KeepBlobs{count:2})}>
 				<Router><RespondMultiModal max_drive_duration="4s" {StringEnumOptions{field:"image"}}/></Router>
 			</CreateActor>
 		</Thread>

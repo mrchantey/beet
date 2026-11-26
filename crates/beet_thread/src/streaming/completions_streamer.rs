@@ -125,15 +125,13 @@ impl CompletionsStreamer {
 					}
 
 					// Convert the thread's posts to completions messages
-					let post_messages = records
-						.request_posts(&agent_id, None)
-						.into_iter()
-						.xtry_map(|post| {
+					for post in records.request_posts(&agent_id, None) {
+						messages.extend(
 							completions_mapper::post_to_completions_message(
 								&agent_id, post, &blobs,
-							)
-						})?;
-					messages.extend(post_messages);
+							)?,
+						);
+					}
 
 					// Collect tools
 					let tools = query

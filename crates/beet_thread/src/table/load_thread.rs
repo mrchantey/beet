@@ -15,9 +15,16 @@ use beet_net::prelude::*;
 /// filled directory continues, so `threads/coach/{claim}` continues a thread
 /// per claim. The records are rows of the [`TableStore`] at or above the
 /// thread, each thread its own partition, listed under the filled path
-/// ([`ThreadStore`]); a `media` post's bytes go to the nearest [`BlobStore`]
-/// at or above it, so where that is the repo store the thread is as public
-/// as the repo. A deferred mount:
+/// ([`ThreadStore`]).
+///
+/// The bytes of a post's file, a `media` post's or a tool's answer, go to
+/// `blobs/<cid>` in the nearest [`BlobStore`] at or above the thread. That
+/// may be the repo store, and the thread is then as public as the repo. A
+/// thread with no blob store above it holds bytes in memory on its window,
+/// only those its agents' contexts carry ([`KeepBlobs`]), so a file older
+/// than any context keeps is gone when the runtime stops.
+///
+/// A deferred mount:
 /// [`Thread::enter`] fills it, picks the stored thread and only then inserts
 /// the [`ThreadStore`], so the persistence sync never flushes a thread before
 /// it knows which one it is.

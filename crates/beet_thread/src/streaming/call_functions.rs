@@ -11,7 +11,9 @@ use beet_net::prelude::*;
 /// router, its arguments the JSON body a typed-input route reads as its
 /// input. Whatever answers is the call's output, the router's not-found
 /// with its "did you mean" included, so an agent reaches only the tools it
-/// was given.
+/// was given. An answer of bytes, ie an image, is kept as the output's file
+/// ([`AgentPost::new_function_call_output_file`]), so any route answering
+/// media is a tool an agent can look through.
 ///
 /// [`Router`]: beet_router::prelude::Router
 pub(crate) async fn call_functions(
@@ -22,14 +24,14 @@ pub(crate) async fn call_functions(
 		.with_state::<ThreadQuery, _>(|entity, query| query.tool_router(entity))
 		.await??;
 	for call in function_calls.into_iter() {
-		let output = match router {
+		let answer = match router {
 			Some(router) => {
 				call_function(&agent.world().entity(router), &call).await
 			}
-			None => format!(
+			None => ToolAnswer::Text(format!(
 				"Function call refused '{}': this agent has no tools",
 				call.name()
-			),
+			)),
 		};
 
 		agent
@@ -37,15 +39,29 @@ pub(crate) async fn call_functions(
 				move |entity, mut records_mut| {
 					let actor_id = records_mut.actor_id(entity)?;
 					let thread_id = records_mut.thread_id(entity)?;
-
-					let post = AgentPost::new_function_call_output(
-						actor_id,
-						thread_id,
-						call.post(),
-						call.call_id().to_string(),
-						output,
-						PostStatus::Completed,
-					);
+					let post = match answer {
+						ToolAnswer::Text(output) => {
+							AgentPost::new_function_call_output(
+								actor_id,
+								thread_id,
+								call.post(),
+								call.call_id().to_string(),
+								output,
+								PostStatus::Completed,
+							)
+						}
+						ToolAnswer::File(media) => {
+							AgentPost::new_function_call_output_file(
+								actor_id,
+								thread_id,
+								call.post(),
+								call.call_id().to_string(),
+								media,
+								call.file_stem(),
+								PostStatus::Completed,
+							)
+						}
+					};
 					records_mut.push_post(entity, post)
 				},
 			)
@@ -55,45 +71,74 @@ pub(crate) async fn call_functions(
 	Ok(())
 }
 
-/// The output of one call exchanged with the agent's `router`: the response
-/// body, a non-JSON one as a JSON string, or the error it answered with.
+/// What a tool answered: text, or bytes a model reads as a file.
+enum ToolAnswer {
+	Text(String),
+	File(MediaBytes),
+}
+
+/// The answer of one call exchanged with the agent's `router`: a JSON body
+/// as it is, a body of bytes, ie an image, as a file, any other as a JSON
+/// string, or the error it answered with.
 async fn call_function(
 	router: &AsyncEntity,
 	call: &OwnedFunctionCall,
-) -> String {
+) -> ToolAnswer {
 	let request =
 		Request::get(FunctionToolDefinition::decode_name(call.name()))
 			.with_body(call.arguments())
 			.with_header::<header::ContentType>(MediaType::Json)
 			.with_header::<header::Accept>(MediaType::Json);
 
-	match router.call::<Request, Response>(request).await {
+	let res = match router.call::<Request, Response>(request).await {
 		Ok(res) => match res.into_result().await {
-			Ok(res) => {
-				let is_json = res
-					.parts
-					.headers
-					.get::<header::ContentType>()
-					.and_then(|r| r.ok())
-					.map_or(false, |ct| ct == MediaType::Json);
-				let body = res.body.into_string().await.unwrap_or_else(|err| {
-					format!("Failed to read response body as string: {err}")
-				});
-				if is_json {
-					body
-				} else {
-					// Wrap non-JSON responses as a JSON string value
-					MediaBytes::serialize(MediaType::Json, &body)
-						.and_then(|bytes| bytes.as_utf8().map(str::to_string))
-						.unwrap_or(body)
-				}
-			}
+			Ok(res) => res,
 			Err(err) => {
-				format!("Function call returned error '{}': {err}", call.name())
+				return ToolAnswer::Text(format!(
+					"Function call returned error '{}': {err}",
+					call.name()
+				));
 			}
 		},
 		Err(err) => {
-			format!("Function call failed '{}': {err}", call.name())
+			return ToolAnswer::Text(format!(
+				"Function call failed '{}': {err}",
+				call.name()
+			));
+		}
+	};
+	let media_type = res
+		.parts
+		.headers
+		.get::<header::ContentType>()
+		.and_then(|media_type| media_type.ok());
+	match media_type {
+		Some(media_type) if media_type == MediaType::Json => {
+			ToolAnswer::Text(res.body.into_string().await.unwrap_or_else(
+				|err| format!("Failed to read response body as string: {err}"),
+			))
+		}
+		// bytes, ie an image or a pdf
+		Some(media_type) if !media_type.is_text() => {
+			match res.body.into_bytes().await {
+				Ok(bytes) => {
+					ToolAnswer::File(MediaBytes::new(media_type, bytes))
+				}
+				Err(err) => ToolAnswer::Text(format!(
+					"Failed to read response body: {err}"
+				)),
+			}
+		}
+		_ => {
+			let body = res.body.into_string().await.unwrap_or_else(|err| {
+				format!("Failed to read response body as string: {err}")
+			});
+			// wrap a text body as a JSON string value
+			ToolAnswer::Text(
+				MediaBytes::serialize(MediaType::Json, &body)
+					.and_then(|bytes| bytes.as_utf8().map(str::to_string))
+					.unwrap_or(body),
+			)
 		}
 	}
 }

@@ -23,8 +23,8 @@ use beet_core::prelude::*;
 /// [`crate::table`], "Posts"): a note as it is in the user role, another
 /// actor's call with its output as one user message, the reading agent's own
 /// posts native, a System or Developer post its role's message unwrapped, and
-/// anyone else's a user message wrapped in `<post author=..>`. A `media`
-/// post's bytes come from `blobs`, read before.
+/// anyone else's a user message wrapped in `<post author=..>`. Each file is
+/// as `blobs` sends it, carried as content parts, a tool's output included.
 pub fn post_to_o11s_input(
 	agent_id: &ActorId,
 	post: ModelPost,
@@ -45,11 +45,20 @@ pub fn post_to_o11s_input(
 				.xok();
 		}
 		ModelPost::Call { call, output } => {
-			return message(
-				MessageRole::User,
-				MessageContent::Text(call.call_text(output.as_ref())),
-			)
-			.xok();
+			let text = call.call_text(
+				output.as_ref().map(|output| blobs.output_text(output)),
+			);
+			let content =
+				match output.and_then(|output| blobs.file(output.post)) {
+					Some(RequestFile::Carried(file, bytes)) => {
+						MessageContent::Parts(vec![
+							ContentPart::input_text(text),
+							file_part(&file, &bytes),
+						])
+					}
+					_ => MessageContent::Text(text),
+				};
+			return message(MessageRole::User, content).xok();
 		}
 	};
 	let role = match post.actor.kind() {
@@ -79,10 +88,19 @@ pub fn post_to_o11s_input(
 			})
 		}
 		AgentPost::FunctionCallOutput(fco) => {
+			let output = match blobs.file(post.post) {
+				Some(RequestFile::Carried(file, bytes)) => {
+					FunctionOutputContent::Parts(vec![
+						ContentPart::input_text(fco.output()),
+						file_part(&file, &bytes),
+					])
+				}
+				_ => FunctionOutputContent::Text(blobs.output_text(post.post)),
+			};
 			InputItem::FunctionCallOutput(FunctionCallOutputParam {
 				id: None,
 				call_id: fco.call_id().to_string(),
-				output: FunctionOutputContent::Text(fco.output().to_string()),
+				output,
 				status: None,
 			})
 		}
@@ -100,23 +118,12 @@ pub fn post_to_o11s_input(
 				file_url: Some(view.url().to_string()),
 			})),
 		),
-		AgentPost::Media(view) => match blobs.base64(post.post) {
+		AgentPost::Media(_) => match blobs.file(post.post) {
+			Some(RequestFile::Carried(file, bytes)) => {
+				message(role, parts(file_part(&file, &bytes)))
+			}
+			Some(file) => message(role, text(&file.text())),
 			None => message(role, text(RequestBlobs::UNAVAILABLE)),
-			Some(data) if view.media_type().is_image() => message(
-				role,
-				parts(ContentPart::InputImage(o11s::InputImage::from_base64(
-					view.media_type().as_str(),
-					&data,
-				))),
-			),
-			Some(data) => message(
-				role,
-				parts(ContentPart::InputFile(o11s::InputFile {
-					filename: Some(view.filename()),
-					file_data: Some(data),
-					file_url: None,
-				})),
-			),
 		},
 		AgentPost::Text(view)
 		| AgentPost::Refusal(view)
@@ -125,6 +132,22 @@ pub fn post_to_o11s_input(
 		| AgentPost::ReasoningSummary(view) => message(role, text(view.text())),
 	}
 	.xok()
+}
+
+/// The content part carrying `bytes` of `file`, base64 encoded: an image as
+/// an image, any other as a file.
+fn file_part(file: &PostFile, bytes: &[u8]) -> ContentPart {
+	let data = base64::Engine::encode(&base64::prelude::BASE64_STANDARD, bytes);
+	match file.media_type() {
+		media_type if media_type.is_image() => ContentPart::InputImage(
+			o11s::InputImage::from_base64(media_type.as_str(), &data),
+		),
+		_ => ContentPart::InputFile(o11s::InputFile {
+			filename: Some(file.filename()),
+			file_data: Some(data),
+			file_url: None,
+		}),
+	}
 }
 
 pub fn ev_to_response_partial(

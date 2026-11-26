@@ -13,13 +13,14 @@ use async_openai::types::chat::ChatCompletionRequestDeveloperMessage;
 use async_openai::types::chat::ChatCompletionRequestDeveloperMessageContent;
 use async_openai::types::chat::ChatCompletionRequestMessage;
 use async_openai::types::chat::ChatCompletionRequestMessageContentPartImage;
+use async_openai::types::chat::ChatCompletionRequestMessageContentPartText;
 use async_openai::types::chat::ChatCompletionRequestSystemMessage;
 use async_openai::types::chat::ChatCompletionRequestSystemMessageContent;
 use async_openai::types::chat::ChatCompletionRequestToolMessage;
 use async_openai::types::chat::ChatCompletionRequestToolMessageContent;
 use async_openai::types::chat::ChatCompletionRequestUserMessage;
-use async_openai::types::chat::ChatCompletionRequestUserMessageContent;
-use async_openai::types::chat::ChatCompletionRequestUserMessageContentPart;
+use async_openai::types::chat::ChatCompletionRequestUserMessageContent as UserContent;
+use async_openai::types::chat::ChatCompletionRequestUserMessageContentPart as UserPart;
 use async_openai::types::chat::ChatCompletionTool;
 use async_openai::types::chat::ChatCompletionToolChoiceOption;
 use async_openai::types::chat::ChatCompletionTools;
@@ -36,35 +37,40 @@ use beet_core::prelude::*;
 // Request Mapping: ModelPost -> ChatCompletionRequestMessage
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Maps a [`ModelPost`] into a [`ChatCompletionRequestMessage`] by the one
-/// rule every protocol shares (the model page, [`crate::table`], "Posts"):
-/// a note as it is in the user role, another actor's call with its output as
-/// one user message, the reading agent's own posts native, a System or
-/// Developer post its role's message unwrapped, and anyone else's a user
-/// message wrapped in `<post author=..>`. A tool message is text alone, so a
-/// file that is neither an image nor text is one line naming it
-/// ([`MediaView::line`]). A `media` post's bytes come from `blobs`, read
-/// before.
+/// Maps a [`ModelPost`] into its [`ChatCompletionRequestMessage`]s by the
+/// one rule every protocol shares (the model page, [`crate::table`],
+/// "Posts"): a note as it is in the user role, another actor's call with its
+/// output as one user message, the reading agent's own posts native, a
+/// System or Developer post its role's message unwrapped, and anyone else's
+/// a user message wrapped in `<post author=..>`.
+///
+/// Each file is as `blobs` sends it. Completions carries an image as an
+/// image and a text file as its text; any other file reads as its line
+/// ([`PostFile::line`]). A tool message is text alone, so a carried file a
+/// tool answered follows it as a user message holding it.
 pub fn post_to_completions_message(
 	agent_id: &ActorId,
 	post: ModelPost,
 	blobs: &RequestBlobs,
-) -> Result<ChatCompletionRequestMessage> {
-	let user = |text: String, name: Option<String>| {
-		ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
-			content: ChatCompletionRequestUserMessageContent::Text(text),
-			name,
-		})
-	};
+) -> Result<Vec<ChatCompletionRequestMessage>> {
 	let post = match post {
 		ModelPost::Post(post) => post,
-		ModelPost::Note(note) => return user(note, None).xok(),
+		ModelPost::Note(note) => {
+			return user_message(UserContent::Text(note), None).xvec().xok();
+		}
 		ModelPost::Call { call, output } => {
-			return user(
-				call.call_text(output.as_ref()),
-				Some(call.actor.name().to_string()),
-			)
-			.xok();
+			let text = call.call_text(
+				output.as_ref().map(|output| blobs.output_text(output)),
+			);
+			let name = Some(call.actor.name().to_string());
+			let content = match output
+				.and_then(|output| blobs.file(output.post))
+				.and_then(|file| carried_part(&file))
+			{
+				Some(part) => UserContent::Array(vec![text_part(text), part]),
+				None => UserContent::Text(text),
+			};
+			return user_message(content, name).xvec().xok();
 		}
 	};
 	let is_self = post.actor_id() == agent_id;
@@ -97,14 +103,19 @@ pub fn post_to_completions_message(
 			ChatCompletionRequestMessage::Assistant(assistant)
 		}
 		AgentPost::FunctionCallOutput(fco) => {
-			ChatCompletionRequestMessage::Tool(
+			let tool = ChatCompletionRequestMessage::Tool(
 				ChatCompletionRequestToolMessage {
 					content: ChatCompletionRequestToolMessageContent::Text(
-						fco.output().to_string(),
+						blobs.output_text(post.post),
 					),
 					tool_call_id: fco.call_id().to_string(),
 				},
-			)
+			);
+			let held = blobs
+				.file(post.post)
+				.and_then(|file| carried_part(&file))
+				.map(|part| user_message(UserContent::Array(vec![part]), None));
+			return [tool].into_iter().chain(held).collect::<Vec<_>>().xok();
 		}
 		AgentPost::Url(view) if view.media_type().is_image() => {
 			build_image_user_message(&post, view.url().to_string())
@@ -120,33 +131,26 @@ pub fn post_to_completions_message(
 		AgentPost::Url(view) => {
 			build_text_message(&post, view.url(), kind, is_self)
 		}
-		AgentPost::Media(view) => match blobs.bytes(post.post) {
-			None => build_text_message(
-				&post,
-				RequestBlobs::UNAVAILABLE,
-				kind,
-				is_self,
-			),
-			Some(_) if view.media_type().is_image() => {
-				build_image_user_message(
-					&post,
-					format!(
-						"data:{};base64,{}",
-						view.media_type().as_str(),
-						blobs.base64(post.post).unwrap_or_default()
-					),
-				)
-			}
-			Some(bytes) if view.media_type().is_text() => {
-				match std::str::from_utf8(&bytes) {
-					Ok(text) => build_text_message(&post, text, kind, is_self),
-					Err(_) => {
-						build_text_message(&post, &view.line(), kind, is_self)
-					}
+		AgentPost::Media(_) => {
+			let file = blobs.file(post.post);
+			match file.as_ref().and_then(carried_part) {
+				Some(UserPart::ImageUrl(image)) => {
+					build_image_user_message(&post, image.image_url.url)
 				}
+				Some(UserPart::Text(text)) => {
+					build_text_message(&post, &text.text, kind, is_self)
+				}
+				_ => build_text_message(
+					&post,
+					&file.map_or_else(
+						|| RequestBlobs::UNAVAILABLE.to_string(),
+						|file| file.text(),
+					),
+					kind,
+					is_self,
+				),
 			}
-			Some(_) => build_text_message(&post, &view.line(), kind, is_self),
-		},
+		}
 		AgentPost::Text(view)
 		| AgentPost::Refusal(view)
 		| AgentPost::Error(view)
@@ -155,7 +159,49 @@ pub fn post_to_completions_message(
 			build_text_message(&post, view.text(), kind, is_self)
 		}
 	};
-	msg.xok()
+	msg.xvec().xok()
+}
+
+/// The part carrying a carried file: an image as an image, its bytes
+/// base64 encoded in a data url, and a text file as its text. `None` for a
+/// file completions cannot carry, which reads as its line, or one not
+/// carried.
+fn carried_part(file: &RequestFile) -> Option<UserPart> {
+	let RequestFile::Carried(file, bytes) = file else {
+		return None;
+	};
+	let media_type = file.media_type();
+	if media_type.is_image() {
+		let data =
+			base64::Engine::encode(&base64::prelude::BASE64_STANDARD, bytes);
+		UserPart::ImageUrl(ChatCompletionRequestMessageContentPartImage {
+			image_url: ImageUrl {
+				url: format!("data:{media_type};base64,{data}"),
+				detail: None,
+			},
+		})
+		.xsome()
+	} else if media_type.is_text() {
+		text_part(std::str::from_utf8(bytes).ok()?.to_string()).xsome()
+	} else {
+		None
+	}
+}
+
+/// A text part of a user message.
+fn text_part(text: String) -> UserPart {
+	UserPart::Text(ChatCompletionRequestMessageContentPartText { text })
+}
+
+/// A user message of `content`, by `name` if given, never wrapped.
+fn user_message(
+	content: UserContent,
+	name: Option<String>,
+) -> ChatCompletionRequestMessage {
+	ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+		content,
+		name,
+	})
 }
 
 /// Builds a text message, dispatching on role.
@@ -205,9 +251,7 @@ fn build_text_message(
 			let wrapped = post.wrap_user_text(text);
 			ChatCompletionRequestMessage::User(
 				ChatCompletionRequestUserMessage {
-					content: ChatCompletionRequestUserMessageContent::Text(
-						wrapped,
-					),
+					content: UserContent::Text(wrapped),
 					name: Some(post.actor.name().to_string()),
 				},
 			)
@@ -220,19 +264,17 @@ fn build_image_user_message(
 	post: &AuthoredPost,
 	image_url: String,
 ) -> ChatCompletionRequestMessage {
-	ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
-		content: ChatCompletionRequestUserMessageContent::Array(vec![
-			ChatCompletionRequestUserMessageContentPart::ImageUrl(
-				ChatCompletionRequestMessageContentPartImage {
-					image_url: ImageUrl {
-						url: image_url,
-						detail: None,
-					},
+	user_message(
+		UserContent::Array(vec![UserPart::ImageUrl(
+			ChatCompletionRequestMessageContentPartImage {
+				image_url: ImageUrl {
+					url: image_url,
+					detail: None,
 				},
-			),
-		]),
-		name: Some(post.actor.name().to_string()),
-	})
+			},
+		)]),
+		Some(post.actor.name().to_string()),
+	)
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -620,6 +662,7 @@ mod test {
 			&RequestBlobs::default(),
 		)
 		.unwrap()
+		.remove(0)
 		{
 			ChatCompletionRequestMessage::User(message) => {
 				match message.content {
@@ -685,7 +728,7 @@ mod test {
 			)
 			.unwrap(),
 		)
-		.unwrap()["content"][0]["image_url"]["url"]
+		.unwrap()[0]["content"][0]["image_url"]["url"]
 			.as_str()
 			.unwrap()
 			.xpect_eq("https://example.com/cat.png");

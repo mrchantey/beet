@@ -17,6 +17,8 @@ mod request_blobs;
 pub use request_blobs::*;
 #[cfg(feature = "action")]
 mod post_streamer_action;
+#[cfg(all(test, feature = "agent"))]
+pub(crate) mod request_test;
 #[cfg(feature = "action")]
 pub(crate) use call_functions::*;
 #[cfg(feature = "agent")]

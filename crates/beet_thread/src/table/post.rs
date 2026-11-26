@@ -9,9 +9,10 @@ use beet_net::prelude::*;
 ///
 /// Its id carries its time and its partition is its thread, so the row
 /// stores neither: [`Self::thread`] is set by whatever loaded it, since a
-/// branch's records hold several threads' posts. A `media` post's bytes are
-/// never in its row: they ride on the post in memory ([`Self::bytes`]) until
-/// a flush writes them to the blob store, and are read back for a request.
+/// branch's records hold several threads' posts. The bytes of a file a post
+/// holds ([`Self::file`]) are never in its row: they ride on the post in
+/// memory ([`Self::bytes`]) until a flush writes them to the blob store, and
+/// are read back for a request.
 ///
 /// Read a post's content through its typed view ([`AgentPost`]), a log's
 /// through its kind ([`Self::log`]). Posts order by id.
@@ -37,7 +38,7 @@ pub struct Post {
 	/// The kind's own fields.
 	#[serde(default)]
 	body: Map,
-	/// A `media` post's bytes, held in memory and never serialized.
+	/// The bytes of the file the post holds, in memory and never serialized.
 	#[serde(skip)]
 	#[reflect(ignore)]
 	bytes: Option<Bytes>,
@@ -109,7 +110,8 @@ pub enum PostKind {
 	ReasoningSummary,
 	/// `{name, call_id, arguments}`: a tool called.
 	ToolCall,
-	/// `{call_id, text}`, its subject the call: what a tool answered.
+	/// `{call_id, text, blob?, file_stem?}`, its subject the call: what a
+	/// tool answered, its bytes by reference.
 	ToolOutput,
 	/// A log: an actor joined ([`SessionOpened`]).
 	SessionOpened,
@@ -336,25 +338,25 @@ impl Post {
 		}
 	}
 
-	/// Replace what the post is, keeping its id, author and status.
-	pub(crate) fn replace_content(&mut self, kind: PostKind, body: Map) {
-		self.kind = kind;
-		self.body = body;
-		self.bytes = None;
-	}
-
 	/// Set the string field `name` of the body.
 	pub(crate) fn set_field(&mut self, name: &str, value: impl Into<String>) {
 		self.body.insert(name, value.into());
 	}
 
-	/// A `media` post's bytes, while this post holds them in memory.
+	/// The body, mutably.
+	pub(crate) fn body_mut(&mut self) -> &mut Map { &mut self.body }
+
+	/// The bytes of the file this post holds ([`Self::file`]), while it
+	/// holds them in memory.
 	pub fn bytes(&self) -> Option<&Bytes> { self.bytes.as_ref() }
 
 	/// Hold `bytes` in memory on this post.
 	pub(crate) fn set_bytes(&mut self, bytes: Bytes) {
 		self.bytes = Some(bytes);
 	}
+
+	/// Drop the bytes held in memory, which the blob store, if any, holds.
+	pub(crate) fn release_bytes(&mut self) { self.bytes = None; }
 }
 
 impl std::fmt::Display for Post {
@@ -362,11 +364,11 @@ impl std::fmt::Display for Post {
 		if let Some(text) = self.text() {
 			return f.write_str(text);
 		}
-		match self.as_agent_post() {
-			Some(AgentPost::Media(view)) => {
-				write!(f, "[{}, {} bytes]", view.media_type(), view.size())
+		match self.file() {
+			Some(file) => {
+				write!(f, "[{}, {} bytes]", file.media_type(), file.size())
 			}
-			_ => write!(f, "[{}]", self.kind),
+			None => write!(f, "[{}]", self.kind),
 		}
 	}
 }

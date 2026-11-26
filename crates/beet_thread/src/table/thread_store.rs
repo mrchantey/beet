@@ -27,15 +27,16 @@ use std::sync::atomic::Ordering;
 /// A window's records flush into it as they change, each flush one atomic
 /// batch of the posts it has not written and their metadata, a task of its
 /// own; [`ThreadStore::flush`] awaits every one, so a window is torn down
-/// only once its records are written. A `media` post's bytes are written to
-/// `blobs/<cid>` in the nearest blob store before its row, so a stored
-/// reference always resolves.
+/// only once its records are written. The bytes of a file a post holds are
+/// written to `blobs/<cid>` in the nearest blob store before its row, so a
+/// stored reference always resolves.
 #[derive(Clone, Component)]
 #[require(SyncedRecords)]
 pub struct ThreadStore {
 	/// The root partition of the table store holding every thread.
 	root: TableStore,
-	/// Where a `media` post's bytes are written, `None` to hold them in memory.
+	/// Where the bytes of a post's file are written, `None` to hold them in
+	/// memory.
 	blobs: Option<BlobStore>,
 	/// The mount's filled directory, the prefix of every index key.
 	dir: RelPath,
@@ -68,7 +69,7 @@ impl ThreadStore {
 		.xok()
 	}
 
-	/// Write `media` posts' bytes to `blobs`.
+	/// Write the bytes of posts' files to `blobs`.
 	pub fn with_blobs(mut self, blobs: BlobStore) -> Self {
 		self.blobs = Some(blobs);
 		self
@@ -77,7 +78,7 @@ impl ThreadStore {
 	/// The directory this store's threads are listed under.
 	pub fn dir(&self) -> &RelPath { &self.dir }
 
-	/// The blob store `media` posts' bytes are written to, if any.
+	/// The blob store the bytes of posts' files are written to, if any.
 	pub fn blobs(&self) -> Option<&BlobStore> { self.blobs.as_ref() }
 
 	/// Ensure the backing store exists, creating it if needed.
@@ -318,19 +319,17 @@ impl ThreadStore {
 		self.partition(id)?.table::<Thread>().get(id).await
 	}
 
-	/// Write each `media` post's bytes it holds to `blobs/<cid>`, addressed
-	/// by content so the same bytes twice are one blob. Without a blob store
-	/// the bytes stay in memory on the window.
+	/// Write the bytes of each file a post holds in memory to `blobs/<cid>`,
+	/// addressed by content so the same bytes twice are one blob. Without a
+	/// blob store the bytes stay in memory on the window. Nothing removes a
+	/// blob: a post edited or deleted keeps its file, as it keeps its row.
 	async fn write_blobs(&self, posts: &[Post]) -> Result {
 		let Some(blobs) = &self.blobs else {
 			return Ok(());
 		};
 		for post in posts {
-			if let (Some(bytes), Some(AgentPost::Media(view))) =
-				(post.bytes(), post.as_agent_post())
-				&& let Some(blob) = view.blob()
-			{
-				let path = Self::blob_path(&blob);
+			if let (Some(bytes), Some(file)) = (post.bytes(), post.file()) {
+				let path = Self::blob_path(file.blob());
 				if !blobs.exists(&path).await? {
 					blobs.insert(&path, bytes.clone()).await?;
 				}
@@ -965,11 +964,8 @@ pub(crate) mod thread_store_test {
 		posts.len().xpect_eq(2);
 		for post in &posts {
 			post.bytes().xpect_none();
-			let Some(AgentPost::Media(view)) = post.as_agent_post() else {
-				panic!("expected a media post, found {post:?}");
-			};
 			store
-				.read_blob(&view.blob().unwrap())
+				.read_blob(post.file().unwrap().blob())
 				.await
 				.unwrap()
 				.to_vec()

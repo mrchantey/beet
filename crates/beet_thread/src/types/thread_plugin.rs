@@ -36,9 +36,6 @@ impl Plugin for ThreadPlugin {
 			// markup persistence: declare a thread-record store from `.bsx`
 			.register_type::<MountThreadStore>()
 			.register_type::<ThreadEntryParams>()
-			// markup image bounding: stub older images so an endless loop's
-			// request stays bounded without dropping a post
-			.register_type::<StubOldImages>()
 			// a route of the surrounding url space as an agent's tool,
 			// `<RouteTool path=".."/>`
 			.register_type::<RouteToolCall>()
@@ -100,6 +97,8 @@ impl Plugin for ThreadPlugin {
 			.register_type::<ProviderToolDefinition>()
 			.register_type::<ToolChoice>()
 			.register_type::<StringEnumOptions>()
+			// how many files an agent's context carries
+			.register_type::<KeepBlobs>()
 			// ── Markup templates ──────────────────────────────────────────
 			.install_types::<(CreatePost, CreateActor)>()
 			.add_observer(reapply_string_enum_options)
@@ -110,7 +109,7 @@ impl Plugin for ThreadPlugin {
 			.add_systems(Update, sync_string_enum_options)
 			.add_systems(
 				PostUpdate,
-				(sync_windows, sync_records_to_store).chain(),
+				(sync_windows, sync_records_to_store, release_bytes).chain(),
 			);
 	}
 }
