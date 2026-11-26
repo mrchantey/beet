@@ -1,4 +1,4 @@
-//! An account's repo as a provider: the [`Pds`] family and the converge that
+//! An account's PDS as a provider: the [`Pds`] family and the converge that
 //! makes a repo match what a document declares.
 //!
 //! The erased-provider pattern: a [`PdsProvider`] trait, the [`Pds`] handle

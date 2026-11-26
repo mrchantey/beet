@@ -1,4 +1,4 @@
-//! The provider-agnostic seam an account's repo lives behind.
+//! The provider-agnostic seam an account's PDS lives behind.
 use crate::prelude::*;
 use alloc::sync::Arc;
 use beet_core::prelude::*;

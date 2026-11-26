@@ -24,7 +24,7 @@ site (eg `examples/beetmania`) declares its own servers and commands in markup, 
 | `run-wasm` | Cargo runner for `wasm32-unknown-unknown` targets |
 | `build-wasm` | Build a wasm module and its bindings |
 | `check` | Lint a no-code site's routes |
-| `compile` | Compile a package's branch into its scene records and package record, in the package's space under `./.beet/repo/` (`--branch`, `--home`) |
+| `compile` | Compile a package's branch into its scene records and package record, in the package's space under `./.beet/pds/` (`--branch`, `--home`) |
 | `export-static` | Render a no-code site to its `dist/` |
 | `export-pdf` | Render a route to PDF |
 | `store-sync` | Sync one store into another, any two store uris |

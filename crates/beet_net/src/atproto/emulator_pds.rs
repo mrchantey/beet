@@ -16,8 +16,8 @@ use bytes::Bytes;
 /// ```text
 /// records/<collection>/<rkey>.cbor   a record body in its storage format
 /// blobs/<cid>                        a blob's bytes
-/// spaces/<type>/<key>/<author>/      a member's repo in a space, laid out
-///                                    the same
+/// space/<type>/<key>/<author>/       a member's repo in a space, laid out
+///                                    the same, `space` the uri's segment
 /// ```
 ///
 /// A record is stored in its [`storage_format`](Self::storage_format),
@@ -69,7 +69,6 @@ impl EmulatorPds {
 
 	const RECORDS: &'static str = "records";
 	const BLOBS: &'static str = "blobs";
-	const SPACES: &'static str = "spaces";
 	/// The author directory of the account's own repo in a space.
 	const SELF_AUTHOR: &'static str = "self";
 
@@ -91,7 +90,7 @@ impl EmulatorPds {
 			RepoScope::Space { space, author } => {
 				self.root.with_subdir(RelPath::new(format!(
 					"{}/{}/{}/{}",
-					Self::SPACES,
+					RepoScope::SPACE_SEGMENT,
 					space.r#type,
 					space.key,
 					match author == &self.did {
@@ -596,11 +595,11 @@ mod test {
 		paths.sort();
 		paths.xpect_eq(vec![
 			RelPath::new(format!(
-				"spaces/org.beet.space.package/todos/self/blobs/{}",
+				"space/org.beet.space.package/todos/self/blobs/{}",
 				blob.cid
 			)),
 			RelPath::new(
-				"spaces/org.beet.space.package/todos/self/records/com.example.card/a.cbor",
+				"space/org.beet.space.package/todos/self/records/com.example.card/a.cbor",
 			),
 		]);
 		public
@@ -623,7 +622,7 @@ mod test {
 		emulator
 			.store()
 			.exists(&RelPath::new(format!(
-				"spaces/org.beet.space.package/todos/self/blobs/{}",
+				"space/org.beet.space.package/todos/self/blobs/{}",
 				blob.cid
 			)))
 			.await

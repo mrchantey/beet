@@ -284,12 +284,12 @@ mod test {
 			registry.register::<RouteMeta>();
 			registry.register::<DocMeta>();
 		}
-		let repo = PackageCompiler::local_repo(&home);
-		let report = PackageCompiler::new(DocParsers::of(&world), repo.clone())
+		let pds = PackageCompiler::local_pds(&home);
+		let report = PackageCompiler::new(DocParsers::of(&world), pds.clone())
 			.compile(&home, &RelPath::new("site/main.bsx"))
 			.await
 			.unwrap();
-		let space = repo.space(SpaceRef::package("site").unwrap()).unwrap();
+		let space = pds.space(SpaceRef::package("site").unwrap()).unwrap();
 		let package = space
 			.get::<PackageRecord>(report.package_record.uri.rkey())
 			.await

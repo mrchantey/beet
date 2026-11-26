@@ -37,8 +37,8 @@ use bytes::Bytes;
 /// let home = BlobStore::temp();
 /// home.insert(&RelPath::new("todos/main.json"), r#"{"title":"todos"}"#).await?;
 /// let world = ScenePlugin.into_world();
-/// let repo = PackageCompiler::local_repo(&home);
-/// let report = PackageCompiler::new(DocParsers::of(&world), repo)
+/// let pds = PackageCompiler::local_pds(&home);
+/// let report = PackageCompiler::new(DocParsers::of(&world), pds)
 /// 	.compile(&home, &RelPath::new("todos/main.json"))
 /// 	.await?;
 /// report.package.name.as_str().xpect_eq("todos");
@@ -50,16 +50,16 @@ use bytes::Bytes;
 #[derive(Clone)]
 pub struct PackageCompiler {
 	parsers: DocParsers,
-	repo: Pds,
+	pds: Pds,
 	branch: BranchName,
 }
 
 impl PackageCompiler {
-	/// The did a home directory's repo answers for before any account syncs
+	/// The did a home directory's PDS answers for before any account syncs
 	/// it, its own repo in each space laid out under `self` all the same.
 	pub const LOCAL_DID: &'static str = "did:web:localhost";
 	/// Where a home directory keeps its compiled form.
-	pub const REPO_DIR: &'static str = ".beet/repo";
+	pub const PDS_DIR: &'static str = ".beet/pds";
 	/// The stem an entry document is named by, ie `main.bsx`, which is how a
 	/// dependency's and a sub package's entry are found.
 	pub const ENTRY_STEM: &'static str = "main";
@@ -68,12 +68,12 @@ impl PackageCompiler {
 	const EXCLUDED: &'static [&'static str] = &[".beet", ".git", "target"];
 
 	/// A compiler reading documents through `parsers`, whose types are the
-	/// compiling binary's, and writing into `repo`'s account, each package
+	/// compiling binary's, and writing into `pds`, each package
 	/// into its own space.
-	pub fn new(parsers: DocParsers, repo: Pds) -> Self {
+	pub fn new(parsers: DocParsers, pds: Pds) -> Self {
 		Self {
 			parsers,
-			repo,
+			pds,
 			branch: BranchName::MAIN,
 		}
 	}
@@ -84,13 +84,13 @@ impl PackageCompiler {
 		self
 	}
 
-	/// The repo of the home directory `home`: an [`EmulatorPds`] under its
-	/// [`REPO_DIR`](Self::REPO_DIR), the public repo at the top and each
+	/// The PDS of the home directory `home`: an [`EmulatorPds`] under its
+	/// [`PDS_DIR`](Self::PDS_DIR), the public repo at the top and each
 	/// package's space beneath.
-	pub fn local_repo(home: &BlobStore) -> Pds {
+	pub fn local_pds(home: &BlobStore) -> Pds {
 		Pds::new(EmulatorPds::new(
 			Did::parse(Self::LOCAL_DID).expect("a valid did"),
-			home.with_subdir(RelPath::new(Self::REPO_DIR)),
+			home.with_subdir(RelPath::new(Self::PDS_DIR)),
 		))
 	}
 
@@ -125,7 +125,7 @@ impl PackageCompiler {
 	/// record beside it, or is missing, read from the package's space.
 	pub async fn is_stale(&self, branch: &Branch) -> Result<bool> {
 		let space = self
-			.repo
+			.pds
 			.space(SpaceRef::package(branch.package.as_str())?)?;
 		let rkey = branch.rkey();
 		let (Some(branch_record), Some(package)) = (
@@ -249,7 +249,7 @@ impl PackageCompiler {
 					)
 					.await?;
 				dependency.resolved = Some(ResolvedDependency {
-					did: self.repo.did().clone(),
+					did: self.pds.did().clone(),
 					version: compiled.report.package.version.clone(),
 					record: compiled.report.package_record.clone(),
 				});
@@ -318,7 +318,7 @@ impl PackageCompiler {
 
 			// the writes, each only where its content moved
 			let space =
-				self.repo.space(SpaceRef::package(package.name.as_str())?)?;
+				self.pds.space(SpaceRef::package(package.name.as_str())?)?;
 			let mut writer = SpaceWriter::new(space);
 			let branch = Branch::new(package.name.clone(), self.branch.clone());
 			let existing_files = writer
@@ -667,7 +667,7 @@ mod test {
 	fn compiler(home: &BlobStore) -> PackageCompiler {
 		PackageCompiler::new(
 			DocParsers::of(&world()),
-			PackageCompiler::local_repo(home),
+			PackageCompiler::local_pds(home),
 		)
 	}
 
@@ -691,7 +691,7 @@ mod test {
 	}
 
 	fn space(home: &BlobStore, name: &str) -> Pds {
-		PackageCompiler::local_repo(home)
+		PackageCompiler::local_pds(home)
 			.space(SpaceRef::package(name).unwrap())
 			.unwrap()
 	}
@@ -728,7 +728,7 @@ mod test {
 		let blob = scene.body().get::<BlobRef>().unwrap();
 		let bytes = home
 			.get(&RelPath::new(format!(
-				".beet/repo/spaces/org.beet.space.package/todos/self/blobs/{}",
+				".beet/pds/space/org.beet.space.package/todos/self/blobs/{}",
 				blob.cid
 			)))
 			.await
@@ -989,12 +989,12 @@ mod test {
 			.await
 			.into_iter()
 			.map(|(path, _)| path.to_string())
-			.filter(|path| path.starts_with(".beet/repo/"))
+			.filter(|path| path.starts_with(".beet/pds/"))
 			.collect::<Vec<_>>();
 		paths.is_empty().xpect_false();
 		for path in paths {
 			path.xpect_starts_with(
-				".beet/repo/spaces/org.beet.space.package/todos/self/",
+				".beet/pds/space/org.beet.space.package/todos/self/",
 			);
 		}
 	}

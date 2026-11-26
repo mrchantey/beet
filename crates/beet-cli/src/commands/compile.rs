@@ -1,7 +1,7 @@
 use beet::prelude::*;
 
 /// Compiles a package's branch into scene records and a package record, in
-/// the package's space under the home directory's `.beet/repo/`
+/// the package's space under the home directory's `.beet/pds/`
 /// ([`PackageCompiler`]). The home directory is where `beet` runs unless
 /// `--home` names another, the entry a document or the directory holding it,
 /// relative to the home directory, and a second run over unchanged files
@@ -18,7 +18,7 @@ pub async fn Compile(
 	/// The branch compiled, `main` when absent.
 	#[param]
 	branch: Option<String>,
-	/// The home directory, whose `.beet/repo/` the compile writes to, the
+	/// The home directory, whose `.beet/pds/` the compile writes to, the
 	/// working directory when absent.
 	#[param]
 	home: Option<String>,
@@ -34,7 +34,7 @@ pub async fn Compile(
 		.with(|world: &mut World| DocParsers::of(world))
 		.await;
 	let mut compiler =
-		PackageCompiler::new(parsers, PackageCompiler::local_repo(&home));
+		PackageCompiler::new(parsers, PackageCompiler::local_pds(&home));
 	if let Some(branch) = branch {
 		compiler = compiler.with_branch(BranchName::parse(&branch)?);
 	}
@@ -46,7 +46,7 @@ pub async fn Compile(
 mod test {
 	use super::*;
 
-	/// The verb compiles a package into the home directory's repo, and a
+	/// The verb compiles a package into the home directory's PDS, and a
 	/// second run writes nothing.
 	#[beet::test]
 	async fn compiles_a_package() {
