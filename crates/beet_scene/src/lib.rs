@@ -8,6 +8,8 @@
 //! - [`body`]: a [`SceneBody`](beet_core::prelude::SceneBody) to and from a
 //!   world, what parses a document onto an entity, loads one, saves one and
 //!   edits one.
+//! - [`compile`]: a branch of a package compiled into scenes and a package
+//!   record, under the `compile` feature.
 //! - `instance`: an [`Instance`](beet_core::prelude::Instance) names another
 //!   document of its package. Activating it loads the target through the parser
 //!   its format selects, holds it as data
@@ -25,6 +27,8 @@ extern crate alloc;
 beet_core::test_main!();
 
 pub mod body;
+#[cfg(feature = "compile")]
+pub mod compile;
 pub mod formats;
 mod instance;
 mod literal;
@@ -35,6 +39,8 @@ mod scene_plugin;
 /// Exports the most commonly used items.
 pub mod prelude {
 	pub use crate::body::*;
+	#[cfg(feature = "compile")]
+	pub use crate::compile::*;
 	pub use crate::formats::*;
 	pub use crate::instance::*;
 	pub use crate::literal::*;

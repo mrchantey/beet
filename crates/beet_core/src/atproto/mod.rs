@@ -7,13 +7,19 @@
 //! `Pds`, whose module docs carry the converge's words.
 //!
 //! - [`Did`], an account; [`Nsid`], a collection or a lexicon def; [`Rkey`]
-//!   and [`Tid`], a record's key; [`AtUri`], a record's address, and
+//!   and [`Tid`], a record's key; [`RepoScope`], which of an account's repos
+//!   (its public one or a member's in a [`SpaceRef`]); [`AtUri`], a record's
+//!   address, and
 //!   [`Uri::at_uri`], the view of a lexicon `uri` field (a [`Uri`], held
 //!   verbatim) that names one
 //! - [`Cid`], content addressing for bytes and records; [`StrongRef`] and
 //!   [`BlobRef`], the two references a record holds
+//! - [`Def`], the NSID a type is keyed by in a record, and [`ReflectDef`], a
+//!   registry's lookup both ways
 //! - [`AtprotoRecord`], one shape for every record type beet reads or writes,
 //!   the body alone, and [`Rkeyed`], a body paired with the rkey it lives at
+//! - [`EntityBodyRecord`], an entity body in the data model keyed by NSID,
+//!   and [`EntityCollection`], every beet record, which is one
 //! - [`AtprotoValue`], a value sealed in the data model, which is how a float
 //!   reaches a repo that has none; in canonical DAG-CBOR through
 //!   [`MediaType::DagCbor`] under the `dag_cbor` feature, which is also what
@@ -59,10 +65,13 @@ mod blob_ref;
 mod cid;
 #[cfg(feature = "dag_cbor")]
 mod dag_cbor;
+mod def;
 mod did;
+mod entity_body_record;
 mod nsid;
 mod open_union;
 mod provenance;
+mod repo_scope;
 mod rkey;
 mod rkeyed;
 mod self_labels;
@@ -74,10 +83,13 @@ pub use atproto_record::*;
 pub use atproto_value::*;
 pub use blob_ref::*;
 pub use cid::*;
+pub use def::*;
 pub use did::*;
+pub use entity_body_record::*;
 pub use nsid::*;
 pub use open_union::*;
 pub use provenance::*;
+pub use repo_scope::*;
 pub use rkey::*;
 pub use rkeyed::*;
 pub use self_labels::*;

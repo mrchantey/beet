@@ -504,6 +504,10 @@ scene = ["net", "dep:beet_scene", "beet_router?/scene", "beet_ui?/scene"]
 # BSX, HTML and XML documents, which the router and `beet_ui` turn on with
 # `scene`.
 bsx = ["scene", "beet_scene?/bsx"]
+# The compiler: a package's branch compiled into scene records and a package
+# record in its space (`beet compile`). Builds for every target, so a browser
+# runtime may recompile an edited document.
+compile = ["scene", "dag_cbor", "beet_scene?/compile"]
 # beet_net is a hard dependency of beet_router. The facade pins beet_router to
 # `default-features = false`, so the std router must re-enable the std + http
 # surface it relied on (previously supplied by default features + net).

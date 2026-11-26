@@ -67,6 +67,8 @@ impl Instance {
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
+// hoisted into its document's `Props` at compile
+#[cfg_attr(feature = "serde", reflect(SceneMeta))]
 pub struct Prop {
 	/// The name a use passes it by, and the body binds it by.
 	pub name: SmolStr,

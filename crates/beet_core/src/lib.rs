@@ -67,6 +67,8 @@ mod crate_check;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
+#[cfg(feature = "serde")]
+pub mod package;
 mod path;
 #[cfg(feature = "std")]
 mod path_utils;
@@ -188,6 +190,8 @@ pub mod prelude {
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::fs::*;
+	#[cfg(feature = "serde")]
+	pub use crate::package::*;
 	pub use crate::path::*;
 	#[cfg(feature = "std")]
 	pub use crate::path_utils::*;

@@ -1392,6 +1392,7 @@ dependencies = [
  "beet_net",
  "beet_scene",
  "bevy",
+ "bytes",
  "indexmap 2.14.0",
  "pulldown-cmark",
  "serde",

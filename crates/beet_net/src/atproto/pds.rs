@@ -5,11 +5,14 @@ use beet_core::prelude::*;
 use bytes::Bytes;
 use core::fmt;
 
-/// One account's repo: a real PDS over xrpc, an emulated one in a
+/// One repo of an account: a real PDS over xrpc, an emulated one in a
 /// [`BlobStore`], or anything else downstream. A handle is scoped to the one
-/// repo it was resolved for, exactly as a [`BlobStore`] is scoped to a bucket,
+/// repo it was resolved for, the account's public repo or a member's within one
+/// space ([`RepoScope`]), exactly as a [`BlobStore`] is scoped to a directory,
 /// so every method takes a collection and an rkey and the provider composes
-/// the address.
+/// the address. A caller (the converge, the compiler) works on a scope without
+/// knowing which it holds; [`scoped`](Self::scoped) and
+/// [`space`](Self::space) answer another repo of the same account.
 ///
 /// The erased-provider pattern: an `Arc<dyn PdsProvider>` cloned by every
 /// consumer, landed on the declaring entity by `<AtprotoAccount/>`'s attach
@@ -79,6 +82,28 @@ impl Pds {
 	/// Whether a write here reaches no repo, see [`DryRunPds`].
 	pub fn is_dry_run(&self) -> bool { self.provider.is_dry_run() }
 
+	/// The repo of the account this handle is scoped to.
+	pub fn scope(&self) -> &RepoScope { self.provider.scope() }
+
+	/// The handle to `scope` of the same account.
+	///
+	/// ## Errors
+	/// Errors when the provider cannot reach that repo.
+	pub fn scoped(&self, scope: RepoScope) -> Result<Self> {
+		Self {
+			provider: Arc::from(self.provider.scoped(scope)?),
+		}
+		.xok()
+	}
+
+	/// The account's own repo within `space`.
+	pub fn space(&self, space: SpaceRef) -> Result<Self> {
+		self.scoped(RepoScope::space(space, self.did().clone()))
+	}
+
+	/// The account's public repo.
+	pub fn public(&self) -> Result<Self> { self.scoped(RepoScope::Public) }
+
 	/// A [`DryRunPds`] over this repo, or this repo when it already is one.
 	pub fn dry(&self) -> Self {
 		match self.is_dry_run() {
@@ -89,7 +114,12 @@ impl Pds {
 
 	/// The address of `rkey` in `collection` of this repo.
 	pub fn uri(&self, collection: &Nsid, rkey: &Rkey) -> AtUri {
-		AtUri::new(self.did().clone(), collection.clone(), rkey.clone())
+		AtUri::scoped(
+			self.did().clone(),
+			self.scope().clone(),
+			collection.clone(),
+			rkey.clone(),
+		)
 	}
 
 	/// The record at `rkey`, `None` when there is none.
@@ -205,6 +235,12 @@ pub trait PdsProvider: 'static + Send + Sync {
 
 	/// Whether a write here reaches no repo, see [`DryRunPds`].
 	fn is_dry_run(&self) -> bool { false }
+
+	/// See [`Pds::scope`].
+	fn scope(&self) -> &RepoScope;
+
+	/// See [`Pds::scoped`].
+	fn scoped(&self, scope: RepoScope) -> Result<Box<dyn PdsProvider>>;
 
 	/// See [`Pds::get_record`].
 	fn get_record(

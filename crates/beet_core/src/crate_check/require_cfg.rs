@@ -26,8 +26,10 @@ use crate::prelude::*;
 /// Reporting goes through [`BuildCondition::explain`], which walks a false
 /// condition without short-circuiting, so a rebuild fixes everything the error
 /// named rather than revealing the next missing item one run at a time.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
-#[reflect(Component, Default)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect, Def)]
+#[reflect(Component, Default, Def)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize, SceneMeta))]
 pub struct RequireCfg {
 	/// The condition source, ie `feature:infra && feature:extra`.
 	pub cfg: SmolStr,
@@ -39,6 +41,39 @@ impl RequireCfg {
 		Self {
 			cfg: condition.into(),
 		}
+	}
+
+	/// One requirement holding exactly when every one of `conditions` does,
+	/// `None` for none: each parsed, its top level `&&` flattened, and the
+	/// members deduplicated and sorted, so the union is the same whatever
+	/// order the conditions came in.
+	pub fn union<'a>(
+		conditions: impl IntoIterator<Item = &'a str>,
+	) -> Result<Option<Self>> {
+		let mut members = alloc::collections::BTreeSet::new();
+		for condition in conditions {
+			match BuildCondition::parse(condition)? {
+				BuildCondition::All(all) => {
+					members.extend(all.iter().map(|member| match member {
+						BuildCondition::Any(_) => format!("({member})"),
+						_ => member.to_string(),
+					}))
+				}
+				BuildCondition::Any(any) => {
+					members.insert(format!("({})", BuildCondition::Any(any)));
+				}
+				other => {
+					members.insert(other.to_string());
+				}
+			}
+		}
+		match members.is_empty() {
+			true => None,
+			false => Some(Self::new(
+				members.into_iter().collect::<Vec<_>>().join(" && "),
+			)),
+		}
+		.xok()
 	}
 
 	/// Assert every one of `requirements` holds for this build, before anything
@@ -115,6 +150,31 @@ impl RequireCfg {
 		)
 		.xsome()
 		.xok()
+	}
+}
+
+/// A document's requirements union onto its scene, so a runtime checks a load
+/// set's before fetching any body.
+#[cfg(feature = "serde")]
+impl SceneMeta for RequireCfg {
+	fn apply(cx: &mut SceneMetaContext) -> Result {
+		let own = cx.get::<Self>()?.cfg.clone();
+		let error = |err| cx.error(err);
+		let union = {
+			let existing = cx
+				.world
+				.entity(cx.meta)
+				.get::<Self>()
+				.map(|require| require.cfg.clone());
+			Self::union(
+				existing.iter().map(SmolStr::as_str).chain([own.as_str()]),
+			)
+			.map_err(error)?
+		};
+		if let Some(union) = union {
+			cx.insert_meta(union);
+		}
+		Ok(())
 	}
 }
 

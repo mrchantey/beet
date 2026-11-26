@@ -186,6 +186,8 @@ mermaid-rs-renderer = { version = "0.3", optional = true, default-features = fal
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing", "fs", "rand"] }
+# a page's metas compiled onto its scene record
+beet_scene = { workspace = true, features = ["compile", "bsx"] }
 beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "server"] }
 
 # the in-browser reactivity test drives the fixture through the webdriver

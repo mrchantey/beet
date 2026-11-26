@@ -129,6 +129,51 @@ pub enum BuildCondition {
 	Any(Vec<BuildCondition>),
 }
 
+/// The condition as it parses back, a compound member of another kind in
+/// parentheses: `feature:a && (feature:b || !env:CI)`.
+impl core::fmt::Display for BuildCondition {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		let member = |f: &mut core::fmt::Formatter<'_>,
+		              member: &BuildCondition,
+		              compound: bool|
+		 -> core::fmt::Result {
+			match compound {
+				true => write!(f, "({member})"),
+				false => write!(f, "{member}"),
+			}
+		};
+		let join = |f: &mut core::fmt::Formatter<'_>,
+		            members: &[BuildCondition],
+		            separator: &str,
+		            is_other: fn(&BuildCondition) -> bool|
+		 -> core::fmt::Result {
+			for (i, item) in members.iter().enumerate() {
+				if i > 0 {
+					f.write_str(separator)?;
+				}
+				member(f, item, is_other(item))?;
+			}
+			Ok(())
+		};
+		match self {
+			Self::Atom {
+				namespace,
+				argument,
+			} => write!(f, "{namespace}:{argument}"),
+			Self::Not(inner) => {
+				f.write_str("!")?;
+				member(f, inner, !matches!(**inner, Self::Atom { .. }))
+			}
+			Self::All(members) => {
+				join(f, members, " && ", |item| matches!(item, Self::Any(_)))
+			}
+			Self::Any(members) => {
+				join(f, members, " || ", |item| matches!(item, Self::All(_)))
+			}
+		}
+	}
+}
+
 impl BuildCondition {
 	/// Parse a condition, ie `feature:infra && !env:CI`.
 	pub fn parse(source: &str) -> Result<Self> {

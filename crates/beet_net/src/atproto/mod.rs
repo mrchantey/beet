@@ -3,7 +3,11 @@
 //!
 //! The erased-provider pattern: a [`PdsProvider`] trait, the [`Pds`] handle
 //! every consumer clones, the `<AtprotoAccount/>` declaration whose attach
-//! lands one on its entity, and [`PdsQuery`] to resolve it. Three providers:
+//! lands one on its entity, and [`PdsQuery`] to resolve it. A handle is scoped
+//! to one repo of its account ([`RepoScope`]), the public one or an author's
+//! within a space, a package's being `Pds::space`, and every caller (the
+//! converge, the compiler) works on a scope without knowing which. Three
+//! providers:
 //!
 //! - [`EmulatorPds`], a repo laid out in any [`BlobStore`] that performs a
 //!   PDS's duties on write, for tests and for a repo that never leaves the

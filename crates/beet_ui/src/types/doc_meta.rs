@@ -54,9 +54,11 @@ use beet_scene::prelude::ReflectFrontmatter;
 /// `FrontmatterType`, so its
 /// keys are written unsectioned; a route's own keys sit in a `[RouteMeta]`
 /// table (see [`RouteMeta`](crate::prelude::RouteMeta)).
-#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
-#[reflect(Component, Default)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect, Def)]
+#[reflect(Component, Default, Def)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// read field by field, as authored: no `ReflectDeserialize`
+#[cfg_attr(feature = "serde", reflect(SceneMeta))]
 #[cfg_attr(feature = "scene", reflect(Frontmatter))]
 pub struct DocMeta {
 	/// Document title; overrides the package title in the document `Head`.
@@ -496,5 +498,20 @@ mod test {
 	fn defaults_when_empty() {
 		let meta = parse("", MediaType::Yaml);
 		meta.xpect_eq(DocMeta::default());
+	}
+}
+
+/// A document's DocMeta is its scene's, hoisted at compile so whatever lists
+/// pages (a route table, a sidebar) reads it without fetching a body. The
+/// first a document declares, its root's in a page.
+#[cfg(feature = "serde")]
+impl SceneMeta for DocMeta {
+	fn apply(cx: &mut SceneMetaContext) -> Result {
+		if cx.world.entity(cx.meta).contains::<Self>() {
+			return Ok(());
+		}
+		let declared = cx.get::<Self>()?.clone();
+		cx.insert_meta(declared);
+		Ok(())
 	}
 }

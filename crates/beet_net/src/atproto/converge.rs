@@ -336,6 +336,16 @@ pub(crate) mod test {
 	#[beet_core::test]
 	async fn converges() { converge_suite(&Pds::temp()).await; }
 
+	/// The same code over a member's repo in a space, which never learns
+	/// which scope it holds, leaving the public repo untouched.
+	#[beet_core::test]
+	async fn converges_within_a_space() {
+		let public = Pds::temp();
+		let space = public.space(SpaceRef::package("site").unwrap()).unwrap();
+		converge_suite(&space).await;
+		public.list::<Doc>().await.unwrap().xpect_empty();
+	}
+
 	/// A dry run's report carries the cid the write would produce.
 	#[beet_core::test]
 	async fn a_dry_run_writes_nothing() {

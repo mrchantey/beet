@@ -29,6 +29,10 @@ bsx = ["beet_core/bsx"]
 # fragment primitive, so BSX is the single markup authority and an embedded
 # component, template or `bx:` directive is the one it is in BSX.
 markdown = ["bsx", "dep:pulldown-cmark"]
+# The compiler: a branch of a package compiled into scene records and a
+# package record in the package's space, a scene body's blob being its
+# postcard and every record DAG-CBOR in an `EmulatorPds`.
+compile = ["postcard", "beet_net/dag_cbor", "dep:bytes"]
 
 [lib]
 harness = false
@@ -40,6 +44,7 @@ bevy.workspace = true
 indexmap.workspace = true
 serde.workspace = true
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
+bytes = { workspace = true, optional = true }
 
 # the types of the crates below, through the toolchain
 [[test]]
@@ -52,4 +57,4 @@ beet_action = { workspace = true, features = ["std", "reflect", "scripting"] }
 beet_core = { workspace = true, features = ["testing", "rsx", "json"] }
 beet_net = { workspace = true, features = ["atproto"] }
 # the formats the suite reads
-beet_scene = { path = ".", features = ["json", "toml", "postcard", "bsx", "markdown"] }
+beet_scene = { path = ".", features = ["json", "toml", "postcard", "bsx", "markdown", "compile"] }

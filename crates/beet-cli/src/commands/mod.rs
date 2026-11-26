@@ -2,6 +2,7 @@
 
 mod analytics;
 mod check;
+mod compile;
 mod entry;
 mod export_pdf;
 mod export_static;
@@ -25,6 +26,7 @@ mod wasm_render_check;
 
 pub use analytics::*;
 pub use check::*;
+pub use compile::*;
 pub(crate) use entry::*;
 pub use export_pdf::*;
 pub use export_static::*;
@@ -45,6 +47,7 @@ impl Plugin for CliCommandsPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<AnalyticsReport>()
 			.register_type::<Check>()
+			.register_type::<Compile>()
 			.register_type::<ExportStatic>()
 			.register_type::<RunWasm>()
 			.register_type::<BuildWasm>()

@@ -242,6 +242,8 @@ beet = { workspace = true, features = [
 	# standard.site records and the `<AtprotoAccount/>` declarations
 	"dag_cbor",
 	"scene",
+	# `beet compile`, on every target
+	"compile",
 	"markdown",
 	"style",
 	"template",

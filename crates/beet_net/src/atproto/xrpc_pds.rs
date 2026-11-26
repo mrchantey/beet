@@ -280,6 +280,21 @@ impl PdsProvider for XrpcPds {
 
 	fn did(&self) -> &Did { &self.did }
 
+	/// The public repo alone until the spaces protocol lands.
+	fn scope(&self) -> &RepoScope { &RepoScope::Public }
+
+	fn scoped(&self, scope: RepoScope) -> Result<Box<dyn PdsProvider>> {
+		match scope {
+			RepoScope::Public => self.box_clone().xok(),
+			RepoScope::Space { space, .. } => bevybail!(
+				"{} cannot reach the space `{space}`: a real PDS's spaces are \
+				 spoken by the spaces protocol, which this client does not \
+				 yet speak",
+				self.describe()
+			),
+		}
+	}
+
 	fn get_record(
 		&self,
 		collection: Nsid,

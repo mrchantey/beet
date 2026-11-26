@@ -10,13 +10,14 @@ use crate::prelude::*;
 /// ```json
 /// {"$type":"blob","ref":{"$link":"bafkrei.."},"mimeType":"image/png","size":1234}
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Def)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
 	feature = "serde",
 	serde(try_from = "BlobRefWire", into = "BlobRefWire")
 )]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
+#[reflect(Def)]
 pub struct BlobRef {
 	/// The blob's content id, under the raw codec.
 	pub cid: Cid,

@@ -4,6 +4,7 @@ extern crate alloc;
 mod action;
 mod as_any;
 mod bundle_effect;
+mod def;
 mod entity_target_event;
 mod getset;
 mod main_attr;
@@ -452,6 +453,27 @@ pub fn derive_set_with(
 ///     pub fn parse(text: &str) -> Result<Self> { .. }
 /// }
 /// ```
+/// Derive `Def`, a type's name in a record: its NSID, the lexicon its crate
+/// exports under then `#` and the type name camel cased.
+///
+/// A `beet_*` crate exports as `org.beet.*`, so `Provenance` in `beet_core`
+/// is `org.beet.core#provenance`; any other crate names its lexicon, and a
+/// bare lexicon's `main` names itself whole:
+///
+/// ```ignore
+/// #[derive(Def)]
+/// #[def(lexicon = "com.example.plugin")]
+/// pub struct Thing;   // com.example.plugin#thing
+///
+/// #[derive(Def)]
+/// #[def(nsid = "org.beet.scene#body")]
+/// pub struct SceneBody;
+/// ```
+#[proc_macro_derive(Def, attributes(def))]
+pub fn derive_def(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	def::impl_def(input)
+}
+
 #[proc_macro_derive(StringPrimitive)]
 pub fn derive_string_primitive(
 	input: proc_macro::TokenStream,

@@ -33,9 +33,9 @@ use bytes::Bytes;
 pub struct DryRunPds {
 	/// The repo beneath, only ever read.
 	repo: Pds,
-	/// What this run wrote (`Some`) or deleted (`None`), by collection and
-	/// rkey.
-	writes: Arc<RwLock<HashMap<(Nsid, Rkey), Option<RecordEntry>>>>,
+	/// What this run wrote (`Some`) or deleted (`None`), by scope, collection
+	/// and rkey, shared by every scope of the run.
+	writes: Arc<RwLock<HashMap<(RepoScope, Nsid, Rkey), Option<RecordEntry>>>>,
 }
 
 impl DryRunPds {
@@ -60,7 +60,7 @@ impl DryRunPds {
 		self.writes
 			.read()
 			.unwrap_or_else(bevy::platform::sync::PoisonError::into_inner)
-			.get(&(collection.clone(), rkey.clone()))
+			.get(&(self.repo.scope().clone(), collection.clone(), rkey.clone()))
 			.cloned()
 	}
 
@@ -70,7 +70,7 @@ impl DryRunPds {
 		self.writes
 			.write()
 			.unwrap_or_else(bevy::platform::sync::PoisonError::into_inner)
-			.insert((collection, rkey), entry);
+			.insert((self.repo.scope().clone(), collection, rkey), entry);
 	}
 
 	async fn get(
@@ -97,8 +97,10 @@ impl DryRunPds {
 			.read()
 			.unwrap_or_else(bevy::platform::sync::PoisonError::into_inner)
 			.iter()
-			.filter(|((written, _), _)| *written == collection)
-			.map(|((_, rkey), entry)| (rkey.clone(), entry.clone()))
+			.filter(|((scope, written, _), _)| {
+				scope == self.repo.scope() && *written == collection
+			})
+			.map(|((_, _, rkey), entry)| (rkey.clone(), entry.clone()))
 			.collect::<Vec<_>>();
 		for (rkey, entry) in writes {
 			match entry {
@@ -124,6 +126,16 @@ impl PdsProvider for DryRunPds {
 	fn did(&self) -> &Did { self.repo.did() }
 
 	fn is_dry_run(&self) -> bool { true }
+
+	fn scope(&self) -> &RepoScope { self.repo.scope() }
+
+	fn scoped(&self, scope: RepoScope) -> Result<Box<dyn PdsProvider>> {
+		let scoped: Box<dyn PdsProvider> = Box::new(Self {
+			repo: self.repo.scoped(scope)?,
+			writes: self.writes.clone(),
+		});
+		scoped.xok()
+	}
 
 	fn get_record(
 		&self,

@@ -22,9 +22,11 @@ use beet_scene::prelude::ReflectFrontmatter;
 /// [`apply_slug`](Self::apply_slug) and
 /// [`declare_file_defaults`](Self::declare_file_defaults)): a `slug` renames
 /// the route's last segment, and a numbered filename orders it.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
-#[reflect(Component, Default)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect, Def)]
+#[reflect(Component, Default, Def)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// read field by field, as authored: no `ReflectDeserialize`
+#[cfg_attr(feature = "serde", reflect(SceneMeta))]
 #[cfg_attr(feature = "scene", reflect(Frontmatter))]
 pub struct RouteMeta {
 	/// The single url segment this page serves at, replacing the one its
@@ -261,5 +263,74 @@ mod test {
 			.xpect_true();
 		// the filename orders a document declaring nothing else
 		order("blog/10-later.md", "").unwrap().xpect_eq(10);
+	}
+
+	/// A page's metas, authored as markup writes them, hoist onto its scene
+	/// record, so whatever lists pages reads them with no body: an enum
+	/// variant and a date read field by field as at runtime.
+	#[beet_core::test]
+	async fn hoists_onto_the_scene_record() {
+		use beet_net::prelude::*;
+		let home = BlobStore::temp();
+		home.insert(
+			&RelPath::new("site/main.bsx"),
+			r#"<article {RouteMeta{visibility: RouteVisibility::Unlisted}} {DocMeta{title:"Counter", created:"2026-08-28"}}><p>hi</p></article>"#,
+		)
+		.await
+		.unwrap();
+		let world = ScenePlugin.into_world();
+		{
+			let mut registry = world.resource::<AppTypeRegistry>().write();
+			registry.register::<RouteMeta>();
+			registry.register::<DocMeta>();
+		}
+		let repo = PackageCompiler::local_repo(&home);
+		let report = PackageCompiler::new(DocParsers::of(&world), repo.clone())
+			.compile(&home, &RelPath::new("site/main.bsx"))
+			.await
+			.unwrap();
+		let space = repo.space(SpaceRef::package("site").unwrap()).unwrap();
+		let package = space
+			.get::<PackageRecord>(report.package_record.uri.rkey())
+			.await
+			.unwrap()
+			.unwrap()
+			.value;
+		let scene_ref = package.body().get::<Scenes>().unwrap().0
+			[&RelPath::new("main.bsx")]
+			.clone();
+		let scene = space
+			.get::<SceneRecord>(scene_ref.record.uri.rkey())
+			.await
+			.unwrap()
+			.unwrap()
+			.value;
+		scene
+			.body()
+			.get::<RouteMeta>()
+			.unwrap()
+			.visibility
+			.xpect_eq(RouteVisibility::Unlisted);
+		scene
+			.body()
+			.get::<DocMeta>()
+			.unwrap()
+			.title
+			.xpect_eq(Some("Counter".to_string()));
+	}
+}
+
+/// A document's RouteMeta is its scene's, hoisted at compile so whatever lists
+/// pages (a route table, a sidebar) reads it without fetching a body. The
+/// first a document declares, its root's in a page.
+#[cfg(feature = "serde")]
+impl SceneMeta for RouteMeta {
+	fn apply(cx: &mut SceneMetaContext) -> Result {
+		if cx.world.entity(cx.meta).contains::<Self>() {
+			return Ok(());
+		}
+		let declared = cx.get::<Self>()?.clone();
+		cx.insert_meta(declared);
+		Ok(())
 	}
 }

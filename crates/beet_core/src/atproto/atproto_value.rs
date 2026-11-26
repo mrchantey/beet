@@ -88,6 +88,11 @@ impl AtprotoValue {
 	/// The data model form as json text, exactly what a repo stores.
 	pub fn to_json_string(&self) -> String { self.0.to_json_string() }
 
+	/// The data model form itself, what a repo stores and a cid hashes, its
+	/// floats still [`FLOAT`](Self::FLOAT) objects: the counterpart of
+	/// [`from_wire`](Self::from_wire).
+	pub fn into_wire(self) -> Value { self.0 }
+
 	/// Back to a beet value: every [`FLOAT`](Self::FLOAT) object a float and
 	/// every `$bytes` a byte string again.
 	pub fn decode(self) -> Value { Self::decode_value(self.0) }

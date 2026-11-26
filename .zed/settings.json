@@ -35,7 +35,7 @@
 		".agents/tmp*",
 		// ".agents/reference",
 		".cargo",
-		".beet",
+		// ".beet",
 		".claude",
 		// "site/assets",
 		// ".gitignore",

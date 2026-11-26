@@ -7,11 +7,17 @@ use bytes::Bytes;
 /// the one a repo that never leaves the machine (or lives in a bucket) is.
 ///
 /// Authoritative on the layout, which is plain enough to read in a file
-/// browser and to mirror with `BlobSync`:
+/// browser and to mirror with `BlobSync`. Each [`RepoScope`] is a
+/// self-contained root with its own records and blobs, the public repo at the
+/// top and each member's repo within a space beneath it, the account's own
+/// under `self`, so one root is one partition and a blob of a space never sits
+/// in the pool a public bucket serves:
 ///
 /// ```text
 /// records/<collection>/<rkey>.cbor   a record body in its storage format
 /// blobs/<cid>                        a blob's bytes
+/// spaces/<type>/<key>/<author>/      a member's repo in a space, laid out
+///                                    the same
 /// ```
 ///
 /// A record is stored in its [`storage_format`](Self::storage_format),
@@ -41,7 +47,13 @@ pub struct EmulatorPds {
 	#[get(skip)]
 	#[set_with(skip)]
 	did: Did,
-	/// The store the repo is laid out in.
+	/// The account's whole tree, every scope beneath it.
+	#[set_with(skip)]
+	root: BlobStore,
+	#[get(skip)]
+	#[set_with(skip)]
+	scope: RepoScope,
+	/// The store this scope's repo is laid out in.
 	#[set_with(skip)]
 	store: BlobStore,
 	/// The format a record body is stored in, [`MediaType::DagCbor`] by
@@ -57,13 +69,42 @@ impl EmulatorPds {
 
 	const RECORDS: &'static str = "records";
 	const BLOBS: &'static str = "blobs";
+	const SPACES: &'static str = "spaces";
+	/// The author directory of the account's own repo in a space.
+	const SELF_AUTHOR: &'static str = "self";
 
-	/// The repo of `did` laid out in `store`, its records in DAG-CBOR.
+	/// The public repo of `did` laid out in `store`, its records in DAG-CBOR.
 	pub fn new(did: Did, store: BlobStore) -> Self {
 		Self {
 			did,
+			root: store.clone(),
+			scope: RepoScope::Public,
 			store,
 			storage_format: MediaType::DagCbor,
+		}
+	}
+
+	/// This account's repo `scope`, laid out beneath the same root.
+	pub fn with_scope(&self, scope: RepoScope) -> Self {
+		let store = match &scope {
+			RepoScope::Public => self.root.clone(),
+			RepoScope::Space { space, author } => {
+				self.root.with_subdir(RelPath::new(format!(
+					"{}/{}/{}/{}",
+					Self::SPACES,
+					space.r#type,
+					space.key,
+					match author == &self.did {
+						true => Self::SELF_AUTHOR,
+						false => author.as_str(),
+					}
+				)))
+			}
+		};
+		Self {
+			scope,
+			store,
+			..self.clone()
 		}
 	}
 
@@ -133,7 +174,12 @@ impl EmulatorPds {
 	}
 
 	fn uri(&self, collection: &Nsid, rkey: &Rkey) -> AtUri {
-		AtUri::new(self.did.clone(), collection.clone(), rkey.clone())
+		AtUri::scoped(
+			self.did.clone(),
+			self.scope.clone(),
+			collection.clone(),
+			rkey.clone(),
+		)
 	}
 
 	fn entry(
@@ -240,6 +286,8 @@ impl EmulatorPds {
 		if candidates.is_empty() {
 			return Ok(Vec::new());
 		}
+		// this scope's records alone: a space beneath the public root is
+		// another partition
 		let records = self
 			.store
 			.list()
@@ -277,6 +325,13 @@ impl PdsProvider for EmulatorPds {
 	}
 
 	fn did(&self) -> &Did { &self.did }
+
+	fn scope(&self) -> &RepoScope { &self.scope }
+
+	fn scoped(&self, scope: RepoScope) -> Result<Box<dyn PdsProvider>> {
+		let scoped: Box<dyn PdsProvider> = Box::new(self.with_scope(scope));
+		scoped.xok()
+	}
 
 	fn get_record(
 		&self,
@@ -517,6 +572,75 @@ mod test {
 			exists(&orphan).await.xpect_false();
 			exists(&second).await.xpect_true();
 		}
+	}
+
+	/// Each scope is a root of its own: a space's records and blobs sit
+	/// beneath the public root, never in its pool, and its addresses carry
+	/// the space.
+	#[beet_core::test]
+	async fn scopes_are_self_contained_roots() {
+		let emulator = EmulatorPds::temp();
+		let public = Pds::new(emulator.clone());
+		let space = public.space(SpaceRef::package("todos").unwrap()).unwrap();
+		let blob = space.upload_blob("private", MediaType::Png).await.unwrap();
+		let written = space
+			.put_record(&collection(), card("a", &blob))
+			.await
+			.unwrap();
+		written.uri.scope().xpect_eq(space.scope().clone());
+		written
+			.uri
+			.to_string()
+			.xpect_contains("/space/org.beet.space.package/todos/did:plc:");
+		let mut paths = emulator.store().list().await.unwrap();
+		paths.sort();
+		paths.xpect_eq(vec![
+			RelPath::new(format!(
+				"spaces/org.beet.space.package/todos/self/blobs/{}",
+				blob.cid
+			)),
+			RelPath::new(
+				"spaces/org.beet.space.package/todos/self/records/com.example.card/a.cbor",
+			),
+		]);
+		public
+			.get_record(&collection(), &rkey("a"))
+			.await
+			.unwrap()
+			.xpect_none();
+		// a public write retains nothing of the space and releases nothing
+		// of it either
+		let public_blob =
+			public.upload_blob("public", MediaType::Png).await.unwrap();
+		public
+			.put_record(&collection(), card("a", &public_blob))
+			.await
+			.unwrap();
+		public
+			.delete_record(&collection(), &rkey("a"))
+			.await
+			.unwrap();
+		emulator
+			.store()
+			.exists(&RelPath::new(format!(
+				"spaces/org.beet.space.package/todos/self/blobs/{}",
+				blob.cid
+			)))
+			.await
+			.unwrap()
+			.xpect_true();
+		// another member's repo in the same space is its own root
+		let other = Did::parse("did:plc:bbbbbbbbbbbbbbbbbbbbbbbb").unwrap();
+		public
+			.scoped(RepoScope::space(
+				SpaceRef::package("todos").unwrap(),
+				other.clone(),
+			))
+			.unwrap()
+			.get_record(&collection(), &rkey("a"))
+			.await
+			.unwrap()
+			.xpect_none();
 	}
 
 	#[beet_core::test]

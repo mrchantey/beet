@@ -2,6 +2,7 @@
      <Instance document="templates/widgets/Card.bsx" props={{title:"Today"}}/>. The
      `title` prop binds into the heading via `@prop:`, the use's own children
      fill the default slot. -->
+<Prop name="title" kind="string" description="The card's heading"/>
 <section class="card-filled">
 	<h2>{@prop:title}</h2>
 	<slot/>

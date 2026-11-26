@@ -21,6 +21,7 @@ answers `did you mean --release?` rather than building a debug module.
     cargo install --path crates/beet-cli --all-features   # then, from anywhere in the repo:
     beet run-wasm <module.wasm>            # run a wasm test module
     beet check examples/beetmania           # lint a no-code site
+    beet compile examples/beetmania         # compile it into ./.beet/repo
     beet export-static examples/beetmania   # write its dist/
     just build-wasm-min                    # the smallest browser runtime (target/wasm/beet-min.wasm)
     just build-wasm-full                   # ..and the kitchen sink (target/wasm/beet-full.wasm)
@@ -92,6 +93,7 @@ stays, an inert tag in a lean build.
 	<RunWasm/>
 	<BuildWasm/>
 	<Check/>
+	<Compile/>
 	<AnalyticsReport/>
 	<ExportStatic/>
 	<ExportPdf/>
