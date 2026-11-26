@@ -34,7 +34,7 @@ const BeetLogo = (() => {
 		// beet's tip. The hand drawn original reaches further than it cuts.
 		reach: 0.39,
 		// corner rounding radius
-		round: 0,
+		round: 0.04,
 		// where the stem grows from, 0 to 1 down the right beet's outer edge
 		stemAt: 0.55,
 		// how far inside the beet's edge the stem's two sides converge
@@ -44,11 +44,16 @@ const BeetLogo = (() => {
 		// angle between the stem's two sides, in degrees
 		stemSpread: 50,
 		// distance from the convergence point to the stem's base
-		stemInner: 0.12,
+		stemInner: 0.04,
 		// distance from the convergence point to the stem's shoulders
 		stemOuter: 0.475,
 		// distance from the convergence point to the stem's tip
 		stemTip: 0.555,
+		// how much of the tip is cut flat, 0 pointed, 1 square across the
+		// shoulders
+		stemFlat: 0,
+		// turns the whole logo about its centre, in degrees clockwise
+		rotation: 0,
 		// outline width, 0 for solid fills
 		stroke: 0,
 		// horizontal stripes across the whole logo, 0 for none
@@ -64,16 +69,16 @@ const BeetLogo = (() => {
 		// secondary and the background the site's `Background` role
 		leftPalette: "primary",
 		leftToneLight: 43,
-		leftToneDark: 56,
+		leftToneDark: 60,
 		rightPalette: "primary",
 		rightToneLight: 65,
-		rightToneDark: 78,
+		rightToneDark: 90,
 		bottomPalette: "primary",
 		bottomToneLight: 24,
-		bottomToneDark: 27,
+		bottomToneDark: 45,
 		stemPalette: "secondary",
 		stemToneLight: 52,
-		stemToneDark: 62,
+		stemToneDark: 65,
 		backgroundPalette: "neutral",
 		backgroundToneLight: 94,
 		backgroundToneDark: 8,
@@ -182,10 +187,15 @@ const BeetLogo = (() => {
 		n: [Math.sqrt(3) / 2, 1 / 2],
 	};
 
-	/** Polygons for every beet and the stem. */
+	/** Polygons for every beet and the stem, turned `rotation` about the centre. */
 	function geometry(params = {}) {
 		const p = { ...DEFAULTS, ...params };
 		const named = lines(p);
+		const pivot = centre(p);
+		const turn = shape => ({
+			...shape,
+			points: shape.points.map(point => add(pivot, rotate(sub(point, pivot), p.rotation))),
+		});
 		const beets = BEETS.map(beet => ({
 			id: beet.id,
 			points: beet.bounds.reduce(
@@ -198,7 +208,7 @@ const BeetLogo = (() => {
 				[[-9, -9], [9, -9], [9, 9], [-9, 9]],
 			),
 		}));
-		return { beets, stem: stem(p, named) };
+		return { beets: beets.map(turn), stem: turn(stem(p, named)) };
 	}
 
 	/**
@@ -306,8 +316,9 @@ ${beetPaths}
 
 	/**
 	 * A wedge between two rays from a point on (or inside) the right beet's outer
-	 * edge, cut square at `stemInner` and pointed from `stemOuter` to `stemTip`.
-	 * The point follows the edge as the gap moves it.
+	 * edge, cut square at `stemInner` and pointed from `stemOuter` to `stemTip`,
+	 * the point cut `stemFlat` of the way back to the shoulders. The point
+	 * follows the edge as the gap moves it.
 	 */
 	function stem(p, named) {
 		// the outer edge runs between the top line and the rising right line
@@ -320,15 +331,13 @@ ${beetPaths}
 		const heading = rotate(edge, -p.stemAngle);
 		const ray = (degrees, radius) => add(origin, mul(rotate(heading, degrees), radius));
 		const half = p.stemSpread / 2;
+		const [left, tip, right] = [ray(-half, p.stemOuter), ray(0, p.stemTip), ray(half, p.stemOuter)];
+		// a flat tip is two corners, each `stemFlat` of the way from the tip to
+		// its shoulder
+		const point = p.stemFlat > 0 ? [lerp(tip, left, p.stemFlat), lerp(tip, right, p.stemFlat)] : [tip];
 		return {
 			id: "stem",
-			points: [
-				ray(-half, p.stemInner),
-				ray(-half, p.stemOuter),
-				ray(0, p.stemTip),
-				ray(half, p.stemOuter),
-				ray(half, p.stemInner),
-			],
+			points: [ray(-half, p.stemInner), left, ...point, right, ray(half, p.stemInner)],
 		};
 	}
 

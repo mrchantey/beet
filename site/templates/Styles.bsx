@@ -77,3 +77,13 @@ to a Material colour token, resolving on both the web and terminal targets.
 <Rule class={["color-box", "outline-variant"]} background-color="@token:OutlineVariant" color="@token:OnSurface" />
 <Rule class={["color-box", "scrim"]} background-color="@token:Scrim" color="@token:Surface" />
 <Rule class={["color-box", "shadow"]} background-color="@token:Shadow" color="@token:Surface" />
+
+<!-- The header title: the logo, then the name beside it while the bar has the
+     room. The logo stands the height of the title line it sits in, so the bar
+     keeps the height the name alone gave it. -->
+<Rule class="site-title"
+      display=Flex
+      align-items=Center
+      column-gap=Rem(0.5) />
+<Rule class="site-title-logo" height=Rem(1.75) />
+<Rule class="site-title-text" media="max-width: 600px" display=None />

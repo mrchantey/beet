@@ -121,12 +121,13 @@ impl Lowering<'_> {
 	/// Lower an uppercase tag: a component, a template or a resource, else a
 	/// name held as nothing registered it.
 	fn named(&mut self, el: &BsxElement, key: &EntityKey) -> Result {
-		let Some((registration, kind)) = reflect_ext::registration_by_name(
-			self.types, &el.tag,
-		)
-		.and_then(|registration| {
-			NameKind::of(registration).map(|kind| (registration.clone(), kind))
-		}) else {
+		let Some((registration, kind)) =
+			reflect_ext::carried_registration_by_name(self.types, &el.tag)
+				.and_then(|registration| {
+					NameKind::of(registration)
+						.map(|kind| (registration.clone(), kind))
+				})
+		else {
 			return self.unregistered(el, key);
 		};
 		match kind {

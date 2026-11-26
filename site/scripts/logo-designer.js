@@ -33,6 +33,7 @@
 			stemInner: range(0, 0.6, 0.005),
 			stemOuter: range(0, 1.2, 0.005),
 			stemTip: range(0, 1.4, 0.005),
+			stemFlat: range(0, 1, 0.01),
 		},
 		Colours: {
 			mode: select(["light", "dark"]),
@@ -52,6 +53,7 @@
 		// the theme's key colours, changing one recomputes its palette
 		Theme: Object.fromEntries(BeetTheme.PALETTES.map(key => [key, { type: "color" }])),
 		Style: {
+			rotation: range(-180, 180, 1),
 			stroke: range(0, 0.1, 0.002),
 			stripes: range(0, 30, 1),
 			stripeFill: range(0.05, 0.95, 0.01),
@@ -200,7 +202,8 @@
 		const saved = favourites();
 		favouriteList.replaceChildren(
 			...Object.entries(saved).map(([name, values]) => {
-				values = { ...DEFAULTS, ...known(values) };
+				// worn in the page's scheme, as the preview is
+				values = { ...DEFAULTS, ...known(values), mode: params.mode };
 				const item = document.createElement("li");
 				item.classList.toggle("current", name === current);
 				const load = document.createElement("button");
@@ -299,6 +302,12 @@
 	document.addEventListener("beet-preferences", () => {
 		renderFavourites();
 		draw();
+	});
+	// the logo wears the page's scheme as the page changes it
+	document.addEventListener("beet-color-scheme", ({ detail: { scheme } }) => {
+		DEFAULTS.mode = params.mode = scheme;
+		renderFavourites();
+		render();
 	});
 
 	// adopt the standalone designer's favourites, then forget them

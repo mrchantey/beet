@@ -20,7 +20,8 @@
 // `read()`/`write(body)` the scene body, `setScheme("light" | "dark" | null)`,
 // `tones()`/`setTones(css | null)`, and `THEME`, the theme resource's key.
 // Every change, a write in another tab included, dispatches
-// `beet-preferences` on `document`.
+// `beet-preferences` on `document`, and a change of the applied scheme, the
+// OS's included, `beet-color-scheme` with the `scheme` as its detail.
 // `LIGHT_SCHEME`, `DARK_SCHEME` and `THEME`, the theme's type path, are
 // injected by the `ColorSchemeScript` widget.
 (function () {
@@ -155,14 +156,39 @@
 		}
 	}
 
+	// the scheme last applied, `null` before the first paint
+	let applied = null;
+
+	// restyle with transitions off for a frame, so a scheme change lands at
+	// once everywhere rather than fading wherever a rule eases its colours
+	function snap(restyle) {
+		const style = document.createElement("style");
+		style.textContent = "*,*::before,*::after{transition:none!important}";
+		document.head.append(style);
+		restyle();
+		// a forced style flush, so the change resolves with transitions off
+		getComputedStyle(root).color;
+		requestAnimationFrame(() => style.remove());
+	}
+
 	function apply() {
 		const pinned = queryScheme() ?? storedScheme();
 		const scheme = pinned ?? (media.matches ? "dark" : "light");
-		root.classList.remove(LIGHT_SCHEME, DARK_SCHEME);
-		root.classList.add(scheme === "dark" ? DARK_SCHEME : LIGHT_SCHEME);
+		const restyle = () => {
+			root.classList.remove(LIGHT_SCHEME, DARK_SCHEME);
+			root.classList.add(scheme === "dark" ? DARK_SCHEME : LIGHT_SCHEME);
+			applyTones();
+		};
+		if (applied === null) restyle();
+		else snap(restyle);
 		tint(pinned);
-		applyTones();
 		labelToggles();
+		if (applied !== null && applied !== scheme) {
+			document.dispatchEvent(
+				new CustomEvent("beet-color-scheme", { detail: { scheme } }),
+			);
+		}
+		applied = scheme;
 	}
 
 	function changed() {

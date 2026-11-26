@@ -15,10 +15,10 @@
 //! | `favicon.ico` | holding 16, 32 and 48, for a browser that still asks for `/favicon.ico` by convention |
 //! | `favicon.svg` | emitted only when the source is itself svg, so it scales rather than being traced |
 //! | `icon-16.png`, `icon-32.png` | the tab and the bookmark bar |
-//! | `icon-180.png` | `apple-touch-icon`, the iOS home screen |
+//! | `icon-180.png` | `apple-touch-icon`, the iOS home screen, padded like the maskable icon since iOS fills transparency black and rounds the corners itself |
 //! | `icon-192.png`, `icon-512.png` | the web app manifest, the Android home screen and the splash |
 //! | `icon-512-maskable.png` | the `maskable` purpose, below |
-//! | `site.webmanifest` | lists the four png sizes with their purposes, and carries the name the entry's `PackageConfig` declares and, since a manifest names one colour, the light tint `<Head>` reads off the `Theme` resource for its light `theme-color` and its `msapplication-TileColor` (the light scheme `Primary` tone, `ThemeTints` beside `Theme`, where both read it) |
+//! | `site.webmanifest` | lists the three png sizes Android reads with their purposes, and carries the name the entry's `PackageConfig` declares and, since a manifest names one colour, the light tint `<Head>` reads off the `Theme` resource for its light `theme-color` and its `msapplication-TileColor` (the light scheme `Primary` tone, `ThemeTints` beside `Theme`, where both read it) |
 //!
 //! # Maskable
 //!
@@ -130,6 +130,8 @@ impl IconSet {
 	const MANIFEST: &str = "site.webmanifest";
 	/// The largest size the set derives, and so the smallest source it accepts.
 	const LARGEST: u32 = 512;
+	/// The padded `apple-touch-icon` size, `icon-<size>.png`.
+	const APPLE_TOUCH: u32 = 180;
 
 	/// The set derived from `src`.
 	pub fn new(src: impl Into<RelPath>) -> Self { Self { src: src.into() } }
@@ -190,8 +192,8 @@ impl IconSet {
 		links.push(link(
 			"apple-touch-icon",
 			"image/png",
-			"180x180".into(),
-			self.png(180),
+			format!("{0}x{0}", Self::APPLE_TOUCH),
+			self.png(Self::APPLE_TOUCH),
 		));
 		links
 	}
@@ -229,7 +231,7 @@ impl IconSet {
 #[cfg(feature = "site_images")]
 impl IconSet {
 	/// The unpadded png sizes, each `icon-<size>.png`.
-	const PNG_SIZES: [u32; 5] = [16, 32, 180, 192, 512];
+	const PNG_SIZES: [u32; 4] = [16, 32, 192, 512];
 	/// The padded 512 for the `maskable` purpose.
 	const MASKABLE: &str = "icon-512-maskable.png";
 	/// The maskable safe zone, as a fraction of the width.
@@ -278,7 +280,7 @@ impl IconSet {
 	}
 
 	/// Every raster of the set drawn from the source `bytes`: each png, the
-	/// maskable padded on `background`, then the ico. CPU bound, so
+	/// apple touch and maskable icons padded on `background`, then the ico. CPU bound, so
 	/// [`Self::derive`] runs it off the world's thread.
 	fn rasters(
 		&self,
@@ -290,7 +292,14 @@ impl IconSet {
 			.iter()
 			.map(|size| (self.png(*size), source.png(*size)?).xok())
 			.collect::<Result<Vec<_>>>()?;
-		rasters.push((self.path(Self::MASKABLE), source.maskable(background)?));
+		rasters.push((
+			self.png(Self::APPLE_TOUCH),
+			source.padded(Self::APPLE_TOUCH, background)?,
+		));
+		rasters.push((
+			self.path(Self::MASKABLE),
+			source.padded(Self::LARGEST, background)?,
+		));
 		rasters.push((self.path(Self::FAVICON_ICO), source.ico()?));
 		rasters.xok()
 	}
@@ -311,7 +320,7 @@ impl IconSet {
 				"purpose": purpose,
 			})
 		};
-		let mut icons = [180, 192, 512]
+		let mut icons = [192, 512]
 			.into_iter()
 			.map(|size| icon(format!("icon-{size}.png"), size, "any"))
 			.collect::<Vec<_>>();
@@ -435,10 +444,9 @@ impl IconSource {
 		Self::encode_png(&self.render(size)?)
 	}
 
-	/// The 512 with the source scaled into the safe zone, padded on
-	/// `background`, as png.
-	fn maskable(&self, background: [u8; 4]) -> Result<Vec<u8>> {
-		let size = IconSet::LARGEST;
+	/// A `size` square with the source scaled into the safe zone, padded on
+	/// `background`, as png: an icon a platform crops to its own shape.
+	fn padded(&self, size: u32, background: [u8; 4]) -> Result<Vec<u8>> {
 		let art =
 			self.render((size as f32 * IconSet::SAFE_ZONE).round() as u32)?;
 		let mut canvas =
@@ -557,9 +565,9 @@ mod test {
 			.xpect_eq(vec![
 				"branding/icon-16.png",
 				"branding/icon-32.png",
-				"branding/icon-180.png",
 				"branding/icon-192.png",
 				"branding/icon-512.png",
+				"branding/icon-180.png",
 				"branding/icon-512-maskable.png",
 				"branding/favicon.ico",
 				"branding/site.webmanifest",
@@ -607,10 +615,10 @@ mod test {
 			.xpect_eq((16, 16));
 	}
 
-	/// The maskable icon pads the art onto the theme's background, the
-	/// ordinary one does not.
+	/// The maskable and apple touch icons pad the art onto the theme's
+	/// background, the ordinary one does not.
 	#[beet_core::test]
-	async fn pads_the_maskable_icon() {
+	async fn pads_the_cropped_icons() {
 		let (mut world, entity, store) = setup(png(512, 512, 0));
 		ensure(&mut world, entity, &store).await;
 		let background = Theme::default()
@@ -618,11 +626,13 @@ mod test {
 			.unwrap()
 			.to_srgba()
 			.to_u8_array();
-		image(&store, "branding/icon-512-maskable.png")
-			.await
-			.get_pixel(0, 0)
-			.0
-			.xpect_eq(background);
+		for padded in ["icon-512-maskable.png", "icon-180.png"] {
+			image(&store, &format!("branding/{padded}"))
+				.await
+				.get_pixel(0, 0)
+				.0
+				.xpect_eq(background);
+		}
 		image(&store, "branding/icon-512.png")
 			.await
 			.get_pixel(0, 0)

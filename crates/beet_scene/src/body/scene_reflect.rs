@@ -220,7 +220,7 @@ impl DynamicTemplate {
 	) -> Option<&'a TypeRegistration> {
 		registry
 			.get_with_type_path(name)
-			.or_else(|| reflect_ext::registration_by_name(registry, name))
+			.or_else(|| reflect_ext::carried_registration_by_name(registry, name))
 	}
 }
 

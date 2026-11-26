@@ -2,7 +2,7 @@
 // key, each change stored as the visitor's theme (`BeetTheme.store`), which
 // recolours every page in this browser.
 (() => {
-	const form = document.getElementById("palette-editor");
+	const editor = document.getElementById("palette-editor");
 	const note = document.getElementById("palette-note");
 	const inputs = Object.fromEntries(
 		BeetTheme.PALETTES.map(palette => {
@@ -10,7 +10,7 @@
 			const label = Object.assign(document.createElement("label"), { htmlFor: input.id, textContent: palette });
 			label.style.cssText = "display: flex; align-items: center; gap: 0.4rem";
 			label.prepend(input);
-			form.append(label);
+			editor.append(label);
 			return [palette, input];
 		}),
 	);
@@ -40,7 +40,7 @@
 		for (const [palette, input] of Object.entries(inputs)) input.value = keys[palette];
 	}
 
-	form.oninput = () =>
+	editor.oninput = () =>
 		store(Object.fromEntries(Object.entries(inputs).map(([palette, input]) => [palette, input.value])));
 	document.getElementById("palette-reset").onclick = () => {
 		const { keys } = BeetTheme.server();

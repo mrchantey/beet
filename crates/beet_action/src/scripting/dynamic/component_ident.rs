@@ -46,7 +46,7 @@ impl ComponentIdent {
 		let registry = world.resource::<AppTypeRegistry>().clone();
 		let resolved = {
 			let registry = registry.read();
-			match reflect_ext::registration_by_name(&registry, ident) {
+			match reflect_ext::carried_registration_by_name(&registry, ident) {
 				Some(registration) => Some((
 					ReflectName::new(registration.type_info().type_path()),
 					registration.type_id(),

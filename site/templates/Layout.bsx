@@ -16,14 +16,14 @@ party request and the site keeps working with the rest of the web unavailable.
 Without it the heaviest weights the type scale asks for are a browser's synthetic
 bold, so the wordmark and every display heading would arrive at the wrong weight.
 
-The header is the shell's own restated, its title the logo rather than the
-site name. The logo is two images, the light and dark files `main.bsx`'s
-`<ScriptDerivation>` draws, the page's scheme class showing one: an image
-cannot see the page it sits in, so one file following the OS would miss a
-scheme the visitor pinned. A terminal shows the name instead. The nav carries
-the site's own links ahead of the scheme toggle and the repository link. The
-Docs link is `hidden`, like the unlisted pages it leads to: they serve to
-whoever holds a url, and nobody browsing the site is shown the way in.
+The header is the shell's own restated, its title the logo beside the site
+name, the name dropping on a narrow screen (`Styles.bsx`). The logo is two
+images, the light and dark files `main.bsx`'s `<ScriptDerivation>` draws, the
+page's scheme class showing one: an image cannot see the page it sits in, so
+one file following the OS would miss a scheme the visitor pinned. The nav
+carries the site's own links ahead of the repository link and the scheme
+toggle. The Docs link is `hidden`, like the unlisted pages it leads to: they
+serve to whoever holds a url, and nobody browsing the site is shown the way in.
 
 <Analytics/> injects the page-view beacon script on every page (web only; the
 runtime ignores the <script> on terminal targets, whose page views come from the
@@ -35,20 +35,19 @@ in-world navigator instead).
 		<link rel="stylesheet" href="/assets/fonts/inter.css"/>
 		<style>
 			.light-scheme .beet-logo.beet-logo-dark, .dark-scheme .beet-logo.beet-logo-light { display: none; }
-			.app-bar-title .beet-logo { display: block; height: 2.5rem; width: auto; }
 		</style>
 	</Fragment>
 	<Header slot="header">
 		<MenuButton slot="leading"/>
-		<Fragment slot="title">
-			<img class="beet-logo beet-logo-light terminal-hidden" src="/assets/logo/logo-light.svg" alt="Beet"/>
-			<img class="beet-logo beet-logo-dark terminal-hidden" src="/assets/logo/logo-dark.svg" alt="Beet"/>
-			<span class="terminal-only">Beet</span>
-		</Fragment>
+		<span slot="title" class="site-title">
+			<img class="beet-logo beet-logo-light site-title-logo terminal-hidden" src="/assets/logo/logo-light.svg" alt=""/>
+			<img class="beet-logo beet-logo-dark site-title-logo terminal-hidden" src="/assets/logo/logo-dark.svg" alt=""/>
+			<span class="site-title-text">Beet</span>
+		</span>
 		<Link slot="nav" href="/docs" variant=ButtonVariant::Text hidden>Docs</Link>
 		<Link slot="nav" href="/blog" variant=ButtonVariant::Text>Blog</Link>
-		<ColorSchemeToggle slot="nav"/>
 		<RepositoryLink slot="nav"/>
+		<ColorSchemeToggle slot="nav"/>
 	</Header>
 	<Analytics/>
 </SiteLayout>

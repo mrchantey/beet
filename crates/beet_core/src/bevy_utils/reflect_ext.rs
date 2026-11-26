@@ -171,3 +171,27 @@ pub fn registration_by_name<'a>(
 	let first = matches.next()?;
 	matches.next().is_none().then_some(first)
 }
+
+/// [`registration_by_name`] for a name an entity carries, a tag or a scene
+/// body's key, so an ambiguous short path resolves in favour of its sole
+/// component or resource: a plain value type sharing the name (registered by
+/// `bevy/reflect_auto_register`, ie the data `Rule` beside the `<Rule>`
+/// component) is no candidate for a slot only a component fills.
+pub fn carried_registration_by_name<'a>(
+	registry: &'a TypeRegistry,
+	name: &str,
+) -> Option<&'a TypeRegistration> {
+	if let Some(registration) = registration_by_name(registry, name) {
+		return Some(registration);
+	}
+	if !registry.is_ambiguous(name) {
+		return None;
+	}
+	let mut carried = registry.iter().filter(|registration| {
+		registration.type_info().type_path_table().short_path() == name
+			&& (registration.data::<ReflectComponent>().is_some()
+				|| registration.data::<ReflectResource>().is_some())
+	});
+	let first = carried.next()?;
+	carried.next().is_none().then_some(first)
+}

@@ -40,8 +40,8 @@ use beet_ui::prelude::Reset;
 ///   head without losing the chrome. The site's icons are not slot content:
 ///   [`RouteHead`] links the [`IconSet`] the entry declares.
 /// - `header`: defaults to the library [`Header`] with a [`MenuButton`], the
-///   `nav` slot's links, a [`ColorSchemeToggle`], then a [`RepositoryLink`]
-///   when the package names a repository. The shell links nothing of its own,
+///   `nav` slot's links, a [`RepositoryLink`] when the package names a
+///   repository, then a [`ColorSchemeToggle`]. The shell links nothing of its own,
 ///   since it cannot know the site's routes. A site replacing the header to
 ///   fill its `title` slot (a logo) restates these.
 /// - `nav`: the default header's navigation links, ie
@@ -102,8 +102,8 @@ pub fn SiteLayout(
 					<Header>
 						<MenuButton slot="leading"/>
 						<slot name="nav" slot="nav"/>
-						<ColorSchemeToggle slot="nav"/>
 						<RepositoryLink slot="nav"/>
+						<ColorSchemeToggle slot="nav"/>
 					</Header>
 				</slot>
 				<div {Classes::new([classes::CONTAINER])}>
