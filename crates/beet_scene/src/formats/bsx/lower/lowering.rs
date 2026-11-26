@@ -1179,6 +1179,47 @@ mod group_test {
 			.xpect_eq(vec![first, second]);
 	}
 
+	/// A template naming its group by entity, the shape of beet_infra's
+	/// `<DeployRoutes deploy={$up}/>`.
+	#[template]
+	fn JoinsGroup(#[prop(required)] group: Entity) -> impl Bundle {
+		MemberOf(group)
+	}
+
+	/// A `$ref` fed to a template prop names the referenced entity, mapped
+	/// exactly as a component field is, a forward reference included.
+	///
+	/// REGRESSION: a template's props were built unmapped, so `group` held
+	/// the reference's id inside the document, which in the live world named
+	/// an unrelated entity. The site's `deploy` verb then refused with `85v0
+	/// is not a \`Group\``, the deploy group never reached.
+	#[beet_core::test]
+	fn a_template_prop_names_the_referenced_entity() {
+		let mut app = App::new();
+		app.add_plugins((ScenePlugin, DocumentPlugin, MinimalTypesPlugin))
+			.install_types::<JoinsGroup>();
+		let mut world = core::mem::take(app.world_mut());
+		let body = BsxParser::body(
+			&world,
+			r#"<div>
+				<JoinsGroup group={$later}/>
+				<Group bx:ref="later"/>
+			</div>"#,
+		)
+		.unwrap();
+		let root = world.spawn_template(body).unwrap().id();
+		world.flush();
+		let children = world.entity(root).get::<Children>().unwrap();
+		let (member, group) = (children[0], children[1]);
+		world
+			.entity(group)
+			.get::<Members>()
+			.unwrap()
+			.iter()
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![member]);
+	}
+
 	/// A `$ref` naming something that never became a group fails when the
 	/// document settles, rather than when the group is later run.
 	#[beet_core::test]

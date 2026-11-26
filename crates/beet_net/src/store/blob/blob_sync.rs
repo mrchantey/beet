@@ -149,15 +149,20 @@ impl BlobSync {
 			)
 			.await?;
 		}
-		// what to prune: in the destination and nowhere in the source
+		// in the destination and nowhere in the source: pruned by a mirror,
+		// else left in place and reported
+		let in_source =
+			source.iter().map(|(path, _)| path).collect::<HashSet<_>>();
+		let extra = dest
+			.keys()
+			.filter(|path| !in_source.contains(path))
+			.cloned()
+			.collect::<Vec<_>>();
+		match self.delete {
+			false => report.kept = extra,
+			true => report.removed = extra,
+		}
 		if self.delete {
-			let kept =
-				source.iter().map(|(path, _)| path).collect::<HashSet<_>>();
-			report.removed = dest
-				.keys()
-				.filter(|path| !kept.contains(path))
-				.cloned()
-				.collect();
 			if !self.dry_run {
 				async_ext::try_join_all_bounded(
 					self.concurrency,
@@ -183,6 +188,9 @@ pub struct BlobSyncReport {
 	pub unchanged: Vec<RelPath>,
 	/// Objects removed from the destination, only under `delete`.
 	pub removed: Vec<RelPath>,
+	/// Objects the destination holds and the source lacks, left in place by
+	/// an additive sync: a file never pushed, or a stale one a pull keeps.
+	pub kept: Vec<RelPath>,
 	/// Total size of the copied objects.
 	pub copied_bytes: u64,
 	/// Total size of the unchanged objects.
@@ -196,6 +204,7 @@ impl BlobSyncReport {
 		self.copied.sort();
 		self.unchanged.sort();
 		self.removed.sort();
+		self.kept.sort();
 	}
 
 	/// A byte total as MiB with one decimal, ie `34.5 MiB`.
@@ -218,7 +227,11 @@ impl core::fmt::Display for BlobSyncReport {
 			self.unchanged.len(),
 			Self::mib(self.unchanged_bytes),
 			self.removed.len()
-		)
+		)?;
+		match self.kept.len() {
+			0 => Ok(()),
+			kept => write!(f, ", kept {kept} the source lacks"),
+		}
 	}
 }
 
@@ -282,18 +295,20 @@ mod test {
 			.xpect_eq(bytes::Bytes::from_static(b"two"));
 	}
 
-	/// An object the source lacks survives an additive sync and goes under
-	/// `delete`, so only a mirror can destroy destination state.
+	/// An object the source lacks survives an additive sync, reported as
+	/// kept, and goes under `delete`, so only a mirror can destroy destination
+	/// state.
 	#[beet_core::test]
 	async fn delete_prunes_only_when_asked() {
 		let source = seeded(&[("keep.txt", "k")]).await;
 		let dest = seeded(&[("keep.txt", "k"), ("stale.txt", "s")]).await;
 		let sync = BlobSync::new(source, dest.clone());
-		sync.run()
-			.await
-			.unwrap()
-			.removed
-			.xpect_eq(Vec::<RelPath>::new());
+		let report = sync.run().await.unwrap();
+		report.removed.xpect_eq(Vec::<RelPath>::new());
+		report.kept.xpect_eq(paths(&["stale.txt"]));
+		report
+			.to_string()
+			.xpect_contains("kept 1 the source lacks");
 		dest.exists(&RelPath::new("stale.txt"))
 			.await
 			.unwrap()
@@ -301,6 +316,7 @@ mod test {
 
 		let report = sync.clone().with_delete(true).run().await.unwrap();
 		report.removed.xpect_eq(paths(&["stale.txt"]));
+		report.kept.xpect_eq(Vec::<RelPath>::new());
 		report.unchanged.xpect_eq(paths(&["keep.txt"]));
 		dest.list().await.unwrap().xpect_eq(paths(&["keep.txt"]));
 	}

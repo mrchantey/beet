@@ -637,6 +637,20 @@ fn build_entity(
 				patch_resource(world, patch.as_ref(), registry)?;
 			}
 			ComponentSlot::Template(deferred) => {
+				// a prop naming an entity holds its in-template id, mapped
+				// exactly as a component field is, ie `deploy={$up}`
+				let mapped = (references(deferred.patch.as_ref()) > 0)
+					.then(|| -> Result<Box<dyn PartialReflect>> {
+						let mut patch = deferred.patch.to_dynamic()?;
+						// SAFETY: only used to look up or spawn referenced entities.
+						let world = unsafe { cx.entity.world_mut() };
+						let (_, mut mapper) =
+							ReferenceMapper::split(world, cx.entity_references);
+						map_entities_in(patch.as_mut(), &mut mapper);
+						patch.xok()
+					})
+					.transpose()?;
+				let patch = mapped.as_deref().unwrap_or(deferred.patch.as_ref());
 				// build the deferred template into a context scoped to this
 				// entity, sharing the reference map so cross-entity refs resolve.
 				// SAFETY: only used to acquire the mapped entity for a scoped build.
@@ -647,7 +661,7 @@ fn build_entity(
 				ReflectTemplate::build_named(
 					app_registry,
 					&deferred.name,
-					deferred.patch.as_ref(),
+					patch,
 					&mut scoped,
 				)?;
 			}
@@ -774,6 +788,57 @@ fn references(value: &dyn PartialReflect) -> usize {
 			.map(|field| references(field.value()))
 			.sum(),
 		_ => 0,
+	}
+}
+
+/// Remap every entity `value` holds through `mapper`, for a reflected value
+/// no `map_entities` covers, ie a template's props. A map's entries stay as
+/// they are, since reflection offers no way to rewrite them in place.
+fn map_entities_in(value: &mut dyn PartialReflect, mapper: &mut dyn EntityMapper) {
+	if let Some(entity) = value.try_downcast_mut::<Entity>() {
+		*entity = mapper.get_mapped(*entity);
+		return;
+	}
+	match value.reflect_mut() {
+		ReflectMut::Struct(value) => {
+			for index in 0..value.field_len() {
+				value
+					.field_at_mut(index)
+					.map(|field| map_entities_in(field, mapper));
+			}
+		}
+		ReflectMut::TupleStruct(value) => {
+			for index in 0..value.field_len() {
+				value
+					.field_mut(index)
+					.map(|field| map_entities_in(field, mapper));
+			}
+		}
+		ReflectMut::Tuple(value) => {
+			for index in 0..value.field_len() {
+				value
+					.field_mut(index)
+					.map(|field| map_entities_in(field, mapper));
+			}
+		}
+		ReflectMut::List(value) => {
+			for index in 0..value.len() {
+				value.get_mut(index).map(|item| map_entities_in(item, mapper));
+			}
+		}
+		ReflectMut::Array(value) => {
+			for index in 0..value.len() {
+				value.get_mut(index).map(|item| map_entities_in(item, mapper));
+			}
+		}
+		ReflectMut::Enum(value) => {
+			for index in 0..value.field_len() {
+				value
+					.field_at_mut(index)
+					.map(|field| map_entities_in(field, mapper));
+			}
+		}
+		_ => {}
 	}
 }
 

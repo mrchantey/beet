@@ -261,11 +261,42 @@ impl StoreMirror {
 				.with_delete(self.delete)
 				.with_size_only(self.size_only)
 				.with_dry_run(self.dry_run)
-				.with_filter(self.filter)
+				.with_filter(core::mem::take(&mut self.filter))
 				.run()
 				.await?;
 		info!("synced {} -> {}: {report}", self.src, self.dest);
+		if let Some(warning) = self.kept_warning(&report) {
+			warn!("{warning}");
+		}
 		report.xok()
+	}
+
+	/// The objects an additive sync left in `dest` that `src` lacks, which
+	/// either end may be missing by mistake: a stale file a pull keeps (and a
+	/// deploy assembling the directory then ships), or one never pushed.
+	fn kept_warning(&self, report: &BlobSyncReport) -> Option<String> {
+		const SHOWN: usize = 10;
+		if report.kept.is_empty() {
+			return None;
+		}
+		let mut listed = report
+			.kept
+			.iter()
+			.take(SHOWN)
+			.map(|path| path.to_string())
+			.collect::<Vec<_>>()
+			.join(", ");
+		if report.kept.len() > SHOWN {
+			listed.push_str(&format!(", and {} more", report.kept.len() - SHOWN));
+		}
+		format!(
+			"{} holds {} object(s) {} does not: {listed}. Sync them the other \
+			 way if they belong, or remove them; a `delete` sync prunes them",
+			self.dest,
+			report.kept.len(),
+			self.src
+		)
+		.xsome()
 	}
 }
 
@@ -291,6 +322,26 @@ mod test {
 		let mut paths = end.blob_store().list().await.unwrap();
 		paths.sort();
 		paths.into_iter().map(|path| path.to_string()).collect()
+	}
+
+	/// What an additive sync leaves behind is named, ends and all, so a stale
+	/// file a pull keeps is seen before a deploy assembles it.
+	#[beet_core::test]
+	async fn names_what_an_additive_sync_keeps() {
+		let src = memory("sync-kept-src", &[("a.txt", "a")]).await;
+		let dest =
+			memory("sync-kept-dest", &[("a.txt", "a"), ("stale.wasm", "s")])
+				.await;
+		let mirror = StoreMirror::new(src.clone(), dest.clone());
+		let report = mirror.clone().run().await.unwrap();
+		mirror
+			.kept_warning(&report)
+			.unwrap()
+			.xpect_contains("memory://sync-kept-dest holds 1 object(s) memory://sync-kept-src does not: stale.wasm");
+		// a mirror prunes rather than keeps
+		let report = mirror.with_delete(true).run().await.unwrap();
+		report.kept.is_empty().xpect_true();
+		listed(&dest).await.xpect_eq(vec!["a.txt".to_string()]);
 	}
 
 	/// A folder below either end is the sync's own root.

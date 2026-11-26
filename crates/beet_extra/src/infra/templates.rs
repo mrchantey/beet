@@ -998,6 +998,45 @@ mod test {
 			.xpect_contains("beet-site--dev--analytics");
 	}
 
+	/// `deploy` and `destroy` run the groups their `<DeployRoutes/>` names by
+	/// `$ref`, the shape `site/main.bsx` declares, its `bx:cfg` fragment
+	/// included.
+	///
+	/// REGRESSION: a template's entity props were built unmapped, so the site's
+	/// `deploy` named an unrelated entity and refused, `85v0 is not a
+	/// \`Group\``, before its first step.
+	#[beet_core::test]
+	fn deploy_routes_run_their_declared_groups() {
+		for (open, close) in [
+			("<Fragment>", "</Fragment>"),
+			// a condition this test binary satisfies, so the fragment builds
+			(r#"<Fragment bx:cfg="!feature:nope">"#, "</Fragment>"),
+		] {
+			let mut world = test_world();
+			let router = router(&mut world);
+			spawn_markup(
+				&mut world,
+				router,
+				&format!(
+					r#"<Route path="site"><Stack>{open}
+						<Group bx:ref="up"><TofuApply layer="storage"/><TofuApply/></Group>
+						<Group bx:ref="down"><TofuDestroy/></Group>
+						<DeployRoutes deploy={{$up}} destroy={{$down}}/>
+					{close}</Stack></Route>"#
+				),
+			);
+			let groups = world
+				.query::<&RunGroup<Request, Response>>()
+				.iter(&world)
+				.map(|run| run.group.unwrap())
+				.collect::<Vec<_>>();
+			groups.len().xpect_eq(2);
+			for group in groups {
+				world.entity(group).contains::<Group>().xpect_true();
+			}
+		}
+	}
+
 	/// The `shared`-stage stack, the shape the site entry declares: its verb
 	/// routes nest under the `shared/` prefix, the assets bucket resolves the
 	/// shared stack by ancestry (`beet-site--shared--assets`), and the app name
