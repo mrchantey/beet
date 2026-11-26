@@ -444,7 +444,7 @@ mod test {
 	/// A store of a markdown route of one card showing the deck's own
 	/// picture, a markdown route of two card articles, a deck and the picture.
 	async fn store() -> BlobStore {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		for (path, body) in [
 			(
 				"01-intro.md",

@@ -37,7 +37,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn lists_empty_subdir() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		let result = store
 			.with_subdir(RelPath::from("empty"))
 			.list()
@@ -48,7 +48,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn lists_blobs_in_subdir() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(&RelPath::from("subdir/a.txt"), "aaa")
 			.await

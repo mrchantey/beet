@@ -251,7 +251,7 @@ mod test {
 			]))
 			.flush();
 
-		let out = BlobStore::new(InMemoryBlobStore::new());
+		let out = BlobStore::temp();
 		let out2 = out.clone();
 		let written = world
 			.run_async_then(async move |world| {
@@ -309,7 +309,7 @@ mod test {
 		));
 		world.flush();
 
-		let out = BlobStore::new(InMemoryBlobStore::new());
+		let out = BlobStore::temp();
 		let out2 = out.clone();
 		let written = world
 			.run_async_then(async move |world| {
@@ -353,7 +353,7 @@ mod test {
 				ExportStrategy::Static,
 			)]))
 			.flush();
-		let out = BlobStore::new(InMemoryBlobStore::new());
+		let out = BlobStore::temp();
 		let out2 = out.clone();
 		world
 			.run_async_then(async move |world| {
@@ -388,7 +388,7 @@ mod test {
 			.unwrap();
 		world.flush();
 
-		let out = BlobStore::new(InMemoryBlobStore::new());
+		let out = BlobStore::temp();
 		let out2 = out.clone();
 		world
 			.run_async_then(async move |world| {
@@ -416,7 +416,7 @@ mod test {
 	/// stage decides the draft gate, so this is always the dev path; the prod
 	/// path is asserted against [`StaticExport::exports`] directly.
 	async fn export(world: &mut World, router: Entity) -> Vec<RelPath> {
-		let out = BlobStore::new(InMemoryBlobStore::new());
+		let out = BlobStore::temp();
 		world
 			.run_async_then(async move |world| {
 				StaticExport::export(&world, router, &out).await

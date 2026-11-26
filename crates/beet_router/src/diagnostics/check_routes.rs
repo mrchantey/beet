@@ -725,7 +725,7 @@ mod test {
 	/// and `export-static` with "entity despawned, generation N".
 	#[beet_core::test]
 	async fn scene_route_survives_check_and_renders() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(&"post.md".into(), "# Title\n\nbody".to_owned())
 			.await
@@ -763,7 +763,7 @@ mod test {
 	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	async fn a_diagnostic_names_its_place() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		for (path, source) in [
 			(
 				"post.md",
@@ -813,7 +813,7 @@ mod test {
 	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	async fn a_malformed_page_names_its_place() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(
 				&"post.md".into(),
@@ -838,7 +838,7 @@ mod test {
 	/// diagnostic per violation, and the vocabulary is the site's to declare.
 	#[beet_core::test]
 	async fn doc_meta_violations_fail() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(
 				&"post.md".into(),
@@ -920,7 +920,7 @@ mod test {
 	/// and a warning once a source changes, since a stale one still serves.
 	#[beet_core::test]
 	async fn reports_missing_and_stale_derived_files() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store.insert(&"notes.md".into(), "first").await.unwrap();
 		let mut world = check_world();
 		let router = derived_notes(
@@ -962,7 +962,7 @@ mod test {
 	/// the verb, since the verb not having run yet is no fault.
 	#[beet_core::test]
 	async fn names_the_verb_of_an_unwritten_derived_file() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		let mut world = check_world();
 		let router = derived_notes(
 			&mut world,

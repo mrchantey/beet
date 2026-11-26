@@ -294,7 +294,7 @@ pub(crate) mod tests {
 		let root = world
 			.spawn((
 				Stack::new("mail").with_stage("prod"),
-				BlobStore::new(InMemoryBlobStore::new()),
+				BlobStore::temp(),
 				RepoStore,
 				DocumentSecrets::new("store.toml"),
 			))
@@ -501,7 +501,7 @@ pub(crate) mod tests {
 		let root = world
 			.spawn((
 				Stack::new("mail").with_stage("dev"),
-				BlobStore::new(InMemoryBlobStore::new()),
+				BlobStore::temp(),
 				RepoStore,
 				DocumentSecrets::new("store.toml"),
 			))

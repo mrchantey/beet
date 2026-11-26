@@ -302,7 +302,7 @@ mod test {
 	/// store holding `index` when given, the fixture publication declared at
 	/// its root and its index loaded.
 	async fn served(index: Option<StandardSiteIndex>) -> (World, Entity) {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		if let Some(index) = index {
 			write_index(&store, &index).await;
 		}
@@ -471,7 +471,7 @@ mod test {
 	#[beet_core::test]
 	async fn derives_its_index() {
 		let (pds, publication) = repo().await;
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		let mut world = syndication_world(Some("https://beet.org"));
 		let entity =
 			world.spawn((harvest(), pds.clone(), store.clone())).flush();

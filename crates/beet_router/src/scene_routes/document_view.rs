@@ -60,7 +60,7 @@ mod test {
 	/// request accepts.
 	#[beet_core::test]
 	async fn views_a_store_file_as_accepted() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(
 				&"docs/plan.html".into(),
@@ -112,7 +112,7 @@ mod test {
 	/// writes it back as its table beside the page's own keys.
 	#[beet_core::test]
 	async fn views_a_declared_component_as_its_section() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(
 				&"docs/plan.md".into(),

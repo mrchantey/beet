@@ -501,7 +501,7 @@ mod test {
 		seed: u64,
 	) -> Gathered {
 		Gathered {
-			store: BlobStore::new(InMemoryBlobStore::new()),
+			store: BlobStore::temp(),
 			rotation: SceneRotation { order, ..default() },
 			discovered: true,
 			scenes: scenes.iter().map(|scene| SmolStr::new(scene)).collect(),
@@ -589,7 +589,7 @@ mod test {
 	/// to titles + served urls, and an empty scene falls back to the configured image.
 	#[beet_core::test]
 	async fn discovers_scenes_and_images() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(&RelPath::from("scenes/foo/main.bsx"), "<ScenePrompt/>")
 			.await

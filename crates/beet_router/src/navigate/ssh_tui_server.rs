@@ -1033,7 +1033,7 @@ mod test {
 	#[beet_core::test]
 	async fn bsx_layout_blob_page_renders_once_per_session() {
 		let mut app = ssh_tui_app();
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(
 				&"index.html".into(),
@@ -1358,7 +1358,7 @@ mod test {
 	#[beet_core::test]
 	async fn counter_increments_only_its_own_session() {
 		let mut app = ssh_tui_live_app();
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(
 				&"counter.bsx".into(),

@@ -228,7 +228,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	async fn seeded(entries: &[(&str, &str)]) -> BlobStore {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		for (path, body) in entries {
 			store
 				.insert(&RelPath::new(path), body.to_string())
@@ -247,7 +247,7 @@ mod test {
 	#[beet_core::test]
 	async fn copies_once_then_skips() {
 		let source = seeded(&[("a.txt", "a"), ("dir/b.txt", "b")]).await;
-		let dest = BlobStore::new(InMemoryBlobStore::new());
+		let dest = BlobStore::temp();
 		let sync = BlobSync::new(source.clone(), dest.clone());
 		let report = sync.run().await.unwrap();
 		report.copied.xpect_eq(paths(&["a.txt", "dir/b.txt"]));
@@ -310,7 +310,7 @@ mod test {
 	#[beet_core::test]
 	async fn refuses_to_mirror_an_empty_source() {
 		let dest = seeded(&[("keep.txt", "k")]).await;
-		let source = BlobStore::new(InMemoryBlobStore::new());
+		let source = BlobStore::temp();
 		let sync = BlobSync::new(source.clone(), dest.clone());
 		sync.run().await.unwrap().copied.xpect_empty();
 		for dry_run in [false, true] {
@@ -360,7 +360,7 @@ mod test {
 					FsStore::new(root.path().clone())
 						.with_follow_symlinks(follow),
 				),
-				BlobStore::new(InMemoryBlobStore::new()),
+				BlobStore::temp(),
 			)
 			.with_delete(true)
 		};
@@ -445,7 +445,7 @@ mod test {
 					FsStore::new(root.path().clone())
 						.with_follow_symlinks(follow),
 				),
-				BlobStore::new(InMemoryBlobStore::new()),
+				BlobStore::temp(),
 			)
 		};
 		sync(true)
@@ -471,7 +471,7 @@ mod test {
 		fs_ext::write(root.join("main.bsx"), "<div/>").unwrap();
 		fs_ext::write(root.join("assets/logo.png"), "png").unwrap();
 		let source = BlobStore::new(FsStore::new(root.path().clone()));
-		let dest = BlobStore::new(InMemoryBlobStore::new());
+		let dest = BlobStore::temp();
 		BlobSync::new(source.clone(), dest.clone())
 			.with_delete(true)
 			.run()

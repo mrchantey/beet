@@ -793,7 +793,7 @@ mod test {
 	/// An in-memory [`BlobStore`] seeded with `files`, proving discovery is
 	/// provider-agnostic (the same scan the S3-backed task runs).
 	async fn memory_fixture(files: &[(&str, &str)]) -> BlobStore {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		for (rel, content) in files {
 			store
 				.insert(&RelPath::from(*rel), content.to_string())

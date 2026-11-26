@@ -355,7 +355,7 @@ mod test {
 		let root = world
 			.spawn((
 				Stack::new("app").with_stage("dev"),
-				BlobStore::new(InMemoryBlobStore::new()),
+				BlobStore::temp(),
 				RepoStore,
 				DocumentSecrets::new("secrets.toml"),
 			))

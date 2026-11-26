@@ -267,18 +267,13 @@ mod test {
 		// a declaration with no store provider on it
 		let storeless = world.spawn_empty().id();
 		let root = world
-			.spawn((
-				BlobStore::new(InMemoryBlobStore::new()),
-				RepoStore,
-				children![
-					Secrets::new("infra/secrets/mail.toml")
-						.with_label("mail-prod"),
-					(
-						Secrets::new("secrets.toml").with_label("cold"),
-						StoreRef(storeless)
-					),
-				],
-			))
+			.spawn((BlobStore::temp(), RepoStore, children![
+				Secrets::new("infra/secrets/mail.toml").with_label("mail-prod"),
+				(
+					Secrets::new("secrets.toml").with_label("cold"),
+					StoreRef(storeless)
+				),
+			]))
 			.id();
 		world.flush();
 		(world, root)
@@ -352,16 +347,13 @@ mod test {
 			.base_dir()
 			.unwrap()
 			.xpect_eq(root.path().clone());
-		SecretsHandle::in_store(
-			BlobStore::new(InMemoryBlobStore::new()),
-			&above,
-		)
-		.unwrap_err()
-		.to_string()
-		.xpect_contains("above the store");
+		SecretsHandle::in_store(BlobStore::temp(), &above)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("above the store");
 		// a plain path is the same document as before
 		SecretsHandle::in_store(
-			BlobStore::new(InMemoryBlobStore::new()),
+			BlobStore::temp(),
 			&Secrets::new("infra/x.toml"),
 		)
 		.unwrap()
@@ -373,9 +365,7 @@ mod test {
 	#[beet_core::test]
 	fn the_default_is_the_lone_declaration_or_the_conventional_file() {
 		let mut world = StorePlugin.into_world();
-		let root = world
-			.spawn((BlobStore::new(InMemoryBlobStore::new()), RepoStore))
-			.id();
+		let root = world.spawn((BlobStore::temp(), RepoStore)).id();
 		world.flush();
 		world.with_state::<SecretsQuery, _>(|query| {
 			let handle = query.resolve(root, None).unwrap();

@@ -543,7 +543,7 @@ mod test {
 			cache: "hot".into(),
 			eager: true,
 		});
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		registry.preload(&prescan, &store).await.unwrap();
 		store
 			.get_media(&RelPath::from("order.txt"))

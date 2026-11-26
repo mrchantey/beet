@@ -71,7 +71,7 @@ impl EmulatorPds {
 	pub fn temp() -> Self {
 		Self::new(
 			Did::parse(Self::TEST_DID).unwrap_or_default(),
-			BlobStore::new(InMemoryBlobStore::new()),
+			BlobStore::temp(),
 		)
 	}
 

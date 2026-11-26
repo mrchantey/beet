@@ -36,7 +36,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn removes_existing_blob() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		let path = RelPath::from("file.txt");
 		store.insert(&path, "hello").await.unwrap();
 		store.exists(&path).await.unwrap().xpect_true();

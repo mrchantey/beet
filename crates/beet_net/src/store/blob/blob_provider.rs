@@ -243,7 +243,7 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// store.insert(&RelPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
@@ -276,7 +276,7 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// let paths = store.list().await?;
 	/// # Ok(())
 	/// # }
@@ -295,7 +295,7 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// let listing = store.list_dir(&RelPath::from("2026")).await?;
 	/// for month in listing.dirs {
 	/// 	println!("{month}");
@@ -329,7 +329,7 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// let data = store.get(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
@@ -343,7 +343,7 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// let exists = store.exists(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
@@ -357,7 +357,7 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// store.remove(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
@@ -494,7 +494,7 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// let url = store.public_url(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }

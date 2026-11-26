@@ -74,7 +74,7 @@ mod test {
 
 	/// Shared helper: create store with a text file at the given path.
 	async fn store_with_text(path: &str, text: &str) -> BlobStore {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(&RelPath::from(path), text.to_owned())
 			.await

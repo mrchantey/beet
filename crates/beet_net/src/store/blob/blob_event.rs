@@ -161,8 +161,8 @@ mod test {
 	/// nested subdirs (same backing, covering), and a mismatched backing.
 	#[beet_core::test]
 	fn routing_truth_table() {
-		let base = BlobStore::new(InMemoryBlobStore::new());
-		let other = BlobStore::new(InMemoryBlobStore::new());
+		let base = BlobStore::temp();
+		let other = BlobStore::temp();
 		let sub = base.with_subdir(RelPath::new("dir"));
 		let ev = BlobEvent::new(
 			base.clone(),

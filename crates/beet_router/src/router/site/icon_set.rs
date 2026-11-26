@@ -498,7 +498,7 @@ mod test {
 	/// A world declaring the set from [`SRC`] in a temp store holding `source`.
 	fn setup(source: Vec<u8>) -> (World, Entity, BlobStore) {
 		let mut world = AsyncPlugin.into_world();
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		let entity = world.spawn(IconSet::new(SRC)).flush();
 		let inserted = store.clone();
 		async_ext::block_on(async move {
@@ -678,7 +678,7 @@ mod test {
 	async fn derives_an_svg_source() {
 		const SVG: &str = "branding/logo.svg";
 		let mut world = AsyncPlugin.into_world();
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(
 				&RelPath::new(SVG),

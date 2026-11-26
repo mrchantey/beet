@@ -273,8 +273,8 @@ mod test {
 	/// A fork of two seeded memory stores: `shared.txt` in both (the local
 	/// copy edited), `upstream.txt` only upstream, `local.txt` only local.
 	async fn fork() -> (BlobStore, BlobStore, BlobStore) {
-		let local = BlobStore::new(InMemoryBlobStore::new());
-		let upstream = BlobStore::new(InMemoryBlobStore::new());
+		let local = BlobStore::temp();
+		let upstream = BlobStore::temp();
 		for (store, path, body) in [
 			(&upstream, "shared.txt", "published"),
 			(&upstream, "upstream.txt", "upstream"),
@@ -370,10 +370,7 @@ mod test {
 	/// object or an unrelated store is neither.
 	#[beet_core::test]
 	fn routes_events_from_either_half_and_its_base() {
-		let (local, upstream) = (
-			BlobStore::new(InMemoryBlobStore::new()),
-			BlobStore::new(InMemoryBlobStore::new()),
-		);
+		let (local, upstream) = (BlobStore::temp(), BlobStore::temp());
 		let fork =
 			BlobStore::new(StoreFork::new(local.clone(), upstream.clone()));
 		let scoped = fork.with_subdir(RelPath::from("docs"));
@@ -391,7 +388,7 @@ mod test {
 			blob.matches_event(&event(source, "docs/b.md"))
 				.xpect_false();
 		}
-		let unrelated = BlobStore::new(InMemoryBlobStore::new());
+		let unrelated = BlobStore::temp();
 		scoped
 			.did_change(&event(&unrelated, "docs/a.md"))
 			.xpect_false();
@@ -401,8 +398,8 @@ mod test {
 
 	#[beet_core::test]
 	async fn rebases_both_halves() {
-		let local = BlobStore::new(InMemoryBlobStore::new());
-		let upstream = BlobStore::new(InMemoryBlobStore::new());
+		let local = BlobStore::temp();
+		let upstream = BlobStore::temp();
 		upstream
 			.insert(&RelPath::new("site/app/main.bsx"), "<Router/>")
 			.await

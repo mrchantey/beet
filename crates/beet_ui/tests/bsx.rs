@@ -49,7 +49,7 @@ async fn package(documents: &[(&str, &str)]) -> (World, Entity) {
 	app.install_types::<AsyncPlugin>()
 		.install_types::<SceneStorePlugin>();
 	let mut world = core::mem::take(app.world_mut());
-	let store = BlobStore::new(InMemoryBlobStore::new());
+	let store = BlobStore::temp();
 	for (path, source) in documents {
 		store
 			.insert(&RelPath::new(path), source.to_string())
@@ -916,7 +916,7 @@ async fn counter_bsx_repaints_in_live_tui() {
 		.install_types::<AsyncPlugin>()
 		.install_types::<SceneStorePlugin>();
 	// the site-local card the counter instantiates
-	let store = BlobStore::new(InMemoryBlobStore::new());
+	let store = BlobStore::temp();
 	store
 		.insert(
 			&RelPath::new("widgets/Card.bsx"),

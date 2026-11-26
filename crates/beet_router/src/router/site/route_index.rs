@@ -259,7 +259,7 @@ mod test {
 	#[beet_core::test]
 	async fn lists_discovered_posts() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		for (path, content) in [
 			(
 				"blog/index.bsx",

@@ -23,7 +23,7 @@ pub trait StoreBackend: 'static + Send + Sync {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// let exists = store.store_exists().await?;
 	/// # Ok(())
 	/// # }
@@ -37,7 +37,7 @@ pub trait StoreBackend: 'static + Send + Sync {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// store.store_create().await?;
 	/// # Ok(())
 	/// # }
@@ -54,7 +54,7 @@ pub trait StoreBackend: 'static + Send + Sync {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// store.store_try_create().await?;
 	/// # Ok(())
 	/// # }
@@ -78,7 +78,7 @@ pub trait StoreBackend: 'static + Send + Sync {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// store.store_remove().await?;
 	/// # Ok(())
 	/// # }

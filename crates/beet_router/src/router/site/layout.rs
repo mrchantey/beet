@@ -281,7 +281,7 @@ mod test {
 
 	/// A store of `documents`, each a layout by its path.
 	async fn documents(documents: &[(&str, &str)]) -> BlobStore {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		for (path, source) in documents {
 			store
 				.insert(&RelPath::new(path), source.to_string())
@@ -406,7 +406,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn wraps_blob_page_markdown() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(&"post.md".into(), "# Hello\n\nmarkdown body".to_owned())
 			.await
@@ -435,7 +435,7 @@ mod test {
 	/// post-parse pipeline re-scanned ever more resident entities).
 	#[beet_core::test]
 	async fn repeated_requests_stay_bounded() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(
 				&"post.md".into(),
@@ -466,9 +466,7 @@ mod test {
 		for layout in [Layout::template("Nope"), Layout::document("Nope.bsx")] {
 			let mut world = router_world();
 			let root = layout_root(&mut world, layout);
-			world
-				.entity_mut(root)
-				.insert(BlobStore::new(InMemoryBlobStore::new()));
+			world.entity_mut(root).insert(BlobStore::temp());
 			world
 				.entity_mut(root)
 				.exchange(Request::get(""))

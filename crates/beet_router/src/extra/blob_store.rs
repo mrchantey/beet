@@ -37,7 +37,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn serve_blob_streams_file() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(&RelPath::from("style.css"), "body { color: red; }")
 			.await
@@ -53,7 +53,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn serve_blob_appends_index_html() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(&RelPath::from("docs/index.html"), "<h1>Hello</h1>")
 			.await

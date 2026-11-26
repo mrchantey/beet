@@ -280,10 +280,7 @@ pub async fn MailColdProbe(
 			dated=true/>`"
 		);
 	};
-	let handle = SecretsHandle::new(
-		BlobStore::new(InMemoryBlobStore::new()),
-		declared.path.as_str(),
-	)?;
+	let handle = SecretsHandle::new(BlobStore::temp(), declared.path.as_str())?;
 	let extension = declared.media_type()?.extension().unwrap_or_default();
 	let series = declared
 		.path

@@ -49,7 +49,7 @@ const COUNTER_BSX: &str = r#"
 /// Seed an in-memory repo store (entry, layout template, content routes) so the
 /// suite runs storage-agnostic, on wasm too, with no temp-dir concurrency hazard.
 async fn site_store() -> BlobStore {
-	let store = BlobStore::new(InMemoryBlobStore::new());
+	let store = BlobStore::temp();
 	for (path, content) in [
 		("main.bsx", MAIN_BSX),
 		("templates/Layout.bsx", LAYOUT_BSX),
@@ -397,7 +397,7 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 /// argv as its request.
 #[beet_core::test]
 async fn an_instance_carries_boot() {
-	let store = BlobStore::new(InMemoryBlobStore::new());
+	let store = BlobStore::temp();
 	store
 		.insert(
 			&RelPath::from("serve.bsx"),

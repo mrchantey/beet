@@ -103,7 +103,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.install_types::<ThreadPlugin>();
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(
 				&RelPath::new("NotesThread.bsx"),

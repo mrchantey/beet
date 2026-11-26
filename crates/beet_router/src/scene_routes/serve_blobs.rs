@@ -213,7 +213,7 @@ mod test {
 
 	/// A temp store with a single `style.css` file.
 	async fn css_store() -> BlobStore {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(&RelPath::from("style.css"), "body { color: red; }")
 			.await
@@ -344,11 +344,10 @@ mod test {
 	async fn miss_hints_at_an_unhydrated_assets_dir() {
 		let mut world = router_world();
 		let root = world
-			.spawn((
-				Router::with_defaults(),
-				BlobStore::new(InMemoryBlobStore::new()),
-				children![serve_route("assets"), serve_route("other")],
-			))
+			.spawn((Router::with_defaults(), BlobStore::temp(), children![
+				serve_route("assets"),
+				serve_route("other")
+			]))
 			.flush();
 		world
 			.entity_mut(root)
@@ -374,7 +373,7 @@ mod test {
 	#[cfg(feature = "json")]
 	#[beet_core::test]
 	async fn lists_keys_as_json() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		for path in ["main.bsx", "docs/a.md", "docs/b/c.md"] {
 			store.insert(&RelPath::from(path), "x").await.unwrap();
 		}
@@ -417,7 +416,7 @@ mod test {
 	))]
 	#[beet_core::test]
 	async fn an_http_store_reads_the_mount() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		for (path, body) in [
 			("main.bsx", "<Router/>"),
 			("docs/a.md", "# a"),
@@ -484,7 +483,7 @@ mod test {
 	/// An extensionless path serves `<path>/index.html`, the static-host fallback.
 	#[beet_core::test]
 	async fn serves_index_html() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(&RelPath::from("bar/index.html"), "<div>fallback</div>")
 			.await

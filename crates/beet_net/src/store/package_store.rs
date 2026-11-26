@@ -103,7 +103,7 @@ mod test {
 	#[beet_core::test]
 	fn resolves_in_the_package_not_the_nearest_store() {
 		let mut world = World::new();
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		let entry = RelPath::new("app/main.bsx");
 		let root = world
 			.spawn((PackageStore::of_entry(&store, &entry), store.clone()))

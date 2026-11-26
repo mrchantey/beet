@@ -19,7 +19,7 @@ use beet_core::prelude::*;
 /// async_ext::block_on(async {
 /// 	let mut identities = AgeIdentityFile::default();
 /// 	identities.push(AgeIdentity::generate());
-/// 	let handle = SecretsHandle::new(BlobStore::new(InMemoryBlobStore::new()), "secrets.toml")?;
+/// 	let handle = SecretsHandle::new(BlobStore::temp(), "secrets.toml")?;
 /// 	let mut document = handle.read_or_new().await?;
 /// 	document.set(&identities, "default", "TOKEN", "hunter2", default())?;
 /// 	handle.write(&document).await?;
@@ -271,7 +271,7 @@ mod test {
 	async fn reads_and_writes_a_document() {
 		let mut identities = AgeIdentityFile::default();
 		identities.push(AgeIdentity::generate());
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		let handle = SecretsHandle::new(store.clone(), "secrets.toml").unwrap();
 		handle.exists().await.unwrap().xpect_false();
 		handle
@@ -317,7 +317,7 @@ mod test {
 	/// and the newest is read back by name.
 	#[beet_core::test]
 	async fn dates_a_series_beside_the_path() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		let handle = SecretsHandle::new(store.clone(), "secrets/export.toml")
 			.unwrap()
 			.with_label("cold");
@@ -367,7 +367,7 @@ mod test {
 	/// (`target/`) is never walked and never mistaken for one.
 	#[beet_core::test]
 	async fn finds_a_root_series_among_siblings() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		let handle = SecretsHandle::new(store.clone(), "secrets.toml").unwrap();
 		for path in [
 			"target/debug/deps/x.rlib",

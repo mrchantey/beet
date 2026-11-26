@@ -44,6 +44,9 @@ impl BlobStore {
 		Self { provider }
 	}
 
+	/// A new, empty [`InMemoryBlobStore`], for a test or scratch work.
+	pub fn temp() -> BlobStore { BlobStore::new(InMemoryBlobStore::new()) }
+
 	/// The erased store a [`StoreUri`] names, for a caller with no entity to
 	/// land the concrete component on (entry resolution, a prune). See
 	/// [`BlobStoreProvider::from_uri`], the one seam this rides.
@@ -156,7 +159,7 @@ impl BlobStore {
 	/// ```
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// let blob = store.blob(RelPath::new("my-file.txt"));
 	/// ```
 	pub fn blob(&self, path: RelPath) -> Blob { Blob::new(self.clone(), path) }
@@ -195,7 +198,7 @@ impl BlobStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// store.insert(&RelPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
@@ -222,7 +225,7 @@ impl BlobStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// store.try_insert(&RelPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
@@ -246,7 +249,7 @@ impl BlobStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::new(InMemoryBlobStore::new());
+	/// let store = BlobStore::temp();
 	/// let all_data = store.get_all().await?;
 	/// # Ok(())
 	/// # }
@@ -390,7 +393,7 @@ mod test {
 	/// A store with no parent universe seeded with a nested entry plus content
 	/// beside and above it.
 	async fn nested_store() -> BlobStore {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(&RelPath::from("a/b/main.bsx"), "<Router/>")
 			.await
@@ -443,7 +446,7 @@ mod test {
 	/// mis-publish, rather than asking the store for keys it cannot hold.
 	#[beet_core::test]
 	async fn escaping_root_names_the_mis_publish() {
-		BlobStore::new(InMemoryBlobStore::new())
+		BlobStore::temp()
 			.rebase_repo("main.bsx", "../..")
 			.unwrap_err()
 			.to_string()
@@ -453,7 +456,7 @@ mod test {
 	/// A declared root the entry does not sit under is an authoring error.
 	#[beet_core::test]
 	async fn entry_outside_root_errors() {
-		BlobStore::new(InMemoryBlobStore::new())
+		BlobStore::temp()
 			.rebase_repo("a/main.bsx", "sub")
 			.unwrap_err()
 			.to_string()

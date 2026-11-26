@@ -773,7 +773,7 @@ mod test {
 	#[beet_core::test]
 	async fn every_target_at_every_rung() {
 		let mut world = syndication_world(Some("https://beet.org"));
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(
 				&RelPath::new("BareLayout.bsx"),

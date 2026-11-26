@@ -774,9 +774,7 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn json() {
-		in_process(json_tables(BlobStore::new(InMemoryBlobStore::new()))).await
-	}
+	async fn json() { in_process(json_tables(BlobStore::temp())).await }
 
 	#[cfg(feature = "sqlite")]
 	#[beet_core::test(timeout_ms = 60_000)]
@@ -786,7 +784,7 @@ mod test {
 	/// server whole.
 	#[beet_core::test]
 	async fn keys_survive_the_path() {
-		let provider = json_tables(BlobStore::new(InMemoryBlobStore::new()));
+		let provider = json_tables(BlobStore::temp());
 		let store = TableStore::new(
 			TableWireClient::connect(TableWireTransport::new(
 				"in-process",
@@ -835,8 +833,7 @@ mod test {
 
 		#[beet_core::test(timeout_ms = 60_000)]
 		async fn json_memory() {
-			over_http(json_tables(BlobStore::new(InMemoryBlobStore::new())))
-				.await
+			over_http(json_tables(BlobStore::temp())).await
 		}
 
 		#[beet_core::test(timeout_ms = 60_000)]

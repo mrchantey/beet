@@ -652,7 +652,7 @@ mod test {
 	#[beet_core::test]
 	async fn static_export_writes_the_placeholder() {
 		let (mut world, router) = site(&default());
-		let out = BlobStore::new(InMemoryBlobStore::new());
+		let out = BlobStore::temp();
 		let store = out.clone();
 		let written = world
 			.run_async_then(async move |world| {

@@ -396,7 +396,7 @@ mod test {
 		let store =
 			recorded(&[page_view(40, "/cold", 1), page_view(1, "/warm", 2)])
 				.await;
-		let archive = BlobStore::new(InMemoryBlobStore::new());
+		let archive = BlobStore::temp();
 		let report =
 			AnalyticsRollupRun::new(store.clone(), Some(archive.clone()))
 				.call()
@@ -475,7 +475,7 @@ mod test {
 	async fn full_rebuilds_from_the_archive() {
 		let store =
 			recorded(&[page_view(40, "/a", 1), page_view(40, "/b", 2)]).await;
-		let archive = BlobStore::new(InMemoryBlobStore::new());
+		let archive = BlobStore::temp();
 		AnalyticsRollupRun::new(store.clone(), Some(archive.clone()))
 			.call()
 			.await

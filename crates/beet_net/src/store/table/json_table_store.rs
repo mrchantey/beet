@@ -65,7 +65,7 @@ impl JsonTableStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let tables = JsonTableStore::over(BlobStore::new(InMemoryBlobStore::new()))?;
+	/// let tables = JsonTableStore::over(BlobStore::temp())?;
 	/// tables.table::<TableItem<u32>>().push(TableItem::new(7)).await?;
 	/// # Ok(())
 	/// # }
@@ -524,18 +524,14 @@ mod test {
 
 	#[beet_core::test]
 	async fn memory_store() {
-		table_test::run(
-			JsonTableStore::over(BlobStore::new(InMemoryBlobStore::new()))
-				.unwrap(),
-		)
-		.await;
+		table_test::run(JsonTableStore::over(BlobStore::temp()).unwrap()).await;
 	}
 
 	/// A store under a path is created with the blob store holding it, and
 	/// leaves what else it holds.
 	#[beet_core::test]
 	async fn under_a_path() {
-		let blobs = BlobStore::new(InMemoryBlobStore::new());
+		let blobs = BlobStore::temp();
 		blobs.insert(&RelPath::new("other.txt"), "x").await.unwrap();
 		let tables = JsonTableStore::default()
 			.with_path(RelPath::new("tables"))
@@ -596,7 +592,7 @@ mod test {
 	/// be written by hand, and an emptied one is gone.
 	#[beet_core::test]
 	async fn layout() {
-		let blobs = BlobStore::new(InMemoryBlobStore::new());
+		let blobs = BlobStore::temp();
 		let tables = JsonTableStore::over(blobs.clone()).unwrap();
 		let rows = tables.table::<table_test::NamedRow>();
 		rows.put(table_test::NamedRow::new("two", 2)).await.unwrap();
@@ -669,7 +665,7 @@ mod test {
 	/// an error naming it, never read as empty or written over.
 	#[beet_core::test]
 	async fn reads_a_hand_written_file() {
-		let blobs = BlobStore::new(InMemoryBlobStore::new());
+		let blobs = BlobStore::temp();
 		let tables = JsonTableStore::over(blobs.clone()).unwrap();
 		let rows = tables.table::<table_test::NamedRow>();
 		let file = RelPath::new("@root.json");
@@ -748,7 +744,7 @@ mod test {
 	/// replaced file is retried, never a row's conflict.
 	#[beet_core::test]
 	async fn writers_of_unrelated_rows_never_conflict() {
-		let blobs = BlobStore::new(InMemoryBlobStore::new());
+		let blobs = BlobStore::temp();
 		(0..16)
 			.map(|idx| {
 				// each its own handle, as another process's is
@@ -781,7 +777,7 @@ mod test {
 			("notes.json", "[]"),
 			("bad name.json", "{}"),
 		] {
-			let blobs = BlobStore::new(InMemoryBlobStore::new());
+			let blobs = BlobStore::temp();
 			let tables = JsonTableStore::over(blobs.clone()).unwrap();
 			tables
 				.table::<table_test::NamedRow>()
@@ -804,8 +800,8 @@ mod test {
 	#[beet_core::test]
 	fn refuses_a_store_without_conditional_writes() {
 		JsonTableStore::over(BlobStore::new(StoreFork::new(
-			BlobStore::new(InMemoryBlobStore::new()),
-			BlobStore::new(InMemoryBlobStore::new()),
+			BlobStore::temp(),
+			BlobStore::temp(),
 		)))
 		.unwrap_err()
 		.to_string()

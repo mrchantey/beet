@@ -80,7 +80,7 @@ mod test {
 
 	/// A temp store seeded with `count` tiny jpeg blobs under `dir`.
 	async fn photo_store(dir: &str, count: usize) -> BlobStore {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		for index in 0..count {
 			store
 				.insert(&RelPath::from(format!("{dir}/{index}.jpg")), vec![
@@ -123,7 +123,7 @@ mod test {
 		});
 		// store on an ancestor, the camera reads it via self-or-ancestor lookup.
 		// unscoped root: `capture` applies the `PhotoStream::dir` subdir itself.
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		for index in 0..3usize {
 			store
 				.insert(&RelPath::from(format!("photos/{index}.jpg")), vec![

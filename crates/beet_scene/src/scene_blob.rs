@@ -191,7 +191,7 @@ mod test {
 
 	/// A store holding the authored original: a heading over two items.
 	async fn store() -> BlobStore {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(
 				&RelPath::from("app.bsx"),
@@ -299,7 +299,7 @@ mod test {
 		let (app, host) = boot(upstream.clone()).await;
 		let key = heading_key(&app, host);
 		drop(app);
-		let local = BlobStore::new(InMemoryBlobStore::new());
+		let local = BlobStore::temp();
 		let fork =
 			BlobStore::new(StoreFork::new(local.clone(), upstream.clone()));
 		let (mut app, host) = boot(fork.clone()).await;

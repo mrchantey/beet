@@ -51,7 +51,7 @@
 //! # use beet_net::prelude::*;
 //! # use beet_core::prelude::*;
 //! # async fn run() -> Result<()> {
-//! let store = BlobStore::new(InMemoryBlobStore::new());
+//! let store = BlobStore::temp();
 //! store.insert(&RelPath::from("hello.txt"), "world").await?;
 //! let data = store.get(&RelPath::from("hello.txt")).await?;
 //! # Ok(())

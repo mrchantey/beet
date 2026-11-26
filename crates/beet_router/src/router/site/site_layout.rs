@@ -280,7 +280,7 @@ mod test {
 	#[beet_core::test]
 	async fn head_previews_the_declared_social_card() {
 		let mut world = syndication_world(Some("https://beet.org"));
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(
 				&RelPath::new("HeadLayout.bsx"),

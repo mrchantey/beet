@@ -317,7 +317,7 @@ mod test {
 		Func: 'static + Send + Sync + Clone + Fn() -> B,
 		B: 'static + Send + Sync + Bundle,
 	{
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		for (path, bytes) in [
 			("photo.png", png(4, 3)),
 			("poster.png", png(2, 1)),
@@ -636,7 +636,7 @@ mod test {
 	#[cfg(all(feature = "http", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn another_hosts_image_under_each_policy() {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert(&RelPath::from("remote.png"), png(8, 8))
 			.await

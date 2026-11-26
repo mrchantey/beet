@@ -150,7 +150,7 @@ mod test {
 	/// A store holding `schema.json` (the schema document) and `todos.json`
 	/// (the state document naming it by location).
 	async fn todo_store() -> BlobStore {
-		let store = BlobStore::new(InMemoryBlobStore::new());
+		let store = BlobStore::temp();
 		store
 			.insert_document(
 				&RelPath::from("schema.json"),
