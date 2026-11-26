@@ -156,6 +156,8 @@ aws = [
 	"json",
 	"dep:sha2",
 	"dep:hmac",
+	# `BsxElement::parse_xml`, the S3 and query protocol answers
+	"beet_core/bsx",
 	"beet_core/rand",
 	# Identity Center's login is an OAuth flow over the same client
 	"oauth",

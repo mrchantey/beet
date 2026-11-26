@@ -14,6 +14,8 @@ pub use doc_parsers::*;
 mod parse_error;
 #[cfg(feature = "serde")]
 pub use parse_error::*;
+mod source_error;
+pub use source_error::*;
 #[cfg(feature = "serde")]
 mod source_map;
 #[cfg(feature = "serde")]

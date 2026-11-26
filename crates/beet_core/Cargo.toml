@@ -154,6 +154,10 @@ bevy_color = ["bevy/bevy_color"]
 # loading. The no_std core stays asset-free; removing this leaves a fully
 # functional asset-free substrate where `Ready` fires immediately.
 bevy_asset = ["bevy/bevy_asset"]
+# BSX markup as a syntax tree (`BsxNode`): the one parser for BSX, HTML and
+# XML, its dialect chosen by `BsxParseConfig`. no_std and serde free; what a
+# tree becomes in a scene is `beet_scene`'s.
+bsx = []
 # no_std base serialization support. Heavier format crates (`serde_plain`,
 # json, postcard, toml) are opt-in via their own features.
 serde = [

@@ -30,7 +30,7 @@ markdown_parser = ["dep:pulldown-cmark"]
 harness = false
 
 [dependencies]
-beet_core = { workspace = true, features = ["serde", "bevy_async"] }
+beet_core = { workspace = true, features = ["serde", "bevy_async", "bsx"] }
 beet_net.workspace = true
 bevy.workspace = true
 indexmap.workspace = true

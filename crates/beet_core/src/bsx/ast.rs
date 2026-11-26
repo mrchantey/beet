@@ -30,9 +30,25 @@ pub enum BsxNode {
 	CData(Spanned<String>),
 	/// `<? .. ?>`, ie the XML declaration, its content as written.
 	ProcessingInstruction(Spanned<String>),
-	/// A document of another format, already lowered, standing where it was
-	/// written, ie a markdown fence a parser reads.
-	Embedded(Spanned<ParsedDocument>),
+	/// A document of another format standing where it was written, ie a
+	/// markdown fence a parser reads, its source unread until it lowers.
+	Embedded(Spanned<EmbeddedDocument>),
+}
+
+/// A document of another format written inside this one, ie a markdown fence
+/// holding mermaid: its source as written, which the lowering reads in its
+/// format.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EmbeddedDocument {
+	/// The format it is written in.
+	pub media_type: MediaType,
+	/// What it says beyond its format, ie `text` of ```` ```mermaid text ````.
+	pub info: SmolStr,
+	/// The source as written.
+	pub source: String,
+	/// Where the source stands whole in the document holding it, `None` once
+	/// it is in pieces, ie within a quote.
+	pub start: Option<usize>,
 }
 
 /// An element: a tag, its attributes, and its children.

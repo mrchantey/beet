@@ -231,7 +231,7 @@
           "$type": "pub.leaflet.pages.linearDocument#block",
           "block": {
             "$type": "pub.leaflet.blocks.text",
-            "plaintext": "The above example demonstrates serving either the raw data (json) or an html view (html/md), but what if we took this idea a little further?"
+            "plaintext": "The above example demonstrates serving either the raw data (json) or a html view (html/md), but what if we took this idea a little further?"
           }
         },
         {

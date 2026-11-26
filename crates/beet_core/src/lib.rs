@@ -61,9 +61,7 @@ pub mod atproto;
 mod bevy_extensions;
 pub mod bevy_utils;
 pub mod bootstrap;
-/// Markup's syntax tree reads into a [`ParsedDocument`](types::ParsedDocument)'s
-/// media types, which are serde's.
-#[cfg(feature = "serde")]
+#[cfg(feature = "bsx")]
 mod bsx;
 mod crate_check;
 pub mod extensions;
@@ -182,7 +180,7 @@ pub mod prelude {
 	pub use crate::bevybail;
 	pub use crate::bevyhow;
 	pub use crate::bootstrap::*;
-	#[cfg(feature = "serde")]
+	#[cfg(feature = "bsx")]
 	pub use crate::bsx::*;
 	pub use crate::cfg_if;
 	pub use crate::crate_check::*;

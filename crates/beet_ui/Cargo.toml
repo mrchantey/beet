@@ -81,7 +81,7 @@ markdown_parser = ["scene", "beet_scene/markdown_parser"]
 # router installs): each read into the one document tree by a `DocParser` and
 # written from it by a `DocRenderer`, its looks through the style cascade,
 # every package read and written through `OpcPackage`, over `zip`.
-ooxml = ["scene", "dep:zip", "dep:flate2"]
+ooxml = ["scene", "beet_core/bsx", "dep:zip", "dep:flate2"]
 # Synthetic fixtures for a downstream's tests, ie `WordFixture` under `ooxml`.
 testing = ["beet_core/testing"]
 # Documents read and scenes loaded, saved and edited through `beet_scene`: the

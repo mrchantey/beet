@@ -249,20 +249,29 @@ impl<'a> Lowering<'a> {
 		slotted: Option<&str>,
 		counts: &mut HashMap<SmolStr, usize>,
 	) -> Result {
-		let key = Self::child_key(node, parent, counts)?;
+		// an embedded document is read first, as its root's tag keys it
+		let embedded = match node {
+			BsxNode::Embedded(embedded) => Some(self.read_embedded(embedded)?),
+			_ => None,
+		};
+		let key = match &embedded {
+			Some(document) => Self::embedded_key(document, parent, counts)?,
+			None => Self::child_key(node, parent, counts)?,
+		};
 		let mut components = EntityBody::default();
 		components.insert(ChildOf::type_path(), parent.reference());
 		self.push(key.clone(), components, node.span())?;
-		match node {
-			BsxNode::Element(element) if self.plain => {
+		match (node, embedded) {
+			(_, Some(document)) => self.embedded(&document, &key)?,
+			(BsxNode::Element(element), _) if self.plain => {
 				self.plain_element(element, &key)?
 			}
-			BsxNode::Element(element) => {
+			(BsxNode::Element(element), _) => {
 				self.element(element, key.clone(), Some(parent))?
 			}
 			// an expression has no plain form
-			BsxNode::Expr(_) if self.plain => {}
-			node => self.leaf(node, &key)?,
+			(BsxNode::Expr(_), _) if self.plain => {}
+			(node, None) => self.leaf(node, &key)?,
 		}
 		// a child that never renders, a `<script {OnEvent}>` a
 		// `bx:onclick` rewrote to, is behaviour of the tag itself and
@@ -298,9 +307,8 @@ impl<'a> Lowering<'a> {
 			BsxNode::Doctype(_) => "#doctype",
 			BsxNode::CData(_) => "#cdata",
 			BsxNode::ProcessingInstruction(_) => "#pi",
-			BsxNode::Embedded(document) => {
-				return Self::embedded_key(document, parent, counts);
-			}
+			// keyed by its root's tag once it is read, see `child`
+			BsxNode::Embedded(_) => "#document",
 		};
 		Self::counted_key(tag, parent, counts)
 	}
@@ -364,8 +372,9 @@ impl<'a> Lowering<'a> {
 				key,
 				&ProcessingInstruction::new(content.value.clone()),
 			),
-			BsxNode::Embedded(document) => self.embedded(document, key),
-			BsxNode::Element(_) => unreachable!("an element is no leaf"),
+			BsxNode::Element(_) | BsxNode::Embedded(_) => {
+				unreachable!("an element or an embedded document is no leaf")
+			}
 		}
 	}
 

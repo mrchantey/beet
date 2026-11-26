@@ -197,7 +197,8 @@ struct MdTreeBuilder<'a> {
 /// A fence read as a document rather than as code.
 struct Fence {
 	media_type: MediaType,
-	info: FenceInfo,
+	/// What the info string says after the media type.
+	info: SmolStr,
 	source: String,
 	/// Where the source stands in the page, `None` once it is in pieces, ie
 	/// within a quote.
@@ -256,7 +257,7 @@ impl Fence {
 		let media_type = MediaType::from_content_type(word);
 		(!word.is_empty() && parsers.reads(&media_type)).then(|| Self {
 			media_type,
-			info: FenceInfo::new(info),
+			info: info.into(),
 			source: default(),
 			start: None,
 			span: span.into(),
@@ -380,7 +381,7 @@ impl<'a> MdTreeBuilder<'a> {
 		match event {
 			Event::Start(tag) => self.handle_start(tag, source, range),
 			Event::End(TagEnd::CodeBlock) if self.fence.is_some() => {
-				self.finish_fence()?
+				self.finish_fence()
 			}
 			Event::End(TagEnd::HtmlBlock) => {}
 			Event::End(_) => self.handle_end(),
@@ -737,27 +738,19 @@ impl<'a> MdTreeBuilder<'a> {
 		}
 	}
 
-	/// Read the fence just closed as the document it holds.
-	fn finish_fence(&mut self) -> Result {
+	/// The fence just closed as the document it holds, read in its format
+	/// when it lowers.
+	fn finish_fence(&mut self) {
 		let Some(fence) = self.fence.take() else {
-			return Ok(());
+			return;
 		};
-		let mut parsers = self.parsers.clone();
-		parsers.edit_setting(|info: &mut FenceInfo| *info = fence.info);
-		let bytes = MediaBytes::new_str(fence.media_type, &fence.source);
-		let mut document = parsers.parse(&bytes).map_err(|error| {
-			match (error.into_source(), fence.start) {
-				// where in the page, when the source stands there whole
-				(error, Some(start)) => SourceError::within(error, start),
-				(error, None) => fence.span.locate(SourceError::split(error).1),
-			}
-		})?;
-		match fence.start {
-			Some(start) => document.spans.shift(start as u32),
-			None => document.spans = default(),
-		}
+		let document = EmbeddedDocument {
+			media_type: fence.media_type,
+			info: fence.info,
+			source: fence.source,
+			start: fence.start,
+		};
 		self.push_leaf(BsxNode::Embedded(Spanned::new(document, fence.span)));
-		Ok(())
 	}
 
 	/// Tokenize an embedded HTML fragment and apply its tokens to the builder

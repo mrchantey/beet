@@ -8,6 +8,34 @@ use bevy::ecs::entity::EntityMapper;
 use bevy::reflect::TypePath;
 
 impl Lowering<'_> {
+	/// `embedded` read in its format against the registry this lowers with,
+	/// its info the [`FenceInfo`] setting it reads, and its error and spans
+	/// placed in the document holding it.
+	pub fn read_embedded(
+		&self,
+		embedded: &Spanned<EmbeddedDocument>,
+	) -> Result<ParsedDocument> {
+		let mut parsers = self.parsers.clone();
+		let info = FenceInfo::new(embedded.info.clone());
+		parsers.edit_setting(|setting: &mut FenceInfo| *setting = info);
+		let bytes =
+			MediaBytes::new_str(embedded.media_type.clone(), &embedded.source);
+		let mut document = parsers.parse(&bytes).map_err(|error| {
+			match (error.into_source(), embedded.start) {
+				// where in the document, when the source stands there whole
+				(error, Some(start)) => SourceError::within(error, start),
+				(error, None) => {
+					embedded.span.locate(SourceError::split(error).1)
+				}
+			}
+		})?;
+		match embedded.start {
+			Some(start) => document.spans.shift(start as u32),
+			None => document.spans = default(),
+		}
+		document.xok()
+	}
+
 	/// The key of an embedded document under `parent`: as an element's, by the
 	/// tag its root is.
 	pub fn embedded_key(
