@@ -1161,6 +1161,7 @@ dependencies = [
  "digest 0.11.3",
  "either",
  "extend",
+ "foldhash 0.2.0",
  "futures",
  "futures-lite",
  "getrandom 0.2.17",

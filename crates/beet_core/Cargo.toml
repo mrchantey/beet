@@ -250,6 +250,7 @@ itertools = { workspace = true, features = ["use_alloc"] }
 send_wrapper = { workspace = true, optional = true }
 smol_str = { workspace = true }
 indexmap = { workspace = true }
+foldhash = { workspace = true }
 heck.workspace = true
 digest.workspace = true
 # the content id a blob and a record are addressed by (`atproto::Cid`)

@@ -1,7 +1,12 @@
 //! Newtype wrapper around an insertion-ordered [`IndexMap`] of [`Value`]s,
 //! providing ergonomic key access and a deterministic [`Hash`] implementation.
 use crate::prelude::*;
-use bevy::platform::hash::RandomState;
+use core::hash::BuildHasher;
+use core::sync::atomic::AtomicUsize;
+use core::sync::atomic::Ordering;
+use foldhash::SharedSeed;
+use foldhash::fast::FoldHasher;
+use foldhash::fast::SeedableRandomState;
 use indexmap::IndexMap;
 
 /// A map of string keys to [`Value`]s.
@@ -15,17 +20,63 @@ use indexmap::IndexMap;
 /// and [`Hash`] ignore order, and the generic serde form still sorts keys, so
 /// two maps holding the same entries stay equal however they were built.
 ///
-/// Its table is **seeded at random** rather than with the fixed seed of
-/// beet's `HashMap`: a map's keys often come from untrusted text, and keys
-/// worked out against a known seed would all collide, making one json object
-/// quadratic to read. Since iteration follows insertion, the seed changes
-/// nothing a caller can observe.
+/// Its table is **seeded at random** ([`MapState`]) rather than with the
+/// fixed seed of beet's `HashMap`: a map's keys often come from untrusted
+/// text, and keys worked out against a known seed would all collide, making
+/// one json object quadratic to read. Since iteration follows insertion, the
+/// seed changes nothing a caller can observe.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut, Reflect)]
 #[reflect(opaque)]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", derive(::serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct Map(pub IndexMap<SmolStr, Value, RandomState>);
+pub struct Map(pub IndexMap<SmolStr, Value, MapState>);
+
+/// The hasher of every [`Map`]'s table: foldhash, its secret seed drawn once
+/// per process from [`SecureRandom`] (the operating system, or a browser's
+/// `crypto.getRandomValues`), so no key can be chosen ahead to collide.
+///
+/// Without the `rand` feature, or where the platform offers no entropy, the
+/// seed is foldhash's own, mixed from addresses and the clock, which on wasm
+/// has no clock to mix.
+#[derive(Debug, Clone)]
+pub struct MapState(SeedableRandomState);
+
+impl MapState {
+	/// The secret every table shares, drawn on first use.
+	fn shared_seed() -> &'static SharedSeed {
+		#[cfg(feature = "rand")]
+		{
+			use bevy::platform::sync::LazyLock;
+			static SECURE: LazyLock<Option<SharedSeed>> = LazyLock::new(|| {
+				SecureRandom::new()
+					.ok()
+					.map(|mut random| u64::from_le_bytes(random.bytes()))
+					.map(SharedSeed::from_u64)
+			});
+			if let Some(seed) = SECURE.as_ref() {
+				return seed;
+			}
+		}
+		SharedSeed::global_random()
+	}
+}
+
+impl Default for MapState {
+	fn default() -> Self {
+		// a seed per table as well, so no two tables probe alike
+		static TABLES: AtomicUsize = AtomicUsize::new(0);
+		Self(SeedableRandomState::with_seed(
+			TABLES.fetch_add(1, Ordering::Relaxed) as u64,
+			Self::shared_seed(),
+		))
+	}
+}
+
+impl BuildHasher for MapState {
+	type Hasher = FoldHasher<'static>;
+	fn build_hasher(&self) -> FoldHasher<'static> { self.0.build_hasher() }
+}
 
 /// Serializes entries sorted by key, matching the deterministic
 /// [`Hash`], [`Ord`] and [`Display`] impls rather than insertion order.
