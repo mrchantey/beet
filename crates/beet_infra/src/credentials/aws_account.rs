@@ -240,7 +240,7 @@ impl AwsAccount {
 				let guard = calls
 					.create_policy(
 						Self::MEMBER_GUARD,
-						&Self::member_guard().to_string(),
+						&Self::member_guard(),
 					)
 					.await?;
 				report.push(format!("policy {} created", Self::MEMBER_GUARD));
@@ -260,7 +260,7 @@ impl AwsAccount {
 			calls
 				.ensure_agent_read(
 					Self::AGENT_READ_POLICY,
-					&Self::agent_read().to_string(),
+					&Self::agent_read(),
 				)
 				.await?,
 		);
@@ -608,7 +608,7 @@ pub(crate) trait ManagementCalls {
 	async fn create_policy(
 		&self,
 		name: &str,
-		document: &str,
+		document: &Value,
 	) -> Result<SmolStr>;
 	/// The ids of the service control policies attached to `target`.
 	async fn attached_policies(&self, target: &str) -> Result<Vec<SmolStr>>;
@@ -619,7 +619,7 @@ pub(crate) trait ManagementCalls {
 	async fn ensure_agent_read(
 		&self,
 		name: &str,
-		document: &str,
+		document: &Value,
 	) -> Result<String>;
 	/// The active account named `name`.
 	async fn find_account(&self, name: &str) -> Result<Option<SmolStr>>;
@@ -857,7 +857,7 @@ impl ManagementCalls for AwsManagement {
 	async fn create_policy(
 		&self,
 		name: &str,
-		document: &str,
+		document: &Value,
 	) -> Result<SmolStr> {
 		let created = self
 			.organizations(
@@ -866,7 +866,8 @@ impl ManagementCalls for AwsManagement {
 					"Name": name,
 					"Type": Self::SCP,
 					"Description": "members stay in the Organization; closing is the management account's act",
-					"Content": document,
+					// the api takes the policy as json text
+					"Content": document.to_json_string(),
 				}),
 			)
 			.await?;
@@ -927,15 +928,14 @@ impl ManagementCalls for AwsManagement {
 	async fn ensure_agent_read(
 		&self,
 		name: &str,
-		document: &str,
+		document: &Value,
 	) -> Result<String> {
 		let account = self.admin.account_id().await?;
-		let document = Value::parse_json(document)?;
 		let report = AwsDeployPolicy::converge_document(
 			&self.admin,
 			&account,
 			name,
-			&document,
+			document,
 		)
 		.await?;
 		AwsDeployPolicy::attach(
@@ -1327,10 +1327,10 @@ mod test {
 		async fn create_policy(
 			&self,
 			name: &str,
-			document: &str,
+			document: &Value,
 		) -> Result<SmolStr> {
 			self.call(format!("create-policy {name}"));
-			document.xpect_contains("organizations:LeaveOrganization");
+			document.xpect_eq(AwsAccount::member_guard());
 			SmolStr::new("p-guard").xok()
 		}
 		async fn attached_policies(
@@ -1355,7 +1355,7 @@ mod test {
 		async fn ensure_agent_read(
 			&self,
 			name: &str,
-			_document: &str,
+			_document: &Value,
 		) -> Result<String> {
 			self.call(format!("agent-read {name}"));
 			format!("policy {name} unchanged").xok()
@@ -1742,6 +1742,25 @@ mod test {
 			management(|_| aws_seam::json_error("PolicyNotFoundException"));
 		calls.attach_policy("p-guard", "r-ab12").await.unwrap_err();
 		log.lock().unwrap().len().xpect_eq(1);
+	}
+
+	/// The guard reaches the api as json text, the document itself rather
+	/// than its human display, which is no json at all.
+	#[beet_core::test]
+	async fn creates_the_guard_as_json() {
+		let (calls, log) = management(|_| {
+			aws_seam::ok(r#"{"Policy":{"PolicySummary":{"Id":"p-guard"}}}"#)
+		});
+		calls
+			.create_policy(AwsAccount::MEMBER_GUARD, &AwsAccount::member_guard())
+			.await
+			.unwrap()
+			.xpect_eq(SmolStr::new("p-guard"));
+		let asked = log.lock().unwrap()[0].clone();
+		asked.target.xpect_eq("AWSOrganizationsV20161128.CreatePolicy");
+		Value::parse_json(asked.json()["Content"].as_str().unwrap())
+			.unwrap()
+			.xpect_eq(AwsAccount::member_guard());
 	}
 
 	/// The guard is found by name across pages of the account's policies.

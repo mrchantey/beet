@@ -6,7 +6,10 @@
 Each dump is flattened to one `path = value` line per leaf, and a multi-line
 string (an instance's `user_data`, a container definition) to one line per
 line of the string, so a diff reads as the changed script lines rather than
-one minified line. Secret-shaped values (`*KEY*=`, `*SECRET*=`, `*TOKEN*=`,
+one minified line. An embedded json document flattens key-sorted, so it also
+prints a `~bytes` digest of its text: a change in key order or whitespace
+alone, which a provider may or may not read as equivalent, shows as that line
+by itself. Secret-shaped values (`*KEY*=`, `*SECRET*=`, `*TOKEN*=`,
 `*PASSWORD*=`) print as a short digest: a change still shows, the value never
 does. Exits 1 when the dumps differ.
 """
@@ -45,6 +48,8 @@ def flatten(node, path, out):
         # an embedded json document, ie an ecs `container_definitions`
         try:
             flatten(json.loads(node), f"{path}~", out)
+            # the parse sorts keys, so a reorder alone shows only here
+            out.append(f"{path}~bytes = sha256:{hashlib.sha256(node.encode()).hexdigest()[:12]}")
         except ValueError:
             out.append(f"{path} = {json.dumps(node)}")
     elif isinstance(node, str) and "\n" in node:

@@ -101,8 +101,8 @@ and a stale one as a warning, since a stale one still serves.
 
 ## The deploy
 
-This same file loads in the deployed binary (built `--no-default-features
---features aws,ssh,geoip`), which never compiled the deploy stack: the
+This same file loads in the deployed binary (built `--no-default-features`
+with the `features` its `<LightsailBeetSiteBlock/>` names), which never compiled the deploy stack: the
 `<Fragment bx:cfg="feature:infra && feature:extra">` inside the `<Stack>`
 excludes the deploy machinery before the build walk, so none of its tags resolve
 and none of it is linked or touched. What is left in its place is a tombstone
