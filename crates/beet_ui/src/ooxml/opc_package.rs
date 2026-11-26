@@ -3,7 +3,6 @@
 //! Packaging Conventions define them.
 use super::xml_part::XmlPart;
 use beet_core::prelude::*;
-use beet_scene::prelude::*;
 use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
@@ -114,6 +113,21 @@ impl OpcPackage {
 	pub const CORE_PROPERTIES_TYPE: &str =
 		"application/vnd.openxmlformats-package.core-properties+xml";
 
+	/// Reads the package a document of `media_type` holds, refusing any
+	/// other media type.
+	pub fn open(
+		bytes: &MediaBytes,
+		media_type: MediaType,
+	) -> Result<Self, ParseError> {
+		if bytes.media_type() != &media_type {
+			return Err(ParseError::UnsupportedType {
+				unsupported: bytes.media_type().clone(),
+				supported: vec![media_type],
+			});
+		}
+		Self::read(bytes.bytes())?.xok()
+	}
+
 	/// Reads the package `bytes` hold.
 	pub fn read(bytes: &[u8]) -> Result<Self> {
 		let entries = Self::read_entries(bytes)?;
@@ -169,13 +183,13 @@ impl OpcPackage {
 
 	/// The part at `path` read as XML through the markup parser, a UTF-16
 	/// part decoded, `None` when the package has no such part.
-	pub fn xml(&self, path: &str) -> Result<Option<Vec<BsxNode>>> {
+	pub fn xml(&self, path: &str) -> Result<Option<Vec<XmlNode>>> {
 		self.part(path).map(Self::read_xml).transpose()
 	}
 
 	/// A part's bytes read as XML, a UTF-16 part decoded.
-	pub fn read_xml(bytes: &[u8]) -> Result<Vec<BsxNode>> {
-		BsxNode::parse_document(&Self::decode(bytes)?, &BsxParseConfig::xml())
+	pub fn read_xml(bytes: &[u8]) -> Result<Vec<XmlNode>> {
+		XmlNode::parse_document(&Self::decode(bytes)?)
 	}
 
 	/// The relationships of `source`, a part's path or `None` for the
@@ -375,7 +389,7 @@ impl OpcPackage {
 		data: &[u8],
 	) -> Result<Vec<(String, SmolStr)>> {
 		let nodes = Self::read_xml(data)?;
-		let Some(types) = BsxNode::document_element(&nodes) else {
+		let Some(types) = XmlNode::document_element(&nodes) else {
 			return Ok(Vec::new());
 		};
 		self.defaults = types
@@ -437,7 +451,7 @@ impl OpcPackage {
 		data: &[u8],
 	) -> Result<Vec<OpcRelationship>> {
 		let nodes = Self::read_xml(data)?;
-		let Some(root) = BsxNode::document_element(&nodes) else {
+		let Some(root) = XmlNode::document_element(&nodes) else {
 			return Ok(Vec::new());
 		};
 		let base = Self::directory(source);
@@ -615,7 +629,6 @@ impl OpcPackage {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_scene::prelude::*;
 
 	/// A package written and read back holds its parts, their types and
 	/// their relationships, a relative target resolving against its source's
@@ -678,7 +691,8 @@ mod test {
 			.unwrap()
 			.unwrap()
 			.xmap(|nodes| {
-				BsxNode::document_element(&nodes).map(|root| root.tag.clone())
+				XmlNode::document_element(&nodes)
+					.map(|root| root.tag.to_string())
 			})
 			.xpect_eq(Some("w".to_string()));
 	}

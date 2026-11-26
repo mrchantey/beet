@@ -5,7 +5,6 @@ use super::office_style::*;
 use super::read_element::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_scene::prelude::*;
 
 /// Reads a Word file into the elements its HTML analogy names: the default
 /// header, the body's blocks, the notes and the default footer, with nothing
@@ -211,18 +210,13 @@ impl WordParser {
 	/// its group and Word 2010's additions, a checkbox among them.
 	const CHOICES: [&str; 4] = ["wps", "wpg", "wp14", "w14"];
 
-	/// Reads `package`'s Word document into `root`.
-	fn read(
-		&self,
-		world: &mut World,
-		root: Entity,
-		package: &OpcPackage,
-	) -> Result {
+	/// Reads `package`'s Word document.
+	fn read(&self, package: &OpcPackage) -> Result<ReadBody> {
 		let main = package
 			.main_part()
 			.ok_or_else(|| bevyhow!("the Word file has no main document part"))?
 			.to_string();
-		let xml = |kind: &str| -> Result<Option<Vec<BsxNode>>> {
+		let xml = |kind: &str| -> Result<Option<Vec<XmlNode>>> {
 			package
 				.related(Some(&main), kind)
 				.map(|path| package.xml(path))
@@ -245,7 +239,7 @@ impl WordParser {
 			note_start: false,
 		};
 		let nodes = package.xml(&main)?.unwrap_or_default();
-		let body = BsxNode::document_element(&nodes)
+		let body = XmlNode::document_element(&nodes)
 			.and_then(|document| document.child("body"))
 			.ok_or_else(|| bevyhow!("the Word document has no body"))?;
 		let mut out = Vec::new();
@@ -274,21 +268,22 @@ impl WordParser {
 		if let Some(path) = footer {
 			out.extend(read.part_element(&path, "footer")?);
 		}
+		let mut body = ReadBody::default();
 		for element in out {
-			element.spawn(world, root, &self.options, &read.theme)?;
+			body.push(element, &self.options, &read.theme)?;
 		}
-		Ok(())
+		body.xok()
 	}
 }
 
 impl WordStyles {
 	/// The styles part's kinds, sizes and numbering.
-	fn parse(nodes: &[BsxNode]) -> Self {
+	fn parse(nodes: &[XmlNode]) -> Self {
 		let mut styles = Self {
 			default_size: 20,
 			..default()
 		};
-		let Some(root) = BsxNode::document_element(nodes) else {
+		let Some(root) = XmlNode::document_element(nodes) else {
 			return styles;
 		};
 		if let Some(size) = root
@@ -358,7 +353,7 @@ impl WordStyles {
 	}
 
 	/// A run properties element's size, `w:sz` in half points.
-	fn size(properties: &BsxElement) -> Option<u32> {
+	fn size(properties: &XmlElement) -> Option<u32> {
 		properties
 			.child("sz")
 			.and_then(|size| size.attribute_local("val"))
@@ -421,12 +416,12 @@ impl StyleKind {
 
 impl WordNumbering {
 	/// The numbering part: each list's levels and whether each counts.
-	fn parse(nodes: &[BsxNode]) -> Self {
+	fn parse(nodes: &[XmlNode]) -> Self {
 		let mut numbering = Self::default();
-		let Some(root) = BsxNode::document_element(nodes) else {
+		let Some(root) = XmlNode::document_element(nodes) else {
 			return numbering;
 		};
-		let levels = |parent: &BsxElement| {
+		let levels = |parent: &XmlElement| {
 			parent
 				.children_named("lvl")
 				.filter_map(|level| {
@@ -469,7 +464,7 @@ impl WordNumbering {
 	}
 
 	/// Whether a level counts, its `w:numFmt` anything but a bullet or none.
-	fn counts(level: &BsxElement) -> bool {
+	fn counts(level: &XmlElement) -> bool {
 		level
 			.child("numFmt")
 			.and_then(|format| format.attribute_local("val"))
@@ -480,7 +475,7 @@ impl WordNumbering {
 impl WordRead<'_> {
 	/// A paragraph properties element's numbering, its `numId` and `ilvl`,
 	/// none for `numId` 0, which ends a style's numbering.
-	fn numbering_of(properties: &BsxElement) -> Option<(SmolStr, u8)> {
+	fn numbering_of(properties: &XmlElement) -> Option<(SmolStr, u8)> {
 		let numbering = properties.child("numPr")?;
 		let num = numbering
 			.child("numId")
@@ -504,7 +499,7 @@ impl WordRead<'_> {
 		let Some(nodes) = self.package.xml(path)? else {
 			return Ok(None);
 		};
-		let Some(root) = BsxNode::document_element(&nodes) else {
+		let Some(root) = XmlNode::document_element(&nodes) else {
 			return Ok(None);
 		};
 		let mut element = ReadElement::new(tag);
@@ -530,7 +525,7 @@ impl WordRead<'_> {
 			let Some(nodes) = self.package.xml(&path)? else {
 				continue;
 			};
-			let Some(root) = BsxNode::document_element(&nodes) else {
+			let Some(root) = XmlNode::document_element(&nodes) else {
 				continue;
 			};
 			// a note may reference another, so the list grows as it is read
@@ -569,7 +564,7 @@ impl WordRead<'_> {
 	fn blocks(
 		&mut self,
 		part: &str,
-		container: &BsxElement,
+		container: &XmlElement,
 	) -> Vec<ReadElement> {
 		let mut items = Vec::new();
 		let mut pending = None;
@@ -582,7 +577,7 @@ impl WordRead<'_> {
 	fn block_items(
 		&mut self,
 		part: &str,
-		container: &BsxElement,
+		container: &XmlElement,
 		items: &mut Vec<BlockRead>,
 		pending: &mut Option<SmolStr>,
 	) {
@@ -631,7 +626,7 @@ impl WordRead<'_> {
 	}
 
 	/// The id a bookmark gives its block, none for Word's own `_GoBack`.
-	fn bookmark(start: &BsxElement) -> Option<SmolStr> {
+	fn bookmark(start: &XmlElement) -> Option<SmolStr> {
 		start
 			.attribute_local("name")
 			.filter(|name| !name.is_empty() && *name != "_GoBack")
@@ -640,7 +635,7 @@ impl WordRead<'_> {
 
 	/// The branch of an `mc:AlternateContent` the reader reads: its first
 	/// choice requiring only what it reads, else its fallback.
-	fn alternate(content: &BsxElement) -> Option<&BsxElement> {
+	fn alternate(content: &XmlElement) -> Option<&XmlElement> {
 		content
 			.children_named("Choice")
 			.find(|choice| {
@@ -659,7 +654,7 @@ impl WordRead<'_> {
 	fn paragraph(
 		&mut self,
 		part: &str,
-		paragraph: &BsxElement,
+		paragraph: &XmlElement,
 		items: &mut Vec<BlockRead>,
 	) {
 		let properties = paragraph.child("pPr");
@@ -775,7 +770,7 @@ impl WordRead<'_> {
 	}
 
 	/// Whether a paragraph's borders are a bottom border alone.
-	fn is_rule(properties: Option<&BsxElement>) -> bool {
+	fn is_rule(properties: Option<&XmlElement>) -> bool {
 		properties
 			.and_then(|properties| properties.child("pBdr"))
 			.is_some_and(|borders| {
@@ -795,12 +790,12 @@ impl WordRead<'_> {
 	}
 
 	/// Whether a toggle property is on, its `w:val` anything but off.
-	fn toggle(element: &BsxElement) -> bool {
+	fn toggle(element: &XmlElement) -> bool {
 		!matches!(element.attribute_local("val"), Some("0" | "false" | "off"))
 	}
 
 	/// A shading's fill, none for `auto`, by its theme slot when it names one.
-	fn shading(shading: &BsxElement) -> Option<OfficeColor> {
+	fn shading(shading: &XmlElement) -> Option<OfficeColor> {
 		Self::color(
 			shading.attribute_local("fill"),
 			shading.attribute_local("themeFill"),
@@ -840,7 +835,7 @@ impl WordRead<'_> {
 	fn inline_children(
 		&mut self,
 		part: &str,
-		parent: &BsxElement,
+		parent: &XmlElement,
 		inline: &mut InlineRead,
 	) {
 		for child in parent.elements() {
@@ -894,7 +889,7 @@ impl WordRead<'_> {
 	fn wrapped(
 		&mut self,
 		part: &str,
-		parent: &BsxElement,
+		parent: &XmlElement,
 		wrapper: Option<ReadElement>,
 		inline: &mut InlineRead,
 	) {
@@ -909,7 +904,7 @@ impl WordRead<'_> {
 
 	/// The `a` a hyperlink reads as: its relationship's target, its anchor
 	/// after a `#`.
-	fn hyperlink(&self, part: &str, link: &BsxElement) -> Option<ReadElement> {
+	fn hyperlink(&self, part: &str, link: &XmlElement) -> Option<ReadElement> {
 		let target = link
 			.prefixed_attribute("id")
 			.and_then(|id| self.package.relationship(Some(part), id))
@@ -924,7 +919,7 @@ impl WordRead<'_> {
 	}
 
 	/// The `ins` or `del` a revision reads as, its date its `datetime`.
-	fn revision(tag: &str, revision: &BsxElement) -> ReadElement {
+	fn revision(tag: &str, revision: &XmlElement) -> ReadElement {
 		let mut element = ReadElement::new(tag);
 		if let Some(date) = revision.attribute_local("date") {
 			element = element.with_attribute("datetime", date.to_string());
@@ -986,7 +981,7 @@ impl WordRead<'_> {
 	}
 
 	/// A checkbox content control as the `input` it is, its glyph dropped.
-	fn checkbox(control: &BsxElement) -> Option<ReadElement> {
+	fn checkbox(control: &XmlElement) -> Option<ReadElement> {
 		let checkbox = control.child("sdtPr")?.child("checkbox")?;
 		let checked = checkbox
 			.child("checked")
@@ -1002,7 +997,7 @@ impl WordRead<'_> {
 
 	/// Reads one run: its look's wrappers around each piece it holds, a
 	/// field's instruction skipped and its result read.
-	fn run(&mut self, part: &str, run: &BsxElement, inline: &mut InlineRead) {
+	fn run(&mut self, part: &str, run: &XmlElement, inline: &mut InlineRead) {
 		let wrappers = run
 			.child("rPr")
 			.map(|properties| self.run_wrappers(properties, inline.base_size))
@@ -1015,7 +1010,7 @@ impl WordRead<'_> {
 	fn run_content(
 		&mut self,
 		part: &str,
-		run: &BsxElement,
+		run: &XmlElement,
 		wrappers: &[ReadElement],
 		inline: &mut InlineRead,
 	) {
@@ -1134,7 +1129,7 @@ impl WordRead<'_> {
 	/// `sup`, `code`.
 	fn run_wrappers(
 		&self,
-		properties: &BsxElement,
+		properties: &XmlElement,
 		base_size: u32,
 	) -> Vec<ReadElement> {
 		let toggle = |local: &str| properties.child(local).map(Self::toggle);
@@ -1225,7 +1220,7 @@ impl WordRead<'_> {
 	fn drawing(
 		&mut self,
 		part: &str,
-		drawing: &BsxElement,
+		drawing: &XmlElement,
 		wrappers: &[ReadElement],
 		inline: &mut InlineRead,
 	) {
@@ -1284,7 +1279,7 @@ impl WordRead<'_> {
 	fn picture(
 		&mut self,
 		part: &str,
-		picture: &BsxElement,
+		picture: &XmlElement,
 		wrappers: &[ReadElement],
 		inline: &mut InlineRead,
 	) {
@@ -1365,7 +1360,7 @@ impl WordRead<'_> {
 	}
 
 	/// A DrawingML extent's `cx` and `cy` in EMU.
-	fn extent(extent: &BsxElement) -> Option<Vec2> {
+	fn extent(extent: &XmlElement) -> Option<Vec2> {
 		Some(Vec2::new(
 			extent.attribute("cx")?.parse().ok()?,
 			extent.attribute("cy")?.parse().ok()?,
@@ -1374,7 +1369,7 @@ impl WordRead<'_> {
 
 	/// A table: a leading run of header rows as a `thead` of `th`s, every
 	/// other row in a `tbody`, a merge as spans on its first cell.
-	fn table(&mut self, part: &str, table: &BsxElement) -> ReadElement {
+	fn table(&mut self, part: &str, table: &XmlElement) -> ReadElement {
 		/// A cell as read, before its rows' merges are known.
 		struct CellRead {
 			column: u32,
@@ -1488,9 +1483,9 @@ impl WordRead<'_> {
 	/// The children of `parent` named `local`, a content control's or custom
 	/// markup's own children read in its place.
 	fn through_controls<'b>(
-		parent: &'b BsxElement,
+		parent: &'b XmlElement,
 		local: &str,
-	) -> Vec<&'b BsxElement> {
+	) -> Vec<&'b XmlElement> {
 		let mut out = Vec::new();
 		for child in parent.elements() {
 			match child.local_name() {
@@ -1726,10 +1721,8 @@ impl DocParser for WordParser {
 		bytes: &MediaBytes,
 		parsers: &DocParsers,
 	) -> Result<ParsedDocument, ParseError> {
-		let package = OoxmlPlugin::open(bytes, MediaType::Docx)?;
-		OoxmlPlugin::read_body(&package, parsers, |world, root| {
-			self.read(world, root, &package)
-		})
+		let package = OpcPackage::open(bytes, MediaType::Docx)?;
+		self.read(&package)?.into_document(&package, parsers)
 	}
 }
 

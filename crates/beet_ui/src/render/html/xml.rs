@@ -108,7 +108,7 @@ impl XmlWriter<'_, '_> {
 				self.close_children(element.tag(), entity, out);
 			}
 			(None, Some(value)) => {
-				out.push_str(&Self::escape_text(&value.to_string()))
+				out.push_str(&XmlElement::escape_text(&value.to_string()))
 			}
 			(None, None) => {
 				for child in self.tree.children(entity) {
@@ -163,20 +163,6 @@ impl XmlWriter<'_, '_> {
 			}
 		}
 		out.push('"');
-	}
-
-	/// Text escaped for XML character data.
-	pub(crate) fn escape_text(text: &str) -> String {
-		let mut out = String::with_capacity(text.len());
-		for char in text.chars() {
-			match char {
-				'&' => out.push_str("&amp;"),
-				'<' => out.push_str("&lt;"),
-				'>' => out.push_str("&gt;"),
-				char => out.push(char),
-			}
-		}
-		out
 	}
 }
 

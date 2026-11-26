@@ -5,7 +5,6 @@ use super::office_style::*;
 use super::read_element::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_scene::prelude::*;
 use bevy::math::Affine2;
 
 /// Reads a slide deck into one `article data-card` per listed slide in
@@ -59,7 +58,7 @@ struct Placeholder {
 	index: Option<SmolStr>,
 	kind: Option<SmolStr>,
 	frame: Option<Rect>,
-	list_style: Option<BsxElement>,
+	list_style: Option<XmlElement>,
 }
 
 /// One slide part being read: the package, the part's path for its
@@ -70,7 +69,7 @@ struct SlideRead<'a> {
 	/// The layout's placeholders, then the master's.
 	placeholders: Vec<Placeholder>,
 	/// The master's body text style, `p:txStyles/p:bodyStyle`.
-	body_style: Option<BsxElement>,
+	body_style: Option<XmlElement>,
 }
 
 /// A group's mapping from its children's coordinates, in EMU, to its
@@ -90,7 +89,7 @@ impl GroupTransform {
 
 	/// The transform a group's `a:xfrm` makes, nested in `self`: its
 	/// `chOff`/`chExt` child space mapped onto its `off`/`ext` frame.
-	fn nest(&self, transform: &BsxElement) -> Self {
+	fn nest(&self, transform: &XmlElement) -> Self {
 		let (Some(offset), Some(extent)) = (
 			Xfrm::point(transform, "off", "x", "y"),
 			Xfrm::point(transform, "ext", "cx", "cy"),
@@ -119,7 +118,7 @@ struct Xfrm;
 
 impl Xfrm {
 	/// A shape's frame in slide space, from its `a:xfrm`.
-	fn frame(transform: &BsxElement) -> Option<Rect> {
+	fn frame(transform: &XmlElement) -> Option<Rect> {
 		let offset = Self::point(transform, "off", "x", "y")?;
 		let extent = Self::point(transform, "ext", "cx", "cy")?;
 		Rect::from_corners(offset, offset + extent).xsome()
@@ -127,7 +126,7 @@ impl Xfrm {
 
 	/// The `first` and `second` attributes of `transform`'s `local` child.
 	fn point(
-		transform: &BsxElement,
+		transform: &XmlElement,
 		local: &str,
 		first: &str,
 		second: &str,
@@ -154,8 +153,8 @@ impl Xfrm {
 impl Placeholder {
 	/// The placeholders of a layout or master part with a frame or list
 	/// style of their own.
-	fn parse(nodes: &[BsxNode]) -> Vec<Self> {
-		let Some(tree) = BsxNode::document_element(nodes)
+	fn parse(nodes: &[XmlNode]) -> Vec<Self> {
+		let Some(tree) = XmlNode::document_element(nodes)
 			.and_then(|root| root.child("cSld"))
 			.and_then(|common| common.child("spTree"))
 		else {
@@ -181,20 +180,15 @@ impl Placeholder {
 }
 
 impl DeckParser {
-	/// Reads `package`'s presentation into `root`.
-	fn read(
-		&self,
-		world: &mut World,
-		root: Entity,
-		package: &OpcPackage,
-	) -> Result {
+	/// Reads `package`'s presentation.
+	fn read(&self, package: &OpcPackage) -> Result<ReadBody> {
 		let presentation = package
 			.main_part()
 			.ok_or_else(|| bevyhow!("the deck has no presentation part"))?
 			.to_string();
 		let nodes = package.xml(&presentation)?.unwrap_or_default();
 		// only the listed slides, a deleted slide's leftover part skipped
-		let slides = BsxNode::document_element(&nodes)
+		let slides = XmlNode::document_element(&nodes)
 			.and_then(|document| document.child("sldIdLst"))
 			.map(|list| {
 				list.children_named("sldId")
@@ -210,11 +204,12 @@ impl DeckParser {
 					.collect::<Vec<_>>()
 			})
 			.unwrap_or_default();
+		let mut body = ReadBody::default();
 		for slide in slides {
 			let (article, theme) = SlideRead::new(package, slide)?.read()?;
-			article.spawn(world, root, &self.options, &theme)?;
+			body.push(article, &self.options, &theme)?;
 		}
-		Ok(())
+		body.xok()
 	}
 }
 
@@ -238,7 +233,7 @@ impl<'a> SlideRead<'a> {
 			let nodes = package.xml(&path)?.unwrap_or_default();
 			placeholders.extend(Placeholder::parse(&nodes));
 			if is_master {
-				body_style = BsxNode::document_element(&nodes)
+				body_style = XmlNode::document_element(&nodes)
 					.and_then(|master| master.child("txStyles"))
 					.and_then(|styles| styles.child("bodyStyle"))
 					.cloned();
@@ -256,7 +251,7 @@ impl<'a> SlideRead<'a> {
 	/// The slide's article and the theme its colours name slots of.
 	fn read(&self) -> Result<(ReadElement, OfficeTheme)> {
 		let nodes = self.package.xml(&self.part)?.unwrap_or_default();
-		let slide = BsxNode::document_element(&nodes)
+		let slide = XmlNode::document_element(&nodes)
 			.ok_or_else(|| bevyhow!("the slide `{}` is empty", self.part))?;
 		let mut article = ReadElement::new("article").with_flag("data-card");
 		if slide.attribute("show") == Some("0") {
@@ -414,7 +409,7 @@ impl<'a> SlideRead<'a> {
 	/// then left to right, a group's shapes in its place.
 	fn shapes(
 		&self,
-		tree: &BsxElement,
+		tree: &XmlElement,
 		transform: &GroupTransform,
 	) -> Vec<ShapeRead> {
 		let mut placed = Vec::<(Rect, Vec<ShapeRead>)>::new();
@@ -447,7 +442,7 @@ impl<'a> SlideRead<'a> {
 	/// One element of a shape tree as the shapes it reads as.
 	fn shape(
 		&self,
-		shape: &BsxElement,
+		shape: &XmlElement,
 		transform: &GroupTransform,
 	) -> Vec<ShapeRead> {
 		let frame = || {
@@ -515,7 +510,7 @@ impl<'a> SlideRead<'a> {
 
 	/// A shape's placeholder declaration, `p:ph` under its non-visual
 	/// properties.
-	fn placeholder(shape: &BsxElement) -> Option<&BsxElement> {
+	fn placeholder(shape: &XmlElement) -> Option<&XmlElement> {
 		shape
 			.elements()
 			.find(|element| element.local_name().starts_with("nv"))?
@@ -525,7 +520,7 @@ impl<'a> SlideRead<'a> {
 
 	/// A shape's own frame, from its shape, group or graphic frame
 	/// properties.
-	fn own_frame(shape: &BsxElement) -> Option<Rect> {
+	fn own_frame(shape: &XmlElement) -> Option<Rect> {
 		["spPr", "grpSpPr"]
 			.iter()
 			.find_map(|local| shape.child(local))
@@ -538,7 +533,7 @@ impl<'a> SlideRead<'a> {
 	/// `idx`, else its `type`.
 	fn inherited(
 		&self,
-		shape: &BsxElement,
+		shape: &XmlElement,
 	) -> impl Iterator<Item = &Placeholder> {
 		let declared = Self::placeholder(shape);
 		let index = declared.and_then(|declared| declared.attribute("idx"));
@@ -558,7 +553,7 @@ impl<'a> SlideRead<'a> {
 
 	/// A shape's frame, a placeholder without its own taking its layout's,
 	/// else its master's.
-	fn frame(&self, shape: &BsxElement) -> Option<Rect> {
+	fn frame(&self, shape: &XmlElement) -> Option<Rect> {
 		Self::own_frame(shape).or_else(|| {
 			self.inherited(shape)
 				.find_map(|placeholder| placeholder.frame)
@@ -567,7 +562,7 @@ impl<'a> SlideRead<'a> {
 
 	/// A shape's role by its placeholder type, and whether its paragraphs
 	/// are a body's, bulleted unless a list style says otherwise.
-	fn role(&self, shape: &BsxElement) -> (Role, bool) {
+	fn role(&self, shape: &XmlElement) -> (Role, bool) {
 		let Some(declared) = Self::placeholder(shape) else {
 			return (Role::Other, false);
 		};
@@ -586,12 +581,12 @@ impl<'a> SlideRead<'a> {
 	/// body bulleted and any other frame not.
 	fn default_bullet(
 		&self,
-		shape: &BsxElement,
+		shape: &XmlElement,
 		level: u8,
 		body: bool,
 	) -> Bullet {
 		let level_name = format!("lvl{}pPr", level + 1);
-		let from = |style: &BsxElement| {
+		let from = |style: &XmlElement| {
 			style.child(&level_name).and_then(Self::bullet)
 		};
 		shape
@@ -614,7 +609,7 @@ impl<'a> SlideRead<'a> {
 	}
 
 	/// The bullet a paragraph's properties set, `None` where they set none.
-	fn bullet(properties: &BsxElement) -> Option<Bullet> {
+	fn bullet(properties: &XmlElement) -> Option<Bullet> {
 		properties
 			.elements()
 			.find_map(|child| match child.local_name() {
@@ -630,8 +625,8 @@ impl<'a> SlideRead<'a> {
 	/// otherwise, empty paragraphs dropped.
 	fn text_body(
 		&self,
-		shape: &BsxElement,
-		text: &BsxElement,
+		shape: &XmlElement,
+		text: &XmlElement,
 		body: bool,
 	) -> Vec<ReadElement> {
 		let base = Self::base_size(text);
@@ -701,7 +696,7 @@ impl<'a> SlideRead<'a> {
 	/// The size most of a text frame's text is set in, in hundredths of a
 	/// point, `None` where most of it sets none, so only a run set otherwise
 	/// reads with a size of its own.
-	fn base_size(text: &BsxElement) -> Option<u32> {
+	fn base_size(text: &XmlElement) -> Option<u32> {
 		let mut counts = HashMap::<Option<u32>, usize>::default();
 		for run in text.descendants_named("r") {
 			let size = run
@@ -721,7 +716,7 @@ impl<'a> SlideRead<'a> {
 	/// wrappers of adjacent runs merged.
 	fn inline(
 		&self,
-		paragraph: &BsxElement,
+		paragraph: &XmlElement,
 		base: Option<u32>,
 	) -> Vec<ReadNode> {
 		let mut segments = Vec::new();
@@ -756,7 +751,7 @@ impl<'a> SlideRead<'a> {
 	/// to decide, so it reads as nothing.
 	fn run_wrappers(
 		&self,
-		properties: Option<&BsxElement>,
+		properties: Option<&XmlElement>,
 		base: Option<u32>,
 	) -> Vec<ReadElement> {
 		let Some(properties) = properties else {
@@ -825,7 +820,7 @@ impl<'a> SlideRead<'a> {
 
 	/// A DrawingML colour, a fill's or a highlight's: its scheme slot,
 	/// tinted by its luminance modifiers, else its value.
-	fn color(fill: &BsxElement) -> Option<OfficeColor> {
+	fn color(fill: &XmlElement) -> Option<OfficeColor> {
 		let color = fill.elements().next()?;
 		let modifier = |local: &str| {
 			color
@@ -862,7 +857,7 @@ impl<'a> SlideRead<'a> {
 	/// frame.
 	fn picture(
 		&self,
-		picture: &BsxElement,
+		picture: &XmlElement,
 		frame: &Rect,
 	) -> Option<ReadElement> {
 		let blip = picture.child("blipFill")?.child("blip")?;
@@ -895,7 +890,7 @@ impl<'a> SlideRead<'a> {
 
 	/// A graphic frame's table, or its SmartArt's text as paragraphs; a
 	/// chart reads as nothing.
-	fn graphic(&self, frame: &BsxElement) -> Vec<ReadElement> {
+	fn graphic(&self, frame: &XmlElement) -> Vec<ReadElement> {
 		let Some(data) = frame
 			.child("graphic")
 			.and_then(|graphic| graphic.child("graphicData"))
@@ -914,7 +909,7 @@ impl<'a> SlideRead<'a> {
 			return Vec::new();
 		};
 		let nodes = self.package.xml(&path).ok().flatten().unwrap_or_default();
-		let Some(root) = BsxNode::document_element(&nodes) else {
+		let Some(root) = XmlNode::document_element(&nodes) else {
 			return Vec::new();
 		};
 		root.descendants_named("p")
@@ -933,7 +928,7 @@ impl<'a> SlideRead<'a> {
 	/// A table: its first row a `thead` of `th`s when the table says so,
 	/// every other row in a `tbody`, a merge as spans on its first cell and
 	/// the cells it covers absent.
-	fn table(&self, table: &BsxElement) -> ReadElement {
+	fn table(&self, table: &XmlElement) -> ReadElement {
 		let header = table
 			.child("tblPr")
 			.and_then(|properties| properties.attribute("firstRow"))
@@ -1010,7 +1005,7 @@ impl<'a> SlideRead<'a> {
 			placeholders: Vec::new(),
 			body_style: None,
 		};
-		BsxNode::document_element(&nodes)
+		XmlNode::document_element(&nodes)
 			.and_then(|root| root.child("cSld"))
 			.and_then(|common| common.child("spTree"))
 			.into_iter()
@@ -1043,10 +1038,8 @@ impl DocParser for DeckParser {
 		bytes: &MediaBytes,
 		parsers: &DocParsers,
 	) -> Result<ParsedDocument, ParseError> {
-		let package = OoxmlPlugin::open(bytes, MediaType::Pptx)?;
-		OoxmlPlugin::read_body(&package, parsers, |world, root| {
-			self.read(world, root, &package)
-		})
+		let package = OpcPackage::open(bytes, MediaType::Pptx)?;
+		self.read(&package)?.into_document(&package, parsers)
 	}
 }
 

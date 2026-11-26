@@ -91,7 +91,7 @@ impl AwsError {
 		let Ok(xml) = XmlElement::parse(body) else {
 			return (None, None);
 		};
-		let error = match xml.name == "Error" {
+		let error = match xml.local_name() == "Error" {
 			true => Some(&xml),
 			false => xml.find("Error"),
 		};

@@ -1,9 +1,12 @@
-//! [`ReadElement`], an HTML element an Office reader assembles before it
-//! spawns the tree.
+//! [`ReadElement`], an HTML element an Office reader assembles, and
+//! [`ReadBody`], the scene body it lowers into.
 use super::office_style::*;
+use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::reflect::TypePath;
 
-/// An element a reader assembles in memory, then spawns whole: its tag,
+/// An element a reader assembles in memory, then lowers whole into its
+/// [`ReadBody`]: its tag,
 /// attributes, children and the look the file formats on it directly.
 #[derive(Debug, Clone)]
 pub(crate) struct ReadElement {
@@ -24,6 +27,18 @@ pub(crate) enum ReadNode {
 	Element(ReadElement),
 	/// Text.
 	Text(String),
+}
+
+/// The scene body a reader lowers its elements into, each the root's next
+/// child, keyed as markup keys its entities (`0/p.0`, `0/p.0/@class`), and
+/// its root the document, declaring the metadata the package's core
+/// properties do.
+#[derive(Debug)]
+pub(crate) struct ReadBody {
+	/// The body so far, its entities in document order.
+	body: SceneBody,
+	/// How many children of each tag the root holds.
+	counts: HashMap<SmolStr, usize>,
 }
 
 /// One piece of inline content inside the elements wrapping it, outermost
@@ -212,35 +227,132 @@ impl ReadElement {
 			Err(blocks) => blocks.into_iter().fold(self, Self::with_child),
 		}
 	}
+}
 
-	/// Spawns this element and its subtree as the last child of `parent`,
-	/// each look registered by `options` against `theme`.
-	pub fn spawn(
-		self,
-		world: &mut World,
-		parent: Entity,
+impl Default for ReadBody {
+	fn default() -> Self {
+		Self {
+			body: SceneBody::root(default()),
+			counts: default(),
+		}
+	}
+}
+
+impl ReadBody {
+	/// Lowers `element` as the root's next child, its looks and its
+	/// descendants' declared by `options` against `theme`.
+	pub fn push(
+		&mut self,
+		element: ReadElement,
 		options: &OfficeReadOptions,
 		theme: &OfficeTheme,
-	) -> Result<Entity> {
-		let entity =
-			world.spawn((Element::new(self.tag), ChildOf(parent))).id();
-		for (key, value) in self.attributes {
-			world.spawn((AttributeOf::new(entity), Attribute::new(key), value));
+	) -> Result {
+		let mut lower = ReadLower {
+			body: &mut self.body,
+			options,
+			theme,
+		};
+		lower.element(element, &EntityKey::ROOT, &mut self.counts)
+	}
+
+	/// The document this body is, its root declaring the metadata
+	/// `package`'s core properties do, named as `parsers` names it.
+	pub fn into_document(
+		mut self,
+		package: &OpcPackage,
+		parsers: &DocParsers,
+	) -> Result<ParsedDocument, ParseError> {
+		let metadata = DocMeta::from_package(package)?.components(parsers)?;
+		if let Some(root) = self.body.entities.get_mut(&EntityKey::ROOT) {
+			for (name, value) in Map::from(metadata) {
+				root.insert(name, value);
+			}
 		}
-		if !self.look.is_empty() {
-			self.look
-				.apply(&mut world.entity_mut(entity), options, theme)?;
+		ParsedDocument::from(self.body).xok()
+	}
+}
+
+/// One lowering of [`ReadElement`]s into a body.
+struct ReadLower<'a> {
+	body: &'a mut SceneBody,
+	options: &'a OfficeReadOptions,
+	theme: &'a OfficeTheme,
+}
+
+impl ReadLower<'_> {
+	/// Lowers `element` and its subtree as the next child of `parent`, whose
+	/// children of each tag `counts` counts.
+	fn element(
+		&mut self,
+		element: ReadElement,
+		parent: &EntityKey,
+		counts: &mut HashMap<SmolStr, usize>,
+	) -> Result {
+		let key = Self::child_key(&element.tag, parent, counts)?;
+		let mut components =
+			Self::child_of(parent).with_typed(&Element::new(element.tag))?;
+		if let Some(rule) = element.look.rule(self.options, self.theme)? {
+			components.insert_typed(&rule)?;
 		}
-		for child in self.children {
+		self.body.entities.insert(key.clone(), components);
+		for (name, value) in element.attributes {
+			self.attribute(&key, &name, value)?;
+		}
+		let mut counts = HashMap::default();
+		for child in element.children {
 			match child {
 				ReadNode::Element(element) => {
-					element.spawn(world, entity, options, theme)?;
+					self.element(element, &key, &mut counts)?
 				}
 				ReadNode::Text(text) => {
-					world.spawn((Value::Str(text.into()), ChildOf(entity)));
+					let text_key = Self::child_key("#text", &key, &mut counts)?;
+					let components = Self::child_of(&key)
+						.with_typed(&Value::Str(text.into()))?;
+					self.body.entities.insert(text_key, components);
 				}
 			}
 		}
-		entity.xok()
+		Ok(())
+	}
+
+	/// Adds the attribute `name` holding `value` to the entity keyed `owner`,
+	/// a second of one name its own entity.
+	fn attribute(
+		&mut self,
+		owner: &EntityKey,
+		name: &str,
+		value: Value,
+	) -> Result {
+		let mut key = EntityKey::parse(&format!("{owner}/@{name}"))?;
+		let mut index = 0;
+		while self.body.entities.contains_key(&key) {
+			index += 1;
+			key = EntityKey::parse(&format!("{owner}/@{name}.{index}"))?;
+		}
+		let mut components = EntityBody::default()
+			.with_typed(&Attribute::new(name))?
+			.with_typed(&value)?;
+		components.insert(AttributeOf::type_path(), owner.reference());
+		self.body.entities.insert(key, components);
+		Ok(())
+	}
+
+	/// The components every child of `parent` carries.
+	fn child_of(parent: &EntityKey) -> EntityBody {
+		let mut components = EntityBody::default();
+		components.insert(ChildOf::type_path(), parent.reference());
+		components
+	}
+
+	/// The key of `parent`'s next child tagged `tag`.
+	fn child_key(
+		tag: &str,
+		parent: &EntityKey,
+		counts: &mut HashMap<SmolStr, usize>,
+	) -> Result<EntityKey> {
+		let count = counts.entry(tag.into()).or_default();
+		let key = EntityKey::parse(&format!("{parent}/{tag}.{count}"));
+		*count += 1;
+		key
 	}
 }

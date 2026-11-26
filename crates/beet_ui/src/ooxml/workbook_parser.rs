@@ -4,7 +4,6 @@ use super::office_style::*;
 use super::read_element::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_scene::prelude::*;
 
 /// Reads a workbook into one `article data-worksheet` per worksheet in tab
 /// order, each holding one `table` dense from `A1` to its last used cell,
@@ -98,13 +97,8 @@ impl WorkbookParser {
 	/// The relationship type of the shared strings.
 	const SHARED_STRINGS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings";
 
-	/// Reads `package`'s workbook into `root`.
-	fn read(
-		&self,
-		world: &mut World,
-		root: Entity,
-		package: &OpcPackage,
-	) -> Result {
+	/// Reads `package`'s workbook.
+	fn read(&self, package: &OpcPackage) -> Result<ReadBody> {
 		let workbook = package
 			.main_part()
 			.ok_or_else(|| bevyhow!("the workbook has no workbook part"))?
@@ -133,7 +127,7 @@ impl WorkbookParser {
 				.unwrap_or_default(),
 		};
 		let nodes = package.xml(&workbook)?.unwrap_or_default();
-		let sheets = BsxNode::document_element(&nodes)
+		let sheets = XmlNode::document_element(&nodes)
 			.and_then(|root| root.child("sheets"))
 			.map(|sheets| {
 				sheets
@@ -161,7 +155,7 @@ impl WorkbookParser {
 		let mut total = 0;
 		for (name, hidden, path) in sheets {
 			let nodes = package.xml(&path)?.unwrap_or_default();
-			let Some(sheet_root) = BsxNode::document_element(&nodes) else {
+			let Some(sheet_root) = XmlNode::document_element(&nodes) else {
 				continue;
 			};
 			let sheet = Self::read_sheet(
@@ -188,15 +182,15 @@ impl WorkbookParser {
 			}
 			read.push((sheet, size));
 		}
+		let mut body = ReadBody::default();
 		for (sheet, size) in read {
-			sheet.article(&shared, size).spawn(
-				world,
-				root,
+			body.push(
+				sheet.article(&shared, size),
 				&self.options,
 				&shared.theme,
 			)?;
 		}
-		Ok(())
+		body.xok()
 	}
 
 	/// The A1 reference of the last slot of a grid of `size`.
@@ -206,8 +200,8 @@ impl WorkbookParser {
 
 	/// The shared strings, each its text or its runs' text joined, a
 	/// phonetic run left out.
-	fn shared_strings(nodes: &[BsxNode]) -> Vec<String> {
-		BsxNode::document_element(nodes)
+	fn shared_strings(nodes: &[XmlNode]) -> Vec<String> {
+		XmlNode::document_element(nodes)
 			.map(|root| {
 				root.children_named("si").map(Self::rich_text).collect()
 			})
@@ -215,7 +209,7 @@ impl WorkbookParser {
 	}
 
 	/// The text of a string item, `si` or `is`: its `t`, else its runs'.
-	fn rich_text(item: &BsxElement) -> String {
+	fn rich_text(item: &XmlElement) -> String {
 		match item.child("t") {
 			Some(text) => text.text(),
 			None => item
@@ -228,8 +222,8 @@ impl WorkbookParser {
 
 	/// The cell formats of a styles part, `cellXfs`, each with its font and
 	/// fill resolved.
-	fn cell_formats(nodes: &[BsxNode]) -> Vec<CellFormat> {
-		let Some(root) = BsxNode::document_element(nodes) else {
+	fn cell_formats(nodes: &[XmlNode]) -> Vec<CellFormat> {
+		let Some(root) = XmlNode::document_element(nodes) else {
 			return Vec::new();
 		};
 		let fonts = root
@@ -258,7 +252,7 @@ impl WorkbookParser {
 					.collect::<Vec<_>>()
 			})
 			.unwrap_or_default();
-		let index = |format: &BsxElement, key: &str| {
+		let index = |format: &XmlElement, key: &str| {
 			format
 				.attribute(key)
 				.and_then(|id| id.parse::<usize>().ok())
@@ -305,7 +299,7 @@ impl WorkbookParser {
 	}
 
 	/// A font element's look.
-	fn font(font: &BsxElement) -> FontRead {
+	fn font(font: &XmlElement) -> FontRead {
 		let flag = |local: &str| {
 			font.child(local).is_some_and(|element| {
 				!matches!(
@@ -330,7 +324,7 @@ impl WorkbookParser {
 	/// A SpreadsheetML colour: its own value, a theme slot tinted, or an
 	/// entry of the legacy indexed palette; `auto` and the system colours
 	/// none.
-	fn color(color: &BsxElement) -> Option<OfficeColor> {
+	fn color(color: &XmlElement) -> Option<OfficeColor> {
 		if let Some(rgb) = color.attribute("rgb") {
 			return OfficeColor::parse_hex(rgb).map(OfficeColor::Rgb);
 		}
@@ -376,7 +370,7 @@ impl WorkbookParser {
 		path: &str,
 		name: SmolStr,
 		hidden: bool,
-		root: &BsxElement,
+		root: &XmlElement,
 		shared: &WorkbookRead,
 	) -> Result<SheetRead> {
 		let mut sheet = SheetRead {
@@ -393,7 +387,7 @@ impl WorkbookParser {
 			merges: Vec::new(),
 			links: Vec::new(),
 		};
-		let number = |element: &BsxElement, key: &str| {
+		let number = |element: &XmlElement, key: &str| {
 			element
 				.attribute(key)
 				.and_then(|value| value.parse::<u32>().ok())
@@ -833,10 +827,8 @@ impl DocParser for WorkbookParser {
 		bytes: &MediaBytes,
 		parsers: &DocParsers,
 	) -> Result<ParsedDocument, ParseError> {
-		let package = OoxmlPlugin::open(bytes, MediaType::Xlsx)?;
-		OoxmlPlugin::read_body(&package, parsers, |world, root| {
-			self.read(world, root, &package)
-		})
+		let package = OpcPackage::open(bytes, MediaType::Xlsx)?;
+		self.read(&package)?.into_document(&package, parsers)
 	}
 }
 

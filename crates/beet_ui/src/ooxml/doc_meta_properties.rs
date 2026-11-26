@@ -27,7 +27,7 @@ impl DocMeta {
 	/// the file was created and modified, every other property dropped.
 	pub(crate) fn from_core_properties(bytes: &[u8]) -> Result<Self> {
 		let nodes = OpcPackage::read_xml(bytes)?;
-		let Some(root) = BsxNode::document_element(&nodes) else {
+		let Some(root) = XmlNode::document_element(&nodes) else {
 			return Self::default().xok();
 		};
 		let field = |local: &str| {

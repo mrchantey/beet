@@ -11,7 +11,6 @@ use crate::style::material::colors;
 use crate::style::*;
 use beet_core::prelude::*;
 use beet_net::prelude::RequestParts;
-use beet_scene::prelude::*;
 
 /// How a reader reads a file's looks, held by every Office reader and set
 /// through its `with_options`.
@@ -336,9 +335,9 @@ impl Default for OfficeTheme {
 impl OfficeTheme {
 	/// The theme a theme part's `a:clrScheme` declares, a slot it omits
 	/// keeping Office's default.
-	pub fn parse(nodes: &[BsxNode]) -> Self {
+	pub fn parse(nodes: &[XmlNode]) -> Self {
 		let mut theme = Self::default();
-		let Some(scheme) = BsxNode::document_element(nodes).and_then(|root| {
+		let Some(scheme) = XmlNode::document_element(nodes).and_then(|root| {
 			root.descendants_named("clrScheme").first().copied()
 		}) else {
 			return theme;
@@ -502,38 +501,22 @@ impl DirectLook {
 	/// Whether the file says nothing of this element's look.
 	pub fn is_empty(&self) -> bool { *self == Self::default() }
 
-	/// Declares this look on `entity` as an [`InlineRule`] in the origin
-	/// `options` names, keyed by its declarations so equal looks share one
-	/// class, `Drop` and an empty look declaring nothing.
-	pub fn apply(
+	/// This look as an [`InlineRule`] in the origin `options` names, `None`
+	/// for `Drop` and for an empty look.
+	pub fn rule(
 		&self,
-		entity: &mut EntityWorldMut,
 		options: &OfficeReadOptions,
 		theme: &OfficeTheme,
-	) -> Result {
+	) -> Result<Option<InlineRule>> {
 		let origin = match options.direct_formatting() {
 			DirectFormatting::Override => RuleOrigin::Direct,
 			DirectFormatting::Cascade => RuleOrigin::Author,
-			DirectFormatting::Drop => return Ok(()),
+			DirectFormatting::Drop => return Ok(None),
 		};
 		let declarations = self.declarations(options, theme)?;
-		if declarations.is_empty() {
-			return Ok(());
-		}
-		// the class keyed by what it declares, so equal looks share it
-		let mut key = format!("office-{origin:?}");
-		let mut sorted = declarations
-			.iter()
-			.map(|(token, value)| format!("{token}={value:?}"))
-			.collect::<Vec<_>>();
-		sorted.sort();
-		for declaration in sorted {
-			key.push(';');
-			key.push_str(&declaration);
-		}
-		let class = ClassName::from_inline_source(&key);
-		entity.insert(InlineRule::new(&class, origin, declarations));
-		Ok(())
+		(!declarations.is_empty())
+			.then(|| InlineRule::new(origin, declarations))
+			.xok()
 	}
 
 	/// The declarations this look makes.
@@ -930,16 +913,14 @@ mod test {
 		let (mut world, root) =
 			themed(rsx! { <div><span>"red"</span><em>"plain"</em></div> });
 		let span = tagged(&mut world, "span");
-		DirectLook {
+		let rule = DirectLook {
 			color: Some(OfficeColor::Rgb(Color::srgb(1., 0., 0.))),
 			..default()
 		}
-		.apply(
-			&mut world.entity_mut(span),
-			&OfficeReadOptions::default(),
-			&OfficeTheme::default(),
-		)
+		.rule(&OfficeReadOptions::default(), &OfficeTheme::default())
+		.unwrap()
 		.unwrap();
+		world.entity_mut(span).insert(rule);
 		let em = tagged(&mut world, "em");
 		let sheet =
 			OfficeStyleSheet::resolve(&mut world, root, screen()).unwrap();
@@ -1022,8 +1003,9 @@ mod test {
 					.with_value(ForegroundColor, Color::srgb(0., 0., 1.)),
 			);
 			let para = tagged(&mut world, "p");
-			look.apply(&mut world.entity_mut(para), &options, &theme)
-				.unwrap();
+			if let Some(rule) = look.rule(&options, &theme).unwrap() {
+				world.entity_mut(para).insert(rule);
+			}
 			world.with_state::<RuleSetQuery, _>(|query| {
 				let memo = &mut CascadeMemo::for_media(screen());
 				(

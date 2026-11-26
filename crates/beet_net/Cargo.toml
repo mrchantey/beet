@@ -156,8 +156,6 @@ aws = [
 	"json",
 	"dep:sha2",
 	"dep:hmac",
-	# `XmlElement`, the S3 and query protocol answers
-	"dep:roxmltree",
 	"beet_core/rand",
 	# Identity Center's login is an OAuth flow over the same client
 	"oauth",
@@ -281,7 +279,6 @@ eventsource-stream = { version = "0.2.3", optional = true }
 # (no SDK feature)
 sha2 = { workspace = true, optional = true }
 hmac = { workspace = true, optional = true }
-roxmltree = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-process = { workspace = true, optional = true }

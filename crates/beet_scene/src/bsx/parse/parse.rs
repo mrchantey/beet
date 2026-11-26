@@ -283,66 +283,9 @@ fn parse_text(
 	// decode character references in prose text (`&amp;` -> `&`); valid in both
 	// XML-inspired BSX and HTML, and required for the renderer round-trip.
 	Ok(Some(BsxNode::Text(Spanned::new(
-		decode_entities(text),
+		html_ext::decode_references(text),
 		cursor.span(start),
 	))))
-}
-
-/// Decode the standard XML/HTML named character references plus numeric
-/// (`&#NN;` / `&#xHH;`) references in prose text. An unrecognized `&name;` is
-/// left verbatim, matching lenient HTML behavior.
-fn decode_entities(input: &str) -> String {
-	// fast path: no references present.
-	if !input.contains('&') {
-		return input.to_string();
-	}
-	let mut out = String::with_capacity(input.len());
-	let mut rest = input;
-	while let Some(amp) = rest.find('&') {
-		out.push_str(&rest[..amp]);
-		rest = &rest[amp..];
-		match rest.find(';') {
-			Some(semi) => {
-				let entity = &rest[..=semi];
-				match decode_one_entity(&entity[1..entity.len() - 1]) {
-					Some(decoded) => out.push_str(&decoded),
-					// unknown reference: keep it verbatim.
-					None => out.push_str(entity),
-				}
-				rest = &rest[semi + 1..];
-			}
-			// no closing `;`: copy the remainder literally.
-			None => {
-				out.push_str(rest);
-				return out;
-			}
-		}
-	}
-	out.push_str(rest);
-	out
-}
-
-/// Decode one entity body (the text between `&` and `;`), or `None` if unknown.
-fn decode_one_entity(body: &str) -> Option<String> {
-	// numeric references: `&#NN;` (decimal) and `&#xHH;` (hex).
-	if let Some(num) = body.strip_prefix('#') {
-		let code = match num.strip_prefix(['x', 'X']) {
-			Some(hex) => u32::from_str_radix(hex, 16).ok()?,
-			None => num.parse::<u32>().ok()?,
-		};
-		return char::from_u32(code).map(String::from);
-	}
-	// the structural XML5 named references, the ones the round-trip relies on.
-	let ch = match body {
-		"amp" => '&',
-		"lt" => '<',
-		"gt" => '>',
-		"quot" => '"',
-		"apos" => '\'',
-		"nbsp" => '\u{00A0}',
-		_ => return None,
-	};
-	Some(String::from(ch))
 }
 
 /// Parse a text-position `{..}` block into a value expression.
@@ -528,12 +471,12 @@ fn parse_attribute(
 			AttrValue::Str(match config.dialect {
 				// a bsx string is authored as is, its `&&` a script's
 				MarkupDialect::Bsx => written,
-				MarkupDialect::Html => decode_entities(&written),
+				MarkupDialect::Html => html_ext::decode_references(&written),
 				// a literal tab or line break is the space the specification
 				// normalizes it to, while a reference to one, `&#xA;`, is kept
-				MarkupDialect::Xml => {
-					decode_entities(&written.replace(['\t', '\n', '\r'], " "))
-				}
+				MarkupDialect::Xml => html_ext::decode_references(
+					&written.replace(['\t', '\n', '\r'], " "),
+				),
 			})
 		}
 		Some('{') if config.is_bsx() => {

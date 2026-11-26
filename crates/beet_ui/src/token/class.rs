@@ -221,44 +221,62 @@ pub(crate) fn register_inline_rule(
 	Ok(())
 }
 
-/// A one-off [`Rule`] for its element, keyed on its own class: the typed
-/// twin of `InlineStyle`, what a reader declares a look it computed with, ie
-/// a Word run's direct formatting.
+/// A one-off [`Rule`] for its element: the typed twin of `InlineStyle`, what
+/// a reader declares a look it computed with, ie a Word run's direct
+/// formatting.
 ///
-/// Inserting it registers its rule in the [`RuleSet`] (only once, so equal
-/// looks share one rule) and adds the class to the element's [`Classes`], as
-/// [`register_inline_rule`] does. Plain data, so a scene body carries the
-/// look and a load registers it again.
-#[derive(Debug, Default, Clone, Component, Reflect)]
+/// Its class is a hash of what it declares ([`class`](Self::class)), so equal
+/// looks share one class and one rule and unequal ones never meet. Inserting
+/// it registers the rule in the [`RuleSet`] and adds the class to the
+/// element's [`Classes`], as [`register_inline_rule`] does. Plain data, so a
+/// scene body carries the look and a load registers it again.
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
+#[cfg_attr(
+	feature = "serde",
+	derive(Serialize, Deserialize),
+	reflect(Serialize, Deserialize)
+)]
 #[component(on_insert = InlineRule::on_insert())]
 pub struct InlineRule {
-	/// The class the rule selects, ie [`ClassName::as_selector`]'s.
-	class: SmolStr,
 	/// Where the rule ranks in the cascade.
 	origin: RuleOrigin,
-	/// What the rule declares, in order.
+	/// What the rule declares.
 	declarations: Vec<(TokenKey, TokenValue)>,
 }
 
 impl InlineRule {
-	/// A one-off rule declaring `declarations` in `origin`, keyed on `class`.
+	/// A one-off rule declaring `declarations` in `origin`.
 	pub fn new(
-		class: &ClassName,
 		origin: RuleOrigin,
 		declarations: impl IntoIterator<Item = (TokenKey, TokenValue)>,
 	) -> Self {
 		Self {
-			class: class.as_selector(),
 			origin,
 			declarations: declarations.into_iter().collect(),
 		}
 	}
 
-	/// The [`Rule`] this declares.
+	/// The class the rule keys on, a hash of its origin and its declarations
+	/// in any order.
+	pub fn class(&self) -> ClassName {
+		let mut declarations = self
+			.declarations
+			.iter()
+			.map(|(token, value)| format!("{token}={value:?}"))
+			.collect::<Vec<_>>();
+		declarations.sort();
+		ClassName::from_inline_source(&format!(
+			"rule:{:?};{}",
+			self.origin,
+			declarations.join(";")
+		))
+	}
+
+	/// The [`Rule`] this declares, selecting its [`class`](Self::class).
 	pub fn rule(&self) -> Rule {
 		Rule::new()
-			.with_selector(Selector::Class(self.class.clone()))
+			.with_selector(Selector::Class(self.class().as_selector()))
 			.with_origin(self.origin)
 			.with_extend(self.declarations.iter().cloned())
 	}
@@ -279,11 +297,7 @@ impl InlineRule {
 			}
 			world.commands().entity(cx.entity).queue(
 				move |mut entity: EntityWorldMut| {
-					register_inline_rule(
-						&mut entity,
-						ClassName::String(inline.class),
-						rule,
-					)
+					register_inline_rule(&mut entity, inline.class(), rule)
 				},
 			);
 		}

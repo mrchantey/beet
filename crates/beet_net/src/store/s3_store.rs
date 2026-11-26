@@ -408,7 +408,7 @@ impl S3Store {
 			)
 			.await
 		{
-			Ok(location) => match location.text.as_str() {
+			Ok(location) => match location.text().trim() {
 				"" => SmolStr::new("us-east-1"),
 				region => SmolStr::new(region),
 			}
