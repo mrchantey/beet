@@ -56,12 +56,10 @@ impl MediaType {
 		bytes: &[u8],
 	) -> Option<(usize, String)> {
 		match self {
-			// a syntax error has a place, a type error (a missing field) none
+			// a syntax error and a type error each have a place
 			#[cfg(feature = "json")]
 			MediaType::Json => {
-				let error =
-					Value::parse_json(core::str::from_utf8(bytes).ok()?)
-						.err()?;
+				let error = json_ext::from_slice::<T>(bytes).err()?;
 				let error = error.downcast_ref::<JsonError>()?;
 				Some((error.offset, error.message.clone()))
 			}

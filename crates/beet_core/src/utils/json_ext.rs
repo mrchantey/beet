@@ -58,10 +58,33 @@ pub fn to_vec_pretty<T: ?Sized + Serialize>(value: &T) -> Result<Vec<u8>> {
 /// The `T` JSON `text` holds.
 ///
 /// # Errors
-/// Errors where `text` is not one JSON document, see [`Value::parse_json`], or
-/// does not hold a `T`.
+/// Errors with a [`JsonError`] where `text` is not one JSON document, see
+/// [`Value::parse_json`], or does not hold a `T`, placed at the value that
+/// does not fit and naming its path:
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// #[derive(Debug, serde::Deserialize)]
+/// struct Item {
+/// 	count: u32,
+/// }
+/// let error = json_ext::from_str::<Vec<Item>>("[{\"count\": 1},\n{\"count\": \"two\"}]")
+/// 	.unwrap_err();
+/// let error = error.downcast_ref::<JsonError>().unwrap();
+/// (error.line, error.column).xpect_eq((2, 11));
+/// error.message.as_str().xpect_starts_with("`[1].count`: invalid type");
+/// ```
 pub fn from_str<T: DeserializeOwned>(text: &str) -> Result<T> {
-	Value::parse_json(text)?.into_serde()
+	T::deserialize(ValueDeserializer::new(Value::parse_json(text)?)).map_err(
+		|err| match JsonError::at_path(
+			text,
+			&err.path().into_inner(),
+			err.to_string(),
+		) {
+			Some(placed) => placed.into(),
+			None => err.into(),
+		},
+	)
 }
 
 /// The `T` JSON `bytes` hold.
@@ -70,4 +93,74 @@ pub fn from_str<T: DeserializeOwned>(text: &str) -> Result<T> {
 /// As [`from_str`], and where `bytes` are not utf8.
 pub fn from_slice<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
 	from_str(core::str::from_utf8(bytes)?)
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use serde::Deserialize;
+
+	#[derive(Debug, Deserialize)]
+	#[allow(dead_code)]
+	struct Item {
+		count: u32,
+		kind: Kind,
+	}
+
+	#[derive(Debug, Deserialize)]
+	#[allow(dead_code)]
+	enum Kind {
+		Plain,
+		Sized { width: u32 },
+	}
+
+	#[derive(Debug, Deserialize)]
+	#[allow(dead_code)]
+	#[serde(untagged)]
+	enum Either {
+		Number(u32),
+		Text(String),
+	}
+
+	/// The line, column and message a read of `text` as a `T` fails with.
+	fn place<T: serde::de::DeserializeOwned + core::fmt::Debug>(
+		text: &str,
+	) -> (usize, usize, String) {
+		let error = json_ext::from_str::<T>(text).unwrap_err();
+		let error = error.downcast_ref::<JsonError>().unwrap();
+		(error.line, error.column, error.message.clone())
+	}
+
+	/// A type error is placed at the value that does not fit, and names its
+	/// path, through lists, maps and enum variants alike.
+	#[crate::test]
+	fn places_type_errors() {
+		let (line, column, message) = place::<Vec<Item>>(
+			"[\n  {\"count\": 1, \"kind\": \"Plain\"},\n  {\"count\": -1, \"kind\": \"Plain\"}\n]",
+		);
+		(line, column).xpect_eq((3, 13));
+		message.xpect_starts_with("`[1].count`: invalid value");
+		// a missing field is missing from its object
+		let (line, column, message) =
+			place::<Vec<Item>>("[{\"count\": 1, \"kind\": \"Plain\"}, {}]");
+		(line, column).xpect_eq((1, 33));
+		message.xpect_contains("`[1]`: missing field");
+		// a variant's payload is under the variant's name
+		let (line, column, message) = place::<Item>(
+			"{\"count\": 1, \"kind\": {\"Sized\": {\"width\": true}}}",
+		);
+		(line, column).xpect_eq((1, 42));
+		message.xpect_starts_with("`kind.Sized.width`: invalid type");
+		// serde buffers an untagged value whole, so the place is that value
+		let (line, column, _) = place::<Vec<Either>>("[1, \"a\", true]");
+		(line, column).xpect_eq((1, 10));
+	}
+
+	/// A syntax error is placed by the reader, before any type is asked.
+	#[crate::test]
+	fn places_syntax_errors() {
+		let (line, column, message) = place::<Item>("{\n  \"count\": 1,\n}");
+		(line, column).xpect_eq((3, 1));
+		message.xpect_eq("expected `\"`");
+	}
 }

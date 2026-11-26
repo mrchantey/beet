@@ -5,18 +5,53 @@ use ::serde::de::IntoDeserializer;
 use alloc::string::String;
 use alloc::string::ToString;
 
-/// Why a [`Value`] could not be deserialized into the target type.
+/// Why a [`Value`] could not be deserialized into the target type, and
+/// where: the [`path`](Self::path) of map keys, list indices and enum
+/// variants down to the value that failed, which `json_ext` turns into a
+/// place in the text.
 #[derive(Debug)]
-pub struct DeError(String);
+pub struct DeError {
+	message: String,
+	/// The path innermost first, each segment pushed as the error leaves it.
+	reversed_path: Vec<FieldSegment>,
+}
+
+impl DeError {
+	fn new(message: impl Into<String>) -> Self {
+		Self {
+			message: message.into(),
+			reversed_path: Vec::new(),
+		}
+	}
+
+	/// This error, raised inside `segment`.
+	fn at(mut self, segment: FieldSegment) -> Self {
+		self.reversed_path.push(segment);
+		self
+	}
+
+	/// Why, without where.
+	pub fn message(&self) -> &str { &self.message }
+
+	/// The path from the root to the value that failed, empty for the root
+	/// itself. A missing field fails at the map it is missing from.
+	pub fn path(&self) -> FieldPath {
+		FieldPath::new(self.reversed_path.iter().rev().cloned())
+	}
+}
+
 impl core::fmt::Display for DeError {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		f.write_str(&self.0)
+		match self.reversed_path.is_empty() {
+			true => f.write_str(&self.message),
+			false => write!(f, "`{}`: {}", self.path(), self.message),
+		}
 	}
 }
 impl core::error::Error for DeError {}
 impl de::Error for DeError {
 	fn custom<T: core::fmt::Display>(msg: T) -> Self {
-		DeError(msg.to_string())
+		DeError::new(msg.to_string())
 	}
 }
 
@@ -84,11 +119,13 @@ impl<'de, 'a> de::Deserializer<'de> for ValueDeserializer<'a> {
 			Value::Str(s) => visitor.visit_string(s.to_string()),
 			Value::List(list) => visitor.visit_seq(SeqAccess {
 				iter: list.into_iter(),
+				index: 0,
 				references: self.references,
 			}),
 			Value::Map(map) => visitor.visit_map(MapAccess {
 				iter: map.into_iter(),
 				value: None,
+				key: None,
 				references: self.references,
 			}),
 		}
@@ -165,17 +202,17 @@ impl<'de, 'a> de::Deserializer<'de> for ValueDeserializer<'a> {
 			Value::Map(map) => {
 				let mut iter = map.into_iter();
 				let entry = iter.next().ok_or_else(|| {
-					DeError("expected a single-entry map for enum".into())
+					DeError::new("expected a single-entry map for enum")
 				})?;
 				if iter.next().is_some() {
-					return Err(DeError(
-						"expected a single-entry map for enum".into(),
+					return Err(DeError::new(
+						"expected a single-entry map for enum",
 					));
 				}
 				(entry.0, Some(entry.1))
 			}
 			other => {
-				return Err(DeError(format!(
+				return Err(DeError::new(format!(
 					"cannot deserialize enum from {:?}",
 					other.kind()
 				)));
@@ -197,6 +234,8 @@ impl<'de, 'a> de::Deserializer<'de> for ValueDeserializer<'a> {
 
 struct SeqAccess<'a> {
 	iter: alloc::vec::IntoIter<Value>,
+	/// The index of the next item, for an error's path.
+	index: usize,
 	references: References<'a>,
 }
 impl<'de, 'a> de::SeqAccess<'de> for SeqAccess<'a> {
@@ -205,10 +244,13 @@ impl<'de, 'a> de::SeqAccess<'de> for SeqAccess<'a> {
 		&mut self,
 		seed: T,
 	) -> DeResult<Option<T::Value>> {
+		let index = self.index;
+		self.index += 1;
 		match self.iter.next() {
 			Some(value) => seed
 				.deserialize(ValueDeserializer::nested(value, self.references))
-				.map(Some),
+				.map(Some)
+				.map_err(|err| err.at(FieldSegment::index(index))),
 			None => Ok(None),
 		}
 	}
@@ -216,7 +258,10 @@ impl<'de, 'a> de::SeqAccess<'de> for SeqAccess<'a> {
 
 struct MapAccess<'a> {
 	iter: <Map as IntoIterator>::IntoIter,
+	/// The entry whose key was read and whose value is next.
 	value: Option<Value>,
+	/// That entry's key, for an error's path.
+	key: Option<SmolStr>,
 	references: References<'a>,
 }
 impl<'de, 'a> de::MapAccess<'de> for MapAccess<'a> {
@@ -228,7 +273,10 @@ impl<'de, 'a> de::MapAccess<'de> for MapAccess<'a> {
 		match self.iter.next() {
 			Some((key, value)) => {
 				self.value = Some(value);
-				seed.deserialize(MapKeyDeserializer(key)).map(Some)
+				self.key = Some(key.clone());
+				seed.deserialize(MapKeyDeserializer(key.clone()))
+					.map(Some)
+					.map_err(|err| err.at(FieldSegment::key(key)))
 			}
 			None => Ok(None),
 		}
@@ -237,10 +285,15 @@ impl<'de, 'a> de::MapAccess<'de> for MapAccess<'a> {
 		&mut self,
 		seed: V,
 	) -> DeResult<V::Value> {
-		let value = self.value.take().ok_or_else(|| {
-			DeError("next_value called before next_key".into())
-		})?;
+		let value = self
+			.value
+			.take()
+			.ok_or_else(|| DeError::new("next_value called before next_key"))?;
 		seed.deserialize(ValueDeserializer::nested(value, self.references))
+			.map_err(|err| match self.key.take() {
+				Some(key) => err.at(FieldSegment::key(key)),
+				None => err,
+			})
 	}
 }
 
@@ -340,6 +393,7 @@ impl<'de, 'a> de::EnumAccess<'de> for EnumAccess<'a> {
 		let variant =
 			seed.deserialize(self.variant.as_str().into_deserializer())?;
 		Ok((variant, VariantAccess {
+			variant: self.variant,
 			payload: self.payload,
 			references: self.references,
 		}))
@@ -347,6 +401,8 @@ impl<'de, 'a> de::EnumAccess<'de> for EnumAccess<'a> {
 }
 
 struct VariantAccess<'a> {
+	/// The variant's name, its payload's key in an error's path.
+	variant: SmolStr,
 	payload: Option<Value>,
 	references: References<'a>,
 }
@@ -356,7 +412,7 @@ impl<'de, 'a> de::VariantAccess<'de> for VariantAccess<'a> {
 		match self.payload {
 			None => Ok(()),
 			Some(_) => {
-				Err(DeError("expected unit variant, found payload".into()))
+				Err(DeError::new("expected unit variant, found payload"))
 			}
 		}
 	}
@@ -364,51 +420,56 @@ impl<'de, 'a> de::VariantAccess<'de> for VariantAccess<'a> {
 		self,
 		seed: T,
 	) -> DeResult<T::Value> {
-		let references = self.references;
+		let (variant, references) = (self.variant.clone(), self.references);
 		seed.deserialize(ValueDeserializer::nested(
 			self.require_payload()?,
 			references,
 		))
+		.map_err(|err| err.at(FieldSegment::key(variant)))
 	}
 	fn tuple_variant<V: de::Visitor<'de>>(
 		self,
 		_len: usize,
 		visitor: V,
 	) -> DeResult<V::Value> {
-		let references = self.references;
+		let (variant, references) = (self.variant.clone(), self.references);
 		match self.require_payload()? {
 			Value::List(list) => visitor.visit_seq(SeqAccess {
 				iter: list.into_iter(),
+				index: 0,
 				references,
 			}),
-			other => Err(DeError(format!(
+			other => Err(DeError::new(format!(
 				"expected a list for tuple variant, got {:?}",
 				other.kind()
 			))),
 		}
+		.map_err(|err| err.at(FieldSegment::key(variant)))
 	}
 	fn struct_variant<V: de::Visitor<'de>>(
 		self,
 		_fields: &'static [&'static str],
 		visitor: V,
 	) -> DeResult<V::Value> {
-		let references = self.references;
+		let (variant, references) = (self.variant.clone(), self.references);
 		match self.require_payload()? {
 			Value::Map(map) => visitor.visit_map(MapAccess {
 				iter: map.into_iter(),
 				value: None,
+				key: None,
 				references,
 			}),
-			other => Err(DeError(format!(
+			other => Err(DeError::new(format!(
 				"expected a map for struct variant, got {:?}",
 				other.kind()
 			))),
 		}
+		.map_err(|err| err.at(FieldSegment::key(variant)))
 	}
 }
 impl VariantAccess<'_> {
 	fn require_payload(self) -> DeResult<Value> {
 		self.payload
-			.ok_or_else(|| DeError("expected a payload for variant".into()))
+			.ok_or_else(|| DeError::new("expected a payload for variant"))
 	}
 }

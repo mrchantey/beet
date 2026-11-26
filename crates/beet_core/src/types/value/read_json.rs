@@ -40,7 +40,8 @@ impl Value {
 	}
 }
 
-/// Where and why JSON text failed to read, see [`Value::parse_json`]: a
+/// Where and why JSON text failed to read, as JSON ([`Value::parse_json`]) or
+/// as a type (`json_ext::from_str`, its message naming the path): a
 /// [`SourceError`] needs the byte offset, a person the line and column.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("invalid json at line {line} column {column}: {message}")]
@@ -53,6 +54,40 @@ pub struct JsonError {
 	pub column: usize,
 	/// What was wrong there.
 	pub message: String,
+}
+
+impl JsonError {
+	/// The error `message` at `offset` into `text`.
+	fn new(text: &str, offset: usize, message: impl Into<String>) -> Self {
+		let offset = offset.min(text.len());
+		let before = &text.as_bytes()[..offset];
+		Self {
+			offset,
+			line: before.iter().filter(|byte| **byte == b'\n').count() + 1,
+			column: before
+				.iter()
+				.rev()
+				.take_while(|byte| **byte != b'\n')
+				.count() + 1,
+			message: message.into(),
+		}
+	}
+
+	/// The error `message` at the value `path` leads to in `text`, a JSON
+	/// document already read, `None` where the path leads nowhere. Walked only
+	/// once a type has refused the value, so a read that succeeds keeps no
+	/// places.
+	#[cfg(feature = "serde")]
+	pub(crate) fn at_path(
+		text: &str,
+		path: &[FieldSegment],
+		message: impl Into<String>,
+	) -> Option<Self> {
+		JsonReader { text, at: 0 }
+			.locate(path)
+			.ok()
+			.map(|offset| Self::new(text, offset, message))
+	}
 }
 
 /// A position in a JSON text.
@@ -82,19 +117,45 @@ impl JsonReader<'_> {
 
 	/// The error `message` at this position.
 	fn error(&self, message: &str) -> BevyError {
-		let offset = self.at.min(self.text.len());
-		let before = &self.text.as_bytes()[..offset];
-		JsonError {
-			offset,
-			line: before.iter().filter(|byte| **byte == b'\n').count() + 1,
-			column: before
-				.iter()
-				.rev()
-				.take_while(|byte| **byte != b'\n')
-				.count() + 1,
-			message: message.into(),
+		JsonError::new(self.text, self.at, message).into()
+	}
+
+	/// The offset of the value `path` leads to from here, stepping over every
+	/// value off it.
+	#[cfg(feature = "serde")]
+	fn locate(&mut self, path: &[FieldSegment]) -> Result<usize> {
+		self.skip_space();
+		let Some((segment, rest)) = path.split_first() else {
+			return self.at.xok();
+		};
+		match (self.peek(), segment) {
+			(Some(b'{'), FieldSegment::ObjectKey(key)) => {
+				self.at += 1;
+				loop {
+					self.skip_space();
+					let found = self.string()? == *key;
+					self.skip_space();
+					self.expect(":")?;
+					if found {
+						return self.locate(rest);
+					}
+					self.value(0)?;
+					self.skip_space();
+					// past the last entry, the key is not here
+					self.expect(",")?;
+				}
+			}
+			(Some(b'['), FieldSegment::ArrayIndex(index)) => {
+				self.at += 1;
+				for _ in 0..*index {
+					self.value(0)?;
+					self.skip_space();
+					self.expect(",")?;
+				}
+				self.locate(rest)
+			}
+			_ => Err(self.error("no value at this path")),
 		}
-		.into()
 	}
 
 	/// Step past `literal`, else an error naming it.

@@ -1,6 +1,7 @@
 //! Newtype wrapper around an insertion-ordered [`IndexMap`] of [`Value`]s,
 //! providing ergonomic key access and a deterministic [`Hash`] implementation.
 use crate::prelude::*;
+use bevy::platform::hash::RandomState;
 use indexmap::IndexMap;
 
 /// A map of string keys to [`Value`]s.
@@ -13,12 +14,18 @@ use indexmap::IndexMap;
 /// order ([`SceneBody`]), a fact a hashed map would silently drop. Equality
 /// and [`Hash`] ignore order, and the generic serde form still sorts keys, so
 /// two maps holding the same entries stay equal however they were built.
+///
+/// Its table is **seeded at random** rather than with the fixed seed of
+/// beet's `HashMap`: a map's keys often come from untrusted text, and keys
+/// worked out against a known seed would all collide, making one json object
+/// quadratic to read. Since iteration follows insertion, the seed changes
+/// nothing a caller can observe.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut, Reflect)]
 #[reflect(opaque)]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", derive(::serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct Map(pub IndexMap<SmolStr, Value, FixedHasher>);
+pub struct Map(pub IndexMap<SmolStr, Value, RandomState>);
 
 /// Serializes entries sorted by key, matching the deterministic
 /// [`Hash`], [`Ord`] and [`Display`] impls rather than insertion order.
