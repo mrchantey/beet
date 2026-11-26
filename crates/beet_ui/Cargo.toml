@@ -73,7 +73,7 @@ serde = ["dep:serde"]
 
 tui = ["style", "keyboard", "dep:vte", "dep:libc", "dep:base64", "dep:image", "dep:resvg", "dep:blocking", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse", "beet_core/bevy_window"]
 
-json = ["dep:serde_json", "serde", "beet_core/json", "beet_scene?/json"]
+json = ["serde", "beet_core/json", "beet_scene?/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
 # The markdown and mdx parser (`beet_scene/markdown`).
 markdown = ["scene", "beet_scene/markdown"]
@@ -153,7 +153,6 @@ resvg = { workspace = true, optional = true }
 # inline `image::load_from_memory` + `resvg::render` freezes every connection
 blocking = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
 heck = { workspace = true, optional = true }
 bitflags = { workspace = true, optional = true }
@@ -192,7 +191,6 @@ beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "server
 # the in-browser reactivity test drives the fixture through the webdriver
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet_net = { workspace = true, features = ["webdriver", "testing"] }
-serde_json = { workspace = true }
 
 # the DOM render target (`render/dom`): the browser's document as a sink over
 # the same walk the string sink reads, painted and patched through `web_sys`,

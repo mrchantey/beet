@@ -17,7 +17,7 @@ use beet::prelude::*;
 pub async fn seeded_store(dir: &str, paths: &[&str]) -> BlobStore {
 	let disk =
 		BlobStore::new(FsStore::new(AbsPath::new_workspace_rel(dir).unwrap()));
-	let store = BlobStore::temp();
+	let store = BlobStore::new(InMemoryBlobStore::new());
 	for path in paths {
 		let path = RelPath::from(*path);
 		let bytes = disk.get(&path).await.unwrap();

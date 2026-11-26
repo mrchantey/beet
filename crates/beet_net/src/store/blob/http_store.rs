@@ -14,7 +14,7 @@ use bytes::Bytes;
 /// origin-relative base (`http:repo`) resolves against the page's origin in a
 /// browser and the canonical loopback server natively. A miss is the mount's
 /// 404, so a consumer distinguishes an absent file from a broken store.
-/// [`list`](BlobStoreProvider::list) asks the mount's listing endpoint
+/// [`list`](BlobProvider::list) asks the mount's listing endpoint
 /// ([`LIST_PARAM`](Self::LIST_PARAM)), which answers the keys under the
 /// requested prefix as a JSON array.
 ///
@@ -135,10 +135,10 @@ impl StoreBackend for HttpStore {
 	}
 }
 
-impl BlobStoreProvider for HttpStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+impl BlobProvider for HttpStore {
+	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
 		Box::new(HttpStore {
 			base: self.base.clone(),
 			subdir: Some(match &self.subdir {
@@ -148,7 +148,7 @@ impl BlobStoreProvider for HttpStore {
 		})
 	}
 
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
+	fn base(&self) -> Box<dyn BlobProvider> {
 		Box::new(HttpStore {
 			base: self.base.clone(),
 			subdir: None,

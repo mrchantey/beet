@@ -47,10 +47,11 @@
 //! Define functions the model can invoke:
 //!
 //! ```no_run
+//! # use beet_core::prelude::*;
 //! # use beet_thread::prelude::*;
 //! let tool = o11s::FunctionToolParam::new("get_weather")
 //!     .with_description("Get current weather for a location")
-//!     .with_parameters(serde_json::json!({
+//!     .with_parameters(value!({
 //!         "type": "object",
 //!         "properties": {
 //!             "location": { "type": "string" }
@@ -442,11 +443,11 @@ impl FunctionCallOutputParam {
 	pub fn json(
 		call_id: impl Into<String>,
 		output: &impl serde::Serialize,
-	) -> Result<Self, serde_json::Error> {
+	) -> Result<Self> {
 		Ok(Self {
 			id: None,
 			call_id: call_id.into(),
-			output: FunctionOutputContent::Text(serde_json::to_string(output)?),
+			output: FunctionOutputContent::Text(json_ext::to_string(output)?),
 			status: None,
 		})
 	}
@@ -533,7 +534,7 @@ pub struct JsonSchemaFormat {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
 	/// The schema for the response format as a JSON Schema object.
-	pub schema: serde_json::Value,
+	pub schema: Value,
 	/// Whether to enable strict schema adherence.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub strict: Option<bool>,
@@ -566,9 +567,9 @@ mod test {
 	#[beet_core::test]
 	fn serializes_simple_request() {
 		let body = RequestBody::new("gpt-4o-mini").with_simple_input("Hello");
-		let json = serde_json::to_value(&body).unwrap();
-		assert_eq!(json["model"], "gpt-4o-mini");
-		assert_eq!(json["input"], "Hello");
+		let json = Value::from_serde(&body).unwrap();
+		assert_eq!(json["model"], Value::str("gpt-4o-mini"));
+		assert_eq!(json["input"], Value::str("Hello"));
 	}
 
 	#[beet_core::test]
@@ -577,24 +578,24 @@ mod test {
 			InputItem::Message(MessageParam::system("You are helpful.")),
 			InputItem::Message(MessageParam::user("Hello")),
 		]);
-		let json = serde_json::to_value(&body).unwrap();
-		assert_eq!(json["input"][0]["role"], "system");
-		assert_eq!(json["input"][1]["role"], "user");
+		let json = Value::from_serde(&body).unwrap();
+		assert_eq!(json["input"][0]["role"], Value::str("system"));
+		assert_eq!(json["input"][1]["role"], Value::str("user"));
 	}
 
 	#[beet_core::test]
 	fn serializes_tool() {
 		let tool = FunctionToolParam::new("get_weather")
 			.with_description("Get the weather")
-			.with_parameters(serde_json::json!({
+			.with_parameters(value!({
 				"type": "object",
 				"properties": {
 					"location": {"type": "string"}
 				}
 			}));
-		let json = serde_json::to_value(&tool).unwrap();
-		assert_eq!(json["type"], "function");
-		assert_eq!(json["name"], "get_weather");
+		let json = Value::from_serde(&tool).unwrap();
+		assert_eq!(json["type"], Value::str("function"));
+		assert_eq!(json["name"], Value::str("get_weather"));
 	}
 
 	#[beet_core::test]
@@ -605,17 +606,17 @@ mod test {
 				"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
 			),
 		]);
-		let json = serde_json::to_value(&msg).unwrap();
-		assert_eq!(json["content"][0]["type"], "input_text");
-		assert_eq!(json["content"][1]["type"], "input_image");
+		let json = Value::from_serde(&msg).unwrap();
+		assert_eq!(json["content"][0]["type"], Value::str("input_text"));
+		assert_eq!(json["content"][1]["type"], Value::str("input_image"));
 	}
 
 	#[beet_core::test]
 	fn serializes_function_call_output() {
 		let output =
 			FunctionCallOutputParam::text("call_123", r#"{"temp": 72}"#);
-		let json = serde_json::to_value(&output).unwrap();
-		assert_eq!(json["call_id"], "call_123");
-		assert_eq!(json["output"], r#"{"temp": 72}"#);
+		let json = Value::from_serde(&output).unwrap();
+		assert_eq!(json["call_id"], Value::str("call_123"));
+		assert_eq!(json["output"], Value::str(r#"{"temp": 72}"#));
 	}
 }

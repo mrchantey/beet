@@ -15,8 +15,6 @@
 mod duration;
 #[cfg(feature = "std")]
 mod exit_status;
-#[cfg(feature = "json")]
-mod json_value;
 mod multimap;
 mod multimap_reflect;
 mod option;
@@ -28,8 +26,6 @@ mod str;
 pub use duration::*;
 #[cfg(feature = "std")]
 pub use exit_status::*;
-#[cfg(feature = "json")]
-pub use json_value::*;
 pub use multimap::*;
 pub use multimap_reflect::*;
 pub use option::*;

@@ -750,7 +750,7 @@ mod test {
 			}
 		}"#;
 
-		let event: StreamingEvent = serde_json::from_str(json).unwrap();
+		let event: StreamingEvent = json_ext::from_str(json).unwrap();
 		matches!(event, StreamingEvent::ResponseCreated(_)).xpect_true();
 		event.sequence_number().xpect_eq(0);
 		event.event_type().xpect_eq("response.created");
@@ -768,7 +768,7 @@ mod test {
 			"logprobs": []
 		}"#;
 
-		let event: StreamingEvent = serde_json::from_str(json).unwrap();
+		let event: StreamingEvent = json_ext::from_str(json).unwrap();
 		if let StreamingEvent::OutputTextDelta(ev) = &event {
 			ev.delta.xpect_eq("Hello");
 			ev.item_id.xpect_eq("msg_123");
@@ -787,7 +787,7 @@ mod test {
 			"arguments": "{\"location\":\"NYC\"}"
 		}"#;
 
-		let event: StreamingEvent = serde_json::from_str(json).unwrap();
+		let event: StreamingEvent = json_ext::from_str(json).unwrap();
 		if let StreamingEvent::FunctionCallArgumentsDone(ev) = &event {
 			ev.arguments.xpect_eq("{\"location\":\"NYC\"}");
 		} else {
@@ -808,7 +808,7 @@ mod test {
 			}
 		}"#;
 
-		let event: StreamingEvent = serde_json::from_str(json).unwrap();
+		let event: StreamingEvent = json_ext::from_str(json).unwrap();
 		if let StreamingEvent::Error(ev) = &event {
 			ev.error.error_type.xpect_eq("invalid_request_error");
 			ev.error.message.xpect_eq("Invalid API key provided");
@@ -856,7 +856,7 @@ mod test {
 			}
 		}"#;
 
-		let event: StreamingEvent = serde_json::from_str(json).unwrap();
+		let event: StreamingEvent = json_ext::from_str(json).unwrap();
 		if let StreamingEvent::ResponseCompleted(ev) = &event {
 			ev.response.status.xpect_eq(response::Status::Completed);
 			ev.response.first_text().xpect_eq(Some("Hello, world!"));

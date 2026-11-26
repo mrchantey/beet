@@ -84,6 +84,7 @@ pub struct OutputTokensDetails {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_core::prelude::*;
 
 	#[beet_core::test]
 	fn deserializes_usage() {
@@ -95,7 +96,7 @@ mod test {
 			"output_tokens_details": {"reasoning_tokens": 0}
 		}"#;
 
-		let usage: Usage = serde_json::from_str(json).unwrap();
+		let usage: Usage = json_ext::from_str(json).unwrap();
 		assert_eq!(usage.input_tokens, 15);
 		assert_eq!(usage.output_tokens, 7);
 		assert_eq!(usage.total_tokens, 22);

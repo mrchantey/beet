@@ -64,7 +64,7 @@ impl Bert {
 		tokenizer_bytes: &[u8],
 	) -> Result<Self> {
 		let model_config: BertModelConfig =
-			serde_json::from_slice(model_config_bytes)?;
+			json_ext::from_slice(model_config_bytes)?;
 		let mut model = model_config.init(&device);
 		load_safetensors(&mut model, weights_bytes)?;
 

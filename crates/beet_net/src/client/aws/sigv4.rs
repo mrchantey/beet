@@ -604,14 +604,10 @@ mod test {
 
 	impl SuiteCase {
 		/// The case's context, `None` for the two that publish none.
-		fn context(&self) -> Option<serde_json::Value> {
+		fn context(&self) -> Option<Value> {
 			match self.context.is_empty() {
 				true => None,
-				false => {
-					serde_json::from_str::<serde_json::Value>(self.context)
-						.unwrap()
-						.xsome()
-				}
+				false => Value::parse_json(self.context).unwrap().xsome(),
 			}
 		}
 
@@ -660,7 +656,7 @@ mod test {
 				credentials["access_key_id"].as_str().unwrap(),
 				credentials["secret_access_key"].as_str().unwrap(),
 			);
-			if let Some(token) = credentials["token"].as_str() {
+			if let Ok(token) = credentials["token"].as_str() {
 				creds = creds.with_session_token(token);
 			}
 			let at = Timestamp::parse_iso8601(

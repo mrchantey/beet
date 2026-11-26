@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
-use serde_json::Value;
 use std::sync::Arc;
 
 /// One AWS service in one region, called as signed requests through
@@ -196,7 +195,7 @@ impl AwsClient {
 		let mut request = AwsRequest::post(action, "/")
 			.with_header("content-type", content_type)
 			.with_header("x-amz-target", format!("{target_prefix}.{action}"))
-			.with_body(serde_json::to_vec(body)?);
+			.with_body(body.to_json_string());
 		request.secret = secret.map(ToString::to_string);
 		let response = self.send(request).await?;
 		Self::json_of(response).await
@@ -293,7 +292,7 @@ impl AwsClient {
 		let text = response.text().await?;
 		match text.trim().is_empty() {
 			true => Value::Null.xok(),
-			false => serde_json::from_str::<Value>(&text)?.xok(),
+			false => Value::parse_json(&text)?.xok(),
 		}
 	}
 
@@ -608,7 +607,7 @@ impl AwsRequest {
 	/// Send `json` as an `application/json` body.
 	pub fn with_json(self, json: &Value) -> Result<Self> {
 		self.with_header("content-type", "application/json")
-			.with_body(serde_json::to_vec(json)?)
+			.with_body(json.to_json_string())
 			.xok()
 	}
 
@@ -639,7 +638,6 @@ impl AwsRequest {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use serde_json::json;
 	use std::sync::Arc;
 	use std::sync::Mutex;
 
@@ -701,16 +699,16 @@ mod test {
 					.unwrap()
 					.xpect_contains("/ap-southeast-2/ssm/aws4_request");
 				let body = request.body.into_bytes().await?;
-				serde_json::from_slice::<serde_json::Value>(&body)?
-					.xpect_eq(json!({"MaxResults": 50}));
+				Value::parse_json(core::str::from_utf8(&body)?)?
+					.xpect_eq(value!({"MaxResults": 50}));
 				Response::ok().with_body(r#"{"Parameters":[]}"#).xok()
 			})
 		});
 		client(AwsService::SSM, handler)
-			.call_json("DescribeParameters", &json!({"MaxResults": 50}))
+			.call_json("DescribeParameters", &value!({"MaxResults": 50}))
 			.await
 			.unwrap()
-			.xpect_eq(json!({"Parameters": []}));
+			.xpect_eq(value!({"Parameters": []}));
 	}
 
 	/// A query call is a form body naming the action and version, answering
@@ -790,7 +788,7 @@ mod test {
 			Response::ok().with_body("{}"),
 		]);
 		client(AwsService::SSM, handler)
-			.call_json("GetParameter", &json!({}))
+			.call_json("GetParameter", &value!({}))
 			.await
 			.unwrap();
 		asked.lock().unwrap().len().xpect_eq(3);
@@ -808,7 +806,7 @@ mod test {
 		let err = client(AwsService::SSM, handler)
 			.call_json_secret(
 				"PutParameter",
-				&json!({"Value": "hunter2"}),
+				&value!({"Value": "hunter2"}),
 				"hunter2",
 			)
 			.await
@@ -866,7 +864,7 @@ mod test {
 		AwsClient::new(AwsService::SSM, "us-east-1")
 			.with_credentials(AwsCredentialSource::new(Rotating(default())))
 			.with_transport(move |request| handler(request))
-			.call_json("GetParameter", &json!({}))
+			.call_json("GetParameter", &value!({}))
 			.await
 			.unwrap();
 		let keys = keys.lock().unwrap().clone();

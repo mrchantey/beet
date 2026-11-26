@@ -314,7 +314,6 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_scene::prelude::*;
-	use serde_json::Value;
 
 	const ALICE: &str = "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa";
 	const BOB: &str = "did:plc:bbbbbbbbbbbbbbbbbbbbbbbb";
@@ -361,8 +360,8 @@ mod test {
 		block: impl FnOnce(AtprotoHandleBlock) -> AtprotoHandleBlock,
 	) -> Vec<(String, String, String)> {
 		let (scope, _dir) = render(stack, accounts, block);
-		let json = scope.finish().unwrap().2.to_json().into_json();
-		let Some(Value::Object(records)) = json
+		let json = scope.finish().unwrap().2.to_json();
+		let Some(Value::Map(records)) = json
 			.get("resource")
 			.and_then(|resource| resource.get("cloudflare_dns_record"))
 		else {
@@ -374,11 +373,11 @@ mod test {
 				let field = |key: &str| {
 					record
 						.get(key)
-						.and_then(Value::as_str)
+						.and_then(|item| item.as_str().ok())
 						.unwrap_or_default()
 						.to_string()
 				};
-				(label.clone(), field("name"), field("content"))
+				(label.to_string(), field("name"), field("content"))
 			})
 			.collect::<Vec<_>>();
 		records.sort_by(|a, b| a.1.cmp(&b.1));

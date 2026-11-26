@@ -1280,7 +1280,7 @@ mod test {
 	/// A router over the store's `routes` beside a set of cards, the store
 	/// holding the font and `files`.
 	async fn setup(files: &[(&str, Vec<u8>)]) -> (World, Entity, BlobStore) {
-		let inner = InMemoryStore::new();
+		let inner = InMemoryBlobStore::new();
 		let store = BlobStore::new(inner.clone());
 		store
 			.insert(&RelPath::new(FONT_PATH), FONT.to_vec())

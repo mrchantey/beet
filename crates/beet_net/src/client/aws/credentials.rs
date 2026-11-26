@@ -139,27 +139,28 @@ impl AwsCredentials {
 	/// json form): `AccessKeyId`, `SecretAccessKey`, `Token` and the
 	/// `Expiration` instant.
 	#[cfg(not(target_arch = "wasm32"))]
-	pub(crate) fn from_metadata_json(json: &serde_json::Value) -> Result<Self> {
+	pub(crate) fn from_metadata_json(json: &Value) -> Result<Self> {
 		let field = |name: &str| {
-			json[name].as_str().map(SmolStr::new).ok_or_else(|| {
-				bevyhow!("the credential answer has no `{name}`")
-			})
+			json[name]
+				.as_str()
+				.map(SmolStr::new)
+				.map_err(|_| bevyhow!("the credential answer has no `{name}`"))
 		};
 		let credentials =
 			Self::new(field("AccessKeyId")?, field("SecretAccessKey")?);
 		let credentials = match json["Token"].as_str() {
-			Some(token) if !token.is_empty() => {
+			Ok(token) if !token.is_empty() => {
 				credentials.with_session_token(token)
 			}
 			_ => credentials,
 		};
 		match json["Expiration"].as_str() {
-			Some(expiration) => credentials.with_expiry(
+			Ok(expiration) => credentials.with_expiry(
 				Timestamp::parse_rfc3339(expiration).ok_or_else(|| {
 					bevyhow!("unreadable credential expiry `{expiration}`")
 				})?,
 			),
-			None => credentials,
+			Err(_) => credentials,
 		}
 		.xok()
 	}
@@ -205,14 +206,13 @@ mod test {
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn reads_metadata_json() {
-		let credentials =
-			AwsCredentials::from_metadata_json(&serde_json::json!({
-				"AccessKeyId": "ASIA",
-				"SecretAccessKey": "secret",
-				"Token": "token",
-				"Expiration": "2026-11-22T12:00:00Z"
-			}))
-			.unwrap();
+		let credentials = AwsCredentials::from_metadata_json(&value!({
+			"AccessKeyId": "ASIA",
+			"SecretAccessKey": "secret",
+			"Token": "token",
+			"Expiration": "2026-11-22T12:00:00Z"
+		}))
+		.unwrap();
 		credentials.session_token().xpect_eq(Some("token"));
 		credentials
 			.expiry()

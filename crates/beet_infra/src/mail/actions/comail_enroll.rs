@@ -4,7 +4,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
 
 
 
@@ -28,11 +27,12 @@ impl ComailEnroll {
 		}
 		let json: Value = response.json().await?;
 		json["Answer"]
-			.as_array()
+			.as_list()
+			.ok()
 			.map(|answers| {
 				answers
 					.iter()
-					.filter_map(|answer| answer["data"].as_str())
+					.filter_map(|answer| answer["data"].as_str().ok())
 					// a DoH `TXT` answer arrives quoted, and a long value
 					// arrives as several quoted strings to be concatenated
 					.map(|data| data.replace('"', "").replace(' ', ""))
@@ -92,7 +92,7 @@ impl ComailEnroll {
 				and the key belongs to the one domain it enrolled"
 			);
 		}
-		serde_json::from_str(&body).map_err(Into::into)
+		json_ext::from_str(&body)
 	}
 }
 
@@ -174,8 +174,8 @@ pub async fn ComailEnroll(
 		info!(
 			"comail accepts '{}' as {did} ({}, {} sent in 14d)",
 			domain.domain(),
-			status["status"].as_str().unwrap_or("unknown"),
-			status["sent_14d"].as_i64().unwrap_or_default()
+			status["status"].as_str().ok().unwrap_or("unknown"),
+			status["sent_14d"].as_i64().ok().unwrap_or_default()
 		);
 
 		// the records the apply publishes read these out of variables, exactly

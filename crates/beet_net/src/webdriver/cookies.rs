@@ -6,8 +6,6 @@
 use super::Page;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 /// One cookie the browser holds. [`Debug`] redacts the value;
 /// [`Self::value`] is the deliberate read.
@@ -74,9 +72,9 @@ impl Cookie {
 	/// From one entry of `storage.getCookies`' `cookies` array; `None` for
 	/// a shape this does not read (a base64 value), with a warning.
 	fn parse(cookie: &Value) -> Option<Self> {
-		let field = |name: &str| cookie.get(name).and_then(Value::as_str);
+		let field = |name: &str| cookie[name].as_str().ok();
 		let value = cookie.get("value")?;
-		if value.get("type").and_then(Value::as_str) != Some("string") {
+		if value["type"].as_str().ok() != Some("string") {
 			warn!(
 				"cookie `{}` has a non-string value, skipping",
 				field("name").unwrap_or("?")
@@ -85,17 +83,11 @@ impl Cookie {
 		}
 		Some(Self {
 			name: field("name")?.into(),
-			value: value.get("value")?.as_str()?.into(),
+			value: value["value"].as_str().ok()?.into(),
 			domain: field("domain")?.trim_start_matches('.').into(),
 			path: field("path").unwrap_or("/").into(),
-			http_only: cookie
-				.get("httpOnly")
-				.and_then(Value::as_bool)
-				.unwrap_or(false),
-			secure: cookie
-				.get("secure")
-				.and_then(Value::as_bool)
-				.unwrap_or(false),
+			http_only: cookie["httpOnly"].as_bool().unwrap_or(false),
+			secure: cookie["secure"].as_bool().unwrap_or(false),
 		})
 	}
 }
@@ -121,11 +113,9 @@ pub struct Cookies(Vec<Cookie>);
 impl Cookies {
 	/// From a `storage.getCookies` response.
 	fn parse(resp: &Value) -> Result<Self> {
-		resp.pointer("/result/cookies")
-			.and_then(Value::as_array)
-			.ok_or_else(|| {
-				bevyhow!("storage.getCookies: cookies array missing")
-			})?
+		resp["result"]["cookies"]
+			.as_list()
+			.map_err(|_| bevyhow!("storage.getCookies: cookies array missing"))?
 			.iter()
 			.filter_map(Cookie::parse)
 			.collect::<Self>()
@@ -221,7 +211,7 @@ impl Page {
 	/// [`Cookies::for_host`].
 	pub async fn cookies(&self) -> Result<Cookies> {
 		self.session
-			.command("storage.getCookies", json!({}))
+			.command("storage.getCookies", value!({}))
 			.await?
 			.xmap(|resp| Cookies::parse(&resp))
 	}
@@ -234,7 +224,7 @@ mod test {
 
 	#[beet_core::test]
 	fn parses_scopes_and_redacts() {
-		let resp = json!({"id": 1, "result": {"cookies": [
+		let resp = value!({"id": 1, "result": {"cookies": [
 			{"name": "session", "value": {"type": "string", "value": "abc"}, "domain": "www.example.com", "path": "/", "httpOnly": true, "secure": true},
 			{"name": "shared", "value": {"type": "string", "value": "xyz"}, "domain": ".example.com", "path": "/"},
 			{"name": "other", "value": {"type": "string", "value": "no"}, "domain": "example.org", "path": "/"},

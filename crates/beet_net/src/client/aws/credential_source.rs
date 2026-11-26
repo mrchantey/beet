@@ -446,7 +446,7 @@ impl AwsCredentialProvider for EcsCredentials {
 			if !response.status().is_success() {
 				bevybail!("answered {}", response.status());
 			}
-			AwsCredentials::from_metadata_json(&serde_json::from_str(
+			AwsCredentials::from_metadata_json(&json_ext::from_str(
 				&response.text().await?,
 			)?)?
 			.xsome()
@@ -540,7 +540,7 @@ impl ImdsCredentials {
 		if !credentials.status().is_success() {
 			bevybail!("the role `{role}` answered {}", credentials.status());
 		}
-		AwsCredentials::from_metadata_json(&serde_json::from_str(
+		AwsCredentials::from_metadata_json(&json_ext::from_str(
 			&credentials.text().await?,
 		)?)?
 		.xsome()
@@ -735,13 +735,13 @@ mod endpoint_test {
 
 	/// A metadata answer for `key`, lapsing in an hour.
 	fn metadata(key: &str) -> String {
-		serde_json::json!({
+		value!({
 			"AccessKeyId": key,
 			"SecretAccessKey": "secret",
 			"Token": "token",
 			"Expiration": (Timestamp::now() + Duration::from_secs(3600)).format_iso8601_secs(),
 		})
-		.to_string()
+		.to_json_string()
 	}
 
 	/// The full uri path, its authorization token read from a file.

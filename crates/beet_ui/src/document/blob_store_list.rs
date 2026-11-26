@@ -18,7 +18,7 @@ use beet_net::prelude::*;
 /// # let mut world = World::new();
 /// world.spawn((
 ///     Document::default(),
-///     InMemoryStore::new(),
+///     InMemoryBlobStore::new(),
 ///     BlobStoreList::new(|_, path| OnSpawn::insert(path.clone())),
 /// ));
 /// ```
@@ -95,9 +95,9 @@ mod test {
 			StorePlugin,
 			DocumentUiPlugin,
 		));
-		// the InMemoryStore is co-located with the Document + list; `store`
+		// the InMemoryBlobStore is co-located with the Document + list; `store`
 		// shares its backing Arc so test writes reach the same objects
-		let inner = InMemoryStore::new();
+		let inner = InMemoryBlobStore::new();
 		let store = BlobStore::new(inner.clone());
 		let entity = app
 			.world_mut()

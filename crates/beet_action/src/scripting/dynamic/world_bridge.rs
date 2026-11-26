@@ -41,7 +41,7 @@ impl WorldBridge {
 	/// # Errors
 	/// Errors only when the reply cannot be encoded.
 	pub async fn serve_line(&self, call: WorldCall) -> Result<String> {
-		serde_json::to_string(&self.serve(call).await)
+		json_ext::to_string(&self.serve(call).await)
 			.map_err(|err| bevyhow!("failed to encode world reply: {err}"))
 	}
 }

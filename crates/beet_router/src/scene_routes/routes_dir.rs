@@ -666,8 +666,8 @@ mod test {
 	/// world.
 	async fn reactive_fixture(
 		files: &[(&str, &str)],
-	) -> (InMemoryStore, BlobStore) {
-		let inner = InMemoryStore::new();
+	) -> (InMemoryBlobStore, BlobStore) {
+		let inner = InMemoryBlobStore::new();
 		let handle = BlobStore::new(inner.clone());
 		for (rel, content) in files {
 			handle
@@ -793,7 +793,7 @@ mod test {
 	/// An in-memory [`BlobStore`] seeded with `files`, proving discovery is
 	/// provider-agnostic (the same scan the S3-backed task runs).
 	async fn memory_fixture(files: &[(&str, &str)]) -> BlobStore {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		for (rel, content) in files {
 			store
 				.insert(&RelPath::from(*rel), content.to_string())

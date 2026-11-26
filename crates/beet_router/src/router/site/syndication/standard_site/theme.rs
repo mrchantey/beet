@@ -106,12 +106,12 @@ mod test {
 	#[beet_core::test]
 	fn round_trips_the_wire_form() {
 		let json = r#"{"$type":"site.standard.theme.basic","background":{"$type":"site.standard.theme.color#rgb","r":255,"g":255,"b":255},"foreground":{"$type":"site.standard.theme.color#rgb","r":0,"g":0,"b":0},"accent":{"$type":"site.standard.theme.color#rgb","r":116,"g":145,"b":0},"accentForeground":{"$type":"site.standard.theme.color#rgb","r":255,"g":255,"b":255}}"#;
-		let theme = serde_json::from_str::<ThemeBasic>(json).unwrap();
+		let theme = json_ext::from_str::<ThemeBasic>(json).unwrap();
 		theme.accent.xpect_eq(ThemeColorRgb {
 			r: 116,
 			g: 145,
 			b: 0,
 		});
-		serde_json::to_string(&theme).unwrap().xpect_eq(json);
+		json_ext::to_string(&theme).unwrap().xpect_eq(json);
 	}
 }

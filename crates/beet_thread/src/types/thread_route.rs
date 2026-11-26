@@ -365,7 +365,7 @@ mod test {
 			.install_types::<ThreadPlugin>()
 			.register_type::<Bail>()
 			.register_type::<Hold>();
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		for (name, source) in [
 			("ReviewThread", REVIEW_THREAD),
 			("DelegateThread", DELEGATE_THREAD),

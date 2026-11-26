@@ -9,8 +9,6 @@ use super::WebElement;
 use super::*;
 use beet_core::prelude::*;
 use core::time::Duration;
-use serde_json::Value;
-use serde_json::json;
 
 /// A node locator strategy for `browsingContext.locateNodes`.
 #[derive(Debug, Clone)]
@@ -24,9 +22,9 @@ pub(crate) enum Locator<'a> {
 impl Locator<'_> {
 	fn to_json(&self) -> Value {
 		match self {
-			Self::Css(value) => json!({"type": "css", "value": value}),
+			Self::Css(value) => value!({"type": "css", "value": *value}),
 			Self::InnerText(value) => {
-				json!({"type": "innerText", "value": value})
+				value!({"type": "innerText", "value": *value})
 			}
 		}
 	}
@@ -41,22 +39,21 @@ pub(crate) async fn locate_nodes(
 	start_node: Option<&WebElement>,
 	max_count: Option<u64>,
 ) -> Result<Vec<WebElement>> {
-	let mut params = json!({
+	let mut params = value!({
 		"context": context_id,
 		"locator": locator.to_json(),
 	});
 	if let Some(max_count) = max_count {
-		params.set_field("maxNodeCount", json!(max_count))?;
+		params.insert("maxNodeCount", max_count)?;
 	}
 	if let Some(start_node) = start_node {
-		params.set_field("startNodes", json!([start_node.shared_ref()?]))?;
+		params.insert("startNodes", value!([start_node.shared_ref()?]))?;
 	}
 	session
 		.command("browsingContext.locateNodes", params)
-		.await?
-		.pointer("/result/nodes")
-		.and_then(|nodes| nodes.as_array())
-		.ok_or_else(|| bevyhow!("locateNodes: missing nodes array"))?
+		.await?["result"]["nodes"]
+		.as_list()
+		.map_err(|_| bevyhow!("locateNodes: missing nodes array"))?
 		.iter()
 		.map(|node| WebElement::from_node_value(session, context_id, node))
 		.collect::<Result<Vec<_>>>()

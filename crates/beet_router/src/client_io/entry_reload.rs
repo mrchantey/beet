@@ -149,7 +149,10 @@ mod test {
 	/// Tear down the previous entry scene and spawn a fresh `BeetSceneRoot`
 	/// [`LiveReload`](super::LiveReload) site over `store`, as the cli's
 	/// `rebuild_watched_entry` does. Returns the new root.
-	fn spawn_entry_root(world: &mut World, store: &InMemoryStore) -> Entity {
+	fn spawn_entry_root(
+		world: &mut World,
+		store: &InMemoryBlobStore,
+	) -> Entity {
 		BeetSceneRoot::despawn_all(world);
 		world
 			.spawn((
@@ -168,7 +171,7 @@ mod test {
 	async fn full_rebuild_leaves_no_leaked_roots() {
 		let mut world =
 			(MinimalPlugins, AsyncPlugin, RouterPlugin).into_world();
-		let store = InMemoryStore::new();
+		let store = InMemoryBlobStore::new();
 		// the driver's rebuild callback: spawn a fresh entry root under a world lock.
 		let rebuild_store = store.clone();
 		world.insert_resource(EntryReloader::new(

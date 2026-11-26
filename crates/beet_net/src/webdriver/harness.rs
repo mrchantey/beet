@@ -302,7 +302,7 @@ mod test {
 		)
 		.await
 		.unwrap()
-		.xpect_eq(serde_json::json!("live"));
+		.xpect_eq(value!("live"));
 
 		page.kill().await.unwrap();
 	}

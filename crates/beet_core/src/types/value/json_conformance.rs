@@ -160,9 +160,7 @@ impl JsonFuzz {
 
 /// What serde reads `text` as, exactly.
 fn serde_reads(text: &str) -> Option<Value> {
-	serde_json::from_str::<serde_json::Value>(text)
-		.ok()
-		.map(Value::from_json)
+	serde_json::from_str::<Value>(text).ok()
 }
 
 /// Assert both readers take `text` alike: the same value, or both refusing
@@ -304,7 +302,9 @@ fn reads_the_edges_alike() {
 
 /// What beet writes, serde reads back as the value written, and lays out
 /// byte for byte as serde does but for a float's text, which serde writes
-/// with `ryu` (`1e-5` is its `0.00001`).
+/// with `ryu` (`1e-5` is its `0.00001`). Serde writes a [`Map`] sorted, its
+/// generic form, so the bytes compare against beet writing the value serde
+/// sees.
 #[crate::test]
 fn writes_what_serde_writes() {
 	let mut fuzz = JsonFuzz::new();
@@ -313,20 +313,22 @@ fn writes_what_serde_writes() {
 		let Ok(value) = Value::parse_json(&fuzz.document(0)) else {
 			continue;
 		};
-		for (ours, theirs) in [
+		for (ours, theirs, sorted) in [
 			(
 				value.to_json_string(),
 				serde_json::to_string(&value).unwrap(),
+				json_ext::to_string(&value).unwrap(),
 			),
 			(
 				value.to_json_pretty(),
 				serde_json::to_string_pretty(&value).unwrap(),
+				json_ext::to_string_pretty(&value).unwrap(),
 			),
 		] {
 			serde_reads(&ours).unwrap().xpect_eq(value.clone());
 			Value::parse_json(&theirs).unwrap().xpect_eq(value.clone());
 			if !holds_float(&value) {
-				ours.xpect_eq(theirs);
+				sorted.xpect_eq(theirs);
 			}
 		}
 	}
@@ -339,4 +341,165 @@ fn holds_float(value: &Value) -> bool {
 		Value::Map(map) => map.values().any(holds_float),
 		_ => false,
 	}
+}
+
+/// Every serde shape a derive writes reads and writes as `serde_json` reads
+/// and writes it, through [`json_ext`]: the value `serde_json` writes, and
+/// the text `serde_json` writes read back as the value.
+#[crate::test]
+fn serde_shapes_cross_alike() {
+	use serde::Deserialize;
+	use serde::Serialize;
+	use serde::de::DeserializeOwned;
+
+	fn cross<T: core::fmt::Debug + PartialEq + Serialize + DeserializeOwned>(
+		value: T,
+	) {
+		let ours = json_ext::to_string(&value).unwrap();
+		let theirs = serde_json::to_string(&value).unwrap();
+		serde_reads(&ours).xpect_eq(serde_reads(&theirs));
+		for text in [theirs, ours] {
+			let read = json_ext::from_str::<T>(&text).unwrap();
+			if read != value {
+				panic!("{text}\n  read:    {read:?}\n  written: {value:?}");
+			}
+		}
+	}
+
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	struct Unit;
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	struct Newtype(u32);
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	struct Tuple(i8, String);
+	#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+	#[serde(rename_all = "camelCase")]
+	struct Fields {
+		first_name: String,
+		#[serde(skip_serializing_if = "Option::is_none")]
+		middle: Option<String>,
+		#[serde(default)]
+		tags: Vec<SmolStr>,
+		scale: f32,
+		ratio: f64,
+		letter: char,
+		bytes: Vec<u8>,
+		by_id: BTreeMap<u32, bool>,
+		by_flag: BTreeMap<bool, i64>,
+		nested: Option<Box<Fields>>,
+		raw: Value,
+	}
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	enum External {
+		Unit,
+		Newtype(u64),
+		Tuple(u8, u8),
+		Struct { at: i64 },
+	}
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	#[serde(tag = "type")]
+	enum Internal {
+		Unit,
+		Struct { at: i64, label: String },
+		Newtype(Newtype2),
+	}
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	struct Newtype2 {
+		inner: f64,
+	}
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	#[serde(tag = "t", content = "c")]
+	enum Adjacent {
+		Unit,
+		Newtype(i32),
+		Struct { at: u8 },
+	}
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	#[serde(untagged)]
+	enum Untagged {
+		Uint(u64),
+		Int(i64),
+		Float(f64),
+		Text(String),
+		List(Vec<Untagged>),
+		Map { key: Box<Untagged> },
+	}
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	struct Flattened {
+		id: u32,
+		#[serde(flatten)]
+		rest: BTreeMap<String, Value>,
+	}
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	struct FlattenedTag {
+		id: u32,
+		#[serde(flatten)]
+		tagged: Internal,
+	}
+
+	cross(Unit);
+	cross(Newtype(7));
+	cross(Tuple(-3, "a\"b".into()));
+	cross((1u8, -1i16, 0.5f64, "x".to_string(), None::<u8>, Some(2u8)));
+	let fields = Fields {
+		first_name: "é\n".into(),
+		middle: None,
+		tags: vec!["a".into()],
+		scale: 1.3,
+		ratio: 0.1,
+		letter: '😀',
+		bytes: vec![0, 255],
+		by_id: [(1, true), (20, false)].into(),
+		by_flag: [(true, -1)].into(),
+		nested: None,
+		raw: value!({ "list": [1, -1, 1.5, null, "s"] }),
+	};
+	cross(Fields {
+		middle: Some("m".into()),
+		nested: Some(Box::new(fields.clone())),
+		..fields
+	});
+	for value in [
+		External::Unit,
+		External::Newtype(u64::MAX),
+		External::Tuple(1, 2),
+		External::Struct { at: i64::MIN },
+	] {
+		cross(value);
+	}
+	for value in [
+		Internal::Unit,
+		Internal::Struct {
+			at: -1,
+			label: "l".into(),
+		},
+		Internal::Newtype(Newtype2 { inner: 2.5 }),
+	] {
+		cross(value);
+	}
+	for value in [Adjacent::Unit, Adjacent::Newtype(-9), Adjacent::Struct {
+		at: 3,
+	}] {
+		cross(value);
+	}
+	cross(Untagged::List(vec![
+		Untagged::Uint(1),
+		Untagged::Int(-1),
+		Untagged::Float(1.5),
+		Untagged::Text("t".into()),
+		Untagged::Map {
+			key: Box::new(Untagged::Uint(2)),
+		},
+	]));
+	cross(Flattened {
+		id: 1,
+		rest: [("extra".to_string(), value!([1, "two"]))].into(),
+	});
+	cross(FlattenedTag {
+		id: 1,
+		tagged: Internal::Struct {
+			at: 4,
+			label: "x".into(),
+		},
+	});
 }

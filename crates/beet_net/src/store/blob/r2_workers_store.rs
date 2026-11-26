@@ -119,10 +119,10 @@ impl StoreBackend for R2WorkersStore {
 	}
 }
 
-impl BlobStoreProvider for R2WorkersStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+impl BlobProvider for R2WorkersStore {
+	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
 		Box::new(R2WorkersStore {
 			binding: self.binding.clone(),
 			subdir: Some(match &self.subdir {
@@ -132,7 +132,7 @@ impl BlobStoreProvider for R2WorkersStore {
 		})
 	}
 
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
+	fn base(&self) -> Box<dyn BlobProvider> {
 		Box::new(R2WorkersStore {
 			subdir: None,
 			..self.clone()

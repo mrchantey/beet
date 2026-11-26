@@ -42,14 +42,14 @@ enum SyncStore {
 
 impl SyncEnd {
 	/// The blob store `uri` names, a relative path resolved as
-	/// [`StoreProvider::from_uri`] resolves one.
+	/// [`BlobStoreProvider::from_uri`] resolves one.
 	pub fn from_uri(uri: &StoreUri) -> Result<Self> {
 		Self {
 			label: uri.to_string().into(),
-			store: match StoreProvider::from_uri(uri)? {
-				StoreProvider::Fs(store) => SyncStore::Fs(store),
+			store: match BlobStoreProvider::from_uri(uri)? {
+				BlobStoreProvider::Fs(store) => SyncStore::Fs(store),
 				#[cfg(feature = "aws")]
-				StoreProvider::S3(store) => SyncStore::S3(store),
+				BlobStoreProvider::S3(store) => SyncStore::S3(store),
 				other => SyncStore::Erased(other.into_blob_store()),
 			},
 		}
@@ -90,21 +90,22 @@ impl SyncEnd {
 	pub fn with_dir(mut self, dir: Option<RelPath>) -> Self {
 		if let Some(dir) = dir {
 			self.label = format!("{}/{dir}", self.label).into();
-			self.store =
-				match self.store {
-					SyncStore::Fs(store) => {
-						SyncStore::Fs(store.clone().with_subdir(
-							BlobStoreProvider::subdir(&store).join(&dir),
-						))
-					}
-					#[cfg(feature = "aws")]
-					SyncStore::S3(store) => SyncStore::S3(store.clone().with_subdir(
-						BlobStoreProvider::subdir(&store).join(&dir),
-					)),
-					SyncStore::Erased(store) => {
-						SyncStore::Erased(store.with_subdir(dir))
-					}
-				};
+			self.store = match self.store {
+				SyncStore::Fs(store) => SyncStore::Fs(
+					store
+						.clone()
+						.with_subdir(BlobProvider::subdir(&store).join(&dir)),
+				),
+				#[cfg(feature = "aws")]
+				SyncStore::S3(store) => SyncStore::S3(
+					store
+						.clone()
+						.with_subdir(BlobProvider::subdir(&store).join(&dir)),
+				),
+				SyncStore::Erased(store) => {
+					SyncStore::Erased(store.with_subdir(dir))
+				}
+			};
 		}
 		self
 	}

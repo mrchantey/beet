@@ -218,7 +218,7 @@ fn write_container_worker_js(
 		.to_env()
 		.iter()
 		.map(|(key, value)| -> Result<String> {
-			format!("    {key}: {},\n", serde_json::to_string(value.as_str())?)
+			format!("    {key}: {},\n", json_ext::to_string(value.as_str())?)
 				.xok()
 		})
 		.collect::<Result<String>>()?;
@@ -262,11 +262,12 @@ const CONTAINERS_PKG_VERSION: &str = "^0.3.7";
 /// `node_modules` on `deploy`, so without it the deploy fails with
 /// `Could not resolve "@cloudflare/containers"`.
 fn write_container_package_json(dir: &AbsPath) -> Result {
-	let json = serde_json::to_string_pretty(&serde_json::json!({
+	let json = value!({
 		"name": "beet-container-worker",
 		"private": true,
 		"dependencies": { "@cloudflare/containers": CONTAINERS_PKG_VERSION },
-	}))?;
+	})
+	.to_json_pretty();
 	fs_ext::write(dir.join("package.json"), json)?;
 	Ok(())
 }
@@ -288,7 +289,7 @@ fn write_container_wrangler(
 	dir: &AbsPath,
 	block: &CloudflareContainerBlock,
 ) -> Result {
-	let json = serde_json::to_string_pretty(&serde_json::json!({
+	let json = value!({
 		"name": block.name(),
 		"main": "worker.js",
 		"compatibility_date": wrangler_ext::COMPATIBILITY_DATE,
@@ -303,7 +304,8 @@ fn write_container_wrangler(
 			"bindings": [{ "name": "BEET_CONTAINER", "class_name": CONTAINER_CLASS }],
 		},
 		"migrations": [{ "tag": "v1", "new_sqlite_classes": [CONTAINER_CLASS] }],
-	}))?;
+	})
+	.to_json_pretty();
 	fs_ext::write(dir.join("wrangler.jsonc"), json)?;
 	Ok(())
 }
@@ -542,13 +544,13 @@ fn worker_wrangler_json(
 		.routes()
 		.iter()
 		.map(|host| {
-			serde_json::json!({
+			value!({
 				"pattern": host,
 				"custom_domain": true,
 			})
 		})
 		.collect::<Vec<_>>();
-	let mut config = serde_json::json!({
+	let mut config = value!({
 		"name": block.name(),
 		"main": main_js,
 		"compatibility_date": wrangler_ext::COMPATIBILITY_DATE,
@@ -557,31 +559,37 @@ fn worker_wrangler_json(
 			"binding": block.binding(),
 			"bucket_name": block.bucket(),
 		}],
-		"vars": vars,
+		"vars": Map::new(vars.clone()),
 	});
 	// omitted rather than empty: wrangler treats an empty `routes` as "serve
 	// nowhere" and unpublishes the `workers.dev` host.
 	if !routes.is_empty() {
-		config["routes"] = routes.into();
+		config.insert("routes", routes)?;
 	}
 	// one class however many namespaces bind it; the migration tag is applied
 	// once and kept, as wrangler requires of every migration it has run
 	if !objects.is_empty() {
-		config["durable_objects"] = serde_json::json!({
-			"bindings": objects
-				.iter()
-				.map(|binding| serde_json::json!({
-					"name": binding,
-					"class_name": DurableObjectStore::CLASS,
-				}))
-				.collect::<Vec<_>>(),
-		});
-		config["migrations"] = serde_json::json!([{
-			"tag": "beet-table-object-v1",
-			"new_sqlite_classes": [DurableObjectStore::CLASS],
-		}]);
+		config.insert(
+			"durable_objects",
+			value!({
+				"bindings": objects
+					.iter()
+					.map(|binding| value!({
+						"name": binding,
+						"class_name": DurableObjectStore::CLASS,
+					}))
+					.collect::<Vec<_>>(),
+			}),
+		)?;
+		config.insert(
+			"migrations",
+			value!([{
+				"tag": "beet-table-object-v1",
+				"new_sqlite_classes": [DurableObjectStore::CLASS],
+			}]),
+		)?;
 	}
-	serde_json::to_string_pretty(&config)?.xok()
+	config.to_json_pretty().xok()
 }
 
 // ───────────────────────────── R2 site sync ────────────────────────────────
@@ -946,12 +954,10 @@ async fn delete_container_app(access: &CloudflareAccess, worker_name: &str) {
 	// loop rather than iterator closures: closures borrowing from `&Value` trip
 	// a higher-ranked-lifetime inference bug once this future is boxed by `#[action]`.
 	let mut id = None;
-	if let Ok(serde_json::Value::Array(apps)) =
-		serde_json::from_str::<serde_json::Value>(&json)
-	{
+	if let Ok(Value::List(apps)) = Value::parse_json(&json) {
 		for app in &apps {
-			if app["name"] == app_name.as_str() {
-				id = app["id"].as_str().map(str::to_string);
+			if app["name"].as_str().ok() == Some(app_name.as_str()) {
+				id = app["id"].as_str().ok().map(str::to_string);
 				break;
 			}
 		}
@@ -980,22 +986,20 @@ async fn delete_container_images(access: &CloudflareAccess, worker_name: &str) {
 	else {
 		return;
 	};
-	let Ok(serde_json::Value::Array(repos)) =
-		serde_json::from_str::<serde_json::Value>(&json)
-	else {
+	let Ok(Value::List(repos)) = Value::parse_json(&json) else {
 		return;
 	};
 	// Explicit loops over the json (see `delete_container_app`): iterator closures
 	// borrowing from `&Value` break HRTB inference inside the boxed `#[action]` future.
 	for entry in &repos {
-		if entry["name"] != repo.as_str() {
+		if entry["name"].as_str().ok() != Some(repo.as_str()) {
 			continue;
 		}
-		let Some(tags) = entry["tags"].as_array() else {
+		let Some(tags) = entry["tags"].as_list().ok() else {
 			continue;
 		};
 		for tag in tags {
-			let Some(tag) = tag.as_str() else {
+			let Ok(tag) = tag.as_str() else {
 				continue;
 			};
 			let image = format!("{repo}:{tag}");

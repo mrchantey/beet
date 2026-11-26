@@ -215,7 +215,7 @@ mod test {
 	/// the mode to the cascade.
 	#[beet_core::test]
 	async fn src_reads_a_package_file() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		store
 			.insert(
 				&RelPath::from("flow.mmd"),

@@ -97,7 +97,9 @@ mod tests {
 	#[beet_core::test]
 	fn store_resolves_from_own_entity() {
 		let mut world = BootstrapPlugin.into_world();
-		let entity = world.spawn((Stack::default(), BlobStore::temp())).id();
+		let entity = world
+			.spawn((Stack::default(), BlobStore::new(InMemoryBlobStore::new())))
+			.id();
 		world.with_state::<StackQuery, _>(|query| {
 			query.store(entity).is_ok().xpect_true();
 		});

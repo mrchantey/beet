@@ -513,7 +513,6 @@ impl DatabaseConsumers {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use serde_json::Value;
 
 	/// The mail stack's database as the plan declares it.
 	fn database() -> RdsPostgresBlock {
@@ -573,8 +572,8 @@ mod tests {
 
 	/// The sole `aws_db_instance` the config carries.
 	fn instance(config: &terra::Config) -> Value {
-		config.to_json().into_json()["resource"]["aws_db_instance"]
-			.as_object()
+		config.to_json()["resource"]["aws_db_instance"]
+			.as_map()
 			.unwrap()
 			.values()
 			.next()
@@ -628,8 +627,8 @@ mod tests {
 			.xpect_eq("beet-infra-dev-db-db")
 			.xnot()
 			.xpect_contains("--");
-		config.to_json().into_json()["resource"]["aws_db_subnet_group"]
-			.as_object()
+		config.to_json()["resource"]["aws_db_subnet_group"]
+			.as_map()
 			.unwrap()
 			.values()
 			.next()
@@ -651,13 +650,13 @@ mod tests {
 			.unwrap()
 			.xpect_false();
 		let vpc = VpcBlock::new("net");
-		config.to_json().into_json()["resource"]["aws_db_subnet_group"]
-			.as_object()
+		config.to_json()["resource"]["aws_db_subnet_group"]
+			.as_map()
 			.unwrap()
 			.values()
 			.next()
 			.unwrap()["subnet_ids"]
-			.as_array()
+			.as_list()
 			.unwrap()
 			.iter()
 			.map(|id| id.as_str().unwrap().to_string())
@@ -676,7 +675,7 @@ mod tests {
 	#[beet_core::test]
 	fn the_database_admits_nothing_by_itself() {
 		let (_stack, config) = build_config(&database());
-		config.to_json().into_json()["resource"]["aws_security_group_rule"]
+		config.to_json()["resource"]["aws_security_group_rule"]
 			.is_null()
 			.xpect_true();
 		config
@@ -725,7 +724,7 @@ mod tests {
 		// ..and the deploy knows to resolve it, so `apply` passes a `-var`
 		scope.variables().len().xpect_eq(1);
 		let (_stack, _deployment, config) = scope.finish().unwrap();
-		let json = config.to_json().into_json();
+		let json = config.to_json();
 		instance(&config)["password"]
 			.as_str()
 			.unwrap()
@@ -785,8 +784,8 @@ mod tests {
 	fn compositions_point_at_the_emitted_instance() {
 		let (stack, config) = build_config(&database());
 		let label = database().ident(&stack).label().to_string();
-		config.to_json().into_json()["resource"]["aws_db_instance"]
-			.as_object()
+		config.to_json()["resource"]["aws_db_instance"]
+			.as_map()
 			.unwrap()
 			.contains_key(label.as_str())
 			.xpect_true();
@@ -795,8 +794,8 @@ mod tests {
 			.as_str()
 			.xpect_eq(format!("${{aws_db_instance.{label}.address}}"));
 		// ..and the group a consumer's ingress rule targets is the one emitted
-		config.to_json().into_json()["resource"]["aws_security_group"]
-			.as_object()
+		config.to_json()["resource"]["aws_security_group"]
+			.as_map()
 			.unwrap()
 			.contains_key(database().security_group_ident(&stack).label())
 			.xpect_true();

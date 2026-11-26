@@ -1,3 +1,4 @@
+//! [`InMemoryBlobStore`]: blobs in process memory.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::platform::sync::Arc;
@@ -10,11 +11,6 @@ use bytes::Bytes;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
-impl BlobStore {
-	/// Create a pre-created [`InMemoryStore`] store for testing.
-	pub fn new_test() -> Self { Self::new(InMemoryStore::new()) }
-}
-
 /// Process-global counter minting a unique name per unnamed backing.
 static INSTANCE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -24,7 +20,18 @@ static INSTANCE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static REGISTRY: LazyLock<Mutex<HashMap<SmolStr, Weak<InMemoryInner>>>> =
 	LazyLock::new(default);
 
-/// A store provider using an in-memory hashmap, `memory://<name>[/<path_prefix>]`.
+/// Blobs in process memory, `memory://<name>[/<path_prefix>]`: for a test, or
+/// a runtime whose bytes need not outlive it.
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
+/// # async fn run() -> Result<()> {
+/// let store = BlobStore::new(InMemoryBlobStore::new());
+/// store.insert(&RelPath::from("hello.txt"), "world").await?;
+/// # Ok(())
+/// # }
+/// ```
 ///
 /// Every backing has a name: [`named`](Self::named) joins the backing of that
 /// name, creating it on the first call, so a store a test seeds by name is the
@@ -37,13 +44,13 @@ static REGISTRY: LazyLock<Mutex<HashMap<SmolStr, Weak<InMemoryInner>>>> =
 ///
 /// Spawned as a [`Component`] (its `on_insert` inserts a [`BlobStore`]), it becomes
 /// reactive: `insert` / `remove` emit a [`BlobEvent`] on the subscribed bus, and
-/// every handle on one name (including [`with_subdir`](BlobStoreProvider::with_subdir))
+/// every handle on one name (including [`with_subdir`](BlobProvider::with_subdir))
 /// shares one backing `Arc`, so the bus subscription is shared.
 #[derive(Debug, Clone, Get, Component, Reflect)]
 // `inner` is rebuilt from the registry by name, see the manual `FromReflect`.
 #[reflect(Component, from_reflect = false, FromReflect)]
 #[component(on_insert = BlobStore::on_insert::<Self>)]
-pub struct InMemoryStore {
+pub struct InMemoryBlobStore {
 	/// The backing's name, the `<name>` in `memory://<name>`.
 	name: SmolStr,
 	/// Shared backing state, opaque to reflection.
@@ -83,7 +90,7 @@ impl InMemoryInner {
 
 impl Drop for InMemoryInner {
 	/// The last handle dropped: prune the registry so a dead name is freed
-	/// and a later [`InMemoryStore::named`] starts fresh.
+	/// and a later [`InMemoryBlobStore::named`] starts fresh.
 	fn drop(&mut self) {
 		if let Ok(mut registry) = REGISTRY.lock() {
 			registry.retain(|_, weak| weak.strong_count() > 0);
@@ -91,14 +98,14 @@ impl Drop for InMemoryInner {
 	}
 }
 
-impl Default for InMemoryStore {
+impl Default for InMemoryBlobStore {
 	fn default() -> Self { Self::new() }
 }
 
 /// Rebuild from the registry by name, so a scene round-trips a memory store
 /// onto its data: the derived impl would default the ignored `inner` to a
 /// fresh backing. A concrete value (a reflect clone) downcasts directly.
-impl FromReflect for InMemoryStore {
+impl FromReflect for InMemoryBlobStore {
 	fn from_reflect(reflect: &dyn PartialReflect) -> Option<Self> {
 		if let Some(value) = reflect.try_downcast_ref::<Self>() {
 			return Some(value.clone());
@@ -117,7 +124,7 @@ impl FromReflect for InMemoryStore {
 	}
 }
 
-impl InMemoryStore {
+impl InMemoryBlobStore {
 	/// Creates a new already-created (empty) in-memory provider under a minted
 	/// name, isolated because nobody else knows it.
 	pub fn new() -> Self { Self::minted(Some(HashMap::new())) }
@@ -228,7 +235,7 @@ impl InMemoryStore {
 	}
 }
 
-impl StoreBackend for InMemoryStore {
+impl StoreBackend for InMemoryBlobStore {
 	fn id(&self) -> &'static str { "memory" }
 
 	fn describe(&self) -> String { self.root_key().to_string() }
@@ -265,11 +272,11 @@ impl StoreBackend for InMemoryStore {
 	}
 }
 
-impl BlobStoreProvider for InMemoryStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+impl BlobProvider for InMemoryBlobStore {
+	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
-		Box::new(InMemoryStore {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
+		Box::new(InMemoryBlobStore {
 			name: self.name.clone(),
 			inner: self.inner.clone(),
 			subdir: Some(match &self.subdir {
@@ -279,8 +286,8 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
-		Box::new(InMemoryStore {
+	fn base(&self) -> Box<dyn BlobProvider> {
+		Box::new(InMemoryBlobStore {
 			subdir: None,
 			..self.clone()
 		})
@@ -473,26 +480,26 @@ impl BlobStoreProvider for InMemoryStore {
 	}
 }
 
-/// Subscribe the added [`InMemoryStore`] to the [`BlobEventBus`], so its
+/// Subscribe the added [`InMemoryBlobStore`] to the [`BlobEventBus`], so its
 /// `insert` / `remove` emit [`BlobEvent`]s. Refcounted per backing `Arc`, so a
 /// `with_subdir` clone adds no duplicate sends.
 #[cfg(feature = "std")]
 pub(crate) fn add_memory_store_watcher(
-	ev: On<Add<InMemoryStore>>,
+	ev: On<Add<InMemoryBlobStore>>,
 	bus: Res<BlobEventBus>,
-	stores: Query<&InMemoryStore>,
+	stores: Query<&InMemoryBlobStore>,
 ) {
 	if let Ok(store) = stores.get(ev.entity) {
 		store.subscribe(bus.sender.clone());
 	}
 }
 
-/// Unsubscribe the removed [`InMemoryStore`], clearing the bus on the last
+/// Unsubscribe the removed [`InMemoryBlobStore`], clearing the bus on the last
 /// subscriber.
 #[cfg(feature = "std")]
 pub(crate) fn remove_memory_store_watcher(
-	ev: On<Remove<InMemoryStore>>,
-	stores: Query<&InMemoryStore>,
+	ev: On<Remove<InMemoryBlobStore>>,
+	stores: Query<&InMemoryBlobStore>,
 ) {
 	if let Ok(store) = stores.get(ev.entity) {
 		store.unsubscribe();
@@ -508,7 +515,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		let provider = InMemoryStore::new_empty();
+		let provider = InMemoryBlobStore::new_empty();
 		store_test::run(provider).await;
 	}
 
@@ -516,8 +523,8 @@ mod test {
 	/// backing.
 	#[beet_core::test]
 	async fn handles_by_name_share_a_backing() {
-		let first = InMemoryStore::named("shared-backing");
-		let second = InMemoryStore::named("shared-backing");
+		let first = InMemoryBlobStore::named("shared-backing");
+		let second = InMemoryBlobStore::named("shared-backing");
 		first.root_key().xpect_eq(second.root_key());
 		first.root_key().xpect_eq("memory:shared-backing");
 		first
@@ -539,8 +546,8 @@ mod test {
 	/// A minted name is nobody else's: two `new` stores never see each other.
 	#[beet_core::test]
 	async fn minted_stores_are_isolated() {
-		let first = InMemoryStore::new();
-		let second = InMemoryStore::new();
+		let first = InMemoryBlobStore::new();
+		let second = InMemoryBlobStore::new();
 		(first.root_key() != second.root_key()).xpect_true();
 		first
 			.insert(&RelPath::new("a.txt"), Bytes::from_static(b"hi"))
@@ -559,7 +566,7 @@ mod test {
 	async fn a_dead_name_leaves_the_registry() {
 		let registered =
 			|name: &str| REGISTRY.lock().unwrap().contains_key(name);
-		let store = InMemoryStore::named("ephemeral");
+		let store = InMemoryBlobStore::named("ephemeral");
 		store
 			.insert(&RelPath::new("a.txt"), Bytes::from_static(b"hi"))
 			.await
@@ -567,7 +574,7 @@ mod test {
 		registered("ephemeral").xpect_true();
 		drop(store);
 		registered("ephemeral").xpect_false();
-		InMemoryStore::named("ephemeral")
+		InMemoryBlobStore::named("ephemeral")
 			.exists(&RelPath::new("a.txt"))
 			.await
 			.unwrap()
@@ -578,13 +585,14 @@ mod test {
 	/// scene round-trips a memory store onto its data.
 	#[beet_core::test]
 	async fn from_reflect_joins_the_backing() {
-		let store = InMemoryStore::named("reflected").with_subdir("docs");
+		let store = InMemoryBlobStore::named("reflected").with_subdir("docs");
 		store
 			.insert(&RelPath::new("a.txt"), Bytes::from_static(b"hi"))
 			.await
 			.unwrap();
 		let dynamic = store.to_dynamic().unwrap();
-		let rebuilt = InMemoryStore::from_reflect(dynamic.as_ref()).unwrap();
+		let rebuilt =
+			InMemoryBlobStore::from_reflect(dynamic.as_ref()).unwrap();
 		rebuilt.name().xpect_eq("reflected");
 		rebuilt.subdir().xpect_eq(RelPath::new("docs"));
 		rebuilt

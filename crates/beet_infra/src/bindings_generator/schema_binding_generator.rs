@@ -19,8 +19,6 @@
 use super::binding_generator::BindingGenerator;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::json;
-use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -233,18 +231,18 @@ impl SchemaBindingGenerator {
 	/// [`constraint`](terra::Provider::constraint), the same one every
 	/// rendered config carries.
 	fn build_providers_tf_content(&self) -> Result<Vec<u8>> {
-		let mut required_providers = serde_json::Map::new();
+		let mut required_providers = Map::default();
 
 		for file in &self.files {
 			for list in &file.resources {
 				// Deduplicate by local name.
 				let local = list.provider.local_name().to_string();
-				if required_providers.contains_key(&local) {
+				if required_providers.contains(&local) {
 					continue;
 				}
 				required_providers.insert(
 					local,
-					json!({
+					value!({
 						"source": list.provider.short_source(),
 						"version": list.provider.constraint(),
 					}),
@@ -252,15 +250,14 @@ impl SchemaBindingGenerator {
 			}
 		}
 
-		let tf_json = json!({
+		let tf_json = value!({
 			"terraform": {
 				"required_providers": required_providers,
 			}
 		});
 
-		let mut buf = Vec::new();
-		serde_json::to_writer_pretty(&mut buf, &tf_json)?;
-		buf.write_all(b"\n")?;
+		let mut buf = tf_json.to_json_pretty().into_bytes();
+		buf.push(b'\n');
 		Ok(buf)
 	}
 

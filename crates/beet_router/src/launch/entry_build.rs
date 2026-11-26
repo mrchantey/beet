@@ -66,7 +66,7 @@ pub struct ResolvedEntry {
 /// key in a self-rooted store).
 ///
 /// Live reload watches the store's local root when it has one
-/// ([`BlobStoreProvider::watch_dir`]) — the rebased root, so the watcher sees
+/// ([`BlobProvider::watch_dir`]) — the rebased root, so the watcher sees
 /// the entry's whole declared universe; a store with no local directory
 /// watches nothing.
 pub async fn resolve_in_repo_store(
@@ -171,7 +171,7 @@ pub fn default_store_fork(repo_uri: &StoreUri) -> Option<StoreUri> {
 }
 
 /// The repo store `uri` names forked into `store_fork` (else
-/// [`default_store_fork`]), see [`StoreProvider::compose`].
+/// [`default_store_fork`]), see [`BlobStoreProvider::compose`].
 fn compose_repo_store(
 	uri: &StoreUri,
 	store_fork: Option<&StoreUri>,
@@ -180,7 +180,7 @@ fn compose_repo_store(
 		.is_none()
 		.then(|| default_store_fork(uri))
 		.flatten();
-	StoreProvider::compose(uri, store_fork.or(default.as_ref()))
+	BlobStoreProvider::compose(uri, store_fork.or(default.as_ref()))
 }
 
 /// The entry document a self-rooted store serves: `entry` when the launch names
@@ -599,7 +599,7 @@ mod test {
 	/// Build `source` as the `main.bsx` entry of an in-memory store, through the
 	/// same prescan, read and build steps a launch runs.
 	async fn build_source(world: &mut World, source: &str) -> Result<Entity> {
-		let repo_store = BlobStore::temp();
+		let repo_store = BlobStore::new(InMemoryBlobStore::new());
 		repo_store
 			.insert(&RelPath::from("main.bsx"), source.to_owned())
 			.await?;
@@ -738,7 +738,7 @@ mod test {
 				)
 				.unwrap();
 		}
-		let repo_store = BlobStore::temp();
+		let repo_store = BlobStore::new(InMemoryBlobStore::new());
 		repo_store
 			.insert(
 				&RelPath::from("app/main.bsx"),
@@ -823,7 +823,7 @@ mod test {
 	/// dropped by policy.
 	#[beet_core::test]
 	async fn self_rooted_entry_rebases_to_a_prefix_view() {
-		let repo_store = BlobStore::temp();
+		let repo_store = BlobStore::new(InMemoryBlobStore::new());
 		repo_store
 			.insert(
 				&RelPath::from("apps/site/main.bsx"),
@@ -853,7 +853,7 @@ mod test {
 	/// universe fails loudly naming the mis-publish.
 	#[beet_core::test]
 	async fn self_rooted_escape_fails_loudly() {
-		let repo_store = BlobStore::temp();
+		let repo_store = BlobStore::new(InMemoryBlobStore::new());
 		repo_store
 			.insert(
 				&RelPath::from("main.bsx"),
@@ -956,7 +956,7 @@ mod test {
 	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn rebuild_fires_ready_every_time() {
-		let repo_store = BlobStore::temp();
+		let repo_store = BlobStore::new(InMemoryBlobStore::new());
 		repo_store
 			.insert(&RelPath::from("main.bsx"), "<Router/>")
 			.await
@@ -995,7 +995,7 @@ mod test {
 	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn failed_rebuild_keeps_the_site_reloadable() {
-		let repo_store = BlobStore::temp();
+		let repo_store = BlobStore::new(InMemoryBlobStore::new());
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		// per rebuild: whether it built, and the live sites it left behind
 		let outcomes = Store::new(Vec::new());
@@ -1043,7 +1043,7 @@ mod test {
 	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn structural_sources_include_entry_documents() {
-		let repo_store = BlobStore::temp();
+		let repo_store = BlobStore::new(InMemoryBlobStore::new());
 		let files = [
 			(
 				"app/main.bsx",
@@ -1097,7 +1097,7 @@ mod test {
 	/// dispatches through.
 	#[beet_core::test]
 	async fn an_entry_instantiates_documents() {
-		let repo_store = BlobStore::temp();
+		let repo_store = BlobStore::new(InMemoryBlobStore::new());
 		for (path, source) in [
 			(
 				"main.bsx",

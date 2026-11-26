@@ -177,7 +177,7 @@ impl S3Store {
 	}
 
 	/// Declare the bucket's objects anonymously readable, so
-	/// [`BlobStoreProvider::public_url`] hands out its url and a static-file route
+	/// [`BlobProvider::public_url`] hands out its url and a static-file route
 	/// redirects to the bucket rather than streaming through the app. Only true
 	/// when a bucket policy (or an R2 custom domain) actually grants public read.
 	pub fn with_public(mut self, public: bool) -> Self {
@@ -538,10 +538,10 @@ impl StoreBackend for S3Store {
 	}
 }
 
-impl BlobStoreProvider for S3Store {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+impl BlobProvider for S3Store {
+	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
 		Box::new(S3Store {
 			subdir: Some(match &self.subdir {
 				Some(existing) => existing.join(&path),
@@ -551,7 +551,7 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
+	fn base(&self) -> Box<dyn BlobProvider> {
 		Box::new(S3Store {
 			subdir: None,
 			..self.clone()

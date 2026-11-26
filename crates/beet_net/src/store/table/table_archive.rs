@@ -209,7 +209,7 @@ mod test {
 	#[beet_core::test]
 	async fn moves_a_range() {
 		let store = TableStore::new(InMemoryTableStore::new());
-		let bucket = BlobStore::temp();
+		let bucket = BlobStore::new(InMemoryBlobStore::new());
 		let table = rows(&store);
 		for (key, value) in [("a", 1), ("b", 2), ("c", 3)] {
 			table
@@ -262,7 +262,7 @@ mod test {
 	#[beet_core::test]
 	async fn reruns_merge() {
 		let store = TableStore::new(InMemoryTableStore::new());
-		let bucket = BlobStore::temp();
+		let bucket = BlobStore::new(InMemoryBlobStore::new());
 		let table = rows(&store);
 		let path = RelPath::new("archive/named.db");
 		let archive = TableArchive::new(&table, Scan::default());

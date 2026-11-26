@@ -334,7 +334,7 @@ mod test {
 	}
 
 	/// Spawn a watched site: a router serving `routes/` from `store` (an `FsStore`,
-	/// `InMemoryStore`, ...), marked [`LiveReload`] so `start_live_reload` gives it a
+	/// `InMemoryBlobStore`, ...), marked [`LiveReload`] so `start_live_reload` gives it a
 	/// [`ClientIo`] child. Returns the root entity, which carries the store.
 	fn spawn_site(world: &mut World, store: impl Bundle) -> Entity {
 		world
@@ -448,7 +448,7 @@ mod test {
 		let mut world = reload_world();
 		let root = spawn_site(
 			&mut world,
-			(InMemoryStore::new(), JsonTableStore::default()),
+			(InMemoryBlobStore::new(), JsonTableStore::default()),
 		);
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		let tables = world.get::<TableStore>(root).unwrap().clone();
@@ -590,14 +590,14 @@ mod test {
 			.xpect_contains("edited");
 	}
 
-	/// The store drives reloads, not the filesystem: an [`InMemoryStore`]'s own
+	/// The store drives reloads, not the filesystem: an [`InMemoryBlobStore`]'s own
 	/// watcher emits a [`BlobEvent`] on a write, which flows through the global event
 	/// pipeline ([`StorePlugin`]) into a reload that rescans the store. Proves the
 	/// in-memory watcher path and the store-agnostic live-reload integration.
 	#[beet_core::test]
 	async fn blob_event_drives_in_memory_reload() {
 		let mut world = reload_world();
-		let store = InMemoryStore::new();
+		let store = InMemoryBlobStore::new();
 		// seed an initial route, then spawn the site over the same backing
 		let handle = BlobStore::new(store.clone());
 		handle
@@ -696,7 +696,7 @@ mod test {
 		// no pre-set ClientIo: `start_live_reload` spawns one as the root's child
 		let root = world
 			.spawn((
-				InMemoryStore::new(),
+				InMemoryBlobStore::new(),
 				Router::with_defaults(),
 				LiveReload::new(),
 			))

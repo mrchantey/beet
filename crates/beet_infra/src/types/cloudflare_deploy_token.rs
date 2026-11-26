@@ -4,8 +4,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 /// The Cloudflare counterpart of [`AwsDeployPolicy`]: that lowers the AWS types
 /// a stack renders into what the credential applying it may do, this lowers the
@@ -422,7 +420,7 @@ impl CloudflareDeployToken {
 					.asked
 					.keys()
 					.filter(|permission| permission.scope == scope)
-					.map(|permission| json!({ "id": permission.id }))
+					.map(|permission| value!({ "id": permission.id }))
 					.collect::<Vec<_>>();
 				if groups.is_empty() {
 					return None;
@@ -430,9 +428,9 @@ impl CloudflareDeployToken {
 				let resources = self
 					.resources(scope)
 					.into_iter()
-					.map(|resource| (resource, Value::from("*")))
-					.collect::<serde_json::Map<_, _>>();
-				json!({
+					.map(|resource| (SmolStr::from(resource), Value::from("*")))
+					.collect::<Map>();
+				value!({
 					"effect": "allow",
 					"resources": resources,
 					"permission_groups": groups,
@@ -440,21 +438,21 @@ impl CloudflareDeployToken {
 				.xmap(Some)
 			})
 			.chain(self.buckets.iter().map(|(bucket, groups)| {
-				json!({
+				value!({
 					"effect": "allow",
 					"resources": self
 						.bucket_resources(bucket)
 						.into_iter()
-						.map(|resource| (resource, Value::from("*")))
-						.collect::<serde_json::Map<_, _>>(),
+						.map(|resource| (SmolStr::from(resource), Value::from("*")))
+						.collect::<Map>(),
 					"permission_groups": groups
 						.keys()
-						.map(|permission| json!({ "id": permission.id }))
+						.map(|permission| value!({ "id": permission.id }))
 						.collect::<Vec<_>>(),
 				})
 			}))
 			.collect::<Vec<_>>()
-			.xmap(Value::Array)
+			.xmap(Value::List)
 	}
 
 	/// What the lowering grants, flattened to one `(resource, group id)` pair
@@ -488,22 +486,25 @@ impl CloudflareDeployToken {
 	/// denies rather than allows is not a grant and is left out of both.
 	pub fn fingerprint_of(policies: &Value) -> BTreeSet<(SmolStr, SmolStr)> {
 		policies
-			.as_array()
+			.as_list()
+			.ok()
 			.map(Vec::as_slice)
 			.unwrap_or_default()
 			.iter()
-			.filter(|policy| policy["effect"] == "allow")
+			.filter(|policy| policy["effect"].as_str().ok() == Some("allow"))
 			.flat_map(|policy| {
 				let groups = policy["permission_groups"]
-					.as_array()
+					.as_list()
+					.ok()
 					.map(Vec::as_slice)
 					.unwrap_or_default()
 					.iter()
-					.filter_map(|group| group["id"].as_str())
+					.filter_map(|group| group["id"].as_str().ok())
 					.map(SmolStr::new)
 					.collect::<Vec<_>>();
 				policy["resources"]
-					.as_object()
+					.as_map()
+					.ok()
 					.map(|resources| {
 						resources.keys().cloned().collect::<Vec<_>>()
 					})
@@ -936,7 +937,7 @@ mod test {
 		token.account().unwrap().as_str().xpect_eq("acct123");
 		token
 			.to_json()
-			.to_string()
+			.to_json_string()
 			.as_str()
 			.xpect_contains("com.cloudflare.api.account.zone.zone123")
 			.xnot()
@@ -968,19 +969,21 @@ mod test {
 		let policies = token.to_json();
 		let scoped = |permission: TokenPermission| {
 			policies
-				.as_array()
+				.as_list()
 				.unwrap()
 				.iter()
-				.find(|policy| policy.to_string().contains(permission.id()))
+				.find(|policy| {
+					policy.to_json_string().contains(permission.id())
+				})
 				.unwrap()["resources"]
-				.as_object()
+				.as_map()
 				.unwrap()
 				.keys()
 				.cloned()
 				.collect::<Vec<_>>()
 		};
 		// two scopes, two policies, neither reaching the other's resources
-		policies.as_array().unwrap().len().xpect_eq(2);
+		policies.as_list().unwrap().len().xpect_eq(2);
 		scoped(TokenPermission::CACHE_PURGE)
 			.xpect_eq(vec!["com.cloudflare.api.account.zone.zone123"]);
 		scoped(TokenPermission::WORKERS_R2_STORAGE_WRITE)
@@ -988,7 +991,7 @@ mod test {
 		CloudflareDeployToken::fingerprint_of(&policies)
 			.xpect_eq(token.fingerprint());
 		// the same grants, one policy per pair, plus a deny: still a match
-		let regrouped = serde_json::json!([
+		let regrouped = value!([
 			{
 				"effect": "allow",
 				"resources": { "com.cloudflare.api.account.zone.zone123": "*" },
@@ -1118,9 +1121,9 @@ mod test {
 			.unwrap();
 		token.asked().is_empty().xpect_true();
 		let policies = token.to_json();
-		policies.as_array().unwrap().len().xpect_eq(1);
+		policies.as_list().unwrap().len().xpect_eq(1);
 		policies[0]["resources"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.keys()
 			.cloned()

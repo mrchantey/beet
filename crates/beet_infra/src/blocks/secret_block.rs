@@ -511,9 +511,9 @@ mod test {
 			parent.spawn(block.clone());
 		});
 		let (stack, _deployment, config) = scope.finish().unwrap();
-		let json = config.to_json().into_json();
+		let json = config.to_json();
 		let parameters = json["resource"][SecretBlock::RESOURCE_TYPE]
-			.as_object()
+			.as_map()
 			.unwrap();
 		parameters.len().xpect_eq(1);
 		let (label, body) = parameters.iter().next().unwrap();
@@ -627,8 +627,6 @@ mod test {
 	fn fake_ssm(
 		canary: &'static str,
 	) -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
-		use serde_json::Value;
-		use serde_json::json;
 		use std::io::BufRead;
 		use std::io::Read;
 		use std::io::Write;
@@ -640,10 +638,12 @@ mod test {
 			let mut params = HashMap::<String, Value>::default();
 			let mut tags = HashMap::<String, Vec<Value>>::default();
 			let mut handle = |target: &str, req: Value| -> (u16, Value) {
-				let name = req["Name"].as_str().unwrap_or_default().to_string();
+				let name =
+					req["Name"].as_str().ok().unwrap_or_default().to_string();
 				let mut call = format!("{target} {name}");
-				if let Some(value) = req["Value"].as_str() {
-					let overwrite = req["Overwrite"].as_bool().unwrap_or(false);
+				if let Some(value) = req["Value"].as_str().ok() {
+					let overwrite =
+						req["Overwrite"].as_bool().ok().unwrap_or(false);
 					call += &format!(
 						" overwrite={overwrite} canary={}",
 						value == canary
@@ -652,7 +652,7 @@ mod test {
 				log.lock().unwrap().push(call);
 				let missing = (
 					400,
-					json!({"__type": "ParameterNotFound", "message": ""}),
+					value!({"__type": "ParameterNotFound", "message": ""}),
 				);
 				match target {
 					"PutParameter" => {
@@ -661,48 +661,52 @@ mod test {
 						}) + 1;
 						params.insert(
 							name.clone(),
-							json!({
-								"Name": name, "Type": req["Type"], "Version": version,
-								"Description": req["Description"], "Tier": "Standard",
+							value!({
+								"Name": &name, "Type": req["Type"].clone(), "Version": version,
+								"Description": req["Description"].clone(), "Tier": "Standard",
 								"DataType": "text", "LastModifiedDate": 0,
 								"ARN": format!("arn:aws:ssm:us-west-2:000000000000:parameter{name}"),
 							}),
 						);
-						if let Some(created) = req["Tags"].as_array() {
+						if let Some(created) = req["Tags"].as_list().ok() {
 							tags.insert(name, created.clone());
 						}
-						(200, json!({"Version": version, "Tier": "Standard"}))
+						(200, value!({"Version": version, "Tier": "Standard"}))
 					}
 					"GetParameter" => match params.get(&name) {
 						// a stand-in: tofu must keep whatever it reads out of state
 						Some(param) => {
 							let mut param = param.clone();
-							param["Value"] = json!("read-back");
-							(200, json!({ "Parameter": param }))
+							param.insert("Value", "read-back").unwrap();
+							(200, value!({ "Parameter": param }))
 						}
 						None => missing,
 					},
 					"DescribeParameters" => (
 						200,
-						json!({ "Parameters": params.values().collect::<Vec<_>>() }),
+						value!({ "Parameters": params.values().cloned().collect::<Vec<_>>() }),
 					),
 					"ListTagsForResource" => (
 						200,
-						json!({ "TagList": tags.get(req["ResourceId"].as_str().unwrap_or_default()) }),
+						value!({ "TagList": tags.get(req["ResourceId"].as_str().ok().unwrap_or_default()).cloned() }),
 					),
 					"AddTagsToResource" => {
 						let resource =
-							req["ResourceId"].as_str().unwrap_or_default();
+							req["ResourceId"].as_str().ok().unwrap_or_default();
 						tags.entry(resource.to_string()).or_default().extend(
-							req["Tags"].as_array().cloned().unwrap_or_default(),
+							req["Tags"]
+								.as_list()
+								.ok()
+								.cloned()
+								.unwrap_or_default(),
 						);
-						(200, json!({}))
+						(200, value!({}))
 					}
 					"DeleteParameter" => match params.remove(&name) {
-						Some(_) => (200, json!({})),
+						Some(_) => (200, value!({})),
 						None => missing,
 					},
-					_ => (200, json!({})),
+					_ => (200, value!({})),
 				}
 			};
 			for mut stream in listener.incoming().flatten() {
@@ -740,9 +744,9 @@ mod test {
 				.unwrap_or("Unknown");
 				let (status, reply) = handle(
 					target,
-					serde_json::from_slice(&body).unwrap_or_default(),
+					json_ext::from_slice(&body).unwrap_or_default(),
 				);
-				let reply = reply.to_string();
+				let reply = reply.to_json_string();
 				write!(
 					stream,
 					"HTTP/1.1 {status} OK\r\nContent-Type: \

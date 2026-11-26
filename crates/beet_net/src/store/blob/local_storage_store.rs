@@ -97,10 +97,10 @@ impl StoreBackend for LocalStorageStore {
 	}
 }
 
-impl BlobStoreProvider for LocalStorageStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+impl BlobProvider for LocalStorageStore {
+	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
 		Box::new(LocalStorageStore {
 			store_name: self.store_name.clone(),
 			subdir: Some(match &self.subdir {
@@ -110,7 +110,7 @@ impl BlobStoreProvider for LocalStorageStore {
 		})
 	}
 
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
+	fn base(&self) -> Box<dyn BlobProvider> {
 		Box::new(LocalStorageStore {
 			subdir: None,
 			..self.clone()

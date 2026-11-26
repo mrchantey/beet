@@ -1,8 +1,6 @@
 //! Everything the mail stack declares *inside* Stalwart's data store.
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 /// The configuration a [`StalwartBlock`] and its [`MailDomainBlock`]s add up
 /// to, as the JMAP objects `0.16` stores them.
@@ -81,10 +79,10 @@ where
 	I: IntoIterator<Item = S>,
 	S: ToString,
 {
-	Value::Object(
+	Value::Map(
 		items
 			.into_iter()
-			.map(|item| (item.to_string(), Value::Bool(true)))
+			.map(|item| (SmolStr::from(item.to_string()), Value::Bool(true)))
 			.collect(),
 	)
 }
@@ -281,7 +279,7 @@ impl StalwartPlan {
 	/// second writer to the same directory. Verified against the pinned tag's
 	/// `x:TracerLog` schema per decision 18.
 	pub fn log_tracer() -> Value {
-		json!({
+		value!({
 			"@type": "Log",
 			"path": format!("{}/", StalwartBlock::LOG_DIR),
 			"prefix": StalwartBlock::SERVER_LOG_PREFIX,
@@ -306,7 +304,7 @@ impl StalwartPlan {
 	/// The key still changes on a fresh data store, which is why `MailDane`
 	/// re-reads it after every provision rather than trusting this flag.
 	pub fn acme_provider(&self) -> Value {
-		json!({
+		value!({
 			"directory": Self::ACME_DIRECTORY,
 			"challengeType": "TlsAlpn01",
 			"contact": set_map([&self.acme_contact]),
@@ -331,7 +329,7 @@ impl StalwartPlan {
 			"https" => ("http", true),
 			_ => return None,
 		};
-		json!({
+		value!({
 			"name": service,
 			"protocol": protocol,
 			"bind": set_map([format!("[::]:{port}")]),
@@ -388,7 +386,7 @@ impl StalwartPlan {
 		port: i64,
 		credential: &RelayCredential,
 	) -> Value {
-		json!({
+		value!({
 			"@type": "Relay",
 			"name": name,
 			"description": description,
@@ -397,8 +395,8 @@ impl StalwartPlan {
 			"protocol": "smtp",
 			"implicitTls": false,
 			"allowInvalidCerts": false,
-			"authUsername": credential.username,
-			"authSecret": { "@type": "Value", "secret": credential.password },
+			"authUsername": &credential.username,
+			"authSecret": { "@type": "Value", "secret": &credential.password },
 		})
 	}
 
@@ -417,10 +415,10 @@ impl StalwartPlan {
 	pub fn outbound_strategy(&self) -> Value {
 		// a `List` on the wire is an object keyed by index, never an array,
 		// exactly like an account's aliases
-		let mut branches = serde_json::Map::new();
+		let mut branches = Map::default();
 		branches.insert(
 			"0".to_string(),
-			json!({
+			value!({
 				"if": "is_local_domain(rcpt_domain)",
 				"then": format!("'{}'", Self::LOCAL_ROUTE),
 			}),
@@ -428,16 +426,16 @@ impl StalwartPlan {
 		for (index, (domain, route)) in self.routing.iter().enumerate() {
 			branches.insert(
 				(index + 1).to_string(),
-				json!({
+				value!({
 					"if": format!("sender_domain == '{domain}'"),
 					"then": format!("'{route}'"),
 				}),
 			);
 		}
-		json!({
+		value!({
 			"route": {
 				"else": format!("'{}'", self.fallback),
-				"match": Value::Object(branches),
+				"match": Value::Map(branches),
 			}
 		})
 	}
@@ -450,13 +448,13 @@ impl StalwartPlan {
 	/// decoration. Scores are the shipped defaults: tagging at 5 and never
 	/// rejecting outright, since a false positive that bounces is mail lost.
 	pub fn spam_settings(&self) -> Value {
-		json!({ "enable": true, "scoreSpam": 5.0, "scoreReject": 0.0, "scoreDiscard": 0.0 })
+		value!({ "enable": true, "scoreSpam": 5.0, "scoreReject": 0.0, "scoreDiscard": 0.0 })
 	}
 
 	/// The classifier's auto-learn wiring, the other half of
 	/// [`spam_settings`](Self::spam_settings).
 	pub fn spam_classifier(&self) -> Value {
-		json!({
+		value!({
 			"learnHamFromReply": true,
 			"learnHamFromCard": true,
 			"learnSpamFromTraps": true,
@@ -498,7 +496,7 @@ impl StalwartPlan {
 	/// rejection (`eval_if` turns the error into `None`) as "off". So one word
 	/// turns both off, for two different reasons.
 	pub fn dmarc_report_settings(&self) -> Value {
-		json!({
+		value!({
 			"aggregateSendFrequency": { "else": "daily" },
 			"failureSendFrequency": { "else": "disable" },
 		})
@@ -518,15 +516,15 @@ impl StalwartPlan {
 	/// (`daily`), it is the other half of the reports the MTA-STS enforce
 	/// flips are judged against, and it stays exactly as it is.
 	pub fn auth_failure_report_settings(&self) -> Value {
-		json!({ "sendFrequency": { "else": "disable" } })
+		value!({ "sendFrequency": { "else": "disable" } })
 	}
 
 	/// The system settings patch: the box's own name, which is what its SMTP
 	/// greeting, its reports and its discovery documents all publish, and the
 	/// protocols those documents advertise ([`Self::advertised_services`]).
 	pub fn system_settings(&self, default_domain_id: &str) -> Value {
-		json!({
-			"defaultHostname": self.hostname,
+		value!({
+			"defaultHostname": &self.hostname,
 			"defaultDomainId": default_domain_id,
 			"services": Self::advertised_services(),
 		})
@@ -555,9 +553,11 @@ impl StalwartPlan {
 		.into_iter()
 		.filter(|(service, _)| served(service))
 		.flat_map(|(_, protocols)| protocols.iter())
-		.map(|protocol| (protocol.to_string(), json!({ "cleartext": false })))
-		.collect::<serde_json::Map<_, _>>()
-		.xmap(Value::Object)
+		.map(|protocol| {
+			(SmolStr::from(*protocol), value!({ "cleartext": false }))
+		})
+		.collect::<Map>()
+		.xmap(Value::Map)
 	}
 }
 
@@ -621,8 +621,8 @@ impl DomainPlan {
 	/// block; a second, server-held selector is a later step, and generating
 	/// one now would put a key in the data store that no record points at.
 	pub fn object(&self, acme_provider_id: &str) -> Value {
-		json!({
-			"name": self.name,
+		value!({
+			"name": &self.name,
 			"isEnabled": true,
 			"certificateManagement": {
 				"@type": "Automatic",
@@ -677,16 +677,20 @@ impl DomainPlan {
 		domain_id: &str,
 		private_key: Option<&str>,
 	) -> Value {
-		let mut object = json!({
+		let mut object = value!({
 			"@type": "Dkim1RsaSha256",
 			"selector": MailDomainBlock::DKIM_SELECTOR,
 			"domainId": domain_id,
 			"stage": "active",
 			"headers": set_map(Self::SIGNED_HEADERS),
 		});
-		if let Some(private_key) = private_key {
-			object["privateKey"] =
-				json!({ "@type": "Text", "secret": private_key });
+		if let Some(private_key) = private_key
+			&& let Ok(map) = object.as_map_mut()
+		{
+			map.insert(
+				"privateKey",
+				value!({ "@type": "Text", "secret": private_key }),
+			);
 		}
 		object
 	}
@@ -695,7 +699,7 @@ impl DomainPlan {
 	pub fn catch_all_patch(&self) -> Option<Value> {
 		self.catch_all
 			.as_ref()
-			.map(|localpart| json!({ "catchAllAddress": format!("{localpart}@{}", self.name) }))
+			.map(|localpart| value!({ "catchAllAddress": format!("{localpart}@{}", self.name) }))
 	}
 }
 
@@ -758,7 +762,7 @@ impl AccountPlan {
 	/// The credential half of the account object alone, for setting a
 	/// re-minted password on an account that exists.
 	pub fn credentials_patch(password: &str) -> Value {
-		json!({
+		value!({
 			"credentials": {
 				"0": { "@type": "Password", "secret": password }
 			}
@@ -801,9 +805,9 @@ impl AccountPlan {
 	/// the credential it has, since rolling it on every deploy would lock out
 	/// every client configured against it.
 	pub fn object(&self, domain_id: &str, password: Option<&str>) -> Value {
-		let mut object = json!({
+		let mut object = value!({
 			"@type": "User",
-			"name": self.name,
+			"name": &self.name,
 			"domainId": domain_id,
 			"roles": { "@type": if self.admin { "Admin" } else { "User" } },
 			"aliases": self
@@ -811,14 +815,18 @@ impl AccountPlan {
 				.iter()
 				.enumerate()
 				.map(|(index, alias)| (
-					index.to_string(),
-					json!({ "name": alias, "domainId": domain_id, "enabled": true }),
+					SmolStr::from(index.to_string()),
+					value!({ "name": alias, "domainId": domain_id, "enabled": true }),
 				))
-				.collect::<serde_json::Map<_, _>>(),
+				.collect::<Map>(),
 		});
-		if let Some(password) = password {
-			object["credentials"] =
-				Self::credentials_patch(password)["credentials"].clone();
+		if let Some(password) = password
+			&& let Ok(map) = object.as_map_mut()
+		{
+			map.insert(
+				"credentials",
+				Self::credentials_patch(password)["credentials"].clone(),
+			);
 		}
 		object
 	}
@@ -909,7 +917,7 @@ mod tests {
 	fn advertises_only_the_served_protocols() {
 		let services = StalwartPlan::advertised_services();
 		let mut protocols = services
-			.as_object()
+			.as_map()
 			.unwrap()
 			.keys()
 			.cloned()
@@ -924,10 +932,10 @@ mod tests {
 			"webdav".into(),
 		]);
 		services
-			.as_object()
+			.as_map()
 			.unwrap()
 			.values()
-			.all(|service| service["cleartext"] == false)
+			.all(|service| service["cleartext"] == Value::Bool(false))
 			.xpect_true();
 	}
 
@@ -945,9 +953,9 @@ mod tests {
 			.listeners
 			.iter()
 			.map(|listener| {
-				let bind = listener["bind"].as_object().unwrap();
+				let bind = listener["bind"].as_map().unwrap();
 				bind.values()
-					.all(|value| value.as_bool() == Some(true))
+					.all(|value| value.as_bool().ok() == Some(true))
 					.xpect_true();
 				bind.keys().next().unwrap().to_string()
 			})
@@ -971,7 +979,7 @@ mod tests {
 			plan()
 				.listeners
 				.iter()
-				.find(|listener| listener["name"] == name)
+				.find(|listener| listener["name"] == Value::from(name))
 				.unwrap()["tlsImplicit"]
 				.as_bool()
 				.unwrap()
@@ -1129,7 +1137,7 @@ mod tests {
 			&HashMap::default(),
 		)
 		.unwrap();
-		plan.relays.xpect_eq(Vec::<serde_json::Value>::new());
+		plan.relays.xpect_eq(Vec::<Value>::new());
 		plan.outbound_strategy()["route"]["else"]
 			.as_str()
 			.unwrap()
@@ -1391,8 +1399,7 @@ mod tests {
 	#[beet_core::test]
 	fn the_relay_password_appears_only_on_the_relay_route() {
 		let plan = plan();
-		let rendered =
-			serde_json::to_string(&plan.domains[0].object("acme1")).unwrap();
+		let rendered = plan.domains[0].object("acme1").to_json_string();
 		rendered.contains("smtp-derived-password").xpect_false();
 		plan.relays[0]["authSecret"]["secret"]
 			.as_str()
@@ -1434,7 +1441,7 @@ mod tests {
 		let object = DomainPlan::new(&staging(), &mail_box(), true)
 			.unwrap()
 			.dkim_object("d1", None);
-		let headers = object["headers"].as_object().unwrap();
+		let headers = object["headers"].as_map().unwrap();
 		// rewritten by SES on every message
 		headers.contains_key("Message-ID").xpect_false();
 		headers.contains_key("Date").xpect_false();

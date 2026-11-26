@@ -65,7 +65,7 @@ impl JsonTableStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let tables = JsonTableStore::over(BlobStore::temp())?;
+	/// let tables = JsonTableStore::over(BlobStore::new(InMemoryBlobStore::new()))?;
 	/// tables.table::<TableItem<u32>>().push(TableItem::new(7)).await?;
 	/// # Ok(())
 	/// # }
@@ -524,14 +524,18 @@ mod test {
 
 	#[beet_core::test]
 	async fn memory_store() {
-		table_test::run(JsonTableStore::over(BlobStore::temp()).unwrap()).await;
+		table_test::run(
+			JsonTableStore::over(BlobStore::new(InMemoryBlobStore::new()))
+				.unwrap(),
+		)
+		.await;
 	}
 
 	/// A store under a path is created with the blob store holding it, and
 	/// leaves what else it holds.
 	#[beet_core::test]
 	async fn under_a_path() {
-		let blobs = BlobStore::temp();
+		let blobs = BlobStore::new(InMemoryBlobStore::new());
 		blobs.insert(&RelPath::new("other.txt"), "x").await.unwrap();
 		let tables = JsonTableStore::default()
 			.with_path(RelPath::new("tables"))
@@ -592,7 +596,7 @@ mod test {
 	/// be written by hand, and an emptied one is gone.
 	#[beet_core::test]
 	async fn layout() {
-		let blobs = BlobStore::temp();
+		let blobs = BlobStore::new(InMemoryBlobStore::new());
 		let tables = JsonTableStore::over(blobs.clone()).unwrap();
 		let rows = tables.table::<table_test::NamedRow>();
 		rows.put(table_test::NamedRow::new("two", 2)).await.unwrap();
@@ -665,7 +669,7 @@ mod test {
 	/// an error naming it, never read as empty or written over.
 	#[beet_core::test]
 	async fn reads_a_hand_written_file() {
-		let blobs = BlobStore::temp();
+		let blobs = BlobStore::new(InMemoryBlobStore::new());
 		let tables = JsonTableStore::over(blobs.clone()).unwrap();
 		let rows = tables.table::<table_test::NamedRow>();
 		let file = RelPath::new("@root.json");
@@ -744,7 +748,7 @@ mod test {
 	/// replaced file is retried, never a row's conflict.
 	#[beet_core::test]
 	async fn writers_of_unrelated_rows_never_conflict() {
-		let blobs = BlobStore::temp();
+		let blobs = BlobStore::new(InMemoryBlobStore::new());
 		(0..16)
 			.map(|idx| {
 				// each its own handle, as another process's is
@@ -777,7 +781,7 @@ mod test {
 			("notes.json", "[]"),
 			("bad name.json", "{}"),
 		] {
-			let blobs = BlobStore::temp();
+			let blobs = BlobStore::new(InMemoryBlobStore::new());
 			let tables = JsonTableStore::over(blobs.clone()).unwrap();
 			tables
 				.table::<table_test::NamedRow>()
@@ -800,8 +804,8 @@ mod test {
 	#[beet_core::test]
 	fn refuses_a_store_without_conditional_writes() {
 		JsonTableStore::over(BlobStore::new(StoreFork::new(
-			BlobStore::temp(),
-			BlobStore::temp(),
+			BlobStore::new(InMemoryBlobStore::new()),
+			BlobStore::new(InMemoryBlobStore::new()),
 		)))
 		.unwrap_err()
 		.to_string()
@@ -823,7 +827,10 @@ mod test {
 	fn follows_the_nearest_blob_store() {
 		let mut world = world();
 		let beside = world
-			.spawn((InMemoryStore::named("beside"), JsonTableStore::default()))
+			.spawn((
+				InMemoryBlobStore::named("beside"),
+				JsonTableStore::default(),
+			))
 			.flush();
 		tables(&world, beside)
 			.unwrap()
@@ -837,14 +844,16 @@ mod test {
 			.spawn(JsonTableStore::default().with_path(RelPath::new("t")))
 			.flush();
 		tables(&world, child).xpect_none();
-		let parent = world.spawn(InMemoryStore::named("parent")).flush();
+		let parent = world.spawn(InMemoryBlobStore::named("parent")).flush();
 		world.entity_mut(child).insert(ChildOf(parent));
 		world.flush();
 		tables(&world, child)
 			.unwrap()
 			.xpect_contains("json:memory:parent");
 		// a nearer store
-		world.entity_mut(child).insert(InMemoryStore::named("near"));
+		world
+			.entity_mut(child)
+			.insert(InMemoryBlobStore::named("near"));
 		world.flush();
 		tables(&world, child)
 			.unwrap()
@@ -867,7 +876,7 @@ mod test {
 			|err, _| RAISED.lock().unwrap().push(err.to_string()),
 		));
 		let entity = world
-			.spawn((InMemoryStore::new(), JsonTableStore::default()))
+			.spawn((InMemoryBlobStore::new(), JsonTableStore::default()))
 			.flush();
 		let before = tables(&world, entity);
 		world
@@ -885,7 +894,7 @@ mod test {
 	#[beet_core::test]
 	fn neither_kind_implies_the_other() {
 		let mut world = world();
-		let memory = world.spawn(InMemoryStore::new()).flush();
+		let memory = world.spawn(InMemoryBlobStore::new()).flush();
 		world.entity(memory).contains::<BlobStore>().xpect_true();
 		world.entity(memory).contains::<TableStore>().xpect_false();
 		let fs = world.spawn(FsStore::new(WsPath::new("target"))).flush();
@@ -947,7 +956,7 @@ mod test {
 	#[beet_core::test]
 	async fn a_missing_table_store_names_its_fix() {
 		let mut world = world();
-		let entity = world.spawn(InMemoryStore::new()).flush();
+		let entity = world.spawn(InMemoryBlobStore::new()).flush();
 		for err in [
 			world
 				.run_async_then(move |world| async move {

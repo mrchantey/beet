@@ -425,14 +425,14 @@ pub(super) mod test {
 		pub async fn new() -> Self {
 			let beet = EmulatorPds::new(
 				Did::parse("did:plc:vgxy56shhs3t3b2mu2avizjf").unwrap(),
-				BlobStore::temp(),
+				BlobStore::new(InMemoryBlobStore::new()),
 			);
 			Self::with("https://beet.org", Pds::new(beet)).await
 		}
 
 		/// [`Site::new`] at `homepage`, its publication in `publisher`.
 		pub async fn with(homepage: &str, publisher: Pds) -> Self {
-			let store = BlobStore::temp();
+			let store = BlobStore::new(InMemoryBlobStore::new());
 			let icon = IconSet::new("assets/logo/logo.png").publication_icon();
 			store.insert(&icon, png(512, 512)).await.unwrap();
 			store
@@ -479,7 +479,7 @@ pub(super) mod test {
 			world.flush();
 			let pete_pds = Pds::new(EmulatorPds::new(
 				world.get::<AtprotoAccount>(pete).unwrap().did().clone(),
-				BlobStore::temp(),
+				BlobStore::new(InMemoryBlobStore::new()),
 			));
 			world.entity_mut(beet).insert(publisher.clone());
 			world.entity_mut(pete).insert(pete_pds.clone());

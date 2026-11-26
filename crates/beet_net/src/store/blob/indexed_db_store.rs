@@ -242,10 +242,10 @@ impl StoreBackend for IndexedDbStore {
 	}
 }
 
-impl BlobStoreProvider for IndexedDbStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+impl BlobProvider for IndexedDbStore {
+	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
 		Box::new(IndexedDbStore {
 			db_name: self.db_name.clone(),
 			subdir: Some(match &self.subdir {
@@ -255,7 +255,7 @@ impl BlobStoreProvider for IndexedDbStore {
 		})
 	}
 
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
+	fn base(&self) -> Box<dyn BlobProvider> {
 		Box::new(IndexedDbStore {
 			subdir: None,
 			..self.clone()

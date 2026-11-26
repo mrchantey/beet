@@ -3,8 +3,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 /// The third policy in the model, beside [`AwsDeployPolicy`] (what the operator
 /// may do) and [`IamPolicy`] (what one running process may do): the
@@ -248,16 +246,16 @@ impl RuntimeBoundary {
 							document, so the boundary cannot tell what it grants"
 						)
 					})?;
-				for statement in
-					serde_json::from_str::<Value>(document)?["Statement"]
-						.as_array()
-						.ok_or_else(|| {
-							bevyhow!(
-								"`{resource_type}.{label}`'s policy has no \
+				for statement in Value::parse_json(document)?["Statement"]
+					.as_list()
+					.ok()
+					.ok_or_else(|| {
+						bevyhow!(
+							"`{resource_type}.{label}`'s policy has no \
 								`Statement` list"
-							)
-						})?
-						.clone()
+						)
+					})?
+					.clone()
 				{
 					self.push(
 						Self::sid(label),
@@ -291,9 +289,9 @@ impl RuntimeBoundary {
 					})?;
 				self.push(
 					Self::sid(label),
-					json!({
+					value!({
 						"Effect": "Allow",
-						"Action": actions,
+						"Action": Value::new_list(actions.iter().copied()),
 						"Resource": "*",
 					}),
 				);
@@ -304,7 +302,7 @@ impl RuntimeBoundary {
 
 	/// The policy document, ready for `iam create-policy`.
 	pub fn to_json(&self) -> Value {
-		json!({ "Version": "2012-10-17", "Statement": self.statements })
+		value!({ "Version": "2012-10-17", "Statement": self.statements.clone() })
 	}
 
 	/// Add `statement` under a `Sid` derived from `prefix`, unless an identical
@@ -315,10 +313,13 @@ impl RuntimeBoundary {
 			"{prefix}{}",
 			statement
 				.get("Sid")
-				.and_then(Value::as_str)
+				.and_then(|sid| sid.as_str().ok())
 				.unwrap_or_default()
 		);
-		statement.as_object_mut().map(|object| object.remove("Sid"));
+		statement
+			.as_map_mut()
+			.ok()
+			.map(|object| object.remove("Sid"));
 		if self
 			.statements
 			.iter()
@@ -326,7 +327,11 @@ impl RuntimeBoundary {
 		{
 			return;
 		}
-		statement["Sid"] = Value::String(self.unique_sid(sid));
+		let sid = self.unique_sid(sid);
+		statement
+			.as_map_mut()
+			.ok()
+			.map(|object| object.insert("Sid", sid));
 		self.statements.push(statement);
 	}
 
@@ -334,7 +339,10 @@ impl RuntimeBoundary {
 	fn same(left: &Value, right: &Value) -> bool {
 		let without_sid = |statement: &Value| {
 			let mut statement = statement.clone();
-			statement.as_object_mut().map(|object| object.remove("Sid"));
+			statement
+				.as_map_mut()
+				.ok()
+				.map(|object| object.remove("Sid"));
 			statement
 		};
 		without_sid(left) == without_sid(right)
@@ -370,22 +378,20 @@ impl RuntimeBoundary {
 			return statement.xok();
 		};
 		let resolved = match resource {
-			Value::String(one) => {
-				Value::String(Self::resolve_arn(config, one)?)
-			}
-			Value::Array(many) => Value::Array(
+			Value::Str(one) => Self::resolve_arn(config, one)?.into(),
+			Value::List(many) => Value::List(
 				many.iter()
 					.map(|one| match one.as_str() {
-						Some(one) => {
-							Self::resolve_arn(config, one).map(Value::String)
+						Ok(one) => {
+							Self::resolve_arn(config, one).map(Value::from)
 						}
-						None => one.clone().xok(),
+						Err(_) => one.clone().xok(),
 					})
 					.collect::<Result<Vec<_>>>()?,
 			),
 			other => other.clone(),
 		};
-		statement["Resource"] = resolved;
+		statement.insert("Resource", resolved)?;
 		statement.xok()
 	}
 
@@ -447,9 +453,9 @@ impl RuntimeBoundary {
 	/// account, mid-mint.
 	fn unique_sid(&self, sid: String) -> String {
 		let taken = |candidate: &str| {
-			self.statements.iter().any(|held| {
-				held.get("Sid").and_then(Value::as_str) == Some(candidate)
-			})
+			self.statements
+				.iter()
+				.any(|held| held["Sid"].as_str().ok() == Some(candidate))
 		};
 		if !taken(&sid) {
 			return sid;
@@ -496,7 +502,7 @@ mod test {
 		));
 		boundary
 			.to_json()
-			.to_string()
+			.to_json_string()
 			.as_str()
 			// what the managed `AWSLambdaBasicExecutionRole` grants, which an
 			// intersection would otherwise silence
@@ -524,7 +530,7 @@ mod test {
 				}
 			});
 			let (_stack, _deployment, config) = scope.finish().unwrap();
-			config.to_json().to_string()
+			config.to_json().to_json_string()
 		};
 		render(true).xpect_contains("permissions_boundary");
 		render(false).xnot().xpect_contains("permissions_boundary");
@@ -600,7 +606,7 @@ mod test {
 			.lower(&config)
 			.unwrap()
 			.to_json()
-			.to_string()
+			.to_json_string()
 		};
 		// a stack taking the launch's stage, rendered at prod
 		let from_any_launch = prod(Stack::new("app"));
@@ -632,8 +638,8 @@ mod test {
 		let twice = once.clone().lower(&config).unwrap();
 		twice
 			.to_json()
-			.to_string()
-			.xpect_eq(once.to_json().to_string());
+			.to_json_string()
+			.xpect_eq(once.to_json().to_json_string());
 	}
 
 	/// A rendered document may point at a resource rather than name it, which
@@ -662,7 +668,7 @@ mod test {
 		.lower(&config)
 		.unwrap()
 		.to_json()
-		.to_string();
+		.to_json_string();
 		document
 			.as_str()
 			.xpect_contains("lambda:InvokeFunction")
@@ -708,7 +714,7 @@ mod test {
 					label,
 					&value!({
 						"role": "x",
-						"policy": (serde_json::json!({
+						"policy": (value!({
 							"Version": "2012-10-17",
 							"Statement": [{
 								"Sid": "ReadStores",
@@ -716,7 +722,7 @@ mod test {
 								"Action": "s3:GetObject",
 								"Resource": format!("arn:aws:s3:::{label}"),
 							}],
-						}).to_string()),
+						}).to_json_string()),
 					}),
 				)
 				.unwrap();
@@ -726,7 +732,7 @@ mod test {
 			.unwrap()
 			.to_json();
 		document["Statement"]
-			.as_array()
+			.as_list()
 			.unwrap()
 			.iter()
 			.map(|statement| statement["Sid"].as_str().unwrap().to_string())
@@ -737,10 +743,10 @@ mod test {
 			]);
 		// and the document is a valid one: every Sid distinct
 		document["Statement"]
-			.as_array()
+			.as_list()
 			.unwrap()
 			.iter()
-			.filter_map(|statement| statement["Sid"].as_str())
+			.filter_map(|statement| statement["Sid"].as_str().ok())
 			.collect::<std::collections::BTreeSet<_>>()
 			.len()
 			.xpect_eq(2);

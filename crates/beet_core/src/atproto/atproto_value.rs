@@ -80,15 +80,13 @@ impl AtprotoValue {
 		self.decode().into_serde()
 	}
 
-	/// A value read off the network as json.
-	#[cfg(feature = "json")]
-	pub fn from_json(json: serde_json::Value) -> Result<Self> {
-		Self::from_wire(Value::from_json(json))
+	/// A value read off the network as json text.
+	pub fn parse_json(text: &str) -> Result<Self> {
+		Value::parse_json(text)?.xmap(Self::from_wire)
 	}
 
-	/// The data model form as json, exactly what a repo stores.
-	#[cfg(feature = "json")]
-	pub fn to_json(&self) -> serde_json::Value { self.0.clone().into_json() }
+	/// The data model form as json text, exactly what a repo stores.
+	pub fn to_json_string(&self) -> String { self.0.to_json_string() }
 
 	/// Back to a beet value: every [`FLOAT`](Self::FLOAT) object a float and
 	/// every `$bytes` a byte string again.
@@ -318,7 +316,6 @@ mod test {
 
 	/// A record equals what a repo answers for it, though the repo reads a
 	/// signed integer back unsigned.
-	#[cfg(feature = "json")]
 	#[crate::test]
 	fn a_record_equals_its_round_trip() {
 		let record = AtprotoValue::try_from(value!({
@@ -326,7 +323,7 @@ mod test {
 			"negative": (-3i64)
 		}))
 		.unwrap();
-		AtprotoValue::from_json(record.to_json())
+		AtprotoValue::parse_json(&record.to_json_string())
 			.unwrap()
 			.xpect_eq(record);
 	}
@@ -363,21 +360,17 @@ mod test {
 	}
 
 	/// The written form is the documented one, and reads back off the wire.
-	#[cfg(feature = "json")]
 	#[crate::test]
 	fn writes_the_documented_form() {
 		let value = value!({ "x": 0.5, "b": (Value::Bytes(b"hi".to_vec())) });
 		let record = AtprotoValue::try_from(value.clone()).unwrap();
-		let json = record.to_json();
-		MediaBytes::serialize(MediaType::Json, &json)
-			.unwrap()
-			.as_utf8()
-			.unwrap()
+		let json = record.to_json_string();
+		json.as_str()
 			.xpect_contains(
 				r#""x":{"$type":"org.beet.core#float","value":"0.5"}"#,
 			)
 			.xpect_contains(r#""b":{"$bytes":"aGk"}"#);
-		AtprotoValue::from_json(json)
+		AtprotoValue::parse_json(&json)
 			.unwrap()
 			.decode()
 			.xpect_eq(value);

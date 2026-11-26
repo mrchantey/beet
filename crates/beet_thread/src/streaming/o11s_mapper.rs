@@ -477,8 +477,7 @@ pub fn tool_to_function_param(tool: &ToolDefinition) -> FunctionToolParam {
 		ToolDefinition::Function(func) => {
 			let mut params = func.params_schema().clone();
 			params.sanitize_for_strict_mode();
-			let json_params: serde_json::Value =
-				params.into_inner().into_json();
+			let json_params = params.into_inner();
 			FunctionToolParam {
 				tool_type: "function".to_string(),
 				name: FunctionToolDefinition::encode_name(func.path()),

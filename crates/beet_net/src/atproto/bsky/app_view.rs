@@ -203,13 +203,13 @@ mod test {
 	fn post_view(rkey: &str) -> PostView {
 		PostView {
 			uri: uri(rkey),
-			..serde_json::from_str(POST_VIEW).unwrap()
+			..json_ext::from_str(POST_VIEW).unwrap()
 		}
 	}
 
 	#[beet_core::test]
 	fn reads_a_post_view() {
-		let post = serde_json::from_str::<PostView>(POST_VIEW).unwrap();
+		let post = json_ext::from_str::<PostView>(POST_VIEW).unwrap();
 		post.author.label().xpect_eq("Alice");
 		post.record.text.xpect_eq("have you seen alf lately?");
 		post.like_count.xpect_eq(4);
@@ -221,7 +221,7 @@ mod test {
 	/// post, and only the post is a reply shown.
 	#[beet_core::test]
 	fn reads_a_thread() {
-		let thread = serde_json::from_str::<PostThread>(&format!(
+		let thread = json_ext::from_str::<PostThread>(&format!(
 			r#"{{
 				"$type": "app.bsky.feed.defs#threadViewPost",
 				"post": {POST_VIEW},

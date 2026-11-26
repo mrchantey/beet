@@ -6,14 +6,14 @@ use bytes::Bytes;
 
 /// Cross-service storage store for S3, filesystem, memory, or other providers.
 ///
-/// Wraps an [`Arc<dyn BlobStoreProvider>`] and delegates all operations to the
-/// inner provider. Implements [`BlobStoreProvider`] itself, so it can be used
+/// Wraps an [`Arc<dyn BlobProvider>`] and delegates all operations to the
+/// inner provider. Implements [`BlobProvider`] itself, so it can be used
 /// anywhere a provider is expected. Bytes alone: a blob store is never a table
 /// store, see `JsonTableStore` for rows over one.
 #[derive(Clone, Component)]
 pub struct BlobStore {
 	/// Provider that handles store operations (S3, filesystem, memory, etc.)
-	provider: Arc<dyn BlobStoreProvider>,
+	provider: Arc<dyn BlobProvider>,
 }
 
 impl core::fmt::Debug for BlobStore {
@@ -33,27 +33,23 @@ impl BlobStore {
 	pub const GET_ALL_CONCURRENCY: usize = 32;
 
 	/// Creates a new store wrapping the given provider.
-	pub fn new(provider: impl BlobStoreProvider) -> Self {
+	pub fn new(provider: impl BlobProvider) -> Self {
 		Self {
 			provider: Arc::new(provider),
 		}
 	}
 
-	/// Creates a new store from a pre-existing [`Arc<dyn BlobStoreProvider>`].
-	pub fn from_arc(provider: Arc<dyn BlobStoreProvider>) -> Self {
+	/// Creates a new store from a pre-existing [`Arc<dyn BlobProvider>`].
+	pub fn from_arc(provider: Arc<dyn BlobProvider>) -> Self {
 		Self { provider }
 	}
 
-	/// Create temporary in-memory store for testing.
-	/// The returned store is pre-created and ready for immediate use.
-	pub fn temp() -> BlobStore { BlobStore::new(InMemoryStore::new()) }
-
 	/// The erased store a [`StoreUri`] names, for a caller with no entity to
 	/// land the concrete component on (entry resolution, a prune). See
-	/// [`StoreProvider::from_uri`], the one seam this rides.
+	/// [`BlobStoreProvider::from_uri`], the one seam this rides.
 	#[cfg(feature = "std")]
 	pub fn from_uri(uri: &StoreUri) -> Result<BlobStore> {
-		StoreProvider::from_uri(uri)?.into_blob_store().xok()
+		BlobStoreProvider::from_uri(uri)?.into_blob_store().xok()
 	}
 
 	/// The store and file name a path or uri ending in a file names: the
@@ -101,7 +97,7 @@ impl BlobStore {
 	}
 
 	/// The unscoped store at this store's root (see
-	/// [`BlobStoreProvider::base`]): the same backing, no subdir.
+	/// [`BlobProvider::base`]): the same backing, no subdir.
 	pub fn base(&self) -> BlobStore {
 		BlobStore::from_arc(Arc::from(self.provider.base()))
 	}
@@ -112,7 +108,7 @@ impl BlobStore {
 	/// `normalize(parent(entry_name)/src)` and the entry name becomes the
 	/// entry path relative to it.
 	///
-	/// Kind behavior rides [`BlobStoreProvider::rebase`]: a filesystem store
+	/// Kind behavior rides [`BlobProvider::rebase`]: a filesystem store
 	/// re-roots at the absolute resolved directory (fs has a parent universe,
 	/// walking above the store is the point), every other store takes a
 	/// key-prefix view of itself for a root at or under its own and errors
@@ -160,7 +156,7 @@ impl BlobStore {
 	/// ```
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// let blob = store.blob(RelPath::new("my-file.txt"));
 	/// ```
 	pub fn blob(&self, path: RelPath) -> Blob { Blob::new(self.clone(), path) }
@@ -168,7 +164,7 @@ impl BlobStore {
 	/// Component hook that reads a concrete store component from
 	/// the entity and inserts a [`BlobStore`] wrapping it.
 	/// Use with `#[component(on_insert = BlobStore::on_insert::<MyStore>)]`.
-	pub fn on_insert<T: Component + Clone + BlobStoreProvider>(
+	pub fn on_insert<T: Component + Clone + BlobProvider>(
 		mut world: DeferredWorld,
 		cx: HookContext,
 	) {
@@ -199,7 +195,7 @@ impl BlobStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// store.insert(&RelPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
@@ -213,7 +209,7 @@ impl BlobStore {
 	}
 
 	/// Insert the contents of a local file without holding it in memory, see
-	/// [`BlobStoreProvider::insert_file`].
+	/// [`BlobProvider::insert_file`].
 	#[cfg(feature = "std")]
 	pub async fn insert_file(&self, path: &RelPath, file: &AbsPath) -> Result {
 		self.provider.insert_file(path, file).await
@@ -226,7 +222,7 @@ impl BlobStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// store.try_insert(&RelPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
@@ -250,14 +246,14 @@ impl BlobStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// let all_data = store.get_all().await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	///
 	/// # Caution
-	/// Expensive operation - prefer [`BlobStoreProvider::list`] + [`BlobStoreProvider::get`]
+	/// Expensive operation - prefer [`BlobProvider::list`] + [`BlobProvider::get`]
 	pub async fn get_all(&self) -> Result<Vec<(RelPath, Bytes)>> {
 		self.list()
 			.await?
@@ -300,17 +296,17 @@ impl StoreBackend for BlobStore {
 	}
 }
 
-impl BlobStoreProvider for BlobStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+impl BlobProvider for BlobStore {
+	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
 		self.provider.with_subdir(path)
 	}
-	fn base(&self) -> Box<dyn BlobStoreProvider> { self.provider.base() }
+	fn base(&self) -> Box<dyn BlobProvider> { self.provider.base() }
 	fn rebase(
 		&self,
 		entry_name: &RelPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
+	) -> Result<(Box<dyn BlobProvider>, RelPath)> {
 		self.provider.rebase(entry_name, root)
 	}
 	fn root_key(&self) -> SmolStr { self.provider.root_key() }
@@ -394,7 +390,7 @@ mod test {
 	/// A store with no parent universe seeded with a nested entry plus content
 	/// beside and above it.
 	async fn nested_store() -> BlobStore {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		store
 			.insert(&RelPath::from("a/b/main.bsx"), "<Router/>")
 			.await
@@ -447,7 +443,7 @@ mod test {
 	/// mis-publish, rather than asking the store for keys it cannot hold.
 	#[beet_core::test]
 	async fn escaping_root_names_the_mis_publish() {
-		BlobStore::temp()
+		BlobStore::new(InMemoryBlobStore::new())
 			.rebase_repo("main.bsx", "../..")
 			.unwrap_err()
 			.to_string()
@@ -457,7 +453,7 @@ mod test {
 	/// A declared root the entry does not sit under is an authoring error.
 	#[beet_core::test]
 	async fn entry_outside_root_errors() {
-		BlobStore::temp()
+		BlobStore::new(InMemoryBlobStore::new())
 			.rebase_repo("a/main.bsx", "sub")
 			.unwrap_err()
 			.to_string()
@@ -557,7 +553,7 @@ pub mod store_test {
 	}
 
 	/// Runs the standard store provider test suite.
-	pub async fn run(provider: impl BlobStoreProvider) {
+	pub async fn run(provider: impl BlobProvider) {
 		let store = BlobStore::new(provider);
 		store.store_remove().await.ok();
 		store.store_exists().await.unwrap().xpect_false();

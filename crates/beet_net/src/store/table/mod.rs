@@ -1,6 +1,12 @@
 //! Tables: beet's one dialect for table-shaped data, see [`TableStore`]. A
 //! table store holds rows and a blob store bytes, and neither implies the
 //! other: each is declared.
+// tables in AWS DynamoDB
+#[cfg(feature = "aws")]
+mod dynamo_store;
+// tables in a SQLite database file, with an SQL escape hatch
+#[cfg(feature = "sqlite")]
+mod sqlite_store;
 // the naive table, json files in any blob store
 mod json_table_store;
 // tables in process memory, for tests and scratch runtimes
@@ -31,6 +37,8 @@ pub mod table_test;
 pub use durable_object_store::*;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub use durable_object_worker::*;
+#[cfg(feature = "aws")]
+pub use dynamo_store::*;
 pub use in_memory_table_store::*;
 pub use json_table_store::*;
 #[cfg(feature = "sqlite")]
@@ -38,6 +46,8 @@ pub use partition_host::*;
 pub(crate) use partition_rows::*;
 pub use row::*;
 pub use sql_table::*;
+#[cfg(feature = "sqlite")]
+pub use sqlite_store::*;
 #[cfg(feature = "sqlite")]
 pub use table_archive::*;
 pub use table_index::*;

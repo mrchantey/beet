@@ -33,6 +33,9 @@ mod glob_filter;
 /// HTML vocabulary: element kinds and character references.
 pub mod html_ext;
 mod into_option;
+/// JSON text for any serde type, through beet's own reader and writer.
+#[cfg(feature = "serde")]
+pub mod json_ext;
 mod type_filter;
 // LazyPool is built on async_lock (std-only).
 #[cfg(feature = "rand")]

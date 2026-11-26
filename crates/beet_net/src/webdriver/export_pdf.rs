@@ -6,7 +6,6 @@
 use super::*;
 use base64::prelude::*;
 use beet_core::prelude::*;
-use serde_json::json;
 
 /// Configuration options for PDF export.
 #[derive(Debug, Clone)]
@@ -141,8 +140,8 @@ impl Page {
 			.session
 			.command(
 				"browsingContext.print",
-				json!({
-					"context": self.context_id,
+				value!({
+					"context": &self.context_id,
 					"background": options.background,
 					"margin": {
 						"top": options.margin.top,
@@ -158,17 +157,16 @@ impl Page {
 						"width": options.page_size.width,
 						"height": options.page_size.height
 					},
-					"pageRanges": options.page_ranges,
+					"pageRanges": Value::new_list(options.page_ranges.iter()),
 					"scale": options.scale,
 					"shrinkToFit": options.shrink_to_fit
 				}),
 			)
 			.await?;
 
-		let data_base64 = response
-			.pointer("/result/data")
-			.and_then(|v| v.as_str())
-			.ok_or_else(|| bevyhow!("missing PDF data in response"))?;
+		let data_base64 = response["result"]["data"]
+			.as_str()
+			.map_err(|_| bevyhow!("missing PDF data in response"))?;
 
 		BASE64_STANDARD
 			.decode(data_base64)

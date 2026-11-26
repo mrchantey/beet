@@ -557,7 +557,7 @@ mod test {
 	async fn targets_from_an_instance_resolve() {
 		let mut world = router_world();
 
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		store
 			.insert(
 				&RelPath::from("site.bsx"),

@@ -245,7 +245,7 @@ mod test {
 			RichText::new("see https://beet.org", async |_| bevybail!("none"))
 				.await
 				.unwrap();
-		serde_json::to_string(&rich.facets)
+		json_ext::to_string(&rich.facets)
 			.unwrap()
 			.xpect_eq(r#"[{"index":{"byteStart":4,"byteEnd":20},"features":[{"$type":"app.bsky.richtext.facet#link","uri":"https://beet.org"}]}]"#);
 	}

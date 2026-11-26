@@ -135,8 +135,6 @@ bytes.workspace = true
 beet_action = { workspace = true, features = ["std", "reflect", "json"] }
 beet_router = { workspace = true, optional = true, features = ["json"] }
 serde.workspace = true
-# `std` for `to_writer_pretty` and the `io`-based serializers.
-serde_json = { workspace = true, features = ["std"] }
 heck.workspace = true
 semver.workspace = true
 # not optional: a block's machine-config digest (`LightsailBlock::machine_config_hash`)

@@ -165,30 +165,36 @@ impl LogTail {
 		let mut events = Vec::new();
 		let mut next_token = None::<String>;
 		loop {
-			let mut body = serde_json::json!({
-				"logGroupName": self.log_group,
+			let mut body = value!({
+				"logGroupName": &self.log_group,
 				"startTime": self.cursor,
 			});
 			if let Some(token) = &next_token {
-				body["nextToken"] = token.as_str().into();
+				body.insert("nextToken", token.as_str())?;
 			}
 			let page = self.client.call_json("FilterLogEvents", &body).await?;
-			if let Some(page_events) = page["events"].as_array() {
+			if let Some(page_events) = page["events"].as_list().ok() {
 				events.extend(page_events.iter().cloned());
 			}
-			next_token = page["nextToken"].as_str().map(ToString::to_string);
+			next_token =
+				page["nextToken"].as_str().ok().map(ToString::to_string);
 			if next_token.is_none() {
 				break;
 			}
 		}
 		events.sort_by_key(|event| {
-			event["timestamp"].as_i64().unwrap_or_default()
+			event["timestamp"].as_i64().ok().unwrap_or_default()
 		});
 
 		let mut lines = Vec::new();
 		for event in events {
-			let timestamp = event["timestamp"].as_i64().unwrap_or_default();
-			let id = event["eventId"].as_str().unwrap_or_default().to_string();
+			let timestamp =
+				event["timestamp"].as_i64().ok().unwrap_or_default();
+			let id = event["eventId"]
+				.as_str()
+				.ok()
+				.unwrap_or_default()
+				.to_string();
 			if timestamp < self.cursor
 				|| (timestamp == self.cursor && self.seen.contains(&id))
 			{
@@ -201,7 +207,7 @@ impl LogTail {
 			self.seen.insert(id);
 			lines.push(Self::line(
 				timestamp,
-				event["message"].as_str().unwrap_or_default(),
+				event["message"].as_str().ok().unwrap_or_default(),
 			));
 		}
 		lines.xok()
@@ -222,8 +228,6 @@ impl LogTail {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use serde_json::Value;
-	use serde_json::json;
 	use std::sync::Arc;
 	use std::sync::Mutex;
 
@@ -243,7 +247,7 @@ mod tests {
 						.first_raw("x-amz-target")
 						.unwrap()
 						.xpect_eq("Logs_20140328.FilterLogEvents");
-					let body = serde_json::from_slice::<Value>(
+					let body = json_ext::from_slice::<Value>(
 						&request.body.into_bytes().await?,
 					)?;
 					recorded.lock().unwrap().push(body);
@@ -252,7 +256,7 @@ mod tests {
 						.unwrap()
 						.next()
 						.ok_or_else(|| bevyhow!("no page left"))?;
-					Response::ok().with_body(page.to_string()).xok()
+					Response::ok().with_body(page.to_json_string()).xok()
 				})
 			});
 		let now = Timestamp::from_millis(1_800_000_600_000);
@@ -260,7 +264,7 @@ mod tests {
 	}
 
 	fn event(id: &str, timestamp: i64, message: &str) -> Value {
-		json!({
+		value!({
 			"logStreamName": "ecs/app/0123",
 			"timestamp": timestamp,
 			"message": message,
@@ -274,19 +278,19 @@ mod tests {
 	#[beet_core::test]
 	async fn pages_and_skips_printed_events() {
 		let (mut tail, calls) = tail(vec![
-			json!({
+			value!({
 				"events": [event("1", 1_800_000_001_000, "booting\n")],
 				"nextToken": "page-2",
 				"searchedLogStreams": [],
 			}),
-			json!({
+			value!({
 				"events": [
 					event("2", 1_800_000_002_000, "GET /about 200"),
 					event("3", 1_800_000_002_000, "GET / 200"),
 				],
 			}),
 			// the second poll overlaps the newest millisecond
-			json!({
+			value!({
 				"events": [
 					event("2", 1_800_000_002_000, "GET /about 200"),
 					event("3", 1_800_000_002_000, "GET / 200"),
@@ -305,13 +309,13 @@ mod tests {
 			"2027-01-15T08:00:03 GET /docs 200".to_string(),
 		]);
 		calls.lock().unwrap().clone().xpect_eq(vec![
-			json!({ "logGroupName": "/ecs/beetmash/prod", "startTime": 1_800_000_000_000_i64 }),
-			json!({
+			value!({ "logGroupName": "/ecs/beetmash/prod", "startTime": 1_800_000_000_000_i64 }),
+			value!({
 				"logGroupName": "/ecs/beetmash/prod",
 				"startTime": 1_800_000_000_000_i64,
 				"nextToken": "page-2",
 			}),
-			json!({ "logGroupName": "/ecs/beetmash/prod", "startTime": 1_800_000_002_000_i64 }),
+			value!({ "logGroupName": "/ecs/beetmash/prod", "startTime": 1_800_000_002_000_i64 }),
 		]);
 	}
 }

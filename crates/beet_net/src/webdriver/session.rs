@@ -4,8 +4,6 @@ use crate::sockets::*;
 use beet_core::exports::async_channel;
 use beet_core::prelude::*;
 use bevy::tasks::IoTaskPool;
-use serde_json::Value;
-use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -184,9 +182,13 @@ impl Session {
 		events: &[&str],
 		contexts: Option<&[&str]>,
 	) -> Result<()> {
-		let mut params = json!({ "events": events });
+		let mut params =
+			value!({ "events": Value::new_list(events.iter().copied()) });
 		if let Some(contexts) = contexts {
-			params.set_field("contexts", json!(contexts))?;
+			params.insert(
+				"contexts",
+				Value::new_list(contexts.iter().copied()),
+			)?;
 		}
 		self.command("session.subscribe", params).await?;
 		Ok(())
@@ -204,13 +206,12 @@ impl Session {
 			pending.insert(id, tx);
 		}
 
-		let payload = json!({
+		let payload = value!({
 			"id": id,
 			"method": method,
 			"params": params
 		});
-		let raw = serde_json::to_string(&payload)
-			.map_err(|e| bevyhow!("Failed to serialize command: {}", e))?;
+		let raw = payload.to_json_string();
 
 		self.inner
 			.cmd_tx
@@ -227,9 +228,8 @@ impl Session {
 			return Err(BiDiError {
 				method: method.to_string(),
 				code: code.as_str().unwrap_or_default().to_string(),
-				message: resp
-					.get("message")
-					.and_then(|message| message.as_str())
+				message: resp["message"]
+					.as_str()
 					.unwrap_or_default()
 					.to_string(),
 			}
@@ -249,7 +249,7 @@ impl Session {
 	/// * response routed via `pending`
 	pub async fn ping(&self) -> Result<()> {
 		let _ = self
-			.command("browsingContext.getTree", json!({"maxDepth": 0}))
+			.command("browsingContext.getTree", value!({"maxDepth": 0}))
 			.await?;
 		Ok(())
 	}
@@ -326,14 +326,12 @@ impl Session {
 						let Ok(Message::Text(text)) = item else {
 							continue;
 						};
-						let Ok(val) = serde_json::from_str::<Value>(&text)
-						else {
+						let Ok(val) = Value::parse_json(&text) else {
 							continue;
 						};
 
 						// Response (has id)
-						if let Some(id) = val.get("id").and_then(|v| v.as_u64())
-						{
+						if let Some(id) = val["id"].as_u64().ok() {
 							let pending = {
 								let mut pending_map =
 									inner.pending.lock().unwrap();
@@ -347,9 +345,7 @@ impl Session {
 
 						// Event (has method, no id): deliver to matching
 						// subscribers, pruning any whose receiver has closed.
-						if let Some(method) =
-							val.get("method").and_then(|m| m.as_str())
-						{
+						if let Some(method) = val["method"].as_str().ok() {
 							let method = method.to_string();
 							let mut subscribers =
 								inner.subscribers.lock().unwrap();

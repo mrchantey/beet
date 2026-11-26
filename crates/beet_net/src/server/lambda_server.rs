@@ -5,8 +5,6 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use core::str::FromStr;
-use serde_json::Value;
-use serde_json::json;
 
 impl HttpServer {
 	/// Serve Lambda invocations until the function is torn down: the
@@ -184,7 +182,7 @@ impl LambdaRuntime {
 		Invocation {
 			id,
 			trace_id,
-			event: serde_json::from_str(&body)?,
+			event: Value::parse_json(&body)?,
 		}
 		.xok()
 	}
@@ -192,7 +190,7 @@ impl LambdaRuntime {
 	async fn post(&self, path: &str, body: Value) -> Result {
 		let response = Request::post(self.url(path))
 			.with_header_raw("content-type", "application/json")
-			.with_body(serde_json::to_vec(&body)?)
+			.with_body(body.to_json_string())
 			.send()
 			.await?;
 		match response.status().is_success() {
@@ -208,10 +206,13 @@ impl LambdaRuntime {
 		let response = Request::post(self.url(path))
 			.with_header_raw("content-type", "application/json")
 			.with_header_raw("lambda-runtime-function-error-type", "Unhandled")
-			.with_body(serde_json::to_vec(&json!({
-				"errorMessage": err.to_string(),
-				"errorType": "BeetError",
-			}))?)
+			.with_body(
+				value!({
+					"errorMessage": err.to_string(),
+					"errorType": "BeetError",
+				})
+				.to_json_string(),
+			)
 			.send()
 			.await?;
 		match response.status().is_success() {
@@ -238,7 +239,7 @@ impl LambdaRuntime {
 		answered.unwrap_or_else(|err| {
 			error!("failed to answer a lambda http event: {err}");
 			// the cause stays in the log, never in front of the client
-			json!({
+			value!({
 				"statusCode": 500,
 				"headers": {"content-type": "text/plain"},
 				"body": "Internal Server Error",
@@ -260,7 +261,7 @@ impl LambdaRuntime {
 		Fut: Future<Output = Response>,
 	{
 		let invoke =
-			ScheduledInvoke::from_payload(&serde_json::to_vec(&event)?)?;
+			ScheduledInvoke::from_payload(event.to_json_string().as_bytes())?;
 		let path = invoke.path().clone();
 		info!("⏱ scheduled invoke: {} {path}", invoke.method());
 		let (parts, body) = dispatch(invoke.into_request()).await.into_parts();
@@ -272,7 +273,7 @@ impl LambdaRuntime {
 				parts.status()
 			);
 		}
-		json!({ "path": path, "result": text }).xok()
+		value!({ "path": path, "result": text }).xok()
 	}
 
 	/// The request a 2.0 http event describes.
@@ -282,7 +283,7 @@ impl LambdaRuntime {
 		let method = HttpMethod::from_str(method)?;
 		let mut path = event["rawPath"].as_str().unwrap_or("/").to_string();
 		// a named stage prefixes the path the routes never declared
-		if let Some(stage) = event["requestContext"]["stage"].as_str()
+		if let Ok(stage) = event["requestContext"]["stage"].as_str()
 			&& stage != "$default"
 			&& let Some(rest) = path.strip_prefix(&format!("/{stage}"))
 			&& (rest.is_empty() || rest.starts_with('/'))
@@ -293,27 +294,27 @@ impl LambdaRuntime {
 			};
 		}
 		let url = match event["rawQueryString"].as_str() {
-			Some(query) if !query.is_empty() => format!("{path}?{query}"),
+			Ok(query) if !query.is_empty() => format!("{path}?{query}"),
 			_ => path,
 		};
 		let mut request = Request::new(method, url.as_str());
-		for (name, value) in event["headers"].as_object().into_iter().flatten()
-		{
-			if let Some(value) = value.as_str() {
+		for (name, value) in event["headers"].as_map().into_iter().flatten() {
+			if let Ok(value) = value.as_str() {
 				request = request.with_header_raw(name, value);
 			}
 		}
 		let cookies = event["cookies"]
-			.as_array()
+			.as_list()
 			.into_iter()
 			.flatten()
-			.filter_map(Value::as_str)
+			.filter_map(|cookie| cookie.as_str().ok())
 			.collect::<Vec<_>>();
 		if !cookies.is_empty() {
 			request = request.with_header_raw("cookie", &cookies.join("; "));
 		}
 		if let Some(ip) = http["sourceIp"]
 			.as_str()
+			.ok()
 			.and_then(|ip| ip.parse::<std::net::IpAddr>().ok())
 		{
 			request = request.with_header_raw(
@@ -322,8 +323,8 @@ impl LambdaRuntime {
 			);
 		}
 		let body = match (
-			event["body"].as_str(),
-			event["isBase64Encoded"].as_bool(),
+			event["body"].as_str().ok(),
+			event["isBase64Encoded"].as_bool().ok(),
 		) {
 			(Some(body), Some(true)) => Bytes::from(
 				base64::engine::general_purpose::STANDARD.decode(body)?,
@@ -340,13 +341,13 @@ impl LambdaRuntime {
 	async fn response_of(response: Response) -> Result<Value> {
 		let (parts, body) = response.into_parts();
 		let bytes = body.into_bytes().await?;
-		let mut headers = serde_json::Map::new();
+		let mut headers = Map::default();
 		let mut cookies = Vec::new();
 		for (name, values) in parts.headers().iter_all() {
 			match name.as_str() {
 				"set-cookie" => cookies.extend(values.iter().cloned()),
 				_ => {
-					headers.insert(name.clone(), json!(values.join(",")));
+					headers.insert(name.clone(), value!(values.join(",")));
 				}
 			}
 		}
@@ -357,10 +358,10 @@ impl LambdaRuntime {
 				true,
 			),
 		};
-		json!({
+		value!({
 			"statusCode": parts.status().as_u16(),
 			"headers": headers,
-			"cookies": cookies,
+			"cookies": Value::new_list(cookies),
 			"body": body,
 			"isBase64Encoded": is_base64,
 		})
@@ -379,7 +380,7 @@ enum LambdaEvent {
 
 impl LambdaEvent {
 	fn of(event: Value) -> Self {
-		match event["requestContext"]["http"].is_object() {
+		match event["requestContext"]["http"].is_map() {
 			true => Self::Http(event),
 			false => Self::Scheduled(event),
 		}
@@ -409,7 +410,7 @@ mod test {
 						HttpMethod::Get => {
 							match events.lock().unwrap().next() {
 								Some((index, event)) => {
-									Response::ok_text(event.to_string())
+									Response::ok_text(event.to_json_string())
 										.with_header(
 											"lambda-runtime-aws-request-id",
 											&format!("req-{index}"),
@@ -424,7 +425,7 @@ mod test {
 						}
 						_ => {
 							let body = request.body.into_bytes().await.unwrap();
-							let body = serde_json::from_slice(&body).unwrap();
+							let body = json_ext::from_slice(&body).unwrap();
 							seen.lock().unwrap().push((path, body));
 							Response::from_status(StatusCode::ACCEPTED)
 						}
@@ -445,7 +446,7 @@ mod test {
 				.with_body("broke"),
 			"/jobs/ok" => Response::ok_text("rolled up"),
 			path => {
-				let echo = json!({
+				let echo = value!({
 					"method": request.method().to_string(),
 					"path": path,
 					"query": request.url().query_string(),
@@ -455,7 +456,7 @@ mod test {
 						request.body.into_bytes().await.unwrap().to_vec()
 					).unwrap(),
 				});
-				Response::ok_text(echo.to_string())
+				Response::ok_text(echo.to_json_string())
 					.with_header("set-cookie", "a=1")
 					.with_header("set-cookie", "b=2")
 			}
@@ -463,7 +464,7 @@ mod test {
 	}
 
 	fn http_event(path: &str, stage: &str, body: &str, base64: bool) -> Value {
-		json!({
+		value!({
 			"version": "2.0",
 			"rawPath": path,
 			"rawQueryString": "q=1",
@@ -495,11 +496,11 @@ mod test {
 			.as_str()
 			.xpect_eq("/2018-06-01/runtime/invocation/req-0/response");
 		let answer = &posts[0].1;
-		answer["statusCode"].xpect_eq(json!(200));
-		answer["cookies"].xpect_eq(json!(["a=1", "b=2"]));
-		serde_json::from_str::<Value>(answer["body"].as_str().unwrap())
+		answer["statusCode"].xpect_eq(value!(200));
+		answer["cookies"].xpect_eq(value!(["a=1", "b=2"]));
+		Value::parse_json(answer["body"].as_str().unwrap())
 			.unwrap()
-			.xpect_eq(json!({
+			.xpect_eq(value!({
 				"method": "Post",
 				"path": "/echo",
 				"query": "q=1",
@@ -507,8 +508,8 @@ mod test {
 				"x-test": "yes",
 				"body": "hello",
 			}));
-		posts[1].1["isBase64Encoded"].xpect_eq(json!(true));
-		posts[1].1["body"].xpect_eq(json!("//4A"));
+		posts[1].1["isBase64Encoded"].xpect_eq(value!(true));
+		posts[1].1["body"].xpect_eq(value!("//4A"));
 		env_ext::var("_X_AMZN_TRACE_ID")
 			.unwrap()
 			.as_str()
@@ -519,7 +520,7 @@ mod test {
 	#[beet_core::test]
 	async fn answers_a_scheduled_success() {
 		let (runtime, posts) = fake_api(vec![
-			serde_json::to_value(ScheduledInvoke::new("jobs/ok")).unwrap(),
+			Value::from_serde(ScheduledInvoke::new("jobs/ok")).unwrap(),
 		])
 		.await;
 		runtime.serve_one(&dispatch).await.unwrap();
@@ -530,14 +531,14 @@ mod test {
 			.xpect_eq("/2018-06-01/runtime/invocation/req-0/response");
 		posts[0]
 			.1
-			.xpect_eq(json!({"path": "jobs/ok", "result": "rolled up"}));
+			.xpect_eq(value!({"path": "jobs/ok", "result": "rolled up"}));
 	}
 
 	/// A scheduled invoke that fails fails the invocation through `/error`.
 	#[beet_core::test]
 	async fn fails_a_scheduled_failure() {
 		let (runtime, posts) = fake_api(vec![
-			serde_json::to_value(ScheduledInvoke::new("fail")).unwrap(),
+			Value::from_serde(ScheduledInvoke::new("fail")).unwrap(),
 		])
 		.await;
 		runtime.serve_one(&dispatch).await.unwrap();

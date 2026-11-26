@@ -3,8 +3,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 
 
@@ -382,7 +380,7 @@ async fn send_inbound_ses(
 	// through the domain's own configuration set, so a bounce or a complaint
 	// on the probe lands in the same event stream as real mail rather than
 	// silently nowhere.
-	let body = json!({
+	let body = value!({
 		"FromEmailAddress": from,
 		"Destination": { "ToAddresses": [address] },
 		"ConfigurationSetName": sender_domain.configuration_set_name(),
@@ -399,7 +397,7 @@ async fn send_inbound_ses(
 				.with_json(&body)?,
 		)
 		.await?;
-	match response["MessageId"].as_str() {
+	match response["MessageId"].as_str().ok() {
 		Some(id) => id.to_string().xok(),
 		None => {
 			bevybail!("SES accepted the inbound probe but named no message id")
@@ -443,7 +441,7 @@ async fn send_inbound_comail(
 		let response = Request::post(comail.send_url())
 			.with_auth_bearer(&api_key)
 			.with_header_raw("x-atmos-did", &did)
-			.with_json_body(&json!({
+			.with_json_body(&value!({
 				"from": from,
 				"to": [address],
 				"subject": MailProbe::subject(token),
@@ -596,14 +594,14 @@ async fn find_probe_message(
 	let query = client
 		.call_mail(
 			"Email/query",
-			json!({
+			value!({
 				"accountId": account,
 				"filter": { "subject": subject },
 				"limit": 1,
 			}),
 		)
 		.await?;
-	let Some(id) = query["ids"][0].as_str() else {
+	let Some(id) = query["ids"][0].as_str().ok() else {
 		return Ok(None);
 	};
 	// the header as text, since the verdicts are what matters and not the
@@ -611,7 +609,7 @@ async fn find_probe_message(
 	let get = client
 		.call_mail(
 			"Email/get",
-			json!({
+			value!({
 				"accountId": account,
 				"ids": [id],
 				"properties": ["subject", "header:Authentication-Results:asText"],
@@ -627,6 +625,7 @@ async fn find_probe_message(
 fn authentication_results(response: &Value) -> String {
 	response["list"][0]["header:Authentication-Results:asText"]
 		.as_str()
+		.ok()
 		.unwrap_or_default()
 		.to_string()
 }
@@ -752,11 +751,9 @@ mod tests {
 	/// the caller reports as a failure rather than reading as a pass.
 	#[beet_core::test]
 	fn a_message_without_the_header_reads_as_empty() {
-		authentication_results(
-			&serde_json::json!({ "list": [{ "subject": "x" }] }),
-		)
-		.is_empty()
-		.xpect_true();
+		authentication_results(&value!({ "list": [{ "subject": "x" }] }))
+			.is_empty()
+			.xpect_true();
 	}
 
 	/// The SES arm is one `SendEmail` from the sender to the probe mailbox
@@ -780,7 +777,7 @@ mod tests {
 						.first_raw("authorization")
 						.unwrap()
 						.xpect_contains("/ap-southeast-2/ses/aws4_request");
-					let body = serde_json::from_slice::<Value>(
+					let body = json_ext::from_slice::<Value>(
 						&request.body.into_bytes().await?,
 					)?;
 					*seen.lock().unwrap() = Some(body);
@@ -802,7 +799,7 @@ mod tests {
 		.unwrap()
 		.as_str()
 		.xpect_eq("0100018f-probe");
-		sent.lock().unwrap().clone().unwrap().xpect_eq(json!({
+		sent.lock().unwrap().clone().unwrap().xpect_eq(value!({
 			"FromEmailAddress": "news@news.beetmash.com",
 			"Destination": { "ToAddresses": ["probe@beetmash.com"] },
 			"ConfigurationSetName": domain.configuration_set_name(),

@@ -501,7 +501,7 @@ mod test {
 	/// pinned here the way `ScriptEvent`'s are.
 	#[beet_core::test]
 	fn wire_tags_are_stable() {
-		serde_json::to_string(&WorldCall {
+		json_ext::to_string(&WorldCall {
 			id: 1,
 			op: WorldOp::Remove {
 				entity: "42v1".to_string(),
@@ -512,10 +512,10 @@ mod test {
 		.xpect_eq(
 			r#"{"id":1,"op":"remove","entity":"42v1","component":"Name"}"#,
 		);
-		serde_json::to_string(&WorldReply::Ok { id: 1, value: None })
+		json_ext::to_string(&WorldReply::Ok { id: 1, value: None })
 			.unwrap()
 			.xpect_eq(r#"{"status":"ok","id":1}"#);
-		serde_json::to_string(&WorldReply::Err {
+		json_ext::to_string(&WorldReply::Err {
 			id: 1,
 			message: "boom".to_string(),
 		})
@@ -527,7 +527,7 @@ mod test {
 	/// still decode into the variants the world expects.
 	#[beet_core::test]
 	fn a_value_wire_decodes_a_json_line() {
-		let WorldOp::Insert { value, .. } = serde_json::from_str::<WorldCall>(
+		let WorldOp::Insert { value, .. } = json_ext::from_str::<WorldCall>(
 			r#"{"id":0,"op":"insert","entity":"0v1","component":"a.B","value":{"n":-1,"list":[1,2]}}"#,
 		)
 		.unwrap()

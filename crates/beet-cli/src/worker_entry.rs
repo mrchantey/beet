@@ -94,7 +94,8 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 			 Worker's vars"
 		)
 	})?;
-	let StoreProvider::R2(store) = StoreProvider::from_uri(repo_uri)? else {
+	let BlobStoreProvider::R2(store) = BlobStoreProvider::from_uri(repo_uri)?
+	else {
 		bevybail!(
 			"`BEET_REPO={repo_uri}` is not an `r2://<binding>` uri, the one \
 			 store a Worker serves from"

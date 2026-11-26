@@ -147,7 +147,7 @@ impl Page {
 						.map(el => `${el.tagName}.${el.className}`)"#,
 				)
 				.await?
-				.as_array()
+				.as_list()
 				.into_iter()
 				.flatten()
 				.map(|el| el.as_str().unwrap_or_default().to_string())
@@ -252,10 +252,8 @@ impl WebElement {
 		assert_eventually(
 			poll_ext::DEFAULT_TIMEOUT,
 			async || {
-				self.get_property("value")
-					.await?
-					.pointer("/result/result/value")
-					.and_then(|value| value.as_str())
+				self.get_property("value").await?["result"]["result"]["value"]
+					.as_str()
 					.unwrap_or_default()
 					.to_string()
 					.xok()

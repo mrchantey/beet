@@ -279,6 +279,16 @@ impl Project {
 	/// Short alias for [`Self::work_dir`], the tofu driver's `-chdir`.
 	fn dir(&self) -> AbsPath { self.work_dir() }
 
+	/// The `main.tf.json` text, every map's keys sorted so the init stamp's
+	/// digest names the config's content and not the order its blocks
+	/// rendered in.
+	fn rendered_config(&self) -> String {
+		self.config
+			.to_json()
+			.xtap(Value::sort_maps)
+			.to_json_pretty()
+	}
+
 	/// The blob holding this project's tofu state.
 	pub fn state_file(&self) -> Result<Blob> {
 		self.backend
@@ -296,8 +306,8 @@ impl Project {
 		const TOFU_DIR: &str = ".terraform";
 
 		let dir = self.dir();
-		let bytes = serde_json::to_vec_pretty(&self.config.to_json())?;
-		let digest = digest_ext::hex::<sha2::Sha256>(&bytes);
+		let rendered = self.rendered_config();
+		let digest = digest_ext::hex::<sha2::Sha256>(rendered.as_bytes());
 		let config_path = dir.join("main.tf.json");
 		let stamp_path = dir.join(Self::INIT_STAMP);
 		let config_initialized =
@@ -311,7 +321,7 @@ impl Project {
 			trace!("tofu config unchanged since its init, skipping init");
 			return Ok(());
 		}
-		fs_ext::write_async(config_path, &bytes).await?;
+		fs_ext::write_async(config_path, &rendered).await?;
 		debug!("initializing tofu backend");
 		self.backend().ensure_exists().await?;
 		debug!("initializing tofu project");
@@ -343,10 +353,7 @@ impl Project {
 	pub(crate) async fn validate_offline(&self) -> Result<String> {
 		let dir = self.dir();
 		fs_ext::create_dir_all(&dir)?;
-		fs_ext::write(
-			dir.join("main.tf.json"),
-			serde_json::to_vec_pretty(&self.config.to_json())?,
-		)?;
+		fs_ext::write(dir.join("main.tf.json"), self.rendered_config())?;
 		self.backend().ensure_exists().await?;
 		tofu::test_support::init_offline(&dir, &self.required_vars()?).await?;
 		tofu::validate(&dir).await
@@ -654,7 +661,7 @@ impl Project {
 		if !blob.exists().await? {
 			return None.xok();
 		}
-		serde_json::from_slice::<serde_json::Value>(&blob.get().await?)?
+		json_ext::from_slice::<Value>(&blob.get().await?)?
 			.get("encrypted_data")
 			.is_some()
 			.xmap(Some)
@@ -687,15 +694,15 @@ impl Project {
 		let dir = self.dir();
 		let mut state = tofu::state_pull(&dir, &vars)
 			.await?
-			.xmap(|json| serde_json::from_str::<serde_json::Value>(&json))?;
-		let serial = state["serial"]
-			.as_u64()
-			.ok_or_else(|| bevyhow!("the pulled state carries no serial"))?
-			+ 1;
-		state["serial"] = serial.into();
+			.xmap(|json| Value::parse_json(&json))?;
+		let serial =
+			state["serial"].as_u64().ok().ok_or_else(|| {
+				bevyhow!("the pulled state carries no serial")
+			})? + 1;
+		state.insert("serial", serial)?;
 		// the state holds what an apply derives, so it never sits readable
 		let file = dir.join("rewrite.tfstate");
-		fs_ext::write_private(&file, serde_json::to_vec(&state)?)?;
+		fs_ext::write_private(&file, state.to_json_string())?;
 		let pushed = tofu::state_push(&dir, &vars, &file).await;
 		fs_ext::remove_async(&file).await.ok();
 		pushed?;
@@ -868,7 +875,7 @@ mod init {
 		let second = under("state-b");
 		fs_ext::write_async(
 			second.dir().join("main.tf.json"),
-			serde_json::to_vec_pretty(&second.config.to_json()).unwrap(),
+			second.rendered_config(),
 		)
 		.await
 		.unwrap();
@@ -966,11 +973,10 @@ mod roll {
 					};
 					// a tofu state, settled or in flight; anything else in the
 					// directory (a lock, a backup) is not what this watches
-					if serde_json::from_slice::<serde_json::Value>(&bytes)
-						.is_ok_and(|json| {
-							json.get("lineage").is_some()
-								|| json.get("encrypted_data").is_some()
-						}) && !last.contains(&bytes)
+					if json_ext::from_slice::<Value>(&bytes).is_ok_and(|json| {
+						json.get("lineage").is_some()
+							|| json.get("encrypted_data").is_some()
+					}) && !last.contains(&bytes)
 					{
 						last.push(bytes.clone());
 						watched.lock().unwrap().push(bytes);
@@ -993,7 +999,7 @@ mod roll {
 		let seen = writes.lock().unwrap().clone();
 		seen.is_empty().xpect_false();
 		for bytes in &seen {
-			serde_json::from_slice::<serde_json::Value>(bytes)
+			json_ext::from_slice::<Value>(bytes)
 				.unwrap()
 				.get("encrypted_data")
 				.xpect_some();

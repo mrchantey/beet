@@ -3,8 +3,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 impl StalwartProvision {
 	/// The management port Stalwart serves in bootstrap mode, on loopback at
@@ -386,12 +384,12 @@ async fn retire_listeners(
 	let declared = plan
 		.listeners
 		.iter()
-		.filter_map(|listener| listener["name"].as_str())
+		.filter_map(|listener| listener["name"].as_str().ok())
 		.collect::<Vec<_>>();
 	let mut retired = false;
 	for listener in client.list("x:NetworkListener").await? {
 		let (Some(id), Some(name)) =
-			(listener["id"].as_str(), listener["name"].as_str())
+			(listener["id"].as_str().ok(), listener["name"].as_str().ok())
 		else {
 			continue;
 		};
@@ -430,7 +428,7 @@ async fn converge_certificates(
 		client
 			.create(
 				"x:Task",
-				&json!({ "@type": "AcmeRenewal", "domainId": domain_id }),
+				&value!({ "@type": "AcmeRenewal", "domainId": domain_id }),
 			)
 			.await?;
 		info!("{}: certificate issuance scheduled", domain.name);
@@ -502,8 +500,8 @@ async fn bootstrap(
 		.update_returning(
 			"x:Bootstrap",
 			JmapClient::SINGLETON_ID,
-			&json!({
-				"serverHostname": plan.hostname,
+			&value!({
+				"serverHostname": &plan.hostname,
 				"defaultDomain": domain.domain(),
 				// provision owns certificates and DKIM: ACME converges as its own
 				// object below, and outbound is SES-signed until the sovereign
@@ -527,7 +525,7 @@ async fn bootstrap(
 		StalwartBlock::ADMIN_USER,
 		&domain.slug(),
 	);
-	match updated["secret"].as_str() {
+	match updated["secret"].as_str().ok() {
 		Some(secret) => {
 			mail.secrets
 				.overwrite(
@@ -642,7 +640,7 @@ async fn apply_plan(
 			"outbound relays through {}, else {}",
 			plan.relays
 				.iter()
-				.map(|relay| relay["name"].as_str().unwrap_or_default())
+				.map(|relay| relay["name"].as_str().ok().unwrap_or_default())
 				.collect::<Vec<_>>()
 				.join(", "),
 			plan.fallback
@@ -713,14 +711,14 @@ async fn converge_default_certificate(
 	let settings = client.try_get_singleton("x:SystemSettings").await?;
 	let current = settings
 		.as_ref()
-		.and_then(|settings| settings["defaultCertificateId"].as_str());
+		.and_then(|settings| settings["defaultCertificateId"].as_str().ok());
 	if current == Some(id.as_str()) {
 		return Ok(());
 	}
 	client
 		.update_singleton(
 			"x:SystemSettings",
-			&json!({ "defaultCertificateId": id }),
+			&value!({ "defaultCertificateId": id }),
 		)
 		.await?;
 	// a settings change reloads the core config and NOT the served
@@ -728,7 +726,7 @@ async fn converge_default_certificate(
 	// certificate change), so the server keeps answering a peer without SNI
 	// from the old map until asked to reload
 	client
-		.create("x:Action", &json!({ "@type": "ReloadTlsCertificates" }))
+		.create("x:Action", &value!({ "@type": "ReloadTlsCertificates" }))
 		.await?;
 	info!("default certificate is the one covering {}", plan.hostname);
 	Ok(())
@@ -749,10 +747,11 @@ fn default_certificate(
 		.max_by_key(|certificate| {
 			certificate["notValidAfter"]
 				.as_str()
+				.ok()
 				.unwrap_or_default()
 				.to_string()
 		})
-		.and_then(|certificate| certificate["id"].as_str())
+		.and_then(|certificate| certificate["id"].as_str().ok())
 		.map(String::from)
 }
 
@@ -762,11 +761,11 @@ fn default_certificate(
 /// wire shape, ie the names are the KEYS.
 fn certificate_covers(certificates: &[Value], names: &[String]) -> bool {
 	certificates.iter().any(|certificate| {
-		let Some(sans) = certificate["subjectAlternativeNames"].as_object()
+		let Some(sans) = certificate["subjectAlternativeNames"].as_map().ok()
 		else {
 			return false;
 		};
-		names.iter().all(|name| sans.contains_key(name))
+		names.iter().all(|name| sans.contains(name))
 	})
 }
 
@@ -821,29 +820,31 @@ fn plan_converge(
 	let Some(found) = existing.iter().find(|candidate| {
 		match_on
 			.iter()
-			.all(|property| candidate[property] == object[property])
+			.all(|property| candidate[*property] == object[*property])
 	}) else {
 		return Ok(Converge::Create);
 	};
 	let id = found["id"]
 		.as_str()
+		.ok()
 		.ok_or_else(|| bevyhow!("a matched object carried no id"))?
 		.to_string();
 	let patch = object
-		.as_object()
+		.as_map()
+		.ok()
 		.map(|declared| {
 			declared
 				.iter()
 				.filter(|(key, value)| {
-					!key.starts_with('@') && &&found[key] != value
+					!key.starts_with('@') && found[key.as_str()] != **value
 				})
 				.map(|(key, value)| (key.clone(), value.clone()))
-				.collect::<serde_json::Map<_, _>>()
+				.collect::<Map>()
 		})
 		.unwrap_or_default();
 	match patch.is_empty() {
 		true => Ok(Converge::Unchanged(id)),
-		false => Ok(Converge::Patch(id, Value::Object(patch))),
+		false => Ok(Converge::Patch(id, Value::Map(patch))),
 	}
 }
 
@@ -965,14 +966,16 @@ async fn converge_account(
 				&declared,
 			)? {
 				Converge::Patch(_, patch) => patch,
-				_ => json!({}),
+				_ => value!({}),
 			};
 			patch
-				.as_object_mut()
+				.as_map_mut()
+				.ok()
 				.ok_or_else(|| bevyhow!("an account patch is an object"))?
 				.extend(
 					AccountPlan::credentials_patch(&password)
-						.as_object()
+						.as_map()
+						.ok()
 						.into_iter()
 						.flatten()
 						.map(|(key, value)| (key.clone(), value.clone())),
@@ -1188,7 +1191,7 @@ mod tests {
 	}
 
 	fn existing() -> Vec<Value> {
-		vec![serde_json::json!({
+		vec![value!({
 			"id": "a1",
 			"name": "smtp",
 			"protocol": "smtp",
@@ -1205,13 +1208,9 @@ mod tests {
 	/// the next restart.
 	#[beet_core::test]
 	fn an_unmatched_declaration_is_created() {
-		plan_converge(
-			&existing(),
-			&["name"],
-			&serde_json::json!({ "name": "imaps" }),
-		)
-		.unwrap()
-		.xpect_eq(Converge::Create);
+		plan_converge(&existing(), &["name"], &value!({ "name": "imaps" }))
+			.unwrap()
+			.xpect_eq(Converge::Create);
 	}
 
 	/// A second deploy that changed nothing must write nothing, or every run
@@ -1222,7 +1221,7 @@ mod tests {
 		plan_converge(
 			&existing(),
 			&["name"],
-			&serde_json::json!({
+			&value!({
 				"name": "smtp",
 				"protocol": "smtp",
 				"bind": ["[::]:25"],
@@ -1241,7 +1240,7 @@ mod tests {
 		let Converge::Patch(id, patch) = plan_converge(
 			&existing(),
 			&["name"],
-			&serde_json::json!({
+			&value!({
 				"name": "smtp",
 				"protocol": "smtp",
 				"bind": ["[::]:2525"],
@@ -1252,7 +1251,7 @@ mod tests {
 			panic!("expected a patch");
 		};
 		id.as_str().xpect_eq("a1");
-		patch.as_object().unwrap().len().xpect_eq(1);
+		patch.as_map().unwrap().len().xpect_eq(1);
 		patch["bind"][0].as_str().unwrap().xpect_eq("[::]:2525");
 	}
 
@@ -1262,9 +1261,11 @@ mod tests {
 	#[beet_core::test]
 	fn the_variant_tag_is_never_patched() {
 		let Converge::Patch(_, patch) = plan_converge(
-			&[serde_json::json!({ "id": "u1", "name": "pete", "domainId": "d1", "description": "" })],
+			&[
+				value!({ "id": "u1", "name": "pete", "domainId": "d1", "description": "" }),
+			],
 			&["name", "domainId"],
-			&serde_json::json!({
+			&value!({
 				"@type": "User",
 				"name": "pete",
 				"domainId": "d1",
@@ -1309,20 +1310,20 @@ mod tests {
 	#[beet_core::test]
 	fn every_match_property_must_agree() {
 		let accounts = vec![
-			serde_json::json!({ "id": "u1", "name": "pete", "domainId": "d1" }),
-			serde_json::json!({ "id": "u2", "name": "pete", "domainId": "d2" }),
+			value!({ "id": "u1", "name": "pete", "domainId": "d1" }),
+			value!({ "id": "u2", "name": "pete", "domainId": "d2" }),
 		];
 		plan_converge(
 			&accounts,
 			&["name", "domainId"],
-			&serde_json::json!({ "name": "pete", "domainId": "d2" }),
+			&value!({ "name": "pete", "domainId": "d2" }),
 		)
 		.unwrap()
 		.xpect_eq(Converge::Unchanged("u2".to_string()));
 		plan_converge(
 			&accounts,
 			&["name", "domainId"],
-			&serde_json::json!({ "name": "pete", "domainId": "d3" }),
+			&value!({ "name": "pete", "domainId": "d3" }),
 		)
 		.unwrap()
 		.xpect_eq(Converge::Create);
@@ -1337,15 +1338,15 @@ mod tests {
 	fn the_default_certificate_covers_the_box_and_expires_last() {
 		let names = vec!["mail.beetmash.com".to_string()];
 		let certificates = vec![
-			serde_json::json!({
+			value!({
 				"id": "old", "notValidAfter": "2026-12-07T00:00:00Z",
 				"subjectAlternativeNames": { "mail.beetmash.com": true }
 			}),
-			serde_json::json!({
+			value!({
 				"id": "news", "notValidAfter": "2027-06-01T00:00:00Z",
 				"subjectAlternativeNames": { "autoconfig.news.beetmash.com": true }
 			}),
-			serde_json::json!({
+			value!({
 				"id": "renewed", "notValidAfter": "2027-02-05T00:00:00Z",
 				"subjectAlternativeNames": { "mail.beetmash.com": true }
 			}),

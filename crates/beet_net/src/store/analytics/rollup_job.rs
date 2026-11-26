@@ -396,7 +396,7 @@ mod test {
 		let store =
 			recorded(&[page_view(40, "/cold", 1), page_view(1, "/warm", 2)])
 				.await;
-		let archive = BlobStore::temp();
+		let archive = BlobStore::new(InMemoryBlobStore::new());
 		let report =
 			AnalyticsRollupRun::new(store.clone(), Some(archive.clone()))
 				.call()
@@ -475,7 +475,7 @@ mod test {
 	async fn full_rebuilds_from_the_archive() {
 		let store =
 			recorded(&[page_view(40, "/a", 1), page_view(40, "/b", 2)]).await;
-		let archive = BlobStore::temp();
+		let archive = BlobStore::new(InMemoryBlobStore::new());
 		AnalyticsRollupRun::new(store.clone(), Some(archive.clone()))
 			.call()
 			.await
@@ -529,7 +529,7 @@ mod test {
 	async fn job_runs_from_its_fields() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
 		let analytics = world.spawn(InMemoryTableStore::new()).flush();
-		let archive = world.spawn(InMemoryStore::new()).flush();
+		let archive = world.spawn(InMemoryBlobStore::new()).flush();
 		let store = AnalyticsStore::new(
 			world.entity(analytics).get::<TableStore>().unwrap().clone(),
 		);

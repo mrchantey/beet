@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::Value;
 
 /// An answer AWS marks as an error, ie `ParameterNotFound`: matched on by
 /// [`code`](Self::code), the one part of an AWS error that is stable.
@@ -72,16 +71,16 @@ impl AwsError {
 
 	/// A json error's code and message.
 	fn from_json(body: &str) -> (Option<SmolStr>, Option<String>) {
-		let Ok(json) = serde_json::from_str::<Value>(body) else {
+		let Ok(json) = Value::parse_json(body) else {
 			return (None, None);
 		};
 		let code = ["__type", "code", "Code"]
 			.iter()
-			.find_map(|key| json[*key].as_str())
+			.find_map(|key| json[*key].as_str().ok())
 			.map(|code| SmolStr::new(Self::strip_namespace(code)));
 		let message = ["message", "Message", "errorMessage"]
 			.iter()
-			.find_map(|key| json[*key].as_str())
+			.find_map(|key| json[*key].as_str().ok())
 			.map(ToString::to_string);
 		(code, message)
 	}

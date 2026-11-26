@@ -690,7 +690,7 @@ mod test {
 	/// route answers `404`.
 	#[beet_core::test]
 	async fn registers_the_store_file_routes() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		store
 			.insert(&"guide.md".into(), "# Guide\n".to_owned())
 			.await

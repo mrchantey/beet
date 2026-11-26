@@ -86,7 +86,8 @@ mod test {
 		.unwrap();
 		let put = || {
 			Request::put("/tables/named_rows/k").with_body(
-				serde_json::to_vec(&serde_json::json!({ "row": row })).unwrap(),
+				value!({ "row": Value::from_serde(&row).unwrap() })
+					.to_json_string(),
 			)
 		};
 		let mut exchange = async |request: Request| {
@@ -118,7 +119,7 @@ mod test {
 	async fn a_blob_store_is_not_served() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let router = world
-			.spawn((Router, InMemoryStore::new(), children![
+			.spawn((Router, InMemoryBlobStore::new(), children![
 				ServeTables {
 					prefix: "tables".into()
 				}

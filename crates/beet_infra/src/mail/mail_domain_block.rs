@@ -1220,7 +1220,6 @@ impl MailDomainBlock {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use serde_json::Value;
 
 	/// The staging domain as the plan declares it, which is also the fixture
 	/// every assertion below reads. Never the apex: an apex mail record
@@ -1349,8 +1348,8 @@ mod tests {
 	/// As [`records`], with each record's content (`data.target` for the `SRV`s,
 	/// which carry no `content`).
 	fn record_values(blocks: &[Relayed]) -> Vec<(String, String, String)> {
-		let json = build_config(blocks).to_json().into_json();
-		let Some(Value::Object(records)) = json
+		let json = build_config(blocks).to_json();
+		let Some(Value::Map(records)) = json
 			.get("resource")
 			.and_then(|it| it.get("cloudflare_dns_record"))
 		else {
@@ -1362,7 +1361,7 @@ mod tests {
 				let field = |key: &str| {
 					record
 						.get(key)
-						.and_then(Value::as_str)
+						.and_then(|item| item.as_str().ok())
 						.unwrap_or_default()
 						.to_string()
 				};
@@ -1371,7 +1370,7 @@ mod tests {
 					true => record
 						.get("data")
 						.and_then(|data| data.get("target"))
-						.and_then(Value::as_str)
+						.and_then(|item| item.as_str().ok())
 						.unwrap_or_default()
 						.to_string(),
 				};
@@ -1428,8 +1427,8 @@ mod tests {
 				"v=DKIM1; k=rsa; h=sha256; p=${var.dkim_stalwart_beetmash_com}",
 			);
 		// declared, so `plan` and `destroy` (which pass no `-var`) still parse
-		config.to_json().into_json()["variable"]["dkim_stalwart_beetmash_com"]
-			.is_object()
+		config.to_json()["variable"]["dkim_stalwart_beetmash_com"]
+			.is_map()
 			.xpect_true();
 	}
 
@@ -1447,9 +1446,9 @@ mod tests {
 			.xnot()
 			.xpect_contains("aws_sesv2_configuration_set_event_destination");
 
-		let json = build_config(&[on_topic(staging())]).to_json().into_json();
+		let json = build_config(&[on_topic(staging())]).to_json();
 		let alarms = json["resource"]["aws_cloudwatch_metric_alarm"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.values()
 			.collect::<Vec<_>>();
@@ -1469,12 +1468,12 @@ mod tests {
 				.xpect_contains("beetmash-ses-events");
 		}
 		json["resource"]["aws_sesv2_configuration_set_event_destination"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.values()
 			.next()
 			.unwrap()["event_destination"][0]["matching_event_types"]
-			.as_array()
+			.as_list()
 			.unwrap()
 			.len()
 			.xpect_eq(SesRelay::EVENT_TYPES.len());
@@ -1487,12 +1486,10 @@ mod tests {
 	#[beet_core::test]
 	fn a_declared_topic_is_referenced_not_composed() {
 		let relayed = on_topic(staging());
-		let json = build_config_with_topic(&[relayed.clone()])
-			.to_json()
-			.into_json();
+		let json = build_config_with_topic(&[relayed.clone()]).to_json();
 		let expected = "${aws_sns_topic.beet_infra__dev__ses_events.arn}";
 		json["resource"]["aws_sesv2_configuration_set_event_destination"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.values()
 			.next()
@@ -1501,7 +1498,7 @@ mod tests {
 			.unwrap()
 			.xpect_eq(expected);
 		for alarm in json["resource"]["aws_cloudwatch_metric_alarm"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.values()
 		{
@@ -1614,10 +1611,10 @@ mod tests {
 						SesRelay::default(),
 					));
 				});
-			scope.finish().unwrap().2.to_json().into_json()
+			scope.finish().unwrap().2.to_json()
 		};
 		records_in("prod")["resource"]["cloudflare_dns_record"]
-			.is_object()
+			.is_map()
 			.xpect_true();
 		let drill = records_in("drill");
 		drill["resource"]["cloudflare_dns_record"]
@@ -1625,7 +1622,7 @@ mod tests {
 			.xpect_true();
 		// ..while the sending identity, which IS stack-scoped, still exists
 		drill["resource"]["aws_sesv2_email_identity"]
-			.is_object()
+			.is_map()
 			.xpect_true();
 	}
 
@@ -1670,9 +1667,9 @@ mod tests {
 					SesRelay::default(),
 				));
 			});
-		scope.finish().unwrap().2.to_json().into_json()["variable"]
+		scope.finish().unwrap().2.to_json()["variable"]
 			["dkim_stalwart_beetmash_com"]
-			.is_object()
+			.is_map()
 			.xpect_true();
 	}
 
@@ -1928,10 +1925,9 @@ mod tests {
 			news().with_alarms_topic("beetmash-mail-alarms"),
 			RelayMode::Comail(ComailRelay::default()),
 		)])
-		.to_json()
-		.into_json();
+		.to_json();
 		let alarms = json["resource"]["aws_cloudwatch_metric_alarm"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.values()
 			.collect::<Vec<_>>();
@@ -1964,15 +1960,15 @@ mod tests {
 	fn a_comail_domain_declares_its_enrolled_records() {
 		let blocks =
 			relayed(&[news()], RelayMode::Comail(ComailRelay::default()));
-		let variables = build_config(&blocks).to_json().into_json()["variable"]
-			.as_object()
+		let variables = build_config(&blocks).to_json()["variable"]
+			.as_map()
 			.unwrap()
 			.keys()
 			.cloned()
 			.collect::<HashSet<_>>();
 		for suffix in ["dkim_selector", "dkim_rsa", "dkim_ed"] {
 			variables
-				.contains(&format!("comail_{suffix}_news_beetmash_com"))
+				.contains(format!("comail_{suffix}_news_beetmash_com").as_str())
 				.xpect_true();
 		}
 		// ..and the sovereign key's, which every mode keeps

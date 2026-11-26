@@ -4,7 +4,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
 
 /// `<AwsDeployCredential/>`: the entry's AWS deploy credential, declared at
 /// the entry's root like `<Secrets/>`: one IAM user for the entry, one managed
@@ -426,9 +425,13 @@ impl AwsDeployCredential {
 		apps: &[AppPolicies],
 		identity_center: Option<&(IdentityCenter, SmolStr)>,
 	) -> Result<Vec<String>> {
-		let digest = |document: &Value| {
-			digest_ext::hex::<sha2::Sha256>(document.to_string().as_bytes())
-				[..16]
+		// keys sorted, so the digest names the document's content and not the
+		// order its statements were built in
+		let digest = |document: Value| {
+			document
+				.xtap(Value::sort_maps)
+				.to_json_string()
+				.xmap(|text| digest_ext::hex::<sha2::Sha256>(text.as_bytes()))[..16]
 				.to_string()
 		};
 		let mut lines = Vec::new();
@@ -436,7 +439,7 @@ impl AwsDeployCredential {
 			lines.push(format!(
 				"{} {}",
 				app.deploy.policy_name(),
-				digest(&app.deploy.to_json())
+				digest(app.deploy.to_json())
 			));
 			for boundary in
 				app.boundaries.values().filter(|held| !held.is_empty())
@@ -444,7 +447,7 @@ impl AwsDeployCredential {
 				lines.push(format!(
 					"{} {}",
 					boundary.policy_name(),
-					digest(&boundary.to_json())
+					digest(boundary.to_json())
 				));
 			}
 		}
@@ -695,7 +698,7 @@ impl AwsDeployCredential {
 			out.push_str(&format!(
 				"\npolicy {}\n{}\n",
 				app.deploy.policy_name(),
-				serde_json::to_string_pretty(&app.deploy.to_json())?
+				app.deploy.to_json().to_json_pretty()
 			));
 			for boundary in
 				app.boundaries.values().filter(|held| !held.is_empty())
@@ -703,7 +706,7 @@ impl AwsDeployCredential {
 				out.push_str(&format!(
 					"\npolicy {}\n{}\n",
 					boundary.policy_name(),
-					serde_json::to_string_pretty(&boundary.to_json())?
+					boundary.to_json().to_json_pretty()
 				));
 			}
 		}
@@ -1378,7 +1381,6 @@ pub(crate) mod aws_seam {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-	use serde_json::Value;
 	use std::sync::Arc;
 	use std::sync::Mutex;
 
@@ -1412,7 +1414,7 @@ pub(crate) mod aws_seam {
 
 		/// The body as json.
 		pub(crate) fn json(&self) -> Value {
-			serde_json::from_str(&self.body).unwrap()
+			json_ext::from_str(&self.body).unwrap()
 		}
 	}
 
@@ -1678,7 +1680,7 @@ impl AwsDeployPolicy {
 		// a managed policy is capped at 6144 characters, and the failure is a
 		// `LimitExceeded` mid-converge with earlier apps already converged
 		const LIMIT: usize = 6144;
-		let rendered = document.to_string();
+		let rendered = document.to_json_string();
 		if rendered.len() > LIMIT {
 			bevybail!(
 				"the document for `{name}` is {} characters, over IAM's {LIMIT} \
@@ -1737,7 +1739,7 @@ impl AwsDeployPolicy {
 		let live = live
 			.text_at("PolicyVersion/Document")
 			.map(Self::decode_document)
-			.and_then(|live| serde_json::from_str::<Value>(&live).ok());
+			.and_then(|live| Value::parse_json(&live).ok());
 		if live.as_ref() == Some(document) {
 			return format!("policy {name} unchanged").xok();
 		}
@@ -1752,7 +1754,7 @@ impl AwsDeployPolicy {
 				.await?;
 			info!("pruned version {oldest} of {name}, which holds five");
 		}
-		let rendered = document.to_string();
+		let rendered = document.to_json_string();
 		admin
 			.iam_call("CreatePolicyVersion", &[
 				("PolicyArn", arn),
@@ -2170,7 +2172,7 @@ mod test {
 	/// changed one prunes the oldest of a full set of versions first.
 	#[beet_core::test]
 	async fn compares_the_live_document_decoded() {
-		let document = serde_json::json!({
+		let document = value!({
 			"Version": "2012-10-17",
 			"Statement": [{"Effect": "Allow", "Action": "s3:GetObject", "Resource": "*"}],
 		});
@@ -2226,8 +2228,7 @@ mod test {
 			.xpect_eq(Some("arn:aws:iam::111:policy/app--deploy".into()));
 
 		let (admin, log) = aws_seam::admin(answer);
-		let changed =
-			serde_json::json!({"Version": "2012-10-17", "Statement": []});
+		let changed = value!({"Version": "2012-10-17", "Statement": []});
 		AwsDeployPolicy::converge_document(
 			&admin,
 			"111",
@@ -2244,9 +2245,7 @@ mod test {
 		log[4].param("SetAsDefault").xpect_eq(Some("true".into()));
 		log[4]
 			.param("PolicyDocument")
-			.map(|document| {
-				serde_json::from_str::<serde_json::Value>(&document).unwrap()
-			})
+			.map(|document| Value::parse_json(&document).unwrap())
 			.xpect_eq(Some(changed));
 	}
 }

@@ -180,14 +180,14 @@ pub(crate) mod test_fixtures {
 	}
 
 	/// `record` exactly as a repo stores it: in the data model, its `$type`
-	/// written as its collection, as indented json.
+	/// written as its collection, as indented json with its keys sorted.
 	pub fn wire<T: AtprotoRecord>(record: &T) -> String {
-		AtprotoValue::from_serde(record)
+		let record = AtprotoValue::from_serde(record)
 			.unwrap()
 			.into_record(&T::COLLECTION)
-			.unwrap()
-			.to_json()
-			.xmap(|json| serde_json::to_string_pretty(&json))
-			.unwrap()
+			.unwrap();
+		let mut sorted = Value::clone(&record);
+		sorted.sort_maps();
+		sorted.to_json_pretty()
 	}
 }

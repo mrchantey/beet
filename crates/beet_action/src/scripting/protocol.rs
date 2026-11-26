@@ -107,13 +107,13 @@ pub enum ScriptEvent {
 pub trait JsonLine: Sized + Serialize + DeserializeOwned {
 	/// Encode as a single newline-free line, without the terminator.
 	fn to_line(&self) -> Result<String> {
-		serde_json::to_string(self)
+		json_ext::to_string(self)
 			.map_err(|err| bevyhow!("script protocol: encode: {err}"))
 	}
 
 	/// Decode one line.
 	fn from_line(line: &str) -> Result<Self> {
-		serde_json::from_str(line)
+		json_ext::from_str(line)
 			.map_err(|err| bevyhow!("script protocol: decode: {err}"))
 	}
 }
@@ -275,10 +275,9 @@ impl ScriptRequest {
 	/// string literal, so the emitted source carries the script and its input as
 	/// data the runner parses, never as code.
 	fn to_js_prelude(&self) -> Result<String> {
-		let literal =
-			serde_json::to_string(&self.to_line()?).map_err(|err| {
-				bevyhow!("script protocol: encode request: {err}")
-			})?;
+		let literal = json_ext::to_string(&self.to_line()?).map_err(|err| {
+			bevyhow!("script protocol: encode request: {err}")
+		})?;
 		format!("const request = JSON.parse({literal});").xok()
 	}
 }

@@ -268,32 +268,26 @@ impl R2BucketBlock {
 	/// bucket, and nothing else in the account. One place says what the token
 	/// grants, so the verb that mints it posts a declaration rather than
 	/// composing one.
-	pub fn token_policies(
-		&self,
-		stack: &ResolvedStack,
-	) -> Result<serde_json::Value> {
-		serde_json::json!([{
+	pub fn token_policies(&self, stack: &ResolvedStack) -> Result<Value> {
+		value!([{
 			"effect": "allow",
 			"resources": self.token_resources(stack)?,
 			"permission_groups": Self::ITEM_PERMISSIONS
 				.iter()
-				.map(|permission| serde_json::json!({ "id": permission.id() }))
+				.map(|permission| value!({ "id": permission.id() }))
 				.collect::<Vec<_>>(),
 		}])
 		.xok()
 	}
 
 	/// The token's resource scope: this bucket, in the default jurisdiction.
-	fn token_resources(
-		&self,
-		stack: &ResolvedStack,
-	) -> Result<serde_json::Value> {
-		serde_json::json!({
-			format!(
+	fn token_resources(&self, stack: &ResolvedStack) -> Result<Value> {
+		value!({
+			(format!(
 				"com.cloudflare.edge.r2.bucket.{}_default_{}",
 				stack.cloudflare_account()?.id(),
 				self.bucket_name(stack)
-			): "*"
+			)): "*"
 		})
 		.xok()
 	}

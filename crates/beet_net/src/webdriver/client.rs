@@ -9,8 +9,6 @@ use async_process::Child;
 use async_process::Command;
 use async_process::Stdio;
 use beet_core::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 use std::time::Duration;
 
 /// WebDriver client configuration for browser automation.
@@ -151,13 +149,9 @@ impl Client {
 			Provider::Geckodriver => "firefox",
 		};
 
-		let mut body = json!({
-			"capabilities": {
-				"alwaysMatch": {
-					"browserName": browser_name,
-					"webSocketUrl": true
-				}
-			}
+		let mut always_match = value!({
+			"browserName": browser_name,
+			"webSocketUrl": true
 		});
 
 		if let Some(dir) = &opts.user_data_dir {
@@ -187,8 +181,10 @@ impl Client {
 					args.push(format!("--user-data-dir={dir}"));
 				}
 				args.extend(opts.extra_args.iter().cloned());
-				body["capabilities"]["alwaysMatch"]
-					.set_field("goog:chromeOptions", json!({ "args": args }))?;
+				always_match.insert(
+					"goog:chromeOptions",
+					value!({ "args": Value::new_list(args) }),
+				)?;
 			}
 			Provider::Geckodriver => {
 				let mut args = vec![];
@@ -201,10 +197,13 @@ impl Client {
 					args.push(dir.to_string());
 				}
 				args.extend(opts.extra_args.iter().cloned());
-				body["capabilities"]["alwaysMatch"]
-					.set_field("moz:firefoxOptions", json!({ "args": args }))?;
+				always_match.insert(
+					"moz:firefoxOptions",
+					value!({ "args": Value::new_list(args) }),
+				)?;
 			}
 		};
+		let body = value!({ "capabilities": { "alwaysMatch": always_match } });
 
 		let res = Backoff::default()
 			.with_max_attempts(15)
@@ -222,9 +221,9 @@ impl Client {
 			.await?;
 
 		// let value = res.field("value")?;/
-		let session_id = res["value"]["sessionId"].to_str()?;
+		let session_id = res["value"]["sessionId"].as_str()?;
 		let socket_url =
-			res["value"]["capabilities"]["webSocketUrl"].to_str()?;
+			res["value"]["capabilities"]["webSocketUrl"].as_str()?;
 
 		let driver_url = self.base_url();
 		Session::connect(&driver_url, session_id, socket_url).await
@@ -439,7 +438,7 @@ mod test {
 			.evaluate_value("localStorage.getItem('beet')")
 			.await
 			.unwrap()
-			.xpect_eq(serde_json::json!("kept"));
+			.xpect_eq(value!("kept"));
 		browser.kill().await.unwrap();
 		#[cfg(unix)]
 		{

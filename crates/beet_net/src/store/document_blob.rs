@@ -304,10 +304,10 @@ mod test {
 	}
 
 	/// A store holding the app's two documents, as the entry ships them. The
-	/// concrete [`InMemoryStore`] so spawning it subscribes its watcher, the way
+	/// concrete [`InMemoryBlobStore`] so spawning it subscribes its watcher, the way
 	/// a store declared in markup does.
-	async fn todo_store() -> InMemoryStore {
-		let inner = InMemoryStore::new();
+	async fn todo_store() -> InMemoryBlobStore {
+		let inner = InMemoryBlobStore::new();
 		let store = BlobStore::new(inner.clone());
 		store
 			.insert_document(

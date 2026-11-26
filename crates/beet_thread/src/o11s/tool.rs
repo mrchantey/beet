@@ -14,10 +14,11 @@
 //! Use [`FunctionToolParam`] to define tools available to the model:
 //!
 //! ```no_run
+//! # use beet_core::prelude::*;
 //! # use beet_thread::prelude::*;
 //! let tool = o11s::FunctionToolParam::new("search_web")
 //!     .with_description("Search the web for information")
-//!     .with_parameters(serde_json::json!({
+//!     .with_parameters(value!({
 //!         "type": "object",
 //!         "properties": {
 //!             "query": {
@@ -38,6 +39,7 @@
 //! - `ToolChoice::required()`: Force the model to call a tool
 //! - `ToolChoice::function("name")`: Force a specific function
 
+use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -54,7 +56,7 @@ pub struct FunctionToolParam {
 	pub description: Option<String>,
 	/// A JSON schema object describing the function parameters.
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub parameters: Option<serde_json::Value>,
+	pub parameters: Option<Value>,
 	/// Whether to enforce strict parameter validation. Defaults to `true`.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub strict: Option<bool>,
@@ -66,11 +68,12 @@ impl FunctionToolParam {
 	/// # Example
 	///
 	/// ```no_run
+	/// use beet_core::prelude::*;
 	/// use beet_thread::o11s::FunctionToolParam;
 	///
 	/// let tool = FunctionToolParam::new("get_weather")
 	///     .with_description("Get the current weather for a location")
-	///     .with_parameters(serde_json::json!({
+	///     .with_parameters(value!({
 	///         "type": "object",
 	///         "properties": {
 	///             "location": {
@@ -100,7 +103,7 @@ impl FunctionToolParam {
 	}
 
 	/// Sets the function parameters schema.
-	pub fn with_parameters(mut self, parameters: serde_json::Value) -> Self {
+	pub fn with_parameters(mut self, parameters: Value) -> Self {
 		self.parameters = Some(parameters);
 		self
 	}
@@ -125,7 +128,7 @@ pub struct FunctionTool {
 	pub description: Option<String>,
 	/// The parameters schema.
 	#[serde(default)]
-	pub parameters: Option<serde_json::Value>,
+	pub parameters: Option<Value>,
 	/// Whether strict parameter validation is enforced.
 	#[serde(default)]
 	pub strict: Option<bool>,
@@ -192,7 +195,7 @@ mod test {
 	fn serializes_function_tool() {
 		let tool = FunctionToolParam::new("get_weather")
 			.with_description("Get weather info")
-			.with_parameters(serde_json::json!({
+			.with_parameters(value!({
 				"type": "object",
 				"properties": {
 					"location": {"type": "string"}
@@ -200,22 +203,22 @@ mod test {
 				"required": ["location"]
 			}));
 
-		let json = serde_json::to_value(&tool).unwrap();
-		assert_eq!(json["type"], "function");
-		assert_eq!(json["name"], "get_weather");
-		assert_eq!(json["description"], "Get weather info");
-		assert!(json["parameters"]["properties"]["location"].is_object());
+		let json = Value::from_serde(&tool).unwrap();
+		assert_eq!(json["type"], Value::str("function"));
+		assert_eq!(json["name"], Value::str("get_weather"));
+		assert_eq!(json["description"], Value::str("Get weather info"));
+		assert!(json["parameters"]["properties"]["location"].is_map());
 	}
 
 	#[beet_core::test]
 	fn serializes_tool_choice() {
 		let choice = ToolChoice::auto();
-		let json = serde_json::to_value(&choice).unwrap();
-		assert_eq!(json, "auto");
+		let json = Value::from_serde(&choice).unwrap();
+		assert_eq!(json, Value::str("auto"));
 
 		let choice = ToolChoice::function("get_weather");
-		let json = serde_json::to_value(&choice).unwrap();
-		assert_eq!(json["type"], "function");
-		assert_eq!(json["name"], "get_weather");
+		let json = Value::from_serde(&choice).unwrap();
+		assert_eq!(json["type"], Value::str("function"));
+		assert_eq!(json["name"], Value::str("get_weather"));
 	}
 }

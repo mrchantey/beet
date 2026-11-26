@@ -401,7 +401,11 @@ pub(crate) mod test_support {
 		let mut identities = AgeIdentityFile::default();
 		identities.push(process_identity());
 		DocumentSecretStore::new(
-			SecretsHandle::new(BlobStore::temp(), "secrets.toml").unwrap(),
+			SecretsHandle::new(
+				BlobStore::new(InMemoryBlobStore::new()),
+				"secrets.toml",
+			)
+			.unwrap(),
 			stack.secret_scope(),
 		)
 		.unwrap()
@@ -433,7 +437,7 @@ pub(crate) mod test_support {
 			.spawn((
 				Stack::new("app").with_stage("prod"),
 				AwsRegion::new(Stack::TEST_AWS_REGION),
-				BlobStore::temp(),
+				BlobStore::new(InMemoryBlobStore::new()),
 				RepoStore,
 				declarations,
 			))
@@ -760,8 +764,11 @@ mod test {
 		let alice = AgeIdentity::generate();
 		let mut alice_file = AgeIdentityFile::default();
 		alice_file.push(alice.clone());
-		let seed =
-			SecretsHandle::new(BlobStore::temp(), "secrets.toml").unwrap();
+		let seed = SecretsHandle::new(
+			BlobStore::new(InMemoryBlobStore::new()),
+			"secrets.toml",
+		)
+		.unwrap();
 		let mut document = SecretsDocument::default();
 		document
 			.set(&alice_file, "default", "A", "1", default())

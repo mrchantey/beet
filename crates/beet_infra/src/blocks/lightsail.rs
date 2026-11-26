@@ -1,7 +1,6 @@
 use crate::bindings::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::json;
 
 /// Networking mode for the Lightsail instance.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -267,7 +266,7 @@ impl LightsailBlock {
 	) -> Result<String> {
 		let region = stack.aws_region()?;
 		let log_group = self.log_group(stack);
-		let certificate_store = json!({
+		let certificate_store = value!({
 			"Sid": "CertificateStore",
 			"Effect": "Allow",
 			"Action": ["s3:PutObject"],
@@ -285,7 +284,7 @@ impl LightsailBlock {
 				false => policy.statement(certificate_store),
 			})
 			// the block's own log group, for the CloudWatch agent
-			.statement(json!({
+			.statement(value!({
 				"Sid": "OwnLogGroup",
 				"Effect": "Allow",
 				"Action": [
@@ -1612,8 +1611,8 @@ mod tests {
 			.resource_ident(block.build_label("key-rotation"))
 			.label()
 			.to_string();
-		scope.finish().unwrap().2.to_json().into_json()["resource"]
-			["terraform_data"][label]["input"]
+		scope.finish().unwrap().2.to_json()["resource"]["terraform_data"]
+			[label.as_str()]["input"]
 			.as_str()
 			.unwrap()
 			.to_string()
@@ -1729,9 +1728,9 @@ mod tests {
 			.resource_ident(block.build_label("instance"))
 			.label()
 			.to_string();
-		let config = scope.finish().unwrap().2.to_json().into_json();
+		let config = scope.finish().unwrap().2.to_json();
 		let ports = &config["resource"]["aws_lightsail_instance_public_ports"]
-			[&ports_label];
+			[ports_label.as_str()];
 		ports["lifecycle"]["replace_triggered_by"][0]
 			.as_str()
 			.unwrap()
@@ -1739,7 +1738,7 @@ mod tests {
 		// the rules the rebuild must restore, ie every port the box needs to be
 		// reachable on: without 443 the edge cannot reach the origin at all
 		ports["port_info"]
-			.as_array()
+			.as_list()
 			.unwrap()
 			.iter()
 			.map(|port| port["from_port"].as_u64().unwrap())
@@ -1766,13 +1765,13 @@ mod tests {
 			.resource_ident(block.build_label("logs"))
 			.label()
 			.to_string();
-		let config = scope.finish().unwrap().2.to_json().into_json();
-		config["resource"]["aws_lightsail_instance"][&instance_label]
+		let config = scope.finish().unwrap().2.to_json();
+		config["resource"]["aws_lightsail_instance"][instance_label.as_str()]
 			["depends_on"][0]
 			.as_str()
 			.unwrap()
 			.xpect_eq(&format!("aws_cloudwatch_log_group.{logs_label}"));
-		config["resource"]["aws_lightsail_instance"][&instance_label]
+		config["resource"]["aws_lightsail_instance"][instance_label.as_str()]
 			["depends_on"][1]
 			.as_str()
 			.unwrap()
@@ -1800,8 +1799,8 @@ mod tests {
 			.to_string();
 		let rendered = scope.finish().unwrap().2;
 		let json = rendered.to_json_string();
-		let config = rendered.to_json().into_json();
-		config["resource"]["aws_cloudwatch_log_group"][&logs_label]
+		let config = rendered.to_json();
+		config["resource"]["aws_cloudwatch_log_group"][logs_label.as_str()]
 			["retention_in_days"]
 			.as_i64()
 			.unwrap()
@@ -2135,7 +2134,7 @@ mod tests {
 			.lower(&config)
 			.unwrap()
 			.to_json()
-			.to_string()
+			.to_json_string()
 			.xpect_contains(&parameter)
 			.xnot()
 			.xpect_contains("other-secret");
@@ -2264,9 +2263,8 @@ mod tests {
 			.xpect_contains("dynamodb:PutItem");
 		// ..and the read-only statement stays the repo bucket alone, never
 		// widened by the writable one
-		serde_json::from_str::<serde_json::Value>(&policy).unwrap()["Statement"]
-			[0]["Resource"]
-			.to_string()
+		Value::parse_json(&policy).unwrap()["Statement"][0]["Resource"]
+			.to_json_string()
 			.as_str()
 			.xnot()
 			.xpect_contains("writable-bucket");

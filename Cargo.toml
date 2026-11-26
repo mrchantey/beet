@@ -235,7 +235,7 @@ semver = { version = "1", default-features = false }
 indexmap = { version = "2", default-features = false }
 # no_std by default; std consumers re-enable `serde/std` (eg via `beet_core/std`).
 serde = { version = "1", default-features = false, features = ["derive"] }
-# no_std by default (alloc only); std consumers re-enable `serde_json/std`.
+# only the reference beet_core's own json is tested against, a dev-dependency
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 # QuickJS engine via high-level bindings to the bundled C engine. `rust-alloc`
 # routes allocation through Rust's global allocator instead of libc's malloc; the
@@ -694,7 +694,6 @@ uuid = { workspace = true, features = ["std", "js"] }
 [dev-dependencies]
 beet = { path = "." }
 serde.workspace = true
-serde_json.workspace = true
 async-executor.workspace = true
 futures.workspace = true
 

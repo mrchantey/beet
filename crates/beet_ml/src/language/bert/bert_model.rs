@@ -12,8 +12,8 @@ use burn::tensor::Int;
 use burn::tensor::Tensor;
 
 /// HuggingFace-compatible bert model config (sentence-transformers
-/// MiniLM family). Load from a `config.json` via [`serde_json`]; extra
-/// fields are ignored.
+/// MiniLM family). Load from a `config.json` via `json_ext::from_slice`;
+/// extra fields are ignored.
 #[derive(Config, Debug)]
 pub struct BertModelConfig {
 	pub hidden_size: usize,

@@ -71,9 +71,13 @@ impl Row {
 	}
 
 	/// The json form as a value: bytes as `$bytes` objects, everything else
-	/// as itself, which for a record is its data model form.
+	/// as itself, which for a record is its data model form. Its maps are
+	/// sorted ([`Value::sort_maps`]), so rows equal by content store the same
+	/// text.
 	pub fn into_json_form(self) -> Value {
-		Self::encode_bytes(Value::Map(self.0))
+		let mut value = Self::encode_bytes(Value::Map(self.0));
+		value.sort_maps();
+		value
 	}
 
 	/// The json form as compact text, see

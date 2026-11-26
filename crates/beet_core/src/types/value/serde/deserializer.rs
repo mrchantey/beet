@@ -22,10 +22,8 @@ impl de::Error for DeError {
 
 type DeResult<T> = core::result::Result<T, DeError>;
 
-/// A [`::serde::Deserializer`] that reads a [`Value`] directly.
-///
-/// This avoids round-tripping through `serde_json::Value`, preserving the
-/// signed/unsigned distinction.
+/// A [`::serde::Deserializer`] that reads a [`Value`] directly, the second
+/// half of every `json_ext` read, keeping the signed/unsigned distinction.
 pub struct ValueDeserializer<'a> {
 	value: Value,
 	references: References<'a>,

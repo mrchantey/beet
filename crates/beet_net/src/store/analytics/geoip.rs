@@ -345,7 +345,7 @@ mod test {
 	/// rather than failing the load.
 	#[beet_core::test]
 	async fn missing_db_yields_empty_lookups() {
-		let assets = BlobStore::new(InMemoryStore::new());
+		let assets = BlobStore::new(InMemoryBlobStore::new());
 		GeoIp::load(&assets, &RelPath::new(COUNTRY_DB_PATH))
 			.await
 			.unwrap()
@@ -358,7 +358,7 @@ mod test {
 	#[cfg(feature = "geoip")]
 	#[beet_core::test]
 	async fn corrupt_db_is_loud() {
-		let assets = BlobStore::new(InMemoryStore::new());
+		let assets = BlobStore::new(InMemoryBlobStore::new());
 		let path = RelPath::new(COUNTRY_DB_PATH);
 		assets.insert(&path, "not an mmdb").await.unwrap();
 		GeoIp::load(&assets, &path)

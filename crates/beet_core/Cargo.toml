@@ -82,7 +82,6 @@ std = [
 	"thiserror/std",
 	"tracing/std",
 	"serde?/std",
-	"serde_json?/std",
 	"futures-lite/race",
 	# the async bridge is std-independent, but every std build wants it
 	"bevy_async",
@@ -171,7 +170,7 @@ serde = [
 ]
 # Plaintext (de)serialization for `MediaType::Text` via serde_plain.
 serde_plain = ["serde", "dep:serde_plain"]
-json = ["serde", "dep:serde_json"]
+json = ["serde"]
 postcard = ["serde", "dep:postcard"]
 # TOML through `MediaType::Toml`'s serde dispatch, values only.
 toml = ["serde", "dep:toml"]
@@ -268,7 +267,6 @@ either = { version = "1", default-features = false }
 # `serde/std` via the `std` feature. `alloc`/`rc` add the no_std collection impls.
 serde = { workspace = true, optional = true, features = ["alloc", "rc"] }
 serde_plain = {workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
 # canonical DAG-CBOR, hand rolling being where map ordering and tag 42 go

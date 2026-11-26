@@ -276,7 +276,7 @@ mod test {
 	async fn package(documents: &[(&str, &str)]) -> (World, BlobStore) {
 		let world =
 			(AsyncPlugin, DocumentPlugin, SceneStorePlugin).into_world();
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		for (path, source) in documents {
 			store
 				.insert(&RelPath::new(path), source.to_string())

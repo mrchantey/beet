@@ -198,21 +198,18 @@ impl MockPostStreamer {
 	///
 	/// Returns an error if the tool's schema is not a readable JSON Schema.
 	fn default_arguments(schema: &JsonSchema) -> Result<String> {
-		let json = schema.clone().into_inner().into_json();
+		let json = schema.clone().into_inner();
 		let mut registry = SchemaRegistry::new();
-		if let Some(defs) = json.get("$defs").and_then(|defs| defs.as_object())
+		if let Some(defs) =
+			json.get("$defs").and_then(|defs| defs.as_map().ok())
 		{
-			for (name, def) in defs {
-				registry.insert(
-					name.as_str(),
-					ValueSchema::from_value(&Value::from_serde(def)?)?,
-				);
+			for (name, def) in defs.iter() {
+				registry.insert(name.as_str(), ValueSchema::from_value(def)?);
 			}
 		}
-		ValueSchema::from_value(&Value::from_serde(&json)?)?
+		ValueSchema::from_value(&json)?
 			.default_value_in(SchemaResolver::default().with_schemas(&registry))
-			.into_json()
-			.xmap(|json| serde_json::to_string(&json))?
+			.to_json_string()
 			.xok()
 	}
 }
@@ -279,7 +276,7 @@ impl PostStreamer for MockPostStreamer {
 			// provider would
 			let call = match turn {
 				Some(MockTurn::Call { tool, arguments }) => {
-					Some((tool, serde_json::to_string(&arguments)?))
+					Some((tool, arguments.to_json_string()))
 				}
 				Some(MockTurn::Text(text)) => {
 					return Self::stream(
@@ -489,7 +486,7 @@ mod test {
 		.unwrap();
 
 		name.xpect_eq("greet");
-		let parsed: serde_json::Value = serde_json::from_str(&args).unwrap();
+		let parsed = Value::parse_json(&args).unwrap();
 		parsed["name"].as_str().unwrap().xpect_eq("");
 		parsed["age"].as_i64().unwrap().xpect_eq(0);
 	}
@@ -638,7 +635,7 @@ mod test {
 		})
 		.unwrap();
 
-		let parsed: serde_json::Value = serde_json::from_str(&args).unwrap();
+		let parsed = Value::parse_json(&args).unwrap();
 		parsed["label"].as_str().unwrap().xpect_eq("");
 		parsed["at"]["x"].as_i64().unwrap().xpect_eq(0);
 		parsed["at"]["y"].as_i64().unwrap().xpect_eq(0);

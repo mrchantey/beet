@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 /// Store-agnostic, so the same mirror publishes a staged directory into an S3
 /// prefix, a memory store or a directory, and a test compares the two ends
 /// directly. Both ends are read through
-/// [`list_stats`](BlobStoreProvider::list_stats), so an object whose size and
+/// [`list_stats`](BlobProvider::list_stats), so an object whose size and
 /// digest already match is never re-sent: on S3 one listing answers every
 /// stat, which is what keeps a content-only sync of a large tree quick.
 ///
@@ -17,7 +17,7 @@ use beet_core::prelude::*;
 /// exactly reflects it. A deploy wants that (a renamed or removed source file
 /// otherwise lingers across deploys), a source of record does not. A mirror is
 /// refused where its source is empty or missing, or reads through a link to an
-/// empty directory ([`BlobStoreProvider::empty_links`]): the signature of an
+/// empty directory ([`BlobProvider::empty_links`]): the signature of an
 /// unhydrated checkout, which would empty the destination.
 ///
 /// What each end is, beyond its contents, is the end's own declaration: a
@@ -228,7 +228,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	async fn seeded(entries: &[(&str, &str)]) -> BlobStore {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		for (path, body) in entries {
 			store
 				.insert(&RelPath::new(path), body.to_string())
@@ -247,7 +247,7 @@ mod test {
 	#[beet_core::test]
 	async fn copies_once_then_skips() {
 		let source = seeded(&[("a.txt", "a"), ("dir/b.txt", "b")]).await;
-		let dest = BlobStore::temp();
+		let dest = BlobStore::new(InMemoryBlobStore::new());
 		let sync = BlobSync::new(source.clone(), dest.clone());
 		let report = sync.run().await.unwrap();
 		report.copied.xpect_eq(paths(&["a.txt", "dir/b.txt"]));
@@ -310,7 +310,7 @@ mod test {
 	#[beet_core::test]
 	async fn refuses_to_mirror_an_empty_source() {
 		let dest = seeded(&[("keep.txt", "k")]).await;
-		let source = BlobStore::temp();
+		let source = BlobStore::new(InMemoryBlobStore::new());
 		let sync = BlobSync::new(source.clone(), dest.clone());
 		sync.run().await.unwrap().copied.xpect_empty();
 		for dry_run in [false, true] {
@@ -360,7 +360,7 @@ mod test {
 					FsStore::new(root.path().clone())
 						.with_follow_symlinks(follow),
 				),
-				BlobStore::temp(),
+				BlobStore::new(InMemoryBlobStore::new()),
 			)
 			.with_delete(true)
 		};
@@ -445,7 +445,7 @@ mod test {
 					FsStore::new(root.path().clone())
 						.with_follow_symlinks(follow),
 				),
-				BlobStore::temp(),
+				BlobStore::new(InMemoryBlobStore::new()),
 			)
 		};
 		sync(true)
@@ -471,7 +471,7 @@ mod test {
 		fs_ext::write(root.join("main.bsx"), "<div/>").unwrap();
 		fs_ext::write(root.join("assets/logo.png"), "png").unwrap();
 		let source = BlobStore::new(FsStore::new(root.path().clone()));
-		let dest = BlobStore::temp();
+		let dest = BlobStore::new(InMemoryBlobStore::new());
 		BlobSync::new(source.clone(), dest.clone())
 			.with_delete(true)
 			.run()

@@ -77,8 +77,11 @@ impl JsonLd {
 		// this document is embedded in a `<script>`, where a `</script>` in any
 		// value would close the block early and spill the rest into the page as
 		// markup. Inside json text a `<` only ever appears within a string
-		// literal, so escaping every one is both safe and sufficient.
-		Value::Map(map).to_json_string().replace('<', "\\u003c")
+		// literal, so escaping every one is both safe and sufficient. Keys are
+		// sorted, so the text reads the same however the map was built.
+		let mut value = Value::Map(map);
+		value.sort_maps();
+		value.to_json_string().replace('<', "\\u003c")
 	}
 }
 

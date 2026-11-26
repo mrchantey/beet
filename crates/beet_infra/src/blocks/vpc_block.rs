@@ -509,7 +509,6 @@ pub struct VpcConsumers(Vec<Entity>);
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use serde_json::Value;
 
 	/// The config `block` emits against a Sydney stack, ie the one the mail
 	/// stack deploys into and the one whose availability zones the subnets name.
@@ -529,13 +528,9 @@ mod tests {
 
 	/// Every resource of `resource_type` the config carries, keyed by terraform
 	/// label.
-	fn resources(
-		config: &terra::Config,
-		resource_type: &str,
-	) -> serde_json::Map<String, Value> {
-		let Some(Value::Object(resources)) = config
+	fn resources(config: &terra::Config, resource_type: &str) -> Map {
+		let Some(Value::Map(resources)) = config
 			.to_json()
-			.into_json()
 			.get("resource")
 			.and_then(|it| it.get(resource_type))
 			.cloned()
@@ -707,7 +702,7 @@ mod tests {
 		let block = VpcBlock::new("net").with_ipv6(true);
 		config
 			.to_json()
-			.into_json()["resource"]["aws_vpc"]["beet_infra__dev__net_vpc"]
+			["resource"]["aws_vpc"]["beet_infra__dev__net_vpc"]
 			["assign_generated_ipv6_cidr_block"]
 			.xpect_eq(Value::Bool(true));
 		let mut subnets = resources(&config, "aws_subnet")
@@ -716,9 +711,10 @@ mod tests {
 				format!(
 					"{} {} {}",
 					subnet["tags"]["Name"].as_str().unwrap(),
-					subnet["ipv6_cidr_block"].as_str().unwrap_or("-"),
+					subnet["ipv6_cidr_block"].as_str().ok().unwrap_or("-"),
 					subnet["assign_ipv6_address_on_creation"]
 						.as_bool()
+						.ok()
 						.map(|it| it.to_string())
 						.unwrap_or("-".into()),
 				)
@@ -776,7 +772,7 @@ mod tests {
 				.trim_start_matches(&format!("{resource_type}."))
 				.to_string();
 			resources(&config, resource_type)
-				.contains_key(&label)
+				.contains(&label)
 				.xpect_true();
 		}
 		// ..and a subnet group's worth of them, in zone order

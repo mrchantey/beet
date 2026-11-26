@@ -6,11 +6,11 @@ use serde::Serialize;
 
 /// Storage provider for one partition's tables: rows read and written as
 /// [`StoredRow`]s, each write guarded by a [`Precondition`]. Rows alone: a table
-/// store holds no bytes, which are a [`BlobStoreProvider`]'s.
+/// store holds no bytes, which are a [`BlobProvider`]'s.
 ///
 /// A provider is one database with one writer, atomic within itself:
 /// [`partition`](Self::partition) scopes another one out of the same
-/// declaration, the way [`with_subdir`](BlobStoreProvider::with_subdir) scopes
+/// declaration, the way [`with_subdir`](BlobProvider::with_subdir) scopes
 /// a blob store, and [`apply`](Self::apply) is atomic across this partition's
 /// tables and never beyond them.
 ///

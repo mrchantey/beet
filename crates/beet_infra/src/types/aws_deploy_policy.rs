@@ -3,8 +3,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 /// The deploy-side counterpart of [`IamPolicy`]: that lowers a stack's
 /// [`AccessGrant`]s into what the RUNNING process may do, this lowers the
@@ -344,24 +342,24 @@ impl AwsDeployPolicy {
 
 	/// The policy document, ready for `iam create-policy`.
 	pub fn to_json(&self) -> Value {
-		let mut statements = vec![json!({
+		let mut statements = vec![value!({
 			"Sid": "Global",
 			"Effect": "Allow",
-			"Action": self.global_actions(),
+			"Action": Value::new_list(self.global_actions()),
 			"Resource": "*",
 		})];
 		if let Some(regional) = self.regional_actions() {
-			statements.push(json!({
+			statements.push(value!({
 				"Sid": "Regional",
 				"Effect": "Allow",
-				"Action": regional,
+				"Action": Value::new_list(regional),
 				"Resource": "*",
 				// every regional service in one condition: a credential that
 				// cannot call outside its stacks' regions cannot quietly run a
 				// workload in one nobody looks at
 				"Condition": {
 					"StringEquals": {
-						"aws:RequestedRegion": self.regions.iter().collect::<Vec<_>>(),
+						"aws:RequestedRegion": Value::new_list(&self.regions),
 					}
 				},
 			}));
@@ -369,7 +367,7 @@ impl AwsDeployPolicy {
 		// the state bucket itself is shared by every app in the account, so
 		// only its keys are scoped: the bucket-level reads are what
 		// `ensure_exists` and the region discovery call on every verb
-		statements.push(json!({
+		statements.push(value!({
 			"Sid": "StateBucket",
 			"Effect": "Allow",
 			"Action": [
@@ -379,7 +377,7 @@ impl AwsDeployPolicy {
 			],
 			"Resource": format!("arn:aws:s3:::{}", self.state_bucket),
 		}));
-		statements.push(json!({
+		statements.push(value!({
 			"Sid": "State",
 			"Effect": "Allow",
 			"Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
@@ -391,7 +389,7 @@ impl AwsDeployPolicy {
 			),
 		}));
 		if self.services.contains("s3") {
-			statements.push(json!({
+			statements.push(value!({
 				"Sid": "Buckets",
 				"Effect": "Allow",
 				"Action": "s3:*",
@@ -402,13 +400,13 @@ impl AwsDeployPolicy {
 			}));
 		}
 		if self.services.contains("iam") {
-			statements.push(json!({
+			statements.push(value!({
 				"Sid": "Iam",
 				"Effect": "Allow",
 				"Action": "iam:*",
-				"Resource": self.iam_resources(),
+				"Resource": Value::new_list(self.iam_resources()),
 			}));
-			statements.push(json!({
+			statements.push(value!({
 				"Sid": "IamManagedRead",
 				"Effect": "Allow",
 				// an attachment of an aws-managed policy reads it first
@@ -431,7 +429,7 @@ impl AwsDeployPolicy {
 		// rendered `aws_ssm_*` denied those writes for a stack that renders
 		// none, with an `AccessDenied` on `ssm:PutParameter` that no re-mint
 		// could fix, since the lowering follows the declarations.
-		statements.push(json!({
+		statements.push(value!({
 			"Sid": "Ssm",
 			"Effect": "Allow",
 			"Action": "ssm:*",
@@ -443,7 +441,7 @@ impl AwsDeployPolicy {
 		// answers names and descriptions, never a value. Gating it on a
 		// rendered parameter left every stack rendering none unable to sweep
 		// its own store on destroy.
-		statements.push(json!({
+		statements.push(value!({
 			"Sid": "SsmDescribe",
 			"Effect": "Allow",
 			"Action": "ssm:DescribeParameters",
@@ -457,14 +455,14 @@ impl AwsDeployPolicy {
 			// RESOURCE (`PutParameter`, `GetParameter`, `ListTagsForResource`,
 			// `AddTagsToResource`, `RemoveTagsFromResource`, `DeleteParameter`)
 			// names the app's prefix, and `DescribeParameters` is granted above.
-			statements.push(json!({
+			statements.push(value!({
 				"Sid": "SsmPublic",
 				"Effect": "Allow",
 				"Action": ["ssm:GetParameter", "ssm:GetParameters"],
 				"Resource": "arn:aws:ssm:*:*:parameter/aws/service/*",
 			}));
 		}
-		json!({ "Version": "2012-10-17", "Statement": statements })
+		value!({ "Version": "2012-10-17", "Statement": statements })
 	}
 
 	/// The unconditioned statement's actions: the identity call every launch
@@ -537,7 +535,7 @@ impl AwsDeployPolicy {
 		}
 		let boundary = self.boundary_pattern();
 		vec![
-			json!({
+			value!({
 				"Sid": "IamOnlyUnderTheBoundary",
 				"Effect": "Deny",
 				"Action": [
@@ -556,7 +554,7 @@ impl AwsDeployPolicy {
 				],
 				// this app's principals only: see the note above about one
 				// user carrying one policy per app
-				"Resource": self.principal_resources(),
+				"Resource": Value::new_list(self.principal_resources()),
 				// `StringNotLike`, since one policy covers every stage and
 				// each stage has a boundary of its own.
 				//
@@ -574,16 +572,16 @@ impl AwsDeployPolicy {
 					"StringNotLike": { "iam:PermissionsBoundary": &boundary }
 				},
 			}),
-			json!({
+			value!({
 				"Sid": "NeverUncap",
 				"Effect": "Deny",
 				"Action": [
 					"iam:DeleteRolePermissionsBoundary",
 					"iam:DeleteUserPermissionsBoundary",
 				],
-				"Resource": self.principal_resources(),
+				"Resource": Value::new_list(self.principal_resources()),
 			}),
-			json!({
+			value!({
 				"Sid": "NeverMintOrRewriteACap",
 				"Effect": "Deny",
 				// `CreatePolicy` belongs here because the condition above
@@ -730,11 +728,11 @@ impl AwsDeployPolicy {
 			"rbin:DeleteRule",
 		]);
 		resources.push("arn:aws:rbin:*:*:rule/*".into());
-		json!({
+		value!({
 			"Sid": "IrreversibleNeedsMfa",
 			"Effect": "Deny",
-			"Action": actions,
-			"Resource": resources,
+			"Action": Value::new_list(actions),
+			"Resource": Value::new_list(resources),
 			"Condition": {
 				"BoolIfExists": { "aws:MultiFactorAuthPresent": "false" }
 			},
@@ -750,14 +748,14 @@ impl AwsDeployPolicy {
 	/// and the gate refuses a plan that would, before it runs.
 	fn data_volume_statement(&self) -> Option<Value> {
 		self.services.contains("ec2").then(|| {
-			json!({
+			value!({
 				"Sid": "DataVolumeNeedsMfa",
 				"Effect": "Deny",
 				"Action": ["ec2:DeleteVolume"],
 				"Resource": "*",
 				"Condition": {
 					"BoolIfExists": { "aws:MultiFactorAuthPresent": "false" },
-					"StringEquals": { "aws:ResourceTag/Project": self.app },
+					"StringEquals": { "aws:ResourceTag/Project": &self.app },
 					"StringNotEquals": {
 						"aws:ResourceTag/Stage": BootstrapConfig::DEFAULT_STAGE
 					},
@@ -867,7 +865,7 @@ mod test {
 			.lower(&stack, &config)
 			.unwrap();
 		policy.policy_name().xpect_eq("my-egress--deploy");
-		let document = policy.to_json().to_string();
+		let document = policy.to_json().to_json_string();
 		document
 			.as_str()
 			.xpect_contains("arn:aws:s3:::my-egress--*/*")
@@ -912,7 +910,7 @@ mod test {
 			.lower(&stack, &config)
 			.unwrap()
 			.to_json()
-			.to_string()
+			.to_json_string()
 			.as_str()
 			.xpect_contains("arn:aws:ssm:*:*:parameter/my-egress/*")
 			// the store's listing, which `StackTeardown` sweeps it with
@@ -942,7 +940,7 @@ mod test {
 			.xpect_eq(vec!["ops.apigateway.amazonaws.com"]);
 		policy
 			.to_json()
-			.to_string()
+			.to_json_string()
 			.xnot()
 			.xpect_contains("CreateServiceLinkedRole");
 	}
@@ -971,7 +969,7 @@ mod test {
 			.lower(&shared, &shared_config)
 			.unwrap()
 			.to_json()
-			.to_string();
+			.to_json_string();
 		// one pattern covers both stages, so lowering the second adds nothing
 		document
 			.as_str()
@@ -1003,17 +1001,17 @@ mod test {
 		// unconditioned until the account says every principal is capped
 		policy
 			.to_json()
-			.to_string()
+			.to_json_string()
 			.xpect_contains("iam:*")
 			.xnot()
 			.xpect_contains("PermissionsBoundary");
 		let document = policy.with_boundary().to_json();
 		let statement = |sid: &str| {
 			document["Statement"]
-				.as_array()
+				.as_list()
 				.unwrap()
 				.iter()
-				.find(|statement| statement["Sid"] == sid)
+				.find(|statement| statement["Sid"] == Value::from(sid))
 				.cloned()
 				.unwrap()
 		};
@@ -1026,7 +1024,7 @@ mod test {
 		// trust-policy change outright, and denying it buys nothing once the
 		// boundary is attached.
 		under["Action"]
-			.to_string()
+			.to_json_string()
 			.as_str()
 			.xpect_contains("iam:CreateRole")
 			.xnot()
@@ -1043,16 +1041,16 @@ mod test {
 		// a capped principal cannot uncap itself, and the cap itself cannot
 		// be rewritten by the policy it caps
 		statement("NeverUncap")["Action"]
-			.to_string()
+			.to_json_string()
 			.xpect_contains("iam:DeleteRolePermissionsBoundary");
 		// the condition admits ANY boundary of this app, so minting one is
 		// what has to be denied or the cap is decorative
 		let never_mint = statement("NeverMintOrRewriteACap");
 		never_mint["Action"]
-			.to_string()
+			.to_json_string()
 			.xpect_contains("iam:CreatePolicy");
 		never_mint["Resource"]
-			.to_string()
+			.to_json_string()
 			.xpect_contains("--*--runtime-boundary")
 			.xpect_contains("--deploy");
 	}
@@ -1083,10 +1081,13 @@ mod test {
 		};
 		let deny = |app: &str| {
 			document(app)["Statement"]
-				.as_array()
+				.as_list()
 				.unwrap()
 				.iter()
-				.find(|statement| statement["Sid"] == "IamOnlyUnderTheBoundary")
+				.find(|statement| {
+					statement["Sid"].as_str().ok()
+						== Some("IamOnlyUnderTheBoundary")
+				})
 				.unwrap()
 				.clone()
 		};
@@ -1098,7 +1099,7 @@ mod test {
 			(&site, "beet-site", "beet-social"),
 			(&social, "beet-social", "beet-site"),
 		] {
-			let resources = held["Resource"].to_string();
+			let resources = held["Resource"].to_json_string();
 			resources
 				.as_str()
 				.xpect_contains(&format!("role/{mine}--*"))
@@ -1111,7 +1112,7 @@ mod test {
 		}
 		// and the `--` separator is what keeps an app named `beet` from
 		// matching `beet-site--*`, which is what makes per-app scoping enough
-		let beet = deny("beet")["Resource"].to_string();
+		let beet = deny("beet")["Resource"].to_json_string();
 		beet.as_str().xpect_contains("role/beet--*");
 		beet.contains("beet-site").xpect_false();
 	}
@@ -1140,10 +1141,12 @@ mod test {
 			.unwrap()
 			.to_json();
 		let deny = document["Statement"]
-			.as_array()
+			.as_list()
 			.unwrap()
 			.iter()
-			.find(|statement| statement["Sid"] == "IrreversibleNeedsMfa")
+			.find(|statement| {
+				statement["Sid"].as_str().ok() == Some("IrreversibleNeedsMfa")
+			})
 			.unwrap()
 			.clone();
 		deny["Effect"].as_str().unwrap().xpect_eq("Deny");
@@ -1155,7 +1158,7 @@ mod test {
 		// of which a plain deploy never changes: the gate sends a plan that
 		// would elevated first. A rename is an ordinary change, so not a role.
 		deny["Action"]
-			.to_string()
+			.to_json_string()
 			.xpect_contains("s3:DeleteBucket")
 			.xpect_contains("s3:DeleteObjectVersion")
 			.xpect_contains("s3:PutBucketVersioning")
@@ -1170,7 +1173,7 @@ mod test {
 		// the buckets and their objects, the rules, and a dev teardown stays
 		// free, which the infra-deploy skill does often
 		deny["Resource"]
-			.to_string()
+			.to_json_string()
 			.xpect_contains("arn:aws:s3:::my-egress--prod--*\"")
 			.xpect_contains("arn:aws:s3:::my-egress--prod--*/*")
 			.xpect_contains("arn:aws:rbin:*:*:rule/*")
@@ -1188,14 +1191,16 @@ mod test {
 		policy.services.insert("ec2".into());
 		let document = policy.to_json();
 		let deny = document["Statement"]
-			.as_array()
+			.as_list()
 			.unwrap()
 			.iter()
-			.find(|statement| statement["Sid"] == "DataVolumeNeedsMfa")
+			.find(|statement| {
+				statement["Sid"].as_str().ok() == Some("DataVolumeNeedsMfa")
+			})
 			.unwrap()
 			.clone();
 		deny["Action"]
-			.to_string()
+			.to_json_string()
 			.xpect_contains("ec2:DeleteVolume");
 		deny["Condition"]["StringEquals"]["aws:ResourceTag/Project"]
 			.as_str()
@@ -1208,7 +1213,7 @@ mod test {
 		// and an app rendering no `ec2` carries no such statement
 		AwsDeployPolicy::new("site", "state")
 			.to_json()
-			.to_string()
+			.to_json_string()
 			.xnot()
 			.xpect_contains("DataVolumeNeedsMfa");
 	}
@@ -1248,12 +1253,15 @@ mod test {
 					},
 				)
 				.to_json()["Statement"]
-				.as_array()
+				.as_list()
 				.unwrap()
 				.iter()
-				.find(|statement| statement["Sid"] == "IrreversibleNeedsMfa")
+				.find(|statement| {
+					statement["Sid"].as_str().ok()
+						== Some("IrreversibleNeedsMfa")
+				})
 				.unwrap()["Resource"]
-				.to_string()
+				.to_json_string()
 		};
 		// a shared-only app protects `shared`, where a hard-coded prod
 		// protected a name the app does not have; prod stays named regardless,
@@ -1298,12 +1306,14 @@ mod test {
 			.lower(&stack, &config)
 			.unwrap()
 			.to_json()["Statement"]
-			.as_array()
+			.as_list()
 			.unwrap()
 			.iter()
-			.find(|statement| statement["Sid"] == "IrreversibleNeedsMfa")
+			.find(|statement| {
+				statement["Sid"].as_str().ok() == Some("IrreversibleNeedsMfa")
+			})
 			.unwrap()["Resource"]
-			.to_string();
+			.to_json_string();
 		// a mint under `dev` still protects prod, and leaves dev deletable
 		deny.as_str()
 			.xpect_contains("beet-site--prod--*")

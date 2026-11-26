@@ -141,7 +141,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, ThreadPlugin::default()))
 			.init_resource::<PhotoStream>();
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		for index in 0..2u8 {
 			store
 				.insert(

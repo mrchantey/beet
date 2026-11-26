@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 /// `dir` is the precise directory to watch (a store's `effective_root`); `base`
 /// is the owning store's unscoped root, so emitted [`BlobEvent`]s are keyed to
 /// it and base-relative, routing through the root live reload via
-/// [`did_change`](BlobStoreProvider::did_change). The live set of these derives
+/// [`did_change`](BlobProvider::did_change). The live set of these derives
 /// the watcher set (see [`FsBlobWatchers`]). Cross-platform; the native watcher
 /// observers back it (inert on wasm, where there is no fs watcher).
 #[derive(Debug, Clone, Component)]
@@ -24,7 +24,7 @@ pub struct WatchDir {
 }
 
 impl WatchDir {
-	/// Watch `store`'s [`watch_dir`](BlobStoreProvider::watch_dir) (its
+	/// Watch `store`'s [`watch_dir`](BlobProvider::watch_dir) (its
 	/// `effective_root`), keyed to its base. `None` for a store with no
 	/// watchable directory (memory, S3), so a non-fs mount registers nothing.
 	pub fn from_store(store: &BlobStore) -> Option<Self> {
@@ -74,7 +74,7 @@ mod native {
 	/// registered dir covering it ([`bases_covering`](Self::bases_covering)),
 	/// keyed to that base and base-relative, so two stores over one directory
 	/// share one OS watcher and each still routes its own events through
-	/// [`did_change`](BlobStoreProvider::did_change) and [`Blob::matches_event`].
+	/// [`did_change`](BlobProvider::did_change) and [`Blob::matches_event`].
 	#[derive(Default, Resource)]
 	pub struct FsBlobWatchers {
 		/// Per live [`WatchDir`] entity: the dir it registers and its base store.
@@ -354,7 +354,7 @@ mod native {
 
 		/// A [`WatchDir`] over a subdir emits a BASE-relative, base-keyed
 		/// [`BlobEvent`] when a file in the subdir changes, so it routes through the
-		/// base store's [`did_change`](BlobStoreProvider::did_change) and matches
+		/// base store's [`did_change`](BlobProvider::did_change) and matches
 		/// a [`Blob`] of the scoped store.
 		#[beet_core::test]
 		async fn subdir_watcher_emits_base_relative_event() {

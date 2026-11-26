@@ -10,7 +10,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::Value;
 use std::path::Path;
 
 const RESERVED_WORDS: [&str; 32] = [
@@ -528,7 +527,7 @@ fn cty_field_type(
 	reg: &mut Registry,
 ) -> Result<FieldType> {
 	match value {
-		Value::String(type_str) => match type_str.as_str() {
+		Value::Str(type_str) => match type_str.as_str() {
 			"string" => Ok(FieldType::Str),
 			"bool" => Ok(FieldType::Bool),
 			"number" => Ok(FieldType::I64),
@@ -543,10 +542,10 @@ fn cty_field_type(
 			}),
 			other => bevybail!("Unknown type {other}"),
 		},
-		Value::Array(type_arr) => {
+		Value::List(type_arr) => {
 			let kind = type_arr
 				.first()
-				.and_then(Value::as_str)
+				.and_then(|item| item.as_str().ok())
 				.ok_or_else(|| bevyhow!("empty cty type array"))?;
 			match kind {
 				"set" | "list" => match type_arr.get(1) {
@@ -572,7 +571,7 @@ fn cty_field_type(
 					}),
 				},
 				"object" => {
-					let Some(Value::Object(attrs)) = type_arr.get(1) else {
+					let Some(Value::Map(attrs)) = type_arr.get(1) else {
 						bevybail!(
 							"cty object at `{parent_fqn}.{attr_name}` has no attribute map"
 						);
@@ -580,17 +579,21 @@ fn cty_field_type(
 					// the optional third element lists the optional attribute names
 					let optional_names = type_arr
 						.get(2)
-						.and_then(Value::as_array)
+						.and_then(|names| names.as_list().ok())
 						.map(|names| {
 							names
 								.iter()
-								.filter_map(Value::as_str)
+								.filter_map(|item| item.as_str().ok())
 								.collect::<std::collections::HashSet<_>>()
 						})
 						.unwrap_or_default();
 					let fqn = format!("{parent_fqn}_{attr_name}");
+					// sorted by name, so the generated fields never follow the
+					// order the schema happened to list them in
+					let mut attrs = attrs.iter().collect::<Vec<_>>();
+					attrs.sort_by_key(|(field_name, _)| field_name.as_str());
 					let fields = attrs
-						.iter()
+						.into_iter()
 						.map(|(field_name, field_value)| {
 							let field_type = cty_field_type(
 								&fqn,
@@ -623,7 +626,7 @@ fn cty_field_type(
 				"tuple" => {
 					let elems = type_arr
 						.get(1)
-						.and_then(Value::as_array)
+						.and_then(|elems| elems.as_list().ok())
 						.ok_or_else(|| {
 							bevyhow!(
 								"cty tuple at `{parent_fqn}.{attr_name}` has no element list"
@@ -663,24 +666,24 @@ fn insert_nested_container(
 
 fn inject_meta_arguments(blk: &mut Block) {
 	let depends_on_attr = Attribute {
-		r#type: Some(AttributeType(serde_json::json!(["set"]))),
+		r#type: Some(AttributeType(value!(["set"]))),
 		optional: Some(true),
 		..Default::default()
 	};
 	let count_attr = Attribute {
-		r#type: Some(AttributeType(serde_json::json!("number"))),
+		r#type: Some(AttributeType(value!("number"))),
 		optional: Some(true),
 		..Default::default()
 	};
 
 	let for_each_attr = Attribute {
-		r#type: Some(AttributeType(serde_json::json!(["set"]))),
+		r#type: Some(AttributeType(value!(["set"]))),
 		optional: Some(true),
 		..Default::default()
 	};
 
 	let provider_attr = Attribute {
-		r#type: Some(AttributeType(serde_json::json!("string"))),
+		r#type: Some(AttributeType(value!("string"))),
 		optional: Some(true),
 		..Default::default()
 	};
@@ -782,7 +785,7 @@ pub(crate) fn read_tf_schema_from_file<P: AsRef<Path>>(
 	path: P,
 ) -> Result<TerraformSchemaExport> {
 	let bytes = fs_ext::read(path)?;
-	let schema: TerraformSchemaExport = serde_json::from_slice(&bytes)?;
+	let schema: TerraformSchemaExport = json_ext::from_slice(&bytes)?;
 	Ok(schema)
 }
 
@@ -928,7 +931,7 @@ mod test {
 
 	#[beet_core::test]
 	fn unmarshall_provider() {
-		let res: config = serde_json::from_str(include_str!(
+		let res: config = json_ext::from_str(include_str!(
 			"../../tests/fixtures/provider_test.json"
 		))
 		.unwrap();
@@ -954,7 +957,7 @@ mod test {
 
 	#[beet_core::test]
 	fn unmarshall_resource() {
-		let res: config = serde_json::from_str(include_str!(
+		let res: config = json_ext::from_str(include_str!(
 			"../../tests/fixtures/resource_test.json"
 		))
 		.unwrap();
@@ -984,7 +987,7 @@ mod test {
 
 	#[beet_core::test]
 	fn unmarshall_datasource() {
-		let res: config = serde_json::from_str(include_str!(
+		let res: config = json_ext::from_str(include_str!(
 			"../../tests/fixtures/datasource_test.json"
 		))
 		.unwrap();
@@ -1014,7 +1017,7 @@ mod test {
 
 	#[beet_core::test]
 	fn unmarshall_block_type() {
-		let res: config = serde_json::from_str(include_str!(
+		let res: config = json_ext::from_str(include_str!(
 			"../../tests/fixtures/block_type_test.json"
 		))
 		.unwrap();
@@ -1225,9 +1228,7 @@ mod test {
 		// Test that 'self' and 'Self' are renamed to avoid raw identifier issues
 		let mut attrs = BTreeMap::new();
 		attrs.insert("self".to_string(), Attribute {
-			r#type: Some(AttributeType(serde_json::Value::String(
-				"bool".to_string(),
-			))),
+			r#type: Some(AttributeType(Value::str("bool"))),
 			description: None,
 			required: Some(false),
 			optional: Some(true),
@@ -1238,9 +1239,7 @@ mod test {
 			nested_type: None,
 		});
 		attrs.insert("Self".to_string(), Attribute {
-			r#type: Some(AttributeType(serde_json::Value::String(
-				"string".to_string(),
-			))),
+			r#type: Some(AttributeType(Value::str("string"))),
 			description: None,
 			required: Some(true),
 			optional: None,
@@ -1251,9 +1250,7 @@ mod test {
 			nested_type: None,
 		});
 		attrs.insert("type".to_string(), Attribute {
-			r#type: Some(AttributeType(serde_json::Value::String(
-				"string".to_string(),
-			))),
+			r#type: Some(AttributeType(Value::str("string"))),
 			description: None,
 			required: Some(true),
 			optional: None,

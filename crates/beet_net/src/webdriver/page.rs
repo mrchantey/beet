@@ -8,8 +8,6 @@ use super::*;
 use beet_core::prelude::*;
 use bevy::prelude::Result;
 use core::time::Duration;
-use serde_json::Value;
-use serde_json::json;
 
 /// High level ergonomic wrapper over a BiDi `Session` bound to a single
 /// top-level browsing context (page / tab).
@@ -37,15 +35,14 @@ impl Page {
 	/// existing `Session`.
 	pub async fn from_session(session: Session) -> Result<Self> {
 		let tree = session
-			.command("browsingContext.getTree", json!({"maxDepth": 0}))
+			.command("browsingContext.getTree", value!({"maxDepth": 0}))
 			.await?;
 		let contexts = tree["result"]["contexts"]
-			.as_array()
-			.ok_or_else(|| bevyhow!("contexts array missing"))?;
+			.as_list()
+			.map_err(|_| bevyhow!("contexts array missing"))?;
 		let first = contexts
 			.get(0)
-			.and_then(|c| c.get("context"))
-			.and_then(|c| c.as_str())
+			.and_then(|c| c["context"].as_str().ok())
 			.ok_or_else(|| bevyhow!("no top-level context discovered"))?;
 		Ok(Self {
 			session,
@@ -89,8 +86,8 @@ impl Page {
 		self.session
 			.command(
 				"browsingContext.navigate",
-				json!({
-					"context": self.context_id,
+				value!({
+					"context": &self.context_id,
 					"url": url,
 					"wait": "complete"
 				}),
@@ -108,8 +105,8 @@ impl Page {
 		self.session
 			.command(
 				"browsingContext.setViewport",
-				json!({
-					"context": self.context_id,
+				value!({
+					"context": &self.context_id,
 					"viewport": { "width": width, "height": height }
 				}),
 			)
@@ -125,9 +122,9 @@ impl Page {
 			.session
 			.command(
 				"script.evaluate",
-				json!({
+				value!({
 					"expression": expression,
-					"target": { "context": self.context_id },
+					"target": { "context": &self.context_id },
 					"awaitPromise": true,
 					"resultOwnership": "root"
 				}),
@@ -145,9 +142,9 @@ impl Page {
 			.session
 			.command(
 				"script.evaluate",
-				json!({
+				value!({
 					"expression": expression,
-					"target": { "context": self.context_id },
+					"target": { "context": &self.context_id },
 					"awaitPromise": true,
 					"resultOwnership": "none",
 					"serializationOptions": { "maxObjectDepth": 64 }
@@ -155,7 +152,8 @@ impl Page {
 			)
 			.await?;
 		Self::check_exception(&resp)?;
-		resp.pointer("/result/result")
+		resp["result"]
+			.get("result")
 			.ok_or_else(|| bevyhow!("script result missing"))?
 			.xmap(bidi_value::to_json)
 			.xok()
@@ -165,12 +163,9 @@ impl Page {
 	/// error; protocol-level errors are already handled by
 	/// [`Session::command`].
 	fn check_exception(resp: &Value) -> Result<()> {
-		if resp.pointer("/result/type").and_then(|ty| ty.as_str())
-			== Some("exception")
-		{
-			let text = resp
-				.pointer("/result/exceptionDetails/text")
-				.and_then(|text| text.as_str())
+		if resp["result"]["type"].as_str().ok() == Some("exception") {
+			let text = resp["result"]["exceptionDetails"]["text"]
+				.as_str()
 				.unwrap_or("unknown script exception");
 			bevybail!("script threw: {text}");
 		}
@@ -183,7 +178,7 @@ impl Page {
 			.await?
 			.as_str()
 			.map(|title| title.to_string())
-			.ok_or_else(|| bevyhow!("missing document title"))
+			.map_err(|_| bevyhow!("missing document title"))
 	}
 
 	/// The page's url, auto-waiting through a navigation: a context
@@ -258,11 +253,9 @@ impl Page {
 
 	/// One `location.href` read, the probe both url methods poll.
 	async fn read_url(&self) -> Result<String> {
-		self.evaluate("location.href")
-			.await?
-			.pointer("/result/result/value")
-			.and_then(|value| value.as_str())
-			.ok_or_else(|| bevyhow!("missing location.href value"))?
+		self.evaluate("location.href").await?["result"]["result"]["value"]
+			.as_str()
+			.map_err(|_| bevyhow!("missing location.href value"))?
 			.to_string()
 			.xok()
 	}
@@ -277,9 +270,8 @@ impl Page {
 	) -> Result<Option<WebElement>> {
 		let expr = format!("document.querySelector({selector:?})");
 		let resp = self.evaluate(&expr).await?;
-		let ty = resp
-			.pointer("/result/result/type")
-			.and_then(|v| v.as_str())
+		let ty = resp["result"]["result"]["type"]
+			.as_str()
 			.unwrap_or("undefined");
 		if ty == "null" || ty == "undefined" {
 			return Ok(None);
@@ -319,7 +311,7 @@ mod tests {
 		page.evaluate_value("document.querySelector('h1')?.textContent")
 			.await
 			.unwrap()
-			.xpect_eq(json!("Example Domain"));
+			.xpect_eq(value!("Example Domain"));
 
 		// objects deep-serialize into plain json
 		page.evaluate_value(
@@ -328,7 +320,7 @@ mod tests {
 		.await
 		.unwrap()
 		.xpect_eq(
-			json!({"count": 1, "items": [1, 2], "nested": {"flag": true}}),
+			value!({"count": 1, "items": [1, 2], "nested": {"flag": true}}),
 		);
 
 		// in-page exceptions surface as errors

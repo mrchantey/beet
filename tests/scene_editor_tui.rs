@@ -98,7 +98,7 @@ impl SceneHost {
 	/// The fork as the store holds it: the record of the session.
 	async fn fork(&self) -> Value {
 		let bytes = self.store.get(&RelPath::from(FORK)).await.unwrap();
-		serde_json::from_slice(&bytes).unwrap()
+		json_ext::from_slice(&bytes).unwrap()
 	}
 
 	/// Open the editor's disclosure and wait for its tree.

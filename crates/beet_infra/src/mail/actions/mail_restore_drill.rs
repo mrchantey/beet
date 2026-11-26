@@ -3,7 +3,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::json;
 
 /// Which copy a drill restores from: the live archive the box snapshots into,
 /// or the cold copy in the other vendor's account. A restore proves exactly
@@ -502,12 +501,13 @@ async fn read_mailboxes(
 	address: &str,
 	password: &str,
 ) -> Result<usize> {
-	let session: serde_json::Value = serde_json::from_str(
+	let session = Value::parse_json(
 		&jmap_curl(host, ip, address, password, JmapClient::SESSION_PATH, None)
 			.await?,
 	)?;
 	let account = session["primaryAccounts"][JmapClient::MAIL_CAPABILITY]
 		.as_str()
+		.ok()
 		.ok_or_else(|| {
 			bevyhow!(
 				"the restored session names no primary mail account for \
@@ -517,27 +517,29 @@ async fn read_mailboxes(
 		.to_string();
 	let api_path = session["apiUrl"]
 		.as_str()
+		.ok()
 		.map(JmapClient::url_to_path)
 		.ok_or_else(|| bevyhow!("the restored session carried no apiUrl"))?;
-	let body = json!({
+	let body = value!({
 		"using": ["urn:ietf:params:jmap:core", JmapClient::MAIL_CAPABILITY],
 		"methodCalls": [
 			["Mailbox/get", { "accountId": account }, "0"]
 		]
 	});
-	let response: serde_json::Value = serde_json::from_str(
+	let response = Value::parse_json(
 		&jmap_curl(
 			host,
 			ip,
 			address,
 			password,
 			&api_path,
-			Some(&body.to_string()),
+			Some(&body.to_json_string()),
 		)
 		.await?,
 	)?;
 	response["methodResponses"][0][1]["list"]
-		.as_array()
+		.as_list()
+		.ok()
 		.map(Vec::len)
 		.unwrap_or_default()
 		.xok()

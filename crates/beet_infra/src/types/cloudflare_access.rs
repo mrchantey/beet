@@ -174,7 +174,7 @@ impl CloudflareAccess {
 			which a token made under My Profile is not)",
 		)
 		.await?;
-		match verified["result"]["id"].as_str() {
+		match verified["result"]["id"].as_str().ok() {
 			Some(id) => (
 				id.to_string(),
 				cloudflare_api_ext::derive_secret_key(&token),

@@ -389,11 +389,12 @@ mod test {
 	/// back unchanged.
 	#[beet_core::test]
 	fn reads_a_leaflet_record() {
-		let record: serde_json::Value =
-			serde_json::from_str(LEAFLET_RECORD).unwrap();
-		serde_json::from_value::<LeafletContent>(record.clone())
+		let record = Value::parse_json(LEAFLET_RECORD).unwrap();
+		record
+			.clone()
+			.into_serde::<LeafletContent>()
 			.unwrap()
-			.xmap(|content| serde_json::to_value(content).unwrap())
+			.xmap(|content| Value::from_serde(content).unwrap())
 			.xpect_eq(record);
 	}
 

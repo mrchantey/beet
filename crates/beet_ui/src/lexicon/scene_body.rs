@@ -143,13 +143,15 @@ fn main() { println!("hello"); }
 	}
 
 	/// The member as a record carries it and a reader receives it: encoded
-	/// into the data model, written as json text (whose object keys sort as
-	/// strings, `"10"` before `"2"`), read back and decoded.
+	/// into the data model, written as json text with its object keys sorted
+	/// as strings (`"10"` before `"2"`), as a canonical writer orders them,
+	/// read back and decoded.
 	#[cfg(feature = "json")]
 	fn through_a_record(member: OpenUnion) -> OpenUnion {
 		let record = AtprotoValue::try_from(Value::from(member)).unwrap();
-		let text = serde_json::to_string(&record.to_json()).unwrap();
-		AtprotoValue::from_json(serde_json::from_str(&text).unwrap())
+		let mut sorted = Value::clone(&record);
+		sorted.sort_maps();
+		AtprotoValue::parse_json(&sorted.to_json_string())
 			.unwrap()
 			.decode()
 			.xmap(OpenUnion::try_from)
@@ -215,8 +217,7 @@ fn main() { println!("hello"); }
 		let member = render(&mut source, post);
 		AtprotoValue::try_from(Value::from(member.clone()))
 			.unwrap()
-			.to_json()
-			.to_string()
+			.to_json_string()
 			.xpect_contains(AtprotoValue::FLOAT.as_str());
 
 		let (read, entity) = parse(&through_a_record(member));

@@ -32,8 +32,8 @@ use bytes::Bytes;
 /// [`WatchDir`] keys the watcher's events to), the local half's and the
 /// upstream's (a half spawned as its own store emits keyed to itself). Every
 /// other store compares one key, so the fork answers
-/// [`did_change`](BlobStoreProvider::did_change) and
-/// [`matches_object`](BlobStoreProvider::matches_object) for all three.
+/// [`did_change`](BlobProvider::did_change) and
+/// [`matches_object`](BlobProvider::matches_object) for all three.
 #[derive(Clone)]
 pub struct StoreFork {
 	/// The store writes land in and reads try first.
@@ -102,11 +102,11 @@ impl StoreBackend for StoreFork {
 	}
 }
 
-impl BlobStoreProvider for StoreFork {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+impl BlobProvider for StoreFork {
+	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
 	/// Both halves scope together, so keys keep corresponding.
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
 		Box::new(Self {
 			local: self.local.with_subdir(path.clone()),
 			upstream: self.upstream.with_subdir(path),
@@ -115,7 +115,7 @@ impl BlobStoreProvider for StoreFork {
 	}
 
 	/// The pair of bases: what a watcher keys this store's events to.
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
+	fn base(&self) -> Box<dyn BlobProvider> {
 		Box::new(Self {
 			local: self.local.base(),
 			upstream: self.upstream.base(),
@@ -131,7 +131,7 @@ impl BlobStoreProvider for StoreFork {
 		&self,
 		entry_name: &RelPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
+	) -> Result<(Box<dyn BlobProvider>, RelPath)> {
 		let (upstream, upstream_entry) =
 			self.upstream.rebase(entry_name, root)?;
 		let (local, local_entry) = self.local.rebase(entry_name, root)?;
@@ -148,7 +148,7 @@ impl BlobStoreProvider for StoreFork {
 				local: BlobStore::from_arc(local.into()),
 				upstream: BlobStore::from_arc(upstream.into()),
 				mark: self.mark.clone(),
-			}) as Box<dyn BlobStoreProvider>,
+			}) as Box<dyn BlobProvider>,
 			upstream_entry,
 		)
 			.xok()
@@ -192,7 +192,7 @@ impl BlobStoreProvider for StoreFork {
 	}
 
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
-		let write = BlobStoreProvider::insert(&self.local, path, body);
+		let write = BlobProvider::insert(&self.local, path, body);
 		let fork = self.clone();
 		Box::pin(async move {
 			write.await?;
@@ -273,8 +273,8 @@ mod test {
 	/// A fork of two seeded memory stores: `shared.txt` in both (the local
 	/// copy edited), `upstream.txt` only upstream, `local.txt` only local.
 	async fn fork() -> (BlobStore, BlobStore, BlobStore) {
-		let local = BlobStore::temp();
-		let upstream = BlobStore::temp();
+		let local = BlobStore::new(InMemoryBlobStore::new());
+		let upstream = BlobStore::new(InMemoryBlobStore::new());
 		for (store, path, body) in [
 			(&upstream, "shared.txt", "published"),
 			(&upstream, "upstream.txt", "upstream"),
@@ -370,7 +370,10 @@ mod test {
 	/// object or an unrelated store is neither.
 	#[beet_core::test]
 	fn routes_events_from_either_half_and_its_base() {
-		let (local, upstream) = (BlobStore::temp(), BlobStore::temp());
+		let (local, upstream) = (
+			BlobStore::new(InMemoryBlobStore::new()),
+			BlobStore::new(InMemoryBlobStore::new()),
+		);
 		let fork =
 			BlobStore::new(StoreFork::new(local.clone(), upstream.clone()));
 		let scoped = fork.with_subdir(RelPath::from("docs"));
@@ -388,7 +391,7 @@ mod test {
 			blob.matches_event(&event(source, "docs/b.md"))
 				.xpect_false();
 		}
-		let unrelated = BlobStore::temp();
+		let unrelated = BlobStore::new(InMemoryBlobStore::new());
 		scoped
 			.did_change(&event(&unrelated, "docs/a.md"))
 			.xpect_false();
@@ -398,8 +401,8 @@ mod test {
 
 	#[beet_core::test]
 	async fn rebases_both_halves() {
-		let local = BlobStore::temp();
-		let upstream = BlobStore::temp();
+		let local = BlobStore::new(InMemoryBlobStore::new());
+		let upstream = BlobStore::new(InMemoryBlobStore::new());
 		upstream
 			.insert(&RelPath::new("site/app/main.bsx"), "<Router/>")
 			.await

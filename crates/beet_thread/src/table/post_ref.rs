@@ -85,7 +85,7 @@ mod test {
 		PostRef::parse(&post_ref.to_string())
 			.unwrap()
 			.xpect_eq(post_ref);
-		serde_json::to_string(&post_ref)
+		json_ext::to_string(&post_ref)
 			.unwrap()
 			.xpect_eq(format!("\"{thread}/{post}\""));
 	}

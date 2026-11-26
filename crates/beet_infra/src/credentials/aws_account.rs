@@ -5,8 +5,6 @@ use super::aws_deploy_credential::AwsAdmin;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 /// `<AwsAccount name="beetmash"/>`: the AWS account a repo deploys into, its
 /// own member account of the operator's AWS Organization, declared at the
@@ -455,7 +453,7 @@ impl AwsAccount {
 
 	/// The service control policy keeping every member in the Organization.
 	fn member_guard() -> Value {
-		json!({
+		value!({
 			"Version": "2012-10-17",
 			"Statement": [{
 				"Sid": "MembersStay",
@@ -471,7 +469,7 @@ impl AwsAccount {
 	/// at. Granted here rather than left to `ViewOnlyAccess`'s
 	/// contents, so the read path never depends on what AWS puts in it.
 	fn agent_read() -> Value {
-		json!({
+		value!({
 			"Version": "2012-10-17",
 			"Statement": [
 				{
@@ -560,7 +558,7 @@ impl AwsAccount {
 		}
 		management
 			.organizations()
-			.call_json("CloseAccount", &json!({"AccountId": member.id}))
+			.call_json("CloseAccount", &value!({"AccountId": &member.id}))
 			.await?;
 		format!(
 			"closed `{}` ({}): suspended and reopenable for 90 days with its \
@@ -777,13 +775,15 @@ impl AwsManagement {
 		let mut body = body;
 		loop {
 			let mut page = organizations.call_json(action, &body).await?;
-			if let Some(held) = page[list].as_array_mut() {
+			if let Some(held) =
+				page.get_mut(list).and_then(|held| held.as_list_mut().ok())
+			{
 				entries.append(held);
 			}
-			match page["NextToken"].as_str() {
-				Some(token) => body["NextToken"] = token.into(),
+			match page["NextToken"].as_str().ok() {
+				Some(token) => body.insert("NextToken", token)?,
 				None => break,
-			}
+			};
 		}
 		entries.xok()
 	}
@@ -793,7 +793,7 @@ impl ManagementCalls for AwsManagement {
 	type Member = AwsMember;
 
 	async fn organization_exists(&self) -> Result<bool> {
-		match self.organizations("DescribeOrganization", json!({})).await {
+		match self.organizations("DescribeOrganization", value!({})).await {
 			Ok(_) => true.xok(),
 			Err(err)
 				if AwsError::is(&err, &[
@@ -807,30 +807,34 @@ impl ManagementCalls for AwsManagement {
 	}
 
 	async fn create_organization(&self) -> Result {
-		self.organizations("CreateOrganization", json!({"FeatureSet": "ALL"}))
+		self.organizations("CreateOrganization", value!({"FeatureSet": "ALL"}))
 			.await?;
 		OK
 	}
 
 	async fn root(&self) -> Result<(SmolStr, bool)> {
-		let roots = self.organizations("ListRoots", json!({})).await?;
+		let roots = self.organizations("ListRoots", value!({})).await?;
 		let root = &roots["Roots"][0];
 		let id = root["Id"]
 			.as_str()
+			.ok()
 			.ok_or_else(|| bevyhow!("the Organization answered no root"))?;
-		let enabled = root["PolicyTypes"].as_array().into_iter().flatten().any(
-			|policy_type| {
-				policy_type["Type"] == Self::SCP
-					&& policy_type["Status"] == "ENABLED"
-			},
-		);
+		let enabled = root["PolicyTypes"]
+			.as_list()
+			.ok()
+			.into_iter()
+			.flatten()
+			.any(|policy_type| {
+				policy_type["Type"].as_str().ok() == Some(Self::SCP)
+					&& policy_type["Status"].as_str().ok() == Some("ENABLED")
+			});
 		(SmolStr::new(id), enabled).xok()
 	}
 
 	async fn enable_policies(&self, root: &str) -> Result {
 		self.organizations(
 			"EnablePolicyType",
-			json!({"RootId": root, "PolicyType": Self::SCP}),
+			value!({"RootId": root, "PolicyType": Self::SCP}),
 		)
 		.await?;
 		OK
@@ -839,13 +843,13 @@ impl ManagementCalls for AwsManagement {
 	async fn find_policy(&self, name: &str) -> Result<Option<SmolStr>> {
 		self.organizations_list(
 			"ListPolicies",
-			json!({"Filter": Self::SCP}),
+			value!({"Filter": Self::SCP}),
 			"Policies",
 		)
 		.await?
 		.iter()
-		.find(|policy| policy["Name"] == name)
-		.and_then(|policy| policy["Id"].as_str())
+		.find(|policy| policy["Name"].as_str().ok() == Some(name))
+		.and_then(|policy| policy["Id"].as_str().ok())
 		.map(SmolStr::new)
 		.xok()
 	}
@@ -858,7 +862,7 @@ impl ManagementCalls for AwsManagement {
 		let created = self
 			.organizations(
 				"CreatePolicy",
-				json!({
+				value!({
 					"Name": name,
 					"Type": Self::SCP,
 					"Description": "members stay in the Organization; closing is the management account's act",
@@ -868,6 +872,7 @@ impl ManagementCalls for AwsManagement {
 			.await?;
 		created["Policy"]["PolicySummary"]["Id"]
 			.as_str()
+			.ok()
 			.map(SmolStr::new)
 			.ok_or_else(|| {
 				bevyhow!("`organizations:CreatePolicy` answered no id")
@@ -877,12 +882,12 @@ impl ManagementCalls for AwsManagement {
 	async fn attached_policies(&self, target: &str) -> Result<Vec<SmolStr>> {
 		self.organizations_list(
 			"ListPoliciesForTarget",
-			json!({"TargetId": target, "Filter": Self::SCP}),
+			value!({"TargetId": target, "Filter": Self::SCP}),
 			"Policies",
 		)
 		.await?
 		.iter()
-		.filter_map(|policy| policy["Id"].as_str())
+		.filter_map(|policy| policy["Id"].as_str().ok())
 		.map(SmolStr::new)
 		.collect::<Vec<_>>()
 		.xok()
@@ -896,7 +901,7 @@ impl ManagementCalls for AwsManagement {
 			match self
 				.organizations(
 					"AttachPolicy",
-					json!({"PolicyId": policy, "TargetId": target}),
+					value!({"PolicyId": policy, "TargetId": target}),
 				)
 				.await
 			{
@@ -925,7 +930,7 @@ impl ManagementCalls for AwsManagement {
 		document: &str,
 	) -> Result<String> {
 		let account = self.admin.account_id().await?;
-		let document = serde_json::from_str::<Value>(document)?;
+		let document = Value::parse_json(document)?;
 		let report = AwsDeployPolicy::converge_document(
 			&self.admin,
 			&account,
@@ -969,7 +974,7 @@ impl ManagementCalls for AwsManagement {
 		let created = self
 			.organizations(
 				"CreateAccount",
-				json!({
+				value!({
 					"Email": email,
 					"AccountName": name,
 					"RoleName": MemberAccount::ADMIN_ROLE,
@@ -978,6 +983,7 @@ impl ManagementCalls for AwsManagement {
 			.await?;
 		created["CreateAccountStatus"]["Id"]
 			.as_str()
+			.ok()
 			.map(SmolStr::new)
 			.ok_or_else(|| {
 				bevyhow!("`organizations:CreateAccount` answered no request id")
@@ -988,17 +994,21 @@ impl ManagementCalls for AwsManagement {
 		let answer = self
 			.organizations(
 				"DescribeCreateAccountStatus",
-				json!({"CreateAccountRequestId": request}),
+				value!({"CreateAccountRequestId": request}),
 			)
 			.await?;
 		let status = &answer["CreateAccountStatus"];
-		match (status["State"].as_str(), status["AccountId"].as_str()) {
+		match (
+			status["State"].as_str().ok(),
+			status["AccountId"].as_str().ok(),
+		) {
 			(Some("SUCCEEDED"), Some(id)) => Some(SmolStr::new(id)).xok(),
 			(Some("IN_PROGRESS"), _) => None.xok(),
 			(Some("FAILED"), _) => bevybail!(
 				"creating the account failed: {}",
 				status["FailureReason"]
 					.as_str()
+					.ok()
 					.unwrap_or("no reason given")
 			),
 			(state, _) => bevybail!(
@@ -1141,7 +1151,7 @@ impl MemberCalls for AwsMember {
 		description: &str,
 	) -> Result<Option<u16>> {
 		let recycle_bin = self.recycle_bin();
-		let mut body = json!({"ResourceType": resource_type});
+		let mut body = value!({"ResourceType": resource_type});
 		loop {
 			let page = recycle_bin
 				.send_json(
@@ -1149,22 +1159,23 @@ impl MemberCalls for AwsMember {
 						.with_json(&body)?,
 				)
 				.await?;
-			if let Some(rule) = page["Rules"]
-				.as_array()
-				.into_iter()
-				.flatten()
-				.find(|rule| rule["Description"] == description)
-			{
+			if let Some(rule) =
+				page["Rules"].as_list().ok().into_iter().flatten().find(
+					|rule| {
+						rule["Description"].as_str().ok() == Some(description)
+					},
+				) {
 				return rule["RetentionPeriod"]["RetentionPeriodValue"]
 					.as_u64()
+					.ok()
 					.map(u16::try_from)
 					.transpose()?
 					.xok();
 			}
-			match page["NextToken"].as_str() {
-				Some(token) => body["NextToken"] = token.into(),
+			match page["NextToken"].as_str().ok() {
+				Some(token) => body.insert("NextToken", token)?,
 				None => return None.xok(),
-			}
+			};
 		}
 	}
 
@@ -1177,7 +1188,7 @@ impl MemberCalls for AwsMember {
 	) -> Result {
 		self.recycle_bin()
 			.send(AwsRequest::post("CreateRule", "/rules").with_json(
-				&json!({
+				&value!({
 					"ResourceType": resource_type,
 					"Description": description,
 					"RetentionPeriod": {
@@ -1204,7 +1215,7 @@ impl MemberCalls for AwsMember {
 	}
 
 	async fn create_read_role(&self, name: &str, principal: &str) -> Result {
-		let trust = json!({
+		let trust = value!({
 			"Version": "2012-10-17",
 			"Statement": [{
 				"Effect": "Allow",
@@ -1212,7 +1223,7 @@ impl MemberCalls for AwsMember {
 				"Action": "sts:AssumeRole",
 			}],
 		})
-		.to_string();
+		.to_json_string();
 		self.admin
 			.iam_call("CreateRole", &[
 				("RoleName", name),
@@ -1684,7 +1695,7 @@ mod test {
 		calls.account_created("car-1").await.unwrap().xpect_none();
 		log.lock().unwrap()[0]
 			.json()
-			.xpect_eq(serde_json::json!({"CreateAccountRequestId": "car-1"}));
+			.xpect_eq(value!({"CreateAccountRequestId": "car-1"}));
 		let (calls, _) = management(status(
 			r#"{"Id":"car-1","State":"SUCCEEDED","AccountId":"222"}"#,
 		));
@@ -1723,9 +1734,9 @@ mod test {
 		calls.attach_policy("p-guard", "r-ab12").await.unwrap();
 		let log = log.lock().unwrap().clone();
 		log.len().xpect_eq(3);
-		log[2].json().xpect_eq(
-			serde_json::json!({"PolicyId": "p-guard", "TargetId": "r-ab12"}),
-		);
+		log[2]
+			.json()
+			.xpect_eq(value!({"PolicyId": "p-guard", "TargetId": "r-ab12"}));
 		// any other refusal is answered at once
 		let (calls, log) =
 			management(|_| aws_seam::json_error("PolicyNotFoundException"));
@@ -1738,6 +1749,7 @@ mod test {
 	async fn finds_the_guard_across_pages() {
 		let (calls, log) = management(|asked| match asked.json()["NextToken"]
 			.as_str()
+			.ok()
 		{
 			None => aws_seam::ok(
 				r#"{"Policies":[{"Id":"p-full","Name":"FullAWSAccess"}],"NextToken":"t1"}"#,
@@ -1754,8 +1766,8 @@ mod test {
 		let log = log.lock().unwrap().clone();
 		log[0]
 			.json()
-			.xpect_eq(serde_json::json!({"Filter": "SERVICE_CONTROL_POLICY"}));
-		log[1].json().xpect_eq(serde_json::json!({
+			.xpect_eq(value!({"Filter": "SERVICE_CONTROL_POLICY"}));
+		log[1].json().xpect_eq(value!({
 			"Filter": "SERVICE_CONTROL_POLICY",
 			"NextToken": "t1",
 		}));
@@ -1766,7 +1778,7 @@ mod test {
 	#[beet_core::test]
 	async fn finds_and_creates_recycle_bin_rules() {
 		let (inside, log) = member(|asked| {
-			match asked.json()["NextToken"].as_str() {
+			match asked.json()["NextToken"].as_str().ok() {
 				None => aws_seam::ok(
 					r#"{"Rules":[{"Identifier":"a","Description":"someone else's","RetentionPeriod":{"RetentionPeriodValue":3,"RetentionPeriodUnit":"DAYS"}}],"NextToken":"t1"}"#,
 				),
@@ -1785,7 +1797,7 @@ mod test {
 		log[0].line.xpect_eq(
 			"POST https://rbin.ap-southeast-2.amazonaws.com/list-rules",
 		);
-		log[1].json().xpect_eq(serde_json::json!({
+		log[1].json().xpect_eq(value!({
 			"ResourceType": "EBS_SNAPSHOT",
 			"NextToken": "t1",
 		}));
@@ -1799,7 +1811,7 @@ mod test {
 		asked
 			.line
 			.xpect_eq("POST https://rbin.ap-southeast-2.amazonaws.com/rules");
-		asked.json().xpect_eq(serde_json::json!({
+		asked.json().xpect_eq(value!({
 			"ResourceType": "EBS_VOLUME",
 			"Description": AwsAccount::RULE_DESCRIPTION,
 			"RetentionPeriod": {"RetentionPeriodValue": 7, "RetentionPeriodUnit": "DAYS"},

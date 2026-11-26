@@ -10,7 +10,7 @@ use core::str::FromStr;
 /// type instead of re-matching a prefix.
 ///
 /// Parse, display and predicates only, so it needs no store backend and no
-/// features; `StoreProvider::from_uri` in beet_net constructs the backend it
+/// features; `BlobStoreProvider::from_uri` in beet_net constructs the backend it
 /// names. Every kind is TOTAL: a uri carries everything its backend needs (a
 /// bucket, a table, a browser database) plus the root it starts at, so the one
 /// uri is the whole answer and nothing downstream patches it. Every kind

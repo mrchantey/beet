@@ -9,8 +9,6 @@ use super::WebElement;
 use super::*;
 use base64::prelude::*;
 use beet_core::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 /// Configuration options for screenshot capture. Always png, the only format
 /// the BiDi spec requires of every browser.
@@ -54,7 +52,7 @@ impl Page {
 		options: &ScreenshotOptions,
 	) -> Result<Vec<u8>> {
 		let clip = options.clip.map(|clip| {
-			json!({
+			value!({
 				"type": "box",
 				"x": clip.min.x,
 				"y": clip.min.y,
@@ -69,7 +67,7 @@ impl Page {
 impl WebElement {
 	/// Capture just this element as png bytes.
 	pub async fn screenshot(&self) -> Result<Vec<u8>> {
-		let clip = json!({"type": "element", "element": self.shared_ref()?});
+		let clip = value!({"type": "element", "element": self.shared_ref()?});
 		capture(
 			self.session(),
 			self.context_id(),
@@ -89,7 +87,7 @@ async fn capture(
 	origin: ScreenshotOrigin,
 	clip: Option<Value>,
 ) -> Result<Vec<u8>> {
-	let mut params = json!({
+	let mut params = value!({
 		"context": context_id,
 		"origin": match origin {
 			ScreenshotOrigin::Viewport => "viewport",
@@ -98,14 +96,13 @@ async fn capture(
 		"format": { "type": "image/png" },
 	});
 	if let Some(clip) = clip {
-		params.set_field("clip", clip)?;
+		params.insert("clip", clip)?;
 	}
 	session
 		.command("browsingContext.captureScreenshot", params)
-		.await?
-		.pointer("/result/data")
-		.and_then(|data| data.as_str())
-		.ok_or_else(|| bevyhow!("missing screenshot data in response"))?
+		.await?["result"]["data"]
+		.as_str()
+		.map_err(|_| bevyhow!("missing screenshot data in response"))?
 		.xmap(|data| BASE64_STANDARD.decode(data))
 		.map_err(|err| bevyhow!("failed to decode base64 screenshot: {err}"))
 }
@@ -115,7 +112,6 @@ mod test {
 	use crate::webdriver::test_fixtures;
 	use crate::webdriver::*;
 	use beet_core::prelude::*;
-	use serde_json::json;
 
 	const PNG_MAGIC: &[u8] = &[0x89, b'P', b'N', b'G'];
 
@@ -168,7 +164,7 @@ mod test {
 		page.evaluate_value("document.documentElement.clientWidth")
 			.await
 			.unwrap()
-			.xpect_eq(json!(1280));
+			.xpect_eq(value!(1280));
 		page.screenshot_with_options(&ScreenshotOptions::full_page())
 			.await
 			.unwrap()

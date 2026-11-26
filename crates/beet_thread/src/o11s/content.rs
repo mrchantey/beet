@@ -295,11 +295,12 @@ impl ContentPart {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_core::prelude::*;
 
 	#[beet_core::test]
 	fn deserializes_output_text() {
 		let json = r#"{"type":"output_text","text":"Hello","annotations":[],"logprobs":[]}"#;
-		let content: ContentPart = serde_json::from_str(json).unwrap();
+		let content: ContentPart = json_ext::from_str(json).unwrap();
 		assert!(matches!(content, ContentPart::OutputText(_)));
 		assert_eq!(content.as_text(), Some("Hello"));
 	}
@@ -307,7 +308,7 @@ mod test {
 	#[beet_core::test]
 	fn deserializes_input_image() {
 		let json = r#"{"type":"input_image","image_url":"https://example.com/img.png"}"#;
-		let content: ContentPart = serde_json::from_str(json).unwrap();
+		let content: ContentPart = json_ext::from_str(json).unwrap();
 		assert!(matches!(content, ContentPart::InputImage(_)));
 	}
 

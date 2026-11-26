@@ -3,8 +3,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 /// An inline IAM policy document under construction: the statements a compute
 /// block's runtime identity carries, LOWERED from the [`AccessGrants`] the
@@ -110,11 +108,11 @@ impl IamPolicy {
 				)
 			})
 			.collect::<Vec<_>>();
-		self.statement(json!({
+		self.statement(value!({
 			"Sid": "StackSecrets",
 			"Effect": "Allow",
 			"Action": ["ssm:GetParameter"],
-			"Resource": resource
+			"Resource": Value::new_list(resource)
 		}))
 		.decrypt_secure_strings()
 	}
@@ -146,7 +144,7 @@ impl IamPolicy {
 	/// render and this is a thing the runtime genuinely does.
 	pub fn decrypt_secure_strings(self) -> Self {
 		let region = self.region.clone();
-		self.statement(json!({
+		self.statement(value!({
 			"Sid": "SsmSecureStringDecrypt",
 			"Effect": "Allow",
 			"Action": ["kms:Decrypt"],
@@ -221,16 +219,15 @@ impl IamPolicy {
 		#[cfg(any(feature = "rds_postgres_block", feature = "cloudflare_dns"))]
 		if !parameters.is_empty() {
 			let region = &self.region;
-			self.statements.push(json!({
+			self.statements.push(value!({
 				"Sid": "DeclaredParameters",
 				"Effect": "Allow",
 				"Action": ["ssm:GetParameter"],
-				"Resource": parameters
+				"Resource": Value::new_list(parameters
 					.iter()
 					.map(|name| format!(
 						"arn:aws:ssm:{region}:*:parameter{name}"
-					))
-					.collect::<Vec<_>>()
+					)))
 			}));
 		}
 
@@ -241,11 +238,11 @@ impl IamPolicy {
 		self.read_buckets.dedup();
 		if !self.read_buckets.is_empty() {
 			let resource = Self::bucket_arns(&self.read_buckets);
-			self.statements.push(json!({
+			self.statements.push(value!({
 				"Sid": "ReadStores",
 				"Effect": "Allow",
 				"Action": ["s3:GetObject", "s3:ListBucket"],
-				"Resource": resource
+				"Resource": Value::new_list(resource)
 			}));
 		}
 		if !write_buckets.is_empty() {
@@ -260,11 +257,11 @@ impl IamPolicy {
 			.map(|action| action.to_string())
 			.chain(self.write_actions.iter().cloned())
 			.collect::<Vec<_>>();
-			self.statements.push(json!({
+			self.statements.push(value!({
 				"Sid": "WriteStores",
 				"Effect": "Allow",
-				"Action": actions,
-				"Resource": resource
+				"Action": Value::new_list(actions),
+				"Resource": Value::new_list(resource)
 			}));
 		}
 
@@ -275,11 +272,11 @@ impl IamPolicy {
 		#[cfg(feature = "bindings_aws_dynamo")]
 		if !read_tables.is_empty() {
 			let resource = self.table_arns(&read_tables);
-			self.statements.push(json!({
+			self.statements.push(value!({
 				"Sid": "ReadTables",
 				"Effect": "Allow",
-				"Action": Self::READ_TABLE_ACTIONS,
-				"Resource": resource
+				"Action": Value::new_list(Self::READ_TABLE_ACTIONS.iter().copied()),
+				"Resource": Value::new_list(resource)
 			}));
 		}
 		// `cloudwatch:PutMetricData` takes no resource-level permission at all,
@@ -292,13 +289,13 @@ impl IamPolicy {
 		if !metric_namespaces.is_empty() {
 			metric_namespaces.sort();
 			metric_namespaces.dedup();
-			self.statements.push(json!({
+			self.statements.push(value!({
 				"Sid": "PublishMetrics",
 				"Effect": "Allow",
 				"Action": ["cloudwatch:PutMetricData"],
 				"Resource": "*",
 				"Condition": {
-					"StringEquals": { "cloudwatch:namespace": metric_namespaces }
+					"StringEquals": { "cloudwatch:namespace": Value::new_list(metric_namespaces) }
 				}
 			}));
 		}
@@ -306,11 +303,11 @@ impl IamPolicy {
 		#[cfg(feature = "bindings_aws_dynamo")]
 		if !write_tables.is_empty() {
 			let resource = self.table_arns(&write_tables);
-			self.statements.push(json!({
+			self.statements.push(value!({
 				"Sid": "DeclaredTables",
 				"Effect": "Allow",
-				"Action": Self::READ_WRITE_TABLE_ACTIONS,
-				"Resource": resource
+				"Action": Value::new_list(Self::READ_WRITE_TABLE_ACTIONS.iter().copied()),
+				"Resource": Value::new_list(resource)
 			}));
 		}
 
@@ -331,7 +328,7 @@ impl IamPolicy {
 		for sid in self
 			.statements
 			.iter()
-			.filter_map(|statement| statement["Sid"].as_str())
+			.filter_map(|statement| statement["Sid"].as_str().ok())
 		{
 			if !seen.insert(sid) {
 				bevybail!(
@@ -341,8 +338,8 @@ impl IamPolicy {
 				);
 			}
 		}
-		json!({ "Version": "2012-10-17", "Statement": self.statements })
-			.to_string()
+		value!({ "Version": "2012-10-17", "Statement": self.statements.clone() })
+			.to_json_string()
 			.xok()
 	}
 
@@ -422,11 +419,11 @@ mod tests {
 				"declared-bucket",
 			)]))
 			.unwrap()
-			.statement(json!({ "Sid": "OwnThing" }))
+			.statement(value!({ "Sid": "OwnThing" }))
 			.render()
 			.unwrap();
-		serde_json::from_str::<Value>(&policy).unwrap()["Statement"]
-			.as_array()
+		Value::parse_json(&policy).unwrap()["Statement"]
+			.as_list()
 			.unwrap()
 			.len()
 			.xpect_eq(2);
@@ -493,11 +490,10 @@ mod tests {
 			.unwrap()
 			.render()
 			.unwrap();
-		let statements =
-			serde_json::from_str::<Value>(&policy).unwrap()["Statement"]
-				.as_array()
-				.unwrap()
-				.clone();
+		let statements = Value::parse_json(&policy).unwrap()["Statement"]
+			.as_list()
+			.unwrap()
+			.clone();
 		let sids = statements
 			.iter()
 			.map(|statement| statement["Sid"].as_str().unwrap().to_string())

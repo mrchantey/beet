@@ -137,7 +137,7 @@ pub struct Body {
 	pub tools: Vec<FunctionTool>,
 	/// The tool choice setting that was used.
 	#[serde(default)]
-	pub tool_choice: Option<serde_json::Value>,
+	pub tool_choice: Option<beet_core::prelude::Value>,
 	/// How the input was truncated by the service.
 	#[serde(default)]
 	pub truncation: Option<Truncation>,
@@ -185,7 +185,7 @@ pub struct Body {
 	pub service_tier: Option<String>,
 	/// Developer-defined metadata associated with the response.
 	#[serde(default)]
-	pub metadata: Option<serde_json::Value>,
+	pub metadata: Option<beet_core::prelude::Value>,
 	/// A stable identifier used for safety monitoring.
 	#[serde(default)]
 	pub safety_identifier: Option<String>,
@@ -314,7 +314,7 @@ pub enum TextFormatField {
 		#[serde(default)]
 		description: Option<String>,
 		/// The schema definition.
-		schema: serde_json::Value,
+		schema: beet_core::prelude::Value,
 		/// Whether strict mode is enabled.
 		#[serde(default)]
 		strict: Option<bool>,
@@ -370,7 +370,8 @@ mod test {
 			}
 		}"#;
 
-		let response: Body = serde_json::from_str(json).unwrap();
+		let response: Body =
+			beet_core::prelude::json_ext::from_str(json).unwrap();
 		assert_eq!(response.id, "resp_123");
 		assert_eq!(response.status, Status::Completed);
 		assert_eq!(response.first_text(), Some("Hello!"));
@@ -397,7 +398,8 @@ mod test {
 			"tools": []
 		}"#;
 
-		let response: Body = serde_json::from_str(json).unwrap();
+		let response: Body =
+			beet_core::prelude::json_ext::from_str(json).unwrap();
 		let calls = response.function_calls();
 		assert_eq!(calls.len(), 1);
 		assert_eq!(calls[0].name, "get_weather");

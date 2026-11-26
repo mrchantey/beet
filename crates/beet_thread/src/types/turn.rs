@@ -355,9 +355,7 @@ mod test {
 		)])
 	}
 
-	fn call_wait() -> MockTurn {
-		MockTurn::call("wait", serde_json::json!({})).unwrap()
-	}
+	fn call_wait() -> MockTurn { MockTurn::call("wait", value!({})).unwrap() }
 
 	/// An app over `root`, its threads reduced and its behavior called,
 	/// answering the root and whether the call has resolved.

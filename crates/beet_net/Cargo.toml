@@ -68,7 +68,7 @@ action = ["dep:beet_action"]
 sockets = ["action", "dep:sha1", "dep:base64"]
 # Tables ride `json`: rows are canonical json, hashed through `dag_cbor`, keyed
 # by default by a TID `rand` mints.
-json = ["serde", "dep:serde_json", "beet_core/json", "beet_action?/json", "dag_cbor", "beet_core/rand"]
+json = ["serde", "beet_core/json", "beet_action?/json", "dag_cbor", "beet_core/rand"]
 # The `atproto` module's data model half: the `Pds` family, `EmulatorPds`, the
 # converge and the `<AtprotoAccount/>` declaration, every record crossing
 # through `MediaType::DagCbor`. No network.
@@ -267,7 +267,6 @@ sha1 = { workspace = true, optional = true }
 # the store mirror's change detection, see `BlobStat`
 md-5.workspace = true
 serde = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
 serde_urlencoded = { version = "0.7", optional = true }
 # the terminal qr print behind `vault backup --qr`
 qrcode = { workspace = true, optional = true }

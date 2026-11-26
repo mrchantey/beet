@@ -1,7 +1,7 @@
 use beet_core::prelude::*;
 
 /// What every store backend is, whichever kind of thing it holds: an identity
-/// and a lifecycle. Bytes are a [`BlobStoreProvider`](crate::prelude::BlobStoreProvider)'s and rows a
+/// and a lifecycle. Bytes are a [`BlobProvider`](crate::prelude::BlobProvider)'s and rows a
 /// `TableProvider`'s, two traits over this one, neither implying the other.
 pub trait StoreBackend: 'static + Send + Sync {
 	/// Stable family discriminator, ie `"fs"`, `"memory"`, `"localstorage"`,
@@ -23,7 +23,7 @@ pub trait StoreBackend: 'static + Send + Sync {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// let exists = store.store_exists().await?;
 	/// # Ok(())
 	/// # }
@@ -37,7 +37,7 @@ pub trait StoreBackend: 'static + Send + Sync {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// store.store_create().await?;
 	/// # Ok(())
 	/// # }
@@ -54,7 +54,7 @@ pub trait StoreBackend: 'static + Send + Sync {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// store.store_try_create().await?;
 	/// # Ok(())
 	/// # }
@@ -78,7 +78,7 @@ pub trait StoreBackend: 'static + Send + Sync {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// store.store_remove().await?;
 	/// # Ok(())
 	/// # }

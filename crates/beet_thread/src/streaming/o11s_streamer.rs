@@ -268,16 +268,14 @@ where
 					_ev => {}
 				}
 				let ev_result =
-					serde_json::from_str::<StreamingEventOrUnknown>(
-						&event.data,
-					)
-					.map_err(|err| {
-						bevyhow!(
-							"Failed to parse streaming event: {}\nRaw: {}",
-							err,
-							event.data
-						)
-					});
+					json_ext::from_str::<StreamingEventOrUnknown>(&event.data)
+						.map_err(|err| {
+							bevyhow!(
+								"Failed to parse streaming event: {}\nRaw: {}",
+								err,
+								event.data
+							)
+						});
 
 				let ev_result = match ev_result {
 					Ok(StreamingEventOrUnknown::Known(ev)) => Ok(ev),
@@ -322,5 +320,31 @@ where
 #[serde(untagged)]
 enum StreamingEventOrUnknown {
 	Known(o11s::StreamingEvent),
-	Unknown(serde_json::Value),
+	Unknown(Value),
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	/// An event the api documents parses as known, any other json as unknown,
+	/// so a keepalive is skipped rather than failing the stream.
+	#[beet_core::test]
+	fn parses_known_and_unknown_events() {
+		json_ext::from_str::<StreamingEventOrUnknown>(
+			r#"{"type":"response.output_text.delta","item_id":"msg_1","output_index":0,"content_index":0,"delta":"Hi","sequence_number":3,"logprobs":[]}"#,
+		)
+		.unwrap()
+		.xmap(|ev| matches!(ev, StreamingEventOrUnknown::Known(_)))
+		.xpect_true();
+		json_ext::from_str::<StreamingEventOrUnknown>(
+			r#"{"type":"keepalive","sequence_number":4}"#,
+		)
+		.unwrap()
+		.xmap(|ev| match ev {
+			StreamingEventOrUnknown::Unknown(value) => value,
+			StreamingEventOrUnknown::Known(_) => Value::Null,
+		})
+		.xpect_eq(value!({ "type": "keepalive", "sequence_number": 4 }));
+	}
 }

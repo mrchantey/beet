@@ -205,7 +205,7 @@ impl ErasedStoreBlock {
 /// provider the declaration's [`ErasedStoreBlock::runtime_uri`] names under
 /// this launch's [`ServiceAccess`], as the [`StoreKind`] it declares and that
 /// one alone, so a table over a blob uri lands no [`BlobStore`]. Built through
-/// [`StoreProvider::from_uri`] or [`TableStoreProvider::from_uri`] on every
+/// [`BlobStoreProvider::from_uri`] or [`TableStoreProvider::from_uri`] on every
 /// target: a store kind this build has no backend for errors with guidance
 /// here rather than silently carrying no store.
 ///
@@ -230,7 +230,7 @@ pub(crate) fn attach_store(
 			);
 			match store.kind {
 				StoreKind::Blob => {
-					StoreProvider::from_uri(&uri)?.insert(&mut entity)
+					BlobStoreProvider::from_uri(&uri)?.insert(&mut entity)
 				}
 				StoreKind::Table => {
 					TableStoreProvider::from_uri(&uri)?.insert(&mut entity)
@@ -360,7 +360,7 @@ mod test {
 		);
 		let erased = world.get::<ErasedStoreBlock>(entity).unwrap();
 		let read = || {
-			StoreProvider::from_uri(
+			BlobStoreProvider::from_uri(
 				&erased.runtime_uri(ServiceAccess::Remote, None),
 			)
 			.unwrap()

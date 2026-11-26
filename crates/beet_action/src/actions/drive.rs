@@ -203,12 +203,12 @@ mod test {
 			drive: DifferentialDrive::new(40., -90.),
 			duration: Duration::from_secs_f64(1.5),
 		};
-		let json = serde_json::to_string(&command).unwrap();
+		let json = json_ext::to_string(&command).unwrap();
 		json.xpect_eq(
 			r#"{"drive":{"linear":40.0,"angular":-90.0},"duration":"1.5s"}"#
 				.to_string(),
 		);
-		serde_json::from_str::<DriveForDuration>(&json)
+		json_ext::from_str::<DriveForDuration>(&json)
 			.unwrap()
 			.xpect_eq(command);
 	}
@@ -221,7 +221,7 @@ mod test {
 	#[beet_core::test]
 	fn drive_duration_requires_a_unit() {
 		let decode = |duration: &str| {
-			serde_json::from_str::<DriveForDuration>(&format!(
+			json_ext::from_str::<DriveForDuration>(&format!(
 				r#"{{"drive":{{"linear":0.0,"angular":0.0}},"duration":{duration}}}"#
 			))
 		};

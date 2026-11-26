@@ -3,7 +3,8 @@
 //! This module provides a unified API for storing and retrieving binary data
 //! across different storage backends:
 //!
-//! - [`InMemoryStore`]: Ephemeral storage for testing
+//! - [`InMemoryBlobStore`]: blobs in process memory, for a test or a runtime
+//!   whose bytes need not outlive it
 //! - [`FsStore`]: Local filesystem storage, cross-platform via `fs_ext` (the deno
 //!   runner's fs globals back it on wasm)
 //! - [`LocalStorageStore`]: Browser localStorage (WASM only)
@@ -50,45 +51,28 @@
 //! # use beet_net::prelude::*;
 //! # use beet_core::prelude::*;
 //! # async fn run() -> Result<()> {
-//! let store = BlobStore::temp();
+//! let store = BlobStore::new(InMemoryBlobStore::new());
 //! store.insert(&RelPath::from("hello.txt"), "world").await?;
 //! let data = store.get(&RelPath::from("hello.txt")).await?;
 //! # Ok(())
 //! # }
 //! ```
-// no_std core: the BlobStore facade, provider trait, in-memory store, and the
-// reactive/handle wrappers. The concrete backends below are std-only.
+// blobs: the `BlobStore` handle, its provider trait, the in-memory store and
+// every blob backend.
 mod blob;
-mod blob_event;
-mod blob_store_provider;
+pub use blob::*;
 // what a blob store and a table store share.
 mod store_backend;
-pub use blob_event::*;
-pub use blob_store_provider::*;
-mod blob_store;
-// the store-agnostic mirror, over the provider trait's `list_stats`.
-mod blob_sync;
-mod in_memory_store;
+pub use store_backend::*;
 // the mark every store reader carries while its content is arriving, the one
 // signal a surface waits on before its first paint.
 mod loading;
 pub use loading::*;
-// a local store forked off an upstream one: pure composition, so it rides the
-// core.
-mod store_fork;
 // the one canonical store an app runs from, and the singleton it enforces.
 mod package_store;
 mod repo_store;
-mod store_path;
-pub use blob::*;
-pub use blob_store::*;
-pub use blob_sync::*;
-pub use in_memory_store::*;
 pub use package_store::*;
 pub use repo_store::*;
-pub use store_backend::*;
-pub use store_fork::*;
-pub use store_path::*;
 
 // the analytics types + emission need only serde (which `std` pulls); the store
 // persistence inside needs `json` (the TableStore surface) and gates itself.
@@ -98,9 +82,6 @@ mod analytics;
 mod document_blob;
 #[cfg(feature = "json")]
 mod document_store;
-// the http-served store: its listing endpoint answers json.
-#[cfg(all(feature = "std", feature = "json"))]
-mod http_store;
 // a file computed from declared sources, regenerated when stale: the store
 // side of `Provenance`, its producer an action.
 #[cfg(feature = "std")]
@@ -110,9 +91,6 @@ mod store_ref;
 // the uri -> concrete component seam every store construction goes through.
 #[cfg(feature = "std")]
 mod store_provider;
-// one sync between any two stores, by uri or by declaration.
-#[cfg(feature = "std")]
-mod store_sync;
 // tables, beet's one dialect for table-shaped data: rows as canonical json, keyed and
 // hashed through DAG-CBOR, so `json` (which brings `dag_cbor`).
 #[cfg(feature = "json")]
@@ -125,64 +103,18 @@ pub use derivation::*;
 pub use document_blob::*;
 #[cfg(feature = "json")]
 pub(crate) use document_store::*;
-#[cfg(all(feature = "std", feature = "json"))]
-pub use http_store::*;
 #[cfg(feature = "std")]
 pub use store_provider::*;
 #[cfg(feature = "std")]
 pub use store_ref::*;
-#[cfg(feature = "std")]
-pub use store_sync::*;
 #[cfg(feature = "json")]
 pub use table::*;
-// the `WatchDir` registration component (any `std` target) and the notify-based
-// directory watcher backing it. The watcher itself is native+fs only for now (deno
-// directory watching is unimplemented), so a wasm `FsStore` works without live
-// reload; the `WatchDir` component is inert there. A future wasm watcher slots into
-// this same seam (see `StorePlugin`).
-#[cfg(feature = "std")]
-mod fs_blob_watchers;
-#[cfg(feature = "std")]
-mod fs_store;
-#[cfg(feature = "std")]
-pub use fs_blob_watchers::*;
-// the browser stores ride the `std` store surface (`BlobEventBus`, the
-// send_wrapper/futures bridge, and the base64 blob encoding).
-#[cfg(all(target_arch = "wasm32", feature = "std"))]
-mod indexed_db_store;
-#[cfg(all(target_arch = "wasm32", feature = "std"))]
-mod local_storage_store;
-#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
-mod r2_workers_store;
-// the Worker runtime's ambient env and request conversions
+// the Worker runtime's ambient env and request conversions, shared by the R2
+// blob store and the Durable Object table store
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 mod worker_env;
-#[cfg(feature = "std")]
-pub use fs_store::*;
-#[cfg(all(target_arch = "wasm32", feature = "std"))]
-pub use indexed_db_store::*;
-#[cfg(all(target_arch = "wasm32", feature = "std"))]
-pub use local_storage_store::*;
-#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
-pub use r2_workers_store::*;
-#[cfg(feature = "aws")]
-pub use s3_store::*;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub use worker_env::*;
-#[cfg(feature = "aws")]
-mod s3_store;
-#[cfg(feature = "aws")]
-pub use dynamo_store::*;
-#[cfg(feature = "aws")]
-mod dynamo_store;
-#[cfg(feature = "sqlite")]
-mod sqlite_blob_store;
-#[cfg(feature = "sqlite")]
-mod sqlite_store;
-#[cfg(feature = "sqlite")]
-pub use sqlite_blob_store::*;
-#[cfg(feature = "sqlite")]
-pub use sqlite_store::*;
 
 use beet_core::prelude::*;
 
@@ -194,7 +126,7 @@ pub struct StorePlugin;
 
 impl Plugin for StorePlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<InMemoryStore>()
+		app.register_type::<InMemoryBlobStore>()
 			// store-path components: resolve a scoped store / blob from the nearest
 			// ancestor store, kept correct as stores churn above them.
 			.register_type::<DirPath>()

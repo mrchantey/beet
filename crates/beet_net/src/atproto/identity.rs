@@ -264,7 +264,7 @@ mod test {
 	/// Pete's did document as the PLC directory answered it.
 	#[beet_core::test]
 	fn reads_a_did_document() {
-		let document = serde_json::from_str::<DidDocument>(
+		let document = json_ext::from_str::<DidDocument>(
 			r##"{"@context":["https://www.w3.org/ns/did/v1"],"id":"did:plc:hnv7bd4gtxrf7iigjo22qukp","alsoKnownAs":["at://pete.beet.org"],"verificationMethod":[],"service":[{"id":"#atproto_pds","type":"AtprotoPersonalDataServer","serviceEndpoint":"https://cordyceps.us-west.host.bsky.network"}]}"##,
 		)
 		.unwrap();

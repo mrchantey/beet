@@ -1,8 +1,6 @@
 mod dynamic_components;
 #[cfg(target_arch = "wasm32")]
 mod js;
-#[cfg(feature = "json")]
-mod json;
 pub use dynamic_components::*;
 pub mod map;
 pub use map::*;
@@ -23,6 +21,7 @@ pub use value::*;
 mod write_json;
 // reading json text exactly, floats included.
 mod read_json;
+pub use read_json::JsonError;
 // the reader and writer against `serde_json`'s exact mode
 #[cfg(all(test, feature = "json"))]
 mod json_conformance;

@@ -165,7 +165,7 @@ queue ran dry while it was still pending"
 
 	/// Hand one reply to the shim, settling the promise its id names.
 	fn answer(&self, reply: &WorldReply) -> Result<()> {
-		let reply = serde_json::to_string(reply).map_err(|err| {
+		let reply = json_ext::to_string(reply).map_err(|err| {
 			bevyhow!("quickjs: failed to encode world reply: {err}")
 		})?;
 		self.context.with(|ctx| {
@@ -277,7 +277,7 @@ pub(crate) async fn run_quickjs<Sink>(
 where
 	Sink: 'static + FnMut(ConsoleStream, &str),
 {
-	let input = encode_input(input)?;
+	let input = input.to_json_string();
 	let bounded = BoundedRuntime::new(&config.limits)?;
 	// a bridged script's calls queue here rather than crossing a transport: the
 	// engine runs on this thread, so `__world_send_json` is a host function that
@@ -324,7 +324,7 @@ where
 		Some(bridge) => drive_bridge(&bounded, &queue, bridge).await,
 		None => settled
 			.map(|output| {
-				serde_json::from_str(&output).map_err(|err| {
+				json_ext::from_str(&output).map_err(|err| {
 					bevyhow!("quickjs: failed to decode output: {err}")
 				})
 			})
@@ -369,7 +369,7 @@ async fn drive_bridge(
 	loop {
 		match bounded.pump(queue)? {
 			Pumped::Done(done) => {
-				return match serde_json::from_str::<Completion>(&done)
+				return match json_ext::from_str::<Completion>(&done)
 					.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?
 				{
 					Completion::Ok { value } => value.xok(),
@@ -380,7 +380,7 @@ async fn drive_bridge(
 			}
 			Pumped::Calls(calls) => {
 				for call in calls {
-					let call = serde_json::from_str::<WorldCall>(&call)
+					let call = json_ext::from_str::<WorldCall>(&call)
 						// the shim is the only writer, so this can only be a bug
 						// in the wire types, and it has no id to correlate.
 						.map_err(|err| {
@@ -394,12 +394,6 @@ async fn drive_bridge(
 			}
 		}
 	}
-}
-
-/// `input` as the JSON encoding the engine parses it from.
-fn encode_input(input: &Value) -> Result<String> {
-	serde_json::to_string(input)
-		.map_err(|err| bevyhow!("quickjs: failed to encode input: {err}"))
 }
 
 /// Bind the `input` global, then install the streaming `console` if the config

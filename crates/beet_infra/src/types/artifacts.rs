@@ -440,7 +440,7 @@ mod tests {
 	/// together.
 	#[beet_core::test]
 	async fn the_pointer_carries_the_repo_store() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let uri = |version: &str| {
 			StoreUri::parse(&format!("s3://beet-site--prod--repo/{version}"))
 				.unwrap()
@@ -484,7 +484,7 @@ mod tests {
 	/// now serves.
 	#[beet_core::test]
 	async fn the_ledger_records_its_source() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let source = |commit: &str| DeploySource::Git {
 			commit: commit.into(),
 			describe: commit[..7].into(),
@@ -517,7 +517,7 @@ mod tests {
 	/// back to it.
 	#[beet_core::test]
 	async fn a_ledger_without_a_repo_still_parses() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let ledger = test_ledger(vec![("app", "versions/v1/app", "h1")]);
 		let json = value!({
 			"deploy_id": (Value::from_serde(&ledger.deploy_id).unwrap()),
@@ -558,7 +558,7 @@ mod tests {
 	#[beet_core::test]
 	async fn upload_and_download() {
 		let mut client = ArtifactsClient::new(
-			BlobStore::temp(),
+			BlobStore::new(InMemoryBlobStore::new()),
 			ArtifactLedger::default_test(),
 		);
 		let bytes = b"hello world".to_vec();
@@ -579,7 +579,10 @@ mod tests {
 	async fn publish_and_read_ledger() {
 		let ledger =
 			test_ledger(vec![("app.zip", "versions/x/app.zip", "abc123")]);
-		let client = ArtifactsClient::new(BlobStore::temp(), ledger.clone());
+		let client = ArtifactsClient::new(
+			BlobStore::new(InMemoryBlobStore::new()),
+			ledger.clone(),
+		);
 		client.current_ledger().await.unwrap().xpect_eq(None);
 		client.publish_ledger().await.unwrap();
 		let current = client.current_ledger().await.unwrap().unwrap();
@@ -593,7 +596,7 @@ mod tests {
 	/// track the ledger rather than the boot it happened to start from.
 	#[beet_core::test]
 	async fn release_pointer_tracks_the_current_ledger() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let first = test_ledger(vec![("app", "versions/v1/app", "h1")]);
 		let second = test_ledger(vec![("app", "versions/v2/app", "h2")]);
 		let client = ArtifactsClient::new(store.clone(), first.clone());
@@ -629,7 +632,7 @@ mod tests {
 
 	#[beet_core::test]
 	async fn list_versions_sorted() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let client1 = ArtifactsClient::new(
 			store.clone(),
 			test_ledger(vec![("app.zip", "v1", "h1")]),
@@ -650,7 +653,7 @@ mod tests {
 	#[beet_core::test]
 	async fn rollback_and_rollforward() {
 		let mut client = ArtifactsClient::new(
-			BlobStore::temp(),
+			BlobStore::new(InMemoryBlobStore::new()),
 			ArtifactLedger::default_test(),
 		);
 		let ledger1 = test_ledger(vec![("app.zip", "v1", "h1")]);
@@ -674,7 +677,7 @@ mod tests {
 	/// rollback range, since `rollback` counts back through what is retained.
 	#[beet_core::test]
 	async fn prunes_to_the_retained_count() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let mut ledgers = Vec::new();
 		for idx in 0..5 {
 			let ledger = test_ledger(vec![("app.zip", "key", "hash")]);
@@ -716,7 +719,7 @@ mod tests {
 	/// since a version is one prefix.
 	#[beet_core::test]
 	async fn removing_a_version_takes_its_whole_prefix() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let mut client =
 			ArtifactsClient::new(store.clone(), ArtifactLedger::default_test());
 		let version = *client.deploy_id();
@@ -756,7 +759,7 @@ mod tests {
 	#[beet_core::test]
 	async fn rollback_too_far_fails() {
 		let mut client = ArtifactsClient::new(
-			BlobStore::temp(),
+			BlobStore::new(InMemoryBlobStore::new()),
 			ArtifactLedger::default_test(),
 		);
 		let ledger = test_ledger(vec![("app.zip", "v1", "h1")]);

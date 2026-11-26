@@ -175,11 +175,10 @@ mod test {
 	#[beet_core::test]
 	fn reads_a_foreign_publication() {
 		let json = r#"{"url":"https://lab.leaflet.pub","icon":{"ref":{"$link":"bafkreicchgde2juzzjey4opdbbh7h26mmi4c4pcbg7pc3muhmixb6mrm3u"},"size":3394,"$type":"blob","mimeType":"image/webp"},"name":"Leaflet Lab Notes","$type":"site.standard.publication","theme":{"$type":"pub.leaflet.publication#theme","primary":{"b":39,"g":39,"r":39,"$type":"pub.leaflet.theme.color#rgb"},"pageWidth":624},"basicTheme":{"$type":"site.standard.theme.basic","accent":{"b":0,"g":145,"r":116,"$type":"site.standard.theme.color#rgb"},"background":{"b":255,"g":255,"r":255,"$type":"site.standard.theme.color#rgb"},"foreground":{"b":0,"g":0,"r":0,"$type":"site.standard.theme.color#rgb"},"accentForeground":{"b":255,"g":255,"r":255,"$type":"site.standard.theme.color#rgb"}},"description":"Behind the scenes as we build Leaflet, an open social publishing tool for blogs, newsletters, and more!","preferences":{"showComments":true,"showInDiscover":true,"prevNextDirection":"rtl"}}"#;
-		let publication =
-			AtprotoValue::from_json(serde_json::from_str(json).unwrap())
-				.unwrap()
-				.into_serde::<StandardSitePublication>()
-				.unwrap();
+		let publication = AtprotoValue::parse_json(json)
+			.unwrap()
+			.into_serde::<StandardSitePublication>()
+			.unwrap();
 		publication.url.as_str().xpect_eq("https://lab.leaflet.pub");
 		publication
 			.icon

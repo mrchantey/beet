@@ -45,7 +45,7 @@ pub fn SearchIndex() -> impl Bundle {
 
 /// One indexed page.
 ///
-/// Hand-serialized through [`json_ext`] rather than derived: a `Serialize` impl
+/// Hand-serialized through [`Value`] rather than derived: a `Serialize` impl
 /// would put this whole route behind the `json` feature, and a site's search
 /// index should exist in every build that serves the site.
 #[derive(Debug, Clone, PartialEq)]
@@ -101,9 +101,10 @@ impl SearchEntry {
 			entries.len(),
 			started.elapsed()
 		);
-		Value::new_list(entries.iter().map(Self::to_value))
-			.to_json_string()
-			.xok()
+		// keys sorted, so the index reads the same however an entry was built
+		let mut index = Value::new_list(entries.iter().map(Self::to_value));
+		index.sort_maps();
+		index.to_json_string().xok()
 	}
 
 	/// A page's plain text as an index carries it: whitespace collapsed to

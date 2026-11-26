@@ -1,7 +1,6 @@
 //! Publishing custom metrics, as CloudWatch `PutMetricData`.
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::json;
 
 /// One metric value, in a namespace's units.
 ///
@@ -40,13 +39,9 @@ impl MetricDatum {
 	}
 
 	/// The wire form, one entry of `PutMetricData`'s `MetricData`.
-	pub fn to_json(
-		&self,
-		dimension: &str,
-		dimension_value: &str,
-	) -> serde_json::Value {
-		json!({
-			"MetricName": self.name,
+	pub fn to_json(&self, dimension: &str, dimension_value: &str) -> Value {
+		value!({
+			"MetricName": &self.name,
 			"Value": self.value,
 			"Unit": self.unit.unwrap_or("None"),
 			"Dimensions": [{ "Name": dimension, "Value": dimension_value }],
@@ -96,7 +91,7 @@ async fn put_metric_data_with(
 	client
 		.call_json(
 			"PutMetricData",
-			&json!({ "Namespace": namespace, "MetricData": metrics }),
+			&value!({ "Namespace": namespace, "MetricData": metrics }),
 		)
 		.await?;
 	Ok(())
@@ -105,7 +100,6 @@ async fn put_metric_data_with(
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use serde_json::Value;
 	use std::sync::Arc;
 	use std::sync::Mutex;
 
@@ -117,10 +111,10 @@ mod tests {
 	fn a_datum_carries_the_dimension_its_alarm_names() {
 		MetricDatum::rate("BounceRate", 0.012)
 			.to_json("Domain", "news.example.com")
-			.to_string()
+			.to_json_string()
 			.as_str()
 			.xpect_eq(
-				r#"{"Dimensions":[{"Name":"Domain","Value":"news.example.com"}],"MetricName":"BounceRate","Unit":"None","Value":0.012}"#,
+				r#"{"MetricName":"BounceRate","Value":0.012,"Unit":"None","Dimensions":[{"Name":"Domain","Value":"news.example.com"}]}"#,
 			);
 	}
 
@@ -143,7 +137,7 @@ mod tests {
 						.first_raw("x-amz-target")
 						.unwrap_or_default()
 						.to_string();
-					let body = serde_json::from_slice::<Value>(
+					let body = json_ext::from_slice::<Value>(
 						&request.body.into_bytes().await?,
 					)?;
 					recorded.lock().unwrap().push((target, body));
@@ -175,7 +169,7 @@ mod tests {
 		.unwrap();
 		calls.lock().unwrap().clone().xpect_eq(vec![(
 			"GraniteServiceVersion20100801.PutMetricData".to_string(),
-			json!({
+			value!({
 				"Namespace": "Beet/Mail",
 				"MetricData": [
 					{

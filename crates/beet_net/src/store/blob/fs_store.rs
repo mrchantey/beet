@@ -29,7 +29,7 @@ pub struct FsStore {
 	subdir: Option<RelPath>,
 	/// Whether a listing reads through symbolic links, materializing a linked
 	/// directory's files as the store's own. On by default, as a path read
-	/// is; off, a link is invisible to [`list`](BlobStoreProvider::list).
+	/// is; off, a link is invisible to [`list`](BlobProvider::list).
 	follow_symlinks: bool,
 }
 
@@ -168,10 +168,10 @@ impl StoreBackend for FsStore {
 	}
 }
 
-impl BlobStoreProvider for FsStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+impl BlobProvider for FsStore {
+	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
 		Box::new(FsStore {
 			subdir: Some(match &self.subdir {
 				Some(existing) => existing.join(&path),
@@ -181,7 +181,7 @@ impl BlobStoreProvider for FsStore {
 		})
 	}
 
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
+	fn base(&self) -> Box<dyn BlobProvider> {
 		Box::new(FsStore {
 			subdir: None,
 			..self.clone()
@@ -196,7 +196,7 @@ impl BlobStoreProvider for FsStore {
 		&self,
 		entry_name: &RelPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
+	) -> Result<(Box<dyn BlobProvider>, RelPath)> {
 		let abs_root = self.effective_root().join(root);
 		let entry_name = self
 			.effective_root()
@@ -213,7 +213,7 @@ impl BlobStoreProvider for FsStore {
 				path: abs_root,
 				subdir: None,
 				..self.clone()
-			}) as Box<dyn BlobStoreProvider>),
+			}) as Box<dyn BlobProvider>),
 			entry_name,
 		)
 			.xok()

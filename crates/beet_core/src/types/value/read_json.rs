@@ -18,8 +18,8 @@ impl Value {
 	/// when it is not negative, and a float past the range of either.
 	///
 	/// # Errors
-	/// Errors on anything that is not one JSON document, naming the line and
-	/// column, and on an object naming a key twice, which RFC 8259 leaves to
+	/// Errors with a [`JsonError`] on anything that is not one JSON document,
+	/// naming the line and column, and on an object naming a key twice, which RFC 8259 leaves to
 	/// each reader and I-JSON (RFC 7493) refuses: two readers taking different
 	/// values from one document is how a signed or hashed one is forged.
 	///
@@ -38,6 +38,21 @@ impl Value {
 			Some(_) => Err(reader.error("expected the end of the document")),
 		}
 	}
+}
+
+/// Where and why JSON text failed to read, see [`Value::parse_json`]: a
+/// [`SourceError`] needs the byte offset, a person the line and column.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("invalid json at line {line} column {column}: {message}")]
+pub struct JsonError {
+	/// The byte offset into the text.
+	pub offset: usize,
+	/// The line, counting from 1.
+	pub line: usize,
+	/// The column in bytes, counting from 1.
+	pub column: usize,
+	/// What was wrong there.
+	pub message: String,
 }
 
 /// A position in a JSON text.
@@ -67,15 +82,19 @@ impl JsonReader<'_> {
 
 	/// The error `message` at this position.
 	fn error(&self, message: &str) -> BevyError {
-		let before =
-			&self.text.as_bytes()[..self.at.min(self.text.as_bytes().len())];
-		let line = before.iter().filter(|byte| **byte == b'\n').count() + 1;
-		let column = before
-			.iter()
-			.rev()
-			.take_while(|byte| **byte != b'\n')
-			.count() + 1;
-		bevyhow!("invalid json at line {line} column {column}: {message}")
+		let offset = self.at.min(self.text.len());
+		let before = &self.text.as_bytes()[..offset];
+		JsonError {
+			offset,
+			line: before.iter().filter(|byte| **byte == b'\n').count() + 1,
+			column: before
+				.iter()
+				.rev()
+				.take_while(|byte| **byte != b'\n')
+				.count() + 1,
+			message: message.into(),
+		}
+		.into()
 	}
 
 	/// Step past `literal`, else an error naming it.

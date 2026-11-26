@@ -14,7 +14,7 @@ pub struct RealtimeResponseCreateParamsToolsInner {
 	pub description: Option<String>,
 	/// Parameters of the function in JSON Schema.
 	#[serde(rename = "parameters", skip_serializing_if = "Option::is_none")]
-	pub parameters: Option<serde_json::Value>,
+	pub parameters: Option<beet_core::prelude::Value>,
 }
 
 impl RealtimeResponseCreateParamsToolsInner {

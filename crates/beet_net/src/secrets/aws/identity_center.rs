@@ -2,8 +2,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -179,7 +177,7 @@ impl IdentityCenterClient {
 		let answer = self
 			.create_token(
 				&client,
-				json!({
+				value!({
 					"grantType": "authorization_code",
 					"code": code.as_str(),
 					"redirectUri": redirect_uri,
@@ -213,7 +211,7 @@ impl IdentityCenterClient {
 					"StartDeviceAuthorization",
 					"/device_authorization",
 				)
-				.with_json(&json!({
+				.with_json(&value!({
 					"clientId": client.client_id.as_str(),
 					"clientSecret": client.client_secret.as_str(),
 					"startUrl": self.start_url.as_str(),
@@ -222,19 +220,16 @@ impl IdentityCenterClient {
 			)
 			.await?;
 		let field = |name: &str| {
-			start[name]
-				.as_str()
-				.map(ToString::to_string)
-				.ok_or_else(|| {
-					bevyhow!("the device authorization answered no `{name}`")
-				})
+			start[name].as_str().map(ToString::to_string).map_err(|_| {
+				bevyhow!("the device authorization answered no `{name}`")
+			})
 		};
 		let device_code = field("deviceCode")?;
 		(self.present)(SsoPrompt::Device {
 			url: start["verificationUriComplete"]
 				.as_str()
 				.map(ToString::to_string)
-				.map_or_else(|| field("verificationUri"), Ok)?,
+				.or_else(|_| field("verificationUri"))?,
 			code: field("userCode")?,
 		})
 		.await?;
@@ -249,7 +244,7 @@ impl IdentityCenterClient {
 					match self
 						.create_token(
 							&client,
-							json!({
+							value!({
 								"grantType": Self::DEVICE_GRANT,
 								"deviceCode": device_code,
 							}),
@@ -309,8 +304,8 @@ impl IdentityCenterClient {
 		client: &SsoClient,
 		mut grant: Value,
 	) -> Result<Value> {
-		grant["clientId"] = json!(client.client_id.as_str());
-		grant["clientSecret"] = json!(client.client_secret.as_str());
+		grant.insert("clientId", client.client_id.as_str())?;
+		grant.insert("clientSecret", client.client_secret.as_str())?;
 		self.oidc
 			.send_json(
 				AwsRequest::post("CreateToken", "/token")
@@ -327,10 +322,11 @@ impl IdentityCenterClient {
 		answer: &Value,
 		previous: Option<&OAuthTokens>,
 	) -> Result<IdentityCenterSession> {
-		let Some(access_token) = answer["accessToken"].as_str() else {
+		let Ok(access_token) = answer["accessToken"].as_str() else {
 			bevybail!("CreateToken answered no access token");
 		};
-		let refresh_token = answer["refreshToken"].as_str().map(SmolStr::new);
+		let refresh_token =
+			answer["refreshToken"].as_str().ok().map(SmolStr::new);
 		let expires_in =
 			Duration::from_secs(answer["expiresIn"].as_u64().unwrap_or(3600));
 		let now = (self.clock)();
@@ -360,7 +356,7 @@ impl IdentityCenterClient {
 	async fn client(&self, dir: &Path) -> Result<SsoClient> {
 		let path = dir.join(IdentityCenterSession::CLIENT_FILE);
 		if let Ok(text) = fs_ext::read_to_string(&path)
-			&& let Ok(client) = serde_json::from_str::<SsoClient>(&text)
+			&& let Ok(client) = json_ext::from_str::<SsoClient>(&text)
 			&& client.start_url == self.start_url
 			&& (self.clock)() + Duration::from_secs(3600) < client.expires_at
 		{
@@ -370,7 +366,7 @@ impl IdentityCenterClient {
 			.oidc
 			.send_json(
 				AwsRequest::post("RegisterClient", "/client/register")
-					.with_json(&json!({
+					.with_json(&value!({
 						"clientName": "beet",
 						"clientType": "public",
 						"scopes": [Self::SCOPE],
@@ -384,7 +380,7 @@ impl IdentityCenterClient {
 			answer[name]
 				.as_str()
 				.map(SmolStr::new)
-				.ok_or_else(|| bevyhow!("RegisterClient answered no `{name}`"))
+				.map_err(|_| bevyhow!("RegisterClient answered no `{name}`"))
 		};
 		let client = SsoClient {
 			client_id: field("clientId")?,
@@ -395,7 +391,7 @@ impl IdentityCenterClient {
 			start_url: self.start_url.clone(),
 		};
 		fs_ext::create_dir_private(dir)?;
-		fs_ext::write_private(&path, serde_json::to_string(&client)?)?;
+		fs_ext::write_private(&path, json_ext::to_string(&client)?)?;
 		client.xok()
 	}
 
@@ -416,7 +412,7 @@ impl IdentityCenterClient {
 		let answer = self
 			.create_token(
 				&session.client,
-				json!({
+				value!({
 					"grantType": "refresh_token",
 					"refreshToken": refresh_token,
 				}),
@@ -469,20 +465,20 @@ impl IdentityCenterClient {
 				.await?;
 			accounts.extend(
 				page["accountList"]
-					.as_array()
+					.as_list()
 					.into_iter()
 					.flatten()
 					.filter_map(|account| {
 						SsoAccount {
-							id: account["accountId"].as_str()?.into(),
-							name: account["accountName"].as_str()?.into(),
+							id: account["accountId"].as_str().ok()?.into(),
+							name: account["accountName"].as_str().ok()?.into(),
 						}
 						.xsome()
 					}),
 			);
 			match page["nextToken"].as_str() {
-				Some(token) => next = Some(token.to_string()),
-				None => break,
+				Ok(token) => next = Some(token.to_string()),
+				Err(_) => break,
 			}
 		}
 		accounts.xok()
@@ -509,15 +505,15 @@ impl IdentityCenterClient {
 				.await?;
 			roles.extend(
 				page["roleList"]
-					.as_array()
+					.as_list()
 					.into_iter()
 					.flatten()
-					.filter_map(|role| role["roleName"].as_str())
+					.filter_map(|role| role["roleName"].as_str().ok())
 					.map(SmolStr::new),
 			);
 			match page["nextToken"].as_str() {
-				Some(token) => next = Some(token.to_string()),
-				None => break,
+				Ok(token) => next = Some(token.to_string()),
+				Err(_) => break,
 			}
 		}
 		roles.xok()
@@ -578,7 +574,7 @@ impl IdentityCenterClient {
 			.await?;
 		let credentials = &answer["roleCredentials"];
 		let field = |name: &str| {
-			credentials[name].as_str().map(SmolStr::new).ok_or_else(|| {
+			credentials[name].as_str().map(SmolStr::new).map_err(|_| {
 				bevyhow!("GetRoleCredentials answered no `{name}`")
 			})
 		};
@@ -720,7 +716,7 @@ impl IdentityCenterSession {
 			);
 		}
 		let Ok(session) =
-			serde_json::from_str::<Self>(&fs_ext::read_to_string(&path)?)
+			json_ext::from_str::<Self>(&fs_ext::read_to_string(&path)?)
 		else {
 			fs_ext::remove(&path)?;
 			return SsoState::None.xok();
@@ -741,7 +737,7 @@ impl IdentityCenterSession {
 		fs_ext::create_dir_private(dir)?;
 		fs_ext::write_private(
 			dir.join(Self::SESSION_FILE),
-			serde_json::to_string(self)?,
+			json_ext::to_string(self)?,
 		)?;
 		OK
 	}
@@ -795,7 +791,7 @@ mod test {
 				let account = request.get_param("account_id").map(ToString::to_string);
 				let role = request.get_param("role_name").map(ToString::to_string);
 				let body = request.body.into_bytes().await.unwrap_or_default();
-				let body: Value = serde_json::from_slice(&body).unwrap_or_default();
+				let body: Value = json_ext::from_slice(&body).unwrap_or_default();
 				let mut fake = state.lock().unwrap();
 				let error = |code: &str| {
 					Response::from_status(StatusCode::BAD_REQUEST)
@@ -805,13 +801,13 @@ mod test {
 				let token = |fake: &mut Fake| {
 					fake.token += 1;
 					Response::ok_text(
-						json!({
+						value!({
 							"accessToken": format!("access-{}", fake.token),
 							"refreshToken": format!("refresh-{}", fake.token),
 							"expiresIn": 3600,
 							"tokenType": "Bearer",
 						})
-						.to_string(),
+						.to_json_string(),
 					)
 				};
 				let live = |fake: &Fake| bearer.as_deref() == Some(format!("access-{}", fake.token).as_str());
@@ -819,16 +815,16 @@ mod test {
 					"/client/register" => {
 						fake.registrations += 1;
 						Response::ok_text(
-							json!({
+							value!({
 								"clientId": "client-1",
 								"clientSecret": "client-secret",
 								"clientSecretExpiresAt": Timestamp::now().secs() + 90 * 86400,
 							})
-							.to_string(),
+							.to_json_string(),
 						)
 					}
 					"/device_authorization" => Response::ok_text(
-						json!({
+						value!({
 							"deviceCode": "device-1",
 							"userCode": "ABCD-EFGH",
 							"verificationUri": "https://device.sso/",
@@ -836,7 +832,7 @@ mod test {
 							"expiresIn": 600,
 							"interval": 0,
 						})
-						.to_string(),
+						.to_json_string(),
 					),
 					"/token" => match body["grantType"].as_str().unwrap_or_default() {
 						"authorization_code" => {
@@ -844,7 +840,7 @@ mod test {
 							let verifier = body["codeVerifier"].as_str().unwrap_or_default();
 							let challenge = base64::engine::general_purpose::URL_SAFE_NO_PAD
 								.encode(sha2::Sha256::digest(verifier.as_bytes()));
-							match (Some(challenge) == fake.challenge, body["code"].as_str()) {
+							match (Some(challenge) == fake.challenge, body["code"].as_str().ok()) {
 								(true, Some("auth-code")) => token(&mut fake),
 								_ => error("InvalidGrantException"),
 							}
@@ -857,33 +853,33 @@ mod test {
 								_ => token(&mut fake),
 							}
 						}
-						"refresh_token" => match body["refreshToken"].as_str() == Some(format!("refresh-{}", fake.token).as_str()) {
+						"refresh_token" => match body["refreshToken"].as_str().ok() == Some(format!("refresh-{}", fake.token).as_str()) {
 							true => token(&mut fake),
 							false => error("InvalidGrantException"),
 						},
 						_ => error("UnsupportedGrantTypeException"),
 					},
 					"/assignment/accounts" if live(&fake) => Response::ok_text(
-						json!({"accountList": [{"accountId": "222", "accountName": "beetmash"}]}).to_string(),
+						value!({"accountList": [{"accountId": "222", "accountName": "beetmash"}]}).to_json_string(),
 					),
 					"/assignment/roles" if live(&fake) && account.as_deref() == Some("222") => {
 						Response::ok_text(
-							json!({"roleList": [
+							value!({"roleList": [
 								{"roleName": "beet-admin", "accountId": "222"},
 								{"roleName": "beet-read", "accountId": "222"},
 							]})
-							.to_string(),
+							.to_json_string(),
 						)
 					}
 					"/federation/credentials" if live(&fake) && account.as_deref() == Some("222") => {
 						Response::ok_text(
-							json!({"roleCredentials": {
+							value!({"roleCredentials": {
 								"accessKeyId": format!("ASIA-{}", role.unwrap_or_default()),
 								"secretAccessKey": "secret",
 								"sessionToken": "session",
 								"expiration": Timestamp::now().millis() + 3_600_000,
 							}})
-							.to_string(),
+							.to_json_string(),
 						)
 					}
 					"/logout" if live(&fake) => Response::ok(),

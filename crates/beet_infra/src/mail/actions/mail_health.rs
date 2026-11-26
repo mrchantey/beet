@@ -3,7 +3,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
 
 
 
@@ -109,11 +108,12 @@ fn tlsa_pins(body: &Value) -> Vec<String> {
 	let (usage, selector, matching) = StalwartBlock::TLSA_PARAMS;
 	let prefix = format!("{usage} {selector} {matching} ");
 	body["Answer"]
-		.as_array()
+		.as_list()
+		.ok()
 		.into_iter()
 		.flatten()
-		.filter(|answer| answer["type"] == 52)
-		.filter_map(|answer| answer["data"].as_str())
+		.filter(|answer| answer["type"].as_u64().ok() == Some(52))
+		.filter_map(|answer| answer["data"].as_str().ok())
 		.filter_map(|data| data.strip_prefix(&prefix))
 		.map(|digest| {
 			digest
@@ -226,13 +226,12 @@ async fn check_jmap(hostname: &str) -> Result {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use serde_json::json;
 
 	/// Only `3 1 1` answers are pins this box publishes; another usage at the
 	/// same name is somebody else's record and must not read as a match.
 	#[beet_core::test]
 	fn only_the_published_shape_counts_as_a_pin() {
-		let body = json!({
+		let body = value!({
 			"AD": true,
 			"Answer": [
 				{ "type": 52, "data": "3 1 1 ABCD" },
@@ -243,6 +242,6 @@ mod tests {
 			]
 		});
 		tlsa_pins(&body).xpect_eq(vec!["abcd".to_string(), "f0d3".to_string()]);
-		tlsa_pins(&json!({ "Status": 0 })).is_empty().xpect_true();
+		tlsa_pins(&value!({ "Status": 0 })).is_empty().xpect_true();
 	}
 }

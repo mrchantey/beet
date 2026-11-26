@@ -103,7 +103,7 @@ impl SqlSelect {
 		// every line terminated, including the last, so the body concatenates
 		// with the next one a pipe reads
 		rows.iter()
-			.map(|row| format!("{}\n", row.clone().into_json()))
+			.map(|row| format!("{}\n", row.to_json_string()))
 			.collect()
 	}
 
@@ -253,8 +253,8 @@ mod test {
 	#[beet_core::test]
 	fn writes_jsonl() {
 		SqlSelect::render(&rows(), RowFormat::Jsonl).xpect_eq(
-			"{\"messages\":2,\"sender\":\"ada\"}\n\
-			 {\"messages\":null,\"sender\":\"grace\"}\n",
+			"{\"sender\":\"ada\",\"messages\":2}\n\
+			 {\"sender\":\"grace\",\"messages\":null}\n",
 		);
 	}
 

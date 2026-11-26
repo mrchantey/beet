@@ -1,6 +1,4 @@
 use beet_core::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 use super::Session;
 
@@ -51,8 +49,9 @@ impl WebElement {
 		resp: &Value,
 	) -> Option<Self> {
 		let field = |name: &str| {
-			resp.pointer(&format!("/result/result/{name}"))
-				.and_then(|v| v.as_str())
+			resp["result"]["result"][name]
+				.as_str()
+				.ok()
 				.map(|v| v.to_string())
 		};
 		let handle = field("handle");
@@ -68,15 +67,15 @@ impl WebElement {
 		context_id: &str,
 		node: &Value,
 	) -> Result<Self> {
-		let field = |name: &str| {
-			node.get(name)
-				.and_then(|v| v.as_str())
-				.map(|v| v.to_string())
-		};
+		let field =
+			|name: &str| node[name].as_str().ok().map(|v| v.to_string());
 		let handle = field("handle");
 		let shared_id = field("sharedId");
 		if handle.is_none() && shared_id.is_none() {
-			bevybail!("node value carries neither sharedId nor handle: {node}");
+			bevybail!(
+				"node value carries neither sharedId nor handle: {}",
+				node.to_json_string()
+			);
 		}
 		Self::new(session, context_id, handle, shared_id).xok()
 	}
@@ -84,14 +83,14 @@ impl WebElement {
 	/// The `RemoteReference` for `script.callFunction`'s `this`, carrying
 	/// whichever reference kinds are present.
 	fn remote_ref(&self) -> Value {
-		let mut reference = serde_json::Map::new();
+		let mut reference = Map::default();
 		if let Some(shared_id) = &self.shared_id {
-			reference.insert("sharedId".into(), json!(shared_id));
+			reference.insert("sharedId", shared_id);
 		}
 		if let Some(handle) = &self.handle {
-			reference.insert("handle".into(), json!(handle));
+			reference.insert("handle", handle);
 		}
-		Value::Object(reference)
+		Value::Map(reference)
 	}
 
 	/// The `SharedReference` required by `startNodes`, `input` element
@@ -103,8 +102,8 @@ impl WebElement {
 			bevyhow!("this operation needs a BiDi sharedId, ie an element produced by `find` or `query_selector`")
 		})?;
 		match &self.handle {
-			Some(handle) => json!({"sharedId": shared_id, "handle": handle}),
-			None => json!({"sharedId": shared_id}),
+			Some(handle) => value!({"sharedId": shared_id, "handle": handle}),
+			None => value!({"sharedId": shared_id}),
 		}
 		.xok()
 	}
@@ -129,11 +128,11 @@ impl WebElement {
 		self.session
 			.command(
 				"script.callFunction",
-				json!({
+				value!({
 					"functionDeclaration": function_declaration,
 					"this": self.remote_ref(),
-					"arguments": arguments,
-					"target": { "context": self.context_id },
+					"arguments": arguments.to_vec(),
+					"target": { "context": &self.context_id },
 					"awaitPromise": true,
 					"resultOwnership": ownership
 				}),
@@ -146,13 +145,13 @@ impl WebElement {
 		let resp = self
 			.call_function(
 				"function(n){ return this.getAttribute(n); }",
-				&[json!({ "type": "string", "value": name })],
+				&[value!({ "type": "string", "value": name })],
 				true,
 			)
 			.await?;
-		let val = resp
-			.pointer("/result/result/value")
-			.and_then(|v| v.as_str())
+		let val = resp["result"]["result"]["value"]
+			.as_str()
+			.ok()
 			.map(|s| s.to_string());
 		Ok(val)
 	}
@@ -162,8 +161,8 @@ impl WebElement {
 		self.call_function(
 			"function(n,v){ this.setAttribute(n,v); return true; }",
 			&[
-				json!({ "type": "string", "value": name }),
-				json!({ "type": "string", "value": value }),
+				value!({ "type": "string", "value": name }),
+				value!({ "type": "string", "value": value }),
 			],
 			false,
 		)
@@ -175,7 +174,7 @@ impl WebElement {
 	pub async fn remove_attribute(&self, name: &str) -> Result<()> {
 		self.call_function(
 			"function(n){ this.removeAttribute(n); return true; }",
-			&[json!({ "type": "string", "value": name })],
+			&[value!({ "type": "string", "value": name })],
 			false,
 		)
 		.await?;
@@ -187,7 +186,7 @@ impl WebElement {
 	pub async fn get_property(&self, name: &str) -> Result<Value> {
 		self.call_function(
 			"function(n){ return this[n]; }",
-			&[json!({ "type": "string", "value": name })],
+			&[value!({ "type": "string", "value": name })],
 			true,
 		)
 		.await
@@ -201,30 +200,22 @@ impl WebElement {
 		value: Value,
 	) -> Result<Value> {
 		// Convert simple JSON value into a BiDi argument remote value.
-		let bidi_arg = if value.is_string() {
-			json!({ "type": "string", "value": value.as_str().unwrap() })
-		} else if value.is_number() {
-			if let Some(n) = value.as_i64() {
-				json!({ "type": "number", "value": n })
-			} else if let Some(n) = value.as_u64() {
-				json!({ "type": "number", "value": n })
-			} else if let Some(f) = value.as_f64() {
-				json!({ "type": "number", "value": f })
-			} else {
-				json!({ "type": "undefined" })
+		let bidi_arg = match value {
+			Value::Str(text) => value!({ "type": "string", "value": text }),
+			Value::Int(_) | Value::Uint(_) | Value::Float(_) => {
+				value!({ "type": "number", "value": value })
 			}
-		} else if value.is_boolean() {
-			json!({ "type": "boolean", "value": value.as_bool().unwrap() })
-		} else if value.is_null() {
-			json!({ "type": "null" })
-		} else {
+			Value::Bool(flag) => value!({ "type": "boolean", "value": flag }),
+			Value::Null => value!({ "type": "null" }),
 			// Fallback: stringify complex values client-side then send.
-			json!({ "type": "string", "value": value.to_string() })
+			other => {
+				value!({ "type": "string", "value": other.to_json_string() })
+			}
 		};
 
 		self.call_function(
 			"function(n,v){ this[n] = v; return this[n]; }",
-			&[json!({ "type": "string", "value": name }), bidi_arg],
+			&[value!({ "type": "string", "value": name }), bidi_arg],
 			true,
 		)
 		.await
@@ -235,8 +226,9 @@ impl WebElement {
 		let resp = self
 			.call_function("function(){ return this.innerHTML; }", &[], true)
 			.await?;
-		resp.pointer("/result/result/value")
-			.and_then(|v| v.as_str())
+		resp["result"]["result"]["value"]
+			.as_str()
+			.ok()
 			.ok_or_else(|| bevyhow!("innerHTML missing in response"))?
 			.to_string()
 			.xok()
@@ -246,7 +238,7 @@ impl WebElement {
 	pub async fn set_inner_html(&self, html: &str) -> Result<()> {
 		self.call_function(
 			"function(h){ this.innerHTML = h; return true; }",
-			&[json!({ "type": "string", "value": html })],
+			&[value!({ "type": "string", "value": html })],
 			false,
 		)
 		.await?;
@@ -257,8 +249,9 @@ impl WebElement {
 		let resp = self
 			.call_function("function(){ return this.innerText; }", &[], true)
 			.await?;
-		resp.pointer("/result/result/value")
-			.and_then(|v| v.as_str())
+		resp["result"]["result"]["value"]
+			.as_str()
+			.ok()
 			.ok_or_else(|| bevyhow!("innerText missing in response"))?
 			.to_string()
 			.xok()
@@ -268,7 +261,7 @@ impl WebElement {
 	pub async fn set_inner_text(&self, html: &str) -> Result<()> {
 		self.call_function(
 			"function(h){ this.innerText = h; return true; }",
-			&[json!({ "type": "string", "value": html })],
+			&[value!({ "type": "string", "value": html })],
 			false,
 		)
 		.await?;
@@ -287,14 +280,17 @@ impl WebElement {
 				false,
 			)
 			.await?;
-		let corners = resp
-			.pointer("/result/result")
+		let corners = resp["result"]
+			.get("result")
 			.map(super::bidi_value::to_json)
 			.and_then(|value| {
 				value
-					.as_array()?
+					.as_list()
+					.ok()?
 					.iter()
-					.map(|corner| corner.as_f64().map(|corner| corner as f32))
+					.map(|corner| {
+						corner.as_f64().ok().map(|corner| corner as f32)
+					})
 					.collect::<Option<Vec<f32>>>()
 			})
 			.ok_or_else(|| bevyhow!("bounding rect missing in response"))?;
@@ -307,9 +303,9 @@ impl WebElement {
 		let resp = self
 			.call_function("function(){ return this.textContent; }", &[], true)
 			.await?;
-		let val = resp
-			.pointer("/result/result/value")
-			.and_then(|v| v.as_str())
+		let val = resp["result"]["result"]["value"]
+			.as_str()
+			.ok()
 			.map(|s| s.to_string());
 		Ok(val)
 	}

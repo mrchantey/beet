@@ -587,7 +587,7 @@ mod test {
 	/// sources would fail if read, and it enters with its stored posts.
 	#[beet_core::test]
 	async fn a_continued_thread_reads_no_seed() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		store
 			.insert(&RelPath::new("seeds/system.md"), "be brief".to_string())
 			.await
@@ -621,7 +621,7 @@ mod test {
 	/// fails the entry, naming it.
 	#[beet_core::test]
 	async fn a_created_thread_reads_its_seed() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		enter(
 			&store,
 			mount("threads"),
@@ -638,7 +638,7 @@ mod test {
 	/// value continues one.
 	#[beet_core::test]
 	async fn the_path_names_the_thread() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let mut ids = Vec::new();
 		for claim in ["one", "two", "one"] {
 			let (thread, _) = enter(
@@ -660,7 +660,7 @@ mod test {
 	/// A greedy param fills as the path it captured, so the filled path nests.
 	#[beet_core::test]
 	async fn a_greedy_param_nests() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let mut request = Request::get("build/acme/01-plan");
 		request
 			.params_mut()
@@ -689,7 +689,7 @@ mod test {
 			("", "is empty"),
 		] {
 			enter(
-				&BlobStore::temp(),
+				&BlobStore::new(InMemoryBlobStore::new()),
 				mount("threads/{claim}"),
 				Post::spawn("hi"),
 				request(&[("claim", value)]),
@@ -706,7 +706,7 @@ mod test {
 	/// A `new` mount persists every thread and continues none.
 	#[beet_core::test]
 	async fn a_new_mount_never_continues() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		for _ in 0..2 {
 			enter(
 				&store,
@@ -727,7 +727,7 @@ mod test {
 	/// `--thread` continues a stored thread by id.
 	#[beet_core::test]
 	async fn new_and_thread_pick_the_thread() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let enter = async |params: &[(&str, &str)]| {
 			enter(&store, mount("threads"), Post::spawn("hi"), request(params))
 				.await
@@ -752,7 +752,7 @@ mod test {
 	/// seed, and writes its own posts to its own thread.
 	#[beet_core::test]
 	async fn a_branch_continues_its_parent() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let (parent, records) = enter(
 			&store,
 			mount("threads"),
@@ -798,7 +798,7 @@ mod test {
 	/// beside `--thread`.
 	#[beet_core::test]
 	async fn a_branch_is_refused() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let (parent, _) =
 			enter(&store, mount("threads"), Post::spawn("hi"), request(&[]))
 				.await

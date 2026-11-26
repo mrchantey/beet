@@ -56,24 +56,14 @@ impl MediaType {
 		bytes: &[u8],
 	) -> Option<(usize, String)> {
 		match self {
+			// a syntax error has a place, a type error (a missing field) none
 			#[cfg(feature = "json")]
 			MediaType::Json => {
-				let error = serde_json::from_slice::<T>(bytes).err()?;
-				// its line is zero for an error of no place
-				let line = error.line().checked_sub(1)?;
-				let start = bytes
-					.split_inclusive(|byte| *byte == b'\n')
-					.take(line)
-					.map(<[u8]>::len)
-					.sum::<usize>();
-				let message = error.to_string();
-				let message = message
-					.rsplit_once(" at line ")
-					.map_or(message.as_str(), |(message, _)| message);
-				Some((
-					start + error.column().saturating_sub(1),
-					message.to_string(),
-				))
+				let error =
+					Value::parse_json(core::str::from_utf8(bytes).ok()?)
+						.err()?;
+				let error = error.downcast_ref::<JsonError>()?;
+				Some((error.offset, error.message.clone()))
 			}
 			#[cfg(feature = "toml")]
 			MediaType::Toml => {
@@ -129,9 +119,9 @@ impl MediaType {
 			cfg_if! {
 				if #[cfg(feature = "json")]{
 					let value = if options.pretty {
-						serde_json::to_string_pretty(value)?
+						json_ext::to_string_pretty(value)?
 					} else {
-						serde_json::to_string(value)?
+						json_ext::to_string(value)?
 					};
 					Ok(MediaBytes::new(MediaType::Json, value.into_bytes()))
 				} else if #[cfg(feature = "serde_plain")] {
@@ -201,13 +191,9 @@ impl MediaType {
 				cfg_if! {
 					if #[cfg(feature = "json")] {
 						if options.pretty {
-							serde_json::to_vec_pretty(value).map_err(|err| {
-								bevyhow!("Failed to serialize JSON: {err}")
-							})
+							json_ext::to_vec_pretty(value)
 						} else {
-							serde_json::to_vec(value).map_err(|err| {
-								bevyhow!("Failed to serialize JSON: {err}")
-							})
+							json_ext::to_vec(value)
 						}
 					} else {
 						let _ = (value, options);
@@ -328,9 +314,7 @@ impl MediaType {
 				cfg_if! {
 					if #[cfg(feature = "json")] {
 						let slice = if bytes.is_empty() { b"null" } else { bytes };
-						serde_json::from_slice(slice).map_err(|err| {
-							bevyhow!("Failed to deserialize JSON body: {err}")
-						})
+						json_ext::from_slice(slice)
 					} else {
 						let _ = bytes;
 						bevybail!(

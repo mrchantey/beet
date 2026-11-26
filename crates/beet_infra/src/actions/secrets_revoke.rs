@@ -302,7 +302,7 @@ mod tests {
 		let root = world
 			.spawn((
 				Stack::new("mail").with_stage("prod"),
-				BlobStore::temp(),
+				BlobStore::new(InMemoryBlobStore::new()),
 				RepoStore,
 				DocumentSecrets::new("store.toml"),
 				children![Secrets::default(), Router::with_defaults()],

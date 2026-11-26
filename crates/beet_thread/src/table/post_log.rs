@@ -34,17 +34,16 @@ impl Post {
 		thread: ThreadId,
 		log: &T,
 	) -> Result<Self> {
-		let serde_json::Value::Object(mut fields) = serde_json::to_value(log)?
-		else {
+		let Value::Map(mut fields) = Value::from_serde(log)? else {
 			bevybail!("log kind `{}` is no JSON object", T::KIND);
 		};
-		fields.insert(KIND_FIELD.into(), T::KIND.into());
+		fields.insert(KIND_FIELD, T::KIND);
 		Self::new_raw(
 			author,
 			thread,
 			PostIntent::Log,
 			MediaType::Json,
-			serde_json::to_vec(&fields)?,
+			Value::Map(fields).to_json_string().into_bytes(),
 			default(),
 		)
 		.xok()
@@ -53,26 +52,28 @@ impl Post {
 	/// This post as a `T`, if it is a log post of that kind.
 	pub fn log<T: LogKind>(&self) -> Option<T> {
 		let mut fields = self.log_fields()?;
-		(fields.remove(KIND_FIELD)?.as_str()? == T::KIND)
-			.then(|| serde_json::from_value(fields.into()).ok())
+		(fields.remove(KIND_FIELD)?.as_str().ok()? == T::KIND)
+			.then(|| Value::Map(fields).into_serde().ok())
 			.flatten()
 	}
 
 	/// The kind of this post, if it is a log post.
 	pub fn log_kind(&self) -> Option<SmolStr> {
 		self.log_fields()?
-			.get(KIND_FIELD)?
+			.get(KIND_FIELD)
+			.ok()?
 			.as_str()
+			.ok()
 			.map(SmolStr::from)
 	}
 
 	/// The body object of a log post.
-	fn log_fields(&self) -> Option<serde_json::Map<String, serde_json::Value>> {
+	fn log_fields(&self) -> Option<Map> {
 		if self.intent() != PostIntent::Log {
 			return None;
 		}
-		match serde_json::from_slice(self.body_bytes()).ok()? {
-			serde_json::Value::Object(fields) => Some(fields),
+		match json_ext::from_slice(self.body_bytes()).ok()? {
+			Value::Map(fields) => Some(fields),
 			_ => None,
 		}
 	}

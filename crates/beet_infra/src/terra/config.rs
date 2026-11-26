@@ -789,8 +789,8 @@ impl Config {
 		Value::Map(root)
 	}
 
-	/// Serialize [`Self::to_json`] to a compact JSON string, entries sorted
-	/// by key.
+	/// Serialize [`Self::to_json`] to a compact JSON string, each map's
+	/// entries in insertion order.
 	pub fn to_json_string(&self) -> String { self.to_json().to_json_string() }
 
 	// =====================================================================

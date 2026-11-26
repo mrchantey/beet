@@ -4,8 +4,6 @@ use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
 use heck::ToUpperCamelCase;
-use serde_json::Value;
-use serde_json::json;
 
 /// The mail box: one EC2 instance running a pinned [Stalwart] release.
 /// Mail metadata lives in Stalwart's embedded SQLite database on a persistent
@@ -764,7 +762,7 @@ impl StalwartBlock {
 		let role = ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("role")),
 			AwsIamRoleDetails {
-				assume_role_policy: json!({
+				assume_role_policy: value!({
 					"Version": "2012-10-17",
 					"Statement": [{
 						"Effect": "Allow",
@@ -772,7 +770,7 @@ impl StalwartBlock {
 						"Action": "sts:AssumeRole"
 					}]
 				})
-				.to_string()
+				.to_json_string()
 				.into(),
 				// every principal a credentialed deploy creates is capped by its app's
 				// boundary, which is what stops an `iam:*` on this app's names
@@ -830,7 +828,7 @@ impl StalwartBlock {
 		let region = stack.aws_region()?;
 		let log_group = self.log_group(stack);
 		IamPolicy::new(region.clone(), "stalwart box")
-			.statement(json!({
+			.statement(value!({
 				"Sid": "BootstrapAdmin",
 				"Effect": "Allow",
 				"Action": ["ssm:GetParameter"],
@@ -844,7 +842,7 @@ impl StalwartBlock {
 			.read_secrets(stack, &self.ssh_host().host_secrets())
 			.write_action("s3:AbortMultipartUpload")
 			.lower(access)?
-			.statement(json!({
+			.statement(value!({
 				"Sid": "OwnLogGroup",
 				"Effect": "Allow",
 				"Action": [
@@ -893,7 +891,7 @@ impl StalwartBlock {
 				user: user.field_ref("name").into(),
 				// every identity in the account: identities are per-domain
 				// blocks and this user sends for all of them.
-				policy: json!({
+				policy: value!({
 					"Version": "2012-10-17",
 					"Statement": [{
 						"Sid": "SesSmtpRelay",
@@ -902,7 +900,7 @@ impl StalwartBlock {
 						"Resource": "*"
 					}]
 				})
-				.to_string()
+				.to_json_string()
 				.into(),
 				..default()
 			},
@@ -1280,7 +1278,7 @@ impl StalwartBlock {
 	/// `Bootstrap` claim, while search and in-memory stores use the data store via
 	/// `Default`.
 	pub(crate) fn data_store_config(&self) -> Value {
-		json!({
+		value!({
 			"@type": "Sqlite",
 			"path": Self::DATABASE_PATH
 		})
@@ -1290,15 +1288,15 @@ impl StalwartBlock {
 	/// beside the data store template so the box's file and the provision
 	/// payload cannot drift.
 	pub fn blob_store_config(&self, stack: &ResolvedStack) -> Result<Value> {
-		let none = json!({ "@type": "None" });
-		json!({
+		let none = value!({ "@type": "None" });
+		value!({
 			"@type": "S3",
 			"bucket": stack.resource_name(self.blob_bucket.clone()),
 			// no static credential anywhere on this box: the S3 client
 			// falls through its chain to the instance profile.
-			"accessKey": none,
-			"secretKey": none,
-			"securityToken": none,
+			"accessKey": none.clone(),
+			"secretKey": none.clone(),
+			"securityToken": none.clone(),
 			"sessionToken": none,
 			"region": {
 				"@type": stack.aws_region()?.to_upper_camel_case()
@@ -1530,7 +1528,7 @@ WantedBy=multi-user.target"#,
 	/// role is never granted.
 	fn cloudwatch_config(&self, stack: &ResolvedStack) -> Result<Value> {
 		let tail = |file_path: String, stream: &str| {
-			json!({
+			value!({
 				"file_path": file_path,
 				"log_group_name": self.log_group(stack),
 				"log_stream_name": stream,
@@ -1539,7 +1537,7 @@ WantedBy=multi-user.target"#,
 				"multi_line_start_pattern": "{timestamp_format}"
 			})
 		};
-		json!({
+		value!({
 			"agent": { "run_as_user": "root", "region": stack.aws_region()? },
 			"logs": {
 				"logs_collected": {
@@ -1820,14 +1818,20 @@ COLD_TIMER_EOF
 		let version = Self::STALWART_VERSION;
 		let tarball = Self::STALWART_TARBALL;
 		let sha256 = Self::STALWART_SHA256;
-		let store_template =
-			serde_json::to_string_pretty(&self.data_store_config())?;
+		// keys sorted, as every json the user data carries: the user data is
+		// the box's identity, so its text must not follow build order
+		let store_template = self
+			.data_store_config()
+			.xtap(Value::sort_maps)
+			.to_json_pretty();
 		let secrets_script = self.secrets_script(stack)?;
 		let unit = self.systemd_unit();
 		let guards = self.memory_guards();
 		let memory_setup = guards.setup_script();
-		let cloudwatch =
-			serde_json::to_string_pretty(&self.cloudwatch_config(stack)?)?;
+		let cloudwatch = self
+			.cloudwatch_config(stack)?
+			.xtap(Value::sort_maps)
+			.to_json_pretty();
 		let backup = self.backup_stanza(stack)?;
 		let backup_enable = self.backup_enable();
 		let cold_install = self.cold_install(cold);
@@ -2151,12 +2155,9 @@ mod tests {
 	}
 
 	/// The sole resource of `resource_type` in the rendered config.
-	fn resource(
-		config: &terra::Config,
-		resource_type: &str,
-	) -> serde_json::Value {
-		config.to_json().into_json()["resource"][resource_type]
-			.as_object()
+	fn resource(config: &terra::Config, resource_type: &str) -> Value {
+		config.to_json()["resource"][resource_type]
+			.as_map()
 			.unwrap()
 			.values()
 			.next()
@@ -2165,7 +2166,7 @@ mod tests {
 	}
 
 	/// The sole `aws_instance` in the rendered config.
-	fn instance(config: &terra::Config) -> serde_json::Value {
+	fn instance(config: &terra::Config) -> Value {
 		resource(config, "aws_instance")
 	}
 
@@ -2178,7 +2179,7 @@ mod tests {
 			.trim_start_matches("${base64gzip(local.")
 			.trim_end_matches(")}")
 			.to_string();
-		config.to_json().into_json()["locals"][&local]
+		config.to_json()["locals"][local.as_str()]
 			.as_str()
 			.unwrap()
 			.to_string()
@@ -2352,18 +2353,17 @@ mod tests {
 	fn ses_smtp_credential_is_terraform_derived() {
 		let block = mail_box();
 		let (stack, _deployment, config) = build_config(&block);
-		let params =
-			config.to_json().into_json()["resource"]["aws_ssm_parameter"]
-				.as_object()
-				.unwrap()
-				.values()
-				.cloned()
-				.collect::<Vec<_>>();
+		let params = config.to_json()["resource"]["aws_ssm_parameter"]
+			.as_map()
+			.unwrap()
+			.values()
+			.cloned()
+			.collect::<Vec<_>>();
 		params.len().xpect_eq(2);
 		let value_of = |name: &str| {
 			params
 				.iter()
-				.find(|param| param["name"] == name)
+				.find(|param| param["name"] == Value::from(name))
 				.unwrap()
 				.clone()
 		};
@@ -2386,16 +2386,15 @@ mod tests {
 			.xpect_starts_with("replace:aws_iam_access_key.");
 		}
 		// the sending user may send raw mail, and do nothing else
-		let policy =
-			config.to_json().into_json()["resource"]["aws_iam_user_policy"]
-				.as_object()
-				.unwrap()
-				.values()
-				.next()
-				.unwrap()["policy"]
-				.as_str()
-				.unwrap()
-				.to_string();
+		let policy = config.to_json()["resource"]["aws_iam_user_policy"]
+			.as_map()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()["policy"]
+			.as_str()
+			.unwrap()
+			.to_string();
 		policy
 			.as_str()
 			.xpect_contains("ses:SendRawEmail")
@@ -2438,25 +2437,26 @@ mod tests {
 	#[beet_core::test]
 	fn firewall_is_exactly_the_port_list() {
 		let (_stack, _deployment, config) = build_config(&mail_box());
-		let rules =
-			config.to_json().into_json()["resource"]["aws_security_group_rule"]
-				.as_object()
-				.unwrap()
-				.values()
-				.cloned()
-				.collect::<Vec<_>>();
+		let rules = config.to_json()["resource"]["aws_security_group_rule"]
+			.as_map()
+			.unwrap()
+			.values()
+			.cloned()
+			.collect::<Vec<_>>();
 		let mut ingress = rules
 			.iter()
-			.filter(|rule| rule["type"] == "ingress")
+			.filter(|rule| rule["type"].as_str().ok() == Some("ingress"))
 			// the box's public rules, not the database's group-sourced one
-			.filter(|rule| rule["cidr_blocks"][0] == "0.0.0.0/0")
+			.filter(|rule| {
+				rule["cidr_blocks"][0].as_str().ok() == Some("0.0.0.0/0")
+			})
 			.map(|rule| rule["from_port"].as_i64().unwrap())
 			.collect::<Vec<_>>();
 		ingress.sort();
 		ingress.xpect_eq(vec![22, 25, 443, 465, 587, 993]);
 		let egress = rules
 			.iter()
-			.filter(|rule| rule["type"] == "egress")
+			.filter(|rule| rule["type"].as_str().ok() == Some("egress"))
 			.collect::<Vec<_>>();
 		egress.len().xpect_eq(1);
 		egress[0]["protocol"].as_str().unwrap().xpect_eq("-1");
@@ -2491,8 +2491,8 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_contains("${data.aws_ssm_parameter.");
-		config.to_json().into_json()["data"]["aws_ssm_parameter"]
-			.as_object()
+		config.to_json()["data"]["aws_ssm_parameter"]
+			.as_map()
 			.unwrap()
 			.values()
 			.next()
@@ -2566,7 +2566,7 @@ mod tests {
 	#[beet_core::test]
 	fn trusts_only_its_ssh_authority() {
 		let (stack, _deployment, config) = build_config(&mail_box());
-		let json = config.to_json().into_json();
+		let json = config.to_json();
 		json["resource"]["aws_key_pair"].is_null().xpect_true();
 		instance(&config)["key_name"].is_null().xpect_true();
 		json["variable"]["ssh_user_ca"]["default"]
@@ -2583,14 +2583,14 @@ mod tests {
 			.xpect_less_than(script.find("dnf install").unwrap());
 		runtime_statements(&config)
 			.into_iter()
-			.find(|statement| statement["Sid"] == "StackSecrets")
+			.find(|statement| {
+				statement["Sid"].as_str().ok() == Some("StackSecrets")
+			})
 			.unwrap()["Resource"]
-			.xpect_eq(json!(
-				mail_box().ssh_host().parameter_names(&stack).map(
-					|name| format!(
-						"arn:aws:ssm:ap-southeast-2:*:parameter{name}"
-					)
-				)
+			.xpect_eq(Value::new_list(
+				mail_box().ssh_host().parameter_names(&stack).map(|name| {
+					format!("arn:aws:ssm:ap-southeast-2:*:parameter{name}")
+				}),
 			));
 		// the box boots reading those at once, so its profile waits on the
 		// policy: a policy refused at the apply leaves the running box alone
@@ -2601,13 +2601,13 @@ mod tests {
 	}
 
 	/// Every statement of the box's runtime policy.
-	fn runtime_statements(config: &terra::Config) -> Vec<serde_json::Value> {
+	fn runtime_statements(config: &terra::Config) -> Vec<Value> {
 		let policy = resource(config, "aws_iam_role_policy")["policy"]
 			.as_str()
 			.unwrap()
 			.to_string();
-		serde_json::from_str::<serde_json::Value>(&policy).unwrap()["Statement"]
-			.as_array()
+		Value::parse_json(&policy).unwrap()["Statement"]
+			.as_list()
 			.unwrap()
 			.clone()
 	}
@@ -2709,14 +2709,14 @@ mod tests {
 		instance(&config)["subnet_id"].as_str().unwrap().xpect_eq(
 			VpcBlock::new("net").subnet_id(&stack, SubnetTier::Public, "a"),
 		);
-		config.to_json().into_json()["resource"]["aws_security_group"]
-			.as_object()
+		config.to_json()["resource"]["aws_security_group"]
+			.as_map()
 			.unwrap()
 			.contains_key(mail_box().security_group_ident(&stack).label())
 			.xpect_true();
 		// the eip waits on the gateway the vpc declares
-		config.to_json().into_json()["resource"]["aws_eip"]
-			.as_object()
+		config.to_json()["resource"]["aws_eip"]
+			.as_map()
 			.unwrap()
 			.values()
 			.next()
@@ -2724,8 +2724,8 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_contains("aws_internet_gateway");
-		config.to_json().into_json()["resource"]["aws_eip_association"]
-			.as_object()
+		config.to_json()["resource"]["aws_eip_association"]
+			.as_map()
 			.unwrap()
 			.len()
 			.xpect_eq(1);
@@ -2737,16 +2737,15 @@ mod tests {
 	#[beet_core::test]
 	fn role_lowers_the_declared_grants() {
 		let (stack, _deployment, config) = build_config(&mail_box());
-		let policy =
-			config.to_json().into_json()["resource"]["aws_iam_role_policy"]
-				.as_object()
-				.unwrap()
-				.values()
-				.next()
-				.unwrap()["policy"]
-				.as_str()
-				.unwrap()
-				.to_string();
+		let policy = config.to_json()["resource"]["aws_iam_role_policy"]
+			.as_map()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()["policy"]
+			.as_str()
+			.unwrap()
+			.to_string();
 		policy
 			.as_str()
 			// the one parameter the box reads during bootstrap
@@ -2768,11 +2767,13 @@ mod tests {
 			.xnot()
 			.xpect_contains("\"Resource\":\"arn:aws:s3:::*\"");
 		// grants scale with declarations: an undeclared write is not granted
-		serde_json::from_str::<serde_json::Value>(&policy).unwrap()["Statement"]
-			.as_array()
+		Value::parse_json(&policy).unwrap()["Statement"]
+			.as_list()
 			.unwrap()
 			.iter()
-			.filter(|statement| statement["Sid"] == "WriteStores")
+			.filter(|statement| {
+				statement["Sid"].as_str().ok() == Some("WriteStores")
+			})
 			.count()
 			.xpect_eq(1);
 	}
@@ -2789,7 +2790,8 @@ mod tests {
 			.unwrap()
 			.xpect_eq(StalwartBlock::DATABASE_PATH);
 		config.get("authSecret").is_none().xpect_true();
-		for absent in ["DataStore", "SearchStore", "InMemoryStore", "BlobStore"]
+		for absent in
+			["DataStore", "SearchStore", "InMemoryBlobStore", "BlobStore"]
 		{
 			config[absent].is_null().xpect_true();
 		}
@@ -2845,7 +2847,7 @@ mod tests {
 		let (stack, _deployment, _dir) = sydney_resolved();
 		let config = mail_box().cloudwatch_config(&stack).unwrap();
 		let tails = config["logs"]["logs_collected"]["files"]["collect_list"]
-			.as_array()
+			.as_list()
 			.unwrap()
 			.iter()
 			.map(|tail| {
@@ -2881,7 +2883,7 @@ mod tests {
 		matches(StalwartBlock::UNIT_LOG).xpect_false();
 		// both land in the one group `watch` tails
 		for tail in config["logs"]["logs_collected"]["files"]["collect_list"]
-			.as_array()
+			.as_list()
 			.unwrap()
 		{
 			tail["log_group_name"]
@@ -2911,19 +2913,19 @@ mod tests {
 			.xnot()
 			.xpect_contains("retention_in_days");
 
-		let json = config.to_json().into_json();
+		let json = config.to_json();
 		json["resource"]["aws_cloudwatch_log_group"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.values()
 			.find(|group| {
-				group["name"] == mail_box().log_group(&stack).as_str()
+				group["name"] == Value::from(mail_box().log_group(&stack))
 			})
 			.unwrap()["retention_in_days"]
 			.as_i64()
 			.unwrap()
 			.xpect_eq(30);
-		json.to_string()
+		json.to_json_string()
 			.xnot()
 			.xpect_contains("logs:DescribeLogGroups")
 			.xnot()
@@ -3146,14 +3148,13 @@ mod tests {
 	#[beet_core::test]
 	fn dns_is_an_unproxied_a_record() {
 		let (_stack, _deployment, config) = build_config(&mail_box());
-		let record =
-			config.to_json().into_json()["resource"]["cloudflare_dns_record"]
-				.as_object()
-				.unwrap()
-				.values()
-				.next()
-				.unwrap()
-				.clone();
+		let record = config.to_json()["resource"]["cloudflare_dns_record"]
+			.as_map()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()
+			.clone();
 		record["type"].as_str().unwrap().xpect_eq("A");
 		record["name"]
 			.as_str()
@@ -3209,7 +3210,7 @@ mod tests {
 		.lower(&config)
 		.unwrap()
 		.to_json()
-		.to_string();
+		.to_json_string();
 		boundary
 			.as_str()
 			.xpect_contains("kms:Decrypt")
@@ -3221,9 +3222,13 @@ mod tests {
 		let (_stack, _deployment, config) = build_config(&mail_box());
 		let decrypt = runtime_statements(&config)
 			.into_iter()
-			.find(|statement| statement["Sid"] == "SsmSecureStringDecrypt")
+			.find(|statement| {
+				statement["Sid"].as_str().ok() == Some("SsmSecureStringDecrypt")
+			})
 			.unwrap();
-		decrypt["Action"].to_string().xpect_contains("kms:Decrypt");
+		decrypt["Action"]
+			.to_json_string()
+			.xpect_contains("kms:Decrypt");
 		// bounded by the service that asks rather than by an arn, since the
 		// account's `aws/ssm` key id is not knowable at render time
 		decrypt["Condition"]["StringEquals"]["kms:ViaService"]
@@ -3244,12 +3249,12 @@ mod tests {
 	fn the_dane_pin_is_read_never_typed() {
 		let (stack, _deployment, config) =
 			build_config(&mail_box().with_dane(true));
-		let json = config.to_json().into_json();
+		let json = config.to_json();
 		let (label, record) = json["resource"]["cloudflare_dns_record"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.iter()
-			.find(|(_, record)| record["type"] == "TLSA")
+			.find(|(_, record)| record["type"].as_str().ok() == Some("TLSA"))
 			.unwrap();
 		label.as_str().xpect_eq("beet_infra__dev__mail_tlsa");
 		record["name"]
@@ -3276,7 +3281,7 @@ mod tests {
 		variables.len().xpect_eq(2);
 		variables[1].absent_is_empty().xpect_true();
 		json["variable"]["tlsa_mail"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.contains_key("default")
 			.xpect_false();
@@ -3325,11 +3330,11 @@ mod tests {
 						),
 					);
 				});
-			scope.finish().unwrap().2.to_json().into_json()
+			scope.finish().unwrap().2.to_json()
 		};
 		let json = render(true);
 		json["resource"]["aws_instance"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.values()
 			.next()
@@ -3338,10 +3343,10 @@ mod tests {
 			.unwrap()
 			.xpect_eq(1);
 		let aaaa = json["resource"]["cloudflare_dns_record"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.values()
-			.find(|record| record["type"] == "AAAA")
+			.find(|record| record["type"].as_str().ok() == Some("AAAA"))
 			.unwrap();
 		aaaa["name"].as_str().unwrap().xpect_eq("mail.beetmash.com");
 		aaaa["proxied"].as_bool().unwrap().xpect_false();
@@ -3350,10 +3355,10 @@ mod tests {
 			.unwrap()
 			.xpect_contains("aws_instance.")
 			.xpect_contains(".ipv6_addresses[0]}");
-		json["output"]["mail_public_ipv6"].is_object().xpect_true();
+		json["output"]["mail_public_ipv6"].is_map().xpect_true();
 		let json = render(false);
 		json["resource"]["aws_instance"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.values()
 			.next()
@@ -3361,10 +3366,10 @@ mod tests {
 			.is_null()
 			.xpect_true();
 		json["resource"]["cloudflare_dns_record"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.values()
-			.any(|record| record["type"] == "AAAA")
+			.any(|record| record["type"].as_str().ok() == Some("AAAA"))
 			.xpect_false();
 		json["output"]["mail_public_ipv6"].is_null().xpect_true();
 	}

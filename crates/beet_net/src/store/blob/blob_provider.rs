@@ -35,7 +35,7 @@ impl BlobStat {
 }
 
 /// One directory's immediate children, by name, see
-/// [`BlobStoreProvider::list_dir`].
+/// [`BlobProvider::list_dir`].
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct BlobDir {
 	/// The subdirectories, sorted, no trailing slash.
@@ -76,8 +76,8 @@ impl BlobVersion {
 	pub fn as_str(&self) -> &str { &self.0 }
 }
 
-/// What a conditional blob write ([`BlobStoreProvider::insert_if`],
-/// [`BlobStoreProvider::remove_if`]) requires of the object there now.
+/// What a conditional blob write ([`BlobProvider::insert_if`],
+/// [`BlobProvider::remove_if`]) requires of the object there now.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum BlobCondition {
 	/// Whatever is there, including nothing.
@@ -136,18 +136,18 @@ impl BlobConflict {
 /// connection info, etc.) so that no external context is needed. A blob store
 /// holds bytes and is never a table store: rows over one are opted into, see
 /// `JsonTableStore`.
-pub trait BlobStoreProvider: StoreBackend {
+pub trait BlobProvider: StoreBackend {
 	/// Returns a boxed clone of this provider.
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider>;
+	fn box_clone(&self) -> Box<dyn BlobProvider>;
 
 	/// Returns a new provider scoped to the given subdirectory.
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider>;
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider>;
 
 	/// The unscoped store at this store's root: the same backing with no subdir,
 	/// the one [`root_key`](Self::root_key) names. A watcher keys its events to it
 	/// so they route through [`did_change`](Self::did_change) whichever scope
 	/// registered the watch.
-	fn base(&self) -> Box<dyn BlobStoreProvider>;
+	fn base(&self) -> Box<dyn BlobProvider>;
 
 	/// A view of this store rooted at `root` (a cleaned path relative to the
 	/// store, which may climb above it with a leading `..`), plus `entry_name`
@@ -165,7 +165,7 @@ pub trait BlobStoreProvider: StoreBackend {
 		&self,
 		entry_name: &RelPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
+	) -> Result<(Box<dyn BlobProvider>, RelPath)> {
 		if root.first_segment() == Some("..") {
 			bevybail!(
 				"entry `{entry_name}` declares a `<RepoRoot>` above the store \
@@ -243,7 +243,7 @@ pub trait BlobStoreProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// store.insert(&RelPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
@@ -276,7 +276,7 @@ pub trait BlobStoreProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// let paths = store.list().await?;
 	/// # Ok(())
 	/// # }
@@ -295,7 +295,7 @@ pub trait BlobStoreProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// let listing = store.list_dir(&RelPath::from("2026")).await?;
 	/// for month in listing.dirs {
 	/// 	println!("{month}");
@@ -329,7 +329,7 @@ pub trait BlobStoreProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// let data = store.get(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
@@ -343,7 +343,7 @@ pub trait BlobStoreProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// let exists = store.exists(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
@@ -357,7 +357,7 @@ pub trait BlobStoreProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// store.remove(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
@@ -494,7 +494,7 @@ pub trait BlobStoreProvider: StoreBackend {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let store = BlobStore::temp();
+	/// let store = BlobStore::new(InMemoryBlobStore::new());
 	/// let url = store.public_url(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
@@ -505,7 +505,7 @@ pub trait BlobStoreProvider: StoreBackend {
 	) -> SendBoxedFuture<Result<Option<String>>>;
 }
 
-impl StoreBackend for Box<dyn BlobStoreProvider> {
+impl StoreBackend for Box<dyn BlobProvider> {
 	fn id(&self) -> &'static str { self.as_ref().id() }
 
 	fn describe(&self) -> String { self.as_ref().describe() }
@@ -529,19 +529,17 @@ impl StoreBackend for Box<dyn BlobStoreProvider> {
 	}
 }
 
-impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> {
-		self.as_ref().box_clone()
-	}
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+impl BlobProvider for Box<dyn BlobProvider> {
+	fn box_clone(&self) -> Box<dyn BlobProvider> { self.as_ref().box_clone() }
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
 		self.as_ref().with_subdir(path)
 	}
-	fn base(&self) -> Box<dyn BlobStoreProvider> { self.as_ref().base() }
+	fn base(&self) -> Box<dyn BlobProvider> { self.as_ref().base() }
 	fn rebase(
 		&self,
 		entry_name: &RelPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
+	) -> Result<(Box<dyn BlobProvider>, RelPath)> {
 		self.as_ref().rebase(entry_name, root)
 	}
 	fn root_key(&self) -> SmolStr { self.as_ref().root_key() }

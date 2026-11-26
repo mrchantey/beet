@@ -445,18 +445,24 @@ pub fn stream_chunk_to_partial(
 // ═══════════════════════════════════════════════════════════════════════
 
 /// Maps a beet [`ToolDefinition`] to a [`ChatCompletionTools`].
-pub fn tool_to_completions_tool(tool: &ToolDefinition) -> ChatCompletionTools {
+///
+/// # Errors
+///
+/// Errors if a function's parameter schema does not convert into the json
+/// value async-openai holds, which it always does short of a byte string.
+pub fn tool_to_completions_tool(
+	tool: &ToolDefinition,
+) -> Result<ChatCompletionTools> {
 	match tool {
 		ToolDefinition::Function(func) => {
 			let mut params = func.params_schema().clone();
 			params.sanitize_for_strict_mode();
-			let json_params: serde_json::Value =
-				params.into_inner().into_json();
 			ChatCompletionTools::Function(ChatCompletionTool {
 				function: FunctionObject {
 					name: FunctionToolDefinition::encode_name(func.path()),
 					description: Some(func.description().to_string()),
-					parameters: Some(json_params),
+					// async-openai's own json value, inferred from the field
+					parameters: Some(params.into_inner().into_serde()?),
 					strict: Some(true),
 				},
 			})
@@ -474,6 +480,7 @@ pub fn tool_to_completions_tool(tool: &ToolDefinition) -> ChatCompletionTools {
 			})
 		}
 	}
+	.xok()
 }
 
 /// Maps a beet [`ToolChoice`] to a [`ChatCompletionToolChoiceOption`].

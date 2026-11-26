@@ -188,15 +188,13 @@ mod stalled_store_test {
 		}
 	}
 
-	impl BlobStoreProvider for StalledStore {
-		fn box_clone(&self) -> Box<dyn BlobStoreProvider> {
-			Box::new(self.clone())
-		}
+	impl BlobProvider for StalledStore {
+		fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 		/// Every path stalls, so a subdir view is the same store.
-		fn with_subdir(&self, _path: RelPath) -> Box<dyn BlobStoreProvider> {
+		fn with_subdir(&self, _path: RelPath) -> Box<dyn BlobProvider> {
 			Box::new(self.clone())
 		}
-		fn base(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+		fn base(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 		fn root_key(&self) -> SmolStr { "stalled".into() }
 		fn insert(
 			&self,

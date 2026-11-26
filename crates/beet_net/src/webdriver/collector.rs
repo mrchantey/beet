@@ -9,7 +9,6 @@ use super::Page;
 use crate::prelude::*;
 use beet_core::exports::async_channel;
 use beet_core::prelude::*;
-use serde_json::Value;
 
 /// A typed accumulator over one BiDi event subscription.
 pub struct Collector<T> {
@@ -95,7 +94,7 @@ impl ConsoleEntry {
 
 	fn parse(event: &Value) -> Option<Self> {
 		let params = event.get("params")?;
-		let level = match params.get("level")?.as_str()? {
+		let level = match params.get("level")?.as_str().ok()? {
 			"debug" => log::Level::Debug,
 			"info" => log::Level::Info,
 			"warn" => log::Level::Warn,
@@ -104,11 +103,7 @@ impl ConsoleEntry {
 		};
 		Some(Self {
 			level,
-			text: params
-				.get("text")
-				.and_then(|text| text.as_str())
-				.unwrap_or_default()
-				.to_string(),
+			text: params["text"].as_str().unwrap_or_default().to_string(),
 		})
 	}
 }
@@ -124,10 +119,10 @@ pub struct RequestEvent {
 
 impl RequestEvent {
 	fn parse(event: &Value) -> Option<Self> {
-		let request = event.pointer("/params/request")?;
+		let request = event.get("params")?.get("request")?;
 		Some(Self {
-			method: request.get("method")?.as_str()?.parse().ok()?,
-			url: Url::coerce(request.get("url")?.as_str()?),
+			method: request.get("method")?.as_str().ok()?.parse().ok()?,
+			url: Url::coerce(request.get("url")?.as_str().ok()?),
 		})
 	}
 }
@@ -161,12 +156,16 @@ impl ResponseEvent {
 		let response = params.get("response")?;
 		Some(Self {
 			method: params
-				.pointer("/request/method")?
-				.as_str()?
+				.get("request")?
+				.get("method")?
+				.as_str()
+				.ok()?
 				.parse()
 				.ok()?,
-			status: StatusCode::new(response.get("status")?.as_u64()? as u16),
-			url: Url::coerce(response.get("url")?.as_str()?),
+			status: StatusCode::new(
+				response.get("status")?.as_u64().ok()? as u16
+			),
+			url: Url::coerce(response.get("url")?.as_str().ok()?),
 		})
 	}
 }
@@ -212,20 +211,17 @@ impl Page {
 mod test {
 	use super::*;
 	use crate::webdriver::test_fixtures;
-	use serde_json::json;
 
 	/// The quiet drain returns what arrived, only once the stream has been
 	/// quiet for the window, and never later than the deadline.
 	#[beet_core::test]
 	async fn drains_until_quiet() {
 		use beet_core::exports::async_channel;
-		use serde_json::Value;
 		let (tx, rx) = async_channel::unbounded::<Value>();
-		let collector = Collector::new(rx, |event: &Value| {
-			event.get("n").and_then(Value::as_u64)
-		});
-		tx.send(json!({"n": 1})).await.unwrap();
-		tx.send(json!({"n": 2})).await.unwrap();
+		let collector =
+			Collector::new(rx, |event: &Value| event["n"].as_u64().ok());
+		tx.send(value!({"n": 1})).await.unwrap();
+		tx.send(value!({"n": 2})).await.unwrap();
 		let start = Instant::now();
 		collector
 			.drain_until_quiet(
@@ -239,7 +235,7 @@ mod test {
 		let start = Instant::now();
 		let noisy = async {
 			loop {
-				tx.send(json!({"n": 3})).await.ok();
+				tx.send(value!({"n": 3})).await.ok();
 				time_ext::sleep(Duration::from_millis(20)).await;
 			}
 			// never reached: types the race's other arm
@@ -309,7 +305,7 @@ mod test {
 	#[beet_core::test]
 	fn an_absent_head_is_not_a_failure() {
 		let event = |method: &str, status: u64| {
-			ResponseEvent::parse(&json!({"params": {
+			ResponseEvent::parse(&value!({"params": {
 				"request": {"method": method},
 				"response": {"status": status, "url": "http://localhost/a"},
 			}}))

@@ -324,7 +324,7 @@ mod test {
 	#[beet_core::test]
 	fn dir_path_scopes_ancestor_store() {
 		let mut app = store_app();
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let root = app
 			.world_mut()
 			.spawn((store.clone(), children![DirPath(RelPath::from("assets"))]))
@@ -343,9 +343,9 @@ mod test {
 		let mut app = store_app();
 		let root = app
 			.world_mut()
-			.spawn((BlobStore::temp(), children![BlobPath(RelPath::from(
-				"notes.md"
-			))]))
+			.spawn((BlobStore::new(InMemoryBlobStore::new()), children![
+				BlobPath(RelPath::from("notes.md"))
+			]))
 			.id();
 		app.update();
 		let child = child_of(app.world(), root);
@@ -367,7 +367,9 @@ mod test {
 		// no ancestor store yet, so nothing produced
 		app.world().entity(child).get::<BlobStore>().xpect_none();
 		// the store appears above it
-		app.world_mut().entity_mut(root).insert(BlobStore::temp());
+		app.world_mut()
+			.entity_mut(root)
+			.insert(BlobStore::new(InMemoryBlobStore::new()));
 		app.update();
 		app.world()
 			.entity(child)
@@ -384,13 +386,18 @@ mod test {
 		let mut app = store_app();
 		let with = app
 			.world_mut()
-			.spawn((BlobStore::temp(), BlobPath(RelPath::from("a.md"))))
+			.spawn((
+				BlobStore::new(InMemoryBlobStore::new()),
+				BlobPath(RelPath::from("a.md")),
+			))
 			.id();
 		let later = app.world_mut().spawn(BlobPath(RelPath::from("b.md"))).id();
 		app.update();
 		app.world().entity(with).get::<Blob>().xpect_some();
 		app.world().entity(later).get::<Blob>().xpect_none();
-		app.world_mut().entity_mut(later).insert(BlobStore::temp());
+		app.world_mut()
+			.entity_mut(later)
+			.insert(BlobStore::new(InMemoryBlobStore::new()));
 		app.update();
 		app.world().entity(later).get::<Blob>().xpect_some();
 		app.world_mut().entity_mut(later).remove::<BlobStore>();
@@ -410,7 +417,7 @@ mod test {
 		app.update();
 		app.world().entity(child).get::<Blob>().xpect_none();
 		app.world_mut()
-			.spawn(BlobStore::temp())
+			.spawn(BlobStore::new(InMemoryBlobStore::new()))
 			.add_children(&[child]);
 		app.update();
 		app.world()
@@ -429,7 +436,7 @@ mod test {
 		let mut app = store_app();
 		let root = app
 			.world_mut()
-			.spawn((BlobStore::temp(), children![(
+			.spawn((BlobStore::new(InMemoryBlobStore::new()), children![(
 				DirPath(RelPath::from("a")),
 				children![DirPath(RelPath::from("b"))]
 			)]))
@@ -451,9 +458,9 @@ mod test {
 		let mut app = store_app();
 		let root = app
 			.world_mut()
-			.spawn((BlobStore::temp(), children![DirPath(RelPath::from(
-				"assets"
-			))]))
+			.spawn((BlobStore::new(InMemoryBlobStore::new()), children![
+				DirPath(RelPath::from("assets"))
+			]))
 			.id();
 		app.update();
 		let child = child_of(app.world(), root);
@@ -469,9 +476,9 @@ mod test {
 		let mut app = store_app();
 		let root = app
 			.world_mut()
-			.spawn((BlobStore::temp(), children![DirPath(RelPath::from(
-				"assets"
-			))]))
+			.spawn((BlobStore::new(InMemoryBlobStore::new()), children![
+				DirPath(RelPath::from("assets"))
+			]))
 			.id();
 		app.update();
 		app.world_mut().entity_mut(root).despawn();

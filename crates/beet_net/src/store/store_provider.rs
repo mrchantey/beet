@@ -1,5 +1,5 @@
 //! The one seam between a [`StoreUri`] and the concrete store component it
-//! names, as the kind it is asked for: [`StoreProvider`] a store of bytes,
+//! names, as the kind it is asked for: [`BlobStoreProvider`] a store of bytes,
 //! [`TableStoreProvider`] a store of rows.
 
 use crate::prelude::*;
@@ -23,11 +23,11 @@ use beet_core::prelude::*;
 /// gated. A uri naming a table store alone (`dynamo:`) is refused, see
 /// [`TableStoreProvider`].
 #[derive(Debug, Clone)]
-pub enum StoreProvider {
+pub enum BlobStoreProvider {
 	/// `fs` / `fs:<path>`.
 	Fs(FsStore),
 	/// `memory://<name>`.
-	Memory(InMemoryStore),
+	Memory(InMemoryBlobStore),
 	/// `s3://<bucket>`.
 	#[cfg(feature = "aws")]
 	S3(S3Store),
@@ -53,25 +53,25 @@ pub enum StoreProvider {
 macro_rules! each_store {
 	($this:expr, |$store:ident| $body:expr) => {
 		match $this {
-			StoreProvider::Fs($store) => $body,
-			StoreProvider::Memory($store) => $body,
+			BlobStoreProvider::Fs($store) => $body,
+			BlobStoreProvider::Memory($store) => $body,
 			#[cfg(feature = "aws")]
-			StoreProvider::S3($store) => $body,
+			BlobStoreProvider::S3($store) => $body,
 			#[cfg(target_arch = "wasm32")]
-			StoreProvider::LocalStorage($store) => $body,
+			BlobStoreProvider::LocalStorage($store) => $body,
 			#[cfg(target_arch = "wasm32")]
-			StoreProvider::IndexedDb($store) => $body,
+			BlobStoreProvider::IndexedDb($store) => $body,
 			#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
-			StoreProvider::R2($store) => $body,
+			BlobStoreProvider::R2($store) => $body,
 			#[cfg(feature = "json")]
-			StoreProvider::Http($store) => $body,
+			BlobStoreProvider::Http($store) => $body,
 			#[cfg(feature = "sqlite")]
-			StoreProvider::Sqlite($store) => $body,
+			BlobStoreProvider::Sqlite($store) => $body,
 		}
 	};
 }
 
-impl StoreProvider {
+impl BlobStoreProvider {
 	/// The blob store `uri` names. A relative `fs:` path resolves against the cwd,
 	/// the context dir a caller with a better one pins first
 	/// ([`StoreUri::rooted_at`]).
@@ -85,7 +85,7 @@ impl StoreProvider {
 				.xmap(FsStore::new)
 				.xmap(Self::Fs),
 			StoreUri::Memory { name, path_prefix } => {
-				InMemoryStore::named(name.clone())
+				InMemoryBlobStore::named(name.clone())
 					.xmap(|store| match path_prefix {
 						Some(prefix) => store.with_subdir(prefix.clone()),
 						None => store,
@@ -189,7 +189,7 @@ impl StoreProvider {
 }
 
 /// The table store a [`StoreUri`] names, built by
-/// [`from_uri`](Self::from_uri): [`StoreProvider`]'s twin for rows. A uri
+/// [`from_uri`](Self::from_uri): [`BlobStoreProvider`]'s twin for rows. A uri
 /// names a table store or a blob store by which is asked for, so a `sqlite:`
 /// file answers both, and any blob uri asked for as a table store is a
 /// [`JsonTableStore`] over it, since a caller asking for that names it by
@@ -210,7 +210,7 @@ pub enum TableStoreProvider {
 #[cfg(feature = "json")]
 impl TableStoreProvider {
 	/// The table store `uri` names, a relative path resolved as
-	/// [`StoreProvider::from_uri`] resolves one.
+	/// [`BlobStoreProvider::from_uri`] resolves one.
 	///
 	/// # Errors
 	/// Errors for a kind this build has no backend for, and for a blob store
@@ -226,7 +226,7 @@ impl TableStoreProvider {
 			),
 			#[cfg(feature = "sqlite")]
 			StoreUri::Sqlite { .. } => Self::Sqlite(SqliteStore::from_uri(uri)?),
-			uri => StoreProvider::from_uri(uri)?
+			uri => BlobStoreProvider::from_uri(uri)?
 				.into_blob_store()
 				.xmap(JsonTableProvider::new)?
 				.xmap(Self::Json),
@@ -271,18 +271,20 @@ mod test {
 	/// A uri builds the backend it names, rooted where it says.
 	#[beet_core::test]
 	fn builds_the_named_backend() {
-		StoreProvider::from_uri(&StoreUri::parse("fs:/data").unwrap())
+		BlobStoreProvider::from_uri(&StoreUri::parse("fs:/data").unwrap())
 			.unwrap()
 			.into_blob_store()
 			.base_dir()
 			.unwrap()
 			.to_string()
 			.xpect_eq("/data");
-		StoreProvider::from_uri(&StoreUri::parse("memory://m/docs").unwrap())
-			.unwrap()
-			.into_blob_store()
-			.xmap(|store| (store.root_key(), store.subdir()))
-			.xpect_eq(("memory:m".into(), RelPath::new("docs")));
+		BlobStoreProvider::from_uri(
+			&StoreUri::parse("memory://m/docs").unwrap(),
+		)
+		.unwrap()
+		.into_blob_store()
+		.xmap(|store| (store.root_key(), store.subdir()))
+		.xpect_eq(("memory:m".into(), RelPath::new("docs")));
 	}
 
 	/// A database file uri builds the sqlite blob store, its relative path
@@ -290,7 +292,7 @@ mod test {
 	#[cfg(feature = "sqlite")]
 	#[beet_core::test]
 	fn builds_a_sqlite_backend() {
-		let store = StoreProvider::from_uri(
+		let store = BlobStoreProvider::from_uri(
 			&StoreUri::parse("sqlite:data.db").unwrap(),
 		)
 		.unwrap()
@@ -347,7 +349,7 @@ mod test {
 		let mut world = World::new();
 		let uri = StoreUri::parse("memory://lands-one-kind").unwrap();
 		let blobs = world.spawn_empty().id();
-		StoreProvider::from_uri(&uri)
+		BlobStoreProvider::from_uri(&uri)
 			.unwrap()
 			.insert(&mut world.entity_mut(blobs));
 		let tables = world.spawn_empty().id();
@@ -366,7 +368,8 @@ mod test {
 	#[beet_core::test]
 	async fn a_memory_uri_names_one_backing() {
 		let uri = StoreUri::parse("memory://provider-shared").unwrap();
-		let build = || StoreProvider::from_uri(&uri).unwrap().into_blob_store();
+		let build =
+			|| BlobStoreProvider::from_uri(&uri).unwrap().into_blob_store();
 		let seeded = build();
 		seeded.insert(&RelPath::new("a.txt"), "hi").await.unwrap();
 		build()
@@ -382,11 +385,11 @@ mod test {
 	fn inserting_derives_the_erased_store() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		StoreProvider::from_uri(&StoreUri::parse("memory://m").unwrap())
+		BlobStoreProvider::from_uri(&StoreUri::parse("memory://m").unwrap())
 			.unwrap()
 			.insert(&mut world.entity_mut(entity));
 		world.flush();
-		world.get::<InMemoryStore>(entity).xpect_some();
+		world.get::<InMemoryBlobStore>(entity).xpect_some();
 		world.get::<BlobStore>(entity).xpect_some();
 	}
 
@@ -394,10 +397,12 @@ mod test {
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn a_missing_backend_errors_with_guidance() {
-		StoreProvider::from_uri(&StoreUri::parse("indexed-db://d").unwrap())
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("only available on wasm");
+		BlobStoreProvider::from_uri(
+			&StoreUri::parse("indexed-db://d").unwrap(),
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("only available on wasm");
 	}
 
 	/// A store fork composes over the repo: the pair reads through and writes
@@ -409,7 +414,8 @@ mod test {
 		// a memory backing lives as long as a handle does
 		let seeded = BlobStore::from_uri(&upstream).unwrap();
 		seeded.insert(&RelPath::new("a.txt"), "up").await.unwrap();
-		let store = StoreProvider::compose(&upstream, Some(&local)).unwrap();
+		let store =
+			BlobStoreProvider::compose(&upstream, Some(&local)).unwrap();
 		store.id().xpect_eq("fork");
 		store
 			.get(&RelPath::new("a.txt"))
@@ -423,7 +429,7 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_true();
-		StoreProvider::compose(&upstream, None)
+		BlobStoreProvider::compose(&upstream, None)
 			.unwrap()
 			.id()
 			.xpect_eq("memory");

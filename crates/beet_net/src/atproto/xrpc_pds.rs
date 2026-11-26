@@ -346,7 +346,7 @@ impl XrpcError {
 	pub async fn read(method: &str, response: Response) -> Self {
 		let status = response.status();
 		let text = response.text().await.unwrap_or_default();
-		let body = serde_json::from_str::<XrpcErrorBody>(&text).ok();
+		let body = json_ext::from_str::<XrpcErrorBody>(&text).ok();
 		Self {
 			method: method.into(),
 			status,

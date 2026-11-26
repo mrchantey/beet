@@ -304,7 +304,7 @@ impl IconSet {
 		background: &str,
 	) -> Result<Vec<u8>> {
 		let icon = |name: String, size: u32, purpose: &str| {
-			serde_json::json!({
+			value!({
 				"src": name,
 				"sizes": format!("{size}x{size}"),
 				"type": "image/png",
@@ -316,16 +316,18 @@ impl IconSet {
 			.map(|size| icon(format!("icon-{size}.png"), size, "any"))
 			.collect::<Vec<_>>();
 		icons.push(icon(Self::MASKABLE.into(), Self::LARGEST, "maskable"));
-		serde_json::to_vec_pretty(&serde_json::json!({
-			"name": package.title,
-			"short_name": package.title,
-			"description": package.description,
+		value!({
+			"name": &package.title,
+			"short_name": &package.title,
+			"description": &package.description,
 			"start_url": "/",
 			"display": "standalone",
 			"theme_color": tints.light.as_str(),
 			"background_color": background,
 			"icons": icons,
-		}))?
+		})
+		.to_json_pretty()
+		.into_bytes()
 		.xok()
 	}
 }
@@ -496,7 +498,7 @@ mod test {
 	/// A world declaring the set from [`SRC`] in a temp store holding `source`.
 	fn setup(source: Vec<u8>) -> (World, Entity, BlobStore) {
 		let mut world = AsyncPlugin.into_world();
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let entity = world.spawn(IconSet::new(SRC)).flush();
 		let inserted = store.clone();
 		async_ext::block_on(async move {
@@ -676,7 +678,7 @@ mod test {
 	async fn derives_an_svg_source() {
 		const SVG: &str = "branding/logo.svg";
 		let mut world = AsyncPlugin.into_world();
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		store
 			.insert(
 				&RelPath::new(SVG),

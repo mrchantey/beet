@@ -3,7 +3,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
 
 
 
@@ -24,7 +23,8 @@ impl ComailDeliverability {
 	/// threshold is a rate: alarming on a count would fire on a busy fortnight
 	/// and stay silent on a small one with a terrible ratio.
 	pub fn metrics(report_paused: bool, response: &Value) -> Vec<MetricDatum> {
-		let number = |key: &str| response[key].as_f64().unwrap_or_default();
+		let number =
+			|key: &str| response[key].as_f64().ok().unwrap_or_default();
 		let sent = number("sent_14d");
 		let complaints = number("complaints_14d");
 		let mut metrics = vec![
@@ -54,6 +54,7 @@ impl ComailDeliverability {
 	fn is_stopped(response: &Value) -> bool {
 		let status = response["status"]
 			.as_str()
+			.ok()
 			.unwrap_or_default()
 			.to_ascii_lowercase();
 		Self::STOPPED
@@ -117,7 +118,7 @@ pub async fn ComailDeliverability(
 				domain.domain()
 			);
 		}
-		let response: Value = serde_json::from_str(&body)?;
+		let response = Value::parse_json(&body)?;
 		let metrics = ComailDeliverability::metrics(report_paused, &response);
 		cloudwatch_ext::put_metric_data(
 			&region,
@@ -130,9 +131,9 @@ pub async fn ComailDeliverability(
 		info!(
 			"{}: {} status, {} sent and {} bounced in 14d",
 			domain.domain(),
-			response["status"].as_str().unwrap_or("unknown"),
-			response["sent_14d"].as_i64().unwrap_or_default(),
-			response["bounced_14d"].as_i64().unwrap_or_default()
+			response["status"].as_str().ok().unwrap_or("unknown"),
+			response["sent_14d"].as_i64().ok().unwrap_or_default(),
+			response["bounced_14d"].as_i64().ok().unwrap_or_default()
 		);
 	}
 	Pass(cx.input).xok()
@@ -150,12 +151,11 @@ async fn read(mail: &MailStack, secret: SecretRef) -> Result<String> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use serde_json::json;
 
 	/// The response comail actually returns
 	/// (`internal/admin/api_member_self.go:222-231`).
 	fn response(status: &str, sent: i64, complaints: i64) -> Value {
-		json!({
+		value!({
 			"did": "did:plc:example",
 			"status": status,
 			"sent_14d": sent,

@@ -25,7 +25,7 @@ use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// # async fn run() -> Result {
 /// let mut world = AsyncPlugin.into_world();
-/// let store = BlobStore::temp();
+/// let store = BlobStore::new(InMemoryBlobStore::new());
 /// store.insert(&RelPath::new("notes.md"), "# Notes").await?;
 /// let entity = world
 /// 	.spawn((
@@ -403,7 +403,7 @@ impl Derivation {
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// # async fn run() -> Result {
-/// let store = BlobStore::temp();
+/// let store = BlobStore::new(InMemoryBlobStore::new());
 /// let mut outputs = DerivationOutputs::default();
 /// outputs.write(&store, "icons/icon-16.png", vec![0u8; 4]).await?;
 /// let body = EntityBody::default().with_typed(&outputs)?;
@@ -648,7 +648,7 @@ mod test {
 		text: &str,
 	) -> (World, Entity, BlobStore, Store<usize>) {
 		let mut world = AsyncPlugin.into_world();
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let runs = Store::new(0);
 		let entity = world
 			.spawn((
@@ -886,7 +886,7 @@ mod test {
 	#[beet_core::test]
 	async fn needs_a_producer_answering_provenance() {
 		let mut world = AsyncPlugin.into_world();
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let bare = world.spawn(Derivation::new(DERIVED)).id();
 		ensure(&mut world, bare, &store)
 			.await
@@ -912,7 +912,7 @@ mod test {
 	/// document, so a changed source renames the output.
 	fn with_outputs() -> (World, Entity, BlobStore) {
 		let mut world = AsyncPlugin.into_world();
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let entity = world
 			.spawn((
 				Derivation::new(DERIVED),
@@ -993,7 +993,7 @@ mod test {
 	#[beet_core::test]
 	async fn regenerates_a_changed_record() {
 		let mut world = AsyncPlugin.into_world();
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let pds = Pds::temp();
 		world.spawn(pds.clone());
 		let collection = Nsid::new_static("org.example.note");

@@ -267,7 +267,7 @@ mod test {
 	fn app_view(recorded: bool) -> AppView {
 		static ORIGIN: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 		let origin = ORIGIN.get_or_init(|| {
-			let store = BlobStore::temp();
+			let store = BlobStore::new(InMemoryBlobStore::new());
 			async_ext::block_on(store.insert(
 				&RelPath::from("recorded/xrpc/app.bsky.feed.getPostThread"),
 				include_str!("fixtures/post_thread.json"),
@@ -312,7 +312,7 @@ mod test {
 	/// its index announcing `blog/full-stack-bevy` and no other post, reading
 	/// threads through `app_view`.
 	async fn site(app_view: impl Bundle) -> (World, Entity) {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let mut index = harvest_index();
 		index.documents[0].bsky_post = Some(announcement());
 		write_index(&store, &index).await;

@@ -10,6 +10,10 @@ use crate::prelude::*;
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct JsonSchema(Value);
 
+impl From<Value> for JsonSchema {
+	fn from(value: Value) -> Self { Self(value) }
+}
+
 impl JsonSchema {
 	/// Wraps an existing [`Value`] as a schema.
 	pub fn from_value(value: Value) -> Self { Self(value) }

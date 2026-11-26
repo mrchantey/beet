@@ -35,10 +35,9 @@ fn key_to_smolstr(value: Value) -> SerResult<SmolStr> {
 	}
 }
 
-/// A [`::serde::Serializer`] that builds a [`Value`] directly.
-///
-/// This avoids round-tripping through `serde_json::Value`, whose number type
-/// collapses the signed/unsigned distinction.
+/// A [`::serde::Serializer`] that builds a [`Value`] directly, the first half
+/// of every `json_ext` write, keeping the signed/unsigned distinction and a
+/// struct's field order.
 pub struct ValueSerializer;
 
 impl ser::Serializer for ValueSerializer {

@@ -221,7 +221,7 @@ mod test {
 	/// opens both onto one thread and runs nothing.
 	#[beet_core::test]
 	fn holds_two_windows_with_no_behavior() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let window = |id: u128, name: &str| {
 			(
 				Thread::default(),
@@ -297,7 +297,7 @@ mod test {
 	// parallel test load.
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn reload_continues_without_duplicating() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let system = ActorId::from_u128(1);
 		let agent = ActorId::from_u128(2);
 
@@ -314,7 +314,7 @@ mod test {
 	/// with no start notification still enters before running.
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn a_direct_call_enters_before_running() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let system = ActorId::from_u128(3);
 		let agent = ActorId::from_u128(4);
 

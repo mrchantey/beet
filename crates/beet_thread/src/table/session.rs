@@ -157,9 +157,11 @@ mod test {
 
 	/// `post`, created `millis` earlier.
 	fn aged(post: Post, millis: i64) -> Post {
-		let mut value = serde_json::to_value(&post).unwrap();
-		value["created"] = (post.created().millis() - millis).into();
-		serde_json::from_value(value).unwrap()
+		let mut value = Value::from_serde(&post).unwrap();
+		value
+			.insert("created", post.created().millis() - millis)
+			.unwrap();
+		value.into_serde().unwrap()
 	}
 
 	/// An app over a store.
@@ -266,8 +268,8 @@ mod test {
 
 	/// The `(role, content)` of each message under `key` of a request.
 	fn messages(request: &impl Serialize, key: &str) -> Vec<(String, String)> {
-		serde_json::to_value(request).unwrap()[key]
-			.as_array()
+		Value::from_serde(request).unwrap()[key]
+			.as_list()
 			.unwrap()
 			.iter()
 			.map(|message| {

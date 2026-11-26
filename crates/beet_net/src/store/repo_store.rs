@@ -49,7 +49,7 @@ impl RepoStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// let mut world = StorePlugin.into_world();
-	/// world.spawn((BlobStore::temp(), RepoStore));
+	/// world.spawn((BlobStore::new(InMemoryBlobStore::new()), RepoStore));
 	/// RepoStore::get(&mut world).unwrap();
 	/// ```
 	pub fn get(world: &mut World) -> Result<BlobStore> {
@@ -103,7 +103,10 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("no repo store");
-		world.spawn((children![(BlobStore::temp(), RepoStore)],));
+		world.spawn((children![(
+			BlobStore::new(InMemoryBlobStore::new()),
+			RepoStore
+		)],));
 		RepoStore::get(&mut world).unwrap();
 	}
 
@@ -112,8 +115,8 @@ mod test {
 	#[should_panic = "already carries one"]
 	fn rejects_second_repo_store() {
 		let mut world = store_world();
-		world.spawn((BlobStore::temp(), RepoStore));
-		world.spawn((BlobStore::temp(), RepoStore));
+		world.spawn((BlobStore::new(InMemoryBlobStore::new()), RepoStore));
+		world.spawn((BlobStore::new(InMemoryBlobStore::new()), RepoStore));
 		world.flush();
 	}
 

@@ -1,9 +1,9 @@
 //! Cross-transport analytics: recording and storing what kinds of clients
 //! connect, what pages they visit, and for how long.
 //!
-//! One [`AnalyticsEvent`] type (built on beet's [`Value`], not `serde_json`)
-//! spans every transport, each event a row of the `analytics_event` table in
-//! the declared [`TableStore`] the moment it happens ([`AnalyticsStore`]). The
+//! One [`AnalyticsEvent`] type (built on beet's [`Value`]) spans every
+//! transport, each event a row of the `analytics_event` table in the
+//! declared [`TableStore`] the moment it happens ([`AnalyticsStore`]). The
 //! nightly [`AnalyticsRollupJob`] reduces each complete day to
 //! `analytics_rollup` rows and archives cold days to a bucket as SQLite files
 //! ([`TableArchive`]). Its [`AnalyticsEventKind`]

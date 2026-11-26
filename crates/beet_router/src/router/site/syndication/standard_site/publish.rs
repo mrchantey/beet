@@ -167,7 +167,7 @@ mod test {
 	/// in its body and a cover in its frontmatter, the media in its repo
 	/// store.
 	async fn site() -> (World, Entity) {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		for (path, bytes) in
 			[("photo.png", png(4, 3)), ("cover.png", png(2, 1))]
 		{

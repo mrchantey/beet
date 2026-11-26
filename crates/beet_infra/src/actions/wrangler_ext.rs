@@ -76,10 +76,10 @@ pub async fn delete_custom_domain(
 	)
 	.await?;
 	let Some(id) = listed
-		.and_then(|body| body["result"].as_array().cloned())
+		.and_then(|body| body["result"].as_list().ok().cloned())
 		.unwrap_or_default()
 		.first()
-		.and_then(|domain| domain["id"].as_str().map(String::from))
+		.and_then(|domain| domain["id"].as_str().ok().map(String::from))
 	else {
 		return Ok(false);
 	};

@@ -337,11 +337,10 @@ mod test {
 	#[beet_core::test]
 	fn reads_a_foreign_document() {
 		let json = r#"{"path":"/docs/lexicons/recommend","site":"at://did:plc:re3ebnp5v7ffagz6rb6xfei4/site.standard.publication/3me5vykp6lf2y","$type":"site.standard.document","title":"Recommend Lexicon","coverImage":{"ref":{"$link":"bafkreibyshzq4yiashq67ajipj3eo6n2dybbvsdmzspox7mpgoxtfimoeq"},"size":113475,"$type":"blob","mimeType":"image/png"},"description":"Schema reference for document recommends, used to declare that a user endorses or recommends a document.","publishedAt":"2026-05-19T00:00:00.000Z","canonicalUrl":"https://standard.site/docs/lexicons/recommend"}"#;
-		let document =
-			AtprotoValue::from_json(serde_json::from_str(json).unwrap())
-				.unwrap()
-				.into_serde::<StandardSiteDocument>()
-				.unwrap();
+		let document = AtprotoValue::parse_json(json)
+			.unwrap()
+			.into_serde::<StandardSiteDocument>()
+			.unwrap();
 		document
 			.site
 			.at_uri()

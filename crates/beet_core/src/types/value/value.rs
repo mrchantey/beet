@@ -344,6 +344,38 @@ impl Value {
 		}
 	}
 
+	/// Sort every map's entries by key, at every depth: the canonical order,
+	/// so values equal by content write the same text, see
+	/// [`to_json_string`](Self::to_json_string).
+	pub fn sort_maps(&mut self) {
+		match self {
+			Value::Map(map) => {
+				map.0.sort_unstable_keys();
+				for value in map.0.values_mut() {
+					value.sort_maps();
+				}
+			}
+			Value::List(items) => {
+				for item in items {
+					item.sort_maps();
+				}
+			}
+			_ => {}
+		}
+	}
+
+	/// The value at `key` of this map, for a fallible chain:
+	/// `value.field("name")?.as_str()?`.
+	///
+	/// ## Errors
+	/// Errors naming `key` where this is not a map or it has no such entry.
+	pub fn field(&self, key: &str) -> Result<&Value> {
+		self.as_map()?
+			.0
+			.get(key)
+			.ok_or_else(|| bevyhow!("missing field `{key}`"))
+	}
+
 	/// The value at `path`, descending maps by key and lists by index; `None`
 	/// where the path leaves the value.
 	pub fn get_path(&self, path: &[FieldSegment]) -> Option<&Value> {
@@ -440,6 +472,25 @@ fn parse_number<T: core::str::FromStr>(text: &str) -> Result<T> {
 	text.trim()
 		.parse()
 		.map_err(|_| bevyhow!("'{text}' is not a valid number"))
+}
+
+/// The `Null` an index past a value answers.
+static NULL: Value = Value::Null;
+
+/// `value["key"]`, a map's entry, or `Null` where it has none or is not a
+/// map, as `serde_json` indexes: a chain into data of unknown shape needs no
+/// check at each step. A fallible lookup is [`Value::field`].
+impl core::ops::Index<&str> for Value {
+	type Output = Value;
+	fn index(&self, key: &str) -> &Value { self.get(key).unwrap_or(&NULL) }
+}
+
+/// `value[0]`, a list's item, or `Null` where it has none or is not a list.
+impl core::ops::Index<usize> for Value {
+	type Output = Value;
+	fn index(&self, index: usize) -> &Value {
+		self.get_index(index).unwrap_or(&NULL)
+	}
 }
 
 impl core::fmt::Display for Value {
@@ -718,63 +769,89 @@ impl<V: Into<Value>> From<HashMap<SmolStr, V>> for Value {
 
 // ── value! macro ──────────────────────────────────────────────────────
 
-/// Creates a [`Value`] from a literal expression.
+/// Creates a [`Value`] from JSON-shaped tokens, as `serde_json::json!` does:
+/// `null`, `[..]` and `{..}` are themselves, and any other expression is
+/// converted with [`Value::from`]. A key is a string literal or any single
+/// token tree convertible to a [`SmolStr`], ie a variable or `(expr)`.
 ///
-/// # Example
-///
-/// ```rust,no_run
+/// ```
 /// # use beet_core::prelude::*;
+/// let name = "Alice";
 /// let value = value!({
-///     "name": "Alice",
-///     "score": 100,
-///     "items": [1, 2, 3],
-///     "active": true
+/// 	"name": name,
+/// 	"score": 50 * 2,
+/// 	"items": [1, -2, [], {}],
+/// 	(format!("{name}_active")): true,
+/// 	"none": null,
 /// });
+/// value["items"][1].clone().xpect_eq(Value::Int(-2));
+/// value["Alice_active"].clone().xpect_eq(Value::Bool(true));
 /// ```
 #[macro_export]
 macro_rules! value {
-	// Null
 	(null) => {
 		$crate::prelude::Value::Null
 	};
-
-	// Boolean
-	(true) => {
-		$crate::prelude::Value::Bool(true)
+	([]) => {
+		$crate::prelude::Value::List($crate::prelude::Vec::new())
 	};
-	(false) => {
-		$crate::prelude::Value::Bool(false)
-	};
-
-	// Array
-	([ $($elem:tt),* $(,)? ]) => {
-		$crate::prelude::Value::List(vec![ $( $crate::value!($elem) ),* ])
-	};
-
-	// Empty object
+	([ $($tt:tt)+ ]) => {{
+		let mut list = $crate::prelude::Vec::new();
+		$crate::value_internal!(@list list $($tt)+);
+		$crate::prelude::Value::List(list)
+	}};
 	({}) => {
 		$crate::prelude::Value::Map($crate::prelude::Map::default())
 	};
-
-	// Object
-	({ $($key:tt : $value:tt),+ $(,)? }) => {
-		{
-			let mut map = $crate::prelude::Map::default();
-			$(
-				map.insert($key, $crate::value!($value));
-			)+
-			$crate::prelude::Value::Map(map)
-		}
-	};
-
-	// String literals
-	($s:literal) => {
-		$crate::prelude::Value::from($s)
-	};
-
-	// Other expressions (numbers, variables, etc.)
+	({ $($tt:tt)+ }) => {{
+		let mut map = $crate::prelude::Map::default();
+		$crate::value_internal!(@map map $($tt)+);
+		$crate::prelude::Value::Map(map)
+	}};
 	($other:expr) => {
 		$crate::prelude::Value::from($other)
+	};
+}
+
+/// The list and map arms of [`value!`], each item matched whole: `null`,
+/// `[..]` and `{..}` by their tokens, anything else as one expression up to
+/// its comma.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! value_internal {
+	(@list $list:ident) => {};
+	(@list $list:ident null $(, $($rest:tt)*)?) => {
+		$list.push($crate::prelude::Value::Null);
+		$crate::value_internal!(@list $list $($($rest)*)?);
+	};
+	(@list $list:ident [ $($inner:tt)* ] $(, $($rest:tt)*)?) => {
+		$list.push($crate::value!([ $($inner)* ]));
+		$crate::value_internal!(@list $list $($($rest)*)?);
+	};
+	(@list $list:ident { $($inner:tt)* } $(, $($rest:tt)*)?) => {
+		$list.push($crate::value!({ $($inner)* }));
+		$crate::value_internal!(@list $list $($($rest)*)?);
+	};
+	(@list $list:ident $item:expr $(, $($rest:tt)*)?) => {
+		$list.push($crate::prelude::Value::from($item));
+		$crate::value_internal!(@list $list $($($rest)*)?);
+	};
+	(@map $map:ident) => {};
+	(@map $map:ident $key:tt : null $(, $($rest:tt)*)?) => {
+		$map.insert($key, $crate::prelude::Value::Null);
+		$crate::value_internal!(@map $map $($($rest)*)?);
+	};
+	(@map $map:ident $key:tt : [ $($inner:tt)* ] $(, $($rest:tt)*)?) => {
+		$map.insert($key, $crate::value!([ $($inner)* ]));
+		$crate::value_internal!(@map $map $($($rest)*)?);
+	};
+	(@map $map:ident $key:tt : { $($inner:tt)* } $(, $($rest:tt)*)?) => {
+		$map.insert($key, $crate::value!({ $($inner)* }));
+		$crate::value_internal!(@map $map $($($rest)*)?);
+	};
+	(@map $map:ident $key:tt : $value:expr $(, $($rest:tt)*)?) => {
+		$map.insert($key, $crate::prelude::Value::from($value));
+		$crate::value_internal!(@map $map $($($rest)*)?);
 	};
 }
 

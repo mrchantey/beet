@@ -1,8 +1,6 @@
 //! The management channel into a running Stalwart.
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 /// A JMAP session against a Stalwart server: the one protocol `0.16` speaks for
 /// both mail and administration.
@@ -62,12 +60,15 @@ impl JmapClient {
 			);
 		}
 		let session: Value = response.json().await?;
-		let api_path = session["apiUrl"]
-			.as_str()
-			.map(Self::url_to_path)
-			.ok_or_else(|| bevyhow!("jmap session carried no apiUrl"))?;
+		let api_path =
+			session["apiUrl"]
+				.as_str()
+				.ok()
+				.map(Self::url_to_path)
+				.ok_or_else(|| bevyhow!("jmap session carried no apiUrl"))?;
 		let mail_account = session["primaryAccounts"][Self::MAIL_CAPABILITY]
 			.as_str()
+			.ok()
 			.map(String::from);
 		Ok(Self {
 			origin,
@@ -135,8 +136,8 @@ impl JmapClient {
 		if name == "error" {
 			bevybail!(
 				"{method} failed: {} {}",
-				result["type"].as_str().unwrap_or("(unknown)"),
-				result["description"].as_str().unwrap_or_default()
+				result["type"].as_str().ok().unwrap_or("(unknown)"),
+				result["description"].as_str().ok().unwrap_or_default()
 			);
 		}
 		Ok(result)
@@ -160,9 +161,11 @@ impl JmapClient {
 		let response =
 			Request::post(format!("{}{}", self.origin, self.api_path))
 				.with_auth_raw(&self.auth)
-				.with_json_body(&json!({
-					"using": using,
-					"methodCalls": calls,
+				.with_json_body(&value!({
+					"using": Value::new_list(using.iter().copied()),
+					"methodCalls": Value::new_list(calls.into_iter().map(
+						|(name, arguments, id)| value!([name, arguments, id])
+					)),
 				}))?
 				.send()
 				.await?;
@@ -171,17 +174,18 @@ impl JmapClient {
 		if !status.is_ok() {
 			bevybail!("jmap call failed: {status} - {body}");
 		}
-		serde_json::from_str::<Value>(&body)?["methodResponses"]
-			.as_array()
+		Value::parse_json(&body)?["methodResponses"]
+			.as_list()
+			.ok()
 			.ok_or_else(|| {
 				bevyhow!("jmap response carried no methodResponses")
 			})?
 			.iter()
 			.map(|call| -> Result<(String, Value, String)> {
 				(
-					call[0].as_str().unwrap_or_default().to_string(),
+					call[0].as_str().ok().unwrap_or_default().to_string(),
 					call[1].clone(),
-					call[2].as_str().unwrap_or_default().to_string(),
+					call[2].as_str().ok().unwrap_or_default().to_string(),
 				)
 					.xok()
 			})
@@ -200,10 +204,10 @@ impl JmapClient {
 		let get = format!("{object_type}/get");
 		let responses = self
 			.call_many(vec![
-				(query.clone(), json!({ "filter": {} }), "q".to_string()),
+				(query.clone(), value!({ "filter": {} }), "q".to_string()),
 				(
 					get.clone(),
-					json!({
+					value!({
 						"#ids": { "resultOf": "q", "name": query, "path": "/ids" },
 						"properties": Value::Null,
 					}),
@@ -218,11 +222,16 @@ impl JmapClient {
 		if name == "error" {
 			bevybail!(
 				"{get} failed: {} {}",
-				result["type"].as_str().unwrap_or("(unknown)"),
-				result["description"].as_str().unwrap_or_default()
+				result["type"].as_str().ok().unwrap_or("(unknown)"),
+				result["description"].as_str().ok().unwrap_or_default()
 			);
 		}
-		result["list"].as_array().cloned().unwrap_or_default().xok()
+		result["list"]
+			.as_list()
+			.ok()
+			.cloned()
+			.unwrap_or_default()
+			.xok()
 	}
 
 	/// Create one object, returning the id the server assigned it.
@@ -234,12 +243,13 @@ impl JmapClient {
 		let result = self
 			.call(
 				&format!("{object_type}/set"),
-				json!({ "create": { "new": value } }),
+				value!({ "create": { "new": value.clone() } }),
 			)
 			.await?;
 		Self::reject_set_errors(object_type, &result, "notCreated")?;
 		result["created"]["new"]["id"]
 			.as_str()
+			.ok()
 			.map(String::from)
 			.ok_or_else(|| {
 				bevyhow!("{object_type}/set created an object with no id")
@@ -270,7 +280,7 @@ impl JmapClient {
 		let result = self
 			.call(
 				&format!("{object_type}/set"),
-				json!({ "update": { id: patch } }),
+				value!({ "update": { id: patch.clone() } }),
 			)
 			.await?;
 		Self::reject_set_errors(object_type, &result, "notUpdated")?;
@@ -285,7 +295,7 @@ impl JmapClient {
 	/// disable flag, so removal is the only way to close a port.
 	pub async fn destroy(&self, object_type: &str, id: &str) -> Result {
 		let result = self
-			.call(&format!("{object_type}/set"), json!({ "destroy": [id] }))
+			.call(&format!("{object_type}/set"), value!({ "destroy": [id] }))
 			.await?;
 		Self::reject_set_errors(object_type, &result, "notDestroyed")
 	}
@@ -302,11 +312,12 @@ impl JmapClient {
 		let result = self
 			.call(
 				&format!("{object_type}/get"),
-				json!({ "ids": [Self::SINGLETON_ID] }),
+				value!({ "ids": [Self::SINGLETON_ID] }),
 			)
 			.await?;
 		result["list"]
-			.as_array()
+			.as_list()
+			.ok()
 			.and_then(|list| list.first())
 			.cloned()
 			.xok()
@@ -334,7 +345,7 @@ impl JmapClient {
 		result: &Value,
 		key: &str,
 	) -> Result {
-		let Some(failures) = result[key].as_object() else {
+		let Some(failures) = result[key].as_map().ok() else {
 			return Ok(());
 		};
 		if failures.is_empty() {
@@ -343,7 +354,7 @@ impl JmapClient {
 		let (id, error) = failures.iter().next().unwrap();
 		bevybail!(
 			"{object_type}/set rejected '{id}': {}",
-			serde_json::to_string(error).unwrap_or_default()
+			error.to_json_string()
 		)
 	}
 
@@ -406,7 +417,7 @@ mod tests {
 	/// only checked the status would report success having created nothing.
 	#[beet_core::test]
 	fn set_failures_inside_a_success_are_errors() {
-		let result = serde_json::json!({
+		let result = value!({
 			"created": {},
 			"notCreated": { "new": { "type": "invalidProperties" } }
 		});
@@ -416,7 +427,7 @@ mod tests {
 			.xpect_contains("invalidProperties");
 		JmapClient::reject_set_errors(
 			"x:Domain",
-			&serde_json::json!({ "created": { "new": { "id": "a" } } }),
+			&value!({ "created": { "new": { "id": "a" } } }),
 			"notCreated",
 		)
 		.unwrap();

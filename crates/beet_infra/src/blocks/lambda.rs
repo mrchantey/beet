@@ -3,7 +3,6 @@ use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::json;
 
 /// Opinionated terraform configuration for a standard web application:
 /// - Serverless lambda function with API Gateway v2
@@ -218,7 +217,7 @@ impl LambdaBlock {
 		let lambda_role = ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("lambda_role")),
 			AwsIamRoleDetails {
-				assume_role_policy: json!({
+				assume_role_policy: value!({
 					"Version": "2012-10-17",
 					"Statement": [{
 						"Action": "sts:AssumeRole",
@@ -226,7 +225,7 @@ impl LambdaBlock {
 						"Principal": { "Service": "lambda.amazonaws.com" }
 					}]
 				})
-				.to_string()
+				.to_json_string()
 				.into(),
 				// every principal a credentialed deploy creates is capped by its app's
 				// boundary, which is what stops an `iam:*` on this app's names

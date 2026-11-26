@@ -60,7 +60,7 @@ interface = ["serde"]
 # before the entry builds (the prescan's half of `beet_net/vault`), so every
 # declaration constructed in the build walk finds its credentials set.
 vault = ["std", "beet_net/vault"]
-json = ["serde", "dep:serde_json", "beet_core/json", "beet_net/json", "beet_scene?/json"]
+json = ["serde", "beet_core/json", "beet_net/json", "beet_scene?/json"]
 # The standard.site records (`router/site/syndication/standard_site`): plain
 # data in the atproto model, beside `beet_net`'s `Pds` family.
 dag_cbor = ["serde", "beet_core/dag_cbor", "beet_net/dag_cbor"]
@@ -165,7 +165,6 @@ variadics_please.workspace = true
 bitflags = "2"
 
 serde = {workspace = true, optional=true}
-serde_json = {workspace = true, optional=true}
 # the raster formats the web serves, for a Leaflet image block's aspect ratio
 imagesize = { workspace = true, optional = true, features = ["png", "jpeg", "gif", "webp", "heif", "bmp", "tiff", "ico"] }
 # an icon set's source decoded, each size resized and encoded
@@ -198,7 +197,6 @@ webbrowser = { workspace = true, optional = true }
 beet_core = { workspace = true, features = ["testing", "fs", "rand"] }
 # the standard.site tests read a record's wire form, json, in every build
 # carrying the records, `json` or not
-serde_json.workspace = true
 
 # `ureq` + `server`: the http store test reads a `<ServeBlobs>` mount over a
 # real listener, which needs a client transport beside the mini server.

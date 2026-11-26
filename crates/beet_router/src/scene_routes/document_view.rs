@@ -48,19 +48,19 @@ impl DocumentView {
 	}
 }
 
-#[cfg(test)]
+// every view needs a parser for the file it reads
+#[cfg(all(test, feature = "markdown"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_scene::prelude::*;
-	#[cfg(feature = "markdown")]
 
 	/// A file a request names is parsed by its media type and rendered as the
 	/// request accepts.
 	#[beet_core::test]
 	async fn views_a_store_file_as_accepted() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		store
 			.insert(
 				&"docs/plan.html".into(),
@@ -91,7 +91,6 @@ mod test {
 	}
 
 	/// Stands in for a component a downstream crate declares frontmatter.
-	#[cfg(feature = "markdown")]
 	#[derive(
 		Debug,
 		Default,
@@ -111,10 +110,9 @@ mod test {
 	/// A component declared outside beet_ui round-trips through a view asked
 	/// for frontmatter: its section declares it on the root, and the view
 	/// writes it back as its table beside the page's own keys.
-	#[cfg(feature = "markdown")]
 	#[beet_core::test]
 	async fn views_a_declared_component_as_its_section() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		store
 			.insert(
 				&"docs/plan.md".into(),

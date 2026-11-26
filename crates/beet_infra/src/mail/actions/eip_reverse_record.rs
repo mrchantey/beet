@@ -4,7 +4,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
 
 /// `<EipReverseRecord up={$attach_up} down={$attach_down}/>` — the box's reverse
 /// record, declared as a thing the stack HAS rather than as a step some verb
@@ -277,12 +276,15 @@ async fn resolve_a(hostname: &str) -> Result<Vec<String>> {
 	}
 	let body: Value = response.json().await?;
 	body["Answer"]
-		.as_array()
+		.as_list()
+		.ok()
 		.map(|answers| {
 			answers
 				.iter()
-				.filter(|answer| answer["type"] == 1)
-				.filter_map(|answer| answer["data"].as_str().map(String::from))
+				.filter(|answer| answer["type"].as_u64().ok() == Some(1))
+				.filter_map(|answer| {
+					answer["data"].as_str().ok().map(String::from)
+				})
 				.collect::<Vec<_>>()
 		})
 		.unwrap_or_default()

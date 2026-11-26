@@ -8,7 +8,6 @@
 use beet_core::prelude::*;
 use beet_net::prelude::Request;
 use beet_net::prelude::StatusCode;
-use serde_json::Value;
 
 /// The Cloudflare v4 api base.
 pub const API_BASE: &str = "https://api.cloudflare.com/client/v4";
@@ -62,8 +61,8 @@ pub async fn send_optional(
 	if status.is_ok() && body.trim().is_empty() {
 		return Some(Value::Null).xok();
 	}
-	let json = serde_json::from_str::<Value>(&body).unwrap_or_default();
-	if !status.is_ok() || json["success"] != true {
+	let json = Value::parse_json(&body).unwrap_or_default();
+	if !status.is_ok() || json["success"].as_bool().ok() != Some(true) {
 		return Err(CloudflareApiError {
 			what: what.into(),
 			status,
@@ -98,7 +97,7 @@ impl CloudflareApiError {
 	/// The envelope's `errors[].message` list, joined, for a line that names
 	/// what Cloudflare said without quoting its whole answer.
 	pub fn messages(&self) -> String {
-		error_messages(&serde_json::from_str(&self.body).unwrap_or_default())
+		error_messages(&Value::parse_json(&self.body).unwrap_or_default())
 	}
 }
 
@@ -107,11 +106,12 @@ impl CloudflareApiError {
 /// reported through this rather than through [`send`].
 pub fn error_messages(body: &Value) -> String {
 	body["errors"]
-		.as_array()
+		.as_list()
+		.ok()
 		.map(|errors| {
 			errors
 				.iter()
-				.filter_map(|error| error["message"].as_str())
+				.filter_map(|error| error["message"].as_str().ok())
 				.collect::<Vec<_>>()
 				.join("; ")
 		})

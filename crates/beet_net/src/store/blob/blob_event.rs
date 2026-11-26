@@ -14,8 +14,8 @@ pub struct BlobEvent {
 	/// `store.get(&path)`.
 	pub path: RelPath,
 	/// Handle to the originating store, so a subscriber can fetch bytes and so
-	/// routing can read its [`root_key`](BlobStoreProvider::root_key) /
-	/// [`subdir`](BlobStoreProvider::subdir).
+	/// routing can read its [`root_key`](BlobProvider::root_key) /
+	/// [`subdir`](BlobProvider::subdir).
 	pub store: BlobStore,
 	/// What happened to the object.
 	pub kind: BlobEventKind,
@@ -40,7 +40,7 @@ impl BlobEvent {
 
 	/// The event's location relative to its `root_key`, ie
 	/// `store.subdir().join(&path)`. This is the routing key compared against a
-	/// store's [`subdir`](BlobStoreProvider::subdir).
+	/// store's [`subdir`](BlobProvider::subdir).
 	pub fn root_relative_path(&self) -> RelPath {
 		self.store.subdir().join(&self.path)
 	}
@@ -161,8 +161,8 @@ mod test {
 	/// nested subdirs (same backing, covering), and a mismatched backing.
 	#[beet_core::test]
 	fn routing_truth_table() {
-		let base = BlobStore::new(InMemoryStore::new());
-		let other = BlobStore::new(InMemoryStore::new());
+		let base = BlobStore::new(InMemoryBlobStore::new());
+		let other = BlobStore::new(InMemoryBlobStore::new());
 		let sub = base.with_subdir(RelPath::new("dir"));
 		let ev = BlobEvent::new(
 			base.clone(),
@@ -203,9 +203,9 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, AsyncPlugin, StorePlugin))
 			.init_resource::<Changes>();
-		let store = InMemoryStore::new();
+		let store = InMemoryBlobStore::new();
 		let owner = app.world_mut().spawn(store.clone()).id();
-		let sibling = app.world_mut().spawn(InMemoryStore::new()).id();
+		let sibling = app.world_mut().spawn(InMemoryBlobStore::new()).id();
 		app.add_systems(
 			Update,
 			move |stores: Query<Entity, Changed<BlobStore>>,
@@ -248,7 +248,7 @@ mod test {
 		app.world_mut()
 			.add_observer(move |ev: On<BlobEvent>| captor.push(ev.kind));
 		// spawning the store subscribes its watcher; the first update flushes it
-		let store = InMemoryStore::new();
+		let store = InMemoryBlobStore::new();
 		app.world_mut().spawn(store.clone());
 		app.update();
 

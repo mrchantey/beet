@@ -3,7 +3,6 @@ use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::json;
 
 /// An S3 bucket, declared once and read by both meanings of the declaration:
 /// the deploy creates it, and the runtime attaches the store its erased half
@@ -427,7 +426,7 @@ impl S3BucketBlock {
 			stack.resource_ident(format!("{}-policy", self.label)),
 			AwsS3BucketPolicyDetails {
 				bucket: bucket.field_ref("id").into(),
-				policy: json!({
+				policy: value!({
 					"Version": "2012-10-17",
 					"Statement": [{
 						"Sid": "PublicReadGetObject",
@@ -444,7 +443,7 @@ impl S3BucketBlock {
 						"Resource": bucket.field_ref("arn").to_string()
 					}]
 				})
-				.to_string()
+				.to_json_string()
 				.into(),
 				// the policy is rejected until the public-access-block lifts the
 				// account/bucket default block on public policies.

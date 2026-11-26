@@ -137,7 +137,7 @@ impl CompletionsStreamer {
 								&tool_def,
 							)
 						})
-						.collect::<Vec<_>>();
+						.collect::<Result<Vec<_>>>()?;
 
 					let tool_choice =
 						query.tool_choice(actor_entity).map(|choice| {
@@ -299,7 +299,7 @@ where
 					return Poll::Ready(None);
 				}
 
-				let chunk = match serde_json::from_str::<
+				let chunk = match json_ext::from_str::<
 					CreateChatCompletionStreamResponse,
 				>(&event.data)
 				{

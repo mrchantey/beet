@@ -271,8 +271,7 @@ mod tests {
 	fn passphrase_emits_pbkdf2_aes_gcm() {
 		let json = StateEncryption::passphrase("TF_STATE_PASSPHRASE")
 			.to_json()
-			.unwrap()
-			.into_json();
+			.unwrap();
 		json["key_provider"]["pbkdf2"]["main"]["passphrase"]
 			.as_str()
 			.unwrap()
@@ -297,8 +296,7 @@ mod tests {
 		let json = StateEncryption::passphrase("TF_STATE_PASSPHRASE")
 			.crossing(StateCrossing::FromPlaintext)
 			.to_json()
-			.unwrap()
-			.into_json();
+			.unwrap();
 		json["state"]["method"]
 			.as_str()
 			.unwrap()
@@ -309,7 +307,7 @@ mod tests {
 			.xpect_eq("method.unencrypted.migrate");
 		// one key provider: nothing names a second passphrase
 		json["key_provider"]["pbkdf2"]
-			.as_object()
+			.as_map()
 			.unwrap()
 			.keys()
 			.collect::<Vec<_>>()
@@ -325,8 +323,7 @@ mod tests {
 		let json = StateEncryption::passphrase("TF_STATE_PASSPHRASE")
 			.crossing(StateCrossing::FromRetiring("OLD".into()))
 			.to_json()
-			.unwrap()
-			.into_json();
+			.unwrap();
 		json["key_provider"]["pbkdf2"]["main"]["passphrase"]
 			.as_str()
 			.unwrap()
@@ -361,8 +358,7 @@ mod tests {
 		let json = StateEncryption::passphrase("TF_STATE_PASSPHRASE")
 			.crossing(StateCrossing::FromSecondary)
 			.to_json()
-			.unwrap()
-			.into_json();
+			.unwrap();
 		for key in ["main", "next"] {
 			json["key_provider"]["pbkdf2"][key]["passphrase"]
 				.as_str()

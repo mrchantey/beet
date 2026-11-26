@@ -119,9 +119,7 @@ mod test {
 	#[beet_core::test]
 	fn round_trips_a_pds_post() {
 		let json = r#"{"$type":"app.bsky.feed.post","createdAt":"2026-09-23T15:22:16.682Z","langs":["en"],"reply":{"parent":{"cid":"bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza","uri":"at://did:plc:y2aci3l7tvrs3vuoz6tou2eb/app.bsky.feed.post/3mw5t5lac4k2y"},"root":{"cid":"bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza","uri":"at://did:plc:y2aci3l7tvrs3vuoz6tou2eb/app.bsky.feed.post/3mw5t5lac4k2y"}},"text":"hi"}"#;
-		let value =
-			AtprotoValue::from_json(serde_json::from_str(json).unwrap())
-				.unwrap();
+		let value = AtprotoValue::parse_json(json).unwrap();
 		let post = value.clone().into_serde::<FeedPost>().unwrap();
 		post.reply
 			.as_ref()

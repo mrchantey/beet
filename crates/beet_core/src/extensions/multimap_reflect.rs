@@ -510,18 +510,10 @@ fn parse_leaf_literal(
 /// The object or list a param's text spells as JSON, `None` for any other
 /// text, a scalar included, which reads as written.
 fn json_structure(text: &str) -> Option<Value> {
-	cfg_if! {
-		if #[cfg(feature = "json")] {
-			text.trim_start()
-				.starts_with(['{', '['])
-				.then(|| serde_json::from_str::<serde_json::Value>(text).ok())
-				.flatten()
-				.map(Value::from_json)
-		} else {
-			let _ = text;
-			None
-		}
-	}
+	text.trim_start()
+		.starts_with(['{', '['])
+		.then(|| Value::parse_json(text).ok())
+		.flatten()
 }
 
 /// Every value under a list field's key, each parsed as one item: through the
@@ -980,7 +972,6 @@ mod test {
 
 	/// A `Value` param keeps the structure its JSON text spells, and reads any
 	/// other text as written.
-	#[cfg(feature = "json")]
 	#[crate::test]
 	fn value_param_reads_json_structure() {
 		#[derive(Debug, Reflect)]

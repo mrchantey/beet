@@ -18,12 +18,12 @@ default = ["std", "reflect"]
 # spawns (process + cwd/env), itself native-only (it pulls async-process/notify).
 std = ["beet_core/std", "beet_core/fs", "rquickjs?/std"]
 serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
-json = ["serde", "dep:serde_json", "beet_core/json"]
+json = ["serde", "beet_core/json"]
 reflect = ["beet_core/bevy_reflect_documentation"]
 # The engine-agnostic `Script` / `ScriptAction` surface: a JavaScript program as
 # data, plus the backend selection that runs it. A `Script` always marshals its
 # input/output, and JSON is the wire currency of every backend, so this pulls
-# `json` (serde_json, `no_std` with alloc) rather than leaving a half-built
+# `json` (beet_core's own reader and writer, `no_std` with alloc) rather than leaving a half-built
 # `Script` that cannot talk to any of them. Backend-free on its own: a build with
 # `scripting` and no backend compiles, and errors when a script is run.
 # The remaining `dep:` entries are the host-realm backends' transports (async
@@ -57,7 +57,6 @@ futures-lite = { workspace = true, optional = true }
 extend.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
 rquickjs = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

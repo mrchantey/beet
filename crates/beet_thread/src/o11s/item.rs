@@ -163,15 +163,15 @@ impl FunctionCall {
 	/// Parses the arguments JSON string into a value.
 	pub fn parse_arguments<T: serde::de::DeserializeOwned>(
 		&self,
-	) -> Result<T, serde_json::Error> {
-		serde_json::from_str(&self.arguments)
+	) -> beet_core::prelude::Result<T> {
+		beet_core::prelude::json_ext::from_str(&self.arguments)
 	}
 
 	/// Parses the arguments as a generic JSON value.
 	pub fn arguments_value(
 		&self,
-	) -> Result<serde_json::Value, serde_json::Error> {
-		serde_json::from_str(&self.arguments)
+	) -> beet_core::prelude::Result<beet_core::prelude::Value> {
+		beet_core::prelude::Value::parse_json(&self.arguments)
 	}
 }
 
@@ -255,6 +255,8 @@ impl ReasoningItem {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_core::prelude::Value;
+	use beet_core::prelude::json_ext;
 
 	#[beet_core::test]
 	fn deserializes_message_item() {
@@ -273,7 +275,7 @@ mod test {
 			]
 		}"#;
 
-		let item: OutputItem = serde_json::from_str(json).unwrap();
+		let item: OutputItem = json_ext::from_str(json).unwrap();
 		assert!(matches!(item, OutputItem::Message(_)));
 		if let OutputItem::Message(msg) = item {
 			assert_eq!(msg.id, "msg_123");
@@ -292,12 +294,12 @@ mod test {
 			"status": "completed"
 		}"#;
 
-		let item: OutputItem = serde_json::from_str(json).unwrap();
+		let item: OutputItem = json_ext::from_str(json).unwrap();
 		assert!(matches!(item, OutputItem::FunctionCall(_)));
 		if let OutputItem::FunctionCall(fc) = item {
 			assert_eq!(fc.name, "get_weather");
-			let args: serde_json::Value = fc.parse_arguments().unwrap();
-			assert_eq!(args["location"], "NYC");
+			let args: Value = fc.parse_arguments().unwrap();
+			assert_eq!(args["location"], Value::str("NYC"));
 		}
 	}
 

@@ -7,7 +7,6 @@ use crate::actions::cloudflare_api_ext::API_BASE;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
 
 /// `<CloudflareDeployCredential/>`: the entry's Cloudflare deploy credential,
 /// declared at the entry's root like `<Secrets/>`, and every Cloudflare token
@@ -458,7 +457,7 @@ impl CloudflareDeployCredential {
 		};
 		format!(
 			"token {name}\n{home}\n{terms}\n\n{lowered}{elevated}\nbody\n{}\n",
-			serde_json::to_string_pretty(&terms.body(name, lowered.to_json()))?,
+			terms.body(name, lowered.to_json()).to_json_pretty(),
 		)
 		.xok()
 	}
@@ -698,7 +697,7 @@ impl CloudflareDeployCredential {
 	async fn holds(account: &str, held: Option<&str>, id: &str) -> bool {
 		let Some(held) = held else { return false };
 		match Self::verify(account, held).await {
-			Ok(Some(body)) => body["result"]["id"] == id,
+			Ok(Some(body)) => body["result"]["id"].as_str().ok() == Some(id),
 			Ok(None) => true,
 			Err(_) => false,
 		}
@@ -712,7 +711,9 @@ impl CloudflareDeployCredential {
 			.await
 			.ok()
 			.flatten()
-			.and_then(|body| body["result"]["id"].as_str().map(SmolStr::from))
+			.and_then(|body| {
+				body["result"]["id"].as_str().ok().map(SmolStr::from)
+			})
 	}
 
 	/// `value` verified at the account, `None` when the endpoint does not
@@ -882,8 +883,8 @@ impl CloudflareDeployCredential {
 		let (id, value) = mint
 			.create_token(
 				&account,
-				serde_json::json!({
-					"name": name,
+				value!({
+					"name": &name,
 					"policies": block.token_policies(stack)?,
 				}),
 			)
@@ -1095,15 +1096,18 @@ impl MintToken {
 				.await?;
 			found.extend(
 				body["result"]
-					.as_array()
+					.as_list()
+					.ok()
 					.map(Vec::as_slice)
 					.unwrap_or_default()
 					.iter()
-					.filter(|token| token["name"] == name)
+					.filter(|token| token["name"].as_str().ok() == Some(name))
 					.filter_map(HeldToken::parse),
 			);
-			let pages =
-				body["result_info"]["total_pages"].as_u64().unwrap_or(1);
+			let pages = body["result_info"]["total_pages"]
+				.as_u64()
+				.ok()
+				.unwrap_or(1);
 			if page >= pages.max(1) {
 				break;
 			}
@@ -1120,7 +1124,7 @@ impl MintToken {
 		account: &str,
 		body: Value,
 	) -> Result<(SmolStr, SmolStr)> {
-		let name = body["name"].as_str().unwrap_or_default().to_string();
+		let name = body["name"].as_str().ok().unwrap_or_default().to_string();
 		let response =
 			Request::post(format!("{API_BASE}/accounts/{account}/tokens"))
 				.with_auth_bearer(&self.0)
@@ -1128,19 +1132,18 @@ impl MintToken {
 				.send()
 				.await?;
 		let status = response.status();
-		let body = serde_json::from_str::<Value>(
-			&response.text().await.unwrap_or_default(),
-		)
-		.unwrap_or_default();
-		if !status.is_ok() || body["success"] != true {
+		let body =
+			Value::parse_json(&response.text().await.unwrap_or_default())
+				.unwrap_or_default();
+		if !status.is_ok() || body["success"].as_bool().ok() != Some(true) {
 			bevybail!(
 				"minting the token failed: {status} - {}",
 				cloudflare_api_ext::error_messages(&body),
 			);
 		}
 		match (
-			body["result"]["id"].as_str(),
-			body["result"]["value"].as_str(),
+			body["result"]["id"].as_str().ok(),
+			body["result"]["value"].as_str().ok(),
 		) {
 			(Some(id), Some(value)) => {
 				(SmolStr::new(id), SmolStr::new(value)).xok()
@@ -1434,18 +1437,18 @@ impl TokenTerms {
 	/// The create body of a token named `name` granting `policies` under
 	/// these terms.
 	fn body(&self, name: &str, policies: Value) -> Value {
-		let mut body = serde_json::json!({
-			"name": name,
-			"policies": policies,
-		});
+		let mut body =
+			Map::new([("name", Value::from(name)), ("policies", policies)]);
 		if let Some(expires_on) = self.expires_on {
-			body["expires_on"] = expires_on.format_iso8601_secs().into();
+			body.insert("expires_on", expires_on.format_iso8601_secs());
 		}
 		if !self.request_ips.is_empty() {
-			body["condition"] =
-				serde_json::json!({ "request_ip": { "in": self.request_ips } });
+			body.insert(
+				"condition",
+				value!({ "request_ip": { "in": Value::new_list(&self.request_ips) } }),
+			);
 		}
-		body
+		Value::Map(body)
 	}
 }
 
@@ -1495,21 +1498,23 @@ struct HeldToken {
 impl HeldToken {
 	fn parse(listed: &Value) -> Option<Self> {
 		let mut request_ips = listed["condition"]["request_ip"]["in"]
-			.as_array()
+			.as_list()
+			.ok()
 			.map(Vec::as_slice)
 			.unwrap_or_default()
 			.iter()
-			.filter_map(Value::as_str)
+			.filter_map(|item| item.as_str().ok())
 			.filter_map(|cidr| TokenTerms::cidr(cidr).ok())
 			.collect::<Vec<_>>();
 		request_ips.sort();
 		request_ips.dedup();
 		Self {
-			id: listed["id"].as_str()?.into(),
+			id: listed["id"].as_str().ok()?.into(),
 			policies: listed["policies"].clone(),
-			active: listed["status"] == "active",
+			active: listed["status"].as_str().ok() == Some("active"),
 			expires_on: listed["expires_on"]
 				.as_str()
+				.ok()
 				.and_then(Timestamp::parse_rfc3339),
 			request_ips,
 		}
@@ -1630,7 +1635,7 @@ mod test {
 	#[beet_core::test]
 	fn retires_the_token_the_record_held_under_another_name() {
 		let named = |id: &str| {
-			super::HeldToken::parse(&serde_json::json!({
+			super::HeldToken::parse(&value!({
 				"id": id,
 				"status": "active",
 				"policies": [],
@@ -1733,12 +1738,12 @@ mod test {
 		expires_on: Option<&str>,
 		request_ips: &[&str],
 	) -> super::HeldToken {
-		super::HeldToken::parse(&serde_json::json!({
+		super::HeldToken::parse(&value!({
 			"id": "abc",
 			"status": "active",
 			"policies": [],
 			"expires_on": expires_on,
-			"condition": { "request_ip": { "in": request_ips } },
+			"condition": { "request_ip": { "in": Value::new_list(request_ips.iter().copied()) } },
 		}))
 		.unwrap()
 	}
@@ -1750,12 +1755,12 @@ mod test {
 	fn the_body_carries_the_terms() {
 		let body = super::TokenTerms::new(None, &[], minted_at())
 			.unwrap()
-			.body("beet-deploy", serde_json::json!([]));
+			.body("beet-deploy", value!([]));
 		body.get("expires_on").xpect_none();
 		body.get("condition").xpect_none();
 		let terms = super::TokenTerms::new(Some(90), &[], minted_at()).unwrap();
-		let body = terms.body("beet-deploy", serde_json::json!([]));
-		body["expires_on"].xpect_eq("2027-01-05T00:00:00Z");
+		let body = terms.body("beet-deploy", value!([]));
+		body["expires_on"].xpect_eq(value!("2027-01-05T00:00:00Z"));
 		body.get("condition").xpect_none();
 		let terms = super::TokenTerms::new(
 			Some(90),
@@ -1763,8 +1768,8 @@ mod test {
 			minted_at(),
 		)
 		.unwrap();
-		terms.body("beet-deploy", serde_json::json!([]))["condition"].xpect_eq(
-			serde_json::json!({ "request_ip": { "in": [
+		terms.body("beet-deploy", value!([]))["condition"].xpect_eq(
+			value!({ "request_ip": { "in": [
 				"203.0.113.7/32",
 				"2606:4700::/32",
 			]}}),
@@ -1773,9 +1778,10 @@ mod test {
 		// the second, however long the deploy token lasts
 		let elevated = terms
 			.elevated(minted_at() + Duration::from_millis(1_500))
-			.body("beet-elevated", serde_json::json!([]));
-		elevated["expires_on"].xpect_eq("2026-10-07T16:00:01Z");
-		elevated["condition"]["request_ip"]["in"][0].xpect_eq("203.0.113.7/32");
+			.body("beet-elevated", value!([]));
+		elevated["expires_on"].xpect_eq(value!("2026-10-07T16:00:01Z"));
+		elevated["condition"]["request_ip"]["in"][0]
+			.xpect_eq(value!("203.0.113.7/32"));
 	}
 
 	/// A lifetime the renewal notice would mostly swallow is refused naming

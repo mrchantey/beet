@@ -1,7 +1,6 @@
 use crate::bindings::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde_json::json;
 
 /// Container image base to use for the Fargate task.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -618,23 +617,23 @@ impl FargateBlock {
 
 		// Task definition. The http port is always mapped; the ssh port only
 		// when `allow_ssh`.
-		let mut port_mappings = vec![json!({
+		let mut port_mappings = vec![value!({
 			"containerPort": self.container_port,
 			"protocol": "tcp"
 		})];
 		if self.allow_ssh {
-			port_mappings.push(json!({
+			port_mappings.push(value!({
 				"containerPort": self.ssh_container_port,
 				"protocol": "tcp"
 			}));
 		}
-		let container_defs = json!([{
+		let container_defs = value!([{
 			"name": self.label.to_string(),
 			"image": self.container_image_uri(deployment, &ecr_url_ref),
 			"essential": true,
 			"portMappings": port_mappings,
 			"environment": env_vars.iter().map(|(k, v)| {
-				json!({ "name": k, "value": v })
+				value!({ "name": k, "value": v })
 			}).collect::<Vec<_>>(),
 			"logConfiguration": {
 				"logDriver": "awslogs",
@@ -645,7 +644,7 @@ impl FargateBlock {
 				}
 			}
 		}])
-		.to_string();
+		.to_json_string();
 		let task_def = terra::ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("task-def")),
 			AwsEcsTaskDefinitionDetails {
@@ -970,7 +969,7 @@ fn forward_to(
 
 /// The ECS-tasks `sts:AssumeRole` trust policy, shared by the exec + task roles.
 fn ecs_assume_role_policy() -> SmolStr {
-	json!({
+	value!({
 		"Version": "2012-10-17",
 		"Statement": [{
 			"Action": "sts:AssumeRole",
@@ -978,7 +977,7 @@ fn ecs_assume_role_policy() -> SmolStr {
 			"Principal": { "Service": "ecs-tasks.amazonaws.com" }
 		}]
 	})
-	.to_string()
+	.to_json_string()
 	.into()
 }
 

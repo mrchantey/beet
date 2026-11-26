@@ -37,7 +37,7 @@ pub(crate) async fn serve_with(
 	call: &str,
 	config: ScriptConfig,
 ) -> WorldReply {
-	let call = serde_json::from_str::<WorldCall>(call).unwrap();
+	let call = json_ext::from_str::<WorldCall>(call).unwrap();
 	world
 		.run_async_then(move |world| async move {
 			WorldBridge::new(world, config).serve(call).await

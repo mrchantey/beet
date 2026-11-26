@@ -449,14 +449,12 @@ mod test {
 		}
 	}
 
-	impl BlobStoreProvider for FailingStore {
-		fn box_clone(&self) -> Box<dyn BlobStoreProvider> {
+	impl BlobProvider for FailingStore {
+		fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
+		fn with_subdir(&self, _path: RelPath) -> Box<dyn BlobProvider> {
 			Box::new(self.clone())
 		}
-		fn with_subdir(&self, _path: RelPath) -> Box<dyn BlobStoreProvider> {
-			Box::new(self.clone())
-		}
-		fn base(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+		fn base(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 		fn root_key(&self) -> SmolStr { "no-such-store".into() }
 		fn insert(
 			&self,

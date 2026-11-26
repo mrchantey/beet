@@ -53,7 +53,7 @@ impl ScheduledInvoke {
 	/// on every event the function is ever sent.
 	#[cfg(feature = "json")]
 	pub fn from_payload(payload: &[u8]) -> Result<Self> {
-		serde_json::from_slice(payload).map_err(|err| {
+		json_ext::from_slice(payload).map_err(|err| {
 			bevyhow!(
 				"a scheduled invoke delivered a payload this binary cannot dispatch: {err}\npayload: {}",
 				String::from_utf8_lossy(payload)
@@ -82,7 +82,7 @@ mod test {
 	/// adapter dispatches, query params included.
 	#[beet_core::test]
 	fn round_trips_into_a_request() {
-		let json = serde_json::to_string(&ScheduledInvoke::new(
+		let json = json_ext::to_string(&ScheduledInvoke::new(
 			"analytics/rollup?full=true",
 		))
 		.unwrap();

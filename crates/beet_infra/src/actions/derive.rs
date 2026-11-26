@@ -200,7 +200,7 @@ mod test {
 	async fn ensures_the_repo_store_in_the_assembled_copy() {
 		let (deployment, _work_dir) = Deployment::default_local();
 		let (dir, mut world, root) = site(deployment.clone());
-		let elsewhere = BlobStore::temp();
+		let elsewhere = BlobStore::new(InMemoryBlobStore::new());
 		elsewhere
 			.insert(&RelPath::new(SOURCE), "# elsewhere")
 			.await

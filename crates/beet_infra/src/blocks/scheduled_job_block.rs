@@ -5,7 +5,6 @@ use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::json;
 
 /// Run one route on a schedule: a timer, the [`LambdaBlock`] it invokes, and the
 /// request that invoke dispatches.
@@ -225,7 +224,7 @@ impl ScheduledJobBlock {
 		let role = ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("invoke-role")),
 			AwsIamRoleDetails {
-				assume_role_policy: json!({
+				assume_role_policy: value!({
 					"Version": "2012-10-17",
 					"Statement": [{
 						"Action": "sts:AssumeRole",
@@ -233,7 +232,7 @@ impl ScheduledJobBlock {
 						"Principal": { "Service": "scheduler.amazonaws.com" }
 					}]
 				})
-				.to_string()
+				.to_json_string()
 				.into(),
 				// every principal a credentialed deploy creates is capped by its app's
 				// boundary, which is what stops an `iam:*` on this app's names
@@ -250,11 +249,11 @@ impl ScheduledJobBlock {
 				name: Some(policy_ident.primary_identifier().clone()),
 				role: role.field_ref("name").into(),
 				policy: IamPolicy::new(region.clone(), "scheduled job")
-					.statement(json!({
+					.statement(value!({
 						"Sid": "InvokeTarget",
 						"Effect": "Allow",
 						"Action": "lambda:InvokeFunction",
-						"Resource": function_arn
+						"Resource": &function_arn
 					}))
 					.render()?
 					.into(),
@@ -286,7 +285,7 @@ impl ScheduledJobBlock {
 						// the request, rendered by the one type the adapter
 						// deserializes, so tofu never hand-crafts an event
 						input: Some(
-							serde_json::to_string(&self.invoke())?.into(),
+							json_ext::to_string(&self.invoke())?.into(),
 						),
 						..default()
 					},

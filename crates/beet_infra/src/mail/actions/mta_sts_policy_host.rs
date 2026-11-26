@@ -4,7 +4,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::json;
 
 
 
@@ -97,19 +96,19 @@ export default {{
 		worker: &str,
 		policies: &BTreeMap<String, String>,
 	) -> Result<String> {
-		json!({
+		value!({
 			"name": worker,
 			"main": "worker.js",
 			"compatibility_date": wrangler_ext::COMPATIBILITY_DATE,
 			"routes": policies
 				.keys()
-				.map(|host| json!({ "pattern": host, "custom_domain": true }))
+				.map(|host| value!({ "pattern": host, "custom_domain": true }))
 				.collect::<Vec<_>>(),
 			"vars": {
-				Self::POLICIES_VAR: serde_json::to_string(policies)?,
+				(Self::POLICIES_VAR): json_ext::to_string(policies)?,
 			},
 		})
-		.xmap(|config| serde_json::to_string_pretty(&config))?
+		.to_json_pretty()
 		.xok()
 	}
 }

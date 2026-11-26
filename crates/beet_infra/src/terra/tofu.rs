@@ -204,14 +204,18 @@ async fn assess(
 fn errors(output: &str) -> Vec<String> {
 	output
 		.lines()
-		.filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-		.filter(|message| message["type"] == "diagnostic")
+		.filter_map(|line| Value::parse_json(line).ok())
+		.filter(|message| message["type"].as_str().ok() == Some("diagnostic"))
 		.map(|message| message["diagnostic"].clone())
-		.filter(|diagnostic| diagnostic["severity"] == "error")
+		.filter(|diagnostic| {
+			diagnostic["severity"].as_str().ok() == Some("error")
+		})
 		.map(|diagnostic| {
-			let summary = diagnostic["summary"].as_str().unwrap_or_default();
+			let summary =
+				diagnostic["summary"].as_str().ok().unwrap_or_default();
 			match diagnostic["detail"]
 				.as_str()
+				.ok()
 				.filter(|detail| !detail.is_empty())
 			{
 				Some(detail) => format!("Error: {summary}\n{detail}"),
@@ -242,17 +246,20 @@ impl PlannedChange {
 	pub fn parse(output: &str) -> Vec<Self> {
 		output
 			.lines()
-			.filter_map(|line| {
-				serde_json::from_str::<serde_json::Value>(line).ok()
+			.filter_map(|line| Value::parse_json(line).ok())
+			.filter(|message| {
+				message["type"].as_str().ok() == Some("planned_change")
 			})
-			.filter(|message| message["type"] == "planned_change")
 			.filter_map(|message| {
 				let change = &message["change"];
 				let resource = &change["resource"];
 				Self {
-					address: resource["addr"].as_str()?.into(),
-					resource_type: resource["resource_type"].as_str()?.into(),
-					action: change["action"].as_str()?.into(),
+					address: resource["addr"].as_str().ok()?.into(),
+					resource_type: resource["resource_type"]
+						.as_str()
+						.ok()?
+						.into(),
+					action: change["action"].as_str().ok()?.into(),
 				}
 				.xmap(Some)
 			})
@@ -484,17 +491,19 @@ pub(crate) mod test_support {
 	) -> Result {
 		let cache = plugin_cache_dir()
 			.ok_or_else(|| bevyhow!("no tofu plugin cache: `HOME` is unset"))?;
-		let config: serde_json::Value = serde_json::from_str(
-			&fs_ext::read_to_string(dir.join("main.tf.json"))?,
-		)?;
+		let config = Value::parse_json(&fs_ext::read_to_string(
+			dir.join("main.tf.json"),
+		)?)?;
 		let required = config["terraform"]["required_providers"]
-			.as_object()
+			.as_map()
+			.ok()
 			.cloned()
 			.unwrap_or_default();
 		for provider in required.values() {
-			let source = provider["source"].as_str().unwrap_or_default();
+			let source = provider["source"].as_str().ok().unwrap_or_default();
 			let version = provider["version"]
 				.as_str()
+				.ok()
 				.unwrap_or_default()
 				.trim_start_matches('=')
 				.trim();
@@ -536,10 +545,10 @@ mod test {
 		let dir = TempDir::new().unwrap();
 		fs_ext::write(
 			dir.join("main.tf.json"),
-			serde_json::json!({
+			value!({
 				"resource": { "terraform_data": { "box": { "input": "box" } } },
 			})
-			.to_string(),
+			.to_json_string(),
 		)
 		.unwrap();
 		test_support::init_offline(&dir, &[]).await.unwrap();
@@ -590,14 +599,14 @@ mod test {
 	#[beet_core::test]
 	fn reads_the_planned_writes() {
 		let change = |addr: &str, kind: &str, action: &str| {
-			serde_json::json!({
+			value!({
 				"type": "planned_change",
 				"change": {
 					"resource": { "addr": addr, "resource_type": kind },
 					"action": action,
 				},
 			})
-			.to_string()
+			.to_json_string()
 		};
 		let output = [
 			r#"{"type":"version","tofu":"1.10.0"}"#.to_string(),
@@ -630,7 +639,7 @@ mod test {
 	#[beet_core::test]
 	fn reads_a_failed_plans_errors() {
 		let diagnostic = |severity: &str, summary: &str, detail: &str| {
-			serde_json::json!({
+			value!({
 				"type": "diagnostic",
 				"diagnostic": {
 					"severity": severity,
@@ -638,7 +647,7 @@ mod test {
 					"detail": detail,
 				},
 			})
-			.to_string()
+			.to_json_string()
 		};
 		let output = [
 			r#"{"type":"version","tofu":"1.10.0"}"#.to_string(),

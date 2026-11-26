@@ -94,7 +94,7 @@ async fn browser_render_boot() {
 	let (colors, width, height) = loop {
 		drain(&console, &mut log);
 		let probe = browser.evaluate_value(PIXEL_PROBE).await.unwrap();
-		if let Some(result) = probe.as_array() {
+		if let Ok(result) = probe.as_list() {
 			// the canvas is claimed; break once pixels are nonuniform (the
 			// first frames may still be clear-color only)
 			let colors = result[0].as_i64().unwrap_or_default();

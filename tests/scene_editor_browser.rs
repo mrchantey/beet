@@ -226,7 +226,7 @@ impl SceneHost {
 		)
 		.await
 		.unwrap()
-		.as_array()
+		.as_list()
 		.unwrap()
 		.iter()
 		.map(|line| line.as_str().unwrap().to_string())
@@ -238,7 +238,8 @@ impl SceneHost {
 		self.evaluate_value(&format!("localStorage.getItem({FORK_MARK:?})"))
 			.await
 			.unwrap()
-			.as_str() == Some("1")
+			.as_str()
+			.ok() == Some("1")
 	}
 
 	/// The fork as the browser's store holds it, read straight out of
@@ -275,7 +276,8 @@ impl SceneHost {
 		.await
 		.unwrap()
 		.as_str()
-		.map(|json| serde_json::from_str(json).unwrap())
+		.ok()
+		.map(|json| Value::parse_json(json).unwrap())
 	}
 
 	/// The fork the browser's store holds, waited for: a write lands off a
@@ -303,7 +305,7 @@ impl SceneHost {
 			}
 		})
 		.await
-		.map(|bytes| serde_json::from_slice(&bytes).unwrap())
+		.map(|bytes| json_ext::from_slice(&bytes).unwrap())
 		.unwrap()
 	}
 
@@ -592,7 +594,8 @@ async fn a_pre_boot_click_lands_after_boot() {
 	.await
 	.unwrap()
 	.as_i64()
-	.xpect_eq(Some(2));
+	.unwrap()
+	.xpect_eq(2);
 	host.painted_clean("/").await;
 	// the replay: the row is selected and the inspector generated for it
 	host.find_containing(".scene-inspector-title", "#2 \"Garden\"")
@@ -682,7 +685,8 @@ async fn a_returning_editor_never_sees_the_published_text() {
 		.await
 		.unwrap()
 		.as_str()
-		.xpect_eq(Some("visible"));
+		.unwrap()
+		.xpect_eq("visible");
 	host.xpect_no_selector(&format!("#{}", PreBoot::STYLE_ID))
 		.await;
 	host.kill().await;

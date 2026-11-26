@@ -251,7 +251,7 @@ impl SqliteStore {
 	}
 
 	/// Run `func` against the pooled connection, off the async executor.
-	pub(super) fn run<T: 'static + Send>(
+	pub(crate) fn run<T: 'static + Send>(
 		&self,
 		func: impl 'static + Send + FnOnce(&Connection) -> Result<T>,
 	) -> SendBoxedFuture<Result<T>> {

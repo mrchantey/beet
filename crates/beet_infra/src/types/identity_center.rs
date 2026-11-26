@@ -5,10 +5,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 use beet_net::prelude::*;
-#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-use serde_json::Value;
-#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-use serde_json::json;
 
 /// The IAM Identity Center instance a package's member accounts are reached
 /// through by a person, ie `{IdentityCenter{region:"us-east-1"}}` beside the
@@ -199,22 +195,25 @@ impl IdentityCenterAdmin {
 	pub async fn instance(&self) -> Result<Option<IdentityCenterInstance>> {
 		let answer = self
 			.sso_admin
-			.call_json("ListInstances", &json!({}))
+			.call_json("ListInstances", &value!({}))
 			.await?;
 		answer["Instances"]
-			.as_array()
+			.as_list()
+			.ok()
 			.into_iter()
 			.flatten()
 			.find(|instance| {
 				instance["Status"]
 					.as_str()
+					.ok()
 					.is_none_or(|status| status == "ACTIVE")
 			})
 			.and_then(|instance| {
 				IdentityCenterInstance {
-					arn: instance["InstanceArn"].as_str()?.into(),
+					arn: instance["InstanceArn"].as_str().ok()?.into(),
 					identity_store_id: instance["IdentityStoreId"]
-						.as_str()?
+						.as_str()
+						.ok()?
 						.into(),
 				}
 				.xsome()
@@ -236,7 +235,7 @@ impl IdentityCenterAdmin {
 			.identity_store
 			.call_json(
 				action,
-				&json!({
+				&value!({
 					"IdentityStoreId": instance.identity_store_id.as_str(),
 					"AlternateIdentifier": {"UniqueAttribute": {
 						"AttributePath": path,
@@ -246,7 +245,9 @@ impl IdentityCenterAdmin {
 			)
 			.await
 		{
-			Ok(answer) => answer[id_field].as_str().map(SmolStr::new).xok(),
+			Ok(answer) => {
+				answer[id_field].as_str().ok().map(SmolStr::new).xok()
+			}
 			Err(err) if AwsError::is(&err, &["ResourceNotFoundException"]) => {
 				None.xok()
 			}
@@ -273,7 +274,7 @@ impl IdentityCenterAdmin {
 		self.identity_store
 			.call_json(
 				"CreateGroup",
-				&json!({
+				&value!({
 					"IdentityStoreId": instance.identity_store_id.as_str(),
 					"DisplayName": name,
 					"Description": "beet: the operators, assigned to every member account",
@@ -281,6 +282,7 @@ impl IdentityCenterAdmin {
 			)
 			.await?["GroupId"]
 			.as_str()
+			.ok()
 			.map(SmolStr::new)
 			.ok_or_else(|| bevyhow!("CreateGroup answered no group id"))
 	}
@@ -306,7 +308,7 @@ impl IdentityCenterAdmin {
 		self.identity_store
 			.call_json(
 				"CreateUser",
-				&json!({
+				&value!({
 					"IdentityStoreId": instance.identity_store_id.as_str(),
 					"UserName": email,
 					"DisplayName": format!("{given} {family}").trim(),
@@ -316,6 +318,7 @@ impl IdentityCenterAdmin {
 			)
 			.await?["UserId"]
 			.as_str()
+			.ok()
 			.map(SmolStr::new)
 			.ok_or_else(|| bevyhow!("CreateUser answered no user id"))
 	}
@@ -328,7 +331,7 @@ impl IdentityCenterAdmin {
 		group: &str,
 		user: &str,
 	) -> Result<bool> {
-		let body = json!({
+		let body = value!({
 			"IdentityStoreId": instance.identity_store_id.as_str(),
 			"GroupId": group,
 			"MemberId": {"UserId": user},
@@ -356,35 +359,38 @@ impl IdentityCenterAdmin {
 	) -> Result<Option<SmolStr>> {
 		let mut next: Option<String> = None;
 		loop {
-			let mut body = json!({"InstanceArn": instance.arn.as_str()});
+			let mut body = value!({"InstanceArn": instance.arn.as_str()});
 			if let Some(token) = next.take() {
-				body["NextToken"] = json!(token);
+				body.insert("NextToken", token)?;
 			}
 			let page = self
 				.sso_admin
 				.call_json("ListPermissionSets", &body)
 				.await?;
 			for arn in page["PermissionSets"]
-				.as_array()
+				.as_list()
+				.ok()
 				.into_iter()
 				.flatten()
-				.filter_map(Value::as_str)
+				.filter_map(|item| item.as_str().ok())
 			{
 				let described = self
 					.sso_admin
 					.call_json(
 						"DescribePermissionSet",
-						&json!({
+						&value!({
 							"InstanceArn": instance.arn.as_str(),
 							"PermissionSetArn": arn,
 						}),
 					)
 					.await?;
-				if described["PermissionSet"]["Name"] == name {
+				if described["PermissionSet"]["Name"].as_str().ok()
+					== Some(name)
+				{
 					return Some(SmolStr::new(arn)).xok();
 				}
 			}
-			match page["NextToken"].as_str() {
+			match page["NextToken"].as_str().ok() {
 				Some(token) => next = Some(token.to_string()),
 				None => return None.xok(),
 			}
@@ -400,7 +406,7 @@ impl IdentityCenterAdmin {
 		self.sso_admin
 			.call_json(
 				"CreatePermissionSet",
-				&json!({
+				&value!({
 					"InstanceArn": instance.arn.as_str(),
 					"Name": spec.name,
 					"Description": spec.description,
@@ -409,6 +415,7 @@ impl IdentityCenterAdmin {
 			)
 			.await?["PermissionSet"]["PermissionSetArn"]
 			.as_str()
+			.ok()
 			.map(SmolStr::new)
 			.ok_or_else(|| bevyhow!("CreatePermissionSet answered no arn"))
 	}
@@ -425,24 +432,25 @@ impl IdentityCenterAdmin {
 			.sso_admin
 			.call_json(
 				"ListManagedPoliciesInPermissionSet",
-				&json!({
+				&value!({
 					"InstanceArn": instance.arn.as_str(),
 					"PermissionSetArn": set,
 				}),
 			)
 			.await?;
 		if held["AttachedManagedPolicies"]
-			.as_array()
+			.as_list()
+			.ok()
 			.into_iter()
 			.flatten()
-			.any(|attached| attached["Arn"] == policy)
+			.any(|attached| attached["Arn"].as_str().ok() == Some(policy))
 		{
 			return false.xok();
 		}
 		self.sso_admin
 			.call_json(
 				"AttachManagedPolicyToPermissionSet",
-				&json!({
+				&value!({
 					"InstanceArn": instance.arn.as_str(),
 					"PermissionSetArn": set,
 					"ManagedPolicyArn": policy,
@@ -463,7 +471,7 @@ impl IdentityCenterAdmin {
 			.sso_admin
 			.call_json(
 				"ProvisionPermissionSet",
-				&json!({
+				&value!({
 					"InstanceArn": instance.arn.as_str(),
 					"PermissionSetArn": set,
 					"TargetType": "ALL_PROVISIONED_ACCOUNTS",
@@ -471,13 +479,13 @@ impl IdentityCenterAdmin {
 			)
 			.await?;
 		let status = &started["PermissionSetProvisioningStatus"];
-		let Some(request) = status["RequestId"].as_str() else {
+		let Some(request) = status["RequestId"].as_str().ok() else {
 			bevybail!("ProvisionPermissionSet answered no request id");
 		};
 		self.settle(
 			status.clone(),
 			"DescribePermissionSetProvisioningStatus",
-			json!({
+			value!({
 				"InstanceArn": instance.arn.as_str(),
 				"ProvisionPermissionSetRequestId": request,
 			}),
@@ -496,29 +504,31 @@ impl IdentityCenterAdmin {
 	) -> Result<bool> {
 		let mut next: Option<String> = None;
 		loop {
-			let mut body = json!({
+			let mut body = value!({
 				"InstanceArn": instance.arn.as_str(),
 				"AccountId": account,
 				"PermissionSetArn": set,
 			});
 			if let Some(token) = next.take() {
-				body["NextToken"] = json!(token);
+				body.insert("NextToken", token)?;
 			}
 			let page = self
 				.sso_admin
 				.call_json("ListAccountAssignments", &body)
 				.await?;
 			if page["AccountAssignments"]
-				.as_array()
+				.as_list()
+				.ok()
 				.into_iter()
 				.flatten()
 				.any(|assignment| {
-					assignment["PrincipalType"] == "GROUP"
-						&& assignment["PrincipalId"] == group
+					assignment["PrincipalType"].as_str().ok() == Some("GROUP")
+						&& assignment["PrincipalId"].as_str().ok()
+							== Some(group)
 				}) {
 				return true.xok();
 			}
-			match page["NextToken"].as_str() {
+			match page["NextToken"].as_str().ok() {
 				Some(token) => next = Some(token.to_string()),
 				None => return false.xok(),
 			}
@@ -553,7 +563,7 @@ impl IdentityCenterAdmin {
 			.sso_admin
 			.call_json(
 				action,
-				&json!({
+				&value!({
 					"InstanceArn": instance.arn.as_str(),
 					"TargetId": account,
 					"TargetType": "AWS_ACCOUNT",
@@ -564,11 +574,11 @@ impl IdentityCenterAdmin {
 			)
 			.await?;
 		let status = &started[status_field];
-		let Some(request) = status["RequestId"].as_str() else {
+		let Some(request) = status["RequestId"].as_str().ok() else {
 			bevybail!("{action} answered no request id");
 		};
-		let mut query = json!({"InstanceArn": instance.arn.as_str()});
-		query[request_field] = json!(request);
+		let mut query = value!({"InstanceArn": instance.arn.as_str()});
+		query.insert(request_field, request)?;
 		self.settle(status.clone(), describe, query, status_field)
 			.await
 	}
@@ -583,12 +593,13 @@ impl IdentityCenterAdmin {
 		field: &str,
 	) -> Result {
 		for _ in 0..60 {
-			match status["Status"].as_str().unwrap_or_default() {
+			match status["Status"].as_str().ok().unwrap_or_default() {
 				"SUCCEEDED" => return OK,
 				"FAILED" => bevybail!(
 					"{describe} failed: {}",
 					status["FailureReason"]
 						.as_str()
+						.ok()
 						.unwrap_or("no reason given")
 				),
 				_ => {

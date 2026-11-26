@@ -129,7 +129,7 @@ mod test {
 	</CreateActor>
 </Thread>
 "#;
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let thread = BsxParser::spawn(app.world_mut(), source).unwrap();
 		app.world_mut().entity_mut(thread).insert(store.clone());
 		app.update();

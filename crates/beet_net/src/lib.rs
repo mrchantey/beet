@@ -22,8 +22,8 @@ pub use types::headers;
 // path, and the `Request::set_http_client` transport hook) compiles unconditionally —
 // the concrete transports (reqwest/ureq/web-sys/file) stay feature-gated.
 mod client;
-// `store` is no_std-capable at its core (BlobStore, BlobStoreProvider,
-// InMemoryStore, StorePlugin's path resolution); the concrete backends
+// `store` is no_std-capable at its core (BlobStore, BlobProvider,
+// InMemoryBlobStore, StorePlugin's path resolution); the concrete backends
 // (fs/s3/dynamo/local-storage) stay feature/std-gated inside the module.
 mod store;
 // The action/exchange integration (`exchange_ext::handler`, …) only needs
@@ -141,7 +141,7 @@ pub mod prelude {
 /// Re-exports of dependency crates for downstream use.
 pub mod exports {
 	pub use bevy::tasks::futures_lite;
-	/// `BlobStoreProvider::insert` takes a [`bytes::Bytes`], so implementing a
+	/// `BlobProvider::insert` takes a [`bytes::Bytes`], so implementing a
 	/// store backend outside this crate needs the same `bytes` version.
 	pub use bytes;
 	#[cfg(feature = "http")]

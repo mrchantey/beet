@@ -83,26 +83,28 @@ impl MemberAccount {
 		let mut next_token: Option<String> = None;
 		loop {
 			let body = match next_token.take() {
-				Some(token) => serde_json::json!({"NextToken": token}),
-				None => serde_json::json!({}),
+				Some(token) => value!({"NextToken": token}),
+				None => value!({}),
 			};
 			let page = organizations.call_json("ListAccounts", &body).await?;
 			ids.extend(
 				page["Accounts"]
-					.as_array()
+					.as_list()
 					.into_iter()
 					.flatten()
 					.filter(|account| {
-						account["Name"] == name
-							&& (account["State"] == "ACTIVE"
-								|| account["Status"] == "ACTIVE")
+						account["Name"].as_str().ok() == Some(name)
+							&& (account["State"].as_str().ok()
+								== Some("ACTIVE") || account["Status"]
+								.as_str()
+								.ok() == Some("ACTIVE"))
 					})
-					.filter_map(|account| account["Id"].as_str())
+					.filter_map(|account| account["Id"].as_str().ok())
 					.map(SmolStr::new),
 			);
 			match page["NextToken"].as_str() {
-				Some(token) => next_token = Some(token.to_string()),
-				None => break,
+				Ok(token) => next_token = Some(token.to_string()),
+				Err(_) => break,
 			}
 		}
 		match ids.as_slice() {

@@ -36,8 +36,8 @@ fn parse(text: &str) -> Value {
 
 /// The file keys in **file order**, read back as a [`SceneBody`].
 ///
-/// A `serde_json::Value` would lose that order (its map sorts keys as
-/// strings, so `"10"` lands before `"2"`), and order is the children-order
+/// A map sorted by key would lose that order (keys sort as strings, so
+/// `"10"` lands before `"2"`), and order is the children-order
 /// contract: the build path applies each `ChildOf` in file order, so file
 /// order *is* child order.
 fn entity_keys(json: &str) -> Vec<String> {

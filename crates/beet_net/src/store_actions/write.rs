@@ -99,17 +99,21 @@ mod test {
 	#[beet_core::test]
 	async fn writes_bytes() {
 		let bytes = vec![0, 159, 146, 150];
-		write(&BlobStore::temp(), WriteBlob, WriteBlobProps {
-			path: RelPath::from("file.bin"),
-			bytes: bytes.clone(),
-		})
+		write(
+			&BlobStore::new(InMemoryBlobStore::new()),
+			WriteBlob,
+			WriteBlobProps {
+				path: RelPath::from("file.bin"),
+				bytes: bytes.clone(),
+			},
+		)
 		.await
 		.xpect_eq(bytes);
 	}
 
 	#[beet_core::test]
 	async fn writes_text_over_bytes() {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		store
 			.insert(&RelPath::from("file.bin"), vec![1, 2])
 			.await

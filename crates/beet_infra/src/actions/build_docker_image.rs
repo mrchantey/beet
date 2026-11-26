@@ -226,12 +226,13 @@ impl EcrRegistry {
 			.client
 			.call_json(
 				"DescribeRepositories",
-				&serde_json::json!({ "repositoryNames": [name] }),
+				&value!({ "repositoryNames": [name] }),
 			)
 			.await;
 		match answer {
 			Ok(answer) => answer["repositories"][0]["repositoryUri"]
 				.as_str()
+				.ok()
 				.map(ToString::to_string)
 				.ok_or_else(|| {
 					bevyhow!("ECR answered no uri for repository {name}")
@@ -252,16 +253,18 @@ impl EcrRegistry {
 	async fn login(&self) -> Result<EcrLogin> {
 		let answer = self
 			.client
-			.call_json("GetAuthorizationToken", &serde_json::json!({}))
+			.call_json("GetAuthorizationToken", &value!({}))
 			.await?;
 		let data = &answer["authorizationData"][0];
 		let registry = data["proxyEndpoint"]
 			.as_str()
+			.ok()
 			.ok_or_else(|| bevyhow!("ECR answered no registry endpoint"))?
 			.trim_start_matches("https://")
 			.to_string();
 		let token = data["authorizationToken"]
 			.as_str()
+			.ok()
 			.ok_or_else(|| bevyhow!("ECR answered no authorization token"))?;
 		let password = Self::decode_token(token)?
 			.strip_prefix("AWS:")
@@ -323,8 +326,6 @@ impl BuildDockerImage {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use serde_json::Value;
-	use serde_json::json;
 	use std::sync::Arc;
 	use std::sync::Mutex;
 
@@ -349,7 +350,7 @@ mod tests {
 						.first_raw("x-amz-target")
 						.unwrap_or_default()
 						.to_string();
-					let body = serde_json::from_slice::<Value>(
+					let body = json_ext::from_slice::<Value>(
 						&request.body.into_bytes().await?,
 					)?;
 					let response = answer(&target, &body);
@@ -366,24 +367,25 @@ mod tests {
 	/// as terraform's to create.
 	#[beet_core::test]
 	async fn finds_the_repository() {
-		let (ecr, calls) =
-			registry(|_, body| match body["repositoryNames"][0].as_str() {
+		let (ecr, calls) = registry(|_, body| {
+			match body["repositoryNames"][0].as_str().ok() {
 				Some("beetmash-prod--ecr") => Response::ok().with_body(
-					json!({ "repositories": [{
+					value!({ "repositories": [{
 						"repositoryName": "beetmash-prod--ecr",
 						"repositoryUri": format!("{REGISTRY}/beetmash-prod--ecr"),
 						"registryId": "123456789012",
 					}]})
-					.to_string(),
+					.to_json_string(),
 				),
 				_ => Response::from_status(StatusCode::BAD_REQUEST).with_body(
-					json!({
+					value!({
 						"__type": "RepositoryNotFoundException",
 						"message": "The repository does not exist",
 					})
-					.to_string(),
+					.to_json_string(),
 				),
-			});
+			}
+		});
 		ecr.repository_uri("beetmash-prod--ecr")
 			.await
 			.unwrap()
@@ -396,7 +398,7 @@ mod tests {
 		calls.lock().unwrap()[0].clone().xpect_eq((
 			"AmazonEC2ContainerRegistry_V20150921.DescribeRepositories"
 				.to_string(),
-			json!({ "repositoryNames": ["beetmash-prod--ecr"] }),
+			value!({ "repositoryNames": ["beetmash-prod--ecr"] }),
 		));
 	}
 
@@ -408,12 +410,12 @@ mod tests {
 		// base64 of `AWS:hunter2`
 		let (ecr, calls) = registry(|_, _| {
 			Response::ok().with_body(
-				json!({ "authorizationData": [{
+				value!({ "authorizationData": [{
 					"authorizationToken": "QVdTOmh1bnRlcjI=",
 					"expiresAt": 1_800_000_000.0,
 					"proxyEndpoint": format!("https://{REGISTRY}"),
 				}]})
-				.to_string(),
+				.to_json_string(),
 			)
 		});
 		let login = ecr.login().await.unwrap();
@@ -433,7 +435,7 @@ mod tests {
 		calls.lock().unwrap()[0].clone().xpect_eq((
 			"AmazonEC2ContainerRegistry_V20150921.GetAuthorizationToken"
 				.to_string(),
-			json!({}),
+			value!({}),
 		));
 	}
 }

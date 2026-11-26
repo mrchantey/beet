@@ -10,8 +10,6 @@ use super::WebElement;
 use super::*;
 use beet_core::prelude::*;
 use bevy::input::keyboard::Key;
-use serde_json::Value;
-use serde_json::json;
 
 /// The WebDriver codepoint for a logical [`Key`], see
 /// <https://www.w3.org/TR/webdriver2/#keyboard-actions>. Characters pass
@@ -44,8 +42,8 @@ fn key_value(key: &Key) -> Result<String> {
 /// A keyDown/keyUp pair for one key value.
 fn key_press(value: &str) -> [Value; 2] {
 	[
-		json!({"type": "keyDown", "value": value}),
-		json!({"type": "keyUp", "value": value}),
+		value!({"type": "keyDown", "value": value}),
+		value!({"type": "keyUp", "value": value}),
 	]
 }
 
@@ -59,7 +57,7 @@ async fn perform(
 	session
 		.command(
 			"input.performActions",
-			json!({
+			value!({
 				"context": context_id,
 				"actions": [{
 					"type": source_type,
@@ -90,14 +88,14 @@ impl WebElement {
 		)
 		.await?;
 		perform(self.session(), self.context_id(), "pointer", vec![
-			json!({
+			value!({
 				"type": "pointerMove",
 				"x": 0,
 				"y": 0,
 				"origin": {"type": "element", "element": self.shared_ref()?},
 			}),
-			json!({"type": "pointerDown", "button": 0}),
-			json!({"type": "pointerUp", "button": 0}),
+			value!({"type": "pointerDown", "button": 0}),
+			value!({"type": "pointerUp", "button": 0}),
 		])
 		.await
 	}
@@ -332,7 +330,8 @@ mod test {
 			.await
 			.unwrap()
 			.as_u64()
-			.xpect_eq(Some("Garden Party".len() as u64));
+			.unwrap()
+			.xpect_eq("Garden Party".len() as u64);
 		page.kill().await.unwrap();
 	}
 

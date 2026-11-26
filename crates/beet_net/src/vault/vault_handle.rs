@@ -19,7 +19,7 @@ use beet_core::prelude::*;
 /// 	let identity = AgeIdentity::generate();
 /// 	let mut identities = AgeIdentityFile::default();
 /// 	identities.push(identity.clone());
-/// 	let vault = VaultHandle::new(BlobStore::temp(), "cert.pem.age")?;
+/// 	let vault = VaultHandle::new(BlobStore::new(InMemoryBlobStore::new()), "cert.pem.age")?;
 /// 	let plaintext = b"-----BEGIN CERTIFICATE-----\n";
 /// 	vault.write(plaintext, &[identity.to_recipient()]).await?;
 /// 	vault.read(&identities).await?.xpect_eq(plaintext.to_vec());
@@ -117,7 +117,7 @@ mod test {
 	#[beet_core::test]
 	async fn writes_then_reads_any_file() {
 		let (identity, identities) = new_identity();
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		let recipients = [identity.to_recipient()];
 		for path in ["cert.pem.age", "keys/id_ed25519.age"] {
 			let vault = VaultHandle::new(store.clone(), path).unwrap();
@@ -146,7 +146,11 @@ mod test {
 	async fn an_unlisted_identity_cannot_open_it() {
 		let (identity, _) = new_identity();
 		let (_, other) = new_identity();
-		let vault = VaultHandle::new(BlobStore::temp(), "a.json.age").unwrap();
+		let vault = VaultHandle::new(
+			BlobStore::new(InMemoryBlobStore::new()),
+			"a.json.age",
+		)
+		.unwrap();
 		vault
 			.write(b"{}", &[identity.to_recipient()])
 			.await

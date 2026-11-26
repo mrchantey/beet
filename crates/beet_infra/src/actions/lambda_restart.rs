@@ -94,9 +94,7 @@ impl LambdaFunction {
 					"UpdateFunctionCode",
 					format!("/2015-03-31/functions/{}/code", self.name),
 				)
-				.with_json(
-					&serde_json::json!({ "S3Bucket": bucket, "S3Key": key }),
-				)?,
+				.with_json(&value!({ "S3Bucket": bucket, "S3Key": key }))?,
 			)
 			.await?;
 		self.xok()
@@ -114,13 +112,14 @@ impl LambdaFunction {
 		};
 		for _ in 0..Self::POLL_ATTEMPTS {
 			let config = self.client.send_json(request()).await?;
-			match config["LastUpdateStatus"].as_str() {
+			match config["LastUpdateStatus"].as_str().ok() {
 				Some("Successful") => return Ok(()),
 				Some("Failed") => bevybail!(
 					"{}: the code update failed: {}",
 					self.name,
 					config["LastUpdateStatusReason"]
 						.as_str()
+						.ok()
 						.unwrap_or("no reason given")
 				),
 				_ => time_ext::sleep(interval).await,
@@ -137,8 +136,6 @@ impl LambdaFunction {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use serde_json::Value;
-	use serde_json::json;
 	use std::sync::Arc;
 	use std::sync::Mutex;
 
@@ -163,20 +160,20 @@ mod tests {
 					let bytes = request.body.into_bytes().await?;
 					let body = match bytes.is_empty() {
 						true => Value::Null,
-						false => serde_json::from_slice(&bytes)?,
+						false => json_ext::from_slice(&bytes)?,
 					};
 					recorded.lock().unwrap().push((method, path, body));
 					let status =
 						statuses.lock().unwrap().next().unwrap_or("InProgress");
 					Response::ok()
 						.with_body(
-							json!({
+							value!({
 								"FunctionName": "beetmash-prod--function",
 								"State": "Active",
 								"LastUpdateStatus": status,
 								"LastUpdateStatusReason": "the zip is not a zip",
 							})
-							.to_string(),
+							.to_json_string(),
 						)
 						.xok()
 				})
@@ -206,7 +203,7 @@ mod tests {
 		calls[0].clone().xpect_eq((
 			HttpMethod::Put,
 			format!("https://lambda.ap-southeast-2.amazonaws.com/2015-03-31/functions/{ARN}/code"),
-			json!({ "S3Bucket": "beetmash-prod--repo", "S3Key": "deploys/abc/lambda.zip" }),
+			value!({ "S3Bucket": "beetmash-prod--repo", "S3Key": "deploys/abc/lambda.zip" }),
 		));
 		calls[3].clone().xpect_eq((
 			HttpMethod::Get,

@@ -187,10 +187,10 @@ impl StoreBackend for SqliteBlobStore {
 	}
 }
 
-impl BlobStoreProvider for SqliteBlobStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
+impl BlobProvider for SqliteBlobStore {
+	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
 		Box::new(Self {
 			path: self.path.clone(),
 			subdir: Some(match &self.subdir {
@@ -200,7 +200,7 @@ impl BlobStoreProvider for SqliteBlobStore {
 		})
 	}
 
-	fn base(&self) -> Box<dyn BlobStoreProvider> {
+	fn base(&self) -> Box<dyn BlobProvider> {
 		Box::new(Self::new(self.path.clone()))
 	}
 

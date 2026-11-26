@@ -59,7 +59,7 @@ impl<T: serde::Serialize> SseBody<T> {
 	/// The inverse of the client-side
 	/// [`event_source_typed`](ResponseSseExt::event_source_typed).
 	pub fn to_chunk(&self) -> Result<Bytes> {
-		let data = serde_json::to_string(&self.data)?;
+		let data = json_ext::to_string(&self.data)?;
 		Bytes::from(format!("event: {}\ndata: {}\n\n", self.event, data)).xok()
 	}
 }
@@ -200,7 +200,7 @@ pub impl Response {
 		T: 'static + serde::de::DeserializeOwned + Send + Sync,
 	{
 		self.event_source_mapped(|event| {
-			let data: T = serde_json::from_str(&event.data).map_err(|err| {
+			let data: T = json_ext::from_str(&event.data).map_err(|err| {
 				bevyhow!(
 					"Failed to deserialize SSE event data: {}\nRaw data: {}",
 					err,

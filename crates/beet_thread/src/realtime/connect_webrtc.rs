@@ -50,8 +50,7 @@ impl RealtimeConnection {
 
 	/// Send a client event onto the data channel as JSON text.
 	pub fn send(&self, event: &Value) -> Result {
-		let text = serde_json::to_string(event)?;
-		self.dc.send_with_str(&text).map_jserr()
+		self.dc.send_with_str(&event.to_json_string()).map_jserr()
 	}
 
 	/// The next server event, parsed from the data channel's JSON text into a
@@ -65,7 +64,7 @@ impl RealtimeConnection {
 		let Some(text) = ev.data().as_string() else {
 			bevybail!("expected a text data channel message");
 		};
-		serde_json::from_str::<Value>(&text)?.xok()
+		Value::parse_json(&text)
 	}
 }
 

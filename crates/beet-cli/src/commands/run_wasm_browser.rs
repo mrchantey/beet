@@ -117,7 +117,7 @@ pub(crate) async fn run(
 			cross_log!("{}", entry.text);
 		}
 		let exit = browser.evaluate_value("globalThis.__beet_exit").await?;
-		if let Some(code) = exit.as_i64() {
+		if let Ok(code) = exit.as_i64() {
 			break code;
 		}
 		if start.elapsed() > SUITE_DEADLINE {

@@ -13,8 +13,11 @@ use core::fmt::Write;
 impl Value {
 	/// This value as compact JSON text.
 	///
-	/// - **Map entries are sorted by key**, so one value always writes one
-	///   document, which a snapshot, a cache key and a diff all need.
+	/// - **Map entries keep their order**, a parsed document's own and a
+	///   struct's field order, so a file reads back and writes as it was and
+	///   a typed value writes the text `serde_json` writes. A value built from
+	///   a hashed collection, or one whose text must be canonical, is sorted
+	///   first with [`sort_maps`](Self::sort_maps).
 	/// - **A float is the shortest text that reads back as it**, always with a
 	///   point or an exponent, so it never reads back as an integer.
 	/// - **A non-finite float is `null`**, the only thing JSON has for one.
@@ -36,7 +39,7 @@ impl Value {
 	/// # use beet_core::prelude::*;
 	/// value!({ "b": [1, 2], "a": {} })
 	/// 	.to_json_pretty()
-	/// 	.xpect_eq("{\n  \"a\": {},\n  \"b\": [\n    1,\n    2\n  ]\n}");
+	/// 	.xpect_eq("{\n  \"b\": [\n    1,\n    2\n  ],\n  \"a\": {}\n}");
 	/// ```
 	pub fn to_json_pretty(&self) -> String { JsonWriter::new(true).write(self) }
 }
@@ -108,11 +111,9 @@ impl JsonWriter {
 				self.container(['[', ']'], items.iter(), Self::value)
 			}
 			Value::Map(map) => {
-				let mut entries = map.iter().collect::<Vec<_>>();
-				entries.sort_unstable_by_key(|(key, _)| key.as_str());
 				self.container(
 					['{', '}'],
-					entries.into_iter(),
+					map.iter(),
 					|writer, (key, value)| {
 						writer.string(key);
 						writer.out.push(':');
@@ -243,7 +244,7 @@ mod test {
 		]);
 		value
 			.to_json_string()
-			.xpect_eq(r#"[{"count":2,"none":{},"tags":["x"],"url":"/a"},[]]"#);
+			.xpect_eq(r#"[{"url":"/a","count":2,"tags":["x"],"none":{}},[]]"#);
 		value.to_json_pretty().xpect_snapshot();
 	}
 }

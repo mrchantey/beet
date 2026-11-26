@@ -15,8 +15,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
-use serde_json::json;
 
 /// Declares that the stack's secrets live in AWS parameter store, in the
 /// stack's region: `<Stack {SsmSecrets}>`, and the declaration a stack with
@@ -115,12 +113,13 @@ impl SsmSecretStore {
 			.client
 			.call_json(
 				"GetParameter",
-				&json!({"Name": name, "WithDecryption": true}),
+				&value!({"Name": name, "WithDecryption": true}),
 			)
 			.await
 		{
 			Ok(body) => body["Parameter"]["Value"]
 				.as_str()
+				.ok()
 				.map(String::from)
 				.ok_or_else(|| {
 					bevyhow!("ssm GetParameter answered {name} without a value")
@@ -144,7 +143,7 @@ impl SsmSecretStore {
 		meta: &SecretMeta,
 		overwrite: bool,
 	) -> Result {
-		let mut body = json!({
+		let mut body = value!({
 			"Name": name,
 			"Value": value,
 			"Type": "SecureString",
@@ -152,7 +151,7 @@ impl SsmSecretStore {
 		});
 		let description = meta.description();
 		if !description.is_empty() {
-			body["Description"] = description.into();
+			body.insert("Description", description)?;
 		}
 		// the one call that carries a secret, so its errors are redacted
 		match self
@@ -181,7 +180,7 @@ impl SsmSecretStore {
 	async fn describe_parameters(&self, prefix: &str) -> Result<Vec<Value>> {
 		self.paginate(
 			"DescribeParameters",
-			json!({
+			value!({
 				"ParameterFilters": [
 					{"Key": "Path", "Option": "Recursive", "Values": [prefix]}
 				],
@@ -197,7 +196,7 @@ impl SsmSecretStore {
 	async fn get_parameters_by_path(&self, prefix: &str) -> Result<Vec<Value>> {
 		self.paginate(
 			"GetParametersByPath",
-			json!({
+			value!({
 				"Path": prefix,
 				"Recursive": true,
 				"WithDecryption": true,
@@ -218,13 +217,13 @@ impl SsmSecretStore {
 		let mut items = Vec::new();
 		loop {
 			let mut page = self.client.call_json(action, &body).await?;
-			if let Value::Array(parameters) = page["Parameters"].take() {
-				items.extend(parameters);
+			if let Some(Value::List(parameters)) = page.get_mut("Parameters") {
+				items.append(parameters);
 			}
-			match page["NextToken"].as_str() {
-				Some(token) => body["NextToken"] = token.into(),
+			match page["NextToken"].as_str().ok() {
+				Some(token) => body.insert("NextToken", token)?,
 				None => return items.xok(),
-			}
+			};
 		}
 	}
 
@@ -236,14 +235,18 @@ impl SsmSecretStore {
 		for batch in names.chunks(10) {
 			let body = self
 				.client
-				.call_json("DeleteParameters", &json!({"Names": batch}))
+				.call_json(
+					"DeleteParameters",
+					&value!({"Names": Value::new_list(batch)}),
+				)
 				.await?;
 			deleted.extend(
 				body["DeletedParameters"]
-					.as_array()
+					.as_list()
+					.ok()
 					.into_iter()
 					.flatten()
-					.filter_map(|name| name.as_str().map(String::from)),
+					.filter_map(|name| name.as_str().ok().map(String::from)),
 			);
 		}
 		Ok(deleted)
@@ -257,6 +260,7 @@ impl SsmSecretStore {
 			.filter(|item| {
 				item["Name"]
 					.as_str()
+					.ok()
 					.is_some_and(|name| name.starts_with(&under))
 			})
 			.collect()
@@ -272,9 +276,9 @@ impl SsmSecretStore {
 
 	/// One listed parameter as an entry.
 	fn entry(&self, item: &Value) -> Option<SecretEntry> {
-		let name = item["Name"].as_str()?;
+		let name = item["Name"].as_str().ok()?;
 		let meta = SecretMeta::parse_description(
-			item["Description"].as_str().unwrap_or_default(),
+			item["Description"].as_str().ok().unwrap_or_default(),
 		);
 		SecretEntry {
 			secret: self.label_of(name)?,
@@ -282,7 +286,7 @@ impl SsmSecretStore {
 			note: meta.note,
 			roll: meta.roll,
 			// the api answers epoch seconds, ie `1757898061.5`
-			modified: item["LastModifiedDate"].as_f64().map(|secs| {
+			modified: item["LastModifiedDate"].as_f64().ok().map(|secs| {
 				Timestamp::from_millis((secs * 1_000.0).round() as i64)
 			}),
 		}
@@ -383,12 +387,12 @@ impl SecretStoreProvider for SsmSecretStore {
 							.iter()
 							.find(|described| described["Name"] == item["Name"])
 							.and_then(|described| {
-								described["Description"].as_str()
+								described["Description"].as_str().ok()
 							})
 							.unwrap_or_default(),
 					);
 					(entry.note, entry.roll) = (meta.note, meta.roll);
-					Some((entry, item["Value"].as_str()?.to_string()))
+					Some((entry, item["Value"].as_str().ok()?.to_string()))
 				})
 				.collect::<Vec<_>>()
 				.xok()
@@ -459,7 +463,7 @@ mod test {
 						.first_raw("authorization")
 						.unwrap()
 						.xpect_contains("/ap-southeast-2/ssm/aws4_request");
-					let body = serde_json::from_slice::<Value>(
+					let body = json_ext::from_slice::<Value>(
 						&request.body.into_bytes().await?,
 					)?;
 					let response = answer(&target, &body);
@@ -478,14 +482,14 @@ mod test {
 
 	/// A json answer.
 	fn ok(body: Value) -> Response {
-		Response::ok().with_body(body.to_string())
+		Response::ok().with_body(body.to_json_string())
 	}
 
 	/// An error answer carrying `code`.
 	fn error(code: &str) -> Response {
 		Response::from_status(StatusCode::BAD_REQUEST).with_body(
-			json!({"__type": format!("com.amazonaws.ssm#{code}"), "message": "no"})
-				.to_string(),
+			value!({"__type": format!("com.amazonaws.ssm#{code}"), "message": "no"})
+				.to_json_string(),
 		)
 	}
 
@@ -493,7 +497,7 @@ mod test {
 	/// pinned: a renamed parameter is a box that boots without its secret.
 	#[beet_core::test]
 	fn addresses_are_the_parameter_names() {
-		let (store, _) = recording(|_, _| ok(json!({})));
+		let (store, _) = recording(|_, _| ok(value!({})));
 		store
 			.address(&SecretRef::new("db-password"))
 			.as_str()
@@ -515,12 +519,13 @@ mod test {
 	/// missing parameter is absence rather than an error.
 	#[beet_core::test]
 	async fn reads_a_parameter() {
-		let (store, calls) = recording(|_, body| match body["Name"].as_str() {
-			Some("/beetmash/prod/ssh-host-key") => {
-				ok(json!({"Parameter": {"Value": "the key"}}))
-			}
-			_ => error("ParameterNotFound"),
-		});
+		let (store, calls) =
+			recording(|_, body| match body["Name"].as_str().ok() {
+				Some("/beetmash/prod/ssh-host-key") => {
+					ok(value!({"Parameter": {"Value": "the key"}}))
+				}
+				_ => error("ParameterNotFound"),
+			});
 		store
 			.get(&SecretRef::new("ssh-host-key"))
 			.await
@@ -533,7 +538,7 @@ mod test {
 			.xpect_none();
 		calls.lock().unwrap()[0].clone().xpect_eq((
 			"AmazonSSM.GetParameter".into(),
-			json!({"Name": "/beetmash/prod/ssh-host-key", "WithDecryption": true}),
+			value!({"Name": "/beetmash/prod/ssh-host-key", "WithDecryption": true}),
 		));
 	}
 
@@ -542,9 +547,9 @@ mod test {
 	#[beet_core::test]
 	async fn writes_a_parameter() {
 		let (store, calls) =
-			recording(|_, body| match body["Overwrite"].as_bool() {
+			recording(|_, body| match body["Overwrite"].as_bool().ok() {
 				Some(false) => error("ParameterAlreadyExists"),
-				_ => ok(json!({"Version": 2})),
+				_ => ok(value!({"Version": 2})),
 			});
 		let secret = SecretRef::new("db-password");
 		let err = store
@@ -560,7 +565,7 @@ mod test {
 		let calls = calls.lock().unwrap();
 		calls[0].clone().xpect_eq((
 			"AmazonSSM.PutParameter".into(),
-			json!({
+			value!({
 				"Name": "/beetmash/prod/db-password",
 				"Value": "hunter2",
 				"Type": "SecureString",
@@ -570,7 +575,7 @@ mod test {
 		));
 		// no metadata, no description: the stored one is kept
 		calls[1].1["Description"].xpect_eq(Value::Null);
-		calls[1].1["Overwrite"].xpect_eq(json!(true));
+		calls[1].1["Overwrite"].xpect_eq(value!(true));
 	}
 
 	/// A listing follows every page under the stack's own prefix, reading
@@ -578,8 +583,8 @@ mod test {
 	#[beet_core::test]
 	async fn lists_every_page() {
 		let (store, calls) =
-			recording(|_, body| match body["NextToken"].as_str() {
-				None => ok(json!({
+			recording(|_, body| match body["NextToken"].as_str().ok() {
+				None => ok(value!({
 					"Parameters": [{
 						"Name": "/beetmash/prod/dkim-example-com",
 						"Description": "manual:a new selector :: the signing key",
@@ -587,7 +592,7 @@ mod test {
 					}],
 					"NextToken": "page-2",
 				})),
-				Some(_) => ok(json!({
+				Some(_) => ok(value!({
 					"Parameters": [
 						{"Name": "/beetmash/prod/db-password"},
 						{"Name": "/beetmash/prod-two/x"},
@@ -620,17 +625,17 @@ mod test {
 		let calls = calls.lock().unwrap();
 		calls.len().xpect_eq(2);
 		calls[0].0.as_str().xpect_eq("AmazonSSM.DescribeParameters");
-		calls[0].1["ParameterFilters"].xpect_eq(json!([
+		calls[0].1["ParameterFilters"].xpect_eq(value!([
 			{"Key": "Path", "Option": "Recursive", "Values": ["/beetmash/prod"]}
 		]));
-		calls[1].1["NextToken"].xpect_eq(json!("page-2"));
+		calls[1].1["NextToken"].xpect_eq(value!("page-2"));
 	}
 
 	/// A delete answers what the api deleted, one already gone absent.
 	#[beet_core::test]
 	async fn deletes_parameters() {
 		let (store, calls) = recording(|_, _| {
-			ok(json!({
+			ok(value!({
 				"DeletedParameters": ["/beetmash/prod/a"],
 				"InvalidParameters": ["/beetmash/prod/b"],
 			}))
@@ -642,7 +647,7 @@ mod test {
 			.xpect_eq(vec![SecretRef::new("a")]);
 		calls.lock().unwrap()[0].clone().xpect_eq((
 			"AmazonSSM.DeleteParameters".into(),
-			json!({"Names": ["/beetmash/prod/a", "/beetmash/prod/b"]}),
+			value!({"Names": ["/beetmash/prod/a", "/beetmash/prod/b"]}),
 		));
 	}
 

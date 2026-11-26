@@ -45,9 +45,10 @@ impl VerbWorld {
 			"memory://verbs-{}",
 			STORES.fetch_add(1, Ordering::Relaxed)
 		);
-		let store = StoreProvider::from_uri(&StoreUri::parse(&uri).unwrap())
-			.unwrap()
-			.into_blob_store();
+		let store =
+			BlobStoreProvider::from_uri(&StoreUri::parse(&uri).unwrap())
+				.unwrap()
+				.into_blob_store();
 		let root = world.spawn((store.clone(), RepoStore)).id();
 		world.flush();
 		Self {

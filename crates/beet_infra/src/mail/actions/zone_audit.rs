@@ -376,8 +376,8 @@ fn declared_records(
 		.iter()
 		.filter_map(|record| {
 			Some(DeclaredRecord {
-				name: to_pattern(record["name"].as_str()?),
-				kind: record["type"].as_str()?.to_string(),
+				name: to_pattern(record["name"].as_str().ok()?),
+				kind: record["type"].as_str().ok()?.to_string(),
 			})
 		})
 		.collect()
@@ -438,16 +438,26 @@ async fn list_records(zone_id: &str, token: &str) -> Result<Vec<ZoneRecord>> {
 		)
 		.await?;
 		let page_records = json["result"]
-			.as_array()
+			.as_list()
+			.ok()
 			.cloned()
 			.unwrap_or_default()
 			.iter()
 			.map(|record| ZoneRecord {
-				id: record["id"].as_str().unwrap_or_default().to_string(),
-				name: record["name"].as_str().unwrap_or_default().to_string(),
-				kind: record["type"].as_str().unwrap_or_default().to_string(),
+				id: record["id"].as_str().ok().unwrap_or_default().to_string(),
+				name: record["name"]
+					.as_str()
+					.ok()
+					.unwrap_or_default()
+					.to_string(),
+				kind: record["type"]
+					.as_str()
+					.ok()
+					.unwrap_or_default()
+					.to_string(),
 				content: record["content"]
 					.as_str()
+					.ok()
 					.unwrap_or_default()
 					.to_string(),
 			})

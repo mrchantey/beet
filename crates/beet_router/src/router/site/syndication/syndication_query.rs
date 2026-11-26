@@ -275,7 +275,7 @@ pub(crate) mod test_fixtures {
 	/// every page, and inside it the article layout, `<ArticleHeader/>` above
 	/// the post, on the blog's dated post `blog/full-stack-bevy`.
 	pub async fn spawn_layout_router(world: &mut World) -> Entity {
-		let store = BlobStore::temp();
+		let store = BlobStore::new(InMemoryBlobStore::new());
 		for (path, source) in [
 			(
 				"FixtureLayout.bsx",

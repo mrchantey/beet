@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use core::ops::Bound;
-use serde_json::Value as JsonValue;
-use serde_json::json;
 
 /// AWS DynamoDB as a table store: one Dynamo table holds every partition's
 /// rows in a single-table layout, and no bytes, which a bucket holds. Each call is an [`AwsClient`] request
@@ -122,12 +120,8 @@ impl DynamoStore {
 	}
 
 	/// Call `action` with `body`, the table named in it.
-	async fn call(
-		&self,
-		action: &str,
-		mut body: JsonValue,
-	) -> Result<JsonValue> {
-		body["TableName"] = json!(self.table_name.as_str());
+	async fn call(&self, action: &str, mut body: Value) -> Result<Value> {
+		body.insert("TableName", self.table_name.as_str())?;
 		self.client()?.call_json(action, &body).await
 	}
 
@@ -151,32 +145,33 @@ impl DynamoStore {
 	}
 
 	/// The item key of `sk` in this partition, as wire json.
-	fn item_key(&self, sk: &str) -> JsonValue {
-		json!({"pk": {"S": self.pk()}, "sk": {"S": sk}})
+	fn item_key(&self, sk: &str) -> Value {
+		value!({"pk": {"S": self.pk()}, "sk": {"S": sk}})
 	}
 
 	/// The string attribute `name` of a wire item.
-	fn string_attr<'a>(item: &'a JsonValue, name: &str) -> Option<&'a str> {
-		item[name]["S"].as_str()
+	fn string_attr<'a>(item: &'a Value, name: &str) -> Option<&'a str> {
+		item[name]["S"].as_str().ok()
 	}
 
 	/// Whether a wire item's `ttl` has passed: expired, so gone to every read
 	/// here though Dynamo has not deleted it yet.
-	fn is_expired(item: &JsonValue) -> bool {
+	fn is_expired(item: &Value) -> bool {
 		item[Self::TTL_ATTRIBUTE]["N"]
 			.as_str()
+			.ok()
 			.and_then(|ttl| ttl.parse::<i64>().ok())
 			.is_some_and(|ttl| ttl <= Timestamp::now().secs())
 	}
 
 	/// The stored row a wire item holds.
-	fn stored_row(table: &TableSpec, item: &JsonValue) -> Result<StoredRow> {
+	fn stored_row(table: &TableSpec, item: &Value) -> Result<StoredRow> {
 		let (Some(sk), Some(row), Some(cid)) = (
 			Self::string_attr(item, "sk"),
 			Self::string_attr(item, "row"),
 			Self::string_attr(item, "cid"),
 		) else {
-			bevybail!("dynamo item is not a row: {item}");
+			bevybail!("dynamo item is not a row: {}", item.to_json_string());
 		};
 		let Some(key) = sk.strip_prefix(&format!("{}#", table.name)) else {
 			bevybail!("dynamo item `{sk}` is not a row of `{}`", table.name);
@@ -206,13 +201,9 @@ impl DynamoStore {
 
 	/// The wire item a row is written as: its key, row text, cid and an
 	/// index slot per declared index.
-	fn row_item(
-		&self,
-		table: &TableSpec,
-		row: &StoredRow,
-	) -> Result<JsonValue> {
+	fn row_item(&self, table: &TableSpec, row: &StoredRow) -> Result<Value> {
 		self.check_index_slots(table)?;
-		let mut item = json!({
+		let mut item = value!({
 			"pk": {"S": self.pk()},
 			"sk": {"S": Self::row_sk(table, row.key())},
 			"row": {"S": row.row().to_json_string()},
@@ -220,10 +211,16 @@ impl DynamoStore {
 		});
 		for (slot, index) in table.indexes.iter().enumerate() {
 			let slot = slot + 1;
-			item[format!("gsi{slot}pk")] = json!({
-				"S": format!("{}#{}#{}", self.pk(), table.name, index.name)
-			});
-			item[format!("gsi{slot}sk")] = json!({"S": index.entry(row.key(), row.row())?.to_sortable_text()});
+			item.insert(
+				format!("gsi{slot}pk"),
+				value!({
+					"S": format!("{}#{}#{}", self.pk(), table.name, index.name)
+				}),
+			)?;
+			item.insert(
+				format!("gsi{slot}sk"),
+				value!({"S": index.entry(row.key(), row.row())?.to_sortable_text()}),
+			)?;
 		}
 		item.xok()
 	}
@@ -232,25 +229,28 @@ impl DynamoStore {
 	/// a row whose `ttl` has passed counts as absent, as every read here
 	/// treats it.
 	fn with_condition(
-		mut body: JsonValue,
+		mut body: Value,
 		precondition: &Precondition,
-	) -> JsonValue {
-		let now = json!({"N": Timestamp::now().secs().to_string()});
+	) -> Result<Value> {
+		let now = value!({"N": Timestamp::now().secs().to_string()});
 		let (expression, values) = match precondition {
-			Precondition::Any => return body,
+			Precondition::Any => return body.xok(),
 			Precondition::Absent => (
 				"attribute_not_exists(pk) OR #ttl <= :now",
-				json!({":now": now}),
+				value!({":now": now}),
 			),
 			Precondition::Matches(cid) => (
 				"cid = :cid AND (attribute_not_exists(#ttl) OR #ttl > :now)",
-				json!({":cid": {"S": cid.as_str()}, ":now": now}),
+				value!({":cid": {"S": cid.as_str()}, ":now": now}),
 			),
 		};
-		body["ConditionExpression"] = json!(expression);
-		body["ExpressionAttributeNames"] = json!({"#ttl": Self::TTL_ATTRIBUTE});
-		body["ExpressionAttributeValues"] = values;
-		body
+		body.insert("ConditionExpression", expression)?;
+		body.insert(
+			"ExpressionAttributeNames",
+			value!({"#ttl": Self::TTL_ATTRIBUTE}),
+		)?;
+		body.insert("ExpressionAttributeValues", values)?;
+		body.xok()
 	}
 
 	/// The conflict at `key`, naming the row there now.
@@ -276,20 +276,20 @@ impl DynamoStore {
 	/// items are read or there are no more, answering whether more remain.
 	async fn query(
 		&self,
-		mut body: JsonValue,
+		mut body: Value,
 		enough: Option<usize>,
-		keep: impl Fn(&JsonValue) -> bool,
-	) -> Result<(Vec<JsonValue>, bool)> {
+		keep: impl Fn(&Value) -> bool,
+	) -> Result<(Vec<Value>, bool)> {
 		let mut items = Vec::new();
 		loop {
 			if let Some(enough) = enough {
 				// a few spare for the bounds filtered client side
-				body["Limit"] = json!(enough - items.len() + 2);
+				body.insert("Limit", enough - items.len() + 2)?;
 			}
 			let out = self.call("Query", body.clone()).await?;
 			items.extend(
 				out["Items"]
-					.as_array()
+					.as_list()
 					.into_iter()
 					.flatten()
 					.filter(|item| keep(item))
@@ -297,7 +297,7 @@ impl DynamoStore {
 			);
 			let more = matches!(
 				&out["LastEvaluatedKey"],
-				JsonValue::Object(key) if !key.is_empty()
+				Value::Map(key) if !key.is_empty()
 			);
 			if enough.is_some_and(|enough| items.len() >= enough) {
 				items.truncate(enough.unwrap());
@@ -306,16 +306,16 @@ impl DynamoStore {
 			if !more {
 				return (items, false).xok();
 			}
-			body["ExclusiveStartKey"] = out["LastEvaluatedKey"].clone();
+			body.insert("ExclusiveStartKey", out["LastEvaluatedKey"].clone())?;
 		}
 	}
 
 	/// Get the table status, returning `None` if the table does not exist.
 	async fn table_status(&self) -> Result<Option<SmolStr>> {
-		match self.call("DescribeTable", json!({})).await {
+		match self.call("DescribeTable", value!({})).await {
 			Ok(out) => match out["Table"]["TableStatus"].as_str() {
-				Some(status) => Ok(Some(status.into())),
-				None => bevybail!("DescribeTable answered no table status"),
+				Ok(status) => Ok(Some(status.into())),
+				Err(_) => bevybail!("DescribeTable answered no table status"),
 			},
 			Err(err) if AwsError::is(&err, &["ResourceNotFoundException"]) => {
 				Ok(None)
@@ -390,7 +390,7 @@ impl StoreBackend for DynamoStore {
 			this.await_status("CREATING", Some("ACTIVE")).await?;
 			this.call(
 				"UpdateTimeToLive",
-				json!({"TimeToLiveSpecification": {
+				value!({"TimeToLiveSpecification": {
 					"Enabled": true,
 					"AttributeName": Self::TTL_ATTRIBUTE
 				}}),
@@ -403,7 +403,7 @@ impl StoreBackend for DynamoStore {
 	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		Box::pin(async move {
-			this.call("DeleteTable", json!({})).await?;
+			this.call("DeleteTable", value!({})).await?;
 			this.await_status("DELETING", None).await
 		})
 	}
@@ -411,20 +411,20 @@ impl StoreBackend for DynamoStore {
 
 impl DynamoStore {
 	/// The `CreateTable` request the single-table layout is.
-	fn create_table_body() -> JsonValue {
+	fn create_table_body() -> Value {
 		let mut attributes = vec![
-			json!({"AttributeName": "pk", "AttributeType": "S"}),
-			json!({"AttributeName": "sk", "AttributeType": "S"}),
+			value!({"AttributeName": "pk", "AttributeType": "S"}),
+			value!({"AttributeName": "sk", "AttributeType": "S"}),
 		];
 		let mut indexes = Vec::new();
 		for slot in 1..=Self::INDEX_SLOTS {
 			attributes.push(
-				json!({"AttributeName": format!("gsi{slot}pk"), "AttributeType": "S"}),
+				value!({"AttributeName": format!("gsi{slot}pk"), "AttributeType": "S"}),
 			);
 			attributes.push(
-				json!({"AttributeName": format!("gsi{slot}sk"), "AttributeType": "S"}),
+				value!({"AttributeName": format!("gsi{slot}sk"), "AttributeType": "S"}),
 			);
-			indexes.push(json!({
+			indexes.push(value!({
 				"IndexName": format!("gsi{slot}"),
 				"KeySchema": [
 					{"AttributeName": format!("gsi{slot}pk"), "KeyType": "HASH"},
@@ -433,7 +433,7 @@ impl DynamoStore {
 				"Projection": {"ProjectionType": "ALL"}
 			}));
 		}
-		json!({
+		value!({
 			"AttributeDefinitions": attributes,
 			"KeySchema": [
 				{"AttributeName": "pk", "KeyType": "HASH"},
@@ -451,20 +451,20 @@ impl DynamoStore {
 		attribute: &str,
 		low: Option<String>,
 		high: Option<String>,
-		values: &mut JsonValue,
+		values: &mut Map,
 	) -> Option<String> {
 		match (low, high) {
 			(Some(low), Some(high)) => {
-				values[":low"] = json!({"S": low});
-				values[":high"] = json!({"S": high});
+				values.insert(":low", value!({"S": low}));
+				values.insert(":high", value!({"S": high}));
 				Some(format!("{attribute} BETWEEN :low AND :high"))
 			}
 			(Some(low), None) => {
-				values[":low"] = json!({"S": low});
+				values.insert(":low", value!({"S": low}));
 				Some(format!("{attribute} >= :low"))
 			}
 			(None, Some(high)) => {
-				values[":high"] = json!({"S": high});
+				values.insert(":high", value!({"S": high}));
 				Some(format!("{attribute} < :high"))
 			}
 			(None, None) => None,
@@ -472,24 +472,24 @@ impl DynamoStore {
 	}
 
 	/// One write of a transaction, as its `TransactItems` entry.
-	fn transact_item(&self, write: &TableWrite) -> Result<JsonValue> {
+	fn transact_item(&self, write: &TableWrite) -> Result<Value> {
 		match write {
 			TableWrite::Put {
 				table,
 				row,
 				precondition,
-			} => json!({"Put": Self::with_condition(json!({
+			} => value!({"Put": Self::with_condition(value!({
 				"TableName": self.table_name.as_str(),
 				"Item": self.row_item(table, row)?
-			}), precondition)}),
+			}), precondition)?}),
 			TableWrite::Remove {
 				table,
 				key,
 				precondition,
-			} => json!({"Delete": Self::with_condition(json!({
+			} => value!({"Delete": Self::with_condition(value!({
 				"TableName": self.table_name.as_str(),
 				"Key": self.item_key(&Self::row_sk(table, key))
-			}), precondition)}),
+			}), precondition)?}),
 		}
 		.xok()
 	}
@@ -535,7 +535,7 @@ impl TableProvider for DynamoStore {
 			let out = this
 				.call(
 					"GetItem",
-					json!({"Key": item_key, "ConsistentRead": true}),
+					value!({"Key": item_key, "ConsistentRead": true}),
 				)
 				.await?;
 			match out["Item"].is_null() || Self::is_expired(&out["Item"]) {
@@ -556,9 +556,9 @@ impl TableProvider for DynamoStore {
 		let table = table.clone();
 		Box::pin(async move {
 			let body = Self::with_condition(
-				json!({"Item": this.row_item(&table, &row)?}),
+				value!({"Item": this.row_item(&table, &row)?}),
 				&precondition,
-			);
+			)?;
 			match this.call("PutItem", body).await {
 				Ok(_) => Ok(()),
 				Err(err)
@@ -584,9 +584,9 @@ impl TableProvider for DynamoStore {
 		let key = key.clone();
 		Box::pin(async move {
 			let body = Self::with_condition(
-				json!({"Key": this.item_key(&Self::row_sk(&table, &key))}),
+				value!({"Key": this.item_key(&Self::row_sk(&table, &key))}),
 				&precondition,
-			);
+			)?;
 			match this.call("DeleteItem", body).await {
 				Ok(_) => Ok(()),
 				Err(err)
@@ -622,12 +622,12 @@ impl TableProvider for DynamoStore {
 				Bound::Included(key) | Bound::Excluded(key) => sk(key),
 				Bound::Unbounded => format!("{}$", table.name),
 			};
-			let mut values = json!({":pk": {"S": this.pk()}});
-			values[":low"] = json!({"S": low});
-			values[":high"] = json!({"S": high});
+			let mut values = value!({":pk": {"S": this.pk()}});
+			values.insert(":low", value!({"S": low}))?;
+			values.insert(":high", value!({"S": high}))?;
 			let (items, _) = this
 				.query(
-					json!({
+					value!({
 						"KeyConditionExpression": "pk = :pk AND sk BETWEEN :low AND :high",
 						"ExpressionAttributeValues": values,
 						"ScanIndexForward": !scan.reverse,
@@ -676,7 +676,7 @@ impl TableProvider for DynamoStore {
 				.iter()
 				.map(|write| this.transact_item(write))
 				.collect::<Result<Vec<_>>>()?;
-			let body = json!({"TransactItems": items});
+			let body = value!({"TransactItems": items});
 			match this.client()?.call_json("TransactWriteItems", &body).await {
 				Ok(_) => Ok(()),
 				Err(err) => {
@@ -715,7 +715,7 @@ impl TableProvider for DynamoStore {
 				.map(|key| {
 					this.call(
 						"UpdateItem",
-						json!({
+						value!({
 							"Key": this.item_key(&Self::row_sk(&table, key)),
 							"UpdateExpression": "SET #ttl = :ttl",
 							"ConditionExpression": "attribute_exists(pk)",
@@ -761,20 +761,20 @@ impl TableProvider for DynamoStore {
 			};
 			let slot = slot + 1;
 			let range = scan.entry_range()?;
-			let mut values = json!({":pk": {"S": format!("{}#{}#{}", this.pk(), table.name, index.name)}});
+			let mut values = value!({":pk": {"S": format!("{}#{}#{}", this.pk(), table.name, index.name)}});
 			let mut condition = format!("gsi{slot}pk = :pk");
 			if let Some(sort) = Self::sort_condition(
 				&format!("gsi{slot}sk"),
 				range.0.as_ref().map(IndexKey::to_sortable_text),
 				range.1.as_ref().map(IndexKey::to_sortable_text),
-				&mut values,
+				values.as_map_mut()?,
 			) {
 				condition.push_str(&format!(" AND {sort}"));
 			}
 			let sk_attr = format!("gsi{slot}sk");
 			let (items, _) = this
 				.query(
-					json!({
+					value!({
 						"IndexName": format!("gsi{slot}"),
 						"KeyConditionExpression": condition,
 						"ExpressionAttributeValues": values,

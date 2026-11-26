@@ -2,7 +2,6 @@ use crate::bindings::*;
 use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
-use serde_json::json;
 
 /// An SNS topic and the access policy that lets services publish into it:
 /// where a stack's alarms fire and its event streams land.
@@ -135,7 +134,7 @@ impl SnsTopicBlock {
 	/// service.
 	fn policy(&self, stack: &ResolvedStack, topic_arn: &str) -> String {
 		let account = "${data.aws_caller_identity.current.account_id}";
-		let mut statements = vec![json!({
+		let mut statements = vec![value!({
 			"Sid": "owner",
 			"Effect": "Allow",
 			"Principal": { "AWS": "*" },
@@ -153,7 +152,7 @@ impl SnsTopicBlock {
 			"Condition": { "StringEquals": { "AWS:SourceOwner": account } },
 		})];
 		for service in &self.publishers {
-			statements.push(json!({
+			statements.push(value!({
 				"Sid": service.split('.').next().unwrap_or_default()
 					.xmap(|prefix| format!("{prefix}-publish")),
 				"Effect": "Allow",
@@ -163,12 +162,12 @@ impl SnsTopicBlock {
 				"Condition": { "StringEquals": { "AWS:SourceAccount": account } },
 			}));
 		}
-		json!({
+		value!({
 			"Version": "2012-10-17",
 			"Id": self.topic_name(stack),
 			"Statement": statements,
 		})
-		.to_string()
+		.to_json_string()
 	}
 
 	/// Rejects a declaration SNS would reject, at config time.
@@ -235,7 +234,6 @@ impl EmitBlock for SnsTopicBlock {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use serde_json::Value;
 
 	fn build_config(block: &SnsTopicBlock) -> (ResolvedStack, Value) {
 		let (scope, _dir) = RenderScope::test_render_stack(
@@ -248,7 +246,7 @@ mod tests {
 			},
 		);
 		let (stack, _deployment, config) = scope.finish().unwrap();
-		(stack, config.to_json().into_json())
+		(stack, config.to_json())
 	}
 
 	/// The declared name is the topic's name and the policy grants exactly the
@@ -267,19 +265,19 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_eq("beetmash-ses-events");
-		let policy: Value = serde_json::from_str(
+		let policy = Value::parse_json(
 			json["resource"]["aws_sns_topic_policy"]
 				["beet_infra__dev__ses_events_policy"]["policy"]
 				.as_str()
 				.unwrap(),
 		)
 		.unwrap();
-		policy["Statement"][1]["Sid"].xpect_eq(json!("ses-publish"));
+		policy["Statement"][1]["Sid"].xpect_eq(value!("ses-publish"));
 		policy["Statement"][1]["Principal"]["Service"]
-			.xpect_eq(json!("ses.amazonaws.com"));
+			.xpect_eq(value!("ses.amazonaws.com"));
 		policy["Statement"][1]["Condition"]["StringEquals"]
 			["AWS:SourceAccount"]
-			.xpect_eq(json!("${data.aws_caller_identity.current.account_id}"));
+			.xpect_eq(value!("${data.aws_caller_identity.current.account_id}"));
 		// and nothing is imported unless asked
 		json.get("import").is_none().xpect_true();
 	}
@@ -317,7 +315,7 @@ mod tests {
 				"to": "aws_sns_topic_policy.beet_infra__dev__ses_events_policy",
 				"id": "arn:aws:sns:ap-southeast-2:${data.aws_caller_identity.current.account_id}:beetmash-ses-events"
 			}
-		]).into_json());
+		]));
 	}
 
 	/// A publisher that is not a service principal is a typo, caught before a

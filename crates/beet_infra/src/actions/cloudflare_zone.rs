@@ -62,7 +62,7 @@ pub async fn CloudflareZoneSetup(
 	cloudflare_api_ext::send(
 		Request::patch(format!("{API_BASE}/zones/{zone_id}/settings/ssl"))
 			.with_auth_bearer(&token)
-			.with_json_body(&serde_json::json!({ "value": "strict" }))?,
+			.with_json_body(&value!({ "value": "strict" }))?,
 		"setting the zone ssl mode",
 	)
 	.await?;
@@ -74,7 +74,7 @@ pub async fn CloudflareZoneSetup(
 			"{API_BASE}/zones/{zone_id}/settings/always_use_https"
 		))
 		.with_auth_bearer(&token)
-		.with_json_body(&serde_json::json!({ "value": "on" }))?,
+		.with_json_body(&value!({ "value": "on" }))?,
 		"redirecting http to https at the edge",
 	)
 	.await?;
@@ -129,12 +129,12 @@ pub async fn CloudflareApexRedirect(
 
 /// The entrypoint cache-ruleset body, in override order (later rules win per
 /// setting): eligible-with-origin-TTLs first, then the non-html bypass.
-fn cache_rules() -> serde_json::Value {
+fn cache_rules() -> Value {
 	// requests whose `Accept` names a non-html media type (a terminal asking
 	// for markdown) skip the cache; an absent header or one carrying
 	// `text/html` / `*/*` (browsers, curl defaults) stays eligible
 	const NON_HTML_ACCEPT: &str = r#"any(http.request.headers["accept"][*] ne "") and not any(http.request.headers["accept"][*] contains "text/html") and not any(http.request.headers["accept"][*] contains "*/*")"#;
-	serde_json::json!({
+	value!({
 		"rules": [
 			{
 				"action": "set_cache_settings",
@@ -159,19 +159,16 @@ fn cache_rules() -> serde_json::Value {
 /// The entrypoint redirect-ruleset body: one rule answering every alias of
 /// the zone apex with a `301` to the same path on the apex, query kept, or no
 /// rules at all when there are no aliases.
-fn redirect_rules(
-	zone: &CloudflareZone,
-	aliases: &[SmolStr],
-) -> serde_json::Value {
+fn redirect_rules(zone: &CloudflareZone, aliases: &[SmolStr]) -> Value {
 	if aliases.is_empty() {
-		return serde_json::json!({ "rules": [] });
+		return value!({ "rules": [] });
 	}
 	let hosts = aliases
 		.iter()
 		.map(|alias| format!("\"{alias}.{}\"", zone.domain))
 		.collect::<Vec<_>>()
 		.join(" ");
-	serde_json::json!({
+	value!({
 		"rules": [{
 			"action": "redirect",
 			"expression": format!("http.host in {{{hosts}}}"),
@@ -240,7 +237,7 @@ pub async fn CloudflarePurgeCache(
 	cloudflare_api_ext::send(
 		Request::post(format!("{API_BASE}/zones/{}/purge_cache", zone.id))
 			.with_auth_bearer(&token)
-			.with_json_body(&serde_json::json!({ "hosts": hosts }))?,
+			.with_json_body(&value!({ "hosts": Value::new_list(&hosts) }))?,
 		"purging the edge cache",
 	)
 	.await?;
@@ -258,8 +255,10 @@ impl CloudflarePurgeCache {
 	fn hosts(config: &terra::Config, zone_id: &str) -> Vec<String> {
 		let mut hosts = CloudflareDnsRecords::of(config, Some(zone_id))
 			.into_iter()
-			.filter(|record| record["proxied"].as_bool() == Some(true))
-			.filter_map(|record| record["name"].as_str().map(str::to_string))
+			.filter(|record| record["proxied"].as_bool().ok() == Some(true))
+			.filter_map(|record| {
+				record["name"].as_str().ok().map(str::to_string)
+			})
 			// a name only known after apply is never a served hostname
 			.filter(|name| !name.contains("${"))
 			.collect::<Vec<_>>();
@@ -280,15 +279,16 @@ impl CloudflareDnsRecords {
 	pub(crate) fn of(
 		config: &terra::Config,
 		zone_id: Option<&str>,
-	) -> Vec<serde_json::Value> {
-		config.to_json().into_json()["resource"]["cloudflare_dns_record"]
-			.as_object()
+	) -> Vec<Value> {
+		config.to_json()["resource"]["cloudflare_dns_record"]
+			.as_map()
+			.ok()
 			.map(|records| {
 				records
 					.values()
 					.filter(|record| match zone_id {
 						Some(zone_id) => {
-							record["zone_id"].as_str() == Some(zone_id)
+							record["zone_id"].as_str().ok() == Some(zone_id)
 						}
 						None => true,
 					})
@@ -347,7 +347,7 @@ mod test {
 			"www".into(),
 			"old".into(),
 		])
-		.xpect_eq(serde_json::json!({
+		.xpect_eq(value!({
 			"rules": [{
 				"action": "redirect",
 				"expression": r#"http.host in {"www.beet.org" "old.beet.org"}"#,
@@ -387,6 +387,6 @@ mod test {
 	#[beet_core::test]
 	fn no_aliases_clears_the_redirects() {
 		redirect_rules(&CloudflareZone::new("beet.org", "zone"), &[])
-			.xpect_eq(serde_json::json!({ "rules": [] }));
+			.xpect_eq(value!({ "rules": [] }));
 	}
 }

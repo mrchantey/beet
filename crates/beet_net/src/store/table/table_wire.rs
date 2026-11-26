@@ -282,7 +282,7 @@ impl TableWire {
 		request: Request,
 	) -> Result<T> {
 		let bytes = request.into_parts().1.into_bytes().await?;
-		serde_json::from_slice::<T>(&bytes)?.xok()
+		json_ext::from_slice::<T>(&bytes)?.xok()
 	}
 
 	fn method_not_allowed() -> Result<Response> {
@@ -516,7 +516,7 @@ impl TableWireClient {
 			return Ok(response);
 		}
 		let text = response.text().await.unwrap_or_default();
-		match serde_json::from_str::<TableError>(&text) {
+		match json_ext::from_str::<TableError>(&text) {
 			Ok(err) => Err(err.into()),
 			Err(_) => Err(HttpError::new(status, text).into()),
 		}
@@ -636,7 +636,7 @@ impl TableProvider for TableWireClient {
 		};
 		Box::pin(async move {
 			let request = Self::with_precondition(
-				Request::put(url).with_body(serde_json::to_vec(&body)?),
+				Request::put(url).with_body(json_ext::to_vec(&body)?),
 				&precondition,
 			);
 			Self::checked(this.send(request).await?).await.map(drop)
@@ -681,7 +681,7 @@ impl TableProvider for TableWireClient {
 		let this = self.clone();
 		let url = self.url([TableWire::APPLY]);
 		Box::pin(async move {
-			let body = serde_json::to_vec(&ApplyBody { writes })?;
+			let body = json_ext::to_vec(&ApplyBody { writes })?;
 			Self::checked(this.send(Request::post(url).with_body(body)).await?)
 				.await
 				.map(drop)
@@ -702,7 +702,7 @@ impl TableProvider for TableWireClient {
 			scan,
 		};
 		Box::pin(async move {
-			let body = serde_json::to_vec(&body)?;
+			let body = json_ext::to_vec(&body)?;
 			Self::checked(this.send(Request::post(url).with_body(body)).await?)
 				.await?
 				.json::<ScanPage>()
@@ -774,7 +774,9 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn json() { in_process(json_tables(BlobStore::temp())).await }
+	async fn json() {
+		in_process(json_tables(BlobStore::new(InMemoryBlobStore::new()))).await
+	}
 
 	#[cfg(feature = "sqlite")]
 	#[beet_core::test(timeout_ms = 60_000)]
@@ -784,7 +786,7 @@ mod test {
 	/// server whole.
 	#[beet_core::test]
 	async fn keys_survive_the_path() {
-		let provider = json_tables(BlobStore::temp());
+		let provider = json_tables(BlobStore::new(InMemoryBlobStore::new()));
 		let store = TableStore::new(
 			TableWireClient::connect(TableWireTransport::new(
 				"in-process",
@@ -833,7 +835,8 @@ mod test {
 
 		#[beet_core::test(timeout_ms = 60_000)]
 		async fn json_memory() {
-			over_http(json_tables(BlobStore::temp())).await
+			over_http(json_tables(BlobStore::new(InMemoryBlobStore::new())))
+				.await
 		}
 
 		#[beet_core::test(timeout_ms = 60_000)]
