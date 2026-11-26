@@ -67,8 +67,8 @@ impl DiagramSvgCache {
 		picture.xok()
 	}
 
-	/// The pictures kept.
-	#[cfg(test)]
+	/// The pictures kept, for the cache's test.
+	#[cfg(all(test, feature = "markdown"))]
 	fn len(&self) -> usize { self.0.len() }
 }
 

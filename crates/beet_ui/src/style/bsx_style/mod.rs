@@ -11,8 +11,9 @@ mod inline_style;
 mod prop_name;
 mod rule_markup;
 pub use inline_style::InlineStyle;
-// a `<Mermaid form>` declares on its figure's behalf exactly as `bx:style` does
-#[cfg(feature = "mermaid")]
+// a `<Mermaid form>` declares on its figure's behalf exactly as `bx:style` does,
+// gated as that widget is, and its stylesheet test reaches it too
+#[cfg(all(feature = "mermaid", any(feature = "net", test)))]
 pub(crate) use inline_style::inline_style_rule;
 pub use prop_name::*;
 pub use rule_markup::DeclaredRule;

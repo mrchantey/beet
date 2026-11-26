@@ -240,6 +240,12 @@ pub(super) fn build_theme(
 		// material containers are already tonal
 		pie_opacity: 1.,
 	};
+	// the browser draws labels in the page's own font, so the crate's estimate
+	// is all the layout needs. It still measures for real where the estimate
+	// does not reach (non-ascii labels, pie, gantt and er diagrams), scanning
+	// the system fonts once per process: a box with none logs one harmless
+	// fontdb `Fallback to loading from known font dir paths` warning, and a
+	// machine with fonts lays those diagrams out slightly differently.
 	let mut layout = LayoutConfig {
 		fast_text_metrics: true,
 		..default()

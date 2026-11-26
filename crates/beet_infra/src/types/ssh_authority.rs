@@ -167,15 +167,28 @@ impl SshHost {
 
 	/// The sshd drop-in, ordered first: sshd takes the first value of each
 	/// keyword it reads, so these beat the distribution's defaults.
-	pub const SSHD_DROP_IN: &'static str =
-		"/etc/ssh/sshd_config.d/00-beet-certificates.conf";
+	pub const SSHD_DROP_IN: &'static str = "/etc/ssh/sshd_config.d/00-beet.conf";
+
+	/// The key exchanges the box's sshd offers, most preferred first, the
+	/// post-quantum hybrids leading. A distribution's crypto policy can leave
+	/// them out of the offer (Amazon Linux's `DEFAULT` does), and OpenSSH 10
+	/// then warns on every login. The stanza keeps only the names the
+	/// installed sshd supports, since an unknown one fails `sshd -t`.
+	pub const KEX_ALGORITHMS: &'static [&'static str] = &[
+		"mlkem768x25519-sha256",
+		"sntrup761x25519-sha512",
+		"sntrup761x25519-sha512@openssh.com",
+		"curve25519-sha256",
+		"curve25519-sha256@libssh.org",
+	];
 
 	/// The cloud-init stanza making the box's sshd trust the stack's
 	/// authority and nothing else: the host key and its certificate fetched
 	/// from the store (retried, since the instance's grant may land moments
 	/// after it boots), the user authority written from the rendered
 	/// variable, and `AuthorizedKeysFile none`, so no key in a file is a way
-	/// in, whatever a provider's key pair wrote there.
+	/// in, whatever a provider's key pair wrote there. The same drop-in
+	/// orders the key exchanges ([`KEX_ALGORITHMS`](Self::KEX_ALGORITHMS)).
 	///
 	/// Needs the `aws` cli holding credentials that read the two parameters
 	/// ([`parameter_names`](Self::parameter_names)). Holds no `${` at all:
@@ -188,6 +201,7 @@ impl SshHost {
 		let ca_path = Self::USER_CA_PATH;
 		let drop_in = Self::SSHD_DROP_IN;
 		let user_ca = SshAuthority::USER_CA_TOKEN;
+		let kex_names = Self::KEX_ALGORITHMS.join(" ");
 		format!(
 			r#"
 # ssh trusts the stack's certificate authority and nothing else: a login is a
@@ -213,6 +227,18 @@ HostCertificate {key_path}-cert.pub
 TrustedUserCAKeys {ca_path}
 AuthorizedKeysFile none
 SSHD_EOF
+# the post-quantum key exchanges first, of the ones this sshd supports
+kex=
+separator=
+for name in {kex_names}; do
+	if ssh -Q kex | grep -qx "$name"; then
+		kex="$kex$separator$name"
+		separator=,
+	fi
+done
+if [ -n "$kex" ]; then
+	echo "KexAlgorithms $kex" >> '{drop_in}'
+fi
 sshd -t
 systemctl restart sshd
 "#
@@ -258,6 +284,29 @@ mod tests {
 			.xpect_contains("cat > '/etc/ssh/beet_user_ca.pub' <<'SSH_CA_EOF'\n__SSH_USER_CA__\nSSH_CA_EOF")
 			// the config is checked before the restart that would apply it
 			.xpect_contains("sshd -t\nsystemctl restart sshd");
+	}
+
+	/// The box offers the post-quantum key exchanges first, filtered to what
+	/// its sshd supports, from the drop-in that beats the distribution's
+	/// crypto policy, all before the config check.
+	#[beet_core::test]
+	fn offers_post_quantum_key_exchange() {
+		let stanza = host().trust_stanza(&stack()).unwrap();
+		stanza
+			.as_str()
+			.xpect_contains(
+				"for name in mlkem768x25519-sha256 sntrup761x25519-sha512 ",
+			)
+			.xpect_contains("ssh -Q kex | grep -qx \"$name\"")
+			.xpect_contains(
+				"echo \"KexAlgorithms $kex\" >> '/etc/ssh/sshd_config.d/00-beet.conf'",
+			);
+		let kex = stanza.find("KexAlgorithms").unwrap();
+		(kex < stanza.find("sshd -t").unwrap()).xpect_true();
+		// sorts before Amazon Linux's `50-redhat.conf`, whose crypto policy
+		// would otherwise be the first value read
+		(SshHost::SSHD_DROP_IN < "/etc/ssh/sshd_config.d/50-redhat.conf")
+			.xpect_true();
 	}
 
 	/// The box fetches exactly its own two parameters, in the stack's
