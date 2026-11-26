@@ -4,6 +4,7 @@ use super::office_style::*;
 use super::read_element::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 
 /// Reads a workbook into one `article data-worksheet` per worksheet in tab
 /// order, each holding one `table` dense from `A1` to its last used cell,
@@ -827,38 +828,15 @@ impl Installer for WorkbookParser {
 impl DocParser for WorkbookParser {
 	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Xlsx] }
 
-	/// The [`DocMeta`] a workbook's core properties declare, named as
-	/// `frontmatter_type`.
-	fn declarations(
-		&self,
+	fn parse(
+		&mut self,
 		bytes: &MediaBytes,
-		frontmatter_type: &str,
-	) -> Result<RootDeclarations> {
-		DocMeta::from_package(&OpcPackage::read(bytes.bytes())?)?
-			.declarations(frontmatter_type)
-			.xok()
-	}
-
-	fn parse(&mut self, bytes: &MediaBytes) -> Result<SceneBody, ParseError> {
-		Err(ParseError::WorldOnly(bytes.media_type().clone()))
-	}
-
-	fn parse_into(&mut self, cx: ParseContext) -> Result<(), ParseError> {
-		if cx.bytes.media_type() != &MediaType::Xlsx {
-			return Err(ParseError::UnsupportedType {
-				unsupported: cx.bytes.media_type().clone(),
-				supported: self.media_types(),
-			});
-		}
-		let package = OpcPackage::read(cx.bytes.bytes())?;
-		let meta = DocMeta::from_package(&package)?;
-		if meta != DocMeta::default() {
-			cx.entity.insert(meta);
-		}
-		let root = cx.entity.id();
-		cx.entity
-			.world_scope(|world| self.read(world, root, &package))?;
-		Ok(())
+		parsers: &DocParsers,
+	) -> Result<ParsedDocument, ParseError> {
+		let package = OoxmlPlugin::open(bytes, MediaType::Xlsx)?;
+		OoxmlPlugin::read_body(&package, parsers, |world, root| {
+			self.read(world, root, &package)
+		})
 	}
 }
 

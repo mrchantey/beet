@@ -5,6 +5,7 @@ use super::office_style::*;
 use super::read_element::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 use bevy::math::Affine2;
 
 /// Reads a slide deck into one `article data-card` per listed slide in
@@ -1037,38 +1038,15 @@ impl Installer for DeckParser {
 impl DocParser for DeckParser {
 	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Pptx] }
 
-	/// The [`DocMeta`] a deck's core properties declare, named as
-	/// `frontmatter_type`.
-	fn declarations(
-		&self,
+	fn parse(
+		&mut self,
 		bytes: &MediaBytes,
-		frontmatter_type: &str,
-	) -> Result<RootDeclarations> {
-		DocMeta::from_package(&OpcPackage::read(bytes.bytes())?)?
-			.declarations(frontmatter_type)
-			.xok()
-	}
-
-	fn parse(&mut self, bytes: &MediaBytes) -> Result<SceneBody, ParseError> {
-		Err(ParseError::WorldOnly(bytes.media_type().clone()))
-	}
-
-	fn parse_into(&mut self, cx: ParseContext) -> Result<(), ParseError> {
-		if cx.bytes.media_type() != &MediaType::Pptx {
-			return Err(ParseError::UnsupportedType {
-				unsupported: cx.bytes.media_type().clone(),
-				supported: self.media_types(),
-			});
-		}
-		let package = OpcPackage::read(cx.bytes.bytes())?;
-		let meta = DocMeta::from_package(&package)?;
-		if meta != DocMeta::default() {
-			cx.entity.insert(meta);
-		}
-		let root = cx.entity.id();
-		cx.entity
-			.world_scope(|world| self.read(world, root, &package))?;
-		Ok(())
+		parsers: &DocParsers,
+	) -> Result<ParsedDocument, ParseError> {
+		let package = OoxmlPlugin::open(bytes, MediaType::Pptx)?;
+		OoxmlPlugin::read_body(&package, parsers, |world, root| {
+			self.read(world, root, &package)
+		})
 	}
 }
 

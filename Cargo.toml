@@ -249,6 +249,8 @@ base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.11", default-features = false }
 # the keyed digest AWS Signature Version 4 derives its signing key with
 hmac = { version = "0.13", default-features = false }
+# reads the xml an http api answers in, ie S3 and the AWS query protocols
+roxmltree = "0.21"
 # SQLite for the `SqliteStore` backend: `bundled` compiles the engine in rather
 # than linking a system library, so it cross-compiles like the rest of the tree.
 # `ffi-sqlite-wasm-rs` is how it reaches the browser: rusqlite swaps

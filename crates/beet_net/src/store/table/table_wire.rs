@@ -127,7 +127,7 @@ impl TableWire {
 					.filter(|capability| provider.supports(*capability))
 					.collect::<Vec<_>>()
 					.xref()
-					.xmap(Response::ok_json)
+					.xmap(Response::with_json)
 			}
 			(_, [segment]) if segment == Self::STORE => match method {
 				HttpMethod::Get => match provider.store_exists().await? {
@@ -159,7 +159,7 @@ impl TableWire {
 					.scan_index(&body.table, &index, body.scan)
 					.await?
 					.xref()
-					.xmap(Response::ok_json)
+					.xmap(Response::with_json)
 			}
 			(_, [segment, rest @ ..]) if segment == Self::BLOB => {
 				Self::blob(provider, method, rest, precondition, request).await
@@ -170,7 +170,7 @@ impl TableWire {
 					.scan_rows(&TableSpec::new(table.clone()), scan)
 					.await?
 					.xref()
-					.xmap(Response::ok_json)
+					.xmap(Response::with_json)
 			}
 			(_, [table, key @ ..]) if !key.is_empty() => {
 				let key = TableKey::from(key.join("/"));
@@ -178,7 +178,7 @@ impl TableWire {
 				match method {
 					HttpMethod::Get => {
 						match provider.get_row(&spec, &key).await? {
-							Some(row) => Response::ok_json(&row)?
+							Some(row) => Response::with_json(&row)?
 								.with_header("etag", &Self::etag(row.cid())),
 							None => Response::not_found(),
 						}
@@ -236,7 +236,7 @@ impl TableWire {
 			.map(|path| path.to_string())
 			.collect::<Vec<_>>();
 			paths.sort();
-			return Response::ok_json(&paths);
+			return Response::with_json(&paths);
 		}
 		if path.is_empty() {
 			return Response::not_found().xok();
@@ -387,7 +387,7 @@ impl TableWire {
 				TableError::Unsupported { .. } => StatusCode::NOT_IMPLEMENTED,
 				TableError::Limit { .. } => StatusCode::CONTENT_TOO_LARGE,
 			};
-			return Response::ok_json(table)
+			return Response::with_json(table)
 				.map(|response| response.with_status(status))
 				.unwrap_or_else(|_| Response::from_status(status));
 		}

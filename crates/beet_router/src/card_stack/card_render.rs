@@ -414,6 +414,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 	use beet_ui::prelude::*;
 
 	/// A synthetic two slide deck, each slide's notes after its `hr`,
@@ -422,13 +423,13 @@ mod test {
 		let mut world =
 			(TemplatePlugin, DocumentPlugin, OoxmlPlugin).into_world();
 		let root = world.spawn_empty().id();
-		DocParsers::parse(ParseContext::new(
+		ParseContext::new(
 			&mut world.entity_mut(root),
 			&MediaBytes::new_html(
 				"<article data-card><h1>Talk one</h1><p>First slide.</p><hr/><p>Talk notes.</p></article>\
 				 <article data-card><h1>Talk two</h1><p>Second slide.</p><hr/><p>More notes.</p></article>",
 			),
-		))
+		).parse()
 		.unwrap();
 		DocRenderers::render(
 			&mut world,
@@ -600,11 +601,9 @@ mod test {
 			.unwrap();
 		bytes.media_type().clone().xpect_eq(MediaType::Pptx);
 		let read = world.spawn_empty().id();
-		DocParsers::parse(ParseContext::new(
-			&mut world.entity_mut(read),
-			&bytes,
-		))
-		.unwrap();
+		ParseContext::new(&mut world.entity_mut(read), &bytes)
+			.parse()
+			.unwrap();
 		let html = HtmlRenderer::new()
 			.render(&mut RenderContext::new(
 				&mut world,

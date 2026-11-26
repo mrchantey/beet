@@ -346,7 +346,12 @@ async fn function_scene_declares_its_route() {
 	assert_crate_check_passed(&mut app);
 	let routes = app.world_mut().query_once::<&ThreadRoute>();
 	routes.len().xpect_eq(1);
-	routes[0].template.as_str().xpect_eq("ReviewThread");
+	match &routes[0].source {
+		TemplateSource::Document(document) => {
+			document.as_str().xpect_eq("templates/ReviewThread.bsx")
+		}
+		TemplateSource::Template(name) => panic!("a template, `{name}`"),
+	};
 	routes[0].message.is_some().xpect_true();
 	let mut app = reduce(include_str!(
 		"../examples/thread/templates/ReviewThread.bsx"

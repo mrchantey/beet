@@ -478,6 +478,7 @@ mod test {
 	use crate::prelude::*;
 	use crate::ui::test_ext;
 	use beet_core::prelude::*;
+	use beet_scene::prelude::*;
 	use bevy::math::UVec2;
 
 	/// A log post projects as a divider row in its own words, beside the

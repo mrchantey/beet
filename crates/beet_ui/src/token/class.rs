@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::ecs::lifecycle::HookContext;
+use bevy::ecs::world::DeferredWorld;
 #[cfg(feature = "serde")]
 use bevy::reflect::Typed;
 
@@ -217,6 +219,75 @@ pub(crate) fn register_inline_rule(
 		entity.insert(Classes::from_iter([class]));
 	}
 	Ok(())
+}
+
+/// A one-off [`Rule`] for its element, keyed on its own class: the typed
+/// twin of `InlineStyle`, what a reader declares a look it computed with, ie
+/// a Word run's direct formatting.
+///
+/// Inserting it registers its rule in the [`RuleSet`] (only once, so equal
+/// looks share one rule) and adds the class to the element's [`Classes`], as
+/// [`register_inline_rule`] does. Plain data, so a scene body carries the
+/// look and a load registers it again.
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
+#[component(on_insert = InlineRule::on_insert())]
+pub struct InlineRule {
+	/// The class the rule selects, ie [`ClassName::as_selector`]'s.
+	class: SmolStr,
+	/// Where the rule ranks in the cascade.
+	origin: RuleOrigin,
+	/// What the rule declares, in order.
+	declarations: Vec<(TokenKey, TokenValue)>,
+}
+
+impl InlineRule {
+	/// A one-off rule declaring `declarations` in `origin`, keyed on `class`.
+	pub fn new(
+		class: &ClassName,
+		origin: RuleOrigin,
+		declarations: impl IntoIterator<Item = (TokenKey, TokenValue)>,
+	) -> Self {
+		Self {
+			class: class.as_selector(),
+			origin,
+			declarations: declarations.into_iter().collect(),
+		}
+	}
+
+	/// The [`Rule`] this declares.
+	pub fn rule(&self) -> Rule {
+		Rule::new()
+			.with_selector(Selector::Class(self.class.clone()))
+			.with_origin(self.origin)
+			.with_extend(self.declarations.iter().cloned())
+	}
+
+	fn on_insert() -> impl FnOnce(DeferredWorld, HookContext) {
+		|mut world, cx| {
+			let Some(inline) = world.get::<Self>(cx.entity).cloned() else {
+				return;
+			};
+			let rule = inline.rule();
+			// the rule lands synchronously where it can, as an `InlineStyle`'s
+			// does: a stylesheet baked later in the same build reads the rule
+			// set before any command flush
+			if let Some(mut rules) = world.get_resource_mut::<RuleSet>()
+				&& !rules.has_inline(rule.selector())
+			{
+				rules.try_insert_inline(rule.clone());
+			}
+			world.commands().entity(cx.entity).queue(
+				move |mut entity: EntityWorldMut| {
+					register_inline_rule(
+						&mut entity,
+						ClassName::String(inline.class),
+						rule,
+					)
+				},
+			);
+		}
+	}
 }
 
 /// Declare a [`RuleSet`] rule inline on an element.

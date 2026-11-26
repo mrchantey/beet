@@ -1339,6 +1339,7 @@ dependencies = [
  "qrcode",
  "rcgen",
  "reqwest",
+ "roxmltree 0.21.1",
  "rusqlite",
  "russh",
  "rustls-pki-types",

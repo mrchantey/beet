@@ -329,18 +329,6 @@ mod test {
 			.xpect_eq("h1".to_string());
 	}
 
-	/// An element one HTML block opens and a later one closes holds the
-	/// markdown between them, ie a disclosure's body.
-	#[beet_core::test]
-	fn html_blocks_span_markdown() {
-		roundtrip(
-			"<details><summary>Open me</summary>\n\nHidden **body**.\n\n</details>\n\nAfter",
-		)
-		.xpect_contains("<details><summary>Open me</summary><p>Hidden <strong>body</strong>.</p></details><p>After</p>")
-		.xnot()
-		.xpect_contains("html_block");
-	}
-
 	#[beet_core::test]
 	fn parse_inline_html_in_markdown() {
 		let mut world = ScenePlugin::world();

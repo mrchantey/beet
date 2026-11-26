@@ -103,7 +103,7 @@
 //! else, so building a template reads no file and calls no route.
 //!
 //! A request's message belongs to the request:
-//! `ThreadRoute{template:"..", message:"review {document}", actor:2}`, each
+//! `ThreadRoute{source:Document(".."), message:"review {document}", actor:2}`, each
 //! `{param}` filled from the request and posted after the joins, on every
 //! request. Without `actor` its author is the thread's first actor of kind
 //! User by id, and a thread holding none fails the request.

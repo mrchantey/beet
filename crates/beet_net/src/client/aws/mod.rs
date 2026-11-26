@@ -13,6 +13,7 @@
 //!   `restJson1`, `restXml` and the query protocols, with retries, the S3
 //!   bucket addressing rules and an [`AwsError`] parsed from whichever shape
 //!   an error arrives in. [`AwsSts`] is the identity calls on top of it.
+//! - [`XmlElement`] reads the `restXml` and query protocols' answers.
 //!
 //! No SDK, no async runtime and no `aws` cli: the same code signs from a
 //! native binary, a Lambda and a Cloudflare Worker. The services a crate
@@ -27,6 +28,7 @@ mod error;
 mod service;
 mod sigv4;
 mod sts;
+mod xml_element;
 pub use auth::*;
 pub use client::*;
 pub use credential_source::*;
@@ -35,3 +37,4 @@ pub use error::*;
 pub use service::*;
 pub use sigv4::*;
 pub use sts::*;
+pub use xml_element::*;

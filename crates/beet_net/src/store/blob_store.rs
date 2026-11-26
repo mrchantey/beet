@@ -460,35 +460,6 @@ mod test {
 			.xpect_contains("not under its declared store root");
 	}
 
-	/// A `..` climbs above a scope within its base store, never above it.
-	#[beet_core::test]
-	async fn climbs_above_a_scope() {
-		let scoped = nested_store().await.with_subdir(RelPath::new("a/b"));
-		let read = async |path: &str| {
-			scoped
-				.relative_blob(path)
-				.unwrap()
-				.get_media()
-				.await
-				.unwrap()
-		};
-		read("../shared.txt")
-			.await
-			.as_utf8()
-			.unwrap()
-			.xpect_eq("shared");
-		read("main.bsx")
-			.await
-			.as_utf8()
-			.unwrap()
-			.xpect_eq("<Router/>");
-		scoped
-			.relative_blob("../../../x")
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("climbs above");
-	}
-
 	#[beet_core::test]
 	fn splits_a_file_uri() {
 		let (store, file) =

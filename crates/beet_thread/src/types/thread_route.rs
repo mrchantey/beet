@@ -51,10 +51,12 @@ pub async fn ThreadRoute(
 	/// The message each request posts once the thread is entered, each
 	/// `{param}` filled from the request. None posts nothing.
 	#[field]
+	#[reflect(default)]
 	message: Option<SmolStr>,
 	/// The message's author, by id, else the thread's first User actor by
 	/// id.
 	#[field]
+	#[reflect(default)]
 	actor: Option<ActorId>,
 	entry: Params<ThreadEntryParams>,
 	cx: ActionContext<Request>,
@@ -152,7 +154,7 @@ impl ThreadRoute {
 			})
 			.await?
 			.ok_or_else(|| {
-bevyhow!("`{template}` must build exactly one root")
+				bevyhow!("`{template}` must build exactly one root")
 			})?;
 		let thread = *threads
 			.first()

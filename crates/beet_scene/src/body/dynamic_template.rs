@@ -235,13 +235,10 @@ impl DynamicTemplate {
 		entity.world_scope(|world| {
 			TemplateLoader::new(world).with_entity(id).build_onto(self)
 		})?;
-		// the tree is extended once, whatever its format: its tables numbered,
-		// then whatever else is registered, ie styles or a deck's triage
-		entity.insert(ParsedRoot);
+		// the tree is extended once, whatever its format, ie styled
 		entity.world_scope(|world| {
 			let _ = world.try_run_schedule(PostParseTree);
 		});
-		entity.remove::<ParsedRoot>();
 		Ok(())
 	}
 

@@ -4,6 +4,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_scene::prelude::*;
 
 /// `bytes` parsed into a world of the formats and the default style rules,
 /// and its root.
@@ -20,7 +21,7 @@ pub(crate) fn parse_in(
 	bytes: &MediaBytes,
 ) -> Result<(World, Entity)> {
 	let root = world.spawn_empty().id();
-	DocParsers::parse(ParseContext::new(&mut world.entity_mut(root), bytes))?;
+	ParseContext::new(&mut world.entity_mut(root), bytes).parse()?;
 	(world, root).xok()
 }
 

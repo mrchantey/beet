@@ -3,6 +3,7 @@
 //! Packaging Conventions define them.
 use super::xml_part::XmlPart;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
@@ -614,6 +615,7 @@ impl OpcPackage {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_scene::prelude::*;
 
 	/// A package written and read back holds its parts, their types and
 	/// their relationships, a relative target resolving against its source's

@@ -276,10 +276,12 @@ impl RouteToolCall {
 		let mut request = Request::get(path.as_str())
 			.with_accept(MediaType::from(self.accept.as_str()));
 		match params {
-			Some(pattern) => Self::insert_params(&mut request, fields, pattern),
+			Some(pattern) => {
+				Self::insert_params(&mut request, fields, pattern)?
+			}
 			None => {
 				request = request
-					.with_body(Value::Map(fields).to_json_string())
+					.with_body(Value::Map(fields).to_json_string()?)
 					.with_content_type(MediaType::Json);
 			}
 		}
@@ -302,26 +304,28 @@ impl RouteToolCall {
 		request: &mut Request,
 		fields: Map,
 		pattern: &ParamsPattern,
-	) {
-		let text = |value: &Value| -> SmolStr {
+	) -> Result {
+		let text = |value: &Value| -> Result<SmolStr> {
 			match value {
 				Value::Str(text) => text.clone(),
-				other => other.to_json_string().into(),
+				other => other.to_json_string()?.into(),
 			}
+			.xok()
 		};
 		let parts = request.request_parts_mut();
 		for (key, value) in fields.0 {
 			let values = match value {
 				Value::Null => continue,
 				Value::List(items) if pattern.repeats(&key) => {
-					items.iter().map(text).collect()
+					items.iter().map(text).collect::<Result<Vec<_>>>()?
 				}
-				value => vec![text(&value)],
+				value => vec![text(&value)?],
 			};
 			for value in values {
 				parts.insert_param(key.clone(), value);
 			}
 		}
+		Ok(())
 	}
 }
 
@@ -354,6 +358,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
+	use beet_scene::prelude::*;
 
 	/// Stands in for a verb taking params.
 	#[action(route = "eval/grade")]
@@ -404,7 +409,7 @@ mod test {
 	) -> Result<MediaBytes> {
 		MediaBytes::new_text(format!(
 			"put {} into {table}",
-			row.to_json_string()
+			row.to_json_string()?
 		))
 		.xok()
 	}
@@ -455,10 +460,7 @@ mod test {
 </Thread>
 "#
 		);
-		let thread = BsxTemplate::parse_entry(app.world(), &source)
-			.unwrap()
-			.spawn(app.world_mut())
-			.unwrap();
+		let thread = BsxParser::spawn(app.world_mut(), &source).unwrap();
 		app.world_mut().entity_mut(router).add_child(thread);
 		app.update();
 		ThreadRecords::reduce_now(app.world_mut());
@@ -533,6 +535,7 @@ mod test {
 			.get("required")
 			.unwrap()
 			.to_json_string()
+			.unwrap()
 			.xpect_eq(r#"["eval","level"]"#);
 		outputs(&mut app, thread, agent, 1).await.xpect_eq(vec![
 			r#""graded brand.voice at 2 [\"a\", \"b\"]""#.to_string(),
@@ -548,6 +551,7 @@ mod test {
 		tool(&mut app, agent, "eval/grade")
 			.params_schema()
 			.to_json_string()
+			.unwrap()
 			.xpect_snapshot();
 	}
 
@@ -576,6 +580,7 @@ mod test {
 			.get("required")
 			.unwrap()
 			.to_json_string()
+			.unwrap()
 			.xpect_eq(r#"["rubric"]"#);
 		outputs(&mut app, thread, agent, 1)
 			.await
@@ -592,7 +597,8 @@ mod test {
 		);
 		let schema = tool(&mut app, agent, "eval/put")
 			.params_schema()
-			.to_json_string();
+			.to_json_string()
+			.unwrap();
 		schema
 			.as_str()
 			.xpect_contains("row")

@@ -3,6 +3,7 @@
 use super::xml_part::XmlPart;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_scene::prelude::*;
 use heck::ToKebabCase;
 
 impl DocMeta {
@@ -137,9 +138,13 @@ impl DocMeta {
 		xml.into_bytes().xsome()
 	}
 
-	/// This as the declarations a root scan reads, named as `component`,
-	/// every field it maps from the core properties that is set.
-	pub(crate) fn declarations(&self, component: &str) -> RootDeclarations {
+	/// This as the root components a document declares, named as `parsers`'
+	/// [metadata type](DocParsers::metadata_type), every field it maps from
+	/// the core properties that is set.
+	pub(crate) fn components(
+		&self,
+		parsers: &DocParsers,
+	) -> Result<EntityBody> {
 		let text = |text: &str| DataLiteral::Scalar(Value::Str(text.into()));
 		let list = |items: &[SmolStr]| {
 			(!items.is_empty()).then(|| {
@@ -157,13 +162,11 @@ impl DocMeta {
 		.into_iter()
 		.filter_map(|(key, value)| Some((SmolStr::new(key), value?)))
 		.collect::<Vec<_>>();
-		match fields.is_empty() {
-			true => RootDeclarations::default(),
-			false => RootDeclarations(vec![NamedLiteral {
-				name: component.into(),
-				fields: NamedFields::Struct(fields),
-			}]),
-		}
+		let declaration = (!fields.is_empty()).then(|| NamedLiteral {
+			name: parsers.metadata_type().into(),
+			fields: NamedFields::Struct(fields),
+		});
+		BsxParser::lower_declarations(declaration, parsers)
 	}
 }
 

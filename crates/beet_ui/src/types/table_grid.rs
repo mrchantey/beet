@@ -194,6 +194,8 @@ impl TableGrid<'_, '_> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	#[cfg(feature = "scene")]
+	use beet_scene::prelude::*;
 
 	/// The world holding `scene`, and its first table.
 	fn table(scene: impl Bundle) -> (World, Entity) {
@@ -359,6 +361,7 @@ mod test {
 
 	/// A table parsed from markdown and one parsed from HTML read the same
 	/// grid.
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn parsed_tables_read_their_grid() {
 		for (media_type, source) in [
@@ -372,10 +375,11 @@ mod test {
 			let mut world =
 				(TemplatePlugin, DocumentPlugin, ParsePlugin).into_world();
 			let root = world.spawn_empty().id();
-			DocParsers::parse(ParseContext::new(
+			ParseContext::new(
 				&mut world.entity_mut(root),
 				&MediaBytes::new(media_type, source.as_bytes().to_vec()),
-			))
+			)
+			.parse()
 			.unwrap();
 			let table = world
 				.query::<(Entity, &Element)>()

@@ -273,6 +273,19 @@ mod test {
 			.to_string()
 	}
 
+	/// An element one HTML block opens and a later one closes holds the
+	/// markdown between them, ie a disclosure's body.
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	fn html_blocks_span_markdown() {
+		roundtrip(
+			"<details><summary>Open me</summary>\n\nHidden **body**.\n\n</details>\n\nAfter",
+		)
+		.xpect_contains("<details><summary>Open me</summary><p>Hidden <strong>body</strong>.</p></details><p>After</p>")
+		.xnot()
+		.xpect_contains("html_block");
+	}
+
 	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
 	fn roundtrip_paragraph() {

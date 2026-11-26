@@ -10,6 +10,8 @@ impl Plugin for CssPlugin {
 		app.world_mut()
 			.get_resource_or_init::<CssTokenMap>()
 			.extend(common_props::token_map());
+		// a one-off rule a reader computed, carried through a scene body
+		app.register_type::<InlineRule>();
 		// markup, and what it writes of a style: the `<Rule>` tag declares a
 		// named rule into the `RuleSet` at build time, the no-code analogue of a
 		// typed `Rule` in Rust, and `bx:style` rewrites to an `InlineStyle`, a

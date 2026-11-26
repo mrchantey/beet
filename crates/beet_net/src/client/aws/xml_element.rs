@@ -1,12 +1,11 @@
-use crate::prelude::*;
+use beet_core::prelude::*;
 
 /// An xml document read as a plain element tree: each element's local name,
 /// its text and its child elements, with attributes, namespace prefixes,
-/// comments and processing instructions dropped. Parsed by the markup parser
-/// in its XML dialect ([`BsxParseConfig::xml`]), then read with
+/// comments and processing instructions dropped, a prefix the document never
+/// declares refused as malformed. Read with
 /// [`child`](Self::child) and [`text_at`](Self::text_at) rather than a
-/// schema, so a field a service adds later is simply not looked at. A reader
-/// needing attributes or prefixes walks the [`BsxNode`]s directly.
+/// schema, so a field a service adds later is simply not looked at.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct XmlElement {
 	/// The local name, namespace prefix dropped.
@@ -19,36 +18,34 @@ pub struct XmlElement {
 
 impl XmlElement {
 	/// The root element of `xml`.
+	///
+	/// ## Errors
+	/// Errors when `xml` is not well formed or has no root element.
 	pub fn parse(xml: &str) -> Result<Self> {
-		BsxNode::parse_document(xml, &BsxParseConfig::xml())?
-			.iter()
-			.find_map(|node| match node {
-				BsxNode::Element(element) => Some(Self::from_element(element)),
-				_ => None,
-			})
-			.ok_or_else(|| bevyhow!("the xml has no root element"))
+		let document =
+			roxmltree::Document::parse(xml).map_err(|err| match err {
+				roxmltree::Error::NoRootNode => {
+					bevyhow!("the xml has no root element")
+				}
+				err => bevyhow!("malformed xml: {err}"),
+			})?;
+		Self::from_node(document.root_element()).xok()
 	}
 
-	fn from_element(element: &BsxElement) -> Self {
-		let name = element
-			.tag
-			.rsplit_once(':')
-			.map_or(element.tag.as_str(), |(_, local)| local);
+	fn from_node(node: roxmltree::Node) -> Self {
 		let mut text = String::new();
 		let mut children = Vec::new();
-		for child in &element.children {
-			match child {
-				BsxNode::Element(element) => {
-					children.push(Self::from_element(element))
-				}
-				BsxNode::Text(content) | BsxNode::CData(content) => {
-					text.push_str(content)
-				}
-				_ => {}
+		for child in node.children() {
+			if child.is_element() {
+				children.push(Self::from_node(child));
+			} else if let Some(content) =
+				child.is_text().then(|| child.text()).flatten()
+			{
+				text.push_str(content);
 			}
 		}
 		Self {
-			name: name.into(),
+			name: node.tag_name().name().into(),
 			text: text.trim().to_string(),
 			children,
 		}
@@ -108,12 +105,13 @@ impl XmlElement {
 mod test {
 	use super::*;
 
-	/// Text is unescaped, namespaces dropped, and paths reach nested fields.
-	#[crate::test]
+	/// Text is unescaped, namespace prefixes dropped, and paths reach nested
+	/// fields.
+	#[beet_core::test]
 	fn reads_a_document() {
 		let xml = XmlElement::parse(
 			r#"<?xml version="1.0" encoding="UTF-8"?>
-			<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+			<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/" xmlns:s3="http://s3.amazonaws.com/doc/2006-03-01/">
 				<Name>bucket</Name>
 				<Contents><Key>a &amp; b</Key><Size>3</Size></Contents>
 				<Contents><Key>c&#47;d</Key><Size>4</Size></Contents>
@@ -134,7 +132,7 @@ mod test {
 		XmlElement::escape_text("<a & b>").xpect_eq("&lt;a &amp; b&gt;");
 	}
 
-	#[crate::test]
+	#[beet_core::test]
 	fn refuses_a_document_without_a_root() {
 		XmlElement::parse("<?xml version=\"1.0\"?>")
 			.unwrap_err()

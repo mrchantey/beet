@@ -576,7 +576,7 @@ impl MarkdownRenderer {
 			if !attr.value.is_null() {
 				open.push_str(&format!(
 					"=\"{}\"",
-					escape_html_attribute(&attr.value.to_string())
+					html_ext::escape_attribute(&attr.value.to_string())
 				));
 			}
 		}
@@ -1351,7 +1351,7 @@ mod test {
 
 	/// A `hidden` element writes nothing, as the web and the terminal show
 	/// nothing of it.
-	#[cfg(feature = "bsx")]
+	#[cfg(feature = "scene")]
 	#[beet_core::test]
 	fn skips_hidden_elements() {
 		render_html_with(
@@ -1364,6 +1364,7 @@ mod test {
 	/// A card article writes as markdown authors one, so a deck dumps card by
 	/// card and reads back as the same cards; asked for, a hidden one writes
 	/// too, keeping its `hidden`.
+	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
 	fn writes_card_articles_as_authored() {
 		let deck = "<article data-card><h1>One</h1><hr/><p>Notes.</p></article>\
@@ -1377,14 +1378,14 @@ mod test {
 			"<article data-card>\n\n# One\n\n---\n\nNotes.\n\n</article>\n\n\
 			 <article data-card hidden>\n\n# Two\n\n</article>\n\nPlain.\n",
 		);
-		let mut world = World::new();
+		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
-		MarkdownParser::new()
-			.parse(ParseContext::new(
-				&mut world.entity_mut(entity),
-				&MediaBytes::new_markdown(&whole),
-			))
-			.unwrap();
+		ParseContext::new(
+			&mut world.entity_mut(entity),
+			&MediaBytes::new_markdown(&whole),
+		)
+		.parse()
+		.unwrap();
 		render_with(&mut world, entity, MarkdownRenderer::new().with_hidden())
 			.xpect_eq(whole);
 	}

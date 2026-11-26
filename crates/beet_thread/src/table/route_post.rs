@@ -10,7 +10,7 @@ use beet_net::prelude::*;
 /// table:
 ///
 /// ```bsx
-/// <Route path="coach/:claim" {ThreadRoute{template:"CoachThread"}}/>
+/// <Route path="coach/:claim" {ThreadRoute{source:Document("templates/CoachThread.bsx")}}/>
 /// <!-- CoachThread.bsx -->
 /// <CreateActor name="System" kind="System">
 ///     <RoutePost path="eval/rows?table=claims&key={claim}"/>
@@ -83,6 +83,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_scene::prelude::*;
 
 	/// Stands in for a verb reporting on a subject.
 	#[action(route = "notes")]
@@ -98,15 +99,15 @@ mod test {
 
 	/// A url space over a temp store with the `notes` verb and a route
 	/// building a thread seeded from `path`, its records under `threads`.
-	fn url_space(path: &str) -> (App, Entity, BlobStore) {
+	async fn url_space(path: &str) -> (App, Entity, BlobStore) {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.install_types::<ThreadPlugin>();
-		app.world_mut()
-			.get_resource_or_init::<BsxTemplateRegistry>()
-			.insert_source(
-				"NotesThread",
-				&format!(
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&RelPath::new("NotesThread.bsx"),
+				format!(
 					r#"
 <Thread {{(Sequence, MountThreadStore{{path:"threads"}})}}>
 	<CreateActor name="System" kind="System" id=1><RoutePost path="{path}"/></CreateActor>
@@ -115,15 +116,14 @@ mod test {
 "#
 				),
 			)
+			.await
 			.unwrap();
-		let store = BlobStore::temp();
-		let router = BsxTemplate::parse_entry(
+		let body = BsxParser::body(
 			app.world(),
-			r#"<Router><Route path="review/:document" {ThreadRoute{template:"NotesThread"}}/></Router>"#,
+			r#"<Router><Route path="review/:document" {ThreadRoute{source:Document("NotesThread.bsx")}}/></Router>"#,
 		)
-		.unwrap()
-		.spawn(app.world_mut())
 		.unwrap();
+		let router = app.world_mut().spawn_template(body).unwrap().id();
 		app.world_mut()
 			.entity_mut(router)
 			.insert((store.clone(), TableStore::new(store.clone())));
@@ -146,7 +146,8 @@ mod test {
 	/// A seed is the answer of a route, its path filled from the request.
 	#[beet_core::test]
 	async fn seeds_from_a_route() {
-		let (mut app, router, store) = url_space("notes?about={document}");
+		let (mut app, router, store) =
+			url_space("notes?about={document}").await;
 		review(&mut app, router).await.0.xpect_eq(StatusCode::OK);
 		let records =
 			ThreadStore::new(TableStore::new(store), RelPath::new("threads"));
@@ -159,7 +160,7 @@ mod test {
 	/// A route answering anything but OK fails the entry, naming the path.
 	#[beet_core::test]
 	async fn a_refusal_fails_the_entry() {
-		let (mut app, router, _) = url_space("nowhere");
+		let (mut app, router, _) = url_space("nowhere").await;
 		let (status, text) = review(&mut app, router).await;
 		status.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 		text.xpect_contains("the seed route `nowhere` answered 404");

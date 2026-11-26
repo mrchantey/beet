@@ -18,8 +18,7 @@ this url space, forwarded to as a call of the agent's own.
 <CallOnReady {(CliServer, HttpServer{default_boot:false})}>
 	<RequireCfg cfg="feature:thread"/>
 	<Router {HelpHandler}>
-		<TemplateDir src="templates"/>
 		<StoreToolset read_only=true/>
-		<Route path="review/:document" {ThreadRoute{template:"ReviewThread", message:"Review the document {document}."}}/>
+		<Route path="review/:document" {ThreadRoute{source:Document("templates/ReviewThread.bsx"), message:"Review the document {document}."}}/>
 	</Router>
 </CallOnReady>

@@ -128,8 +128,6 @@ mod test {
 			.cloned()
 			.unwrap()
 			.xpect_eq(Value::Str("body { color: red; }".into()));
-		// the marker lasts the post parse run alone
-		world.get::<ParsedRoot>(entity).xpect_none();
 	}
 
 	#[beet_core::test]

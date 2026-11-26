@@ -645,7 +645,7 @@ impl Reduction<'_, '_> {
 
 			// hoist or drop this actor's seed posts, despawning their entities.
 			// Scan all descendants (not just direct children) so seeds authored
-			// through a markup `<Slot/>` are still found; actors never nest, so
+			// through a markup `<slot/>` are still found; actors never nest, so
 			// every seed under an actor entity is unambiguously its own.
 			for child in
 				self.children.iter_descendants_depth_first(actor_entity)

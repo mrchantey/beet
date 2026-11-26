@@ -3,11 +3,15 @@
 //! registered as typed inline rules, a theme slot read as its token, and a
 //! writer's looks resolved through the cascade's pure resolve.
 use crate::prelude::*;
+use crate::style::FontStyle;
+use crate::style::FontWeight;
+use crate::style::common_props::BackgroundColor;
 use crate::style::common_props::*;
 use crate::style::material::colors;
 use crate::style::*;
 use beet_core::prelude::*;
 use beet_net::prelude::RequestParts;
+use beet_scene::prelude::*;
 
 /// How a reader reads a file's looks, held by every Office reader and set
 /// through its `with_options`.
@@ -498,9 +502,9 @@ impl DirectLook {
 	/// Whether the file says nothing of this element's look.
 	pub fn is_empty(&self) -> bool { *self == Self::default() }
 
-	/// Registers this look on `entity` as a typed inline rule in the origin
+	/// Declares this look on `entity` as an [`InlineRule`] in the origin
 	/// `options` names, keyed by its declarations so equal looks share one
-	/// class, `Drop` and an empty look registering nothing.
+	/// class, `Drop` and an empty look declaring nothing.
 	pub fn apply(
 		&self,
 		entity: &mut EntityWorldMut,
@@ -528,11 +532,8 @@ impl DirectLook {
 			key.push_str(&declaration);
 		}
 		let class = ClassName::from_inline_source(&key);
-		let rule = Rule::new()
-			.with_selector(Selector::Class(class.as_selector()))
-			.with_origin(origin)
-			.with_extend(declarations);
-		register_inline_rule(entity, class, rule)
+		entity.insert(InlineRule::new(&class, origin, declarations));
+		Ok(())
 	}
 
 	/// The declarations this look makes.

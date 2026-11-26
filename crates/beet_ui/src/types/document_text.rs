@@ -155,8 +155,6 @@ impl DocumentText<'_, '_> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	#[cfg(feature = "scene")]
-	use beet_scene::prelude::*;
 
 	/// A box reads as its value says when it holds a bool, an unticked value
 	/// overriding an authored `checked`, and as its attribute otherwise.

@@ -1,8 +1,8 @@
 //! Office Open XML: Word files, workbooks and slide decks, read into and
 //! written from the one document model.
 //!
-//! A reader is a [`DocParser`]: it reads a file into the entities markdown
-//! and HTML read into, [`Element`]s, their attributes and [`Value`] text,
+//! A reader is a [`DocParser`]: it reads a file into the scene body markdown
+//! and HTML read into, touching no world of the caller's, [`Element`]s, their attributes and [`Value`] text,
 //! with what the file formats directly carried as style rules (see
 //! [Style](#style)), and nothing Office-specific is left on any entity once
 //! it finishes. A writer is a [`DocRenderer`]: it writes from the tree alone,
@@ -213,9 +213,11 @@
 //! ## Reading
 //!
 //! - **Direct looks.** What a file formats directly and no element says, ie
-//!   a colour, a fill, a size or an alignment, a reader registers as a typed
-//!   inline rule on the element, as `inline_class!` and `bx:style` register
-//!   theirs, keyed by its declarations so equal looks share one class. The
+//!   a colour, a fill, a size or an alignment, a reader declares as an
+//!   [`InlineRule`](crate::prelude::InlineRule) on the element, the typed
+//!   twin of what `bx:style` declares, keyed by its declarations so equal
+//!   looks share one class, which a document carries as data and registers
+//!   once it lands in a world. The
 //!   rule sits in the cascade's `Direct` origin, which outranks every author
 //!   rule as an HTML `style` attribute does, so the terminal, the web's
 //!   stylesheet and a writer all see the file's look.

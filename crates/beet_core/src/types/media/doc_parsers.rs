@@ -283,21 +283,13 @@ impl DocParsers {
 	}
 }
 
-/// The schedule run once a document has been parsed into a world, its root
-/// marked [`ParsedRoot`] for the run (or, with `beet_ui`'s
-/// `RealtimeParsePlugin`, after every [`Update`]).
+/// The schedule run once a document has been parsed into a world (or, with
+/// `beet_ui`'s `RealtimeParsePlugin`, after every [`Update`]).
 ///
-/// Hosts table numbering, style resolution, syntax highlighting, charcell
-/// decorations and the layout and paint pipeline, ordered by their system
-/// sets.
+/// Hosts style resolution, syntax highlighting, charcell decorations and the
+/// layout and paint pipeline, ordered by their system sets.
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct PostParseTree;
-
-/// The root of a document just parsed into a world, present for
-/// the [`PostParseTree`] run that follows, so a step extending every parsed
-/// tree finds the roots that are new.
-#[derive(Debug, Default, Clone, Copy, Component)]
-pub struct ParsedRoot;
 
 /// The object-safe face of a [`DocParser`], which a registry can hold.
 trait ErasedDocParser: 'static + Send + Sync {

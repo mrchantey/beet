@@ -591,7 +591,7 @@ mod test {
 		let (first, _) = enter(
 			&store,
 			mount("threads"),
-			SeedSource::blob(RelPath::new("seeds/system.md")),
+			SeedSource::document(DocPath::parse("seeds/system.md").unwrap()),
 			request(&[]),
 		)
 		.await
@@ -600,7 +600,9 @@ mod test {
 			&store,
 			mount("threads"),
 			(
-				SeedSource::blob(RelPath::new("seeds/missing.md")),
+				SeedSource::document(
+					DocPath::parse("seeds/missing.md").unwrap(),
+				),
 				children![SeedSource::route("nowhere")],
 			),
 			request(&[]),
@@ -619,7 +621,7 @@ mod test {
 		enter(
 			&store,
 			mount("threads"),
-			SeedSource::blob(RelPath::new("seeds/missing.md")),
+			SeedSource::document(DocPath::parse("seeds/missing.md").unwrap()),
 			request(&[]),
 		)
 		.await
@@ -768,7 +770,7 @@ mod test {
 		let (branch, records) = enter(
 			&store,
 			mount("threads"),
-			SeedSource::blob(RelPath::new("seeds/missing.md")),
+			SeedSource::document(DocPath::parse("seeds/missing.md").unwrap()),
 			request(&[("branch-of", &point.to_string())]),
 		)
 		.await
