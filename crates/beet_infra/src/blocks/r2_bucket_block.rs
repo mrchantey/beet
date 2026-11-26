@@ -550,7 +550,7 @@ mod tests {
 		let (stack, deployment, _dir) = stack();
 		let mut config = deployment.create_config(&stack);
 		block.emit(&stack, &deployment, &mut config).unwrap();
-		config.to_json_string().unwrap()
+		config.to_json_string()
 	}
 
 	/// The bucket lands in the account the stack declares, at the composed

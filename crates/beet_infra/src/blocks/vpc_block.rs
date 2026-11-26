@@ -679,7 +679,7 @@ mod tests {
 	#[beet_core::test]
 	fn private_subnets_have_no_egress() {
 		let (stack, config) = build_config(&VpcBlock::new("net"));
-		let json = config.to_json_string().unwrap();
+		let json = config.to_json_string();
 		json.as_str().xnot().xpect_contains("aws_nat_gateway");
 		resources(&config, "aws_route_table").len().xpect_eq(1);
 		let block = VpcBlock::new("net");
@@ -744,7 +744,6 @@ mod tests {
 		let (_stack, config) = build_config(&VpcBlock::new("net"));
 		config
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xnot()
 			.xpect_contains("ipv6");

@@ -379,13 +379,13 @@ impl RenderScope {
 		func: impl FnOnce(&mut ChildSpawner),
 	) -> String {
 		let (scope, _dir) = Self::test_render_zoned(domain, func);
-		scope.finish().unwrap().2.to_json_string().unwrap()
+		scope.finish().unwrap().2.to_json_string()
 	}
 
 	/// The terraform json the blocks `func` spawns render to, failing the test
 	/// on any collected error.
 	pub(crate) fn test_json(func: impl FnOnce(&mut ChildSpawner)) -> String {
 		let (scope, _dir) = Self::test_render(func);
-		scope.finish().unwrap().2.to_json_string().unwrap()
+		scope.finish().unwrap().2.to_json_string()
 	}
 }

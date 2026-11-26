@@ -1013,7 +1013,7 @@ mod tests {
 
 	/// Build the terraform json for the given block.
 	fn build_json(block: &FargateBlock) -> String {
-		build_config(block).0.to_json_string().unwrap()
+		build_config(block).0.to_json_string()
 	}
 
 	/// Assert the autoscaling target + policy are emitted regardless of ssh.
@@ -1056,7 +1056,7 @@ mod tests {
 			parent.spawn(DynamoTableBlock::new("analytics"));
 		});
 		let stack = scope.stack().clone();
-		let json = scope.finish().unwrap().2.to_json_string().unwrap();
+		let json = scope.finish().unwrap().2.to_json_string();
 		json.as_str()
 			.xpect_contains("\"aws_iam_role_policy\":")
 			.xpect_contains(&format!(
@@ -1152,7 +1152,7 @@ mod tests {
 				"aws_ecr_repository.{}",
 				stack.resource_ident(block.build_label("ecr")).label()
 			)]);
-		config.to_json_string().unwrap().as_str().xpect_contains(
+		config.to_json_string().as_str().xpect_contains(
 			"\"deployment_circuit_breaker\":[{\"enable\":true,\"rollback\":true}]",
 		);
 	}
@@ -1259,7 +1259,7 @@ mod tests {
 			build_config_at(&autoscaling_block(), "prod");
 		// container_definitions is a JSON string nested in the config, so the env
 		// entry renders with escaped quotes (matching the BEET_SSH_PORT tests).
-		config.to_json_string().unwrap().xpect_contains(&format!(
+		config.to_json_string().xpect_contains(&format!(
 			r#"{{\"name\":\"BEET_STAGE\",\"value\":\"{}\"}}"#,
 			stack.stage()
 		));

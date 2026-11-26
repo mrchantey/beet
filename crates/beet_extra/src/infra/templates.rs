@@ -583,7 +583,7 @@ mod test {
 				let (stack, _deployment, config) = scope.finish().unwrap();
 				renders.push((
 					stack,
-					config.to_json_string().unwrap(),
+					config.to_json_string(),
 					config.to_json(),
 				));
 			}
@@ -649,7 +649,6 @@ mod test {
 				.and_then(|resource| resource.get("aws_lightsail_instance"))
 				.unwrap()
 				.to_json_string()
-				.unwrap()
 				.xpect_contains(&format!(
 					"aws_ssm_parameter.{}",
 					stack.resource_ident("ssh-host-key").label()
@@ -823,7 +822,7 @@ mod test {
 		fn config_json(world: &mut World, root: Entity) -> String {
 			let (.., config) =
 				RenderScope::render(world, root).unwrap().finish().unwrap();
-			config.to_json_string().unwrap()
+			config.to_json_string()
 		}
 		let stacks = world
 			.query::<(Entity, &Stack)>()
@@ -978,7 +977,6 @@ mod test {
 			.unwrap()
 			.xmap(|(.., config)| config)
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xpect_contains("aws_scheduler_schedule")
 			.xpect_contains("cron(0 3 * * ? *)")

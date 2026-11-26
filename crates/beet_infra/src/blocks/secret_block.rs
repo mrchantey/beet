@@ -804,11 +804,8 @@ mod test {
 					}),
 				)
 				.unwrap();
-			fs_ext::write(
-				dir.join("main.tf.json"),
-				config.to_json_string().unwrap(),
-			)
-			.unwrap();
+			fs_ext::write(dir.join("main.tf.json"), config.to_json_string())
+				.unwrap();
 		};
 		// tofu's output without its colors
 		let plain = |output: String| {

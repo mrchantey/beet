@@ -309,7 +309,7 @@ mod test {
 
 	/// The rendered json for a valid schedule related to the `rollup` lambda.
 	fn build_json(block: &ScheduledJobBlock) -> Result<String> {
-		build_config(block)?.to_json_string()
+		build_config(block)?.to_json_string().xok()
 	}
 
 	fn build_config(block: &ScheduledJobBlock) -> Result<terra::Config> {
@@ -371,7 +371,7 @@ mod test {
 		});
 		let (stack, _deployment, config) = scope.finish().unwrap();
 		// the schedule's interpolation names a resource this config declares
-		let json = config.to_json_string().unwrap();
+		let json = config.to_json_string();
 		let address =
 			format!("aws_lambda_function.{}", lambda.ident(&stack).label());
 		json.matches(&address).count().xpect_greater_than(1);

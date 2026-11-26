@@ -2229,7 +2229,6 @@ mod tests {
 				.unwrap()
 				.2
 				.to_json_string()
-				.unwrap()
 		};
 		render(&deployment).xpect_eq(render(&second));
 		user_data(&mail_box())
@@ -2416,7 +2415,6 @@ mod tests {
 		{
 			build_config_relayed(&mail_box(), relay)
 				.to_json_string()
-				.unwrap()
 				.as_str()
 				.xnot()
 				.xpect_contains("aws_iam_user")
@@ -2429,7 +2427,6 @@ mod tests {
 		// relay's to take away
 		build_config_relayed(&mail_box(), RelayMode::None)
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xpect_contains("aws_instance")
 			.xpect_contains("aws_iam_role");
@@ -2465,7 +2462,6 @@ mod tests {
 		egress[0]["protocol"].as_str().unwrap().xpect_eq("-1");
 		config
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xnot()
 			.xpect_contains("8080");
@@ -3294,7 +3290,6 @@ mod tests {
 		let (_stack, _deployment, config) = build_config(&mail_box());
 		config
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xnot()
 			.xpect_contains("TLSA")

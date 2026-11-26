@@ -1441,7 +1441,6 @@ mod tests {
 	fn events_and_alarms_arrive_with_their_topics() {
 		build_config(&ses(&[staging()]))
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xnot()
 			.xpect_contains("aws_cloudwatch_metric_alarm")
@@ -1514,7 +1513,6 @@ mod tests {
 		// undeclared: composed against the account, as before
 		build_config(&[relayed])
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xpect_contains(
 				"arn:aws:sns:ap-southeast-2:${data.aws_caller_identity.current.account_id}:beetmash-ses-events",
@@ -1688,7 +1686,6 @@ mod tests {
 		records(&ses(&[block.clone()])).xpect_eq(Vec::new());
 		build_config(&ses(&[block]))
 			.to_json_string()
-			.unwrap()
 			.xpect_contains("aws_sesv2_email_identity");
 	}
 
@@ -1737,7 +1734,6 @@ mod tests {
 	fn configuration_set_is_named_from_the_domain() {
 		build_config(&ses(&[staging(), news()]))
 			.to_json_string()
-			.unwrap()
 			.xpect_contains(
 				"\"configuration_set_name\":\"stalwart-beetmash-com\"",
 			)
@@ -1837,7 +1833,6 @@ mod tests {
 			relayed(&[news()], RelayMode::Comail(ComailRelay::default()));
 		build_config(&blocks)
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xnot()
 			.xpect_contains("aws_sesv2")
@@ -1889,7 +1884,6 @@ mod tests {
 		let blocks = relayed(&[news()], RelayMode::None);
 		build_config(&blocks)
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xnot()
 			.xpect_contains("aws_sesv2")

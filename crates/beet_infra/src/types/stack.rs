@@ -648,7 +648,6 @@ mod tests {
 		let (_stack, _deployment, config) = scope.finish().unwrap();
 		config
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xpect_contains("\"bucket\":\"beet-site--prod--app\"")
 			.xpect_contains("\"bucket\":\"beet-site--prod--analytics\"")

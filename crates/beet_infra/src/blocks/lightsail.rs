@@ -1599,7 +1599,7 @@ mod tests {
 	/// The rendered terraform config json for a block.
 	fn build_json(block: &LightsailBlock) -> String {
 		let (scope, _dir) = render_block(block);
-		scope.finish().unwrap().2.to_json_string().unwrap()
+		scope.finish().unwrap().2.to_json_string()
 	}
 
 	/// The `terraform_data` input the access key's replacement is triggered by,
@@ -1665,8 +1665,7 @@ mod tests {
 		first.deploy_id().xpect_not_eq(*second.deploy_id());
 		first_config
 			.to_json_string()
-			.unwrap()
-			.xpect_eq(second_config.to_json_string().unwrap());
+			.xpect_eq(second_config.to_json_string());
 		// the version it serves is resolved per start from the artifacts
 		// bucket's stable pointer, and named nowhere in the machine config
 		block
@@ -1800,7 +1799,7 @@ mod tests {
 			.label()
 			.to_string();
 		let rendered = scope.finish().unwrap().2;
-		let json = rendered.to_json_string().unwrap();
+		let json = rendered.to_json_string();
 		let config = rendered.to_json().into_json();
 		config["resource"]["aws_cloudwatch_log_group"][&logs_label]
 			["retention_in_days"]
@@ -2199,7 +2198,7 @@ mod tests {
 		});
 		let stack = scope.stack().clone();
 		let deployment = scope.deployment().clone();
-		let json = scope.finish().unwrap().2.to_json_string().unwrap();
+		let json = scope.finish().unwrap().2.to_json_string();
 		json.as_str()
 			// scoped to the resources the stack DECLARED, resolved through the
 			// one naming composition rather than restated on the block.

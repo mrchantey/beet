@@ -481,7 +481,7 @@ mod tests {
 
 	/// The terraform json rendered by `block`.
 	fn build_json(block: S3BucketBlock) -> String {
-		build_config(block).1.to_json_string().unwrap()
+		build_config(block).1.to_json_string()
 	}
 
 	/// A bucket anything can overwrite and that declares no way back is

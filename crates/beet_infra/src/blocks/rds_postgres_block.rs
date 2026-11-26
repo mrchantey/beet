@@ -681,7 +681,6 @@ mod tests {
 			.xpect_true();
 		config
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xnot()
 			.xpect_contains("\"egress\"");

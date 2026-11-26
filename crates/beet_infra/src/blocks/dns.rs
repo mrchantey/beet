@@ -569,7 +569,6 @@ mod tests {
 			.unwrap();
 		config
 			.to_json_string()
-			.unwrap()
 			.xpect_contains("\"type\":\"TXT\"")
 			.xpect_contains("v=spf1 include:amazonses.com -all")
 			.xnot()
@@ -593,7 +592,6 @@ mod tests {
 			.unwrap();
 		config
 			.to_json_string()
-			.unwrap()
 			.xpect_contains("\\\"v=spf1 include:amazonses.com -all\\\"");
 	}
 
@@ -613,7 +611,7 @@ mod tests {
 				"mail.beetmash.com",
 			)
 			.unwrap();
-		let json = config.to_json_string().unwrap();
+		let json = config.to_json_string();
 		json.xpect_contains("\"type\":\"MX\"")
 			.xpect_contains("\"priority\":10")
 			.xpect_contains("\"content\":\"mail.beetmash.com\"");
@@ -637,7 +635,6 @@ mod tests {
 			.unwrap();
 		config
 			.to_json_string()
-			.unwrap()
 			.xpect_contains("\"10 mail.beetmash.com\"");
 	}
 
@@ -662,7 +659,7 @@ mod tests {
 				"mail.beetmash.com",
 			)
 			.unwrap();
-		let json = config.to_json_string().unwrap();
+		let json = config.to_json_string();
 		json.as_str()
 			.xpect_contains("\"type\":\"SRV\"")
 			.xpect_contains("\"weight\":1")
@@ -692,7 +689,7 @@ mod tests {
 				"${var.mail_tlsa}",
 			)
 			.unwrap();
-		let json = config.to_json_string().unwrap();
+		let json = config.to_json_string();
 		json.as_str()
 			.xpect_contains("\"type\":\"TLSA\"")
 			.xpect_contains("\"usage\":3")
@@ -713,7 +710,6 @@ mod tests {
 			.unwrap();
 		config
 			.to_json_string()
-			.unwrap()
 			.xpect_contains("\"zone_id\":\"zone123\"");
 		DnsProvider::cloudflare("mail.example.org")
 			.emit_txt(&stack, &mut config, "spf2", "mail.example.org", "v=spf1")
@@ -752,10 +748,7 @@ mod tests {
 				"abcd",
 			)
 			.unwrap();
-		config
-			.to_json_string()
-			.unwrap()
-			.xpect_contains("\"3 1 1 abcd\"");
+		config.to_json_string().xpect_contains("\"3 1 1 abcd\"");
 	}
 
 	/// Route53 has no `data` block, so `priority weight port target` is folded
@@ -778,7 +771,6 @@ mod tests {
 			.unwrap();
 		config
 			.to_json_string()
-			.unwrap()
 			.xpect_contains("\"0 1 443 mail.beetmash.com\"");
 	}
 }

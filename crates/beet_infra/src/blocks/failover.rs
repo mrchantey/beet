@@ -187,7 +187,6 @@ mod tests {
 			.unwrap()
 			.2
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xpect_contains("cloudflare_load_balancer")
 			.xpect_contains("\"account_id\":\"test-account\"")

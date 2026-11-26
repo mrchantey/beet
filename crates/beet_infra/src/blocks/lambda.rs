@@ -711,7 +711,6 @@ mod tests {
 			.unwrap()
 			.2
 			.to_json_string()
-			.unwrap()
 			.as_str()
 			.xpect_contains("\"aws_iam_role_policy\":")
 			.xpect_contains(&format!(
@@ -811,7 +810,6 @@ mod tests {
 			.unwrap()
 			.2
 			.to_json_string()
-			.unwrap()
 			.xpect_contains("\"BEET_STAGE\":\"prod\"");
 	}
 
