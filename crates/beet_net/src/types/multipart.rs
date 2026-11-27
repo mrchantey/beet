@@ -11,8 +11,8 @@ use bytes::Bytes;
 /// # use beet_net::prelude::*;
 /// # use beet_core::prelude::*;
 /// let multipart = Multipart::default()
-/// 	.with_part(MultipartPart::new(MediaType::Text, "two files"))
-/// 	.with_part(MultipartPart::new(MediaType::Png, vec![1, 2]).with_filename("cat.png"));
+/// 	.with_part(MediaBytes::new_text("two files").into())
+/// 	.with_part(MultipartPart::new(MediaBytes::new(MediaType::Png, vec![1, 2])).with_filename("cat.png"));
 /// let (content_type, body) = multipart.encode();
 /// Multipart::parse(&content_type, &body).unwrap().xpect_eq(multipart);
 /// ```
@@ -21,23 +21,21 @@ pub struct Multipart {
 	parts: Vec<MultipartPart>,
 }
 
-/// One body of a [`Multipart`].
+/// One body of a [`Multipart`]: its bytes and their `Content-Type`, and for
+/// a file its `Content-Disposition` filename.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MultipartPart {
-	/// The part's `Content-Type`.
-	media_type: MediaType,
+	media: MediaBytes,
 	/// The part's `Content-Disposition` filename, for a file.
 	filename: Option<SmolStr>,
-	bytes: Bytes,
 }
 
 impl MultipartPart {
-	/// A part of `media_type` holding `bytes`.
-	pub fn new(media_type: MediaType, bytes: impl Into<Bytes>) -> Self {
+	/// A part holding `media`.
+	pub fn new(media: impl Into<MediaBytes>) -> Self {
 		Self {
-			media_type,
+			media: media.into(),
 			filename: None,
-			bytes: bytes.into(),
 		}
 	}
 
@@ -47,17 +45,23 @@ impl MultipartPart {
 		self
 	}
 
-	/// The part's `Content-Type`.
-	pub fn media_type(&self) -> &MediaType { &self.media_type }
+	/// The part's bytes and their media type.
+	pub fn media(&self) -> &MediaBytes { &self.media }
 	/// The part's filename, for a file.
 	pub fn filename(&self) -> Option<&str> { self.filename.as_deref() }
-	/// The part's body.
-	pub fn bytes(&self) -> &Bytes { &self.bytes }
 	/// The name without its extension, ie `cat` of `cat.png`.
 	pub fn file_stem(&self) -> Option<&str> {
 		self.filename()
 			.map(|name| name.rsplit_once('.').map_or(name, |(stem, _)| stem))
 	}
+}
+
+impl From<MediaBytes> for MultipartPart {
+	fn from(media: MediaBytes) -> Self { Self::new(media) }
+}
+
+impl From<MultipartPart> for MediaBytes {
+	fn from(part: MultipartPart) -> Self { part.media }
 }
 
 impl Multipart {
@@ -85,7 +89,8 @@ impl Multipart {
 			.map(|index| format!("beet-part-{index}"))
 			.find(|boundary| {
 				!self.parts.iter().any(|part| {
-					part.bytes
+					part.media
+						.bytes()
 						.windows(boundary.len())
 						.any(|window| window == boundary.as_bytes())
 				})
@@ -96,7 +101,7 @@ impl Multipart {
 			body.extend_from_slice(
 				format!(
 					"--{boundary}\r\nContent-Type: {}\r\n",
-					part.media_type
+					part.media.media_type()
 				)
 				.as_bytes(),
 			);
@@ -109,7 +114,7 @@ impl Multipart {
 				);
 			}
 			body.extend_from_slice(b"\r\n");
-			body.extend_from_slice(&part.bytes);
+			body.extend_from_slice(part.media.bytes());
 			body.extend_from_slice(b"\r\n");
 		}
 		body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
@@ -150,32 +155,35 @@ impl Multipart {
 			let headers = String::from_utf8_lossy(&segment[..end]);
 			let bytes = &segment[end + 4..];
 			let bytes = bytes.strip_suffix(b"\r\n").unwrap_or(bytes);
-			let mut part = MultipartPart::new(
-				MediaType::Text,
-				Bytes::copy_from_slice(bytes),
-			);
+			let mut media_type = MediaType::Text;
+			let mut filename = None;
 			for line in headers.lines() {
 				let Some((name, value)) = line.split_once(':') else {
 					continue;
 				};
 				match name.trim().to_ascii_lowercase().as_str() {
 					"content-type" => {
-						part.media_type =
-							MediaType::from_content_type(value.trim());
+						media_type = MediaType::from_content_type(value.trim());
 					}
 					"content-disposition" => {
-						part.filename = value
+						filename = value
 							.split(';')
 							.filter_map(|param| {
 								param.trim().strip_prefix("filename=")
 							})
 							.next()
-							.map(|name| name.trim_matches('"').into());
+							.map(|name| SmolStr::from(name.trim_matches('"')));
 					}
 					_ => {}
 				}
 			}
-			parts.push(part);
+			parts.push(MultipartPart {
+				media: MediaBytes::new(
+					media_type,
+					Bytes::copy_from_slice(bytes),
+				),
+				filename,
+			});
 		}
 		Self { parts }.xok()
 	}
@@ -258,10 +266,12 @@ mod test {
 	#[beet_core::test]
 	async fn round_trips_through_a_response() {
 		let multipart = Multipart::default()
-			.with_part(MultipartPart::new(MediaType::Text, "--beet-part-0"))
+			.with_part(MediaBytes::new_text("--beet-part-0").into())
 			.with_part(
-				MultipartPart::new(MediaType::Png, vec![0, 13, 10, 255])
-					.with_filename("cat.png"),
+				MultipartPart::new(MediaBytes::new(MediaType::Png, vec![
+					0, 13, 10, 255,
+				]))
+				.with_filename("cat.png"),
 			);
 		multipart
 			.encode()

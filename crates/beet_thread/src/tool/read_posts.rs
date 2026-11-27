@@ -118,8 +118,8 @@ pub async fn ReadPostsCall(
 		false => lines.join("\n"),
 	};
 	// each file of what was read, its bytes held or read from the store
-	let mut multipart = Multipart::default()
-		.with_part(MultipartPart::new(MediaType::Text, listing.clone()));
+	let mut multipart =
+		Multipart::default().with_part(MediaBytes::new_text(&listing).into());
 	for post in posts
 		.iter()
 		.filter(|post| post.kind() != &PostKind::Compaction)
@@ -139,8 +139,11 @@ pub async fn ReadPostsCall(
 			};
 			if let Some(bytes) = bytes {
 				multipart.push(
-					MultipartPart::new(file.media_type(), bytes)
-						.with_filename(file.filename()),
+					MultipartPart::new(MediaBytes::new(
+						file.media_type(),
+						bytes,
+					))
+					.with_filename(file.filename()),
 				);
 			}
 		}
@@ -197,7 +200,7 @@ mod test {
 			app.world_mut().entity_mut(router).exchange(request).await;
 		match Multipart::from_response(response).await.unwrap() {
 			Ok(multipart) => {
-				String::from_utf8_lossy(multipart.parts()[0].bytes())
+				String::from_utf8_lossy(multipart.parts()[0].media().bytes())
 					.to_string()
 			}
 			Err(response) => response.text().await.unwrap(),

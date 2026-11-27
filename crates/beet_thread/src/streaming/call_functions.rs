@@ -91,24 +91,16 @@ impl ToolAnswer {
 		let mut text = Vec::new();
 		let mut files = Vec::new();
 		for part in multipart.into_parts() {
-			match (part.filename(), part.media_type().is_text()) {
-				(None, true) => {
-					text.push(
-						String::from_utf8_lossy(part.bytes()).to_string(),
-					);
-				}
+			match (part.filename(), part.media().media_type().is_text()) {
+				(None, true) => text.push(
+					String::from_utf8_lossy(part.media().bytes()).to_string(),
+				),
 				_ => {
 					let stem = part
 						.file_stem()
 						.map(str::to_string)
 						.or_else(|| call.file_stem());
-					files.push((
-						MediaBytes::new(
-							part.media_type().clone(),
-							part.bytes().clone(),
-						),
-						stem,
-					));
+					files.push((MediaBytes::from(part), stem));
 				}
 			}
 		}
