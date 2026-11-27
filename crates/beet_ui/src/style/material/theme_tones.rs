@@ -235,9 +235,9 @@ mod test {
 			neutral_light: Some(Color::srgb_u8(0xf4, 0xee, 0xde)),
 			..default()
 		};
-		let tones = serde_json::to_value(ThemeTones::new(&theme)).unwrap();
+		let tones = Value::from_serde(ThemeTones::new(&theme)).unwrap();
 		tones["primary"][40].as_str().unwrap().xpect_eq("#006C4F");
 		tones["neutral_light"][94].as_str().unwrap().xpect_eq("#F4EEDE");
-		tones["error"].as_array().unwrap().len().xpect_eq(101);
+		tones["error"].as_list().unwrap().len().xpect_eq(101);
 	}
 }

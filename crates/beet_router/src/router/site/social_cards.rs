@@ -1232,7 +1232,6 @@ impl Card {
 #[cfg(all(test, feature = "site_images"))]
 mod test {
 	use super::*;
-	use beet_action::prelude::*;
 
 	/// A Latin subset of Inter Bold, the font every test card is set in.
 	const FONT: &[u8] = include_bytes!("fixtures/inter-bold-latin.ttf");

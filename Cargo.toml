@@ -774,7 +774,7 @@ required-features = ["ssh_client"]
 [[example]]
 name = "media_renderer"
 path = "examples/ui/media_renderer.rs"
-required-features = ["ui"]
+required-features = ["ui", "scene"]
 [[example]]
 name = "style"
 path = "examples/ui/style.rs"

@@ -158,8 +158,6 @@ impl IconSet {
 	const FAVICON_DARK_SVG: &str = "favicon-dark.svg";
 	/// The size the head declares the ico at, see the module docs.
 	const ICO_LINKED: u32 = 32;
-	/// The sizes `favicon.ico` holds.
-	const ICO_SIZES: [u32; 3] = [16, 32, 48];
 	/// The web app manifest.
 	const MANIFEST: &str = "site.webmanifest";
 	/// The largest size the set derives, and so the smallest source it accepts.
@@ -282,6 +280,8 @@ impl IconSet {
 impl IconSet {
 	/// The unpadded png sizes, each `icon-<size>.png`.
 	const PNG_SIZES: [u32; 2] = [192, 512];
+	/// The sizes `favicon.ico` holds.
+	const ICO_SIZES: [u32; 3] = [16, 32, 48];
 	/// The padded 512 for the `maskable` purpose.
 	const MASKABLE: &str = "icon-512-maskable.png";
 	/// The maskable safe zone, as a fraction of the width.
