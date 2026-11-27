@@ -4,10 +4,10 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<SecretsExport document={$home_export}/>` — write every secret the
+/// `<SecretsExport document={$package_export}/>` — write every secret the
 /// stack's store holds into the secrets document `document` declares, keyed
 /// by label, so a destroyed stack's secrets survive in git (the committed
-/// repo document) and, with `dated=true`, as a dated series in the other
+/// package document) and, with `dated=true`, as a dated series in the other
 /// vendor's bucket.
 ///
 /// The document is one of the same type a human keeps by hand: an index of
@@ -31,9 +31,9 @@ use beet_net::prelude::*;
 /// the document is written. `<SecretsRestore/>` is the inverse.
 ///
 /// ```bsx
-/// <Secrets bx:ref="home_export" label="mail-prod" path="infra/secrets/mail--prod.toml"/>
+/// <Secrets bx:ref="package_export" label="mail-prod" path="infra/secrets/mail--prod.toml"/>
 /// <Secrets bx:ref="cold_export" label="mail-cold" path="secrets/export.toml" {StoreRef($cold_backups)}/>
-/// <SecretsExport document={$home_export}/>
+/// <SecretsExport document={$package_export}/>
 /// <SecretsExport document={$cold_export} dated=true/>
 /// ```
 #[action]
@@ -251,7 +251,7 @@ pub(crate) async fn export_target(
 	if declaration == Entity::PLACEHOLDER {
 		bevybail!(
 			"no document to export to: name a `<Secrets>` declaration, ie \
-			`<SecretsExport document={{$home_export}}/>`"
+			`<SecretsExport document={{$package_export}}/>`"
 		);
 	}
 	let entity = caller.world().entity(declaration);
@@ -286,7 +286,7 @@ pub(crate) mod tests {
 	use crate::types::test_support::*;
 
 	/// A stack with a document store, two secrets in it, and an export
-	/// declaration in the home store.
+	/// declaration in the package store.
 	pub(crate) async fn exported_stack(
 		world: &mut World,
 	) -> (Entity, Entity, SecretStore) {
@@ -295,7 +295,7 @@ pub(crate) mod tests {
 			.spawn((
 				Stack::new("mail").with_stage("prod"),
 				BlobStore::temp(),
-				HomeStore,
+				PackageStore,
 				DocumentSecrets::new("store.toml"),
 			))
 			.id();
@@ -375,8 +375,9 @@ pub(crate) mod tests {
 		alice_file.push(alice.clone());
 		world.spawn((Secrets::default(), ChildOf(root)));
 		world.flush();
-		let repo = world.get::<BlobStore>(root).unwrap().clone();
-		let entry = SecretsHandle::new(repo.clone(), "secrets.toml").unwrap();
+		let root_store = world.get::<BlobStore>(root).unwrap().clone();
+		let entry =
+			SecretsHandle::new(root_store.clone(), "secrets.toml").unwrap();
 		let mut document = SecretsDocument::default();
 		document
 			.set(&alice_file, "default", "A", "1", default())
@@ -384,9 +385,11 @@ pub(crate) mod tests {
 		entry.write(&document).await.unwrap();
 
 		run_export(&mut world, root, export, false).await.unwrap();
-		let written =
-			SecretsHandle::new(repo.clone(), "infra/secrets/mail--prod.toml")
-				.unwrap();
+		let written = SecretsHandle::new(
+			root_store.clone(),
+			"infra/secrets/mail--prod.toml",
+		)
+		.unwrap();
 		let exported = written.read().await.unwrap();
 		let origin = exported.origin.clone().unwrap();
 		origin.app.as_str().xpect_eq("mail");
@@ -440,9 +443,10 @@ pub(crate) mod tests {
 	async fn an_unchanged_export_is_not_rewritten() {
 		let mut world = infra_world();
 		let (root, export, store) = exported_stack(&mut world).await;
-		let repo = world.get::<BlobStore>(root).unwrap().clone();
+		let root_store = world.get::<BlobStore>(root).unwrap().clone();
 		let written =
-			SecretsHandle::new(repo, "infra/secrets/mail--prod.toml").unwrap();
+			SecretsHandle::new(root_store, "infra/secrets/mail--prod.toml")
+				.unwrap();
 		run_export(&mut world, root, export, false).await.unwrap();
 		let first = written.read().await.unwrap();
 		run_export(&mut world, root, export, false).await.unwrap();
@@ -480,10 +484,11 @@ pub(crate) mod tests {
 	async fn dated_exports_form_a_series() {
 		let mut world = infra_world();
 		let (root, export, _) = exported_stack(&mut world).await;
-		let repo = world.get::<BlobStore>(root).unwrap().clone();
+		let root_store = world.get::<BlobStore>(root).unwrap().clone();
 		run_export(&mut world, root, export, true).await.unwrap();
 		let declared =
-			SecretsHandle::new(repo, "infra/secrets/mail--prod.toml").unwrap();
+			SecretsHandle::new(root_store, "infra/secrets/mail--prod.toml")
+				.unwrap();
 		declared.exists().await.unwrap().xpect_false();
 		let newest = declared.newest_dated().await.unwrap().unwrap();
 		SecretsHandle::is_dated(
@@ -502,7 +507,7 @@ pub(crate) mod tests {
 			.spawn((
 				Stack::new("mail").with_stage("dev"),
 				BlobStore::temp(),
-				HomeStore,
+				PackageStore,
 				DocumentSecrets::new("store.toml"),
 			))
 			.id();

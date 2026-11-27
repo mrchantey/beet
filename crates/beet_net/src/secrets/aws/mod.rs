@@ -1,4 +1,4 @@
-//! AWS's authority over the accounts a repo deploys into: who this machine
+//! AWS's authority over the accounts a package deploys into: who this machine
 //! is, how a person elevates or signs in, and the verbs that reach through
 //! them. The document, the vault and the `secrets` verbs above are provider
 //! neutral; everything AWS shaped lives here.
@@ -7,7 +7,7 @@
 //!   pair, and [`AdminSession`], the tmpfs session that elevates it
 //! - [`AdminElevate`]: `beet admin`, an administrator session bought with a
 //!   code from a phone
-//! - [`MemberAccount`]: a repo's own account in the operator's Organization,
+//! - [`MemberAccount`]: a package's own account in the operator's Organization,
 //!   and the roles that reach it from the management account
 //! - [`IdentityCenterClient`] and its [`IdentityCenterSession`]: the human path
 //!   into every member account, one browser sign in

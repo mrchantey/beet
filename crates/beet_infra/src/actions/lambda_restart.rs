@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// `<LambdaRestart/>`: after a content sync, retire the function's warm
-/// execution environments, so the next request boots afresh from the repo
+/// execution environments, so the next request boots afresh from the package
 /// store.
 ///
 /// The Lambda counterpart of `<LightsailRestart/>`, for the same reason: a
@@ -22,7 +22,7 @@ use beet_net::prelude::*;
 /// fresh environment. The bucket, key and code are the ones the stack's tofu
 /// state holds, so the next plan sees no drift.
 ///
-/// Declared under the sync sequence after the [`HomeSync`] that publishes and
+/// Declared under the sync sequence after the [`PackageSync`] that publishes and
 /// before the `<CloudflarePurgeCache/>`: purging while the old environments
 /// still serve re-caches their responses.
 #[action]
@@ -37,14 +37,14 @@ pub async fn LambdaRestart(
 ) -> Result<Outcome<Request, Response>> {
 	let (region, function, bucket, key) = cx
 		.caller
-		.with_state::<(StackQuery, HomeStoreQuery), _>(
-			move |entity, (stacks, repos)| -> Result<_> {
+		.with_state::<(StackQuery, PackageStoreQuery), _>(
+			move |entity, (stacks, package_stores)| -> Result<_> {
 				let stack = stacks.resolve(entity);
 				let block = LambdaBlock::default().with_label(label);
 				(
 					stack.aws_region()?.clone(),
 					block.ident(&stack).primary_identifier().to_string(),
-					repos.get(entity)?.bucket_name()?,
+					package_stores.get(entity)?.bucket_name()?,
 					block.code_key(&stacks.deploy_id()),
 				)
 					.xok()
@@ -61,7 +61,9 @@ pub async fn LambdaRestart(
 	// meets a warm environment
 	.await_update(LambdaFunction::POLL_INTERVAL)
 	.await?;
-	info!("restarted {function}: the next request boots from the home store");
+	info!(
+		"restarted {function}: the next request boots from the package store"
+	);
 	Pass(cx.input).xok()
 }
 
@@ -192,7 +194,7 @@ mod tests {
 			"Successful",
 		]);
 		function
-			.update_code("beetmash-prod--repo", "deploys/abc/lambda.zip")
+			.update_code("beetmash-prod--package", "deploys/abc/lambda.zip")
 			.await
 			.unwrap()
 			.await_update(Duration::ZERO)
@@ -203,7 +205,7 @@ mod tests {
 		calls[0].clone().xpect_eq((
 			HttpMethod::Put,
 			format!("https://lambda.ap-southeast-2.amazonaws.com/2015-03-31/functions/{ARN}/code"),
-			value!({ "S3Bucket": "beetmash-prod--repo", "S3Key": "deploys/abc/lambda.zip" }),
+			value!({ "S3Bucket": "beetmash-prod--package", "S3Key": "deploys/abc/lambda.zip" }),
 		));
 		calls[3].clone().xpect_eq((
 			HttpMethod::Get,

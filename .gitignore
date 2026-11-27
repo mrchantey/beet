@@ -15,7 +15,7 @@ examples/beetmania/assets/logo/*
 .claude
 .playwright-cli
 .beet/infra
-# a home directory's compiled form, `beet compile`'s packages and their spaces
+# a source directory's compiled form, `beet compile`'s packages and their spaces
 .beet/pds
 out.txt
 examples/beetmania/dist

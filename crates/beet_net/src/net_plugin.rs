@@ -13,7 +13,7 @@ pub struct NetPlugin;
 impl Plugin for NetPlugin {
 	fn build(&self, app: &mut App) {
 		app.install_types::<StorePlugin>();
-		// account declarations load in every build; their repos need `atproto`
+		// account declarations load in every build; their PDS needs `atproto`
 		#[cfg(feature = "dag_cbor")]
 		app.install_types::<AtprotoPlugin>();
 		#[cfg(feature = "vault")]

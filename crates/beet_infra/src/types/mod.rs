@@ -1,7 +1,7 @@
 //! ECS types for interacting with terraform configurations.
 mod access_grant;
 mod artifacts;
-// what a repo's AWS deploy credential is allowed to do, lowered from the
+// what a package's AWS deploy credential is allowed to do, lowered from the
 // provider types its stacks render. Gated with the AWS IAM lowering it mirrors
 // (`IamPolicy`), since both speak AWS policy documents.
 #[cfg(feature = "bindings_aws_common")]

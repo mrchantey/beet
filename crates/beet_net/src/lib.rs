@@ -10,7 +10,7 @@ beet_core::test_main!();
 
 /// Transport-agnostic request/response wire types — the no_std core.
 mod types;
-// An account's repo as a provider, and the converge over it. The family rides
+// An account's PDS as a provider, and the converge over it. The family rides
 // `dag_cbor`; its network half is behind `atproto` inside the module.
 #[cfg(feature = "dag_cbor")]
 mod atproto;

@@ -143,7 +143,10 @@ impl StandardSiteAnnounce {
 		text: String,
 	) -> Result<StrongRef> {
 		let publication = records.publication.as_ref().ok_or_else(|| {
-			bevyhow!("the repo holds no publication at `{}`", publishing.url)
+			bevyhow!(
+				"the public repo holds no publication at `{}`",
+				publishing.url
+			)
 		})?;
 		let thumb = publishing.card(&page.path).await?;
 		if let Some(thumb) = &thumb {
@@ -173,7 +176,7 @@ impl StandardSiteAnnounce {
 
 	/// Converge the reposts of every announced document by each
 	/// `auto_repost` account it credits, the announcing account aside, each
-	/// account's repo the dry one `request` carries when `dry_run`.
+	/// account's public repo the dry one `request` carries when `dry_run`.
 	async fn reposts(
 		world: &AsyncWorld,
 		publishing: &Publishing,

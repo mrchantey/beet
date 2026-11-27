@@ -5,7 +5,7 @@ use beet_net::prelude::*;
 
 /// A route subtree published as a standard.site publication: what the
 /// publication record says about itself, where its documents come from, the
-/// account whose repo holds them, and the derived index remembering where
+/// account whose public repo holds them, and the derived index remembering where
 /// each record went.
 ///
 /// ```html
@@ -22,8 +22,8 @@ use beet_net::prelude::*;
 ///
 /// The declaration is its own producing action: its [`Derivation`] is the
 /// [`StandardSiteIndex`] at [`index`](Self::index), written by `publish`
-/// alone, which this action rebuilds by listing the account's repo. The served
-/// side reads that file and never the repo: see [`StandardSiteIndex`] for
+/// alone, which this action rebuilds by listing the account's public repo. The served
+/// side reads that file and never the public repo: see [`StandardSiteIndex`] for
 /// what it serves.
 ///
 /// Registered in every build that carries the data model, so a declaration
@@ -71,7 +71,7 @@ pub async fn StandardSitePub(
 	#[field(no_clone)]
 	media_ingest: MediaIngestPolicy,
 	/// The derived index's path in the store the declaration resolves by
-	/// ancestry, the home store's `derived/` in a site.
+	/// ancestry, the package store's `derived/` in a site.
 	#[field(no_clone, default = RelPath::new(StandardSitePub::INDEX))]
 	index: RelPath,
 	cx: ActionContext<BlobStore>,
@@ -95,7 +95,7 @@ pub async fn StandardSitePub(
 		.await?;
 	let index =
 		StandardSiteIndex::from_repo(&pds, &publication.url(&package)?).await?;
-	// no sources: the index is a copy of the repo, which the probe compares
+	// no sources: the index is a copy of the public repo, which the probe compares
 	// against, see `StandardSiteIndex`
 	EntityBody::default()
 		.with_typed(&index)?

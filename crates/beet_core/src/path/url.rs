@@ -1377,9 +1377,9 @@ mod test {
 			.to_string()
 			.xpect_eq("https://example.com/api?key=val#top");
 		// a flag renders bare and parses back as one, so it survives the wire
-		let flagged = Url::coerce("/repo").with_flag("verbose");
+		let flagged = Url::coerce("/package").with_flag("verbose");
 		flagged.has_param("verbose").xpect_true();
-		flagged.to_string().xpect_eq("/repo?verbose");
+		flagged.to_string().xpect_eq("/package?verbose");
 		Url::coerce(flagged.to_string())
 			.has_param("verbose")
 			.xpect_true();

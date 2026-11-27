@@ -4,14 +4,14 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>`:
+/// `<WasmRuntime cargo_package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>`:
 /// a deploy step that builds a release wasm runtime, so the step after it
 /// publishes the runtime this deploy built.
 ///
 /// A runtime is never borrowed as a stored file: whatever an earlier build
 /// (or a bucket pull) left at `out` is overwritten here, immediately before
 /// the publish reads it. Declare it directly before the step that reads `out`,
-/// ie a `<HomeAssemble>` whose source links to it, or an R2 sync of that source.
+/// ie a `<PackageAssemble>` whose source links to it, or an R2 sync of that source.
 ///
 /// The build is a release [`BuildWasm::build`], the same one the
 /// `build-wasm` command and the `just build-wasm-*` recipes run.
@@ -19,9 +19,9 @@ use beet_net::prelude::*;
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn WasmRuntime(
-	/// The cargo package to build (`--package`).
+	/// The cargo package to build, cargo's `--package`.
 	#[field(required)]
-	package: SmolStr,
+	cargo_package: SmolStr,
 	/// The binary target to build (`--bin`).
 	#[field(required)]
 	bin: SmolStr,
@@ -37,7 +37,7 @@ pub async fn WasmRuntime(
 ) -> Result<Outcome<Request, Response>> {
 	BuildWasm::default()
 		.with_release(true)
-		.with_package(package.to_string())
+		.with_cargo_package(cargo_package.to_string())
 		.with_bin(bin.to_string())
 		.with_features(features.to_string())
 		.with_out(out.into_abs().to_string())
@@ -67,6 +67,6 @@ mod test {
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("missing required field `package`");
+			.xpect_contains("missing required field `cargo_package`");
 	}
 }

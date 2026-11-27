@@ -1,4 +1,4 @@
-//! Resolving the repo an entity reads and writes.
+//! Resolving the PDS an entity reads and writes.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -17,31 +17,31 @@ pub struct AccountRef(#[entities] pub Entity);
 #[derive(SystemParam)]
 pub struct PdsQuery<'w, 's> {
 	parents: Query<'w, 's, &'static ChildOf>,
-	repos: Query<'w, 's, &'static Pds>,
+	pds: Query<'w, 's, &'static Pds>,
 	refs: Query<'w, 's, &'static AccountRef>,
 }
 
 impl PdsQuery<'_, '_> {
-	/// The repo `entity` resolves to, shaped to pass directly to
+	/// The PDS `entity` resolves to, shaped to pass directly to
 	/// [`AsyncEntity::with_world`].
 	pub fn resolve(world: &mut World, entity: Entity) -> Result<Pds> {
 		world.with_state::<PdsQuery, _>(|query| query.get(entity))
 	}
 
-	/// The repo `entity` resolves to; an error naming the declaration it
+	/// The PDS `entity` resolves to; an error naming the declaration it
 	/// needs when there is none, or when a referenced account has not landed
-	/// its repo.
+	/// its PDS.
 	pub fn get(&self, entity: Entity) -> Result<Pds> {
 		let mut current = Some(entity);
 		while let Some(entity) = current {
-			if let Ok(pds) = self.repos.get(entity) {
+			if let Ok(pds) = self.pds.get(entity) {
 				return pds.clone().xok();
 			}
 			if let Ok(AccountRef(account)) = self.refs.get(entity) {
-				return self.repos.get(*account).cloned().map_err(|_| {
+				return self.pds.get(*account).cloned().map_err(|_| {
 					bevyhow!(
 						"entity {entity} names account {account}, which has no \
-						 repo: it must be an `<AtprotoAccount/>`, and this build \
+						 PDS: it must be an `<AtprotoAccount/>`, and this build \
 						 must link the `atproto` feature to reach it"
 					)
 				});
@@ -49,7 +49,7 @@ impl PdsQuery<'_, '_> {
 			current = self.parents.get(entity).ok().map(ChildOf::parent);
 		}
 		bevybail!(
-			"entity {entity} has no repo: declare it under an \
+			"entity {entity} has no PDS: declare it under an \
 			 `<AtprotoAccount/>`, or name one with `{{AccountRef($account)}}`"
 		)
 	}

@@ -1,4 +1,4 @@
-//! `<AwsAccount/>`: the AWS account a repo deploys into, a member of the
+//! `<AwsAccount/>`: the AWS account a package deploys into, a member of the
 //! operator's Organization, and its converge.
 
 use super::aws_deploy_credential::AwsAdmin;
@@ -6,13 +6,13 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<AwsAccount name="beetmash"/>`: the AWS account a repo deploys into, its
+/// `<AwsAccount name="beetmash"/>`: the AWS account a package deploys into, its
 /// own member account of the operator's AWS Organization, declared at the
 /// package root beside the [`AwsDeployCredential`] that deploys into it.
 ///
-/// An account isolates a repo outright where a policy scoped by name only
-/// narrows it: one repo's leaked deploy key reaches nothing of another's, and
-/// each repo's SES standing and port 25 allowance are its own. The account is
+/// An account isolates a package outright where a policy scoped by name only
+/// narrows it: one package's leaked deploy key reaches nothing of another's, and
+/// each package's SES standing and port 25 allowance are its own. The account is
 /// global and its resources regional, so the region is the [`AwsRegion`] on
 /// this declaration or an ancestor, which the state bucket and the Recycle
 /// Bin rules land in.
@@ -96,7 +96,7 @@ impl DeployAccountProvider for AwsAccount {
 impl AwsAccount {
 	/// The record of the operator's global document holding the address every
 	/// member's root email is plus-addressed from. Sealed rather than
-	/// declared, since the repos that declare accounts are public.
+	/// declared, since the packages that declare accounts are public.
 	pub const BASE_EMAIL: &'static str = "AWS_ACCOUNT_BASE_EMAIL";
 	/// The service control policy on the Organization's root keeping every
 	/// member in it.
@@ -196,7 +196,7 @@ impl AwsAccount {
 					if found.next().is_some() {
 						bevybail!(
 							"this launch declares two `<AwsAccount/>`s, and a \
-							repo deploys into one: keep one declaration"
+							package deploys into one: keep one declaration"
 						);
 					}
 					let region = regions.get(entity).map_err(|_| {

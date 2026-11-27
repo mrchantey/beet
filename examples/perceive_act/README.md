@@ -8,7 +8,7 @@ One model call per cycle: the `Camera` actor captures via the `take-photo` route
 
 What the robot is, and what it can display, is data in the blob store, not markup. Each scene is a directory under `assets/extra/perceive-act/<name>/` with a `main.bsx` (a single `<ScenePrompt text=".."/>` describing the character) and an `images/` set (the faces it can show; the file stem is the title the model chooses by). `<RotateScene/>` discovers the scenes on boot, plays the `initial` one, and every 8 cycles (`SceneRotation::every_cycles`) rotates to the next (sequential or random). The robot is one continuous creature: its system prompt is fixed and each scene's character is *appended* as a user turn, so it carries its memory across incarnations. The image options constrain the tool schema at runtime (via `StringEnumOptions`), so the model can only pick a title the scene actually ships.
 
-The agent is a socket server (`agent.bsx`, shared by every version); only the head and body clients change between versions. Run every command from the repo root. For clean per-cycle output quiet the socket plumbing with `RUST_LOG=info,beet_net=warn`, which reads like:
+The agent is a socket server (`agent.bsx`, shared by every version); only the head and body clients change between versions. Run every command from the workspace root. For clean per-cycle output quiet the socket plumbing with `RUST_LOG=info,beet_net=warn`, which reads like:
 
 ```
 cycle 3: photo captured (100KB in 0.24s, previous cycle 1.76s)
@@ -48,7 +48,7 @@ just build-wasm-full
 beet --entry=examples/perceive_act/main-v3.bsx
 ```
 
-That build is the ceiling of the browser feature range (the whole example surface, the agent runtime, the JavaScript engine), so it is far larger and slower to build than this head needs. A head-sized artifact is the obvious next narrowing: `beet build-wasm --release --package=beet-cli --bin=beet --features=web_head --out=target/wasm/beet-head.wasm`, with the two head pages' `<Wasm src>` pointed at it.
+That build is the ceiling of the browser feature range (the whole example surface, the agent runtime, the JavaScript engine), so it is far larger and slower to build than this head needs. A head-sized artifact is the obvious next narrowing: `beet build-wasm --release --cargo-package=beet-cli --bin=beet --features=web_head --out=target/wasm/beet-head.wasm`, with the two head pages' `<Wasm src>` pointed at it.
 
 Both servers bind all interfaces, so any device on the LAN works: open `https://<this-host>:8337` (or plain `http://127.0.0.1:8337` locally) and grant camera access; the head derives the agent's socket url from the page location. The `/debug` route shows the webcam, face, and log on one page. All socket clients reconnect with exponential backoff, so the page survives an agent restart.
 

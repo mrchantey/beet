@@ -1,5 +1,5 @@
 //! [`StoreFork`]: a local store forked off an upstream one, the fork a process
-//! keeps of a repo it does not own.
+//! keeps of a package store it does not own.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -11,9 +11,9 @@ use bytes::Bytes;
 /// [`SceneFork`](beet_core::prelude::SceneFork), which forks one document
 /// within a store.
 ///
-/// The composition behind `--store-fork`: a browser forks the site's http repo
+/// The composition behind `--store-fork`: a browser forks the site's http package store
 /// into IndexedDB, a terminal pulling a remote site forks it into an `fs` dir,
-/// and a headless process on a remote repo composes the same pair and never
+/// and a headless process on a remote package store composes the same pair and never
 /// writes. It is a store composition with no surface dependency, so the first
 /// edit to a published scene lands in the local store and every later boot
 /// reads the fork from there while everything unedited still comes from
@@ -362,11 +362,11 @@ mod test {
 			.xpect_eq(vec![RelPath::new("a.md")]);
 	}
 
-	/// Both halves rebase together through an entry's `<HomeRoot>`, so a key
+	/// Both halves rebase together through an entry's `<PackageRoot>`, so a key
 	/// keeps naming the same file on each side.
 	/// An event keyed to either half or to the fork's own base (what its
 	/// watcher keys to) is a change to a scoped fork and to its blob, so a
-	/// fork-backed home store reloads and its documents re-read; a sibling
+	/// fork-backed package store reloads and its documents re-read; a sibling
 	/// object or an unrelated store is neither.
 	#[beet_core::test]
 	fn routes_events_from_either_half_and_its_base() {
@@ -406,7 +406,7 @@ mod test {
 			.unwrap();
 		let fork = BlobStore::new(StoreFork::new(local, upstream));
 		let (rebased, entry_name) =
-			fork.rebase_home("site/app/main.bsx", "..").unwrap();
+			fork.rebase_package("site/app/main.bsx", "..").unwrap();
 		entry_name.xpect_eq("app/main.bsx");
 		rebased
 			.exists(&RelPath::new("app/main.bsx"))

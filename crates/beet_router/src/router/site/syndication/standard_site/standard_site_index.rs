@@ -1,5 +1,5 @@
 //! The standard site index: where each record of a publication went, the
-//! derived file the served site reads instead of the repo.
+//! derived file the served site reads instead of the public repo.
 //!
 //! # What it serves
 //!
@@ -22,11 +22,11 @@
 //!
 //! # Its provenance
 //!
-//! The index is a copy of the repo, rebuilt by listing it, so its
+//! The index is a copy of the public repo, rebuilt by listing it, so its
 //! [`Provenance`] names no sources and no `ttl`. Naming each record as a
 //! source would cost a network read per document on every freshness check,
 //! `beet check` and every boot included, and fail offline; a `ttl` would call
-//! an unchanged index stale by the clock. The comparison against the repo is
+//! an unchanged index stale by the clock. The comparison against the public repo is
 //! the probe's, run on purpose.
 //!
 //! # Who writes it
@@ -35,7 +35,7 @@
 //! regenerates it, so a deploy serves the index exactly as committed. A
 //! regeneration inside the assembled copy would diverge from git, the index
 //! being the one place the rkeys are reviewed, and would make every deploy
-//! depend on the repo answering a listing.
+//! depend on the public repo answering a listing.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -49,7 +49,7 @@ use beet_net::prelude::*;
 /// `index`, beside the file's [`Provenance`], and the component the
 /// declaration carries once the file is read. The converge reads it for the
 /// rkey each record was minted at before it writes, so it is the one memory
-/// of them, rebuilt only by listing the repo
+/// of them, rebuilt only by listing the public repo
 /// ([`from_repo`](Self::from_repo)).
 #[derive(
 	Debug, Clone, PartialEq, Eq, Component, Reflect, Serialize, Deserialize,
@@ -84,7 +84,7 @@ impl StandardSiteIndex {
 	/// with a `path`.
 	///
 	/// # Errors
-	/// Errors when the repo holds no publication at `url`, or a record of
+	/// Errors when the public repo holds no publication at `url`, or a record of
 	/// either collection does not read as its lexicon.
 	pub async fn from_repo(pds: &Pds, url: &Uri) -> Result<Self> {
 		StandardSiteRecords::read(pds, url)
@@ -203,7 +203,7 @@ impl StandardSiteIndex {
 	}
 }
 
-/// A publication's records as its repo holds them, read by listing both
+/// A publication's records as its public repo holds them, read by listing both
 /// collections: the memory the publish steps converge against and the index
 /// is rebuilt from. Every record carries its natural key, so the listing finds
 /// a record whatever an index lost, a run interrupted before the index was
@@ -298,7 +298,7 @@ mod test {
 	use beet_net::prelude::*;
 	use beet_ui::prelude::*;
 
-	/// The fixture site wearing a layout whose head is `RouteHead`, its repo
+	/// The fixture site wearing a layout whose head is `RouteHead`, its public repo
 	/// store holding `index` when given, the fixture publication declared at
 	/// its root and its index loaded.
 	async fn served(index: Option<StandardSiteIndex>) -> (World, Entity) {
@@ -388,10 +388,10 @@ mod test {
 			.xpect_contains(DOCUMENT_LINK);
 	}
 
-	/// The repo holding the fixture publication, a document of it, a document
+	/// The public repo holding the fixture publication, a document of it, a document
 	/// of another publication and a loose document, at the address each was
 	/// written.
-	async fn repo() -> (Pds, StandardSitePublication) {
+	async fn public_repo() -> (Pds, StandardSitePublication) {
 		let pds = Pds::temp();
 		let publication = StandardSitePublication::from_declaration(
 			&harvest(),
@@ -441,7 +441,7 @@ mod test {
 	/// by path, and nothing of another publication.
 	#[beet_core::test]
 	async fn rebuilds_from_the_repo() {
-		let (pds, publication) = repo().await;
+		let (pds, publication) = public_repo().await;
 		let index = StandardSiteIndex::from_repo(&pds, &publication.url)
 			.await
 			.unwrap();
@@ -470,7 +470,7 @@ mod test {
 	/// it resolves and writes the index with its provenance.
 	#[beet_core::test]
 	async fn derives_its_index() {
-		let (pds, publication) = repo().await;
+		let (pds, publication) = public_repo().await;
 		let store = BlobStore::temp();
 		let mut world = syndication_world(Some("https://beet.org"));
 		let entity =

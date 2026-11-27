@@ -13,13 +13,13 @@ use beet_core::prelude::*;
 /// Worker, and the R2 bucket it serves the site from.
 ///
 /// A [`StoreBlock`] whose root is `r2://<binding>`, the uri a Worker reads its
-/// bucket through, and the home store of its stack ([`HomeStoreBlock`]): the
+/// bucket through, and the package store of its stack ([`PackageStoreBlock`]): the
 /// Worker is nothing but a server of that bucket, so the deploy bakes
-/// [`HomeStoreQuery::bootstrap`] into the Worker's `vars` and the Worker boots
-/// from `BEET_HOME` exactly as a native binary boots from `--home`.
+/// [`PackageStoreQuery::bootstrap`] into the Worker's `vars` and the Worker boots
+/// from `BEET_PACKAGE` exactly as a native binary boots from `--package`.
 #[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(HomeStoreBlock)]
+#[require(PackageStoreBlock)]
 #[component(immutable, on_insert = ErasedStoreBlock::on_insert::<Self>,
 	on_remove = ErasedStoreBlock::on_remove
 )]
@@ -32,7 +32,7 @@ pub struct CloudflareWorkerBlock {
 	bucket: SmolStr,
 	/// The wrangler R2 binding name the Worker resolves its bucket from, ie the
 	/// `SITE_BUCKET` in `env.SITE_BUCKET`. Written into the generated
-	/// `wrangler.jsonc` and, as `r2://<binding>`, into the Worker's `BEET_HOME`
+	/// `wrangler.jsonc` and, as `r2://<binding>`, into the Worker's `BEET_PACKAGE`
 	/// var, so the two cannot drift.
 	binding: SmolStr,
 	/// Plain `vars` injected into the Worker (non-secret), eg a deploy id.
@@ -100,10 +100,10 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// The block declares the home store: its erased half roots at the
-	/// binding, and a consumer beside it bakes `BEET_HOME=r2://<binding>`.
+	/// The block declares the package store: its erased half roots at the
+	/// binding, and a consumer beside it bakes `BEET_PACKAGE=r2://<binding>`.
 	#[beet_core::test]
-	fn declares_the_home_store() {
+	fn declares_the_package_store() {
 		let mut world = InfraPlugin.into_world();
 		world.init_resource::<PackageConfig>();
 		let block = world
@@ -121,11 +121,13 @@ mod test {
 			.to_string()
 			.xpect_eq("r2://SITE");
 		world
-			.with_state::<HomeStoreQuery, _>(|repos| repos.bootstrap(block))
+			.with_state::<PackageStoreQuery, _>(|package_stores| {
+				package_stores.bootstrap(block)
+			})
 			.unwrap()
 			.to_env()
 			.xpect_eq(vec![(
-				SmolStr::new("BEET_HOME"),
+				SmolStr::new("BEET_PACKAGE"),
 				SmolStr::new("r2://SITE"),
 			)]);
 	}

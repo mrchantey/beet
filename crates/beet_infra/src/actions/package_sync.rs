@@ -1,37 +1,37 @@
-//! Publishing the assembled document into the home store.
+//! Publishing the assembled document into the package store.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<HomeSync/>` — mirror the assembled copy into this launch's version of the
-/// home store, `<root>/<id>/repo/`.
+/// `<PackageSync/>` — mirror the assembled copy into this launch's version of the
+/// package store, `<root>/<id>/package/`.
 ///
 /// One [`BlobSync`] with `delete`, so the store holds exactly what
-/// [`HomeAssemble`] assembled: a page renamed or removed at the source is
+/// [`PackageAssemble`] assembled: a page renamed or removed at the source is
 /// removed here rather than lingering (two routes for `/` is a boot panic),
 /// and an object already matching by size and digest is not re-sent. Which
 /// version it publishes into is the launch's answer: `deploy` mints one, and
 /// a content-only `sync` runs [`AdoptCurrentDeploy`] first to publish into
 /// the version being served.
 ///
-/// The mirror root is `repo/` under the version, never the version itself, so
+/// The mirror root is `package/` under the version, never the version itself, so
 /// the binary and ledger beside it are structurally out of a content sync's
 /// reach. Store-agnostic: the declaration decides the backend, so a test
 /// declares a memory store and reads the mirror back.
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn HomeSync(
+pub async fn PackageSync(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let (dir, dest) = cx
 		.caller
-		.with_state::<(StackQuery, HomeStoreQuery), _>(
-			|entity, (stacks, repos)| -> Result<_> {
+		.with_state::<(StackQuery, PackageStoreQuery), _>(
+			|entity, (stacks, package_stores)| -> Result<_> {
 				(
-					HomeAssemble::dir(&stacks, entity)?,
-					repos.store_uri(entity)?,
+					PackageAssemble::dir(&stacks, entity)?,
+					package_stores.store_uri(entity)?,
 				)
 					.xok()
 			},
@@ -39,7 +39,7 @@ pub async fn HomeSync(
 		.await??;
 	if fs_ext::is_dir_empty(&dir)? {
 		bevybail!(
-			"nothing assembled at {dir}: declare a `<HomeAssemble src=\"..\"/>` \
+			"nothing assembled at {dir}: declare a `<PackageAssemble src=\"..\"/>` \
 			 before this sync"
 		);
 	}
@@ -81,7 +81,7 @@ mod test {
 		(dir, site, workspace)
 	}
 
-	/// Run the deploy's publish steps of `deployment` against a memory repo
+	/// Run the deploy's publish steps of `deployment` against a memory store
 	/// store, returning the store's document root for that launch and the
 	/// assembled copy.
 	async fn publish(
@@ -100,11 +100,11 @@ mod test {
 		paths: &str,
 	) -> Result<(BlobStore, AbsPath)> {
 		let deploy_id = *deployment.deploy_id();
-		let root = StoreUri::parse("memory://repo-sync-test")?;
+		let root = StoreUri::parse("memory://package-sync-test")?;
 		// held open before the sync runs: a named memory store lives only
 		// while a handle on it does
 		let document = BlobStore::from_uri(
-			&root.with_subdir(ArtifactLedger::version_repo_dir(&deploy_id)),
+			&root.with_subdir(ArtifactLedger::version_package_dir(&deploy_id)),
 		)?;
 		let mut world =
 			(AsyncPlugin, BootstrapPlugin, InfraPlugin).into_world();
@@ -112,19 +112,19 @@ mod test {
 		world
 			.spawn((Stack::new("app"), ExchangeSequence, children![
 				(
-					StoreUriBlock::new("repo", root.clone())
+					StoreUriBlock::new("package", root.clone())
 						.with_deploy_versioned(true),
-					HomeStoreBlock
+					PackageStoreBlock
 				),
 				(
-					HomeAssemble::new(site.clone()).with_paths(paths),
+					PackageAssemble::new(site.clone()).with_paths(paths),
 					children![DirCopy::new(
 						workspace.clone(),
 						"assets",
 						"databases/country.mmdb"
 					)]
 				),
-				HomeSync::default(),
+				PackageSync::default(),
 			]))
 			.exchange(Request::get(""))
 			.await
@@ -135,7 +135,7 @@ mod test {
 				&Stack::new("app").resolve(&PackageConfig::default()),
 			)
 			.into_abs()
-			.join("repo");
+			.join("package");
 		(document, assembled).xok()
 	}
 
@@ -147,7 +147,7 @@ mod test {
 	}
 
 	/// The assembled copy IS the store's contents: the site plus what it borrows
-	/// lands under this launch's `<id>/repo/`, the allowlist keeps the site's
+	/// lands under this launch's `<id>/package/`, the allowlist keeps the site's
 	/// own `target/` out, nothing is written into the source tree, and a file
 	/// removed from the source leaves the mirror.
 	#[beet_core::test]

@@ -80,7 +80,7 @@ impl LambdaBlock {
 		stack.resource_ident(self.build_label(Self::FUNCTION))
 	}
 
-	/// The function's code in the repo bucket, under the version `deploy_id`.
+	/// The function's code in the package bucket, under the version `deploy_id`.
 	pub fn code_key(&self, deploy_id: &Uuid) -> RelPath {
 		ArtifactLedger::version_artifact_key(deploy_id, &self.label)
 	}
@@ -136,7 +136,7 @@ impl LambdaBlock {
 		mut scopes: AncestorQuery<&mut RenderScope>,
 		stacks: StackQuery,
 		blocks: Query<(Entity, &LambdaBlock, Option<&BuildArtifact>)>,
-		repos: HomeStoreQuery,
+		package_stores: PackageStoreQuery,
 		reads: ReadsSecretsQuery,
 	) {
 		for (entity, block, artifact) in blocks.iter() {
@@ -147,18 +147,20 @@ impl LambdaBlock {
 				scope.error(bevyhow!("LambdaBlock '{}': {err}", block.label()));
 				continue;
 			}
-			// the function's code is read from the stack's home store
-			let home_bucket =
-				match repos.get(entity).and_then(|repo| repo.bucket_name()) {
-					Ok(bucket) => bucket,
-					Err(err) => {
-						scope.error(bevyhow!(
-							"LambdaBlock '{}': {err}",
-							block.label()
-						));
-						continue;
-					}
-				};
+			// the function's code is read from the stack's package store
+			let package_bucket = match package_stores
+				.get(entity)
+				.and_then(|package_store| package_store.bucket_name())
+			{
+				Ok(bucket) => bucket,
+				Err(err) => {
+					scope.error(bevyhow!(
+						"LambdaBlock '{}': {err}",
+						block.label()
+					));
+					continue;
+				}
+			};
 			let source_hash = artifact
 				.and_then(|artifact| artifact.compute_source_hash().ok());
 			let access = scope.access();
@@ -167,7 +169,7 @@ impl LambdaBlock {
 			if let Err(err) = block.emit(
 				source_hash,
 				&stack,
-				&home_bucket,
+				&package_bucket,
 				deployment,
 				&access,
 				config,
@@ -185,7 +187,7 @@ impl LambdaBlock {
 		&self,
 		source_hash: Option<String>,
 		stack: &ResolvedStack,
-		home_bucket: &str,
+		package_bucket: &str,
 		deployment: &Deployment,
 		access: &AccessGrants,
 		config: &mut terra::Config,
@@ -252,7 +254,7 @@ impl LambdaBlock {
 		// ie every bucket in the account.
 		//
 		// Nothing is seeded: the Lambda service loads the function's code from
-		// the repo bucket under its own identity, and the basic execution
+		// the package bucket under its own identity, and the basic execution
 		// role above carries the log writes. A stack declaring nothing therefore
 		// grants the function nothing, and no policy resource is emitted at all.
 		let policy =
@@ -287,7 +289,7 @@ impl LambdaBlock {
 				runtime: Some("provided.al2023".into()),
 				handler: Some("bootstrap".into()),
 				filename: None,
-				s3_bucket: Some(home_bucket.into()),
+				s3_bucket: Some(package_bucket.into()),
 				s3_key: Some(artifact_key.to_string().into()),
 				region: Some(region.clone()),
 				role: lambda_role.field_ref("arn").into(),
@@ -639,7 +641,7 @@ mod tests {
 	/// `example.org`.
 	fn build_json(block: LambdaBlock) -> String {
 		RenderScope::test_json_zoned("example.org", move |parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			parent.spawn(block);
 		})
 	}
@@ -655,7 +657,7 @@ mod tests {
 	fn an_invoke_only_lambda_publishes_no_endpoint() {
 		let block = LambdaBlock::default().with_http(false);
 		RenderScope::test_json(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			parent.spawn(block.clone());
 			parent.spawn(
 				S3BucketBlock::new("app")
@@ -696,7 +698,7 @@ mod tests {
 	#[beet_core::test]
 	fn grants_only_least_privilege_policies() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent.spawn(
 				S3BucketBlock::new("app")
@@ -728,7 +730,7 @@ mod tests {
 	#[beet_core::test]
 	fn lowers_permissions_per_grant() {
 		RenderScope::test_json(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent.spawn(
 				S3BucketBlock::new("assets")
@@ -741,7 +743,7 @@ mod tests {
 		.xpect_contains("s3:PutObject")
 		.xpect_contains("dynamodb:PutItem");
 		RenderScope::test_json(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent.spawn(S3BucketBlock::new("assets"));
 		})
@@ -776,7 +778,7 @@ mod tests {
 			.emit(
 				None,
 				&stack,
-				HomeStoreBlock::TEST_BUCKET,
+				PackageStoreBlock::TEST_BUCKET,
 				&deployment,
 				&AccessGrants::new(vec![AccessGrant::read(
 					"gcs_bucket",
@@ -800,7 +802,7 @@ mod tests {
 		let (scope, _dir) = RenderScope::test_render_stack(
 			(stack.with_stage("prod"), region),
 			|parent| {
-				parent.spawn(HomeStoreBlock::test_store());
+				parent.spawn(PackageStoreBlock::test_store());
 				parent.spawn(LambdaBlock::default());
 			},
 		);
@@ -887,7 +889,7 @@ mod tests {
 	#[beet_core::test(timeout_ms = 60_000)]
 	async fn validate() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 		});
 		StateEncryption::ensure_test_passphrase();

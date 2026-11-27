@@ -1533,7 +1533,7 @@ mod test {
 	/// being listed somewhere else.
 	///
 	/// REGRESSION: the MTA-STS publish reached Cloudflare through wrangler but
-	/// sat in no table of action names, so a token minted for a mail repo would
+	/// sat in no table of action names, so a token minted for a mail package would
 	/// have lacked its Workers groups and the next mail deploy would have
 	/// answered 403 while publishing the policy.
 	#[cfg(feature = "mail")]

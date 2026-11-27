@@ -157,7 +157,7 @@ impl SecretsHandle {
 	/// The newest document of the dated series beside this path, `None`
 	/// when none has been written: the one a restore and a probe read.
 	/// Descends year, month and day newest first by one directory listing
-	/// each, so a document at a repo root never walks the repo.
+	/// each, so a document at a source directory's root never walks the directory.
 	pub async fn newest_dated(&self) -> Result<Option<Self>> {
 		let suffix = SmolStr::new(format!("Z.{}", self.extension()?));
 		Self::newest_in(
@@ -362,7 +362,7 @@ mod test {
 			.xpect_eq("2026/09/15/000000Z.json");
 	}
 
-	/// A document at a store root (the home store's `secrets.toml`) looks
+	/// A document at a store root (the package store's `secrets.toml`) looks
 	/// for its series by descending dated directories, so a sibling tree
 	/// (`target/`) is never walked and never mistaken for one.
 	#[beet_core::test]

@@ -56,7 +56,7 @@ async fn package(documents: &[(&str, &str)]) -> (World, Entity) {
 			.await
 			.unwrap();
 	}
-	let package = world.spawn(PackageStore::new(store)).id();
+	let package = world.spawn(PackageFiles::new(store)).id();
 	(world, package)
 }
 
@@ -933,7 +933,7 @@ async fn counter_bsx_repaints_in_live_tui() {
 			channel,
 			terminal,
 			DoubleBuffer::new(UVec2::new(48, 12)),
-			PackageStore::new(store),
+			PackageFiles::new(store),
 		))
 		.id();
 	app.update();

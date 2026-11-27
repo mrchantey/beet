@@ -57,7 +57,7 @@ impl FromStr for WasmHost {
 
 impl RunWasm {
 	/// The positional this command answers to. The runner hosts the module in a
-	/// child runtime, so the `--entry`/`--home` on its argv belong to the module
+	/// child runtime, so the `--entry`/`--package` on its argv belong to the module
 	/// rather than to this process: the binary declares it as an
 	/// [`ArgvPassthrough`] so the entry loader leaves those flags alone.
 	pub const COMMAND: &'static str = "run-wasm";

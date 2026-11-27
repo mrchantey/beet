@@ -669,7 +669,7 @@ mod test {
 				.xpect_eq(stack.aws_region().unwrap().clone());
 			store.scope().clone().xpect_eq(stack.secret_scope());
 		});
-		// (one home store per world, so a second world)
+		// (one package store per world, so a second world)
 		let mut world = infra_world();
 		let declared = stack_root(&mut world, SsmSecrets);
 		world.with_state::<StackQuery, _>(|stacks| {

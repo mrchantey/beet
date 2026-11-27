@@ -913,7 +913,7 @@ mod test {
 		help_body(&mut world, root, "--help")
 			.await
 			.xpect_contains("Before the build")
-			.xpect_contains("&lt;HomeRoot&gt;")
+			.xpect_contains("&lt;PackageRoot&gt;")
 			.xpect_contains("&lt;RequireCfg&gt;");
 		help_body(&mut world, root, "about --help")
 			.await

@@ -4,8 +4,8 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<HomeAssemble src="site">` — assemble the tree this deploy publishes as its
-/// document, in the assembled copy [`HomeSync`] mirrors from.
+/// `<PackageAssemble src="site">` — assemble the tree this deploy publishes as its
+/// document, in the assembled copy [`PackageSync`] mirrors from.
 ///
 /// A published document is rarely one checkout directory: the site's own tree
 /// plus a few files owned elsewhere in the workspace. The assemble composes them
@@ -22,14 +22,14 @@ use beet_net::prelude::*;
 /// borrows a derivation may read.
 ///
 /// ```bsx
-/// <HomeAssemble src="site">
+/// <PackageAssemble src="site">
 ///     <DirCopy src="assets" dest="assets" paths="databases/country.mmdb"/>
 ///     <Derive/>
-/// </HomeAssemble>
-/// <HomeSync/>
+/// </PackageAssemble>
+/// <PackageSync/>
 /// ```
 ///
-/// The dir lives under the deploy work directory (`target/infra/<app>/repo`)
+/// The dir lives under the deploy work directory (`target/infra/<app>/package`)
 /// and is emptied first, so a file removed from the source leaves the mirror
 /// rather than lingering from an earlier assemble. A declared secrets document
 /// sitting in `src` ([`Secrets::within_store`], an entry's conventional
@@ -43,7 +43,7 @@ use beet_net::prelude::*;
 		ChildError::NO_ACTION | ChildError::ACTION_MISMATCH | ChildError::NONE_VALID
 	)
 )]
-pub async fn HomeAssemble(
+pub async fn PackageAssemble(
 	/// The workspace-relative directory to publish.
 	#[field]
 	src: WsPath,
@@ -58,7 +58,7 @@ pub async fn HomeAssemble(
 	let dir = cx
 		.caller
 		.with_state::<StackQuery, _>(|entity, stacks| {
-			HomeAssemble::dir(&stacks, entity)
+			PackageAssemble::dir(&stacks, entity)
 		})
 		.await??;
 	let src = src.into_abs();
@@ -75,8 +75,8 @@ pub async fn HomeAssemble(
 			DirCopy::copy_paths(&src, &dir, &paths)?;
 		}
 	}
-	let documents = HomeAssemble::secrets_documents(&cx.caller).await?;
-	for document in HomeAssemble::leave_out(&dir, &documents)? {
+	let documents = PackageAssemble::secrets_documents(&cx.caller).await?;
+	for document in PackageAssemble::leave_out(&dir, &documents)? {
 		info!("left the secrets document {document} out of the assembled copy");
 	}
 	info!("assembled {src} -> {dir}");
@@ -85,7 +85,7 @@ pub async fn HomeAssemble(
 	let children = BehaviourChildren::valid_for::<
 		Request,
 		Outcome<Request, Response>,
-	>(&cx.world(), cx.id(), "repo assemble")
+	>(&cx.world(), cx.id(), "package assemble")
 	.await?;
 	let world = cx.world();
 	let mut input = cx.input;
@@ -102,7 +102,7 @@ pub async fn HomeAssemble(
 	Outcome::Pass(input).xok()
 }
 
-impl HomeAssemble {
+impl PackageAssemble {
 	/// An assemble of the workspace-relative `src`, whole.
 	pub fn new(src: impl Into<WsPath>) -> Self {
 		Self {
@@ -145,7 +145,7 @@ impl HomeAssemble {
 		removed.xok()
 	}
 
-	/// The assembled copy of the stack `entity` belongs to: `repo/` under the
+	/// The assembled copy of the stack `entity` belongs to: `package/` under the
 	/// deploy work directory, so a teardown removes it with the rest.
 	pub fn dir(stacks: &StackQuery, entity: Entity) -> Result<AbsPath> {
 		let (_, stack) = stacks.root(entity)?;
@@ -153,7 +153,7 @@ impl HomeAssemble {
 			.deployment()
 			.work_directory(&stack)
 			.into_abs()
-			.join("repo")
+			.join("package")
 			.xok()
 	}
 }
@@ -168,7 +168,7 @@ mod test {
 	///
 	/// REGRESSION: `examples/beetmania` gained its own document beside its
 	/// `main.bsx`, and the deploy's assemble would have published it into the
-	/// repo bucket the function serves.
+	/// package bucket the function serves.
 	#[beet_core::test]
 	fn leaves_the_secrets_document_out() {
 		let dir = TempDir::new().unwrap();
@@ -180,7 +180,7 @@ mod test {
 			.filter_map(Secrets::within_store)
 			.map(SmolStr::from)
 			.collect::<Vec<_>>();
-		HomeAssemble::leave_out(&root, &documents)
+		PackageAssemble::leave_out(&root, &documents)
 			.unwrap()
 			.xpect_eq(vec![SmolStr::from("secrets.toml")]);
 		fs_ext::exists(root.join("secrets.toml"))

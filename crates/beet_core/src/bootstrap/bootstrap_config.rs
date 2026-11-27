@@ -33,8 +33,8 @@ use heck::ToShoutySnakeCase;
 ///
 /// One rule, derived from the reflected fields with no per-field exceptions:
 /// **a knob's flag is its kebab-case field name and its environment variable is
-/// `BEET_` plus its screaming snake field name, and argv wins**, so `--home` /
-/// `BEET_HOME`, `--store-fork` / `BEET_STORE_FORK`. An unqualified `port` is
+/// `BEET_` plus its screaming snake field name, and argv wins**, so `--package` /
+/// `BEET_PACKAGE`, `--store-fork` / `BEET_STORE_FORK`. An unqualified `port` is
 /// the http port, everywhere: the field, the flag and the variable. A list knob
 /// is comma separated on either transport. Both channels exist because both are
 /// natural affordances: a human types argv, a platform writes env into a unit
@@ -82,14 +82,14 @@ use heck::ToShoutySnakeCase;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default))]
 pub struct BootstrapConfig {
-	/// The entry document: a path for a dir-rooted home store, a name within a
+	/// The entry document: a path for a dir-rooted package store, a name within a
 	/// self-rooted one.
 	pub entry: Option<SmolStr>,
-	/// The home store the entry loads through.
-	pub home: Option<StoreUri>,
-	/// The local store the home store is forked into: reads fall through to
-	/// the home store, writes land here, so a process on a remote one forks
-	/// rather than writes back. Absent, a browser whose home store is remote
+	/// The package store the entry loads through.
+	pub package: Option<StoreUri>,
+	/// The local store the package store is forked into: reads fall through to
+	/// the package store, writes land here, so a process on a remote one forks
+	/// rather than writes back. Absent, a browser whose package store is remote
 	/// forks into IndexedDB; every other launch reads its own directly.
 	// the browser default is `entry_build::default_store_fork`
 	pub store_fork: Option<StoreUri>,
@@ -133,12 +133,12 @@ pub struct BootstrapConfig {
 /// Every field's static default, ie what an unset knob resolves to. Also the
 /// baseline the renderers diff against, so a field left at its default never
 /// reaches an argv line or an env pair, and the base a launch description is
-/// built over: `BootstrapConfig { home, ..default() }`.
+/// built over: `BootstrapConfig { package, ..default() }`.
 impl Default for BootstrapConfig {
 	fn default() -> Self {
 		Self {
 			entry: None,
-			home: None,
+			package: None,
 			store_fork: None,
 			watch: false,
 			required_features: default(),
@@ -188,8 +188,8 @@ impl BootstrapConfig {
 	/// bootstrap script ([`to_script`](Self::to_script)), so a served page names
 	/// the launch and `?server=http` still selects; in a Cloudflare Worker argv
 	/// is empty and the environment is the Worker's `vars`, seeded into
-	/// [`env_ext`] by its entry before this first reads, so `BEET_HOME` selects
-	/// the store exactly as `--home` does.
+	/// [`env_ext`] by its entry before this first reads, so `BEET_PACKAGE` selects
+	/// the store exactly as `--package` does.
 	pub fn from_env() -> Result<Self> {
 		Self::parse(&CliArgs::parse_env().params, &Self::env_var)
 	}
@@ -484,7 +484,7 @@ impl BootstrapConfig {
 			value.map(ToString::to_string)
 		}
 		push("entry", shown(self.entry.as_ref()));
-		push("home", shown(self.home.as_ref()));
+		push("package", shown(self.package.as_ref()));
 		push("store_fork", shown(self.store_fork.as_ref()));
 		push("server", shown(self.server.as_ref()));
 		push("path", shown(self.path.as_ref()));
@@ -543,17 +543,17 @@ impl BootstrapConfig {
 	}
 
 	/// Split into the `(argv, env)` pair a platform encoder emits, each field on
-	/// its documented default channel: boot selection (the home store, the server
+	/// its documented default channel: boot selection (the package store, the server
 	/// selection, the opening path) is visible on argv, ambient service config
 	/// (the bind address, the ports, the stage, the deploy identity) rides env.
 	///
 	/// The dev-harness fields (`entry`, `watch`, `required_features`, `tls_dir`,
 	/// `headless`, `screenshot*`) belong to neither deploy channel and
 	/// are dropped: a deploy has no use for them, and a deployed process probes
-	/// its home store for the entry rather than being told.
+	/// its package store for the entry rather than being told.
 	pub fn split_channels(self) -> (Self, Self) {
 		let argv = Self {
-			home: self.home,
+			package: self.package,
 			store_fork: self.store_fork,
 			server: self.server,
 			path: self.path,
@@ -716,7 +716,9 @@ mod test {
 	fn full() -> BootstrapConfig {
 		BootstrapConfig {
 			entry: Some("main.bsx".into()),
-			home: Some(StoreUri::parse("s3://site?region=us-west-2").unwrap()),
+			package: Some(
+				StoreUri::parse("s3://site?region=us-west-2").unwrap(),
+			),
 			store_fork: Some(StoreUri::parse("fs:/tmp/fork").unwrap()),
 			watch: true,
 			required_features: vec!["thread".into(), "sockets".into()],
@@ -833,13 +835,13 @@ mod test {
 	#[crate::test]
 	fn renders_cmd_json() {
 		BootstrapConfig {
-			home: Some(StoreUri::parse("s3://site").unwrap()),
+			package: Some(StoreUri::parse("s3://site").unwrap()),
 			server: Some(ServerFilter::new("http,ssh")),
 			..default()
 		}
 		.to_cmd_json("/app", "")
 		.unwrap()
-		.xpect_eq(r#"["/app", "--home=s3://site", "--server=http,ssh"]"#);
+		.xpect_eq(r#"["/app", "--package=s3://site", "--server=http,ssh"]"#);
 		// an entry that is its own CLI boots its command, trailing every flag
 		BootstrapConfig {
 			server: Some(ServerFilter::new("http")),
@@ -856,7 +858,7 @@ mod test {
 	fn splits_channels() {
 		let (argv, env) = full().split_channels();
 		argv.to_argv().unwrap().join(" ").xpect_eq(
-			"--home=s3://site?region=us-west-2 --store-fork=fs:/tmp/fork \
+			"--package=s3://site?region=us-west-2 --store-fork=fs:/tmp/fork \
 			 --server=http,ssh --path=/docs",
 		);
 		env.to_env()
@@ -928,13 +930,13 @@ mod test {
 	fn script_appends_to_the_location_argv() {
 		let launch = BootstrapConfig {
 			entry: Some("scene_editor.bsx".into()),
-			home: Some(StoreUri::parse("http:examples/ui").unwrap()),
+			package: Some(StoreUri::parse("http:examples/ui").unwrap()),
 			server: Some(ServerFilter::new("dom")),
 			..default()
 		};
 		let script = launch.to_script("").unwrap();
 		script.xpect_eq(
-			"--entry=scene_editor.bsx --home=http:examples/ui --server=dom",
+			"--entry=scene_editor.bsx --package=http:examples/ui --server=dom",
 		);
 		// the page at `/docs?color-scheme=dark` booting through the script
 		let mut argv = vec![SmolStr::new("docs"), "--color-scheme=dark".into()];

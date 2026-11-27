@@ -1,4 +1,4 @@
-//! The store-selection grammar behind `--home` / `BEET_HOME` and every store
+//! The store-selection grammar behind `--package` / `BEET_PACKAGE` and every store
 //! declaration.
 
 use crate::prelude::*;
@@ -45,10 +45,10 @@ use core::str::FromStr;
 ///    Worker's binding of that name (a Worker), not the S3-compatible API,
 ///    which is an `s3://<bucket>?endpoint=..` uri.
 /// 7. `http://<host>[:port][/<path_prefix>]` / `https://..` / `http:[<path_prefix>]`:
-///    a store published over http (a site's `<ServeBlobs prefix="repo"/>`),
+///    a store published over http (a site's `<ServeBlobs prefix="package"/>`),
 ///    read-only. The scheme-only form is origin-relative, the `fs:<path>` of
 ///    the web: a browser reads it against `location.origin`, a native process
-///    against its canonical loopback server. A process forks a remote home store
+///    against its canonical loopback server. A process forks a remote package store
 ///    into a local store (`--store-fork`) rather than writing to it.
 /// 8. `sqlite:<path>`: a SQLite database file, a table store or a blob store by
 ///    which is asked for. Relative paths resolve against the context dir and `~`
@@ -229,8 +229,8 @@ impl StoreUri {
 	}
 
 	/// The http store `url` names: its authority is the origin (absent, the
-	/// page's own) and its path the prefix. How a page spells the home store its
-	/// browser process reads, `<Wasm home="/repo"/>`.
+	/// page's own) and its path the prefix. How a page spells the package store its
+	/// browser process reads, `<Wasm package="/package"/>`.
 	pub fn http(url: &Url) -> Self {
 		Self::Http {
 			origin: url.authority().map(|authority| {
@@ -360,7 +360,7 @@ impl StoreUri {
 	pub fn is_self_rooted(&self) -> bool { !matches!(self, Self::Fs { .. }) }
 
 	/// Whether this store is read through the network rather than owned by the
-	/// process: a process on such a home store forks its edits into a store fork
+	/// process: a process on such a package store forks its edits into a store fork
 	/// (`--store-fork`) rather than writing back.
 	pub fn is_remote(&self) -> bool { matches!(self, Self::Http { .. }) }
 
@@ -368,7 +368,7 @@ impl StoreUri {
 	/// store says so: one bit the fork writes on its first write and a served
 	/// page's pre-boot script reads before the world exists, hiding the
 	/// published page from a returning editor until their fork paints. Both
-	/// sides spell the store as the launch does (`--home`), so they agree by
+	/// sides spell the store as the launch does (`--package`), so they agree by
 	/// construction.
 	pub fn fork_mark(&self) -> String { format!("beet:fork:{self}") }
 
@@ -437,7 +437,7 @@ impl StoreUri {
 	/// `dir`, a relative `fs:<path>` or `sqlite:<path>` at `<path>` under it,
 	/// an absolute one stands alone, and every self-rooted kind is untouched.
 	/// The entry resolver calls this with the resolved entry directory, so a
-	/// `--home=fs` means "the entry's own directory" rather than the cwd.
+	/// `--package=fs` means "the entry's own directory" rather than the cwd.
 	pub fn rooted_at(&self, dir: &AbsPath) -> Self {
 		let under_dir = |path: &SmolPath| match path.is_absolute() {
 			true => path.clone(),
@@ -630,11 +630,11 @@ mod test {
 			"s3://my-bucket?endpoint=https://acc.r2.cloudflarestorage.com",
 			"s3://my-bucket?endpoint=https://acc.r2.cloudflarestorage.com&region=auto",
 			"http",
-			"http:repo",
+			"http:package",
 			"http:examples/wasm",
-			"http://127.0.0.1:8337/repo",
+			"http://127.0.0.1:8337/package",
 			"https://beet.org",
-			"https://beet.org/repo",
+			"https://beet.org/package",
 			"sqlite:data.db",
 			"sqlite:../index/data.db",
 			"sqlite:/var/lib/beet/data.db",
@@ -693,12 +693,12 @@ mod test {
 				name: "SITE_BUCKET".into(),
 				path_prefix: Some("p".into()),
 			});
-		StoreUri::parse("https://beet.org/repo").unwrap().xpect_eq(
-			StoreUri::Http {
+		StoreUri::parse("https://beet.org/package")
+			.unwrap()
+			.xpect_eq(StoreUri::Http {
 				origin: Some("https://beet.org".into()),
-				path_prefix: Some("repo".into()),
-			},
-		);
+				path_prefix: Some("package".into()),
+			});
 		// the origin-relative spellings all root at the page's own origin
 		for uri in ["http", "http:", "http:/"] {
 			StoreUri::parse(uri).unwrap().xpect_eq(StoreUri::Http {
@@ -706,11 +706,11 @@ mod test {
 				path_prefix: None,
 			});
 		}
-		StoreUri::parse("http:/repo")
+		StoreUri::parse("http:/package")
 			.unwrap()
 			.xpect_eq(StoreUri::Http {
 				origin: None,
-				path_prefix: Some("repo".into()),
+				path_prefix: Some("package".into()),
 			});
 		StoreUri::parse("sqlite:data.db")
 			.unwrap()
@@ -743,16 +743,16 @@ mod test {
 			.xpect_eq(format!("sqlite:{home}/data.db"));
 	}
 
-	/// A page names its home store as a url: an authority is the origin, a bare
+	/// A page names its package store as a url: an authority is the origin, a bare
 	/// path the page's own.
 	#[crate::test]
 	fn http_from_url() {
 		StoreUri::http(&Url::coerce("/examples/wasm"))
 			.to_string()
 			.xpect_eq("http:examples/wasm");
-		StoreUri::http(&Url::coerce("https://beet.org/repo/"))
+		StoreUri::http(&Url::coerce("https://beet.org/package/"))
 			.to_string()
-			.xpect_eq("https://beet.org/repo");
+			.xpect_eq("https://beet.org/package");
 		StoreUri::http(&Url::coerce("/"))
 			.to_string()
 			.xpect_eq("http");
@@ -781,9 +781,11 @@ mod test {
 			.xpect_eq((Some("s".into()), Some("p".into())));
 		parts("indexed-db://d").xpect_eq((Some("d".into()), None));
 		parts("r2://B/p").xpect_eq((Some("B".into()), Some("p".into())));
-		parts("https://beet.org/repo")
-			.xpect_eq((Some("https://beet.org".into()), Some("repo".into())));
-		parts("http:repo").xpect_eq((None, Some("repo".into())));
+		parts("https://beet.org/package").xpect_eq((
+			Some("https://beet.org".into()),
+			Some("package".into()),
+		));
+		parts("http:package").xpect_eq((None, Some("package".into())));
 		// a database file is the backing and a whole store
 		parts("sqlite:data.db").xpect_eq((Some("data.db".into()), None));
 	}
@@ -820,8 +822,8 @@ mod test {
 			"local-storage://s",
 			"indexed-db://d",
 			"r2://B",
-			"http:repo",
-			"https://beet.org/repo",
+			"http:package",
+			"https://beet.org/package",
 			"sqlite:data.db",
 		] {
 			StoreUri::parse(uri).unwrap().is_self_rooted().xpect_true();
@@ -830,7 +832,7 @@ mod test {
 			StoreUri::parse(uri).unwrap().is_self_rooted().xpect_false();
 		}
 		// only the http kinds are remote
-		StoreUri::parse("http:repo")
+		StoreUri::parse("http:package")
 			.unwrap()
 			.is_remote()
 			.xpect_true();
@@ -903,9 +905,9 @@ mod test {
 			.xpect_eq("indexed-db://d/analytics");
 		nested("local-storage://s/a", "b").xpect_eq("local-storage://s/a/b");
 		nested("r2://B", "v1").xpect_eq("r2://B/v1");
-		nested("http", "repo").xpect_eq("http:repo");
-		nested("https://beet.org/repo", "v1")
-			.xpect_eq("https://beet.org/repo/v1");
+		nested("http", "package").xpect_eq("http:package");
+		nested("https://beet.org/package", "v1")
+			.xpect_eq("https://beet.org/package/v1");
 		// a whole store has no prefix to nest under
 		nested("dynamo://t?region=r", "v1").xpect_eq("dynamo://t?region=r");
 		nested("sqlite:data.db", "v1").xpect_eq("sqlite:data.db");
@@ -928,6 +930,6 @@ mod test {
 		rooted("s3://b").xpect_eq("s3://b");
 		rooted("memory://m").xpect_eq("memory://m");
 		rooted("r2://B/p").xpect_eq("r2://B/p");
-		rooted("http:repo").xpect_eq("http:repo");
+		rooted("http:package").xpect_eq("http:package");
 	}
 }

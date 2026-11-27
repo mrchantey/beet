@@ -22,7 +22,7 @@ use beet::prelude::*;
 
 /// The entry the page boots: the smallest windowed wgpu scene, within the
 /// served examples tree.
-const SCENE_HOME: &str = "/examples/spatial";
+const SCENE_PACKAGE: &str = "/examples/spatial";
 const SCENE_MAIN: &str = "scene_3d.bsx";
 /// The runtime under test, built by `just build-wasm-render`.
 const WASM_SRC: &str = "/wasm/beet-render.wasm";
@@ -59,7 +59,9 @@ const PIXEL_PROBE: &str = r#"(() => {
 /// under test is the one the served `/render` page uses. No canvas is supplied,
 /// exercising the created-and-appended path (`/render` covers page-supplied).
 fn render_page() -> Result<String> {
-	wasm_page(rsx! { <Wasm src=WASM_SRC home=SCENE_HOME entry=SCENE_MAIN/> })
+	wasm_page(
+		rsx! { <Wasm src=WASM_SRC package=SCENE_PACKAGE entry=SCENE_MAIN/> },
+	)
 }
 
 #[beet::test(timeout_ms = 300_000)]

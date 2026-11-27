@@ -61,8 +61,8 @@ use beet_core::prelude::*;
 /// producing action, and ensured by a step gathering every one a document
 /// declares, so nothing regenerates until something asks.
 ///
-/// A record source is read from the repo of the `Pds` in the world holding its
-/// did. A record no repo here holds cannot be seen from here and counts as
+/// A record source is read from the `Pds` in the world answering for its
+/// did. A record no `Pds` here holds cannot be seen from here and counts as
 /// unchanged, so a derivation reading one declares a `ttl`. A url source (a
 /// remote image a card embeds) counts as unchanged the same way, since nothing
 /// local can hash it without fetching it again; one that practically never
@@ -80,7 +80,7 @@ use beet_core::prelude::*;
 /// from the ones it was computed from, a value added or dropped included.
 ///
 /// A file whose producer reads what a deploy must never depend on (a listing
-/// of a remote repo, say) names the verb that alone writes it
+/// of a public repo, say) names the verb that alone writes it
 /// ([`written_by`](Self::written_by)): an ensure step leaves it as committed,
 /// `beet check` names the verb for a missing or stale one, and the verb writes
 /// it with [`Derivation::rewrite`], whatever its freshness.
@@ -627,24 +627,24 @@ impl core::fmt::Display for Freshness {
 }
 
 /// What each source of a [`Provenance`] reads as now: a file from the store
-/// the derived file is in, a record from the repo holding its did.
+/// the derived file is in, a record from the `Pds` answering for its did.
 struct SourceDigests {
 	store: BlobStore,
-	/// Every repo in the world, matched to a record source by did.
+	/// Every `Pds` in the world, matched to a record source by did.
 	#[cfg(feature = "dag_cbor")]
-	repos: Vec<Pds>,
+	pds: Vec<Pds>,
 }
 
 impl SourceDigests {
 	/// The digests a derived file in `store` is checked against.
 	async fn new(world: &AsyncWorld, store: BlobStore) -> Self {
-		// without the data model no repo holds a record
+		// without the data model no `Pds` holds a record
 		#[cfg(not(feature = "dag_cbor"))]
 		let _ = world;
 		Self {
 			store,
 			#[cfg(feature = "dag_cbor")]
-			repos: world
+			pds: world
 				.with(|world: &mut World| {
 					world.query::<&Pds>().iter(world).cloned().collect()
 				})
@@ -692,11 +692,11 @@ impl SourceDigests {
 	}
 
 	/// Whether the record is still at the version recorded, `true` when no
-	/// repo here holds it.
+	/// `Pds` here holds it.
 	#[cfg(feature = "dag_cbor")]
 	async fn record_unchanged(&self, strong_ref: &StrongRef) -> Result<bool> {
 		let uri = &strong_ref.uri;
-		match self.repos.iter().find(|pds| pds.did() == uri.did()) {
+		match self.pds.iter().find(|pds| pds.did() == uri.did()) {
 			Some(pds) => pds
 				.get_record(uri.collection(), uri.rkey())
 				.await?
@@ -706,7 +706,7 @@ impl SourceDigests {
 		.xok()
 	}
 
-	/// No repo here holds a record without the data model.
+	/// No `Pds` here holds a record without the data model.
 	#[cfg(not(feature = "dag_cbor"))]
 	async fn record_unchanged(&self, _strong_ref: &StrongRef) -> Result<bool> {
 		true.xok()
@@ -1115,8 +1115,8 @@ mod test {
 			.xpect_true();
 	}
 
-	/// A record source is checked against the repo holding its did, and one
-	/// no repo here holds is left to the ttl.
+	/// A record source is checked against the `Pds` answering for its did, and
+	/// one no `Pds` here holds is left to the ttl.
 	#[cfg(feature = "dag_cbor")]
 	#[beet_core::test]
 	async fn regenerates_a_changed_record() {

@@ -38,7 +38,7 @@ use bevy::input::keyboard::Key;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
-/// The example's directory, the entry's repo root.
+/// The example's directory, the entry's source directory.
 const ENTRY_DIR: &str = "examples/ui";
 /// The entry document within it.
 const ENTRY: &str = "scene_editor.bsx";
@@ -58,14 +58,14 @@ const SEEDED: &[&str] = &[
 	"wasm/beet-ui.wasm",
 	"wasm/beet-ui.js",
 ];
-/// The local-storage bit the fork sets, as the page names its repo.
-const FORK_MARK: &str = "beet:fork:http:repo";
-/// The browser's fork of the repo, as the launch names it
-/// (`indexed-db://beet/repo`): the database, its one object store, and the
+/// The local-storage bit the fork sets, as the page names its package store.
+const FORK_MARK: &str = "beet:fork:http:package";
+/// The browser's fork of the package store, as the launch names it
+/// (`indexed-db://beet/package`): the database, its one object store, and the
 /// fork's key within it.
 const FORK_DB: &str = "beet";
 const FORK_OBJECT_STORE: &str = "blobs";
-const FORK_KEY: &str = "repo/scene_editor/scene.json";
+const FORK_KEY: &str = "package/scene_editor/scene.json";
 
 /// The served page in a driven tab: the shared [`BrowserHost`] over the scene
 /// editor entry, plus the scene reads and the editor gestures its cases make.
@@ -233,7 +233,7 @@ impl SceneHost {
 		.collect()
 	}
 
-	/// Whether the browser is marked as holding a fork of this repo.
+	/// Whether the browser is marked as holding a fork of this package store.
 	async fn is_marked(&self) -> bool {
 		self.evaluate_value(&format!("localStorage.getItem({FORK_MARK:?})"))
 			.await

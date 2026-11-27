@@ -1,4 +1,4 @@
-//! A repo's deploy accounts, one per provider that has accounts to give, and
+//! A package's deploy accounts, one per provider that has accounts to give, and
 //! the verb that closes them.
 
 use beet_core::prelude::*;
@@ -10,9 +10,9 @@ use std::sync::Arc;
 /// of its declaration (`<AwsAccount/>`) and collected by
 /// [`DeployAccountQuery`].
 ///
-/// A deploy account is the provider account a repo's stacks deploy into, the
-/// repo's own rather than one shared with every other repo: what isolates one
-/// repo's resources and credentials from another's outright, where a policy
+/// A deploy account is the provider account a package's stacks deploy into, the
+/// package's own rather than one shared with every other package: what isolates one
+/// package's resources and credentials from another's outright, where a policy
 /// scoped by name only narrows them. Like a
 /// [`DeployCredential`](crate::prelude::DeployCredential) it is
 /// infrastructure, declared at the package root and converged by an elevated
@@ -60,7 +60,7 @@ pub trait DeployAccountProvider: 'static + Send + Sync {
 	/// Stable provider discriminator, ie `aws`, matching its credential's.
 	fn id(&self) -> &'static str;
 
-	/// The account's name, which it is found by: the repo's.
+	/// The account's name, which it is found by: the package's.
 	fn name(&self) -> SmolStr;
 
 	/// Close the account, asking a person for the provider's human factor,
@@ -76,7 +76,7 @@ pub struct DeployAccountQuery<'w, 's> {
 }
 
 impl DeployAccountQuery<'_, '_> {
-	/// Every declared account, refusing two of one provider: a repo deploys
+	/// Every declared account, refusing two of one provider: a package deploys
 	/// into one account per provider, and two would split its credential.
 	pub fn all(&self) -> Result<Vec<DeployAccount>> {
 		let mut seen = HashSet::<&'static str>::default();
@@ -84,7 +84,7 @@ impl DeployAccountQuery<'_, '_> {
 		for account in self.accounts.iter() {
 			if !seen.insert(account.id()) {
 				bevybail!(
-					"this launch declares two `{}` deploy accounts, and a repo \
+					"this launch declares two `{}` deploy accounts, and a package \
 					deploys into one per provider: keep one declaration",
 					account.id()
 				);

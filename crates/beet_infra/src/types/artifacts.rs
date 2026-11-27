@@ -8,10 +8,10 @@ use beet_net::prelude::*;
 use bytes::Bytes;
 
 /// Metadata about a deployed version, published by [`ArtifactsClient`] into
-/// the stack's home store under this layout:
+/// the stack's package store under this layout:
 ///
 /// ```text
-/// <id>/repo/           the document, the mirror root a process boots from
+/// <id>/package/           the document, the mirror root a process boots from
 /// <id>/bin/<label>     each artifact binary
 /// <id>/ledger.json     this record
 /// current/ledger.json  the version being served
@@ -21,14 +21,14 @@ use bytes::Bytes;
 /// Every key composes through this type, so the uri a compute bakes, the
 /// prefix a sync writes and the object a prune removes cannot describe the
 /// store differently. The document sits one level down deliberately: a
-/// content-only sync mirrors `repo/` alone, so it can never delete the binary
+/// content-only sync mirrors `package/` alone, so it can never delete the binary
 /// beside it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArtifactLedger {
 	pub deploy_id: Uuid,
 	pub timestamp: String,
 	pub artifacts: HashMap<SmolStr, ArtifactEntry>,
-	/// The home store this version's documents were published to, rooted at this
+	/// The package store this version's documents were published to, rooted at this
 	/// version's own prefix.
 	///
 	/// It rides the ledger because a machine that resolves its release per start
@@ -40,11 +40,11 @@ pub struct ArtifactLedger {
 	/// rollback targets, and a deploy that could not parse them could not roll
 	/// back to them.
 	#[serde(default)]
-	pub home: Option<StoreUri>,
+	pub package: Option<StoreUri>,
 	/// The source tree this version was built from, see [`DeploySource`].
 	///
 	/// Defaulted on read to [`DeploySource::default`], which reads as not
-	/// recorded, for the same reason as [`home`](Self::home).
+	/// recorded, for the same reason as [`package`](Self::package).
 	#[serde(default)]
 	pub source: DeploySource,
 }
@@ -60,7 +60,7 @@ impl ArtifactLedger {
 			deploy_id,
 			timestamp,
 			artifacts: default(),
-			home: None,
+			package: None,
 			source: default(),
 		}
 	}
@@ -72,10 +72,10 @@ impl ArtifactLedger {
 		format!("version {} built from {}", self.deploy_id, self.source)
 	}
 
-	/// Record the home store this version's documents live in, so the release
-	/// pointer can publish it. See [`home`](Self::home).
-	pub fn with_home(mut self, home: StoreUri) -> Self {
-		self.home = Some(home);
+	/// Record the package store this version's documents live in, so the release
+	/// pointer can publish it. See [`package`](Self::package).
+	pub fn with_package(mut self, package: StoreUri) -> Self {
+		self.package = Some(package);
 		self
 	}
 	#[cfg(test)]
@@ -103,7 +103,7 @@ impl ArtifactLedger {
 	/// The ledger's own key relative to [`version_prefix`](Self::version_prefix).
 	const LEDGER_NAME: &'static str = "ledger.json";
 	/// The directory under a version prefix holding the document.
-	const REPO_DIR: &'static str = "repo";
+	const PACKAGE_DIR: &'static str = "package";
 	/// The directory under a version prefix holding the artifact binaries.
 	const BIN_DIR: &'static str = "bin";
 	/// The prefix holding what is current: the ledger and the release pointers.
@@ -115,9 +115,9 @@ impl ArtifactLedger {
 		RelPath::new(uuid.to_string())
 	}
 	/// The mirror root of one version's document, the uri a process boots
-	/// from: `<id>/repo`.
-	pub fn version_repo_dir(uuid: &Uuid) -> RelPath {
-		Self::version_prefix(uuid).join(Self::REPO_DIR)
+	/// from: `<id>/package`.
+	pub fn version_package_dir(uuid: &Uuid) -> RelPath {
+		Self::version_prefix(uuid).join(Self::PACKAGE_DIR)
 	}
 	/// One version's artifact binary: `<id>/bin/<name>`.
 	pub fn version_artifact_key(uuid: &Uuid, artifact_name: &str) -> RelPath {
@@ -159,13 +159,13 @@ impl ArtifactLedger {
 	/// The pointer body: an env file, so one file serves both readers a
 	/// deployed box needs, a shell `.` and a systemd `EnvironmentFile=`.
 	///
-	/// The deploy identity and the home store render through
+	/// The deploy identity and the package store render through
 	/// [`BootstrapConfig::to_env`], the same table the runtime parses, so the
 	/// names cannot drift. The artifact key is the pointer's own knob, not a
 	/// bootstrap one: it tells the machine what to download, not the process how
 	/// to boot.
 	///
-	/// The home store is here rather than on the machine's own config because it
+	/// The package store is here rather than on the machine's own config because it
 	/// changes every deploy, and a machine whose config changes every deploy is
 	/// rebuilt every deploy. Publishing it here means the box resolves its
 	/// binary AND the document that binary was built against from one file, at
@@ -180,7 +180,7 @@ impl ArtifactLedger {
 		let mut body = BootstrapConfig {
 			deploy_id: Some(self.deploy_id.to_string().into()),
 			deploy_timestamp: Some(self.timestamp.clone().into()),
-			home: self.home.clone(),
+			package: self.package.clone(),
 			..default()
 		}
 		.to_env()
@@ -229,11 +229,11 @@ impl ArtifactsClient {
 
 	pub fn deploy_id(&self) -> &Uuid { &self.ledger.deploy_id }
 
-	/// Record the home store this deploy publishes its documents to, so the
+	/// Record the package store this deploy publishes its documents to, so the
 	/// ledger and every release pointer it writes name it. See
-	/// [`ArtifactLedger::home`].
-	pub fn with_home(mut self, home: StoreUri) -> Self {
-		self.ledger.home = Some(home);
+	/// [`ArtifactLedger::package`].
+	pub fn with_package(mut self, package: StoreUri) -> Self {
+		self.ledger.package = Some(package);
 		self
 	}
 
@@ -439,16 +439,16 @@ mod tests {
 	/// store rides it beside the artifact key, and `set_current` rewrites both
 	/// together.
 	#[beet_core::test]
-	async fn the_pointer_carries_the_home_store() {
+	async fn the_pointer_carries_the_package_store() {
 		let store = BlobStore::temp();
 		let uri = |version: &str| {
-			StoreUri::parse(&format!("s3://beet-site--prod--repo/{version}"))
+			StoreUri::parse(&format!("s3://beet-site--prod--package/{version}"))
 				.unwrap()
 		};
 		let first = test_ledger(vec![("app", "versions/v1/app", "h1")])
-			.with_home(uri("v1"));
+			.with_package(uri("v1"));
 		let second = test_ledger(vec![("app", "versions/v2/app", "h2")])
-			.with_home(uri("v2"));
+			.with_package(uri("v2"));
 		let client = ArtifactsClient::new(store.clone(), first.clone());
 		client.publish_ledger().await.unwrap();
 		ArtifactsClient::new(store.clone(), second.clone())
@@ -469,13 +469,13 @@ mod tests {
 		pointer()
 			.await
 			.as_str()
-			.xpect_contains("BEET_HOME=s3://beet-site--prod--repo/v2");
+			.xpect_contains("BEET_PACKAGE=s3://beet-site--prod--package/v2");
 		// the whole point: a rollback moves the document with the binary
 		client.set_current(&first.deploy_id).await.unwrap();
 		pointer()
 			.await
 			.as_str()
-			.xpect_contains("BEET_HOME=s3://beet-site--prod--repo/v1")
+			.xpect_contains("BEET_PACKAGE=s3://beet-site--prod--package/v1")
 			.xpect_contains("BEET_ARTIFACT_KEY=versions/v1/app");
 	}
 
@@ -537,7 +537,7 @@ mod tests {
 				.await
 				.unwrap()
 				.unwrap();
-		ledger.home.xpect_none();
+		ledger.package.xpect_none();
 		ledger.source.xpect_eq(DeploySource::default());
 	}
 
@@ -712,7 +712,7 @@ mod tests {
 	/// A pruned version leaves the rollback range before anything else it owns
 	/// goes: the ledger is what `list_versions` answers from, so a failure part
 	/// way through strands an unreachable orphan rather than a listed version
-	/// whose binary has already gone. The document under `repo/` goes with it,
+	/// whose binary has already gone. The document under `package/` goes with it,
 	/// since a version is one prefix.
 	#[beet_core::test]
 	async fn removing_a_version_takes_its_whole_prefix() {
@@ -729,7 +729,7 @@ mod tests {
 			.unwrap();
 		client.publish_ledger().await.unwrap();
 		let document =
-			ArtifactLedger::version_repo_dir(&version).join("main.bsx");
+			ArtifactLedger::version_package_dir(&version).join("main.bsx");
 		store.insert(&document, "<div/>").await.unwrap();
 		client.list_versions().await.unwrap().len().xpect_eq(1);
 

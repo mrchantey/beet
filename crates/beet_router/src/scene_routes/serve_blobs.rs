@@ -18,10 +18,10 @@ pub(crate) const STORE_PATH_PARAM: &str = "store_path";
 /// co-locate a store of its own. The greedy trailing capture and the
 /// request/response adapter are private details ServeBlobs inserts for itself.
 ///
-/// The mount is also a store another process reads: `<ServeBlobs prefix="repo"/>`
-/// publishes a site's home store, and an `HttpStore` at `/repo` (a browser the
+/// The mount is also a store another process reads: `<ServeBlobs prefix="package"/>`
+/// publishes a site's package store, and an `HttpStore` at `/package` (a browser the
 /// site's page boots, a terminal pulling the site) reads it key for key. Its
-/// listing rides the same route under `json`: `GET /repo/docs?list` answers the
+/// listing rides the same route under `json`: `GET /package/docs?list` answers the
 /// keys under `docs` as a JSON array, relative to it.
 #[template]
 pub fn ServeBlobs(
@@ -138,7 +138,7 @@ const HINT_DIR: &str = "assets";
 
 /// Appends a pull hint to a miss under a top-level `assets/` request path.
 ///
-/// A store-agnostic nudge rather than repo-specific knowledge: `assets`
+/// A store-agnostic nudge rather than package-specific knowledge: `assets`
 /// directories are commonly synced from a blob bucket instead of committed, so a
 /// miss there is usually an unhydrated checkout rather than a wrong url. Any
 /// other status or path passes through untouched.
@@ -264,12 +264,12 @@ mod test {
 	}
 
 	/// A secrets document in the served store, as an entry's conventional
-	/// `secrets.toml` sits beside it in its home store, is neither served nor
+	/// `secrets.toml` sits beside it in its package store, is neither served nor
 	/// listed, while the rest of the store is.
 	///
 	/// REGRESSION: `examples/beetmania` gained its own document, and its
-	/// `<ServeBlobs prefix="repo"/>` would have published it at
-	/// `/repo/secrets.toml`.
+	/// `<ServeBlobs prefix="package"/>` would have published it at
+	/// `/package/secrets.toml`.
 	#[cfg(feature = "json")]
 	#[beet_core::test]
 	async fn never_serves_a_secrets_document() {
@@ -282,24 +282,24 @@ mod test {
 		world.spawn(Secrets::default());
 		let router = world
 			.spawn((Router::with_defaults(), store, children![serve_route(
-				"repo"
+				"package"
 			)]))
 			.id();
 		world
 			.entity_mut(router)
-			.exchange(Request::get("repo/secrets.toml"))
+			.exchange(Request::get("package/secrets.toml"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::NOT_FOUND);
 		world
 			.entity_mut(router)
-			.exchange(Request::get("repo/style.css"))
+			.exchange(Request::get("package/style.css"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
 		world
 			.entity_mut(router)
-			.exchange(Request::get("repo?list"))
+			.exchange(Request::get("package?list"))
 			.await
 			.unwrap_str()
 			.await
@@ -380,7 +380,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((Router::with_defaults(), store, children![serve_route(
-				"repo"
+				"package"
 			)]))
 			.flush();
 		let mut list = async |path: &str| -> Vec<RelPath> {
@@ -394,12 +394,12 @@ mod test {
 				.await
 				.unwrap()
 		};
-		list("repo").await.xpect_eq(vec![
+		list("package").await.xpect_eq(vec![
 			RelPath::new("docs/a.md"),
 			RelPath::new("docs/b/c.md"),
 			RelPath::new("main.bsx"),
 		]);
-		list("repo/docs")
+		list("package/docs")
 			.await
 			.xpect_eq(vec![RelPath::new("a.md"), RelPath::new("b/c.md")]);
 	}
@@ -435,11 +435,11 @@ mod test {
 				.spawn((server, on_spawn, store, children![(
 					Router::default(),
 					RejectUnknownParams,
-					children![serve_route("repo")]
+					children![serve_route("package")]
 				)]))
 				.run();
 		});
-		let http = BlobStore::new(HttpStore::new(format!("{url}/repo")));
+		let http = BlobStore::new(HttpStore::new(format!("{url}/package")));
 		http.get_media(&RelPath::from("main.bsx"))
 			.await
 			.unwrap()

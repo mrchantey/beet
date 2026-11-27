@@ -482,7 +482,7 @@ mod tests {
 			.spawn((
 				Stack::new("app").with_stage("dev"),
 				BlobStore::temp(),
-				HomeStore,
+				PackageStore,
 				DocumentSecrets::new("secrets.toml"),
 			))
 			.id();

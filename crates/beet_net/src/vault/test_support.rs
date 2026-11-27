@@ -24,10 +24,10 @@ static IDENTITY: LazyLock<AgeIdentity> = LazyLock::new(|| {
 static STORES: AtomicUsize = AtomicUsize::new(0);
 
 /// A world to call verbs in, the process identity, and a memory store of
-/// its own as the home store, addressable by uri too. The store handle is
+/// its own as the package store, addressable by uri too. The store handle is
 /// held here because a memory backing lives only as long as a handle does,
 /// and a verb given a uri resolves it afresh. With nothing declared the
-/// document verbs land on `secrets.toml` in the home store.
+/// document verbs land on `secrets.toml` in the package store.
 pub struct VerbWorld {
 	pub world: World,
 	pub root: Entity,
@@ -49,7 +49,7 @@ impl VerbWorld {
 			BlobStoreProvider::from_uri(&StoreUri::parse(&uri).unwrap())
 				.unwrap()
 				.into_blob_store();
-		let root = world.spawn((store.clone(), HomeStore)).id();
+		let root = world.spawn((store.clone(), PackageStore)).id();
 		world.flush();
 		Self {
 			world,
@@ -93,7 +93,7 @@ impl VerbWorld {
 		SecretsHandle::new(self.store.clone(), name).unwrap()
 	}
 
-	/// The default document, `secrets.toml` in the home store, empty until
+	/// The default document, `secrets.toml` in the package store, empty until
 	/// written.
 	pub async fn document(&self) -> SecretsDocument {
 		self.secrets(Secrets::DEFAULT_PATH)

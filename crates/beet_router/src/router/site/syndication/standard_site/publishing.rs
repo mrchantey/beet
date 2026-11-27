@@ -5,7 +5,7 @@ use beet_net::exports::bytes::Bytes;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// The `--dry-run` every step writing to a repo or the index takes.
+/// The `--dry-run` every step writing to a public repo or the index takes.
 #[derive(Reflect)]
 pub(crate) struct StandardSiteWriteParams {
 	/// Run against a dry repo per account ([`DryRunPds`]), writing and
@@ -26,7 +26,7 @@ pub(crate) struct StandardSiteAnnounceParams {
 }
 
 /// One publication as its publish steps see it: the declaration a step's
-/// [`PublicationRef`] names, the account's repo, the store its derived files
+/// [`PublicationRef`] names, the account's public repo, the store its derived files
 /// live in, and the listed dated pages beneath it, each a document.
 #[derive(Clone)]
 pub(super) struct Publishing {
@@ -36,7 +36,7 @@ pub(super) struct Publishing {
 	pub router: Entity,
 	/// The declaration.
 	pub declaration: StandardSitePub,
-	/// The repo the publication and its documents live in.
+	/// The public repo the publication and its documents live in.
 	pub pds: Pds,
 	/// The store the declaration resolves by ancestry, where its index lives.
 	pub store: BlobStore,
@@ -120,7 +120,7 @@ impl Publishing {
 			.await?
 	}
 
-	/// This publication as the run `request` is writes it: its repo the dry
+	/// This publication as the run `request` is writes it: its public repo the dry
 	/// one the request carries when `dry_run` ([`DryRunRepos`]).
 	pub fn in_run(mut self, request: &mut Request, dry_run: bool) -> Self {
 		self.pds = DryRunRepos::resolve(request, self.pds, dry_run);
@@ -154,7 +154,7 @@ impl Publishing {
 		DerivedImage::read(store, &path).await?.xmap(Some).xok()
 	}
 
-	/// The publication's records as the repo holds them.
+	/// The publication's records as the public repo holds them.
 	pub async fn records(&self) -> Result<StandardSiteRecords> {
 		StandardSiteRecords::read(&self.pds, &self.url).await
 	}
@@ -318,7 +318,7 @@ struct PublishingQuery<'w, 's> {
 }
 
 impl PublishingQuery<'_, '_> {
-	/// The publication declared on `entity`, its repo `pds`.
+	/// The publication declared on `entity`, its public repo `pds`.
 	fn publishing(&self, entity: Entity, pds: Pds) -> Result<Publishing> {
 		let declaration =
 			self.publications.get(entity).cloned().map_err(|_| {
@@ -404,7 +404,7 @@ pub(super) mod test {
 	use std::sync::Arc;
 	use std::sync::Mutex;
 
-	/// The fixture site with its accounts' repos: `beet` holds the
+	/// The fixture site with its accounts' public repos: `beet` holds the
 	/// publication, `pete` authors every post and reposts its announcements.
 	pub struct Site {
 		pub world: World,
@@ -474,7 +474,7 @@ pub(super) mod test {
 					.with_auto_repost(true),
 				)
 				.id();
-			// the attach lands a network repo first, which the fixture's
+			// the attach lands a network PDS first, which the fixture's
 			// replace
 			world.flush();
 			let pete_pds = Pds::new(EmulatorPds::new(
@@ -571,7 +571,7 @@ pub(super) mod test {
 			Ok(())
 		}
 
-		/// The documents the repo holds, in rkey order.
+		/// The documents the public repo holds, in rkey order.
 		pub async fn documents(
 			&self,
 		) -> Vec<RecordEntry<StandardSiteDocument>> {
@@ -590,7 +590,7 @@ pub(super) mod test {
 				.unwrap()
 		}
 
-		/// The address and cid of every record the publication's repo holds.
+		/// The address and cid of every record the publication's public repo holds.
 		pub async fn versions(&self) -> Vec<StrongRef> {
 			let mut versions = Vec::new();
 			for collection in [
@@ -704,7 +704,7 @@ pub(super) mod test {
 			.did
 			.as_str()
 			.xpect_eq("did:plc:hnv7bd4gtxrf7iigjo22qukp");
-		// the repo answers the post as a scene body, read with no registry
+		// the public repo answers the post as a scene body, read with no registry
 		let content = document.content.clone().unwrap();
 		content.r#type().clone().xpect_eq(SceneBody::NSID);
 		SceneBody::from_value(Value::Map(content.fields().clone()))
@@ -829,8 +829,8 @@ pub(super) mod test {
 			]);
 	}
 
-	/// A named draft refuses before the repo is read, so the refusal holds
-	/// whether or not the repo answers.
+	/// A named draft refuses before the public repo is read, so the refusal holds
+	/// whether or not the public repo answers.
 	#[beet_core::test]
 	async fn refuses_before_reading_the_repo() {
 		let unreachable = XrpcPds::new(
@@ -884,7 +884,7 @@ pub(super) mod test {
 		announce_suite(&mut Site::new().await).await;
 	}
 
-	/// The announcement suite, run against any publishing repo: the emulator
+	/// The announcement suite, run against any publishing public repo: the emulator
 	/// here, the test org behind the live gate.
 	async fn announce_suite(site: &mut Site) {
 		let canonical = format!(
@@ -999,7 +999,7 @@ pub(super) mod test {
 	/// so the announcement finds the document the publish would write, and
 	/// the index it projects is the one the run then writes.
 	///
-	/// REGRESSION: each step of a dry run read the repo as it stood, so an
+	/// REGRESSION: each step of a dry run read the public repo as it stood, so an
 	/// edit's index line read `unchanged` where the run wrote `updated`
 	#[beet_core::test]
 	async fn a_dry_run_projects_the_run() {

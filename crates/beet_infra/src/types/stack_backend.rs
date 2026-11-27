@@ -251,7 +251,7 @@ impl S3Backend {
 	/// S3 bucket name is global, so one account holding `beet-state` would
 	/// leave every other account naming something else. Derived rather than
 	/// declared, so the second project an account deploys finds the first one's
-	/// state bucket with nothing authored, and a repo's own member account
+	/// state bucket with nothing authored, and a package's own member account
 	/// (`<AwsAccount/>`) has its own.
 	pub fn default_bucket(account_id: &str) -> SmolStr {
 		format!("{}{account_id}", Self::DEFAULT_PREFIX).into()

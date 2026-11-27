@@ -61,7 +61,7 @@ thread = ["beet/thread", "beet/ui"]
 # `beet/site_images` derives an `<IconSet/>`'s files and a `<SocialCards/>`
 # set, which the deploy's and the `assets` verb's `<Derive/>` regenerate.
 infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/scheduled_job_block", "beet/lightsail_block", "beet/fargate_block", "aws", "beet/mail", "beet/site_images"]
-# The atproto network half: an `<AtprotoAccount/>` lands its repo, reads and
+# The atproto network half: an `<AtprotoAccount/>` lands its PDS, reads and
 # writes reach a real PDS, handles resolve. Lean, so a serving binary can link
 # it without the deploy machinery; with `infra` too it brings the handle block
 # and its probe (`<AtprotoHandleBlock/>`, `<AtprotoHandleProbe/>`), so the site
@@ -129,7 +129,7 @@ tui = ["beet/tui_server"]
 ssh = ["tui", "beet/ssh_tui"]
 # AWS over signed requests and the S3 and DynamoDB stores, so a deployed `beet`
 # task loads its entry (`main.bsx`, `routes/`, `templates/`) from an S3 bucket
-# instead of the local filesystem, selected at runtime by `--home=s3://<bucket>`.
+# instead of the local filesystem, selected at runtime by `--package=s3://<bucket>`.
 # Adds no deploy/terraform machinery, keeping the container binary lean. `net`
 # is its native transport; a wasm build signs through fetch.
 aws = ["beet/aws", "net"]
@@ -149,8 +149,8 @@ lambda = ["scene", "beet/lambda", "aws"]
 # bindings' credential.
 cloudflare = ["scene", "beet/cloudflare", "dep:worker", "aws"]
 # The browser-wasm target (wasm32-only): builds the standalone `beet` binary for
-# the browser, which boots the launch its page's `<Wasm home entry server>`
-# describes (an http repo forked into IndexedDB, resolved through the one
+# the browser, which boots the launch its page's `<Wasm package entry server>`
+# describes (an http package store forked into IndexedDB, resolved through the one
 # `LaunchPlugin` path) and paints the DOM under `--server=dom`, else runs headless
 # and logs to the console. The wasm-safe render base, no Worker SDK. `BuildWasm`
 # defaults to this.
@@ -166,7 +166,7 @@ web_examples = ["web", "extra"]
 # speech / face handlers, via `beet/perceive_act_web`), so the browser binary serves as
 # the perceive-act head client (v3). Wasm-safe: no `thread` (the native LLM agent runs in
 # the separate native binary serving this head over a socket). Build with:
-# `beet build-wasm --package=beet-cli --bin=beet --features=web_head --out=<path>.wasm`.
+# `beet build-wasm --cargo-package=beet-cli --bin=beet --features=web_head --out=<path>.wasm`.
 web_head = ["web", "beet/perceive_act_web"]
 # `beet-min.wasm`, the floor: the smallest binary that is still a beet runtime in
 # the browser, ie the `web` base and nothing else. It boots the entry its page

@@ -4,7 +4,7 @@
 //! again through the world running in the tab.
 //!
 //! The site is served exactly as `beet --entry=examples/beetmania` serves it
-//! (the entry resolved through its own fs home store, built through the plain
+//! (the entry resolved through its own fs package store, built through the plain
 //! one-shot path, its declared `<HttpServer>` booting), the harness reading the
 //! url off the listener the entry binds. The page's `<Wasm/>` boots the entry
 //! again in the browser under `--server=dom`; once its `DomHost` paints, a
@@ -26,7 +26,7 @@ use beetmania::build_site;
 
 use beet::prelude::*;
 
-/// The example's directory, the entry's repo root.
+/// The example's directory, the entry's source directory.
 const ENTRY_DIR: &str = "examples/beetmania";
 
 /// Serve the on-disk example the way the binary does, on an OS-assigned port.
@@ -65,7 +65,7 @@ async fn the_counter_counts_in_the_browser() {
 	host.goto("/counter").await;
 	// the first paint is the served page
 	host.find_text("Beets eaten today: 0").await;
-	// the boot: the entry resolves through `/repo`, its `DomServer` lands the
+	// the boot: the entry resolves through `/package`, its `DomServer` lands the
 	// navigator on this page and adopts it as it stands
 	host.painted_clean("/counter").await;
 	// the loop: a trusted click reaches the world, the script runs, the count

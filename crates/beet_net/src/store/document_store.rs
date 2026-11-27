@@ -3,7 +3,7 @@
 //!
 //! A state document may name its schema by pointing at another document
 //! ([`SchemaRef::Document`]), resolved in the naming document's own package
-//! ([`PackageQuery`]). The index that answers such a
+//! ([`PackageFilesQuery`]). The index that answers such a
 //! reference is [`SchemaRegistry`]'s by-location one, which sits beside the
 //! by-name namespace rather than inside it; a store sits above the schema layer
 //! in the crate graph, so the reader that fills that index lives here.
@@ -103,7 +103,7 @@ async fn read_located_schema(
 	// `None` while no store has arrived above it: one legitimately lands frames
 	// after the tree that reads it
 	let Some(blob) = entity
-		.with_state::<PackageQuery, _>(move |entity, packages| {
+		.with_state::<PackageFilesQuery, _>(move |entity, packages| {
 			packages.resolve(entity, &document).ok()
 		})
 		.await?

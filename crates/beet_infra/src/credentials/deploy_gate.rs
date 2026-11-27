@@ -1,5 +1,5 @@
 //! `<stack>/deploy` and `<stack>/deploy --elevated`: the deploy and destroy
-//! routes' shell, gated by the repo's deploy credentials.
+//! routes' shell, gated by the package's deploy credentials.
 
 use crate::prelude::*;
 use beet_action::prelude::*;
@@ -27,7 +27,7 @@ pub(crate) struct ElevationParams {
 
 /// The shell of a stack's `deploy` and `destroy` routes, which
 /// `<DeployRoutes/>` puts on both: the group runs through
-/// [`ExchangeGroup::run`] once the repo's deploy credentials
+/// [`ExchangeGroup::run`] once the package's deploy credentials
 /// ([`DeployCredential`]) allow it.
 ///
 /// A package's verb across its stacks, a [`RouteMatrix`] verb whose every
@@ -55,7 +55,7 @@ pub(crate) struct ElevationParams {
 ///   plainly.
 /// - **`--dry-run`** reports, asking for nothing, what each credential would
 ///   become and whether this deploy needs `--elevated`.
-/// - **Any of the three** refuses a launch running as a credential the repo
+/// - **Any of the three** refuses a launch running as a credential the package
 ///   seals with its grants while the entry declares none for it, since
 ///   nothing would check what it holds, and a launch declaring a credential
 ///   whose sealed record another entry owns, since a secrets document holding
@@ -211,7 +211,7 @@ impl DeployGate {
 		.xok()
 	}
 
-	/// Refuse a launch that runs as a deploy credential the repo seals (a
+	/// Refuse a launch that runs as a deploy credential the package seals (a
 	/// record carrying its [grants](DeployCredential::GRANTS)) while declaring
 	/// none for it: nothing would compare what it holds with what the stacks
 	/// need, so a gap would surface mid-apply as the provider's denial, after
@@ -262,7 +262,7 @@ impl DeployGate {
 			return OK;
 		}
 		bevybail!(
-			"this deploy runs as {}, which the repo seals with the grants it \
+			"this deploy runs as {}, which the package seals with the grants it \
 			holds, and this entry declares no deploy credential for it, so \
 			nothing checks that it holds what these stacks need before the \
 			provider refuses mid-apply: declare that provider's deploy \
@@ -1162,7 +1162,7 @@ mod test {
 		deploy(Holding::None).await.is_ok().xpect_false();
 	}
 
-	/// A deploy running as a credential the repo seals with its grants, which
+	/// A deploy running as a credential the package seals with its grants, which
 	/// the entry declares no credential for, refuses before anything runs,
 	/// naming the record; running as another value of it, the provider judges.
 	///
@@ -1215,7 +1215,7 @@ mod test {
 	/// run and elevated run alike; a record naming this entry, or none (sealed
 	/// before records named one), deploys.
 	///
-	/// REGRESSION: the repo's one secrets document held a credential every
+	/// REGRESSION: the package's one secrets document held a credential every
 	/// entry converged to its own needs, so the example's key could redeploy
 	/// the site's lambda.
 	#[beet_core::test]

@@ -689,7 +689,7 @@ mod test {
 	/// Regression: a server mounted under a command route opens at the url space
 	/// its own router serves, not at the command path that addressed it.
 	///
-	/// This is the deployed shape (`app --home=.. --server=ssh serve`, and `beet
+	/// This is the deployed shape (`app --package=.. --server=ssh serve`, and `beet
 	/// --entry=site serve --server=ssh` locally): the site hangs off a `serve` route, so
 	/// every session used to open on a "no route matched /serve" error page.
 	#[beet_core::test]

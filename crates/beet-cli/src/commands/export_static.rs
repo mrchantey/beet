@@ -46,7 +46,7 @@ pub async fn ExportStatic(
 
 	// the output is a local write target, so an `fs` store: `--out` (absolute, or
 	// relative to the cwd) overrides the default `<entry>/dist` (the entry's own
-	// dir, not a `<HomeRoot>`-widened root).
+	// dir, not a `<PackageRoot>`-widened root).
 	let out_dir = match out {
 		Some(out) => AbsPath::new(out)?,
 		None => entry_dir(&entry_path)?.join(DIST_DIR),

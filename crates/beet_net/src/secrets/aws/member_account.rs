@@ -5,7 +5,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// A member account of the operator's AWS Organization, found by its name:
-/// the account a repo deploys into, reached from the management account by
+/// the account a package deploys into, reached from the management account by
 /// assuming a role in it rather than by any credential of its own.
 ///
 /// Two roles reach it. [`ADMIN_ROLE`](Self::ADMIN_ROLE) is the one
@@ -15,7 +15,7 @@ use beet_core::prelude::*;
 /// for [`AgentIdentity::USER`], `ViewOnlyAccess` and nothing else.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MemberAccount {
-	/// The account's name in the Organization, the repo's.
+	/// The account's name in the Organization, the package's.
 	pub name: SmolStr,
 	/// The id AWS assigned it.
 	pub id: SmolStr,
@@ -123,7 +123,7 @@ impl MemberAccount {
 		}
 	}
 
-	/// A name the account lookup can quote safely, which a repo's always is.
+	/// A name the account lookup can quote safely, which a package's always is.
 	fn check_name(name: &str) -> Result {
 		match !name.is_empty()
 			&& name.chars().all(|char| {
@@ -132,7 +132,7 @@ impl MemberAccount {
 			true => OK,
 			false => bevybail!(
 				"`{name}` is not an account name: a member account is named \
-				for its repo, alphanumeric with `-`, `_` or `.`"
+				for its package, alphanumeric with `-`, `_` or `.`"
 			),
 		}
 	}
@@ -174,7 +174,7 @@ impl MemberAccount {
 mod test {
 	use super::*;
 
-	/// A name is quoted into the lookup, so anything but a repo's name is
+	/// A name is quoted into the lookup, so anything but a package's name is
 	/// refused before it reaches the api.
 	#[beet_core::test]
 	fn checks_the_name() {

@@ -1,5 +1,5 @@
 //! An account's PDS as a provider: the [`Pds`] family and the converge that
-//! makes a repo match what a document declares.
+//! makes a scope's records match what a document declares.
 //!
 //! The erased-provider pattern: a [`PdsProvider`] trait, the [`Pds`] handle
 //! every consumer clones, the `<AtprotoAccount/>` declaration whose attach
@@ -10,7 +10,7 @@
 //! providers:
 //!
 //! - [`EmulatorPds`], a repo laid out in any [`BlobStore`] that performs a
-//!   PDS's duties on write, for tests and for a repo that never leaves the
+//!   PDS's duties on write, for tests and for a PDS that never leaves the
 //!   machine, its records stored in canonical DAG-CBOR by default. Compiled
 //!   under `dag_cbor` alone: the data model needs no network.
 //! - `XrpcPds`, a real PDS over xrpc through a `RequestAuth` credential

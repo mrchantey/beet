@@ -9,9 +9,9 @@ beet_core::test_main!();
 mod actions;
 pub mod bindings;
 mod blocks;
-// a repo's deploy credentials, one per provider, and the gate a stack's deploy
+// a package's deploy credentials, one per provider, and the gate a stack's deploy
 // and elevated deploy pass through: native, since a converge reads and seals
-// the repo's secrets document and hands its session to child processes.
+// the package's secrets document and hands its session to child processes.
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 mod credentials;
 // the mail stack's blocks and their declarative identity inputs. Definitions

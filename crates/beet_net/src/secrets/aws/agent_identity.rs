@@ -16,9 +16,9 @@ use std::path::PathBuf;
 ///
 /// ## Why the records are not named for the standard variables
 ///
-/// A name may live in only one document a launch loads, and every repo's own
+/// A name may live in only one document a launch loads, and every package's own
 /// document already holds `AWS_ACCESS_KEY_ID`. Naming these the same would mean
-/// a launch in any repo either shadowing its AWS deploy credential with this
+/// a launch in any package either shadowing its AWS deploy credential with this
 /// read-only pair or refusing to load. So they are named for whose they are,
 /// and the mapping onto the standard names happens per child, where it is
 /// visible.
@@ -330,7 +330,7 @@ mod test {
 	}
 
 	/// The record names are not the standard ones, because a name lives in one
-	/// document and every repo's own already holds those.
+	/// document and every package's own already holds those.
 	#[beet_core::test]
 	fn the_records_are_not_the_standard_names() {
 		AgentIdentity::KEY_ID.xpect_contains("BEET_AGENT");

@@ -4,8 +4,8 @@
 //! The Worker boots exactly as the native binary does: its process config is
 //! [`BootstrapConfig::get`], read off the environment, which is the Worker's
 //! `vars` seeded into the agnostic env on each `fetch` ([`seed_env`]). The
-//! deploy bakes `BEET_HOME=r2://<binding>` in there
-//! (`HomeStoreQuery::bootstrap` on the `CloudflareWorkerBlock`), so the repo
+//! deploy bakes `BEET_PACKAGE=r2://<binding>` in there
+//! (`PackageStoreQuery::bootstrap` on the `CloudflareWorkerBlock`), so the package
 //! store is a declaration on the deploy side and a uri on this side, with no
 //! binding name in between. The per-isolate [`WorkerWorld`] is built (or
 //! reused) through the shared core end to end: the same [`build_app`]
@@ -16,7 +16,7 @@
 //! seed, the worker request/response conversion, and the per-isolate world
 //! cache with version invalidation.
 //!
-//! The entry builds into a root carrying the home store, disarmed via
+//! The entry builds into a root carrying the package store, disarmed via
 //! `DisableCallOnReady` (so its declared servers stay down; the Worker itself
 //! serves each request). The universal seam is the same
 //! `entity.exchange(request) -> Response` the native servers use.
@@ -61,7 +61,7 @@ async fn fetch(
 }
 
 /// Copy every string-valued var off the Worker's [`Env`] into the agnostic
-/// environment, so `env_ext::var("BEET_HOME")` answers in a Worker exactly as
+/// environment, so `env_ext::var("BEET_PACKAGE")` answers in a Worker exactly as
 /// it does natively. Every var, not only `BEET_*`: the env is the process's,
 /// and a site's own actions read theirs through the same surface. A binding
 /// (a bucket, a namespace) is an object and is skipped.
@@ -88,16 +88,17 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 	// the store the deploy baked in, the one kind a Worker serves from: its
 	// concrete provider heads the entry for the version check, its erased form
 	// is what the entry resolves through.
-	let home_uri = config.home.as_ref().ok_or_else(|| {
+	let package_uri = config.package.as_ref().ok_or_else(|| {
 		bevyhow!(
-			"no `BEET_HOME` var: the deploy bakes `r2://<binding>` into the \
+			"no `BEET_PACKAGE` var: the deploy bakes `r2://<binding>` into the \
 			 Worker's vars"
 		)
 	})?;
-	let BlobStoreProvider::R2(store) = BlobStoreProvider::from_uri(home_uri)?
+	let BlobStoreProvider::R2(store) =
+		BlobStoreProvider::from_uri(package_uri)?
 	else {
 		bevybail!(
-			"`BEET_HOME={home_uri}` is not an `r2://<binding>` uri, the one \
+			"`BEET_PACKAGE={package_uri}` is not an `r2://<binding>` uri, the one \
 			 store a Worker serves from"
 		);
 	};
@@ -121,7 +122,7 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 	if stale {
 		worker_world = Some(
 			build_worker_world(
-				home_uri,
+				package_uri,
 				config.store_fork.as_ref(),
 				config.entry.as_deref(),
 				current_version,
@@ -157,7 +158,7 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 /// start would hit the (wasm-absent) backend and panic. Same disarmed build
 /// `export-static`/`check` use.
 async fn build_worker_world(
-	home_uri: &StoreUri,
+	package_uri: &StoreUri,
 	store_fork: Option<&StoreUri>,
 	entry: Option<&str>,
 	version: Option<String>,
@@ -172,7 +173,7 @@ async fn build_worker_world(
 	let prescans = world.get_resource_or_init::<PrescanRegistry>().clone();
 	let resolved = entry_build::resolve_entry(
 		&prescans,
-		Some(home_uri),
+		Some(package_uri),
 		store_fork,
 		entry,
 	)

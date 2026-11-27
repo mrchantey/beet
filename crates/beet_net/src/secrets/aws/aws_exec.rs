@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 /// beet aws -- sts get-caller-identity
 /// beet aws -- iam list-roles
 /// beet aws -- logs tail /beet-site/main-lightsail/prod --region us-west-2
-/// beet aws --account=beetmash -- s3 ls      # inside a repo's own account
+/// beet aws --account=beetmash -- s3 ls      # inside a package's own account
 /// ```
 ///
 /// With `--account=<name>` the call runs inside that member account of the
@@ -53,7 +53,7 @@ use beet_core::prelude::*;
 #[reflect(Component)]
 pub async fn AwsExec(
 	/// The member account of the Organization to run inside, by name, ie the
-	/// repo's own. Unset is the management account.
+	/// package's own. Unset is the management account.
 	#[param]
 	account: Option<String>,
 	/// The aws cli arguments, everything after `--`.

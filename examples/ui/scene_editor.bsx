@@ -5,7 +5,7 @@ A page that edits itself. Run it through the one binary:
     beet --entry=examples/ui/scene_editor.bsx --server=http  # the site alone
 
 The same entry serves itself and boots in the tab: `<ServeBlobs>` publishes
-this directory at `/repo`, the served page's `<Wasm/>` (`templates/EditorShell.bsx`)
+this directory at `/package`, the served page's `<Wasm/>` (`templates/EditorShell.bsx`)
 resolves the entry through it and boots its `DomServer`, adopting the served
 page node for node so the boot is invisible (`just test-scene-editor-browser`,
 `just check-wasm-boot`).
@@ -42,7 +42,7 @@ quit and run again: every edit came back from the fork.
 	<Router {Layout(Document("templates/EditorShell.bsx"))}>
 		<!-- the store the browser reads this entry through, and the wasm binary
 		     its page boots (`wasm/` links to the build output, `just build-wasm-ui`). -->
-		<ServeBlobs prefix="repo"/>
+		<ServeBlobs prefix="package"/>
 		<AssetsDir src="wasm" prefix="wasm"/>
 		<Route path="/" {FixedPage}>
 			<SceneBlob path="scene_editor/scene.json" from="scene_editor/scene.bsx"/>

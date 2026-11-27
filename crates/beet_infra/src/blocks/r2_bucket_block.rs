@@ -36,7 +36,7 @@ use beet_net::prelude::*;
 /// included; Cloudflare has no permissions boundary to cap that with and no mfa
 /// condition to put on it, so the only thing that keeps it out of reach is that
 /// no credential a deploy reads carries it. An apply that minted this token
-/// would put it in every deploy credential of every repo declaring a bucket.
+/// would put it in every deploy credential of every package declaring a bucket.
 /// So an elevated deploy mints it with a credential that exists in no
 /// document, the apply creates the bucket and reads nothing, and
 /// [`missing_credential`](Self::missing_credential) names that deploy when
@@ -645,7 +645,7 @@ mod tests {
 
 	/// The apply creates the bucket and NOTHING else: no token, and no
 	/// parameter holding one. A rendered `cloudflare_account_token` would put
-	/// `Account API Tokens Write` into the deploy credential of every repo that
+	/// `Account API Tokens Write` into the deploy credential of every package that
 	/// declares a bucket, which is the one group no deploy credential may have,
 	/// so an elevated deploy mints it out of band and the config never names it.
 	#[beet_core::test]

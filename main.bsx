@@ -18,10 +18,10 @@ transports, not this dispatcher's. A `CliServer` is strict by requirement: a
 flag the command does not take is refused, so `beet build-wasm --relase`
 answers `did you mean --release?` rather than building a debug module.
 
-    cargo install --path crates/beet-cli --all-features   # then, from anywhere in the repo:
+    cargo install --path crates/beet-cli --all-features   # then, from anywhere in the workspace:
     beet run-wasm <module.wasm>            # run a wasm test module
     beet check examples/beetmania           # lint a no-code site
-    beet compile examples/beetmania         # compile it into ./.beet/repo
+    beet compile examples/beetmania         # compile it into ./.beet/pds
     beet export-static examples/beetmania   # write its dist/
     just build-wasm-min                    # the smallest browser runtime (target/wasm/beet-min.wasm)
     just build-wasm-full                   # ..and the kitchen sink (target/wasm/beet-full.wasm)
@@ -35,7 +35,7 @@ launched directly and names its own verb, exactly as its deploy verbs are
     beet --entry=site serve --server=http,ssh   # ..http plus a multi-tenant ssh terminal
     beet --entry=examples/beetmania serve --server=http   # beetmania, a zero-code BSX site
 
-That is the identical path the deployed box takes (`app --home=s3://.. serve`),
+That is the identical path the deployed box takes (`app --package=s3://.. serve`),
 and it is why the site's resources and deploy verbs live in `site/main.bsx`: the
 application that runs on them is the thing that declares them (`just beet-deploy`
 runs `beet --entry=site all/deploy`, the site's package deploy).
@@ -67,7 +67,7 @@ managed policy of the `beet` app and nothing else, kept in line with the
 declarations by an elevated deploy (`shared/deploy --elevated`; see
 `crates/beet_infra/README.md`, The AWS deploy credential). Every secret this
 entry and the workspace's tests read (the model-provider keys, this entry's AWS
-pair, the live test accounts' app passwords) is a record of the repo's
+pair, the live test accounts' app passwords) is a record of the workspace's root
 `secrets.toml`,
 age-sealed to the humans in its `default` group and loaded into the process
 environment by the launch before this entry builds (`<Secrets/>` below): there
@@ -119,7 +119,7 @@ stays, an inert tag in a lean build.
 	     deploy converges it as an administrator: the scoped pair it seals
 	     cannot mint itself -->
 	<AwsDeployCredential bx:cfg="feature:infra && feature:extra"/>
-	<!-- the repo's own AWS account, a member of the Organization the AWS deploy
+	<!-- beet's own AWS account, a member of the Organization the AWS deploy
 	     credential lives and deploys in. The root carries no region, so it is
 	     spread here: the state bucket and the Recycle Bin rules land there.
 	     Identity Center names its own: the instance's primary region, fixed

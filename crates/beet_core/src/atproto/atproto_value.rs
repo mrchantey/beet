@@ -33,7 +33,7 @@ use base64::Engine;
 ///   to a beet value, infallible because construction refused anything it
 ///   could not decode.
 ///
-/// [`Deref`] reads the data model form itself, what a home stores and a cid
+/// [`Deref`] reads the data model form itself, what a package stores and a cid
 /// hashes; there is no mutable access, which is what keeps it valid.
 ///
 /// ```
@@ -85,10 +85,10 @@ impl AtprotoValue {
 		Value::parse_json(text)?.xmap(Self::from_wire)
 	}
 
-	/// The data model form as json text, exactly what a home stores.
+	/// The data model form as json text, exactly what a package stores.
 	pub fn to_json_string(&self) -> String { self.0.to_json_string() }
 
-	/// The data model form itself, what a home stores and a cid hashes, its
+	/// The data model form itself, what a package stores and a cid hashes, its
 	/// floats still [`FLOAT`](Self::FLOAT) objects: the counterpart of
 	/// [`from_wire`](Self::from_wire).
 	pub fn into_wire(self) -> Value { self.0 }

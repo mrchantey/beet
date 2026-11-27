@@ -35,7 +35,7 @@ use beet_net::prelude::*;
 /// store to do so; a stack whose secrets must outlive its destroy exports
 /// them first, which is what `<SecretsExport/>` is for.
 ///
-/// The home store is not here: it is terraform's, declared as a store block,
+/// The package store is not here: it is terraform's, declared as a store block,
 /// so [`TofuDestroy`] removes it with every other resource and `force_destroy`
 /// takes the versions and release pointers with the bucket.
 #[action]
@@ -188,7 +188,7 @@ mod test {
 	}
 
 	/// The inventory this action took over from the driver's hardcoded sweep,
-	/// less the artifacts bucket, which became the terraform-owned home store,
+	/// less the artifacts bucket, which became the terraform-owned package store,
 	/// plus the secret store, which the driver never swept and which is why a
 	/// destroyed stage's secrets used to be deleted by hand.
 	#[beet_core::test]

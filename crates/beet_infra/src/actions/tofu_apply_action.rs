@@ -26,7 +26,7 @@ use beet_net::prelude::*;
 ///
 /// A full apply builds the terraform config, records the source tree the
 /// deploy is built from ([`DeploySource`]), builds and uploads the artifacts
-/// into the stack's home store, publishes the ledger and applies. It collects
+/// into the stack's package store, publishes the ledger and applies. It collects
 /// each [`BuildArtifact`] paired with the
 /// [`artifact_label`](ErasedBlock::artifact_label) its [`ErasedBlock`] carries
 /// from stack descendants to build the [`ArtifactLedger`], using
@@ -38,9 +38,9 @@ use beet_net::prelude::*;
 /// project resolves from the launch's environment, and every apply refuses,
 /// naming the record, when the launch lacks it.
 ///
-/// The ledger lives in the home store ([`HomeStoreQuery::artifacts_client`]),
+/// The ledger lives in the package store ([`PackageStoreQuery::artifacts_client`]),
 /// so a stack shipping an artifact must declare a versioned one and is told
-/// what to declare when it does not; a stack with a home store and no
+/// what to declare when it does not; a stack with a package store and no
 /// artifact still publishes its ledger, since that is what a content sync
 /// adopts and a rollback indexes.
 ///
@@ -70,14 +70,14 @@ pub async fn TofuApply(
 			let scope = RenderScope::render(world, entity)?;
 			let variables = scope.variables();
 			// each declared artifact, paired with the label its block declared,
-			// the client publishing them into the stack's home store, and the
+			// the client publishing them into the stack's package store, and the
 			// secret store a content variable resolves through
-			let (artifacts, client, secrets) =
-				world.with_state::<(
-					StackQuery,
-					Query<(&ErasedBlock, &BuildArtifact)>,
-					HomeStoreQuery,
-				), _>(|(stacks, artifacts, repos)| -> Result<_> {
+			let (artifacts, client, secrets) = world.with_state::<(
+				StackQuery,
+				Query<(&ErasedBlock, &BuildArtifact)>,
+				PackageStoreQuery,
+			), _>(
+				|(stacks, artifacts, package_stores)| -> Result<_> {
 					let declared = stacks.declared(entity)?;
 					let secrets = stacks.secret_store(entity)?;
 					let built = declared
@@ -90,15 +90,16 @@ pub async fn TofuApply(
 								.map(|label| (artifact.clone(), label))
 						})
 						.collect::<Vec<_>>();
-					// a binary needs a versioned home store to publish into,
+					// a binary needs a versioned package store to publish into,
 					// and a stack shipping one without it is told what to
 					// declare here rather than after the build
 					let client = match built.is_empty() {
-						true => repos.find_artifacts_client(entity)?,
-						false => Some(repos.artifacts_client(entity)?),
+						true => package_stores.find_artifacts_client(entity)?,
+						false => Some(package_stores.artifacts_client(entity)?),
 					};
 					(built, client, secrets).xok()
-				})?;
+				},
+			)?;
 			let (stack, deployment, config) = scope.finish()?;
 			// with the declared variables, so the apply resolves the content
 			// ones from their source rather than expecting them on the request

@@ -208,8 +208,8 @@ impl LeafletParser {
 		Ok(())
 	}
 
-	/// An image: an `img` whose `src` is its blob on the repo the record was
-	/// read from, and no `src` when that repo is unknown.
+	/// An image: an `img` whose `src` is its blob on the public repo the record was
+	/// read from, and no `src` when that public repo is unknown.
 	fn image(cx: LexiconParseContext) -> Result {
 		let image: ImageBlock = cx.member.clone().into_serde()?;
 		cx.entity.insert(Element::new("img"));
@@ -567,7 +567,7 @@ mod test {
 	const NEWSLETTER_MODE: &str =
 		include_str!("../fixtures/leaflet_newsletter_mode.json");
 
-	/// The repo [`NEWSLETTER_MODE`] was read from.
+	/// The public repo [`NEWSLETTER_MODE`] was read from.
 	fn leaflet_lab() -> LexiconSource {
 		LexiconSource {
 			did: Did::parse("did:plc:btxrwcaeyodrap5mnjw2fvmz").unwrap(),
@@ -731,7 +731,7 @@ fn main() { println!("hello"); }
 			.xpect_snapshot();
 	}
 
-	/// A document Leaflet wrote renders as html, its images on the repo it
+	/// A document Leaflet wrote renders as html, its images on the public repo it
 	/// was read from.
 	#[beet_core::test]
 	fn reads_a_leaflet_document() {

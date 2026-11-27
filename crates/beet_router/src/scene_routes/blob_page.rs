@@ -56,7 +56,7 @@ impl BlobPage {
 		// the package the page's references resolve in, a detached tree carrying
 		// its own, and the component its unsectioned metadata declares
 		let (package, frontmatter_type) = caller
-			.with_state::<(PackageQuery, FrontmatterTypeQuery), _>(
+			.with_state::<(PackageFilesQuery, FrontmatterTypeQuery), _>(
 				|entity, (packages, types)| {
 					packages
 						.get(entity)

@@ -8,7 +8,7 @@ use beet_net::prelude::*;
 /// Declares that the stack's secrets live in a secrets document:
 /// `<Stack {DocumentSecrets{path:"infra/secrets/app--prod.toml"}}>`, on the
 /// stack or an ancestor, the file in the nearest ancestor `BlobStore` (the
-/// home store). Target-agnostic, so the same file on either launch.
+/// package store). Target-agnostic, so the same file on either launch.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct DocumentSecrets {
@@ -36,7 +36,7 @@ impl DocumentSecrets {
 /// A [`SecretStore`] over one secrets document: every secret a record in
 /// the document's `default` group with its `note` and `modified`, the label
 /// its record name. The human-side store a `{DocumentSecrets{path:".."}}`
-/// declares in the repo, and the explicit stand-in for parameter store on a
+/// declares in the package, and the explicit stand-in for parameter store on a
 /// run with no account (`{DocumentSecrets{path:"target/secrets/app--dev.toml"}}`).
 ///
 /// One document holds one stack's secrets, so [`for_scope`] to any other
@@ -333,7 +333,7 @@ impl SecretStoreProvider for DocumentSecretStore {
 
 /// Observer: land the [`SecretStore`] a `<DocumentSecrets/>` declares on
 /// its entity, the document at its path in the nearest ancestor store (the
-/// home store), scoped to the stack it is declared on or under and seeded
+/// package store), scoped to the stack it is declared on or under and seeded
 /// from the entry's declared document. Deferred through the command queue
 /// because the stack and the store are ancestors, which land after
 /// insertion.
@@ -423,7 +423,7 @@ pub(crate) mod test_support {
 		SecretStore::new(memory_store(stack))
 	}
 
-	/// A stack root carrying the home store and a region, with
+	/// A stack root carrying the package store and a region, with
 	/// `declarations` (a store declaration, ie) spread on it.
 	pub(crate) fn stack_root(
 		world: &mut World,
@@ -434,7 +434,7 @@ pub(crate) mod test_support {
 				Stack::new("app").with_stage("prod"),
 				AwsRegion::new(Stack::TEST_AWS_REGION),
 				BlobStore::temp(),
-				HomeStore,
+				PackageStore,
 				declarations,
 			))
 			.id();

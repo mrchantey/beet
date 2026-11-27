@@ -1,4 +1,4 @@
-//! The Cloudflare api token a repo's deploy credential needs, LOWERED from the
+//! The Cloudflare api token a package's deploy credential needs, LOWERED from the
 //! provider types its stacks render and the Cloudflare actions their routes
 //! run.
 
@@ -127,7 +127,7 @@ impl CloudflareDeployToken {
 		),
 	];
 
-	/// Lower one of the repo's stacks: the groups its `cloudflare_` types need,
+	/// Lower one of the package's stacks: the groups its `cloudflare_` types need,
 	/// and the account or zone each group's resource list names. A stack
 	/// rendering no Cloudflare type at all adds nothing and demands no address.
 	pub fn lower(
@@ -146,7 +146,7 @@ impl CloudflareDeployToken {
 		self.xok()
 	}
 
-	/// Lower one Cloudflare action a route of the repo runs, by the
+	/// Lower one Cloudflare action a route of the package runs, by the
 	/// [`CloudflareAccess`] it declares and the `bucket` it names for its
 	/// bucket-scoped groups ([`CloudflareAccess::bucket`]). The addresses come
 	/// from the action's OWN stack, resolved by ancestry from its entity, since
@@ -311,7 +311,7 @@ impl CloudflareDeployToken {
 
 	/// What asks for the one group that can mint a credential wider than
 	/// itself, [`None`] when nothing does. A lowering that answers [`None`] is
-	/// a repo whose deploy token never needs to escalate, which is the whole
+	/// a package whose deploy token never needs to escalate, which is the whole
 	/// point of asking.
 	pub fn escalating(&self) -> Option<&BTreeSet<SmolStr>> {
 		self.asked.get(&TokenPermission::API_TOKENS_WRITE)
@@ -330,7 +330,7 @@ impl CloudflareDeployToken {
 			),
 			accounts => bevybail!(
 				"the stacks name {} cloudflare accounts ({}), and one token \
-				lives in one account: deploy them from separate repos, each \
+				lives in one account: deploy them from separate packages, each \
 				with its own document",
 				accounts.len(),
 				accounts
@@ -1046,7 +1046,7 @@ mod test {
 	}
 
 	/// The hole the credential split closed, from the lowering's side: a bucket
-	/// renders its own storage group and NOTHING that mints, so no repo's deploy
+	/// renders its own storage group and NOTHING that mints, so no package's deploy
 	/// token escalates however many buckets it declares. An elevated deploy
 	/// mints the bucket's own token out of band.
 	///

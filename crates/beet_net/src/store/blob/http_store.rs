@@ -5,20 +5,20 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
-/// A store published over http, read-only: a site's home store as its
-/// `<ServeBlobs prefix="repo"/>` serves it, read by the browser process the
+/// A store published over http, read-only: a site's package store as its
+/// `<ServeBlobs prefix="package"/>` serves it, read by the browser process the
 /// site's page boots and by a native process pulling the site into a terminal
-/// (`beet --home=https://beet.org/repo --server=tui`).
+/// (`beet --package=https://beet.org/package --server=tui`).
 ///
 /// Every key is fetched at `{base}/{key}` through [`Request::send`], so an
-/// origin-relative base (`http:repo`) resolves against the page's origin in a
+/// origin-relative base (`http:package`) resolves against the page's origin in a
 /// browser and the canonical loopback server natively. A miss is the mount's
 /// 404, so a consumer distinguishes an absent file from a broken store.
 /// [`list`](BlobProvider::list) asks the mount's listing endpoint
 /// ([`LIST_PARAM`](Self::LIST_PARAM)), which answers the keys under the
 /// requested prefix as a JSON array.
 ///
-/// A write is an error: a process on a remote repo forks its edits into a
+/// A write is an error: a process on a remote package store forks its edits into a
 /// [`StoreFork`] rather than writing back.
 ///
 /// Compiles wherever `json` does, so the mount's listing contract is one
@@ -37,7 +37,7 @@ pub struct HttpStore {
 
 impl HttpStore {
 	/// The query flag that turns a mount request into a listing of the keys
-	/// under its path, `GET /repo/docs?list` answering `["a.md", "b/c.md"]`
+	/// under its path, `GET /package/docs?list` answering `["a.md", "b/c.md"]`
 	/// relative to `docs`: the `list` param `ServeBlobs` declares, which a
 	/// strict mount refuses under any other name.
 	pub const LIST_PARAM: &'static str = "list";
@@ -214,18 +214,20 @@ mod test {
 	/// Keys land below the mount and the subdir, each segment its own.
 	#[beet_core::test]
 	fn builds_key_urls() {
-		HttpStore::from_uri(&StoreUri::parse("https://beet.org/repo").unwrap())
-			.unwrap()
-			.with_subdir("docs")
-			.url(&RelPath::new("a/b.md"))
-			.to_string()
-			.xpect_eq("https://beet.org/repo/docs/a/b.md");
+		HttpStore::from_uri(
+			&StoreUri::parse("https://beet.org/package").unwrap(),
+		)
+		.unwrap()
+		.with_subdir("docs")
+		.url(&RelPath::new("a/b.md"))
+		.to_string()
+		.xpect_eq("https://beet.org/package/docs/a/b.md");
 		// an origin-relative mount is a rooted path, resolved by the transport
-		HttpStore::from_uri(&StoreUri::parse("http:repo").unwrap())
+		HttpStore::from_uri(&StoreUri::parse("http:package").unwrap())
 			.unwrap()
 			.url(&RelPath::new("main.bsx"))
 			.to_string()
-			.xpect_eq("/repo/main.bsx");
+			.xpect_eq("/package/main.bsx");
 		HttpStore::from_uri(&StoreUri::parse("http").unwrap())
 			.unwrap()
 			.url(&RelPath::new("main.bsx"))
@@ -236,7 +238,7 @@ mod test {
 	/// The store is read-only: a write names the store fork as the way to write.
 	#[beet_core::test]
 	async fn writes_are_refused() {
-		HttpStore::new("https://beet.org/repo")
+		HttpStore::new("https://beet.org/package")
 			.insert(&RelPath::new("a.txt"), bytes::Bytes::from_static(b"hi"))
 			.await
 			.unwrap_err()

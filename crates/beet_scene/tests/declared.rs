@@ -231,7 +231,7 @@ fn load(markup: &str) -> Result<World> {
 	world.xok()
 }
 
-/// The account authors from markup, and its repo lands beside it.
+/// The account authors from markup, and its PDS lands beside it.
 #[beet_core::test]
 fn authors_from_markup() {
 	let mut world = load(
@@ -259,7 +259,7 @@ fn authors_from_markup() {
 }
 
 /// A malformed did refuses the load rather than declaring an account no
-/// repo answers to.
+/// PDS answers for.
 #[beet_core::test]
 fn refuses_a_malformed_did() {
 	load(r#"<AtprotoAccount handle="beet.org" did="beet.org"/>"#)

@@ -55,7 +55,7 @@ static POOL: LazyPool<AbsPath, SharedConnection, Result<SharedConnection>> =
 		})
 	});
 
-/// The workspace's own `data.db`, so `<SqliteStore/>` names the repo's index
+/// The workspace's own `data.db`, so `<SqliteStore/>` names that index
 /// and `<SqliteStore path="other.db"/>` any other database. A default is what
 /// makes the tag authorable at all: markup builds the default and writes the
 /// attributes over it.

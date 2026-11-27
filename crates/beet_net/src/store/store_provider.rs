@@ -153,9 +153,9 @@ impl BlobStoreProvider {
 	}
 
 	/// The store `uri` names forked into `store_fork` ([`StoreFork`]), or the
-	/// store alone. The composition behind `--home` + `--store-fork`, erased
+	/// store alone. The composition behind `--package` + `--store-fork`, erased
 	/// since the pair has no single component. The fork is marked for the
-	/// repo it forks ([`StoreUri::fork_mark`]), so a browser's first edit
+	/// package store it forks ([`StoreUri::fork_mark`]), so a browser's first edit
 	/// says so to the next served page.
 	pub fn compose(
 		uri: &StoreUri,
@@ -319,7 +319,7 @@ mod test {
 			.to_string()
 			.xpect_contains("holds no blobs")
 			.xpect_contains("s3://<bucket>");
-		TableStore::from_uri(&uri("http://localhost/repo"))
+		TableStore::from_uri(&uri("http://localhost/package"))
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("conditional writes")
@@ -405,7 +405,7 @@ mod test {
 		.xpect_contains("only available on wasm");
 	}
 
-	/// A store fork composes over the repo: the pair reads through and writes
+	/// A store fork composes over the package store: the pair reads through and writes
 	/// local, by name so a test reaches each half.
 	#[beet_core::test]
 	async fn composes_a_store_fork() {

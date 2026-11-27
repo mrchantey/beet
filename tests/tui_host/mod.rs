@@ -19,7 +19,7 @@ use beet::prelude::*;
 #[path = "../example_store/mod.rs"]
 mod example_store;
 
-/// The examples directory in the repo, the store every suite seeds itself
+/// The examples directory in the workspace, the store every suite seeds itself
 /// from.
 pub const ENTRY_DIR: &str = "examples/ui";
 

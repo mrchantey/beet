@@ -418,8 +418,8 @@ mod test {
 	#[beet_core::test]
 	async fn a_versioned_store_nests_the_deploy() {
 		let (mut world, sync) = declared(
-			r#"<S3BucketBlock bx:ref="repo" label="repo"/>
-			<StoreSync src="fs:site" dest={$repo}/>"#,
+			r#"<S3BucketBlock bx:ref="package" label="package"/>
+			<StoreSync src="fs:site" dest={$package}/>"#,
 		);
 		let dest = world.get::<StoreSync>(sync).unwrap().dest.clone().unwrap();
 		let deploy_id = *world.resource::<Deployment>().deploy_id();
@@ -432,7 +432,7 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(format!(
-				"s3://app--prod--repo/{deploy_id}/repo?region=eu-west-1"
+				"s3://app--prod--package/{deploy_id}/package?region=eu-west-1"
 			));
 	}
 

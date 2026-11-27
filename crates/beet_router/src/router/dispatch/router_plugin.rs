@@ -224,10 +224,10 @@ impl Plugin for RouterPlugin {
 						.in_set(BlobReactions),
 				);
 			// the declarations that act before the entry builds (see `Prescan`),
-			// in preload order: the entry-declared store root (`<HomeRoot
+			// in preload order: the entry-declared store root (`<PackageRoot
 			// src="../.."/>`) first, so nothing runs against a store it has not
 			// rebased, then the crate check and the secrets load.
-			app.install_types::<(HomeRoot, RequireCfg)>();
+			app.install_types::<(PackageRoot, RequireCfg)>();
 			// the declaration resolves in every build, so an entry loaded by
 			// a binary that never reads secrets (a cloud box's) builds it
 			// inert rather than warning it unregistered; `vault` adds the
@@ -368,7 +368,7 @@ impl Plugin for RouterPlugin {
 			#[cfg(feature = "dag_cbor")]
 			app.install_types::<(StandardSiteComments, StandardSiteReplyLink)>(
 			);
-			// the publish sequence's steps, which write to a repo and fetch
+			// the publish sequence's steps, which write to a public repo and fetch
 			// the live site; the route declaring them is gated on the same
 			// feature, so no build loads them inert
 			#[cfg(feature = "atproto")]
@@ -662,7 +662,7 @@ mod test {
 
 	/// REGRESSION: the beet.org box's binary, built without `vault`, warned
 	/// `<Secrets>` unregistered on every load of the site entry, which
-	/// declares it at its top so a deploy loads the repo's document. The
+	/// declares it at its top so a deploy loads the package's document. The
 	/// declaration is registered in every build, `vault` adding only its
 	/// load.
 	#[beet_core::test]

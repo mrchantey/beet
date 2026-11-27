@@ -22,7 +22,7 @@ pub enum StoreKind {
 /// creates, or a [`StoreUriBlock`] naming one it does not. What every store block shares
 /// is where a process reads it, a [`StoreUri`], and whether each deploy
 /// publishes under its own id; [`ErasedStoreBlock`] projects exactly that, so
-/// the consumers that want "the store" rather than "the bucket" (the repo
+/// the consumers that want "the store" rather than "the bucket" (the package
 /// store a compute boots from, the destination a sync publishes to, the
 /// ledger) never name a provider.
 pub trait StoreBlock: Block {
@@ -127,7 +127,7 @@ impl ErasedStoreBlock {
 	}
 
 	/// The uri a deploy hands a process: the root, nested under the version's
-	/// document dir (`<id>/repo`, [`ArtifactLedger::version_repo_dir`]) when
+	/// document dir (`<id>/package`, [`ArtifactLedger::version_package_dir`]) when
 	/// the store is versioned, so the binary and ledger beside the document
 	/// are never inside the root a process reads or a sync mirrors. The ONE
 	/// place that uri is shaped, so the argv a lambda bakes, the env a release
@@ -136,7 +136,7 @@ impl ErasedStoreBlock {
 	pub fn store_uri(&self, deploy_id: Option<&Uuid>) -> StoreUri {
 		match (self.deploy_versioned, deploy_id) {
 			(true, Some(deploy_id)) => self.root.with_subdir(
-				ArtifactLedger::version_repo_dir(deploy_id).to_string(),
+				ArtifactLedger::version_package_dir(deploy_id).to_string(),
 			),
 			_ => self.root.clone(),
 		}
@@ -148,7 +148,7 @@ impl ErasedStoreBlock {
 	/// [`Local`](ServiceAccess::Local) reads the host's stand-in, a table's a
 	/// [`JsonTableStore`] over it. The ONE place the two-way choice is made, so
 	/// a declaration runs both ways without any consumer knowing there are two;
-	/// an exact store (`<S3Store/>`, `--home=s3://..`) never chooses, and a
+	/// an exact store (`<S3Store/>`, `--package=s3://..`) never chooses, and a
 	/// [`StoreSync`] end is the remote root whatever the launch's access.
 	pub fn runtime_uri(
 		&self,
@@ -331,18 +331,21 @@ mod test {
 		let mut world = world();
 		let entity = spawn_store(
 			&mut world,
-			StoreUriBlock::new("repo", StoreUri::parse("s3://bucket").unwrap())
-				.with_deploy_versioned(true),
+			StoreUriBlock::new(
+				"package",
+				StoreUri::parse("s3://bucket").unwrap(),
+			)
+			.with_deploy_versioned(true),
 		);
 		let erased = world.get::<ErasedStoreBlock>(entity).unwrap();
 		let deploy_id = uuid_ext::now_v7();
 		erased
 			.runtime_uri(ServiceAccess::Remote, Some(&deploy_id))
 			.to_string()
-			.xpect_eq(format!("s3://bucket/{deploy_id}/repo"));
+			.xpect_eq(format!("s3://bucket/{deploy_id}/package"));
 		erased
 			.runtime_uri(ServiceAccess::Local, Some(&deploy_id))
-			.xpect_eq(ServiceAccess::local_store_uri("app--prod--repo"));
+			.xpect_eq(ServiceAccess::local_store_uri("app--prod--package"));
 	}
 
 	/// A declaration naming a memory store names ONE store: every remote read
@@ -383,8 +386,11 @@ mod test {
 		let mut world = world();
 		let entity = spawn_store(
 			&mut world,
-			StoreUriBlock::new("repo", StoreUri::parse("s3://bucket").unwrap())
-				.with_deploy_versioned(true),
+			StoreUriBlock::new(
+				"package",
+				StoreUri::parse("s3://bucket").unwrap(),
+			)
+			.with_deploy_versioned(true),
 		);
 		let erased = world.get::<ErasedStoreBlock>(entity).unwrap();
 		erased.root().to_string().xpect_eq("s3://bucket");
@@ -392,7 +398,7 @@ mod test {
 		erased
 			.store_uri(Some(&deploy_id))
 			.to_string()
-			.xpect_eq(format!("s3://bucket/{deploy_id}/repo"));
+			.xpect_eq(format!("s3://bucket/{deploy_id}/package"));
 		erased.store_uri(None).to_string().xpect_eq("s3://bucket");
 	}
 

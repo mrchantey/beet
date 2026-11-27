@@ -15,7 +15,7 @@ Needs `OPENAI_API_KEY` (the agent) and the kokoro `tts` on PATH for spoken audio
 -->
 <Fragment>
 	<!-- the fixtures live workspace-relative, so this entry roots there -->
-	<HomeRoot src="../.."/>
+	<PackageRoot src="../.."/>
 	<RequireCfg cfg="feature:thread && feature:sockets && feature:winit && feature:extra"/>
 	<Instance document="agent.bsx"/>
 	<!-- in-process clients, each its own socket root -->

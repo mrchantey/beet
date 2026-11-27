@@ -8,15 +8,15 @@ use std::path::Path;
 use std::path::PathBuf;
 
 /// A secrets document an entry declares, `<Secrets path="secrets.toml"/>`:
-/// the file at `path` in the nearest ancestor store (the home store, or a
+/// the file at `path` in the nearest ancestor store (the package store, or a
 /// `StoreRef` target's beside it), named by `label` on every document verb's
 /// `--document`. A `path` may climb above the store with `..`
 /// (`<Secrets path="../secrets.toml"/>` from an entry in a subdirectory of
-/// the repo, whose document is the repo's), which a filesystem store
-/// re-roots for and a bucket refuses, exactly as `<HomeRoot>` does.
+/// the source directory, whose document is the source directory's), which a filesystem store
+/// re-roots for and a bucket refuses, exactly as `<PackageRoot>` does.
 ///
 /// Loaded twice, by design. The launch reads every top-level unconditional
-/// declaration in the home store out of the entry's prescan, before the
+/// declaration in the package store out of the entry's prescan, before the
 /// entry builds, and sets its `EnvVar` records into the process environment
 /// (existing wins), so a declaration constructed in the build walk finds
 /// them set; the declaration therefore sits at the entry's top level with no
@@ -25,7 +25,7 @@ use std::path::PathBuf;
 /// opens is verified and the opened document is inserted as [`OpenSecrets`]
 /// on the same entity, for a verb reading a non-env record by name. A
 /// document with no identity on the machine is one warning and nothing
-/// loaded, never an error: a cloud box's home store never carries one, and a
+/// loaded, never an error: a cloud box's package store never carries one, and a
 /// contributor without it still builds. A declaration naming another store
 /// (`{StoreRef($cold)}`) is an export target the verbs read and write, never
 /// loaded into an environment.
@@ -108,7 +108,7 @@ impl Secrets {
 	}
 
 	/// The test runner's convention: the nearest `secrets.<format>` in the
-	/// current directory or its ancestors (the repo's, from any crate's own
+	/// current directory or its ancestors (the source directory's, from any crate's own
 	/// directory), found exactly as a `.env` is and loaded after it, its
 	/// failure one stderr line since the runner has no logger yet.
 	pub fn load_env_vars_nearest() {
@@ -169,8 +169,8 @@ impl Secrets {
 	/// The one `secrets.<format>` in `dir` (`secrets.toml`, `secrets.json`),
 	/// `None` when there is none, an error naming both when there are two.
 	/// Probes the names rather than listing the
-	/// directory: a listing on a js host is a recursive walk, and a repo
-	/// root holds a `target/`.
+	/// directory: a listing on a js host is a recursive walk, and a source
+	/// directory's root holds a `target/`.
 	fn find_in_dir(dir: &Path) -> Result<Option<PathBuf>> {
 		let found = Self::EXTENSIONS
 			.iter()
@@ -239,7 +239,7 @@ mod test {
 		Secrets::default().lands_at("secrets.toml").xpect_true();
 		Secrets::default().lands_at("/secrets.toml").xpect_true();
 		Secrets::default()
-			.lands_at("repo/secrets.toml")
+			.lands_at("site/secrets.toml")
 			.xpect_true();
 		Secrets::default()
 			.lands_at("secrets.toml.bak")

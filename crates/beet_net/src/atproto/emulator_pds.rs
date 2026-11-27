@@ -1,10 +1,11 @@
-//! A repo laid out in any [`BlobStore`], doing a PDS's duties on write.
+//! An atproto repo laid out in any [`BlobStore`], doing a PDS's duties on write.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
-/// A [`PdsProvider`] over any [`BlobStore`]: the repo a test writes to, and
-/// the one a repo that never leaves the machine (or lives in a bucket) is.
+/// A [`PdsProvider`] over any [`BlobStore`]: the PDS a test writes to, and
+/// the one a package's space that never leaves the machine (or lives in a
+/// bucket) is.
 ///
 /// Authoritative on the layout, which is plain enough to read in a file
 /// browser and to mirror with `BlobSync`. Each [`RepoScope`] is a

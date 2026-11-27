@@ -7,7 +7,7 @@ use bevy::ecs::system::SystemParam;
 /// Resolves the document a verb names (`--document=<label or path>`) into
 /// a [`SecretsHandle`]: a declared `<Secrets>` by label, with its store
 /// (the `StoreRef` target's, else the nearest ancestor `BlobStore`, else the
-/// home store); or an undeclared file by path or store uri. Omitted, it is
+/// package store); or an undeclared file by path or store uri. Omitted, it is
 /// the one declared document, an error naming the labels when several are
 /// declared, or the undeclared `secrets.toml` beside the entry when none
 /// is.
@@ -17,7 +17,7 @@ pub struct SecretsQuery<'w, 's> {
 		Query<'w, 's, (Entity, &'static Secrets, Option<&'static StoreRef>)>,
 	stores: Query<'w, 's, &'static BlobStore>,
 	ancestor_stores: AncestorQuery<'w, 's, &'static BlobStore>,
-	repo: Query<'w, 's, &'static BlobStore, With<HomeStore>>,
+	package_store: Query<'w, 's, &'static BlobStore, With<PackageStore>>,
 }
 
 /// What `--document` names: the default, a declared label, or a file by
@@ -170,17 +170,17 @@ impl SecretsQuery<'_, '_> {
 	}
 
 	/// The store a relative document path resolves in: the nearest ancestor
-	/// `BlobStore` of `entity`, else the home store wherever it sits.
+	/// `BlobStore` of `entity`, else the package store wherever it sits.
 	pub fn entry_store(&self, entity: Entity) -> Result<BlobStore> {
 		self.ancestor_stores
 			.get(entity)
 			.ok()
-			.or_else(|| self.repo.single().ok())
+			.or_else(|| self.package_store.single().ok())
 			.cloned()
 			.ok_or_else(|| {
 				bevyhow!(
 					"no store to resolve a document path in: entity {entity} \
-					has no ancestor `BlobStore` and the world has no home store"
+					has no ancestor `BlobStore` and the world has no package store"
 				)
 			})
 	}
@@ -232,7 +232,7 @@ impl SecretsHandle {
 
 	/// The handle a declaration means in `store`: the path within it, or
 	/// one climbing above it with a leading `..`, re-rooted through
-	/// [`BlobStore::rebase_home`] (a filesystem store re-roots, a bucket
+	/// [`BlobStore::rebase_package`] (a filesystem store re-roots, a bucket
 	/// refuses).
 	pub fn in_store(store: BlobStore, secrets: &Secrets) -> Result<Self> {
 		let path = &secrets.path;
@@ -242,9 +242,9 @@ impl SecretsHandle {
 				let dir = path.parent().unwrap_or_default();
 				let file = path.file_name().unwrap_or_default();
 				let (store, _) =
-					store.rebase_home(file, dir.as_str()).map_err(|err| {
-						bevyhow!("document `{}`: {err}", secrets.label)
-					})?;
+					store.rebase_package(file, dir.as_str()).map_err(
+						|err| bevyhow!("document `{}`: {err}", secrets.label),
+					)?;
 				(store, file.to_string())
 			}
 			false => (store, path.to_string()),
@@ -260,14 +260,14 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// An entry root carrying the home store, declaring documents: the shape
+	/// An entry root carrying the package store, declaring documents: the shape
 	/// a deploy entry has.
 	fn world_with_documents() -> (World, Entity) {
 		let mut world = StorePlugin.into_world();
 		// a declaration with no store provider on it
 		let storeless = world.spawn_empty().id();
 		let root = world
-			.spawn((BlobStore::temp(), HomeStore, children![
+			.spawn((BlobStore::temp(), PackageStore, children![
 				Secrets::new("infra/secrets/mail.toml").with_label("mail-prod"),
 				(
 					Secrets::new("secrets.toml").with_label("cold"),
@@ -327,21 +327,21 @@ mod test {
 	}
 
 	/// A declared path climbs above a filesystem store with `..` (an entry in
-	/// a subdirectory naming the repo's document) and a bucket refuses it.
+	/// a subdirectory naming the source directory's document) and a bucket refuses it.
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn a_path_may_climb_above_a_filesystem_store() {
 		let root = TempDir::new_ws().unwrap();
 		fs_ext::create_dir_all(root.join("site")).unwrap();
 		fs_ext::write(root.join("secrets.toml"), "").unwrap();
-		let above = Secrets::new("../secrets.toml").with_label("repo");
+		let above = Secrets::new("../secrets.toml").with_label("package");
 		let handle = SecretsHandle::in_store(
 			BlobStore::new(FsStore::new(root.join("site"))),
 			&above,
 		)
 		.unwrap();
 		handle.path.as_str().xpect_eq("secrets.toml");
-		handle.describe().xpect_eq("`repo` (secrets.toml)");
+		handle.describe().xpect_eq("`package` (secrets.toml)");
 		handle
 			.store
 			.base_dir()
@@ -365,7 +365,7 @@ mod test {
 	#[beet_core::test]
 	fn the_default_is_the_lone_declaration_or_the_conventional_file() {
 		let mut world = StorePlugin.into_world();
-		let root = world.spawn((BlobStore::temp(), HomeStore)).id();
+		let root = world.spawn((BlobStore::temp(), PackageStore)).id();
 		world.flush();
 		world.with_state::<SecretsQuery, _>(|query| {
 			let handle = query.resolve(root, None).unwrap();

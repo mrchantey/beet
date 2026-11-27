@@ -7,7 +7,7 @@ visibility = "unlisted"
 
 # beet_infra
 
-`beet_infra` extends the "everything is an entity" idea all the way out to the cloud. Infrastructure is declared as Bevy entities and exported to Terraform/OpenTofu JSON, so a repo can plan, deploy and destroy the resources it runs on, all from within the same world that describes the software itself.
+`beet_infra` extends the "everything is an entity" idea all the way out to the cloud. Infrastructure is declared as Bevy entities and exported to Terraform/OpenTofu JSON, so a package can plan, deploy and destroy the resources it runs on, all from within the same world that describes the software itself.
 
 Building on [OpenTofu](https://opentofu.org) means beet does not reinvent the deploy engine; it provides the modelling layer above it. The crate is organised around a few concerns:
 

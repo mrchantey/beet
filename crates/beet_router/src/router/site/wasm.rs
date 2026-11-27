@@ -2,13 +2,13 @@
 //! browser support.
 //!
 //! A page built natively and served to the browser is a launch description:
-//! the SSR is the first paint, and `<Wasm src home entry server>` is the
+//! the SSR is the first paint, and `<Wasm src package entry server>` is the
 //! bootstrap of the browser process, emitting the `<script type="module">`
 //! that boots the wasm `beet` binary beside a
 //! `<script type="application/vnd.beet.bootstrap">` carrying the launch's argv.
 //! The booted binary appends that argv to its location's own
 //! (`js_runtime::args`), so `BootstrapConfig::get()` and the entry's start
-//! request read `--entry`/`--home`/`--server` through the one channel every
+//! request read `--entry`/`--package`/`--server` through the one channel every
 //! target uses, and the browser resolves its entry through the same launch
 //! path as the terminal and the server.
 //!
@@ -37,8 +37,8 @@ use beet_ui::prelude::*;
 ///
 /// The launch is the [`BootstrapConfig`] the props describe, rendered through
 /// [`BootstrapConfig::to_script`] into a bootstrap script the binary reads
-/// ([`BootstrapConfig::SCRIPT_TYPE`]): `home` names the http store the entry
-/// loads through (the site's `<ServeBlobs prefix="repo"/>`, so `/repo`; an
+/// ([`BootstrapConfig::SCRIPT_TYPE`]): `package` names the http store the entry
+/// loads through (the site's `<ServeBlobs prefix="package"/>`, so `/package`; an
 /// absolute url reads another origin), `entry` the entry document within it,
 /// and `server` which of the entry's declared servers boot (`dom` paints the
 /// page; none boots the entry headless). `route` names the command serving
@@ -60,8 +60,8 @@ use beet_ui::prelude::*;
 /// head, before the body parses.
 ///
 /// ```bsx
-/// <Wasm src="/wasm/beet-ui.wasm" home="/repo" entry="scene_editor.bsx" server="dom" boot="intent"/>
-/// <Wasm src="/wasm/beet-ui.wasm" home="/repo" entry="main.bsx" server="dom" route="serve"/>
+/// <Wasm src="/wasm/beet-ui.wasm" package="/package" entry="scene_editor.bsx" server="dom" boot="intent"/>
+/// <Wasm src="/wasm/beet-ui.wasm" package="/package" entry="main.bsx" server="dom" route="serve"/>
 /// ```
 #[template]
 pub fn Wasm(
@@ -71,10 +71,10 @@ pub fn Wasm(
 	/// The wasm-bindgen glue url; defaults to `src` with `.wasm` swapped for `.js`.
 	#[prop(default)]
 	js: String,
-	/// The home store the browser process loads its entry through, as a url:
-	/// the mount a `<ServeBlobs>` publishes (`/repo`), or another origin's.
-	home: Option<Url>,
-	/// The entry document within `home`, eg `main.bsx`.
+	/// The package store the browser process loads its entry through, as a url:
+	/// the mount a `<ServeBlobs>` publishes (`/package`), or another origin's.
+	package: Option<Url>,
+	/// The entry document within `package`, eg `main.bsx`.
 	entry: Option<SmolStr>,
 	/// The `--server` selection the entry boots with, eg `dom`.
 	server: Option<SmolStr>,
@@ -93,10 +93,10 @@ pub fn Wasm(
 	} else {
 		js
 	};
-	let home = home.as_ref().map(StoreUri::http);
-	let fork_mark = home.as_ref().map(StoreUri::fork_mark);
+	let package = package.as_ref().map(StoreUri::http);
+	let fork_mark = package.as_ref().map(StoreUri::fork_mark);
 	let launch = BootstrapConfig {
-		home,
+		package,
 		entry,
 		server: server.as_deref().map(ServerFilter::new),
 		..default()
@@ -157,7 +157,7 @@ mod test {
 	// `.wasm` name, calling the glue's default export (`init`) with an explicit
 	// `module_or_path`, then optionally awaiting `start`. The import is dynamic and
 	// the `start` call optional, so a module without that export still mounts. A
-	// page naming no launch carries no bootstrap script, and no home store no
+	// page naming no launch carries no bootstrap script, and no package store no
 	// pre-paint bit; the pre-boot queue precedes the loader either way.
 	#[beet_core::test]
 	fn wasm_emits_module_loader() {
@@ -182,20 +182,20 @@ mod test {
 		pre_boot.xpect_less_than(loader);
 	}
 
-	// `<Wasm home boot="intent">` renders no loader: the pre-boot script holds
+	// `<Wasm package boot="intent">` renders no loader: the pre-boot script holds
 	// it, injecting it on a marked click or toggle, or at once for a browser
-	// marked as holding a fork of the home store.
+	// marked as holding a fork of the package store.
 	#[beet_core::test]
 	fn wasm_boots_on_intent() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world
 			.spawn_template(rsx! {
-				<Wasm src="/wasm/beet-ui.wasm" home="/repo" entry="scene_editor.bsx" server="dom" boot=BootPolicy::Intent/>
+				<Wasm src="/wasm/beet-ui.wasm" package="/package" entry="scene_editor.bsx" server="dom" boot=BootPolicy::Intent/>
 			})
 			.unwrap()
 			.id();
 		render(&mut world, root)
-			.xpect_contains("localStorage.getItem(\"beet:fork:http:repo\")")
+			.xpect_contains("localStorage.getItem(\"beet:fork:http:package\")")
 			.xpect_contains("[data-beet-boot]")
 			.xpect_contains("m.textContent=\"const mod = await import(")
 			.xpect_contains("--server=dom")
@@ -214,36 +214,37 @@ mod test {
 		render(&mut world, root).xpect_contains("await import(\"/b/glue.js\")");
 	}
 
-	// `<Wasm home entry server>` renders the launch as a bootstrap script before
-	// the loader: the home store as an origin-relative http store, the entry within
+	// `<Wasm package entry server>` renders the launch as a bootstrap script before
+	// the loader: the package store as an origin-relative http store, the entry within
 	// it, and the server selection, in the argv the browser appends to its own.
 	#[beet_core::test]
 	fn wasm_renders_the_bootstrap() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world
 			.spawn_template(rsx! {
-				<Wasm src="/wasm/beet-ui.wasm" home="/examples/ui" entry="scene_editor.bsx" server="dom"/>
+				<Wasm src="/wasm/beet-ui.wasm" package="/examples/ui" entry="scene_editor.bsx" server="dom"/>
 			})
 			.unwrap()
 			.id();
 		let html = render(&mut world, root);
 		html.as_str().xpect_contains(
-			"<script type=\"application/vnd.beet.bootstrap\">--entry=scene_editor.bsx --home=http:examples/ui --server=dom</script>",
+			"<script type=\"application/vnd.beet.bootstrap\">--entry=scene_editor.bsx --package=http:examples/ui --server=dom</script>",
 		);
 		// the bootstrap precedes the loader, so it is in the document before
 		// the module boots
 		let bootstrap = html.find(BootstrapConfig::SCRIPT_TYPE).unwrap();
 		let loader = html.find("type=\"module\"").unwrap();
 		bootstrap.xpect_less_than(loader);
-		// an absolute home store keeps its origin
+		// an absolute package store keeps its origin
 		let root = world
 			.spawn_template(rsx! {
-				<Wasm src="/wasm/beet-min.wasm" home="https://beet.org/repo" entry="hello.bsx"/>
+				<Wasm src="/wasm/beet-min.wasm" package="https://beet.org/package" entry="hello.bsx"/>
 			})
 			.unwrap()
 			.id();
-		render(&mut world, root)
-			.xpect_contains("--entry=hello.bsx --home=https://beet.org/repo<");
+		render(&mut world, root).xpect_contains(
+			"--entry=hello.bsx --package=https://beet.org/package<",
+		);
 	}
 
 	// `<Wasm route>` leads the launch with the command serving the page, so
@@ -253,12 +254,12 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world
 			.spawn_template(rsx! {
-				<Wasm src="/wasm/beet-ui.wasm" home="/repo" entry="main.bsx" server="dom" route="serve"/>
+				<Wasm src="/wasm/beet-ui.wasm" package="/package" entry="main.bsx" server="dom" route="serve"/>
 			})
 			.unwrap()
 			.id();
 		render(&mut world, root).xpect_contains(
-			">serve --entry=main.bsx --home=http:repo --server=dom</script>",
+			">serve --entry=main.bsx --package=http:package --server=dom</script>",
 		);
 	}
 }

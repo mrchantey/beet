@@ -21,7 +21,7 @@ use beet_ui::prelude::*;
 /// its icon (the `<IconSet>`'s 512, uploaded when its cid differs). The
 /// documents publish on purpose, one page at a time, so a back catalogue
 /// drips out rather than landing at once: every document already in the
-/// repo is updated, a document is created only for a page `--only` names or
+/// public repo is updated, a document is created only for a page `--only` names or
 /// for every page under `--all`, and the rest are left alone. A page renamed
 /// behind a `<Redirect>` updates the record it was published as.
 ///
@@ -30,16 +30,16 @@ use beet_ui::prelude::*;
 /// when it differs from the record, the blobs it references uploaded before
 /// the tree is released. Its contributors are its authors matched to the
 /// declared accounts, and its announcement is the one the record already
-/// carries. Every record is then converged at the rkey the repo holds it at,
+/// carries. Every record is then converged at the rkey the public repo holds it at,
 /// or a freshly minted TID. A document whose page is gone or became a draft
 /// is an orphan, reported, and deleted under `--prune`; one merely outside
 /// `--only` never is.
 ///
-/// A run refuses before it reads the repo, let alone writes to it, when a
+/// A run refuses before it reads the public repo, let alone writes to it, when a
 /// page it names is a draft or missing, or when an announcement `--announce`
 /// names would be refused (see `<StandardSiteAnnounce/>`).
 ///
-/// The repo itself is the memory: every record carries its natural key, so
+/// The public repo itself is the memory: every record carries its natural key, so
 /// the step finds what an earlier run wrote by listing, and a run
 /// interrupted anywhere resumes without writing anything twice.
 #[action]
@@ -67,7 +67,7 @@ pub async fn StandardSitePublish(
 		.await?
 		.in_run(&mut input, publish.0.dry_run);
 	// the named pages first, so a draft or a typo refuses the whole run
-	// before the repo is even read
+	// before the public repo is even read
 	let named = only
 		.iter()
 		.map(|slug| publishing.page(slug).map(|page| page.route))
@@ -203,7 +203,7 @@ impl StandardSitePublish {
 						.and_then(|existing| existing.bsky_post_ref.clone()),
 					..rendered
 				};
-				// an unchanged document references blobs the repo holds
+				// an unchanged document references blobs the public repo holds
 				if existing.as_ref() != Some(&document) {
 					let record = AtprotoValue::from_serde(&document)?
 						.into_record(&StandardSiteDocument::COLLECTION)?;

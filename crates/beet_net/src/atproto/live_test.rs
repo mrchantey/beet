@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 const BEET_ORG: &str = "did:plc:vgxy56shhs3t3b2mu2avizjf";
 
 /// A record read from a real PDS answers the cid the emulator computes for
-/// its body, which is what keeps a repo in a bucket and one on the network
+/// its body, which is what keeps a PDS in a bucket and one on the network
 /// interchangeable.
 #[ignore = "live: talks to the public network"]
 #[beet_core::test(timeout_ms = 30_000)]

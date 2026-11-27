@@ -15,11 +15,11 @@ beet serve --server=tui
 # every command the entry declares
 beet --help
 
-# static export to dist/ (a dev command, run from the repo)
+# static export to dist/ (a dev command, run from the workspace root)
 beet export-static examples/beetmania
 
 # the browser boots the same entry from the served page (see Layout.bsx),
-# on the wasm binary this builds into target/wasm (run from the repo)
+# on the wasm binary this builds into target/wasm (run from the workspace root)
 just build-wasm-ui
 ```
 
@@ -36,7 +36,7 @@ beetmania/
   derived/       the blog's standard.site index, written by `social/publish`
 ```
 
-There is no `main.rs`. The `beet` binary discovers `main.bsx`, roots the home store at this directory (which `<RoutesDir/>` and every document it names resolve against), and loads `main.bsx` as the app root. The root `<CliServer>` then dispatches the command line into its router: `serve` boots the servers, `--server=http` the HTTP listener, `--server=tui` the live terminal, `--server=dom` the page in a browser tab. Static export is a separate dev command, `beet export-static <site-dir>`.
+There is no `main.rs`. The `beet` binary discovers `main.bsx`, roots the package store at this directory (which `<RoutesDir/>` and every document it names resolve against), and loads `main.bsx` as the app root. The root `<CliServer>` then dispatches the command line into its router: `serve` boots the servers, `--server=http` the HTTP listener, `--server=tui` the live terminal, `--server=dom` the page in a browser tab. Static export is a separate dev command, `beet export-static <site-dir>`.
 
 ## The served site
 
@@ -47,7 +47,7 @@ The site is the router under the `serve` command:
 	<Router {(RequestLogger, CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, Layout(Document("templates/Layout.bsx")))}>
 		<Instance document="templates/Styles.bsx"/>
 		<RoutesDir src="routes"/>
-		<ServeBlobs prefix="repo"/>
+		<ServeBlobs prefix="package"/>
 		<AssetsDir src="wasm" prefix="wasm" cache="1h"/>
 	</Router>
 </Route>
@@ -55,7 +55,7 @@ The site is the router under the `serve` command:
 
 - The servers own the route: `HttpServer`, `TuiServer`, `SshTuiServer` and `DomServer` are transport components, and `--server` selects which boot, so the same markup serves every target with no host binary. A server a binary cannot boot (`SshTuiServer` in a lean build, `HttpServer` in the browser) boots nothing there and the entry keeps its shape.
 - `<Router>` is the `beet_router` dispatch component, the servers' child, and a url space of its own: its pages are rooted at `/` however deep the command, and no request reaches a sibling command.
-- `<ServeBlobs prefix="repo"/>` publishes the site's own directory read-only at `/repo`, the store the browser process reads this entry through; `<AssetsDir>` mounts the wasm binary the page boots, whose `wasm/beet-ui.{wasm,js}` link to the build output in `target/wasm`.
+- `<ServeBlobs prefix="package"/>` publishes the site's own directory read-only at `/package`, the store the browser process reads this entry through; `<AssetsDir>` mounts the wasm binary the page boots, whose `wasm/beet-ui.{wasm,js}` link to the build output in `target/wasm`.
 - `<PackageConfig/>`, beside the commands, is a resource declaration: a capitalized tag naming a `#[reflect(Resource)]` type patches the live resource's named fields (here the site title, description and homepage), leaving the rest, eg the compile-time version, untouched. It produces no markup.
 - The `{(..)}` spread stacks middleware components onto the router entity, exactly as a Rust `world.spawn((Router, RequestLogger, ..))` would: request logging, the cache policy (html edge-cacheable, purged by every deploy and `sync`), `--help`, terminal link navigation, and the layout.
 - `<Instance document="templates/Styles.bsx"/>` builds another document in place, named by its path: the site's style rules.
@@ -81,7 +81,7 @@ The same site renders on the web (a full HTML document), in the terminal (charce
 `routes/counter.bsx` is a single no-code page that runs on every target, unchanged:
 
 - **Terminal (in-process):** `beet serve --server=tui` drives the same `@doc:count` and event scripts natively through the document sync, the count repainting in charcell on each click.
-- **Web (the browser runtime):** `beet serve --server=http` serves the page as its first paint, and the `<Wasm route="serve"/>` in `templates/Layout.bsx` boots the wasm `beet` binary on this same entry, read through `/repo`, dispatching `serve` under `--server=dom` and opening at the page's own url. The tab then runs the page's world: a click reaches the button's entity through the DOM binding, its `bx:onclick` script runs in the sandboxed iframe backend, and the bound count repaints in place with no network round-trip. Until it boots, the served page is inert.
+- **Web (the browser runtime):** `beet serve --server=http` serves the page as its first paint, and the `<Wasm route="serve"/>` in `templates/Layout.bsx` boots the wasm `beet` binary on this same entry, read through `/package`, dispatching `serve` under `--server=dom` and opening at the page's own url. The tab then runs the page's world: a click reaches the button's entity through the DOM binding, its `bx:onclick` script runs in the sandboxed iframe backend, and the bound count repaints in place with no network round-trip. Until it boots, the served page is inert.
 - **Static export:** `beet export-static examples/beetmania` writes the page with its bindings settled to the initial state, the correct first paint.
 
 There is no framework tier between SSR and the world: below wasm the page is plain HTML and CSS, and above it the browser is one more beet runtime, launched by the page.
@@ -92,7 +92,7 @@ There is no framework tier between SSR and the world: below wasm the page is pla
 
 ## The blog, published
 
-The blog, the Beetmania Almanac, is also a [standard.site](https://standard.site) publication on the `beetmania.beet.org` atproto account: `<StandardSitePub>` declares it, and the `social/publish` command writes one document per dated post to the account's repo, each carrying the post itself as a beet scene, then announces it on Bluesky, where `beetlover.beet.org` reposts and replies. The replies to an announcement are the post's comments, read live in `templates/ArticleLayout.bsx`. Its posts are made up, so the example is where a change to that pipeline is tried before it reaches a real blog; `main.bsx` documents the commands.
+The blog, the Beetmania Almanac, is also a [standard.site](https://standard.site) publication on the `beetmania.beet.org` atproto account: `<StandardSitePub>` declares it, and the `social/publish` command writes one document per dated post to the account's public repo, each carrying the post itself as a beet scene, then announces it on Bluesky, where `beetlover.beet.org` reposts and replies. The replies to an announcement are the post's comments, read live in `templates/ArticleLayout.bsx`. Its posts are made up, so the example is where a change to that pipeline is tried before it reaches a real blog; `main.bsx` documents the commands.
 
 ## Test accounts
 
@@ -103,9 +103,9 @@ Two Bluesky accounts exist for this example, both made-up characters, their hand
 | Beetmania | a test org: publishes the standard.site documents and announces each post | `beetmania.beet.org` | `test-beetmania.bsky.social` | `did:plc:7bxw2ljdoqcny4rio7oiqsru` |
 | Beet Lover | a test user: reposts the announcements it is credited on and replies, the comments under each post | `beetlover.beet.org` | `test-beetlover.bsky.social` | `did:plc:xfhml5eyathkdgloyiresv4d` |
 
-Each `beet.org` handle is a `_atproto` TXT record the `social` stack publishes (`just beetmania social deploy --stage=prod`), claimed once in the account's settings (Handle, "I have my own domain"); `just beetmania social probe --stage=prod` checks both. Their app passwords are `BEETMANIA_BEET_ORG_APP_PASSWORD` and `BEETLOVER_BEET_ORG_APP_PASSWORD` in the `agents` group of this example's own `secrets.toml` (see [The secrets](#the-secrets)), rolled at `https://bsky.app/settings/app-passwords`. The repo's `secrets.toml` keeps a copy of each in its own `agents` group for the live tests, so a roll restates both.
+Each `beet.org` handle is a `_atproto` TXT record the `social` stack publishes (`just beetmania social deploy --stage=prod`), claimed once in the account's settings (Handle, "I have my own domain"); `just beetmania social probe --stage=prod` checks both. Their app passwords are `BEETMANIA_BEET_ORG_APP_PASSWORD` and `BEETLOVER_BEET_ORG_APP_PASSWORD` in the `agents` group of this example's own `secrets.toml` (see [The secrets](#the-secrets)), rolled at `https://bsky.app/settings/app-passwords`. The workspace's root `secrets.toml` keeps a copy of each in its own `agents` group for the live tests, so a roll restates both.
 
-Beetmania is also the repo's live test account: `just test-atproto-live` writes to it, only records it deletes again under its own collection and an `https://example.com` publication, so this site's publication is never touched.
+Beetmania is also beet's live test account: `just test-atproto-live` writes to it, only records it deletes again under its own collection and an `https://example.com` publication, so this site's publication is never touched.
 
 ## The deploy
 

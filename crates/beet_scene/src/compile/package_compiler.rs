@@ -26,7 +26,7 @@ use bytes::Bytes;
 /// the time it was first written. Compiling twice writes nothing the second
 /// time.
 ///
-/// A path dependency within the same home directory compiles first into its
+/// A path dependency within the same source directory compiles first into its
 /// own space, and its documents are named through its prefix.
 ///
 /// ```
@@ -34,12 +34,12 @@ use bytes::Bytes;
 /// # use beet_net::prelude::*;
 /// # use beet_scene::prelude::*;
 /// # async_ext::block_on(async {
-/// let home = BlobStore::temp();
-/// home.insert(&RelPath::new("todos/main.json"), r#"{"title":"todos"}"#).await?;
+/// let source = BlobStore::temp();
+/// source.insert(&RelPath::new("todos/main.json"), r#"{"title":"todos"}"#).await?;
 /// let world = ScenePlugin.into_world();
-/// let pds = PackageCompiler::local_pds(&home);
+/// let pds = PackageCompiler::local_pds(&source);
 /// let report = PackageCompiler::new(DocParsers::of(&world), pds)
-/// 	.compile(&home, &RelPath::new("todos/main.json"))
+/// 	.compile(&source, &RelPath::new("todos/main.json"))
 /// 	.await?;
 /// report.package.name.as_str().xpect_eq("todos");
 /// report.package_record.uri.to_string().xpect_contains("/org.beet.package/todos:main");
@@ -55,10 +55,10 @@ pub struct PackageCompiler {
 }
 
 impl PackageCompiler {
-	/// The did a home directory's PDS answers for before any account syncs
+	/// The did a source directory's PDS answers for before any account syncs
 	/// it, its own repo in each space laid out under `self` all the same.
 	pub const LOCAL_DID: &'static str = "did:web:localhost";
-	/// Where a home directory keeps its compiled form.
+	/// Where a source directory keeps its compiled form.
 	pub const PDS_DIR: &'static str = ".beet/pds";
 	/// The stem an entry document is named by, ie `main.bsx`, which is how a
 	/// dependency's and a sub package's entry are found.
@@ -84,40 +84,40 @@ impl PackageCompiler {
 		self
 	}
 
-	/// The PDS of the home directory `home`: an [`EmulatorPds`] under its
+	/// The PDS of the source directory `source`: an [`EmulatorPds`] under its
 	/// [`PDS_DIR`](Self::PDS_DIR), the public repo at the top and each
 	/// package's space beneath.
-	pub fn local_pds(home: &BlobStore) -> Pds {
+	pub fn local_pds(source: &BlobStore) -> Pds {
 		Pds::new(EmulatorPds::new(
 			Did::parse(Self::LOCAL_DID).expect("a valid did"),
-			home.with_subdir(RelPath::new(Self::PDS_DIR)),
+			source.with_subdir(RelPath::new(Self::PDS_DIR)),
 		))
 	}
 
-	/// Compile the package whose entry is `entry` in the home directory
-	/// `home`: the entry's directory is the package's root.
+	/// Compile the package whose entry is `entry` in the source directory
+	/// `source`: the entry's directory is the package's root.
 	pub async fn compile(
 		&self,
-		home: &BlobStore,
+		source: &BlobStore,
 		entry: &RelPath,
 	) -> Result<CompileReport> {
-		self.compile_package(home.clone(), entry.clone(), Vec::new())
+		self.compile_package(source.clone(), entry.clone(), Vec::new())
 			.await
 			.map(|package| package.report)
 	}
 
-	/// The entry `path` of `home` names: the document itself, or the one entry
+	/// The entry `path` of `source` names: the document itself, or the one entry
 	/// of the directory it names ([`ENTRY_STEM`](Self::ENTRY_STEM)).
 	pub async fn entry_of(
 		&self,
-		home: &BlobStore,
+		source: &BlobStore,
 		path: &RelPath,
 	) -> Result<RelPath> {
 		match PackageSource::is_entry_like(path, &self.parsers)
-			&& home.exists(path).await?
+			&& source.exists(path).await?
 		{
 			true => path.clone().xok(),
-			false => Self::find_entry(home, path, &self.parsers).await,
+			false => Self::find_entry(source, path, &self.parsers).await,
 		}
 	}
 
@@ -146,7 +146,7 @@ impl PackageCompiler {
 	/// entries of the packages depending on it, refusing a cycle.
 	fn compile_package(
 		&self,
-		home: BlobStore,
+		directory: BlobStore,
 		entry: RelPath,
 		mut visiting: Vec<RelPath>,
 	) -> LifetimeSendBoxedFuture<'_, Result<CompiledPackage>> {
@@ -165,8 +165,8 @@ impl PackageCompiler {
 			visiting.push(entry.clone());
 			let dir = entry.parent().unwrap_or_default();
 			let store = match dir.is_empty() {
-				true => home.clone(),
-				false => home.with_subdir(dir.clone()),
+				true => directory.clone(),
+				false => directory.with_subdir(dir.clone()),
 			};
 			let entry_path =
 				entry.strip_prefix(&dir).unwrap_or_else(|| entry.clone());
@@ -187,7 +187,7 @@ impl PackageCompiler {
 					dir.file_name()
 						.map(str::to_string)
 						.or_else(|| {
-							home.base_dir().and_then(|dir| {
+							directory.base_dir().and_then(|dir| {
 								dir.file_name().map(str::to_string)
 							})
 						})
@@ -232,18 +232,21 @@ impl PackageCompiler {
 				let joined = dir.as_smol_path().join(path.as_str());
 				if joined.as_str().split('/').next() == Some("..") {
 					bevybail!(
-						"the dependency `{key}` at `{path}` is outside the home \
+						"the dependency `{key}` at `{path}` is outside the source \
 						 directory: a path dependency is a package beside this \
 						 one"
 					);
 				}
 				let dependency_dir = RelPath::new(joined.as_str());
-				let dependency_entry =
-					Self::find_entry(&home, &dependency_dir, &self.parsers)
-						.await?;
+				let dependency_entry = Self::find_entry(
+					&directory,
+					&dependency_dir,
+					&self.parsers,
+				)
+				.await?;
 				let compiled = self
 					.compile_package(
-						home.clone(),
+						directory.clone(),
 						dependency_entry,
 						visiting.clone(),
 					)
@@ -414,14 +417,14 @@ impl PackageCompiler {
 		}
 	}
 
-	/// The entry of the package in `dir` of `home`: its one document named
+	/// The entry of the package in `dir` of `source`: its one document named
 	/// [`ENTRY_STEM`](Self::ENTRY_STEM).
 	async fn find_entry(
-		home: &BlobStore,
+		source: &BlobStore,
 		dir: &RelPath,
 		parsers: &DocParsers,
 	) -> Result<RelPath> {
-		let listed = home.list_dir(dir).await?;
+		let listed = source.list_dir(dir).await?;
 		let entries = listed
 			.files
 			.iter()
@@ -654,26 +657,27 @@ mod test {
 		world
 	}
 
-	async fn home(files: &[(&str, &str)]) -> BlobStore {
-		let home = BlobStore::temp();
-		for (path, source) in files {
-			home.insert(&RelPath::new(path), source.to_string())
+	async fn source(files: &[(&str, &str)]) -> BlobStore {
+		let source = BlobStore::temp();
+		for (path, text) in files {
+			source
+				.insert(&RelPath::new(path), text.to_string())
 				.await
 				.unwrap();
 		}
-		home
+		source
 	}
 
-	fn compiler(home: &BlobStore) -> PackageCompiler {
+	fn compiler(source: &BlobStore) -> PackageCompiler {
 		PackageCompiler::new(
 			DocParsers::of(&world()),
-			PackageCompiler::local_pds(home),
+			PackageCompiler::local_pds(source),
 		)
 	}
 
-	async fn compile(home: &BlobStore) -> Result<CompileReport> {
-		compiler(home)
-			.compile(home, &RelPath::new("todos/main.bsx"))
+	async fn compile(source: &BlobStore) -> Result<CompileReport> {
+		compiler(source)
+			.compile(source, &RelPath::new("todos/main.bsx"))
 			.await
 	}
 
@@ -690,14 +694,14 @@ mod test {
 		files
 	}
 
-	fn space(home: &BlobStore, name: &str) -> Pds {
-		PackageCompiler::local_pds(home)
+	fn space(source: &BlobStore, name: &str) -> Pds {
+		PackageCompiler::local_pds(source)
 			.space(SpaceRef::package(name).unwrap())
 			.unwrap()
 	}
 
-	async fn package_record(home: &BlobStore, rkey: &str) -> PackageRecord {
-		space(home, "todos")
+	async fn package_record(source: &BlobStore, rkey: &str) -> PackageRecord {
+		space(source, "todos")
 			.get::<PackageRecord>(&Rkey::parse(rkey).unwrap())
 			.await
 			.unwrap()
@@ -706,16 +710,16 @@ mod test {
 	}
 
 	async fn scene(
-		home: &BlobStore,
+		source: &BlobStore,
 		report: &CompileReport,
 		path: &str,
 	) -> SceneRecord {
 		let package =
-			package_record(home, report.package_record.uri.rkey().as_str())
+			package_record(source, report.package_record.uri.rkey().as_str())
 				.await;
 		let scenes = package.body().get::<Scenes>().unwrap();
 		let scene_ref = &scenes.0[&RelPath::new(path)];
-		space(home, "todos")
+		space(source, "todos")
 			.get::<SceneRecord>(scene_ref.record.uri.rkey())
 			.await
 			.unwrap()
@@ -724,9 +728,9 @@ mod test {
 	}
 
 	/// The scene body a scene record keys, read back from its blob.
-	async fn body(home: &BlobStore, scene: &SceneRecord) -> SceneBody {
+	async fn body(source: &BlobStore, scene: &SceneRecord) -> SceneBody {
 		let blob = scene.body().get::<BlobRef>().unwrap();
-		let bytes = home
+		let bytes = source
 			.get(&RelPath::new(format!(
 				".beet/pds/space/org.beet.space.package/todos/self/blobs/{}",
 				blob.cid
@@ -752,7 +756,7 @@ mod test {
 <section><h2>{@prop:title}</h2></section>"#;
 
 	async fn todos() -> BlobStore {
-		home(&[
+		source(&[
 			("todos/main.bsx", MAIN),
 			("todos/widgets/Card.bsx", CARD),
 			(
@@ -766,8 +770,8 @@ mod test {
 
 	#[beet_core::test]
 	async fn compiles_twice_byte_identical() {
-		let home = todos().await;
-		let first = compile(&home).await.unwrap();
+		let source = todos().await;
+		let first = compile(&source).await.unwrap();
 		// three scenes, the branch record and the package record
 		first.written.len().xpect_eq(5);
 		// four files and three scene bodies
@@ -777,18 +781,18 @@ mod test {
 			.uri
 			.to_string()
 			.xpect_contains("/space/org.beet.space.package/todos/did:web:localhost/org.beet.package/todos:main");
-		let before = snapshot(&home).await;
-		let second = compile(&home).await.unwrap();
+		let before = snapshot(&source).await;
+		let second = compile(&source).await.unwrap();
 		second.wrote_nothing().xpect_true();
 		second.package_record.xpect_eq(first.package_record);
-		snapshot(&home).await.xpect_eq(before);
+		snapshot(&source).await.xpect_eq(before);
 	}
 
 	#[beet_core::test]
 	async fn writes_the_package_record() {
-		let home = todos().await;
-		let report = compile(&home).await.unwrap();
-		let package = package_record(&home, "todos:main").await;
+		let source = todos().await;
+		let report = compile(&source).await.unwrap();
+		let package = package_record(&source, "todos:main").await;
 		let body = package.body();
 		body.get::<Package>()
 			.unwrap()
@@ -819,8 +823,8 @@ mod test {
 			]));
 		// the entry's set stops at the lazy page, and carries the card's
 		// requirement
-		let card = scene(&home, &report, "widgets/Card.bsx").await;
-		let main = scene(&home, &report, "main.bsx").await;
+		let card = scene(&source, &report, "widgets/Card.bsx").await;
+		let main = scene(&source, &report, "main.bsx").await;
 		let load_sets = body.get::<LoadSets>().unwrap();
 		let set = &load_sets.0[&RelPath::new("main.bsx")];
 		set.scenes.xpect_eq(vec![
@@ -836,9 +840,9 @@ mod test {
 
 	#[beet_core::test]
 	async fn hoists_scene_meta() {
-		let home = todos().await;
-		let report = compile(&home).await.unwrap();
-		let main = scene(&home, &report, "main.bsx").await;
+		let source = todos().await;
+		let report = compile(&source).await.unwrap();
+		let main = scene(&source, &report, "main.bsx").await;
 		main.body()
 			.get::<Route>()
 			.unwrap()
@@ -859,7 +863,7 @@ mod test {
 		imports.0[&RelPath::new("pages/About.bsx")]
 			.kind
 			.xpect_eq(ImportKind::Lazy);
-		let card = scene(&home, &report, "widgets/Card.bsx").await;
+		let card = scene(&source, &report, "widgets/Card.bsx").await;
 		let props = card.body().get::<Props>().unwrap();
 		props.0["title"].kind.as_str().xpect_eq("string");
 		props.0["count"]
@@ -878,10 +882,10 @@ mod test {
 	/// scene body, so a record only ever holds a full path.
 	#[beet_core::test]
 	async fn resolves_references_in_the_body() {
-		let home = todos().await;
-		let report = compile(&home).await.unwrap();
-		let main = scene(&home, &report, "main.bsx").await;
-		let documents = body(&home, &main)
+		let source = todos().await;
+		let report = compile(&source).await.unwrap();
+		let main = scene(&source, &report, "main.bsx").await;
+		let documents = body(&source, &main)
 			.await
 			.entities
 			.values()
@@ -900,15 +904,16 @@ mod test {
 
 	#[beet_core::test]
 	async fn one_changed_document_changes_one_scene() {
-		let home = todos().await;
-		let first = compile(&home).await.unwrap();
-		home.insert(
-			&RelPath::new("todos/widgets/Card.bsx"),
-			format!("{CARD}<footer/>"),
-		)
-		.await
-		.unwrap();
-		let second = compile(&home).await.unwrap();
+		let source = todos().await;
+		let first = compile(&source).await.unwrap();
+		source
+			.insert(
+				&RelPath::new("todos/widgets/Card.bsx"),
+				format!("{CARD}<footer/>"),
+			)
+			.await
+			.unwrap();
+		let second = compile(&source).await.unwrap();
 		// the card's scene, the branch record and the package record
 		second.written.len().xpect_eq(3);
 		// the card's source and its new body
@@ -929,17 +934,17 @@ mod test {
 
 	#[beet_core::test]
 	async fn two_branches_two_package_records() {
-		let home = todos().await;
-		let main = compile(&home).await.unwrap();
-		let dev = compiler(&home)
+		let source = todos().await;
+		let main = compile(&source).await.unwrap();
+		let dev = compiler(&source)
 			.with_branch(BranchName::parse("dev").unwrap())
-			.compile(&home, &RelPath::new("todos/main.bsx"))
+			.compile(&source, &RelPath::new("todos/main.bsx"))
 			.await
 			.unwrap();
 		dev.package_record.uri.rkey().as_str().xpect_eq("todos:dev");
 		// one version, two branches, no collision, the scenes shared
-		package_record(&home, "todos:main").await;
-		package_record(&home, "todos:dev").await;
+		package_record(&source, "todos:main").await;
+		package_record(&source, "todos:dev").await;
 		dev.written
 			.iter()
 			.filter(|written| {
@@ -952,14 +957,14 @@ mod test {
 
 	#[beet_core::test]
 	async fn stale_once_its_branch_moves() {
-		let home = todos().await;
-		compile(&home).await.unwrap();
+		let source = todos().await;
+		compile(&source).await.unwrap();
 		let branch =
 			Branch::new(PackageName::parse("todos").unwrap(), BranchName::MAIN);
-		let compiler = compiler(&home);
+		let compiler = compiler(&source);
 		compiler.is_stale(&branch).await.unwrap().xpect_false();
 		// a runtime with no compiler writes the branch: its files move on
-		let space = space(&home, "todos");
+		let space = space(&source, "todos");
 		let record = space
 			.get::<BranchRecord>(&branch.rkey())
 			.await
@@ -975,7 +980,7 @@ mod test {
 			.await
 			.unwrap();
 		compiler.is_stale(&branch).await.unwrap().xpect_true();
-		compile(&home).await.unwrap();
+		compile(&source).await.unwrap();
 		compiler.is_stale(&branch).await.unwrap().xpect_false();
 	}
 
@@ -983,9 +988,9 @@ mod test {
 	/// wrote, its blobs included.
 	#[beet_core::test]
 	async fn writes_the_space_alone() {
-		let home = todos().await;
-		compile(&home).await.unwrap();
-		let paths = snapshot(&home)
+		let source = todos().await;
+		compile(&source).await.unwrap();
+		let paths = snapshot(&source)
 			.await
 			.into_iter()
 			.map(|(path, _)| path.to_string())
@@ -1003,10 +1008,12 @@ mod test {
 	/// component's hook runs: a `CallOnReady` never fires.
 	#[beet_core::test]
 	async fn runs_no_runtime_behaviour() {
-		let home =
-			home(&[("todos/main.bsx", r#"<div {CallOnReady}><Fires/></div>"#)])
-				.await;
-		compile(&home).await.unwrap();
+		let source = source(&[(
+			"todos/main.bsx",
+			r#"<div {CallOnReady}><Fires/></div>"#,
+		)])
+		.await;
+		compile(&source).await.unwrap();
 		FIRED.load(Ordering::SeqCst).xpect_false();
 		// the same document fires once it is built
 		let mut world = world();
@@ -1019,7 +1026,7 @@ mod test {
 	/// record and the package record.
 	#[beet_core::test]
 	async fn hoists_the_package_declaration() {
-		let home = home(&[(
+		let source = source(&[(
 			"todos/main.bsx",
 			r#"<Package name="todos" version="0.1.0">
 	<Import name="." from="widgets"/>
@@ -1028,8 +1035,8 @@ mod test {
 </Package>"#,
 		)])
 		.await;
-		compile(&home).await.unwrap();
-		let package = package_record(&home, "todos:main").await;
+		compile(&source).await.unwrap();
+		let package = package_record(&source, "todos:main").await;
 		let body = package.body();
 		body.get::<Package>()
 			.unwrap()
@@ -1044,7 +1051,7 @@ mod test {
 			.platform
 			.triple()
 			.xpect_eq("wasm32-unknown-unknown");
-		let branch = space(&home, "todos")
+		let branch = space(&source, "todos")
 			.get::<BranchRecord>(&Rkey::parse("todos:main").unwrap())
 			.await
 			.unwrap()
@@ -1072,9 +1079,9 @@ mod test {
 
 	#[beet_core::test]
 	async fn compiles_an_implicit_package() {
-		let home = home(&[("my-site/main.bsx", "<p>hi</p>")]).await;
-		let report = compiler(&home)
-			.compile(&home, &RelPath::new("my-site/main.bsx"))
+		let source = source(&[("my-site/main.bsx", "<p>hi</p>")]).await;
+		let report = compiler(&source)
+			.compile(&source, &RelPath::new("my-site/main.bsx"))
 			.await
 			.unwrap();
 		report.package.name.as_str().xpect_eq("my-site");
@@ -1083,7 +1090,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn leaves_out_a_sub_package() {
-		let home = home(&[
+		let source = source(&[
 			("todos/main.bsx", "<p>hi</p>"),
 			(
 				"todos/inner/main.bsx",
@@ -1092,8 +1099,8 @@ mod test {
 			("todos/inner/page.bsx", "<p>inner</p>"),
 		])
 		.await;
-		let report = compile(&home).await.unwrap();
-		package_record(&home, "todos:main")
+		let report = compile(&source).await.unwrap();
+		package_record(&source, "todos:main")
 			.await
 			.body()
 			.get::<Files>()
@@ -1106,7 +1113,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn compiles_a_path_dependency() {
-		let home = home(&[
+		let source = source(&[
 			(
 				"todos/main.bsx",
 				r#"<Package name="todos" version="0.1.0"><Dependency path="../widgets"/></Package>
@@ -1116,11 +1123,11 @@ mod test {
 			("widgets/Card.bsx", CARD),
 		])
 		.await;
-		let report = compile(&home).await.unwrap();
+		let report = compile(&source).await.unwrap();
 		report.dependencies.len().xpect_eq(1);
 		let dependency = &report.dependencies[0];
 		dependency.package.name.as_str().xpect_eq("widgets");
-		let package = package_record(&home, "todos:main").await;
+		let package = package_record(&source, "todos:main").await;
 		let resolved = package.body().get::<Dependencies>().unwrap().0
 			[&PackageName::parse("widgets").unwrap()]
 			.resolved
@@ -1136,7 +1143,7 @@ mod test {
 	}
 
 	async fn compile_err(files: &[(&str, &str)]) -> String {
-		compile(&home(files).await).await.unwrap_err().to_string()
+		compile(&source(files).await).await.unwrap_err().to_string()
 	}
 
 	#[beet_core::test]
@@ -1214,7 +1221,7 @@ mod test {
 	#[beet_core::test]
 	async fn leaves_an_undeclared_interface_unchecked() {
 		compile(
-			&home(&[
+			&source(&[
 				(
 					"todos/main.bsx",
 					r#"<Instance document="Card.bsx" props={{title:3}}/>"#,

@@ -8,7 +8,7 @@ visibility = "unlisted"
 
 # Scenes
 
-A scene is beet's unit of everything. It describes structure and behavior as data, it is the record a repo is made of, and it is the layer of malleability most people touch first, since changing a scene changes the software while it runs. This page is about what a scene is and why beet works from nothing else. [A guestbook from a scene](/docs/tutorials/guestbook-scenes) builds one.
+A scene is beet's unit of everything. It describes structure and behavior as data, it is the record a package is made of, and it is the layer of malleability most people touch first, since changing a scene changes the software while it runs. This page is about what a scene is and why beet works from nothing else. [A guestbook from a scene](/docs/tutorials/guestbook-scenes) builds one.
 
 ## The shape
 
@@ -35,7 +35,7 @@ Every value is the serialized form of strongly typed data, which keeps a scene b
 
 ## Representations
 
-The encoding is not the scene. JSON is the record, the form a home stores and beet edits at the component grain. BSX markup and markdown are ways of writing one for a person, imported into the record rather than kept beside it, because text is easy to lose structure in. The guestbook's `main.bsx` is a scene written in BSX:
+The encoding is not the scene. JSON is the record, the form a package stores and beet edits at the component grain. BSX markup and markdown are ways of writing one for a person, imported into the record rather than kept beside it, because text is easy to lose structure in. The guestbook's `main.bsx` is a scene written in BSX:
 
 ```jsx
 <CallOnReady {CliServer}>
@@ -52,7 +52,7 @@ Each tag is an entity, each attribute or `{spread}` a component and each nested 
 
 ## Scenes all the way down
 
-Every document in a repo compiles into a scene, and a file beet has no format for is loaded as its blob. The entry document is one, and so is a route, a page, a behavior tree, a thread of agents, a deploy stack and a [script](/docs/scripts). A reusable document is instantiated by cloning its scene, so a layout or a widget is a scene the same way a page is.
+Every document in a package compiles into a scene, and a file beet has no format for is loaded as its blob. The entry document is one, and so is a route, a page, a behavior tree, a thread of agents, a deploy stack and a [script](/docs/scripts). A reusable document is instantiated by cloning its scene, so a layout or a widget is a scene the same way a page is.
 
 Because behavior lives in scenes rather than compiled control flow, a scene stays open while it runs. Editing one, in a text editor, in the scene editor on any surface or through an agent, is an ordinary edit to a record, and the running software follows it component by component with no rebuild and no redeploy. The words a scene may use come from the runtime, and when the vocabulary runs out the next layers are [scripts](/docs/scripts) and [plugins](/docs/plugins).
 

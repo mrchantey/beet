@@ -273,8 +273,8 @@ mod test {
 	#[beet_core::test]
 	async fn hoists_onto_the_scene_record() {
 		use beet_net::prelude::*;
-		let home = BlobStore::temp();
-		home.insert(
+		let source = BlobStore::temp();
+		source.insert(
 			&RelPath::new("site/main.bsx"),
 			r#"<article {RouteMeta{visibility: RouteVisibility::Unlisted}} {DocMeta{title:"Counter", created:"2026-08-28"}}><p>hi</p></article>"#,
 		)
@@ -286,9 +286,9 @@ mod test {
 			registry.register::<RouteMeta>();
 			registry.register::<DocMeta>();
 		}
-		let pds = PackageCompiler::local_pds(&home);
+		let pds = PackageCompiler::local_pds(&source);
 		let report = PackageCompiler::new(DocParsers::of(&world), pds.clone())
-			.compile(&home, &RelPath::new("site/main.bsx"))
+			.compile(&source, &RelPath::new("site/main.bsx"))
 			.await
 			.unwrap();
 		let space = pds.space(SpaceRef::package("site").unwrap()).unwrap();

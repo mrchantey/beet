@@ -3,7 +3,7 @@
 //!
 //! Inserting a [`RoutesDir`] (eg from a `main.bsx` entry via
 //! `<RoutesDir src="routes"/>`) derives a [`DirPath`] scoping the nearest
-//! ancestor [`BlobStore`] (the home store composed on the loaded root) to `src`
+//! ancestor [`BlobStore`] (the package store composed on the loaded root) to `src`
 //! onto the dir entity, which also registers the dir's [`WatchDir`] for live
 //! reload, and triggers [`RoutesDir::spawn_on_insert`]: the scoped store is
 //! listed, and each content file (`.md`/`.mdx`/`.bsx`/`.html`) spawns a
@@ -158,12 +158,12 @@ impl RoutesDir {
 					// built so the ancestor links are reliably present: the store
 					// the files load from, the package they are documents of, and the
 					// component this dir's unsectioned frontmatter keys declare.
-					let (store, package, frontmatter_type) =
-						dir.with_state::<(
+					let (store, package, frontmatter_type) = dir
+						.with_state::<(
 							Query<&BlobStore>,
-							PackageQuery,
+							PackageFilesQuery,
 							FrontmatterTypeQuery,
-						), Result<(BlobStore, PackageStore, ReflectName)>>(
+						), Result<(BlobStore, PackageFiles, ReflectName)>>(
 							move |entity, (stores, packages, types)| {
 								Ok((
 									scoped_store(
@@ -314,7 +314,7 @@ impl RoutesDir {
 		// guaranteed on the runtime's local executor.
 		entity_mut.run_async_local(async move |route: AsyncEntity| -> Result {
 			let (package, frontmatter_type) = route
-				.with_state::<(PackageQuery, FrontmatterTypeQuery), _>(
+				.with_state::<(PackageFilesQuery, FrontmatterTypeQuery), _>(
 					|entity, (packages, types)| {
 						packages
 							.get(entity)
@@ -431,7 +431,7 @@ impl RoutesDir {
 	/// frontmatter does not take the whole dir down on live reload.
 	async fn discover_routes(
 		parsers: &DocParsers,
-		package: &PackageStore,
+		package: &PackageFiles,
 		store: &BlobStore,
 		filter: &GlobFilter,
 		frontmatter_type: &str,
@@ -634,7 +634,7 @@ mod test {
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
-	/// Compose `store` on the root (the home store an entry carries) so the
+	/// Compose `store` on the root (the package store an entry carries) so the
 	/// [`RoutesDir`] resolves it by ancestry, then settle the async runtime so the
 	/// discovery task (an async store scan) completes. Mirrors a boot path settling
 	/// before it serves.

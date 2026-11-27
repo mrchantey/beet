@@ -29,7 +29,7 @@ LLM, `secure` the TLS serving; the page + assets ride the default native router.
 -->
 <Fragment>
 	<!-- the head routes, wasm binary and eye sprites live workspace-relative -->
-	<HomeRoot src="../.."/>
+	<PackageRoot src="../.."/>
 	<RequireCfg cfg="feature:thread && feature:sockets && feature:secure && feature:extra"/>
 	<!-- the always-socket agent: a socket server whose head capabilities forward to the
 	     browser head over the socket, bound by the `whoami` handshake. -->
@@ -46,7 +46,7 @@ LLM, `secure` the TLS serving; the page + assets ride the default native router.
 		<!-- the wasm build outputs at /wasm (the binary the pages boot,
 		     /wasm/beet-full.wasm), the workspace assets tree at /assets (the scene
 		     face images the head renders, /assets/extra/perceive-act/explorer/images/joy.png).
-		     The examples tree at /examples is the repo the head page names, read
+		     The examples tree at /examples is the package store the head page names, read
 		     over http. -->
 		<AssetsDir src="target/wasm" prefix="wasm"/>
 		<AssetsDir src="assets" prefix="assets"/>

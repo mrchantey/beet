@@ -24,15 +24,15 @@
 //! - [`HttpStore`]: a store served over http (a `<ServeBlobs>` mount), read-only
 //!   (requires `json`; reads need a transport, wasm's fetch or `ureq`/`reqwest`)
 //! - [`StoreFork`]: a local store forked off an upstream one, the fork a
-//!   process keeps of a repo it reads but does not own
+//!   process keeps of a package store it reads but does not own
 //!
-//! ## The home store
+//! ## The package store
 //!
-//! One store in an app is special: the [`HomeStore`], the canonical store an
+//! One store in an app is special: the [`PackageStore`], the canonical store an
 //! entry loads through, holding the entry document, its templates, routes and
 //! assets. A world carries exactly one (the marker errors on a second), and a
 //! consumer reaches it either by ancestry (`AncestorQuery<&BlobStore>`, which
-//! honours any intervening scope) or directly through [`HomeStore::get`]. Every
+//! honours any intervening scope) or directly through [`PackageStore::get`]. Every
 //! other store is a plain one: declared for a purpose and named by a
 //! [`StoreRef`], or scoped out of an ancestor by a [`DirPath`].
 //!
@@ -68,10 +68,11 @@ pub use store_backend::*;
 // signal a surface waits on before its first paint.
 mod loading;
 pub use loading::*;
-// the one canonical store an app runs from, and the singleton it enforces.
-mod home_store;
+// the package a runtime runs from, the singleton it enforces, and the files
+// every `DocPath` under a package resolves in.
+mod package_files;
 mod package_store;
-pub use home_store::*;
+pub use package_files::*;
 pub use package_store::*;
 
 // the analytics types + emission need only serde (which `std` pulls); the store
@@ -131,9 +132,9 @@ impl Plugin for StorePlugin {
 			// ancestor store, kept correct as stores churn above them.
 			.register_type::<DirPath>()
 			.register_type::<BlobPath>()
-			// the home store marker: one canonical store per app, the one an
+			// the package store marker: one canonical store per app, the one an
 			// entry loads through, enforced by its own insert hook.
-			.register_type::<HomeStore>()
+			.register_type::<PackageStore>()
 			.add_observer(on_insert_dir_path)
 			.add_observer(on_insert_blob_path)
 			.add_observer(on_insert_child_of)
@@ -219,7 +220,7 @@ impl Plugin for StorePlugin {
 			.add_observer(on_remove_json_table_blobs)
 			.add_observer(on_remove_json_tables);
 
-		// the http-served store, so a scene declares a remote repo it reads.
+		// the http-served store, so a scene declares a remote package store it reads.
 		#[cfg(all(feature = "std", feature = "json"))]
 		app.register_type::<HttpStore>();
 	}

@@ -83,10 +83,10 @@ pub async fn StateBackendToggle(
 /// its build artifact, on one entity. They share an entity because
 /// `TofuApply` pairs the `BuildArtifact` with the block on the same entity
 /// to upload it under the block's label, the S3 key the lambda reads its code
-/// from. The lambda runtime offers no argv, so the home-store args
+/// from. The lambda runtime offers no argv, so the package-store args
 /// (`http_bootstrap`) bake into the zip's `bootstrap` script (the env-to-args
 /// boundary); the artifact is built on [`Ready`] ([`infra_ext::lambda_artifact`])
-/// once the stack's `{HomeStoreBlock}` declaration has settled.
+/// once the stack's `{PackageStoreBlock}` declaration has settled.
 ///
 /// `authorities` publishes the site's public hostnames as api gateway custom
 /// domains behind Cloudflare's edge (proxied, so they are cached and the origin
@@ -110,7 +110,7 @@ pub fn LambdaSiteBlock(
 	#[prop]
 	exec_route: Option<String>,
 	/// The beet checkout to build the binary out of, workspace-relative. A site
-	/// repo carrying no beet crates of its own names one; a site inside the beet
+	/// package carrying no beet crates of its own names one; a site inside the beet
 	/// workspace leaves it unset.
 	#[prop]
 	workspace_dir: Option<String>,
@@ -194,12 +194,12 @@ pub fn LambdaWatch(timeout: Option<Duration>) -> impl Bundle {
 /// its build artifact, on one entity (paired by `TofuApply`, see
 /// [`LambdaSiteBlock`]).
 ///
-/// It bakes no home store uri, unlike every other site block here, and the
+/// It bakes no package store uri, unlike every other site block here, and the
 /// omission is the declaration. Everything a Lightsail block is given renders
 /// into `user_data`, which terraform cannot update in place, so a per-deploy
 /// value there rebuilds the box on every code-only deploy. The release pointer
-/// carries the stack's `{HomeStoreBlock}` store instead
-/// ([`ArtifactLedger::home`]), and the unit sources that pointer immediately
+/// carries the stack's `{PackageStoreBlock}` store instead
+/// ([`ArtifactLedger::package`]), and the unit sources that pointer immediately
 /// before `exec`, so the box resolves its binary and the document that binary
 /// was built against from one file at every start.
 ///
@@ -238,10 +238,10 @@ pub fn LightsailWatch(timeout: Option<Duration>) -> impl Bundle {
 }
 
 /// `<FargateSiteBlock exec_route="serve"/>` — the fargate deploy block wired to serve the site from
-/// the stack's home store: the home-store config (`http_bootstrap`) lands in
+/// the stack's package store: the package-store config (`http_bootstrap`) lands in
 /// the container `CMD` via the sibling `<BuildDockerImage/>`. Named to avoid
-/// the [`FargateBlock`] it builds, on [`Ready`] through [`HomeStoreQuery`]
-/// once the stack's `{HomeStoreBlock}` declaration has settled.
+/// the [`FargateBlock`] it builds, on [`Ready`] through [`PackageStoreQuery`]
+/// once the stack's `{PackageStoreBlock}` declaration has settled.
 #[template]
 pub fn FargateSiteBlock(
 	/// The route the container boots, for an entry that is its own CLI and so
@@ -251,13 +251,14 @@ pub fn FargateSiteBlock(
 ) -> impl Bundle {
 	OnSpawn::observe(
 		move |ev: On<Ready>,
-		      repos: HomeStoreQuery,
+		      package_stores: PackageStoreQuery,
 		      mut commands: Commands|
 		      -> Result {
 			commands.entity(ev.entity).insert(
 				FargateBlock::default()
 					.with_bootstrap(infra_ext::http_bootstrap(
-						&repos, ev.entity,
+						&package_stores,
+						ev.entity,
 					)?)
 					.with_exec_route(exec_route.clone()),
 			);
@@ -286,7 +287,7 @@ pub fn FargateWatch(timeout: Option<Duration>) -> impl Bundle {
 /// (paired by `TofuApply`, see [`LambdaSiteBlock`]): one `small_3_0` box
 /// (2 GB, known monthly price, no NLB) serving http behind Caddy and the beet
 /// ssh TUI on port 22, with STAGE-AWARE Cloudflare DNS at the static IP.
-/// Runtime env wired so the binary reads its one home store (site and assets
+/// Runtime env wired so the binary reads its one package store (site and assets
 /// alike). Store names derived from the stack (declared once).
 ///
 /// The box presents one stable ssh fingerprint by reading its host key from
@@ -326,12 +327,12 @@ pub fn LightsailBeetSiteBlock(
 		.with_allow_ssh(true)
 		.with_exec_route(exec_route)
 		// one declaration for both channels: the block splits boot selection (the
-		// home store, the transports) onto the unit's `ExecStart` and the service
+		// package store, the transports) onto the unit's `ExecStart` and the service
 		// config the runtime reads onto its `Environment=` lines. The analytics
 		// table is NOT here: the site declares it, and the deployed process
 		// resolves the same declaration.
 		//
-		// No `repo`: everything here renders into `user_data`, which terraform
+		// No package store: everything here renders into `user_data`, which terraform
 		// cannot update in place, so a per-deploy value would rebuild the box on
 		// every deploy. The release pointer carries it, resolved per start.
 		.with_bootstrap(BootstrapConfig {
@@ -444,12 +445,12 @@ mod test {
 			.unwrap()
 	}
 
-	/// The Worker example declares its home store on the Worker block itself:
-	/// the deploy action beside it bakes `BEET_HOME=r2://<binding>` into the
+	/// The Worker example declares its package store on the Worker block itself:
+	/// the deploy action beside it bakes `BEET_PACKAGE=r2://<binding>` into the
 	/// wrangler `vars`, so the Worker boots from the binding wrangler bound with
 	/// no binding name in Rust.
 	#[beet_core::test]
-	fn the_worker_example_bakes_its_home_store() {
+	fn the_worker_example_bakes_its_package_store() {
 		let source = fs_ext::read_to_string(
 			WsPath::new("examples/infra/cloudflare_workers.bsx").into_abs(),
 		)
@@ -463,11 +464,13 @@ mod test {
 			.single(&world)
 			.unwrap();
 		world
-			.with_state::<HomeStoreQuery, _>(|repos| repos.bootstrap(action))
+			.with_state::<PackageStoreQuery, _>(|package_stores| {
+				package_stores.bootstrap(action)
+			})
 			.unwrap()
 			.to_env()
 			.xpect_eq(vec![(
-				SmolStr::new("BEET_HOME"),
+				SmolStr::new("BEET_PACKAGE"),
 				SmolStr::new("r2://SITE_BUCKET"),
 			)]);
 	}
@@ -570,7 +573,7 @@ mod test {
 			&mut world,
 			router,
 			r#"<Stack {(CloudflareAccount("account"), CloudflareZone{domain:"beet.org", id:"zone"})}>
-				<S3BucketBlock label="repo" {HomeStoreBlock}/>
+				<S3BucketBlock label="package" {PackageStoreBlock}/>
 				<SecretBlock bx:ref="ssh_host_key" label="ssh-host-key" env="BEET_SSH_HOST_KEY"/>
 				<LightsailBeetSiteBlock features="aws,ssh,geoip" {ReadsSecrets([$ssh_host_key])}/>
 			</Stack>"#,
@@ -887,10 +890,10 @@ mod test {
 				<Stack>
 					<DynamoTableBlock bx:ref="analytics" label="events"/>
 					<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
-					<!-- the home store the job boots from, deploy-versioned like
+					<!-- the package store the job boots from, deploy-versioned like
 					     every served store: the job dispatches a route of the same
 					     document the site serves -->
-					<S3BucketBlock label="repo" {HomeStoreBlock}/>
+					<S3BucketBlock label="package" {PackageStoreBlock}/>
 					<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="lambda"/>
 					<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 				</Stack>
@@ -912,8 +915,8 @@ mod test {
 		buckets.sort();
 		buckets.xpect_eq(vec![
 			("archive".to_string(), true, false, true),
-			// the home store, versioned per deploy
-			("repo".to_string(), false, true, false),
+			// the package store, versioned per deploy
+			("package".to_string(), false, true, false),
 		]);
 		// nothing but the timer may reach analytics compaction
 		world
@@ -1166,7 +1169,7 @@ mod test {
 		tree.find(&["audit"]).xpect_some();
 	}
 
-	/// A Lightsail site bakes NO home store uri, and the omission is the whole
+	/// A Lightsail site bakes NO package store uri, and the omission is the whole
 	/// point: everything the block is given renders into `user_data`, which
 	/// terraform cannot update in place, so a per-deploy value there would
 	/// rebuild the box on every code-only deploy. The store rides the release
@@ -1175,7 +1178,7 @@ mod test {
 	/// The lambda beside it is the contrast: its config is baked into an
 	/// immutable zip, so it carries the prefix directly.
 	#[beet_core::test]
-	fn a_lightsail_site_bakes_no_home_store() {
+	fn a_lightsail_site_bakes_no_package_store() {
 		let mut world = test_world();
 		world.insert_resource(PackageConfig {
 			app_name: "beet-site".into(),
@@ -1192,16 +1195,16 @@ mod test {
 			.single(&world)
 			.unwrap()
 			.bootstrap()
-			.home
+			.package
 			.xpect_none();
 	}
 
 	/// A compute that bakes the uri it boots from reads it off the stack's
-	/// `{HomeStoreBlock}` declaration once the document settles, so the
+	/// `{PackageStoreBlock}` declaration once the document settles, so the
 	/// declaration may follow the compute in the document, and the uri it bakes
 	/// is the store's own composition nested under this launch's id.
 	#[beet_core::test]
-	fn a_compute_bakes_the_home_store_it_settles_against() {
+	fn a_compute_bakes_the_package_store_it_settles_against() {
 		let mut world = test_world();
 		world.insert_resource(PackageConfig {
 			app_name: "beet-site".into(),
@@ -1213,7 +1216,7 @@ mod test {
 			router,
 			r#"<Stack>
 				<LambdaSiteBlock features="lambda"/>
-				<S3BucketBlock label="repo" {HomeStoreBlock}/>
+				<S3BucketBlock label="package" {PackageStoreBlock}/>
 			</Stack>"#,
 		);
 		let deploy_id = *world.resource::<Deployment>().deploy_id();
@@ -1224,15 +1227,15 @@ mod test {
 			.process()
 			.to_string()
 			.xpect_contains(format!(
-				"--home=s3://beet-site--dev--repo/{deploy_id}/repo"
+				"--package=s3://beet-site--dev--package/{deploy_id}/package"
 			));
 	}
 
-	/// ..and a stack shipping such a compute without declaring a home store is
+	/// ..and a stack shipping such a compute without declaring a package store is
 	/// told what to declare, where the document settles rather than at deploy.
 	#[beet_core::test]
-	#[should_panic = "no home store declared"]
-	fn a_compute_without_a_home_store_is_an_error() {
+	#[should_panic = "no package store declared"]
+	fn a_compute_without_a_package_store_is_an_error() {
 		let mut world = test_world();
 		world.insert_resource(PackageConfig {
 			app_name: "beet-site".into(),

@@ -33,7 +33,7 @@ use beet_router::prelude::*;
 /// ```
 ///
 /// Both lifecycle verbs pass through the [`DeployGate`]: each runs plainly as
-/// the repo's stored deploy credentials, refusing before its first step when
+/// the package's stored deploy credentials, refusing before its first step when
 /// they cannot do what it is about to, and `--elevated` runs it with the human
 /// factor instead.
 ///
@@ -128,12 +128,12 @@ impl terra::Project {
 	}
 }
 
-/// The [`ArtifactsClient`] of the stack's home store, see
-/// [`HomeStoreQuery::artifacts_client`].
+/// The [`ArtifactsClient`] of the stack's package store, see
+/// [`PackageStoreQuery::artifacts_client`].
 async fn artifacts_client(caller: &AsyncEntity) -> Result<ArtifactsClient> {
 	caller
-		.with_state::<HomeStoreQuery, _>(|entity, repos| {
-			repos.artifacts_client(entity)
+		.with_state::<PackageStoreQuery, _>(|entity, package_stores| {
+			package_stores.artifacts_client(entity)
 		})
 		.await?
 }

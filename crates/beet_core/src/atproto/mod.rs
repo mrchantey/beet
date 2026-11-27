@@ -3,7 +3,7 @@
 //! beet record and a derived file carry.
 //!
 //! Plain data with no network, so a compiler, a test and a runtime with no
-//! connection all speak it. The repo these records live in is `beet_net`'s
+//! connection all speak it. The PDS these records live on is `beet_net`'s
 //! `Pds`, whose module docs carry the converge's words.
 //!
 //! - [`Did`], an account; [`Nsid`], a collection or a lexicon def; [`Rkey`]
@@ -21,7 +21,7 @@
 //! - [`EntityBodyRecord`], an entity body in the data model keyed by NSID,
 //!   and [`EntityCollection`], every beet record, which is one
 //! - [`AtprotoValue`], a value sealed in the data model, which is how a float
-//!   reaches a repo that has none; in canonical DAG-CBOR through
+//!   reaches a data model that has none; in canonical DAG-CBOR through
 //!   [`MediaType::DagCbor`] under the `dag_cbor` feature, which is also what
 //!   its [`cid`](AtprotoValue::cid) hashes
 //! - [`OpenUnion`], an object naming its own lexicon in `$type`, and
@@ -30,8 +30,8 @@
 //!
 //! # Words
 //!
-//! The protocol's own, used throughout beet. Beet's vocabulary (account, repo,
-//! publication, derived file) is its glossary's.
+//! The protocol's own, used throughout beet. Beet's vocabulary (account, PDS,
+//! space, package, publication, derived file) is its glossary's.
 //!
 //! - **Rkey.** The record key a record is addressed by, the last segment of
 //!   `at://<did>/<collection>/<rkey>`: 1 to 512 characters of

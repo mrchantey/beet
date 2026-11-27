@@ -89,7 +89,7 @@ fn adopt_source(
 			commands.entity(figure).queue_async_local(
 				move |figure| async move {
 					let bytes = figure
-						.with_state::<PackageQuery, Result<Blob>>(
+						.with_state::<PackageFilesQuery, Result<Blob>>(
 							move |entity, packages| {
 								packages.resolve(entity, &src)
 							},

@@ -44,7 +44,7 @@ pub fn CodeSnippet(
 	OnSpawn::new_async_local(move |snippet: AsyncEntity| async move {
 		let target = snippet.id();
 		let blob = snippet
-			.with_state::<PackageQuery, Result<Blob>>(
+			.with_state::<PackageFilesQuery, Result<Blob>>(
 				move |entity, packages| packages.resolve(entity, &src),
 			)
 			.await??

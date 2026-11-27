@@ -28,12 +28,12 @@ Alex should have understood the three principles on the [home page](/) within he
 The people beet is built for, each as a short story of a day with it. They all matter, they are consistent with each other and no single one is primary. Some run ahead of what is built today, and the construction sign on the front page covers the gap.
 
 - **The publication maintainer** opens their site on a phone, signs in, edits a post's prose in a markdown-shaped editor and publishes. They write a new post from the site, add a docs page and reorder the sidebar, and they can change how a post is shown, because the post and the site are the same kind of thing.
-- **The git diehard** keeps a directory full of markdown and BSX and refuses the browser. One command imports the tree into a repo as scenes and blobs and the site serves from the repo. Markdown comes back where markdown went in, with a warning where honesty runs out, and beet's records stay opaque to them, which is fine.
-- **The visitor who tinkers** reads someone's page, opens the editor, changes the title and keeps browsing with it. A reload keeps it, a reset button discards it and nothing reaches the author. Later a button offers to upload the change into their own repo.
-- **The homegrown builder** starts from an empty repo and grows a todo list in place, a schema, a form, a table, a rule. It runs in their tab, over ssh on a friend's terminal and on a robot, from the one repo.
+- **The git diehard** keeps a directory full of markdown and BSX and refuses the browser. One command imports the tree into a package as scenes and blobs and the site serves from the package. Markdown comes back where markdown went in, with a warning where honesty runs out, and beet's records stay opaque to them, which is fine.
+- **The visitor who tinkers** reads someone's page, opens the editor, changes the title and keeps browsing with it. A reload keeps it, a reset button discards it and nothing reaches the author. Later a button offers to upload the change into their own package.
+- **The homegrown builder** starts from an empty package and grows a todo list in place, a schema, a form, a table, a rule. It runs in their tab, over ssh on a friend's terminal and on a robot, from the one package.
 - **The agent**, asked to add a dark mode toggle, edits scenes through beet's own interface or through a markdown or BSX view in and out. The result is an ordinary scene edit, reviewable as a diff of the view and undoable. Files on disk are not the agent's medium either, though native tools exist for it.
-- **The atproto blogger** has a PDS and no git and wants a page. One action makes them a repo, their handle resolves to it, their posts are records in their own account, and beet.org is the first host that renders it.
-- **The operator on a terminal** has the same repo, no wasm and a binary lacking some capability. What it cannot run stays inert, and prose and structure are still editable from the tty.
+- **The atproto blogger** has a PDS and no git and wants a page. One action makes them a package, their handle resolves to it, their posts are records in their own account, and beet.org is the first host that renders it.
+- **The operator on a terminal** has the same package, no wasm and a binary lacking some capability. What it cannot run stays inert, and prose and structure are still editable from the tty.
 
 ## Brand Archetype
 

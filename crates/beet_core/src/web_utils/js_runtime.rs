@@ -118,8 +118,8 @@ fn has_global(name: &str) -> bool {
 /// "am I wasm bytecode?"), this is a runtime decision: the same wasm binary boots
 /// under the Deno test runner, in a browser tab, or under another JS host, and
 /// branches here. The standalone `beet` binary uses it to decide what a launch
-/// may do: a host with a filesystem (Deno/Node) resolves a dir-rooted `--home`
-/// through `fs_ext`, a `Browser` needs a self-rooted one (the http repo its
+/// may do: a host with a filesystem (Deno/Node) resolves a dir-rooted `--package`
+/// through `fs_ext`, a `Browser` needs a self-rooted one (the http package store its
 /// page names) and is the one host the DOM server boots on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JsEnvironment {
@@ -398,7 +398,7 @@ pub fn args() -> Vec<SmolStr> {
 /// `<script type="application/vnd.beet.bootstrap">`
 /// ([`BootstrapConfig::to_script`], led by the command a page served by one
 /// names), empty for a page carrying none. Appended
-/// after the location's own args, so the page's `--entry`/`--home`/`--server`
+/// after the location's own args, so the page's `--entry`/`--package`/`--server`
 /// reach [`BootstrapConfig::get`] and the entry's start request through the
 /// one channel every target reads, while the location keeps naming the page.
 fn bootstrap_args() -> Vec<SmolStr> {

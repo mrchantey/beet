@@ -782,7 +782,7 @@ mod test {
 		let mut world = check_world();
 		let router = world
 			.spawn((
-				PackageStore::new(store.clone()),
+				PackageFiles::new(store.clone()),
 				store,
 				Router,
 				children![route::new("post", BlobPage::new("post.md"))],

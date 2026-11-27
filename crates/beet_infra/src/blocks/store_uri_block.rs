@@ -3,11 +3,11 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// `<StoreUriBlock label="repo" uri="s3://my-bucket" {HomeStoreBlock}/>` — a
+/// `<StoreUriBlock label="package" uri="s3://my-bucket" {PackageStoreBlock}/>` — a
 /// [`StoreBlock`] that is nothing but a uri: a store provided by something
 /// other than this deploy (a bucket another stack or an operator owns, a
 /// directory on the box, browser storage), declared so the consumers reading a
-/// store through its erased half (the home store a compute boots from, the
+/// store through its erased half (the package store a compute boots from, the
 /// ledger) reach it exactly as they reach a bucket the deploy creates.
 ///
 /// Emits no resource and declares no grant, since what it names is not this
@@ -20,7 +20,7 @@ use beet_core::prelude::*;
 pub struct StoreUriBlock {
 	label: SmolStr,
 	/// The store as a process is told to read it, ie `s3://<bucket>` or
-	/// `fs:/srv/site`, in the spelling `--home` parses.
+	/// `fs:/srv/site`, in the spelling `--package` parses.
 	uri: StoreUri,
 	/// Nest each deploy's content under its id below the uri, see
 	/// [`StoreBlock::deploy_versioned`]. Off by default: a store this deploy

@@ -161,7 +161,7 @@ pub struct Dependency {
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub package: Option<PackageAddress>,
 	/// A local directory relative to this package, for development, ie
-	/// `../widgets`, within the same home directory.
+	/// `../widgets`, within the same source directory.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub path: Option<SmolPath>,
 	/// What it resolved to, written by the compiler.
@@ -236,7 +236,7 @@ impl SceneMeta for Dependency {
 pub struct Dependencies(pub BTreeMap<PackageName, Dependency>);
 
 /// What a [`Dependency`] resolved to: a release for a version requirement, a
-/// branch's package record for `#branch`, or for a path within one home
+/// branch's package record for `#branch`, or for a path within one source
 /// directory that package's package record.
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, Reflect, Serialize, Deserialize,

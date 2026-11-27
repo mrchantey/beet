@@ -168,7 +168,7 @@ async fn read_document_blob(
 	.await?;
 	// what it names resolves from its path in its package
 	let path = entity
-		.with_state::<PackageQuery, _>({
+		.with_state::<PackageFilesQuery, _>({
 			let blob = blob.clone();
 			move |entity, packages| {
 				packages

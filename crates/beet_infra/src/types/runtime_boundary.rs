@@ -478,7 +478,7 @@ mod test {
 	#[beet_core::test]
 	fn lowers_a_lambda_stack() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent.spawn(
 				S3BucketBlock::new("app")
@@ -523,7 +523,7 @@ mod test {
 	fn only_a_credentialed_deploy_bounds_its_principals() {
 		let render = |bounded: bool| {
 			let (scope, _dir) = RenderScope::test_render(|parent| {
-				parent.spawn(HomeStoreBlock::test_store());
+				parent.spawn(PackageStoreBlock::test_store());
 				parent.spawn(LambdaBlock::default());
 				if bounded {
 					parent.spawn(BoundedDeploy);
@@ -564,9 +564,9 @@ mod test {
 	/// A launch of any stage lowers `prod`'s boundary exactly as a `prod`
 	/// launch does, since an elevated deploy of any stage converges it.
 	///
-	/// REGRESSION: the home store's root was read as it landed, at the
+	/// REGRESSION: the package store's root was read as it landed, at the
 	/// launch's stage, so an elevated `dev` deploy converged a prod boundary
-	/// naming `beet-site--dev--repo` wherever the box names its home store,
+	/// naming `beet-site--dev--package` wherever the box names its package store,
 	/// its certificate backup on `caddy/*` included, and prod's `caddy-backup`
 	/// was denied by its own boundary from then on.
 	#[cfg(feature = "lightsail_block")]
@@ -582,10 +582,10 @@ mod test {
 				AwsRegion::new(Stack::TEST_AWS_REGION),
 				children![
 					(
-						S3BucketBlock::new("repo")
+						S3BucketBlock::new("package")
 							.with_deploy_versioned(true)
 							.with_accept_data_loss(true),
-						HomeStoreBlock
+						PackageStoreBlock
 					),
 					LightsailBlock::default(),
 				],
@@ -612,7 +612,7 @@ mod test {
 		let from_any_launch = prod(Stack::new("app"));
 		from_any_launch
 			.as_str()
-			.xpect_contains("arn:aws:s3:::app--prod--repo");
+			.xpect_contains("arn:aws:s3:::app--prod--package");
 		// what a prod launch resolves
 		from_any_launch.xpect_eq(prod(Stack::new("app").with_stage("prod")));
 	}
@@ -622,7 +622,7 @@ mod test {
 	#[beet_core::test]
 	fn identical_statements_render_once() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent.spawn(
 				S3BucketBlock::new("app")
@@ -649,7 +649,7 @@ mod test {
 	#[beet_core::test]
 	fn resolves_a_terraform_reference() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			let lambda = parent
 				.spawn(LambdaBlock::default().with_label("rollup"))
 				.id();

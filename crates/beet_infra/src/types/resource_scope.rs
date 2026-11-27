@@ -105,7 +105,7 @@ impl RenderScope {
 		roots: Vec<Entity>,
 	) -> Result<Vec<Self>> {
 		// a declaration's erased half lands through the command queue, and a
-		// render reads it (the home store a compute names)
+		// render reads it (the package store a compute names)
 		world.flush();
 		for root in roots.iter() {
 			let scope = world.with_state::<StackQuery, _>(|stacks| {

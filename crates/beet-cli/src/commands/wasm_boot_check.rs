@@ -1,7 +1,7 @@
 //! The committed page-driving checks for the browser bootstrap: a page whose
-//! `<Wasm home entry [server]>` names an entry boots the built binary in
+//! `<Wasm package entry [server]>` names an entry boots the built binary in
 //! headless chromium through the in-house webdriver, and the console says the
-//! entry resolved through the http repo and ran. The whole launch path the
+//! entry resolved through the http package store and ran. The whole launch path the
 //! terminal and the server share, run in a tab:
 //!
 //! - the headless boot: `beet-min.wasm` on `examples/wasm/hello.bsx`, the
@@ -60,7 +60,7 @@ async fn boot_until(page: String, needle: &str) -> (String, Browser) {
 async fn browser_headless_boot() {
 	require_runtime("beet-min.wasm", "just build-wasm-min");
 	let page = wasm_page(rsx! {
-		<Wasm src="/wasm/beet-min.wasm" home="/examples/wasm" entry="hello.bsx"/>
+		<Wasm src="/wasm/beet-min.wasm" package="/examples/wasm" entry="hello.bsx"/>
 	})
 	.unwrap();
 	let (log, browser) = boot_until(
@@ -80,7 +80,7 @@ async fn browser_headless_boot() {
 async fn browser_dom_boot() {
 	require_runtime("beet-ui.wasm", "just build-wasm-ui");
 	let page = wasm_page(rsx! {
-		<Wasm src="/wasm/beet-ui.wasm" home="/examples/ui" entry="scene_editor.bsx" server="dom"/>
+		<Wasm src="/wasm/beet-ui.wasm" package="/examples/ui" entry="scene_editor.bsx" server="dom"/>
 	})
 	.unwrap();
 	// what the DOM host logs once its navigator binds the page at the request

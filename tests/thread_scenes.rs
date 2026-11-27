@@ -56,7 +56,7 @@ async fn reduce_in(source: &str, package: Option<BlobStore>) -> App {
 	if let Some(package) = package {
 		let root = app
 			.world_mut()
-			.spawn((PackageStore::new(package.clone()), package))
+			.spawn((PackageFiles::new(package.clone()), package))
 			.id();
 		app.world_mut().entity_mut(scene).insert(ChildOf(root));
 	}

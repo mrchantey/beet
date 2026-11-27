@@ -6,13 +6,13 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Assert the live site claims every record its publication's repo holds,
+/// Assert the live site claims every record its publication's public repo holds,
 /// the way a standard.site reader verifies them:
 ///
 /// - the well-known file answers the publication's uri;
 /// - each document's canonical page answers 200 and links both the
 ///   publication and the document in its head;
-/// - the committed index matches the repo, else `publish` rewrites it.
+/// - the committed index matches the public repo, else `publish` rewrites it.
 ///
 /// Reports the documents with no announcement beside, which is no failure.
 /// Read only and unauthenticated, the shape of `<AtprotoHandleProbe/>`: run
@@ -84,7 +84,7 @@ impl StandardSiteProbe {
 				Err(err) => failures.push(err.to_string()),
 			}
 		}
-		// the committed index is the repo's
+		// the committed index is the public repo's
 		let derivation = publishing.declaration.derivation();
 		match derivation.read(&publishing.store).await? {
 			None => failures.push(format!(
@@ -94,7 +94,7 @@ impl StandardSiteProbe {
 			)),
 			Some(body) if body.get_typed::<StandardSiteIndex>()? != index => {
 				failures.push(format!(
-					"the index at `{}` differs from the repo: `{}` rewrites it",
+					"the index at `{}` differs from the public repo: `{}` rewrites it",
 					derivation.path,
 					StandardSitePub::WRITTEN_BY
 				))
@@ -174,7 +174,7 @@ mod test {
 
 	/// A published site verifies; a document published since its index was
 	/// written fails twice, its page linking no document and the index
-	/// behind the repo.
+	/// behind the public repo.
 	#[beet_core::test]
 	async fn verifies_the_served_site() {
 		let mut site = Site::new().await;
@@ -201,6 +201,6 @@ mod test {
 			.xpect_contains(
 				"blog/ecs-router carries no `<link rel=\"site.standard.document\"",
 			)
-			.xpect_contains("differs from the repo");
+			.xpect_contains("differs from the public repo");
 	}
 }

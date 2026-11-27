@@ -69,7 +69,7 @@ pub struct StandardSiteDocument {
 	/// The post's self labels, effectively content warnings.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub labels: Option<SelfLabels>,
-	/// The people credited beyond the repo holding the record.
+	/// The people credited beyond the public repo holding the record.
 	#[serde(default, skip_serializing_if = "Vec::is_empty")]
 	pub contributors: Vec<Contributor>,
 	/// The Bluesky post announcing the document, whose replies are its
@@ -148,8 +148,8 @@ impl StandardSiteDocument {
 }
 
 /// `site.standard.document#contributor`: a person credited on a document
-/// beyond the repo that holds it, so an author needs no write access to the
-/// publication's repo.
+/// beyond the public repo that holds it, so an author needs no write access to the
+/// publication's public repo.
 #[derive(Debug, Clone, PartialEq, Eq, Reflect, Serialize, Deserialize)]
 #[reflect(Serialize, Deserialize)]
 pub struct Contributor {
@@ -211,7 +211,7 @@ mod test {
 	}
 
 	/// Every dated post of the fixture site, the fields its metadata fills, in
-	/// the wire form a home stores.
+	/// the wire form a package stores.
 	#[beet_core::test]
 	fn builds_from_the_fixture_site() {
 		blog_pages()

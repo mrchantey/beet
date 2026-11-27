@@ -30,8 +30,8 @@
 //!   declaration through a [`PublicationRef`]: `StandardSitePublish` (the
 //!   publication and the documents a run names), `StandardSiteAnnounce` (the
 //!   announcements and the reposts), `StandardSiteIndexWrite` (the index,
-//!   rewritten from the repo), and `StandardSiteProbe`, the live site checked
-//!   against the repo. The repo is their memory, [`StandardSiteRecords`] read
+//!   rewritten from the public repo), and `StandardSiteProbe`, the live site checked
+//!   against the public repo. The repo is their memory, [`StandardSiteRecords`] read
 //!   by listing, so a run interrupted anywhere resumes
 //! - a document's `content`, the post rendered as a member of the lexicon def
 //!   its publication names, through `beet_ui`'s `LexiconRenderers`: by default
@@ -179,7 +179,7 @@ pub(crate) mod test_fixtures {
 			.xpect_true();
 	}
 
-	/// `record` exactly as a home stores it: in the data model, its `$type`
+	/// `record` exactly as a package stores it: in the data model, its `$type`
 	/// written as its collection, as indented json with its keys sorted.
 	pub fn wire<T: AtprotoRecord>(record: &T) -> String {
 		let record = AtprotoValue::from_serde(record)

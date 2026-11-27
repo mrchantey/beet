@@ -13,7 +13,7 @@ use beet_net::prelude::*;
 /// deploy_versioned=false/>`. The label alone is declared; the
 /// `<app>--<stage>--<label>` name composes at resolution through the ancestor
 /// [`Stack`], so both sides read the same string. The bucket an app is served
-/// from carries the [`HomeStoreBlock`] marker.
+/// from carries the [`PackageStoreBlock`] marker.
 #[derive(
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
@@ -199,7 +199,7 @@ impl S3BucketBlock {
 	/// - `deploy_versioned=false` is a bucket a sync writes OVER rather than
 	///   beside: without the per-deploy nesting, this run's objects replace
 	///   the last run's. **Do not assume such a bucket is a mirror of the
-	///   repo.** `beet`'s two `assets` buckets are the counter-example that
+	///   package.** `beet`'s two `assets` buckets are the counter-example that
 	///   forced this rule to cover the deploy side too: `./assets` is
 	///   gitignored and HYDRATED from the bucket, so the bucket is the source
 	///   of record and a stale local tree pushed over it is final.
@@ -534,7 +534,7 @@ mod tests {
 			.to_string()
 			.xpect_contains("in place by the deploy");
 		// per-deploy nesting needs nothing: every run writes under its own id
-		render(S3BucketBlock::new("repo")).unwrap();
+		render(S3BucketBlock::new("package")).unwrap();
 	}
 
 	/// Both grants matter: `GetObject` serves the objects, `ListBucket` lets a

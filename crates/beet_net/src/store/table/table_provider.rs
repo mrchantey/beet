@@ -25,7 +25,7 @@ use serde::Serialize;
 /// # A PDS as a backend
 ///
 /// An atproto PDS maps onto this surface with record tables only: a
-/// partition is a repo, a table a collection (any other name refused), a key
+/// partition is an atproto repo, a table a collection (any other name refused), a key
 /// an rkey. [`get_row`](Self::get_row) is `getRecord`;
 /// [`put_row`](Self::put_row) is `putRecord` with `swapRecord` for
 /// [`Precondition::Matches`] and `createRecord` for

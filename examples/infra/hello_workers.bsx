@@ -8,9 +8,9 @@ Worker reads the site from R2 through the native `worker::Bucket` binding (no S3
 credentials at runtime), renders per request, and serves on `<name>.workers.dev`.
 
 The two resources are the Worker and the R2 bucket holding the site, one
-declaration: `<CloudflareWorkerBlock>` is the stack's home store, so `deploy` bakes
-`BEET_HOME=r2://<binding>` into the Worker's `vars` and the Worker boots from it
-exactly as a native binary boots from `--home`. The Worker is generic: it loads
+declaration: `<CloudflareWorkerBlock>` is the stack's package store, so `deploy` bakes
+`BEET_PACKAGE=r2://<binding>` into the Worker's `vars` and the Worker boots from it
+exactly as a native binary boots from `--package`. The Worker is generic: it loads
 `main.bsx`, `routes/` and `templates/` from R2 and version-checks the entry on every
 request, so a `sync` updates the entire site with no redeploy, live on the very next
 fetch. `build` compiles the Worker alone, to inspect it before an upload;
@@ -55,7 +55,7 @@ reads its bucket through the native binding, and the teardown's empty derives
 its S3 credentials from the same token. `build` needs neither (a local
 compile).
 
-The token a repo's document holds is lowered from what its DEPLOYED entry declares
+The token a package's document holds is lowered from what its DEPLOYED entry declares
 (`<CloudflareDeployCredential/>`), so it carries no account-level Workers group: a live run
 here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --entry=..
 deploy`). Each action's `CloudflareAccess` names the groups its calls need.

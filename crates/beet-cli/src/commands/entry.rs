@@ -7,26 +7,26 @@
 
 use beet::prelude::*;
 
-/// The home store selector every entry-loading command shares (`check`,
+/// The package store selector every entry-loading command shares (`check`,
 /// `export-static`, `export-pdf`), naming the backend the entry loads through.
 ///
 /// A command loads an entry into *this* process rather than launching one, so
-/// it takes its own `--entry-home` (documented in its `--help`) rather than the
-/// launch's `--home`, which the launch consumes as its own home store and
+/// it takes its own `--entry-package` (documented in its `--help`) rather than the
+/// launch's `--package`, which the launch consumes as its own package store and
 /// never hands a route.
 #[derive(Reflect)]
 pub(crate) struct EntryParams {
-	/// The home store the entry loads through, eg
-	/// `--entry-home=s3://my-bucket`. Defaults to the filesystem, rooted at the
+	/// The package store the entry loads through, eg
+	/// `--entry-package=s3://my-bucket`. Defaults to the filesystem, rooted at the
 	/// entry directory.
-	entry_home: Option<StoreUri>,
+	entry_package: Option<StoreUri>,
 }
 
 impl EntryParams {
 	/// Load the entry at `entry_path` onto the caller's world through its
 	/// [`BlobStore`], returning its root entity. Resolution is the binary's own
-	/// [`entry_build::resolve_entry_path`] (`--entry-home` picks the backend,
-	/// the entry's `<HomeRoot src>` rebases the root), so the same resolution
+	/// [`entry_build::resolve_entry_path`] (`--entry-package` picks the backend,
+	/// the entry's `<PackageRoot src>` rebases the root), so the same resolution
 	/// serves `beet --entry=..` and these commands.
 	///
 	/// The commands render the entry rather than serve it, so the build
@@ -51,24 +51,25 @@ impl EntryParams {
 			})
 			.await?;
 		let ResolvedEntry {
-			home_store,
+			package_store,
 			entry_name,
 			prescan,
 			..
 		} = entry_build::resolve_entry_path(
 			&prescans,
-			self.entry_home.as_ref(),
+			self.entry_package.as_ref(),
 			None,
 			entry_path,
 		)
 		.await?;
 		let sources =
-			entry_build::read_sources(&home_store, entry_name, prescan).await?;
+			entry_build::read_sources(&package_store, entry_name, prescan)
+				.await?;
 		let root = caller
 			.with_world(move |world, _| {
 				entry_build::build_root(
 					world,
-					home_store,
+					package_store,
 					sources,
 					DisableCallOnReady,
 				)
@@ -97,7 +98,7 @@ const ONE_SHOT_SETTLE_DEADLINE: Duration = Duration::from_secs(60);
 
 /// The entry's own directory (an entry file's parent, or the dir itself), the
 /// default home for command outputs like `dist/` and `site.pdf`. Deliberately
-/// not the `<HomeRoot>`-widened root, so outputs land beside the entry.
+/// not the `<PackageRoot>`-widened root, so outputs land beside the entry.
 pub(crate) fn entry_dir(entry_path: &str) -> Result<AbsPath> {
 	let path = AbsPath::new(entry_path)?;
 	if path.extension().is_some() {
@@ -260,7 +261,7 @@ mod test {
 	/// scans settled, answering the root and the site's router.
 	async fn build_example(world: &mut World) -> (Entity, Entity) {
 		let ResolvedEntry {
-			home_store,
+			package_store,
 			entry_name,
 			prescan,
 			..
@@ -273,12 +274,12 @@ mod test {
 		.await
 		.unwrap();
 		let sources =
-			entry_build::read_sources(&home_store, entry_name, prescan)
+			entry_build::read_sources(&package_store, entry_name, prescan)
 				.await
 				.unwrap();
 		let root = entry_build::build_root(
 			world,
-			home_store,
+			package_store,
 			sources,
 			DisableCallOnReady,
 		)

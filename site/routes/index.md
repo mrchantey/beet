@@ -42,14 +42,14 @@ title = "Beet"
 <!---->
 <!--## **Agnostic** to platforms and domains-->
 <!---->
-<!--- One repo runs the same in a browser tab, a terminal, over ssh, in a window and on a microcontroller.-->
+<!--- One package runs the same in a browser tab, a terminal, over ssh, in a window and on a microcontroller.-->
 <!--- The same capabilities serve web sites, games, robots, infra deploys and agent harnesses.-->
 <!--- Every layer of the stack is swappable, the renderer, the http server, the blob store, the filesystem. Keep what you love and swap out the rest.-->
 <!---->
 <!--## **Decentralized** with DWeb and Local-first integrations-->
 <!---->
-<!--- Your software is records and blobs in a repo that belongs to your account, with your ATProto PDS as its home.-->
-<!--- Local-first by design, so the repo works with no network and syncs when one appears.-->
+<!--- Your software is records and blobs in a package that belongs to your account, kept on your ATProto PDS.-->
+<!--- Local-first by design, so the package works with no network and syncs when one appears.-->
 <!--- The scene format is built for standardization, so other software can read what you made.-->
 <!--- Use a git repo as the source of truth if that is how you like to work.-->
 

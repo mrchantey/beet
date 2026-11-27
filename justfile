@@ -38,7 +38,7 @@ default:
 #💡 Init
 
 # Install the cli. The dev commands (run-wasm, check, export-static, store-sync, ...)
-# are wired in the repo's `main.bsx`, discovered at runtime — no scene to load.
+# are wired in beet's own `main.bsx`, discovered at runtime — no scene to load.
 init-cli:
 	just install-cli
 
@@ -121,7 +121,7 @@ beet-roll-state *args:
   cargo run -p beet-cli --features infra,extra,atproto -- --entry=site site/roll-state "$@"
 # The WORKSPACE assets bucket (`beet--shared--assets`), the source of record for
 # ./assets: `just beet-shared plan|apply|pull|push|..`. Rooted at the workspace
-# entry, since these assets belong to the repo rather than to the website.
+# entry, since these assets belong to the workspace rather than to the website.
 beet-shared *args:
   cargo run -p beet-cli --features infra,extra -- shared "$@"
 # The stores the live store suites run against (`beet--test--dynamo`,
@@ -435,8 +435,8 @@ check-wasm-render *args:
 	cargo test -p beet-cli --lib {{ args }} -- --include-ignored --include '*browser_render_boot*'
 
 # Headless-chrome verification of the browser bootstrap: builds the runtimes,
-# serves them at pages naming an entry through `<Wasm home entry>` and reads
-# from the console that the entry resolved through the http repo and ran,
+# serves them at pages naming an entry through `<Wasm package entry>` and reads
+# from the console that the entry resolved through the http package store and ran,
 # headless (beet-min.wasm on the `serve-wasm` hello entry) and under
 # `--server=dom` (beet-ui.wasm on the scene editor entry, its DOM host painting
 # `/`). Needs the test-browser PATH deps.
@@ -501,21 +501,21 @@ test-scripting-fallback *args:
 # runtime in the browser, the `web` base and nothing else. A page whose program uses
 # only the core vocabulary mounts this.
 build-wasm-min:
-	cargo run -p beet-cli -- build-wasm --release --package=beet-cli --bin=beet --features=web_min --out=target/wasm/beet-min.wasm
+	cargo run -p beet-cli -- build-wasm --release --cargo-package=beet-cli --bin=beet --features=web_min --out=target/wasm/beet-min.wasm
 
 # The editor middle (target/wasm/beet-ui.wasm): the browser binary plus the
 # scripting seam, so a page edits its own scene and its `bx:<event>` scripts run
 # through the iframe backend, with no JavaScript engine compiled in; see the
 # `web_ui` comment in crates/beet-cli/Cargo.toml.
 build-wasm-ui:
-	cargo run -p beet-cli -- build-wasm --release --package=beet-cli --bin=beet --features=web_ui --out=target/wasm/beet-ui.wasm
+	cargo run -p beet-cli -- build-wasm --release --cargo-package=beet-cli --bin=beet --features=web_ui --out=target/wasm/beet-ui.wasm
 
 # The render middle (target/wasm/beet-render.wasm): the browser binary plus the
 # windowed render stack (wgpu via WebGPU, the spatial + example scenes), so a
 # render scene `.bsx` boots in a tab without the full binary's weight; see the
 # `web_render` comment in crates/beet-cli/Cargo.toml.
 build-wasm-render:
-	cargo run -p beet-cli -- build-wasm --release --package=beet-cli --bin=beet --features=web_render --out=target/wasm/beet-render.wasm
+	cargo run -p beet-cli -- build-wasm --release --cargo-package=beet-cli --bin=beet --features=web_render --out=target/wasm/beet-render.wasm
 
 # The ceiling (target/wasm/beet-full.wasm): every feature a browser binary can boot
 # with, ie the example surface, the render stack and ml backend, the perceive-act
@@ -524,13 +524,13 @@ build-wasm-render:
 # Slower to build (the JS engine compiles its C sources) and several times
 # the floor's size, so a page mounts it only when its program needs more than it.
 build-wasm-full:
-	cargo run -p beet-cli -- build-wasm --release --package=beet-cli --bin=beet --features=web_full --out=target/wasm/beet-full.wasm
+	cargo run -p beet-cli -- build-wasm --release --cargo-package=beet-cli --bin=beet --features=web_full --out=target/wasm/beet-full.wasm
 
 # Build and serve the browser-wasm example at http://127.0.0.1:8337. Open the page
 # to run a headless beet entry (examples/wasm/hello.bsx) in the browser, read out
-# of the served repo through the page's `<Wasm home entry>` launch; its console
+# of the served package store through the page's `<Wasm package entry>` launch; its console
 # output renders on the page via <RenderConsole>. The entry roots at the
-# workspace (<HomeRoot>) so the served examples are reachable and --watch
+# workspace (<PackageRoot>) so the served examples are reachable and --watch
 # live-reloads on edit. Its /render and /scripting pages boot the render and full
 # binaries, so build those first (`just build-wasm-render build-wasm-full`) to
 # serve them too.

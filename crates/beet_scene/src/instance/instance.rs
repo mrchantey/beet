@@ -171,7 +171,7 @@ pub(crate) fn activate_on_insert(
 		// resolved here where the tree is whole, else in the task, where it
 		// will be
 		let loaded = world
-			.with_state::<PackageQuery, _>(|packages| {
+			.with_state::<PackageFilesQuery, _>(|packages| {
 				packages.resolve(site, &document).ok()
 			})
 			.and_then(|blob| world.resource::<PrefabCache>().get(&blob));
@@ -222,7 +222,7 @@ async fn activate_when_loaded(
 	let loaded = async {
 		let resolved = document.clone();
 		let blob = entity
-			.with_state::<PackageQuery, Result<Blob>>(
+			.with_state::<PackageFilesQuery, Result<Blob>>(
 				move |entity, packages| packages.resolve(entity, &resolved),
 			)
 			.await??;
@@ -297,7 +297,7 @@ mod test {
 		let template =
 			DynamicTemplate::reflect_at(world, &body, &RelPath::new(path))
 				.unwrap();
-		let root = world.spawn(PackageStore::new(store.clone())).id();
+		let root = world.spawn(PackageFiles::new(store.clone())).id();
 		world.entity_mut(root).insert_template(template).unwrap();
 		settle(world).await;
 		root

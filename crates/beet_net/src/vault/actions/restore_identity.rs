@@ -2,7 +2,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::path::PathBuf;
 
 /// Restore a backup onto this machine: prompt for its passphrase, decrypt
 /// it and append every identity it holds to the identity file, skipping

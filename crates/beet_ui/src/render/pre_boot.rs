@@ -16,7 +16,7 @@ use beet_core::prelude::*;
 ///   ([`take_queue`](Self::take_queue)); a typed value needs no replay,
 ///   adoption reads it;
 /// - it hides the body for a returning editor: a browser holding a fork of
-///   the page's repo says so under one local-storage bit
+///   the page's package store says so under one local-storage bit
 ///   ([`StoreUri::fork_mark`], written by the fork on its first write), for
 ///   whom the served page, the published one, is wrong; the first paint
 ///   reveals it ([`reveal`](Self::reveal));
@@ -38,7 +38,7 @@ impl PreBoot {
 	pub const INTENT: &'static str = "data-beet-boot";
 
 	/// The inline script: the capture queue always; the pre-paint bit when
-	/// the page names a repo (`fork_mark`, see [`StoreUri::fork_mark`]); and,
+	/// the page names a package store (`fork_mark`, see [`StoreUri::fork_mark`]); and,
 	/// booting on intent, the module `loader` body to inject on the first
 	/// marked click or toggle, at once for a returning editor.
 	pub fn script(fork_mark: Option<&str>, loader: Option<&str>) -> String {
@@ -133,7 +133,7 @@ pub enum BootPolicy {
 mod test {
 	use super::*;
 
-	/// The script carries the queue always, the bit only with a repo, and
+	/// The script carries the queue always, the bit only with a package store, and
 	/// the loader only on intent.
 	#[beet_core::test]
 	fn the_script_carries_what_the_page_names() {
@@ -145,13 +145,13 @@ mod test {
 			.xpect_contains("localStorage")
 			.xnot()
 			.xpect_contains("toggle");
-		PreBoot::script(Some("beet:fork:http:repo"), None)
+		PreBoot::script(Some("beet:fork:http:package"), None)
 			.as_str()
-			.xpect_contains("localStorage.getItem(\"beet:fork:http:repo\")")
+			.xpect_contains("localStorage.getItem(\"beet:fork:http:package\")")
 			.xpect_contains("st.id=\"beet-pre-boot\"")
 			.xnot()
 			.xpect_contains("toggle");
-		PreBoot::script(Some("beet:fork:http:repo"), Some("await 1;"))
+		PreBoot::script(Some("beet:fork:http:package"), Some("await 1;"))
 			.as_str()
 			.xpect_contains("m.textContent=\"await 1;\"")
 			.xpect_contains("[data-beet-boot]")

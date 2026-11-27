@@ -75,7 +75,7 @@ json = ["serde", "beet_core/json", "beet_action?/json", "dag_cbor", "beet_core/r
 dag_cbor = ["serde", "beet_core/dag_cbor"]
 # The network half of the `atproto` module: `XrpcPds` writing through
 # `AppPassword` (a `RequestAuth`), did and handle resolution, the account attach that lands an
-# account's repo, and the Bluesky record shapes beet writes. The `Pds` family
+# account's PDS, and the Bluesky record shapes beet writes. The `Pds` family
 # itself (`EmulatorPds`, the converge, the account declaration) rides
 # `dag_cbor`, since the data model needs no network; `json` is the wire. `rand`
 # mints a TID.

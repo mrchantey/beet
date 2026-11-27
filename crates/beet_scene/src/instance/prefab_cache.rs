@@ -93,7 +93,7 @@ impl PrefabCache {
 	/// instantiates.
 	pub async fn load_instances(
 		world: &AsyncWorld,
-		package: &PackageStore,
+		package: &PackageFiles,
 		path: &RelPath,
 		template: &DynamicTemplate,
 	) -> Result {

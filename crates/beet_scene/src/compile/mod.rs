@@ -12,9 +12,9 @@
 //! - a **scene record** ([`SceneRecord`], keyed by its body's cid) is one
 //!   document compiled, shared by every branch whose document did not change.
 //!
-//! [`PackageCompiler`] writes all three into the package's space under a home
-//! directory's `.beet/pds/`, the layout [`EmulatorPds`] keeps, so a home
-//! directory's compiled form reads exactly as a hosted one does. `beet
+//! [`PackageCompiler`] writes all three into the package's space under a
+//! source directory's `.beet/pds/`, the layout [`EmulatorPds`] keeps, so a
+//! source directory's compiled form reads exactly as a hosted one does. `beet
 //! compile` is the verb.
 //!
 //! ```mermaid

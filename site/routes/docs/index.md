@@ -9,13 +9,13 @@ visibility = "unlisted"
 
 # Beet
 
-Beet is an operating system built around a person rather than a machine. The software you build on it is a repo of scenes, records and blobs that belongs to an account, and can be accessed via browser, terminal, ssh session or native GUI.
+Beet is an operating system built around a person rather than a machine. The software you build on it is a package of scenes, records and blobs that belongs to an account, and can be accessed via browser, terminal, ssh session or native GUI.
 
 > 🚧 Beet is pre-release and under active construction. If it sounds interesting, come and say hi in the [Beet Roomy space](https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm).
 
 ## How it works
 
-Beet is built on the [Bevy](https://bevy.org) game engine, and everything in beet, from a ui tree to a router to a cloud deploy, is Entity Component System (ECS) data. A repo is an account's whole store, and a runtime is a binary that runs one, doing nothing until given the repo's entry document, `main.bsx`, the data driven entry point to the program. Servers, routes, behaviors and deploys are entities declared there or in the documents it pulls in, and behavior is spelled as actions, entities that behave like functions. The [glossary](/docs/glossary) has one meaning for each of these words.
+Beet is built on the [Bevy](https://bevy.org) game engine, and everything in beet, from a ui tree to a router to a cloud deploy, is Entity Component System (ECS) data. A package is a unit of software, its sources and its compiled scenes alike, kept in the account's PDS, and a runtime is a binary that runs one, doing nothing until given the package's entry document, `main.bsx`, the data driven entry point to the program. Servers, routes, behaviors and deploys are entities declared there or in the documents it pulls in, and behavior is spelled as actions, entities that behave like functions. The [glossary](/docs/glossary) has one meaning for each of these words.
 
 Because behavior lives in scenes rather than compiled control flow, software stays open while it runs, ready for you, your collaborators and your agents to inspect and reshape.
 
@@ -39,11 +39,11 @@ A runtime does nothing by default and assumes nothing about what you are making,
 
 ## Decentralized
 
-A repo belongs to an account and runs the same everywhere. Identity and sync sit above it as capabilities the repo does not depend on, atproto first.
+A package belongs to an account and runs the same everywhere. Identity and sync sit above it as capabilities the package does not depend on, atproto first.
 
-- **Your account.** Your software is records and blobs in a repo, and an atproto PDS is its home once sync lands, one account among many.
-- **Local-first.** A repo works with no network at all, on a plain directory or in a browser's storage, and syncs when a network appears.
-- **Honest formats.** Import is generous, so markdown, html, BSX or a whole directory come in, and export is honest, giving back the format you asked for without promising byte identity. A git repo can stay the source of truth for a large project, pushed into the repo one way.
+- **Your account.** Your software is records and blobs in a package, kept on an atproto PDS once sync lands, one account among many.
+- **Local-first.** A package works with no network at all, on a plain directory or in a browser's storage, and syncs when a network appears.
+- **Honest formats.** Import is generous, so markdown, html, BSX or a whole directory come in, and export is honest, giving back the format you asked for without promising byte identity. A git repo can stay the source of truth for a large project, pushed into the package one way.
 - **An open format.** The [scene format](/docs/scenes) is designed to outgrow beet, so other software can read what you made.
 
 ## Where to go next

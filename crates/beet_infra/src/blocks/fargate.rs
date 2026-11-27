@@ -549,7 +549,7 @@ impl FargateBlock {
 		//
 		// Nothing is seeded: pulling the image and shipping the container's logs
 		// are the EXEC role's job, and the task reads its artifact from the image
-		// rather than the repo bucket. A stack declaring nothing therefore
+		// rather than the package bucket. A stack declaring nothing therefore
 		// grants the task nothing, and no policy resource is emitted at all.
 		let task_role = terra::ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("task-role")),
@@ -1275,7 +1275,9 @@ mod tests {
 				.with_container_port(9001)
 				.with_bootstrap(BootstrapConfig {
 					service_access: ServiceAccess::Remote,
-					home: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+					package: Some(
+						StoreUri::parse("s3://beet--dev--app").unwrap(),
+					),
 					..default()
 				}),
 		);
@@ -1293,7 +1295,7 @@ mod tests {
 			// one app bucket is the only store there is: no second bucket name
 			// reaches the container.
 			.xnot()
-			.xpect_contains("BEET_HOME")
+			.xpect_contains("BEET_PACKAGE")
 			.xnot()
 			.xpect_contains("BEET_ASSETS_BUCKET");
 	}
@@ -1303,7 +1305,7 @@ mod tests {
 	#[beet_core::test]
 	fn splits_cmd_and_env_channels() {
 		let block = FargateBlock::default().with_bootstrap(BootstrapConfig {
-			home: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+			package: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
 			server: Some(ServerFilter::new("http,ssh")),
 			stage: "staging".into(),
 			..default()
@@ -1313,7 +1315,7 @@ mod tests {
 			.to_cmd_json("/app", "")
 			.unwrap()
 			.xpect_eq(
-				r#"["/app", "--home=s3://beet--dev--app", "--server=http,ssh"]"#,
+				r#"["/app", "--package=s3://beet--dev--app", "--server=http,ssh"]"#,
 			);
 		build_json(&block)
 			.as_str()

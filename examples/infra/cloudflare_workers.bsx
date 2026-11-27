@@ -15,9 +15,9 @@ binding="TABLES"/>` the site declares lives in: one object per partition, the
 class the Worker exports, bound with its `new_sqlite_classes` migration because
 the deploy route declares the store. `examples/infra/cloudflare_tables.bsx` is a
 document mounting those tables, for a local `wrangler dev`. The bucket is one
-declaration: `<CloudflareWorkerBlock>` is the stack's home store, so `deploy` bakes
-`BEET_HOME=r2://<binding>` into the Worker's `vars` and the Worker boots from it
-exactly as a native binary boots from `--home`. The Worker is generic: it loads
+declaration: `<CloudflareWorkerBlock>` is the stack's package store, so `deploy` bakes
+`BEET_PACKAGE=r2://<binding>` into the Worker's `vars` and the Worker boots from it
+exactly as a native binary boots from `--package`. The Worker is generic: it loads
 `main.bsx`, `routes/` and `templates/` from R2 and version-checks the entry on every
 request, so a `sync` updates the entire site behavior with no redeploy, live on the
 very next fetch. `build` compiles the Worker alone, to inspect it before an
@@ -47,7 +47,7 @@ reads its bucket through the native binding, and the teardown's empty derives
 its S3 credentials from the same token. `build` needs neither (a local
 compile).
 
-The token a repo's document holds is lowered from what its DEPLOYED entry declares
+The token a package's document holds is lowered from what its DEPLOYED entry declares
 (`<CloudflareDeployCredential/>`), so it carries no account-level Workers group: a live run
 here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --entry=..
 deploy`). Each action's `CloudflareAccess` names the groups its calls need.
@@ -66,7 +66,7 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 		<CloudflareWorkerDeployAction/>
 		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
-		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
+		<WasmRuntime cargo_package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
 		<CloudflareR2Sync local_dir="examples/beetmania" bucket="beet-hello-site"/>
 		<!-- the Cloudflare rollout is instant, so tail briefly then exit -->
 		<CloudflareWatch name="beet-hello-worker" timeout="10s"/>
@@ -74,7 +74,7 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 	<Route path="sync" {ExchangeSequence}>
 		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
-		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
+		<WasmRuntime cargo_package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
 		<CloudflareR2Sync local_dir="examples/beetmania" bucket="beet-hello-site"/>
 	</Route>
 	<!-- time a sync against a full rebuild + redeploy; add `url="https://
@@ -82,7 +82,7 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 	<Route path="bench" {ExchangeSequence}>
 		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
-		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
+		<WasmRuntime cargo_package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
 		<CloudflareBench name="beet-hello-worker" bucket="beet-hello-site" local_dir="examples/beetmania"/>
 	</Route>
 	<Route path="destroy" {ExchangeSequence}>

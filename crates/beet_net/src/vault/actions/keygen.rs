@@ -2,7 +2,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::path::PathBuf;
 
 /// Make a new age identity and append it to the identity file, created
 /// owner-only when missing, printing its recipient and the next steps. Never

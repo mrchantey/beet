@@ -650,7 +650,7 @@ pub(crate) mod test {
 	/// page.
 	///
 	/// Regression: `beet --entry=site serve --server=tui` and every deployed ssh session
-	/// (`app --home=.. --server=ssh serve`) opened on a "no route matched
+	/// (`app --package=.. --server=ssh serve`) opened on a "no route matched
 	/// /serve" error page, because the whole request path became the opening
 	/// route.
 	#[beet_core::test]

@@ -11,7 +11,7 @@ use beet_net::prelude::*;
 /// Two directories can share files without either owning the other: the site's
 /// assets are its own, but a few workspace-owned files (a geoip database, a
 /// set of images) are served from the site too. This names exactly those.
-/// Under a [`HomeAssemble`] it borrows into the assembled copy the deploy publishes,
+/// Under a [`PackageAssemble`] it borrows into the assembled copy the deploy publishes,
 /// so an updated file cannot go stale on the far side and nothing is written
 /// into the checkout; elsewhere (the local `assets` verb) `dest` is
 /// workspace-relative. Only source files are borrowed: a build output is built
@@ -28,7 +28,7 @@ pub async fn DirCopy(
 	#[field]
 	src: WsPath,
 	/// The destination directory: inside the assembled copy under a
-	/// [`HomeAssemble`] ancestor, else workspace-relative.
+	/// [`PackageAssemble`] ancestor, else workspace-relative.
 	#[field]
 	dest: WsPath,
 	/// Comma-separated paths to copy, each relative to both ends and naming
@@ -42,10 +42,10 @@ pub async fn DirCopy(
 	// where the mirror reads rather than in the checkout
 	let dest_dir = cx
 		.caller
-		.with_state::<(AncestorQuery<&HomeAssemble>, StackQuery), _>(
+		.with_state::<(AncestorQuery<&PackageAssemble>, StackQuery), _>(
 			move |entity, (assembles, stacks)| -> Result<AbsPath> {
 				match assembles.get(entity) {
-					Ok(_) => HomeAssemble::dir(&stacks, entity)?
+					Ok(_) => PackageAssemble::dir(&stacks, entity)?
 						.join(dest.to_string())
 						.xok(),
 					Err(_) => dest.into_abs().xok(),

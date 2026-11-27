@@ -628,7 +628,7 @@ impl<T> TableContent for T where
 
 /// A record table: the table is the collection, the key the rkey, and the
 /// row the record in the data model with its `$type` written, so a float is
-/// the `org.beet.core#float` object it crosses into a repo as and the row's
+/// the `org.beet.core#float` object it crosses into a record as and the row's
 /// cid is the record's.
 impl<T> TableStoreRow for Rkeyed<T>
 where

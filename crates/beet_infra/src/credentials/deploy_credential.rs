@@ -434,7 +434,7 @@ impl DeployCredentialQuery<'_, '_> {
 			if !seen.insert(credential.id()) {
 				bevybail!(
 					"this launch declares two `{}` deploy credentials, and a \
-					repo deploys with one per provider: keep one declaration",
+					package deploys with one per provider: keep one declaration",
 					credential.id()
 				);
 			}

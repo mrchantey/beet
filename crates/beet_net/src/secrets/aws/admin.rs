@@ -55,7 +55,7 @@ pub async fn AdminElevate(
 	#[param]
 	duration: Option<String>,
 	/// The member account of the Organization to act in, by name, ie the
-	/// repo's own. Unset is the management account.
+	/// package's own. Unset is the management account.
 	#[param]
 	account: Option<String>,
 	/// A command to run under fresh credentials, everything after `--`.

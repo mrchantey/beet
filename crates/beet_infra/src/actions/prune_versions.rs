@@ -9,7 +9,7 @@ use beet_net::prelude::*;
 ///
 /// ## What a version is
 ///
-/// One prefix in the stack's home store: the document under `repo/`, the
+/// One prefix in the stack's package store: the document under `package/`, the
 /// binaries under `bin/` and the ledger beside them (see [`ArtifactLedger`]).
 /// So a prune is one removal per version, and a document can never outlive
 /// its binary or the reverse, which is the shape a rollback relies on.
@@ -44,8 +44,8 @@ pub async fn PruneVersions(
 ) -> Result<Outcome<Request, Response>> {
 	let client = cx
 		.caller
-		.with_state::<HomeStoreQuery, _>(|entity, repos| {
-			repos.artifacts_client(entity)
+		.with_state::<PackageStoreQuery, _>(|entity, package_stores| {
+			package_stores.artifacts_client(entity)
 		})
 		.await??;
 

@@ -76,7 +76,7 @@ pub struct CargoBuild {
 	pub exec_route: Option<SmolStr>,
 	/// The cargo workspace the build runs in, ie the child's working directory,
 	/// for building a binary that lives in a DIFFERENT checkout to the one being
-	/// deployed (a site repo carrying no beet crates of its own). Its `target/`
+	/// deployed (a site package carrying no beet crates of its own). Its `target/`
 	/// holds the output, so the artifact path resolves there too. `None` builds
 	/// in the current workspace.
 	#[set_with(unwrap_option)]
@@ -227,7 +227,7 @@ impl CargoBuild {
 
 	/// Run the build in [`workspace_dir`](Self::workspace_dir) when one is
 	/// declared, so cargo resolves the manifest of the checkout holding the
-	/// binary rather than the deploying repo's.
+	/// binary rather than the deploying package's.
 	#[cfg(feature = "deploy")]
 	fn build_process(&self, process: ChildProcess) -> ChildProcess {
 		match &self.workspace_dir {
@@ -377,14 +377,14 @@ mod test {
 			.xpect_eq("cd /tmp/lam && zip -j bootstrap.zip bootstrap");
 		CargoBuild::default()
 			.with_bootstrap(BootstrapConfig {
-				home: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+				package: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
 				server: Some(ServerFilter::new("http")),
 				..default()
 			})
 			.lambda_zip_cmd(dir)
 			.unwrap()
 			.xpect_contains(
-				"exec /var/task/beet --home=s3://beet--dev--app --server=http",
+				"exec /var/task/beet --package=s3://beet--dev--app --server=http",
 			);
 	}
 
@@ -401,7 +401,7 @@ mod test {
 	}
 
 	/// A build in another checkout runs there and resolves its artifact there, so
-	/// a deploying repo with no beet crates of its own still finds the zip.
+	/// a deploying package with no beet crates of its own still finds the zip.
 	#[beet_core::test]
 	fn workspace_dir_relocates_the_artifact() {
 		let build = CargoBuild::default()

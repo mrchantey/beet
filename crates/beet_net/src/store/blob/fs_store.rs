@@ -191,7 +191,7 @@ impl BlobProvider for FsStore {
 	/// The filesystem has a parent universe above the store's root, so a
 	/// `../..` root re-roots the store at the absolute resolved directory
 	/// rather than erroring — walking above the entry's directory is the
-	/// point of an fs `<HomeRoot>`.
+	/// point of an fs `<PackageRoot>`.
 	fn rebase(
 		&self,
 		entry_name: &RelPath,
@@ -521,7 +521,7 @@ mod test {
 	/// the entry name grows the path back down to it.
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
-	async fn rebases_above_the_home_root() {
+	async fn rebases_above_the_package_root() {
 		let tmp = TempDir::new_ws().unwrap();
 		let entry_dir = tmp.join("a/b");
 		fs_ext::create_dir_all(&entry_dir).unwrap();
@@ -529,7 +529,7 @@ mod test {
 		fs_ext::write(tmp.join("shared.txt"), "shared").unwrap();
 		let store = BlobStore::new(FsStore::new(entry_dir));
 		let (rebased, entry_name) =
-			store.rebase_home("main.bsx", "../..").unwrap();
+			store.rebase_package("main.bsx", "../..").unwrap();
 		entry_name.xpect_eq("a/b/main.bsx");
 		rebased
 			.get_media(&RelPath::from("a/b/main.bsx"))

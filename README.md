@@ -18,7 +18,7 @@
 
 Beet is an operating system that lets you access your data and tools wherever you like, however you like.
 
-Beet is built on the [Bevy Engine](https://bevy.org) and its Entity Component System, and user data stores are designed around the [ATProto](https://atproto.com) PDS. A repo's entry point is `main.bsx`, the data driven entry point to the program, and a runtime does nothing until given one. See [the website documentation](https://beet.org/docs) for more info.
+Beet is built on the [Bevy Engine](https://bevy.org) and its Entity Component System, and user data stores are designed around the [ATProto](https://atproto.com) PDS. A package's entry point is `main.bsx`, the data driven entry point to the program, and a runtime does nothing until given one. See [the website documentation](https://beet.org/docs) for more info.
 
 > 🚧 Mind your step! 🚧
 >

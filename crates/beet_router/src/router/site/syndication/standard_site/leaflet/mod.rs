@@ -72,7 +72,7 @@
 //!
 //! # The size ceiling
 //!
-//! A repo block is capped at a megabyte and a reader fetches a record whole, so
+//! A record block is capped at a megabyte and a reader fetches a record whole, so
 //! a document has a budget, checked once where it is rendered whatever its
 //! `content` (`StandardSiteDocument::BUDGET`). The lexicon's escape hatch is
 //! `blobPages`, an `application/json` blob holding the page array, and when it
@@ -101,7 +101,7 @@
 //! | `blocks.code` | `pre > code`, `class` the bare language as a markdown fence writes it |
 //! | `blocks.horizontalRule` | `hr` |
 //! | `blocks.unorderedList`, `blocks.orderedList` | `ul`, `ol` with its `start`; each `#listItem` an `li` holding its text inline, as a tight list does, then its nested lists |
-//! | `blocks.image` | `img`, its `src` the blob on the repo the record was read from ([`LexiconSource::blob_url`]); read with no source, no `src`, warned once per document |
+//! | `blocks.image` | `img`, its `src` the blob on the public repo the record was read from ([`LexiconSource::blob_url`]); read with no source, no `src`, warned once per document |
 //! | `blocks.website` | `p > a`, its text the title, else the url |
 //! | `blocks.iframe` | `iframe` |
 //!

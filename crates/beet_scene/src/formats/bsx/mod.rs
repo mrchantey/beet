@@ -223,7 +223,7 @@
 //! `{ExchangeSequence}` reads them:
 //! `<Route path="deploy" {ExchangeSequence}><MyBlock/><MyAction/></Route>`.
 //!
-//! The declarations an entry's launch pre-scans (`<HomeRoot>`, `<RequireCfg>`,
+//! The declarations an entry's launch pre-scans (`<PackageRoot>`, `<RequireCfg>`,
 //! `<Secrets>`, and whatever prescan type `app.install_types::<T>()` adds), with
 //! string attributes and no `bx:cfg`, each act before the build. A root
 //! admitting no such child has them beside it:

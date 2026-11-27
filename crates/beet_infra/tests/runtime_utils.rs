@@ -147,11 +147,11 @@ impl TestDeploy {
 		Ok(())
 	}
 
-	/// The client of the stack's home store, exactly as
-	/// `HomeStoreQuery::artifacts_client` builds it in a deploy.
+	/// The client of the stack's package store, exactly as
+	/// `PackageStoreQuery::artifacts_client` builds it in a deploy.
 	pub fn artifacts_client(&self) -> ArtifactsClient {
 		ArtifactsClient::new(
-			BlobStore::from_uri(home_store(self).root()).unwrap(),
+			BlobStore::from_uri(package_store(self).root()).unwrap(),
 			ArtifactLedger::new(
 				*self.deployment.deploy_id(),
 				self.deployment.deploy_timestamp().to_string(),
@@ -160,29 +160,29 @@ impl TestDeploy {
 	}
 }
 
-/// The home store declaration every test stack carries: the bucket the site
+/// The package store declaration every test stack carries: the bucket the site
 /// is published into and the ledger lives in, deploy-versioned by default.
-pub fn home_store_block() -> impl Bundle {
-	(S3BucketBlock::new("repo"), HomeStoreBlock)
+pub fn package_store_block() -> impl Bundle {
+	(S3BucketBlock::new("package"), PackageStoreBlock)
 }
 
-/// The erased half of [`home_store_block`] under `deploy`'s stack.
-fn home_store(deploy: &TestDeploy) -> ErasedStoreBlock {
-	ErasedStoreBlock::new(&S3BucketBlock::new("repo"), &deploy.resolved())
+/// The erased half of [`package_store_block`] under `deploy`'s stack.
+fn package_store(deploy: &TestDeploy) -> ErasedStoreBlock {
+	ErasedStoreBlock::new(&S3BucketBlock::new("package"), &deploy.resolved())
 		.unwrap()
 }
 
 /// The publish steps of a deploy: assemble `site_dir` and mirror it into the
-/// home store, so the test's isolated copy of the site is what gets served.
+/// package store, so the test's isolated copy of the site is what gets served.
 pub fn publish_site(site_dir: &AbsPath) -> Result<impl Bundle> {
 	(
-		HomeAssemble::new(site_dir.into_ws_path()?),
-		HomeSync::default(),
+		PackageAssemble::new(site_dir.into_ws_path()?),
+		PackageSync::default(),
 	)
 		.xok()
 }
 
-/// Build the terraform project for `block` deployed beside the home store,
+/// Build the terraform project for `block` deployed beside the package store,
 /// rendered through the same [`DeployRender`] schedule the deploy runs and
 /// against the state backend this launch declares.
 pub async fn render_test_project(
@@ -196,7 +196,7 @@ pub async fn render_test_project(
 		.spawn(deploy.root())
 		.with_children(|parent| {
 			parent.spawn(block);
-			parent.spawn(home_store_block());
+			parent.spawn(package_store_block());
 		})
 		.id();
 	RenderScope::render(&mut world, root)?
@@ -204,15 +204,15 @@ pub async fn render_test_project(
 		.await
 }
 
-/// The document root of `deploy`'s version in the home store, exactly as the
+/// The document root of `deploy`'s version in the package store, exactly as the
 /// declaration projects it.
-pub fn home_uri(deploy: &TestDeploy) -> StoreUri {
-	home_store(deploy).store_uri(Some(deploy.deployment.deploy_id()))
+pub fn package_uri(deploy: &TestDeploy) -> StoreUri {
+	package_store(deploy).store_uri(Some(deploy.deployment.deploy_id()))
 }
 
 /// The published document of `deploy`'s version, for verification.
 pub fn repo_document(deploy: &TestDeploy) -> BlobStore {
-	BlobStore::from_uri(&home_uri(deploy)).unwrap()
+	BlobStore::from_uri(&package_uri(deploy)).unwrap()
 }
 
 /// Verify the published document of `deploy`'s version carries the expected
@@ -295,12 +295,12 @@ pub async fn verify_dead(
 }
 
 /// Clean up any prior state before test starts. Terraform owns every
-/// resource including the home store, so this is the forced destroy plus a
-/// best-effort sweep of a repo bucket an interrupted run left behind.
+/// resource including the package store, so this is the forced destroy plus a
+/// best-effort sweep of a package bucket an interrupted run left behind.
 pub async fn cleanup_prior_state(deploy: &TestDeploy, project: terra::Project) {
 	info!("cleanup_prior_state: calling tofu_destroy --force");
 	project.tofu_destroy(true).await.ok();
-	info!("cleanup_prior_state: removing the home store");
+	info!("cleanup_prior_state: removing the package store");
 	deploy.artifacts_client().store().store_remove().await.ok();
 	info!("cleanup_prior_state: complete");
 }

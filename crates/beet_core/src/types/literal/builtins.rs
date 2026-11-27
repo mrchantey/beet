@@ -164,7 +164,7 @@ fn add_strings(table: &mut Table) {
 
 /// The protocol's primitives, each authored as the string it is written as,
 /// so `<AtprotoAccount did="did:plc:.."/>` refuses a malformed did at load
-/// rather than storing one no repo answers to.
+/// rather than storing one no PDS answers for.
 fn add_atproto(table: &mut Table) {
 	table
 		.add_hinted("a did, eg \"did:plc:..\"", |value: &Value| match value {
@@ -221,7 +221,7 @@ fn add_domain(table: &mut Table) {
 			}
 		})
 		// a store uri, so `<StoreUriBlock uri="s3://my-bucket"/>` authors a
-		// store as a process is told to read it, in the one spelling `--home`
+		// store as a process is told to read it, in the one spelling `--package`
 		// parses. A malformed uri errors with the supported kinds.
 		.add_hinted("a store uri, eg \"s3://<bucket>\"", |value: &Value| {
 			match value {

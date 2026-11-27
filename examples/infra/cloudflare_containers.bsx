@@ -33,7 +33,7 @@ with, which is honest for an example whose bucket holds nothing but published
 site files; a container of its own takes a token scoped to one bucket's
 objects, the way an `<R2BucketBlock/>`'s is.
 
-The token a repo's document holds is lowered from what its DEPLOYED entry declares
+The token a package's document holds is lowered from what its DEPLOYED entry declares
 (`<CloudflareDeployCredential/>`), so it carries no account-level Workers group: a live run
 here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --entry=..
 deploy`). Each action's `CloudflareAccess` names the groups its calls need.
@@ -48,7 +48,7 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 		<CloudflareContainerDeployAction/>
 		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
-		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
+		<WasmRuntime cargo_package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
 		<CloudflareR2Sync local_dir="examples/beetmania" bucket="beet-hello-site"/>
 		<!-- the Cloudflare rollout is instant, so tail briefly then exit -->
 		<CloudflareWatch name="beet-hello-container" timeout="10s"/>
@@ -56,7 +56,7 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 	<Route path="sync" {ExchangeSequence}>
 		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
-		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
+		<WasmRuntime cargo_package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
 		<CloudflareR2Sync local_dir="examples/beetmania" bucket="beet-hello-site"/>
 	</Route>
 	<Route path="destroy" {ExchangeSequence}>

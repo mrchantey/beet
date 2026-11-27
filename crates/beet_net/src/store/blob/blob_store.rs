@@ -106,7 +106,7 @@ impl BlobStore {
 	}
 
 	/// Rebase this store and `entry_name` through the entry's declared
-	/// `<HomeRoot src>`: `src` names a position relative to the entry
+	/// `<PackageRoot src>`: `src` names a position relative to the entry
 	/// document's own location *in this store*, so the new root is
 	/// `normalize(parent(entry_name)/src)` and the entry name becomes the
 	/// entry path relative to it.
@@ -119,7 +119,7 @@ impl BlobStore {
 	/// declaration is a checkable invariant about store layout, and an entry
 	/// whose declared universe is missing was mis-published (its directory was
 	/// synced instead of its declared root).
-	pub fn rebase_home(
+	pub fn rebase_package(
 		&self,
 		entry_name: &str,
 		src: &str,
@@ -412,7 +412,7 @@ mod test {
 	async fn rebases_to_a_prefix_view() {
 		let store = nested_store().await;
 		let (rebased, entry_name) =
-			store.rebase_home("a/b/main.bsx", "..").unwrap();
+			store.rebase_package("a/b/main.bsx", "..").unwrap();
 		entry_name.xpect_eq("b/main.bsx");
 		rebased
 			.get_media(&RelPath::from("b/main.bsx"))
@@ -437,7 +437,7 @@ mod test {
 	async fn root_level_rebase_is_identity() {
 		let store = nested_store().await;
 		let (rebased, entry_name) =
-			store.rebase_home("a/b/main.bsx", "../..").unwrap();
+			store.rebase_package("a/b/main.bsx", "../..").unwrap();
 		entry_name.xpect_eq("a/b/main.bsx");
 		rebased.same_scope(&store).xpect_true();
 	}
@@ -447,7 +447,7 @@ mod test {
 	#[beet_core::test]
 	async fn escaping_root_names_the_mis_publish() {
 		BlobStore::temp()
-			.rebase_home("main.bsx", "../..")
+			.rebase_package("main.bsx", "../..")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("mis-published");
@@ -457,7 +457,7 @@ mod test {
 	#[beet_core::test]
 	async fn entry_outside_root_errors() {
 		BlobStore::temp()
-			.rebase_home("a/main.bsx", "sub")
+			.rebase_package("a/main.bsx", "sub")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("not under its declared store root");

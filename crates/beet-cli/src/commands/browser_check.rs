@@ -56,7 +56,7 @@ pub(crate) async fn serve_wasm_page(page: String) -> Result<u16> {
 							Response::ok_body(page.clone(), MediaType::Html)
 						})
 					),
-					// the runtime and the entry's repo, from the ancestor
+					// the runtime and the entry's package store, from the ancestor
 					// workspace store
 					AssetsDir {
 						src: WASM_DIR.into(),

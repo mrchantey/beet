@@ -4,7 +4,7 @@ use beet_net::prelude::*;
 
 /// Settings for the [`BuildWasmAction`] on this entity (its defaults when
 /// absent), surfaced in `--help`. Request params apply over these
-/// field-by-field, so a markup preset like `<BuildWasm package="beet-cli"
+/// field-by-field, so a markup preset like `<BuildWasm cargo_package="beet-cli"
 /// features="web" out="app.wasm"/>` still yields to an explicit `--features`
 /// per call.
 ///
@@ -17,10 +17,11 @@ use beet_net::prelude::*;
 pub struct BuildWasm {
 	/// Build in release mode and optimize the artifact with `wasm-opt -Oz`.
 	release: bool,
-	/// The cargo package to build (`--package`). Omit to build the current
-	/// directory's crate, a non-workspace `main.bsx` wasm build.
+	/// The cargo package to build (`--cargo-package`), apart from the launch's
+	/// `--package`. Omit to build the current directory's crate, a
+	/// non-workspace `main.bsx` wasm build.
 	#[set_with(unwrap_option)]
-	package: Option<String>,
+	cargo_package: Option<String>,
 	/// The binary target to build (`--bin`).
 	#[set_with(unwrap_option)]
 	bin: Option<String>,
@@ -45,10 +46,10 @@ pub struct BuildWasm {
 /// Compiles a package to wasm and prepares it for the browser.
 ///
 /// Target-agnostic: the invoking entry (a `main.bsx`, a justfile recipe)
-/// supplies the package, cargo features and `--out` path through
+/// supplies the cargo package, features and `--out` path through
 /// [`BuildWasm`] presets and/or request params, so nothing here defaults to a
 /// beet binary.
-/// With no `--package` it builds the current directory's crate (a
+/// With no `--cargo-package` it builds the current directory's crate (a
 /// non-workspace `main.bsx` build).
 ///
 /// Runs [`BuildWasm::build`], answering with the artifact size raw and
@@ -83,8 +84,8 @@ impl BuildWasm {
 			.with_target(BuildTarget::Wasm)
 			.with_no_default_features(!self.default_features)
 			.with_all_features(self.all_features);
-		// no `--package` builds the current directory's crate (a non-workspace build).
-		if let Some(package) = &self.package {
+		// no `--cargo-package` builds the current directory's crate (a non-workspace build).
+		if let Some(package) = &self.cargo_package {
 			cargo = cargo.with_package(package.as_str());
 		}
 		if !self.all_features

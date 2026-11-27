@@ -34,7 +34,7 @@ pub struct Stack {
 	/// state and plans are encrypted with, see [`StateEncryption`]:
 	/// [`DEFAULT_STATE_PASSPHRASE`](Self::DEFAULT_STATE_PASSPHRASE) unless
 	/// declared, a record of the entry's secrets document shared by every
-	/// stack the repo declares, so a new stack's state is encrypted by
+	/// stack the package declares, so a new stack's state is encrypted by
 	/// forgetting rather than plaintext by forgetting, and a missing variable
 	/// is an error at `tofu init`, never a silent downgrade. A throwaway
 	/// stack opts out with `state_passphrase={None}`.
@@ -501,8 +501,8 @@ mod tests {
 			.xpect_eq("beet-site--prod--analytics");
 		prod.resource_name("app").xpect_eq("beet-site--prod--app");
 		resolved(Stack::default().with_stage("dev"))
-			.resource_name("repo")
-			.xpect_eq("beet-site--dev--repo");
+			.resource_name("package")
+			.xpect_eq("beet-site--dev--package");
 		resolved(Stack::default().with_stage("shared"))
 			.resource_name("assets")
 			.xpect_eq("beet-site--shared--assets");
@@ -575,7 +575,7 @@ mod tests {
 			.xpect_eq("eu-west-1");
 	}
 
-	/// The state is encrypted by default, under the repo's one passphrase
+	/// The state is encrypted by default, under the package's one passphrase
 	/// variable; a declared variable replaces it and an explicit `None` opts
 	/// out.
 	#[beet_core::test]

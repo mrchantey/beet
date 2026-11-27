@@ -1,4 +1,4 @@
-//! `<StandardSiteIndexWrite/>`: the derived index rewritten from the repo.
+//! `<StandardSiteIndexWrite/>`: the derived index rewritten from the public repo.
 use super::publishing::*;
 use crate::prelude::*;
 use beet_action::prelude::*;
@@ -6,9 +6,9 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// The last step of a publish sequence: rewrite the publication's
-/// [`StandardSiteIndex`] from the repo by running the declaration's own
+/// [`StandardSiteIndex`] from the public repo by running the declaration's own
 /// producer ([`Derivation::rewrite`]), whatever its freshness, since an index
-/// names no sources that could go stale. An index matching the repo is left
+/// names no sources that could go stale. An index matching the public repo is left
 /// byte for byte as it was, so a second run changes nothing in git. The
 /// served site in this process reads the new index at once.
 ///

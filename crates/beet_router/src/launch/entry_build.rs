@@ -3,8 +3,8 @@
 //! commands and the wasm Worker entry.
 //!
 //! An entry load splits into resolution ([`resolve_entry_path`]: the store + the entry
-//! document name within it, honouring `--home` and the entry's own
-//! `<HomeRoot src>`), a world-free async read ([`read_sources`]: the entry
+//! document name within it, honouring `--package` and the entry's own
+//! `<PackageRoot src>`), a world-free async read ([`read_sources`]: the entry
 //! document, through the [`BlobStore`]) and a synchronous world build
 //! ([`build_root`]: lower the entry and build it into a root carrying the store
 //! and the package its references resolve in). A document the entry
@@ -28,12 +28,12 @@ pub const ENTRY_NAMES: &[&str] = &["main.bsx", "main.json"];
 /// [`Prescan`] set, the one registry-free walk entry resolution reads its
 /// declarations from.
 pub async fn read_prescan(
-	home_store: &BlobStore,
+	package_store: &BlobStore,
 	prescans: &PrescanRegistry,
 	entry_name: &str,
 ) -> Result<EntryPrescan> {
 	let path = RelPath::from(entry_name);
-	home_store
+	package_store
 		.get_media(&path)
 		.await?
 		.xmap(|entry| EntryPrescan::parse(&entry, Some(&path), prescans))
@@ -45,7 +45,7 @@ pub async fn read_prescan(
 /// backend).
 #[derive(Debug)]
 pub struct ResolvedEntry {
-	pub home_store: BlobStore,
+	pub package_store: BlobStore,
 	pub entry_name: String,
 	/// The entry document's declarations, read by the same pass that resolved the
 	/// store, so the load never re-scans it.
@@ -55,8 +55,8 @@ pub struct ResolvedEntry {
 }
 
 /// Resolve an entry within its store: read the prescan once, rebase the
-/// store through the entry's own `<HomeRoot src>` declaration
-/// ([`BlobStore::rebase_home`]) when it carries one, then run every other
+/// store through the entry's own `<PackageRoot src>` declaration
+/// ([`BlobStore::rebase_package`]) when it carries one, then run every other
 /// registered declaration's preload against the rebased store
 /// ([`PrescanRegistry::preload`]: the `<Secrets>` load into the process
 /// environment, and whatever a downstream crate registered). The one
@@ -69,23 +69,23 @@ pub struct ResolvedEntry {
 /// ([`BlobProvider::watch_dir`]) — the rebased root, so the watcher sees
 /// the entry's whole declared universe; a store with no local directory
 /// watches nothing.
-pub async fn resolve_in_home_store(
-	home_store: BlobStore,
+pub async fn resolve_in_package_store(
+	package_store: BlobStore,
 	prescans: &PrescanRegistry,
 	entry_name: String,
 ) -> Result<ResolvedEntry> {
-	let prescan = read_prescan(&home_store, prescans, &entry_name).await?;
+	let prescan = read_prescan(&package_store, prescans, &entry_name).await?;
 	// the rebased store holds the same entry document, so its pre-scan is the
 	// one already read: entry resolution scans the entry exactly once.
-	let (home_store, entry_name) = match prescan.first::<HomeRoot>() {
-		Some(root) => home_store.rebase_home(&entry_name, &root.src)?,
-		None => (home_store, entry_name),
+	let (package_store, entry_name) = match prescan.first::<PackageRoot>() {
+		Some(root) => package_store.rebase_package(&entry_name, &root.src)?,
+		None => (package_store, entry_name),
 	};
-	prescans.preload(&prescan, &home_store).await?;
+	prescans.preload(&prescan, &package_store).await?;
 	Ok(ResolvedEntry {
 		#[cfg(not(target_arch = "wasm32"))]
-		watch_dir: home_store.watch_dir(),
-		home_store,
+		watch_dir: package_store.watch_dir(),
+		package_store,
 		entry_name,
 		prescan,
 	})
@@ -96,40 +96,41 @@ pub async fn resolve_in_home_store(
 /// local root, ie a self-rooted store). The one launch resolution every
 /// world-owning driver runs: the binary's `Startup` loader (native, and the
 /// browser the served page boots) and the wasm Worker, each handing in the
-/// `--home`/`--store-fork`/`--entry` its process config carries.
+/// `--package`/`--store-fork`/`--entry` its process config carries.
 ///
 /// Resolution order:
-/// 1. a self-rooted `home_uri` (`s3://<bucket>`, `r2://<binding>`,
+/// 1. a self-rooted `package_uri` (`s3://<bucket>`, `r2://<binding>`,
 ///    `indexed-db://<db>`, `http:<prefix>`): the store roots itself, so `entry`
 ///    names the entry document *within* it, defaulting to an [`ENTRY_NAMES`]
-///    probe. A deployed task passes `--home=s3://<bucket>` (deploy config as
-///    args, not env); a served page's bootstrap passes `--home=http:repo`.
+///    probe. A deployed task passes `--package=s3://<bucket>` (deploy config as
+///    args, not env); a served page's bootstrap passes `--package=http:package`.
 /// 2. `entry=<path>`: the entry file itself (a recognized extension) or a
 ///    directory probed for [`ENTRY_NAMES`]; see [`resolve_entry_path`].
 /// 3. otherwise: discovery walks the cwd and its ancestors through an `fs`
 ///    store for the first [`ENTRY_NAMES`] match.
 ///
-/// Every path then resolves through [`resolve_in_home_store`], so an entry's
-/// `<HomeRoot src>` declaration rebases any store kind uniformly (an fs store
+/// Every path then resolves through [`resolve_in_package_store`], so an entry's
+/// `<PackageRoot src>` declaration rebases any store kind uniformly (an fs store
 /// re-roots, a self-rooted store takes a key-prefix view or fails loudly on a
 /// mis-publish). The [`StoreUri`] selects the backend (default `fs`), and a
 /// `store_fork` (else [`default_store_fork`]) forks it into a local store.
 ///
 /// Target-agnostic: wasm runs the same walk wherever the runtime has a
 /// filesystem (deno/node through the runner's fs globals); a fs-less runtime
-/// (a browser tab) errors with guidance when handed a dir-rooted home store.
+/// (a browser tab) errors with guidance when handed a dir-rooted package store.
 pub async fn resolve_entry(
 	prescans: &PrescanRegistry,
-	home_uri: Option<&StoreUri>,
+	package_uri: Option<&StoreUri>,
 	store_fork: Option<&StoreUri>,
 	entry: Option<&str>,
 ) -> Result<ResolvedEntry> {
 	// a self-rooted store: no local dir and no ancestor walk, so `entry` is a
 	// key within the store, defaulting to the entry-name probe.
-	if let Some(uri) = home_uri.filter(|uri| uri.is_self_rooted()) {
-		let home_store = compose_home_store(uri, store_fork)?;
-		let entry_name = self_rooted_entry_name(&home_store, entry).await?;
-		return resolve_in_home_store(home_store, prescans, entry_name).await;
+	if let Some(uri) = package_uri.filter(|uri| uri.is_self_rooted()) {
+		let package_store = compose_package_store(uri, store_fork)?;
+		let entry_name = self_rooted_entry_name(&package_store, entry).await?;
+		return resolve_in_package_store(package_store, prescans, entry_name)
+			.await;
 	}
 
 	// dir-rooted: an explicit `entry`, else the ancestor walk. On wasm the `fs`
@@ -138,41 +139,41 @@ pub async fn resolve_entry(
 	#[cfg(target_arch = "wasm32")]
 	if !js_runtime::environment().has_fs() {
 		bevybail!(
-			"this runtime has no filesystem: pass a self-rooted `--home` \
+			"this runtime has no filesystem: pass a self-rooted `--package` \
 			(http:<prefix>, s3://<bucket>, r2://<binding>, indexed-db://<db>)"
 		);
 	}
 	match entry {
 		Some(entry) => {
-			resolve_entry_path(prescans, home_uri, store_fork, entry).await
+			resolve_entry_path(prescans, package_uri, store_fork, entry).await
 		}
-		None => discover_entry(prescans, home_uri, store_fork).await,
+		None => discover_entry(prescans, package_uri, store_fork).await,
 	}
 }
 
 /// The store fork a launch naming none gets: a browser reading a remote home
-/// store forks into IndexedDB (`indexed-db://beet/<home prefix>`, one database
-/// per origin with the home store's own prefix telling its forks apart), so a visitor's
+/// store forks into IndexedDB (`indexed-db://beet/<package prefix>`, one database
+/// per origin with the package store's own prefix telling its forks apart), so a visitor's
 /// first edit lands locally and every later boot reads it. Every other launch
-/// reads its home store directly: a native process names its fork dir with
+/// reads its package store directly: a native process names its fork dir with
 /// `--store-fork=fs:<dir>` when it wants one.
-pub fn default_store_fork(home_uri: &StoreUri) -> Option<StoreUri> {
+pub fn default_store_fork(package_uri: &StoreUri) -> Option<StoreUri> {
 	#[cfg(target_arch = "wasm32")]
-	if home_uri.is_remote()
+	if package_uri.is_remote()
 		&& js_runtime::environment() == js_runtime::JsEnvironment::Browser
 	{
 		return Some(StoreUri::IndexedDb {
 			name: "beet".into(),
-			path_prefix: home_uri.path_prefix().map(RelPath::new),
+			path_prefix: package_uri.path_prefix().map(RelPath::new),
 		});
 	}
-	let _ = home_uri;
+	let _ = package_uri;
 	None
 }
 
-/// The home store `uri` names forked into `store_fork` (else
+/// The package store `uri` names forked into `store_fork` (else
 /// [`default_store_fork`]), see [`BlobStoreProvider::compose`].
-fn compose_home_store(
+fn compose_package_store(
 	uri: &StoreUri,
 	store_fork: Option<&StoreUri>,
 ) -> Result<BlobStore> {
@@ -188,14 +189,14 @@ fn compose_home_store(
 /// guidance on none. Shared by [`resolve_entry`] and a driver that heads the
 /// document between builds (the Worker's version check).
 pub async fn self_rooted_entry_name(
-	home_store: &BlobStore,
+	package_store: &BlobStore,
 	entry: Option<&str>,
 ) -> Result<String> {
 	match entry {
 		Some(entry) => entry.to_string(),
-		None => probe_entry_names(home_store).await?.ok_or_else(|| {
+		None => probe_entry_names(package_store).await?.ok_or_else(|| {
 			bevyhow!(
-				"no entry document found in the `--home` backend: looked \
+				"no entry document found in the `--package` backend: looked \
 				for {ENTRY_NAMES:?}. Seed one, or pass `--entry=<name>`."
 			)
 		})?,
@@ -207,20 +208,25 @@ pub async fn self_rooted_entry_name(
 /// through an `fs` [`BlobStore`] at each candidate dir (consistent with the store
 /// API and async, rather than a raw `fs_ext` probe). Discovery is the only place
 /// a filesystem walk makes sense; the matched entry may still rebase its own
-/// root ([`resolve_in_home_store`]), and no match errors with guidance.
+/// root ([`resolve_in_package_store`]), and no match errors with guidance.
 async fn discover_entry(
 	prescans: &PrescanRegistry,
-	home_uri: Option<&StoreUri>,
+	package_uri: Option<&StoreUri>,
 	store_fork: Option<&StoreUri>,
 ) -> Result<ResolvedEntry> {
 	let start = AbsPath::new(".")?;
 	let mut dir = Some(start.clone());
 	while let Some(current) = dir {
-		let home_store = BlobStore::new(FsStore::new(current.clone()));
-		if let Some(entry_name) = probe_entry_names(&home_store).await? {
-			let home_store = resolve_home_store(home_uri, store_fork, current)?;
-			return resolve_in_home_store(home_store, prescans, entry_name)
-				.await;
+		let package_store = BlobStore::new(FsStore::new(current.clone()));
+		if let Some(entry_name) = probe_entry_names(&package_store).await? {
+			let package_store =
+				resolve_package_store(package_uri, store_fork, current)?;
+			return resolve_in_package_store(
+				package_store,
+				prescans,
+				entry_name,
+			)
+			.await;
 		}
 		dir = current.parent();
 	}
@@ -233,17 +239,17 @@ async fn discover_entry(
 /// Resolve an explicit entry path (the binary's `--entry`, a command's `<entry>`
 /// positional): a path with an extension names the entry file itself, anything
 /// else is a directory probed for the first [`ENTRY_NAMES`] match. Either way
-/// the entry may rebase its own store root with a `<HomeRoot src>` declaration
-/// (see [`resolve_in_home_store`]), the `--home` param picks the backend and
+/// the entry may rebase its own store root with a `<PackageRoot src>` declaration
+/// (see [`resolve_in_package_store`]), the `--package` param picks the backend and
 /// `--store-fork` forks it into a local store.
 pub async fn resolve_entry_path(
 	prescans: &PrescanRegistry,
-	home_uri: Option<&StoreUri>,
+	package_uri: Option<&StoreUri>,
 	store_fork: Option<&StoreUri>,
 	entry: &str,
 ) -> Result<ResolvedEntry> {
 	let path = AbsPath::new(entry)?;
-	let (home_store, entry_name) = if path.extension().is_some() {
+	let (package_store, entry_name) = if path.extension().is_some() {
 		// an entry file: its parent is the initial root
 		let dir = path.parent().ok_or_else(|| {
 			bevyhow!("entry `{path}` has no parent directory")
@@ -252,50 +258,53 @@ pub async fn resolve_entry_path(
 			.file_name()
 			.ok_or_else(|| bevyhow!("entry `{path}` has no file name"))?
 			.to_string();
-		(resolve_home_store(home_uri, store_fork, dir)?, entry_name)
+		(
+			resolve_package_store(package_uri, store_fork, dir)?,
+			entry_name,
+		)
 	} else {
 		// a directory: probe it for an entry document
-		let home_store =
-			resolve_home_store(home_uri, store_fork, path.clone())?;
+		let package_store =
+			resolve_package_store(package_uri, store_fork, path.clone())?;
 		let entry_name =
-			probe_entry_names(&home_store).await?.ok_or_else(|| {
+			probe_entry_names(&package_store).await?.ok_or_else(|| {
 				bevyhow!(
 					"no entry document found in `{path}`: looked for {ENTRY_NAMES:?}. \
 				Create one, or name the entry file itself."
 				)
 			})?;
-		(home_store, entry_name)
+		(package_store, entry_name)
 	};
-	resolve_in_home_store(home_store, prescans, entry_name).await
+	resolve_in_package_store(package_store, prescans, entry_name).await
 }
 
 /// The first [`ENTRY_NAMES`] match at the store's root, if any.
 pub async fn probe_entry_names(
-	home_store: &BlobStore,
+	package_store: &BlobStore,
 ) -> Result<Option<String>> {
 	for name in ENTRY_NAMES {
-		if home_store.exists(&RelPath::from(*name)).await? {
+		if package_store.exists(&RelPath::from(*name)).await? {
 			return Ok(Some(name.to_string()));
 		}
 	}
 	Ok(None)
 }
 
-/// Build the [`BlobStore`] a `--home` [`StoreUri`] names, its filesystem root
+/// Build the [`BlobStore`] a `--package` [`StoreUri`] names, its filesystem root
 /// pinned to `dir` (the resolved entry directory, see [`StoreUri::rooted_at`])
 /// and defaulting to a filesystem store there, forked into the `--store-fork`
 /// store (likewise pinned). Shared by the binary's entry resolution
-/// (the launch config's `--home`) and the `check`/`serve`/`export-static`
-/// commands (each command's own `--entry-home` param) so every entry load is
+/// (the launch config's `--package`) and the `check`/`serve`/`export-static`
+/// commands (each command's own `--entry-package` param) so every entry load is
 /// store-driven rather than filesystem-bound.
-pub fn resolve_home_store(
-	home_uri: Option<&StoreUri>,
+pub fn resolve_package_store(
+	package_uri: Option<&StoreUri>,
 	store_fork: Option<&StoreUri>,
 	dir: AbsPath,
 ) -> Result<BlobStore> {
-	let home = home_uri.cloned().unwrap_or_default().rooted_at(&dir);
+	let store = package_uri.cloned().unwrap_or_default().rooted_at(&dir);
 	let store_fork = store_fork.map(|fork| fork.rooted_at(&dir));
-	compose_home_store(&home, store_fork.as_ref())
+	compose_package_store(&store, store_fork.as_ref())
 }
 
 /// The entry read from a store: its document bytes and name, and its
@@ -311,12 +320,12 @@ pub struct EntrySources {
 /// the `prescan` entry resolution already produced, so the document is never
 /// re-scanned.
 pub async fn read_sources(
-	home_store: &BlobStore,
+	package_store: &BlobStore,
 	entry_name: impl Into<String>,
 	prescan: EntryPrescan,
 ) -> Result<EntrySources> {
 	let entry_name = entry_name.into();
-	let entry = home_store
+	let entry = package_store
 		.get_media(&RelPath::from(entry_name.as_str()))
 		.await?;
 	EntrySources {
@@ -327,14 +336,14 @@ pub async fn read_sources(
 	.xok()
 }
 
-/// Build read [`EntrySources`] into a root carrying `home_store` and its
-/// [`PackageStore`] (resolved by ancestry for `<RoutesDir>` and the rest), with
+/// Build read [`EntrySources`] into a root carrying `package_store` and its
+/// [`PackageFiles`] (resolved by ancestry for `<RoutesDir>` and the rest), with
 /// `extra` riding onto the root. It carries no table store: an entry keeping
 /// rows, ie a thread's records, declares one. The entry runs itself: its own `CallOnReady` verbs act on their `Ready`, so
 /// a render-only command (`check`, `export-static`, the Worker) passes
 /// [`DisableCallOnReady`] in `extra` to build the tree disarmed. The synchronous
 /// world-mutating tail of an entry load; returns the root entity. A driver
-/// passes [`HomeStore`] in `extra` to claim the built store as the process's
+/// passes [`PackageStore`] in `extra` to claim the built store as the process's
 /// canonical one.
 ///
 /// A build that fails leaves the root behind, carrying `extra` and the store
@@ -342,7 +351,7 @@ pub async fn read_sources(
 /// latches onto, and the next build's teardown clears it like any other.
 pub fn build_root(
 	world: &mut World,
-	home_store: BlobStore,
+	package_store: BlobStore,
 	sources: EntrySources,
 	extra: impl Bundle,
 ) -> Result<Entity> {
@@ -352,14 +361,14 @@ pub fn build_root(
 		prescan,
 	} = sources;
 	let entry_path = RelPath::from(entry_name.as_str());
-	let package = PackageStore::of_entry(&home_store, &entry_path);
+	let package = PackageFiles::of_entry(&package_store, &entry_path);
 	// the root carries the store from the start (descendants resolve it by
-	// ancestry) and `extra`, which is where the `HomeStore` marker rides rather
+	// ancestry) and `extra`, which is where the `PackageStore` marker rides rather
 	// than landing here, since only a *driver* build (the process's own entry)
 	// claims the app's one canonical store: a command loading a foreign entry
 	// into the same world builds a second rooted store, which is that sub-app's,
 	// not this process's.
-	let root = world.spawn((extra, home_store, package)).id();
+	let root = world.spawn((extra, package_store, package)).id();
 	// the pre-scanned `<RequireCfg>`s, asserted before the tree builds: an unmet
 	// one refuses the load, so nothing in the tree (a `CallOnReady` action) runs
 	// in a binary that cannot support it, and the report holds even when the
@@ -399,16 +408,16 @@ pub async fn build_entry_owned(
 	resolved: ResolvedEntry,
 ) -> Result<Entity> {
 	let ResolvedEntry {
-		home_store,
+		package_store,
 		entry_name,
 		prescan,
 	} = resolved;
-	let sources = read_sources(&home_store, entry_name, prescan).await?;
+	let sources = read_sources(&package_store, entry_name, prescan).await?;
 	let root = build_root(
 		world,
-		home_store,
+		package_store,
 		sources,
-		(DisableCallOnReady, HomeStore),
+		(DisableCallOnReady, PackageStore),
 	)?;
 	TemplatePending::settle_owned(world).await;
 	Ok(root)
@@ -427,20 +436,20 @@ pub async fn build_entry_owned(
 #[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 pub async fn build_watched(
 	world: &AsyncWorld,
-	home_store: BlobStore,
+	package_store: BlobStore,
 	entry_name: String,
 ) -> Result {
 	// the driver's rebuild callback, re-cloning the store and name per build
 	// (it is an `Fn`, re-run on every structural change). The structural source
 	// set starts empty; the first build below populates it.
 	let rebuild = {
-		let home_store = home_store.clone();
+		let package_store = package_store.clone();
 		let entry_name = entry_name.clone();
 		move |world: AsyncWorld| -> LocalBoxedFuture<'static, Result> {
-			let (home_store, entry_name) =
-				(home_store.clone(), entry_name.clone());
+			let (package_store, entry_name) =
+				(package_store.clone(), entry_name.clone());
 			Box::pin(async move {
-				rebuild_watched(&world, home_store, entry_name).await
+				rebuild_watched(&world, package_store, entry_name).await
 			})
 		}
 	};
@@ -450,7 +459,7 @@ pub async fn build_watched(
 		})
 		.await;
 	// the first build: a no-op teardown, then the fresh `BeetSceneRoot`.
-	rebuild_watched(world, home_store, entry_name).await
+	rebuild_watched(world, package_store, entry_name).await
 }
 
 /// Rebuild the `--watch` entry into a fresh [`BeetSceneRoot`], the shared path the
@@ -475,7 +484,7 @@ pub async fn build_watched(
 #[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 pub async fn rebuild_watched(
 	world: &AsyncWorld,
-	home_store: BlobStore,
+	package_store: BlobStore,
 	entry_name: String,
 ) -> Result {
 	let prescans = world
@@ -483,9 +492,9 @@ pub async fn rebuild_watched(
 			world.get_resource_or_init::<PrescanRegistry>().clone()
 		})
 		.await;
-	let prescan = read_prescan(&home_store, &prescans, &entry_name).await?;
+	let prescan = read_prescan(&package_store, &prescans, &entry_name).await?;
 	let sources =
-		read_sources(&home_store, entry_name.clone(), prescan).await?;
+		read_sources(&package_store, entry_name.clone(), prescan).await?;
 	// the entry is known before the build, so a first build that fails is
 	// rebuilt by its fix
 	let entry_path = RelPath::from(entry_name.as_str());
@@ -504,7 +513,7 @@ pub async fn rebuild_watched(
 			// the entry's own dir, watched for edits to the entry doc / its
 			// includes; on the root from the start, so a failed build's fix is
 			// still seen.
-			let entry_watch = WatchDir::for_entry(&home_store, &entry_name);
+			let entry_watch = WatchDir::for_entry(&package_store, &entry_name);
 			// tear down the previous entry scene so servers close and sockets drop
 			// before the fresh tree binds (a no-op on the first build).
 			BeetSceneRoot::despawn_all(world);
@@ -512,12 +521,12 @@ pub async fn rebuild_watched(
 			// itself on its own `Ready`, so its servers rebind.
 			let root = build_root(
 				world,
-				home_store,
+				package_store,
 				sources,
 				(
 					BeetSceneRoot,
 					LiveReload::new(),
-					HomeStore,
+					PackageStore,
 					OnSpawn::insert_option(entry_watch),
 				),
 			)?;
@@ -599,14 +608,14 @@ mod test {
 	/// Build `source` as the `main.bsx` entry of an in-memory store, through the
 	/// same prescan, read and build steps a launch runs.
 	async fn build_source(world: &mut World, source: &str) -> Result<Entity> {
-		let home_store = BlobStore::temp();
-		home_store
+		let package_store = BlobStore::temp();
+		package_store
 			.insert(&RelPath::from("main.bsx"), source.to_owned())
 			.await?;
 		let prescan =
-			read_prescan(&home_store, &prescans(world), "main.bsx").await?;
-		let sources = read_sources(&home_store, "main.bsx", prescan).await?;
-		build_root(world, home_store, sources, ())
+			read_prescan(&package_store, &prescans(world), "main.bsx").await?;
+		let sources = read_sources(&package_store, "main.bsx", prescan).await?;
+		build_root(world, package_store, sources, ())
 	}
 
 	/// The shared core builds an entry from any store: an in-memory store here, so
@@ -741,15 +750,15 @@ mod test {
 				)
 				.unwrap();
 		}
-		let home_store = BlobStore::temp();
-		home_store
+		let package_store = BlobStore::temp();
+		package_store
 			.insert(
 				&RelPath::from("app/main.bsx"),
-				"<Router><HomeRoot src=\"..\"/><Secrets/></Router>",
+				"<Router><PackageRoot src=\"..\"/><Secrets/></Router>",
 			)
 			.await
 			.unwrap();
-		SecretsHandle::new(home_store.clone(), "secrets.toml")
+		SecretsHandle::new(package_store.clone(), "secrets.toml")
 			.unwrap()
 			.write(&document)
 			.await
@@ -762,8 +771,8 @@ mod test {
 				.unwrap();
 			env_ext::set_var("BEET_TEST_LAUNCH_KEPT", "from-shell").unwrap();
 		}
-		resolve_in_home_store(
-			home_store,
+		resolve_in_package_store(
+			package_store,
 			&router_prescans(),
 			"app/main.bsx".into(),
 		)
@@ -788,7 +797,7 @@ mod test {
 		}
 	}
 
-	/// An fs entry declaring `<HomeRoot src="..">` re-roots the store at the
+	/// An fs entry declaring `<PackageRoot src="..">` re-roots the store at the
 	/// resolved ancestor directory: the watch dir is the widened root and the
 	/// entry name grows the path back down to the document.
 	#[cfg(not(target_arch = "wasm32"))]
@@ -799,7 +808,7 @@ mod test {
 		fs_ext::create_dir_all(&entry_dir).unwrap();
 		fs_ext::write(
 			entry_dir.join("main.bsx"),
-			"<Router><HomeRoot src=\"..\"/></Router>",
+			"<Router><PackageRoot src=\"..\"/></Router>",
 		)
 		.unwrap();
 		let resolved = resolve_entry_path(
@@ -813,7 +822,7 @@ mod test {
 		resolved.entry_name.xpect_eq("app/main.bsx");
 		resolved.watch_dir.xpect_eq(Some(tmp.path().clone()));
 		resolved
-			.home_store
+			.package_store
 			.exists(&RelPath::from("app/main.bsx"))
 			.await
 			.unwrap()
@@ -822,20 +831,20 @@ mod test {
 
 	/// A store with no parent universe honours the same declaration as a
 	/// key-prefix view of itself; the binary's self-rooted branch resolves
-	/// through this same [`resolve_in_home_store`], so the declaration is never
+	/// through this same [`resolve_in_package_store`], so the declaration is never
 	/// dropped by policy.
 	#[beet_core::test]
 	async fn self_rooted_entry_rebases_to_a_prefix_view() {
-		let home_store = BlobStore::temp();
-		home_store
+		let package_store = BlobStore::temp();
+		package_store
 			.insert(
 				&RelPath::from("apps/site/main.bsx"),
-				"<Router><HomeRoot src=\"..\"/></Router>",
+				"<Router><PackageRoot src=\"..\"/></Router>",
 			)
 			.await
 			.unwrap();
-		let resolved = resolve_in_home_store(
-			home_store,
+		let resolved = resolve_in_package_store(
+			package_store,
 			&router_prescans(),
 			"apps/site/main.bsx".to_string(),
 		)
@@ -845,7 +854,7 @@ mod test {
 		#[cfg(not(target_arch = "wasm32"))]
 		resolved.watch_dir.xpect_none();
 		resolved
-			.home_store
+			.package_store
 			.exists(&RelPath::from("site/main.bsx"))
 			.await
 			.unwrap()
@@ -856,16 +865,16 @@ mod test {
 	/// universe fails loudly naming the mis-publish.
 	#[beet_core::test]
 	async fn self_rooted_escape_fails_loudly() {
-		let home_store = BlobStore::temp();
-		home_store
+		let package_store = BlobStore::temp();
+		package_store
 			.insert(
 				&RelPath::from("main.bsx"),
-				"<Router><HomeRoot src=\"../..\"/></Router>",
+				"<Router><PackageRoot src=\"../..\"/></Router>",
 			)
 			.await
 			.unwrap();
-		resolve_in_home_store(
-			home_store,
+		resolve_in_package_store(
+			package_store,
 			&router_prescans(),
 			"main.bsx".to_string(),
 		)
@@ -875,7 +884,7 @@ mod test {
 		.xpect_contains("mis-published");
 	}
 
-	/// The binary path and the command path share [`resolve_in_home_store`], so the
+	/// The binary path and the command path share [`resolve_in_package_store`], so the
 	/// same inputs resolve an identical `(store, entry_name)`: here the
 	/// command-shaped `resolve_entry_path` against the binary-shaped store + name
 	/// pair.
@@ -885,7 +894,7 @@ mod test {
 		let tmp = TempDir::new().unwrap();
 		fs_ext::write(
 			tmp.path().join("main.bsx"),
-			"<Router><HomeRoot src=\".\"/></Router>",
+			"<Router><PackageRoot src=\".\"/></Router>",
 		)
 		.unwrap();
 		let prescans = router_prescans();
@@ -893,8 +902,8 @@ mod test {
 			resolve_entry_path(&prescans, None, None, tmp.path().as_str())
 				.await
 				.unwrap();
-		let by_store = resolve_in_home_store(
-			resolve_home_store(None, None, tmp.path().clone()).unwrap(),
+		let by_store = resolve_in_package_store(
+			resolve_package_store(None, None, tmp.path().clone()).unwrap(),
 			&prescans,
 			"main.bsx".to_string(),
 		)
@@ -902,15 +911,15 @@ mod test {
 		.unwrap();
 		by_path.entry_name.xpect_eq(by_store.entry_name);
 		by_path
-			.home_store
-			.same_scope(&by_store.home_store)
+			.package_store
+			.same_scope(&by_store.package_store)
 			.xpect_true();
 		by_path.watch_dir.xpect_eq(by_store.watch_dir);
 	}
 
-	/// A store fork composes over the resolved home store: a launch on a remote one
+	/// A store fork composes over the resolved package store: a launch on a remote one
 	/// with `--store-fork` composes the pair, reading the entry through the
-	/// upstream and holding the fork locally, on a self-rooted home store and on a
+	/// upstream and holding the fork locally, on a self-rooted package store and on a
 	/// dir-rooted one alike.
 	#[beet_core::test]
 	async fn a_store_fork_composes_over_the_repo() {
@@ -927,9 +936,9 @@ mod test {
 				.await
 				.unwrap();
 		resolved.entry_name.xpect_eq("main.bsx");
-		resolved.home_store.id().xpect_eq("fork");
+		resolved.package_store.id().xpect_eq("fork");
 		resolved
-			.home_store
+			.package_store
 			.insert(&RelPath::from("fork.json"), "{}")
 			.await
 			.unwrap();
@@ -944,11 +953,11 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_false();
-		// no store fork natively: the home store is read directly
+		// no store fork natively: the package store is read directly
 		resolve_entry(&prescans, Some(&upstream), None, None)
 			.await
 			.unwrap()
-			.home_store
+			.package_store
 			.id()
 			.xpect_eq("memory");
 	}
@@ -959,8 +968,8 @@ mod test {
 	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn rebuild_fires_ready_every_time() {
-		let home_store = BlobStore::temp();
-		home_store
+		let package_store = BlobStore::temp();
+		package_store
 			.insert(&RelPath::from("main.bsx"), "<Router/>")
 			.await
 			.unwrap();
@@ -980,7 +989,7 @@ mod test {
 				for _ in 0..2 {
 					rebuild_watched(
 						&world,
-						home_store.clone(),
+						package_store.clone(),
 						"main.bsx".to_string(),
 					)
 					.await
@@ -998,12 +1007,12 @@ mod test {
 	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn failed_rebuild_keeps_the_site_reloadable() {
-		let home_store = BlobStore::temp();
+		let package_store = BlobStore::temp();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		// per rebuild: whether it built, and the live sites it left behind
 		let outcomes = Store::new(Vec::new());
 		let recorder = outcomes.clone();
-		let store = home_store.clone();
+		let store = package_store.clone();
 		world
 			.run_async_local_then(move |world| async move {
 				for source in ["<Router/>", "<Router {", "<Router/>"] {
@@ -1046,7 +1055,7 @@ mod test {
 	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn structural_sources_include_entry_documents() {
-		let home_store = BlobStore::temp();
+		let package_store = BlobStore::temp();
 		let files = [
 			(
 				"app/main.bsx",
@@ -1061,7 +1070,7 @@ mod test {
 			("app/routes/index.md", "# Home"),
 		];
 		for (path, source) in files {
-			home_store
+			package_store
 				.insert(&RelPath::from(path), source)
 				.await
 				.unwrap();
@@ -1072,9 +1081,13 @@ mod test {
 		}));
 		world
 			.run_async_local_then(move |world| async move {
-				rebuild_watched(&world, home_store, "app/main.bsx".to_string())
-					.await
-					.unwrap();
+				rebuild_watched(
+					&world,
+					package_store,
+					"app/main.bsx".to_string(),
+				)
+				.await
+				.unwrap();
 			})
 			.await;
 		let reloader = world.resource::<EntryReloader>();
@@ -1100,7 +1113,7 @@ mod test {
 	/// dispatches through.
 	#[beet_core::test]
 	async fn an_entry_instantiates_documents() {
-		let home_store = BlobStore::temp();
+		let package_store = BlobStore::temp();
 		for (path, source) in [
 			(
 				"main.bsx",
@@ -1108,19 +1121,20 @@ mod test {
 			),
 			("routes.bsx", r#"<Route path="hello"/>"#),
 		] {
-			home_store
+			package_store
 				.insert(&RelPath::from(path), source)
 				.await
 				.unwrap();
 		}
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		let prescan = read_prescan(&home_store, &prescans(&world), "main.bsx")
+		let prescan =
+			read_prescan(&package_store, &prescans(&world), "main.bsx")
+				.await
+				.unwrap();
+		let sources = read_sources(&package_store, "main.bsx", prescan)
 			.await
 			.unwrap();
-		let sources = read_sources(&home_store, "main.bsx", prescan)
-			.await
-			.unwrap();
-		let root = build_root(&mut world, home_store, sources, ()).unwrap();
+		let root = build_root(&mut world, package_store, sources, ()).unwrap();
 		TemplatePending::settle_owned(&mut world).await;
 		world.get::<TemplateError>(root).xpect_none();
 		world

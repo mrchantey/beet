@@ -27,7 +27,7 @@ discovers the pages in
 `routes/`, and the blog is a subtree wearing `templates/ArticleLayout.bsx` inside
 the site `Layout`.
 
-`<ServeBlobs prefix="repo"/>` publishes this directory read-only at `/repo`, the
+`<ServeBlobs prefix="package"/>` publishes this directory read-only at `/package`, the
 store the browser process reads this entry through, and `<AssetsDir src="wasm">`
 mounts the wasm binary the page boots: `wasm/beet-ui.{wasm,js}` link to the build
 output in `target/wasm`, which `just build-wasm-ui` provides and a deploy builds
@@ -73,12 +73,12 @@ resolves once.
 
 ## The publication
 
-The blog is a standard.site publication on `beetmania.beet.org`'s repo, one
+The blog is a standard.site publication on `beetmania.beet.org`'s public repo, one
 document per dated post, each document's `content` the post as a beet scene
 (`org.beet.scene#body`). `beetlover.beet.org` is a contributor who reposts each
 announcement it is credited on and replies to it, so the comments island under
 each post has something to show. The README's "Test accounts" lists both.
-`social/publish` converges the repo
+`social/publish` converges the public repo
 to the posts it names and rewrites the committed index the served site reads
 (`derived/standard-site.json`), which lands with the next `sync`.
 
@@ -90,7 +90,7 @@ to the posts it names and rewrites the committed index the served site reads
 The publisher's app password is `BEETMANIA_BEET_ORG_APP_PASSWORD` and the
 contributor's `BEETLOVER_BEET_ORG_APP_PASSWORD`, both `env_var` records in the
 `agents` group of this entry's own `secrets.toml`, loaded by the top-level
-`<Secrets/>` below. The repo's `secrets.toml` keeps a copy of each for the live
+`<Secrets/>` below. The workspace's root `secrets.toml` keeps a copy of each for the live
 atproto tests, which write to the same test org.
 
 ## The secrets
@@ -157,7 +157,7 @@ judge or delete.
 			<Route path="blog" {Layout(Document("templates/ArticleLayout.bsx"))}>
 				<RoutesDir src="routes/blog"/>
 			</Route>
-			<ServeBlobs prefix="repo"/>
+			<ServeBlobs prefix="package"/>
 			<AssetsDir src="assets" cache="1h"/>
 			<AssetsDir src="wasm" prefix="wasm" cache="1h"/>
 		</Router>
@@ -175,25 +175,25 @@ judge or delete.
 	     than the root, so the browser runtime, which links none of them, never
 	     meets them. -->
 	<Fragment bx:cfg="feature:infra && feature:extra" {(AwsRegion("us-west-2"), CloudflareAccount("74aba4da669f57fc6fc3e63ebcfcff26"), CloudflareZone{domain:"beet.org", id:"45905c861559d9eb8c9b72ee87adca7b"})}>
-	<!-- the repo's AWS account, shared with `site/`, and this entry's own
+	<!-- beet's AWS account, shared with `site/`, and this entry's own
 	     deploy credentials, `beetmania-deploy` at each provider, sealed in
 	     this entry's document and lowered from the stacks below alone -->
 	<AwsAccount name="beet"/>
 	<AwsDeployCredential/>
 	<CloudflareDeployCredential/>
-	<!-- the deploy: a lambda serving the repo bucket at `beetmania.beet.org` -->
+	<!-- the deploy: a lambda serving the package bucket at `beetmania.beet.org` -->
 	<Stack app_name="beetmania">
 		<!-- the block + its build artifact share one entity, booting `serve` -->
 		<LambdaSiteBlock features="lambda,atproto" authorities="beetmania.beet.org" exec_route="serve"/>
-		<S3BucketBlock label="repo" {HomeStoreBlock}/>
+		<S3BucketBlock label="package" {PackageStoreBlock}/>
 		<Group bx:ref="beetmania_up">
 			<TofuApply layer="storage"/>
-			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<HomeAssemble src="examples/beetmania">
+			<WasmRuntime cargo_package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
+			<PackageAssemble src="examples/beetmania">
 				<DirCopy src="assets" dest="assets" paths="fonts/FiraSans-Bold.ttf"/>
 				<Derive/>
-			</HomeAssemble>
-			<HomeSync/>
+			</PackageAssemble>
+			<PackageSync/>
 			<TofuApply/>
 			<!-- after the apply rolls the function, so the edge refills from it -->
 			<CloudflarePurgeCache/>
@@ -207,12 +207,12 @@ judge or delete.
 		<!-- a content-only republish into the version the running function reads -->
 		<Route path="sync" {ExchangeSequence}>
 			<AdoptCurrentDeploy/>
-			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<HomeAssemble src="examples/beetmania">
+			<WasmRuntime cargo_package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
+			<PackageAssemble src="examples/beetmania">
 				<DirCopy src="assets" dest="assets" paths="fonts/FiraSans-Bold.ttf"/>
 				<Derive/>
-			</HomeAssemble>
-			<HomeSync/>
+			</PackageAssemble>
+			<PackageSync/>
 			<!-- a page's bytes are read per request, so the sync above is live
 			     already; the restart is for what a boot resolves once: route
 			     discovery, this document, the publication's index. Before the

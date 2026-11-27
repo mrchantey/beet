@@ -54,7 +54,7 @@ impl SeedSource {
 				async move |cx: ActionContext<ThreadEntry>| -> Result<String> {
 					let document = document.clone();
 					cx.caller
-						.with_state::<PackageQuery, _>(
+						.with_state::<PackageFilesQuery, _>(
 							move |entity, packages| {
 								packages.resolve(entity, &document)
 							},

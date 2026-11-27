@@ -1,4 +1,4 @@
-//! The IAM policy a repo's AWS deploy credential needs, LOWERED from the
+//! The IAM policy a package's AWS deploy credential needs, LOWERED from the
 //! provider types the stacks it deploys declare.
 
 use crate::prelude::*;
@@ -777,7 +777,7 @@ impl AwsDeployPolicy {
 	/// One IAM arn pattern per resource category, each under the app's own
 	/// name, so the credential can create the roles its stacks declare and
 	/// reach nothing else, its own user and policy included (both are named for
-	/// the repo and the policy, never `<app>--`).
+	/// the package and the policy, never `<app>--`).
 	fn iam_resources(&self) -> Vec<String> {
 		["role", "user", "policy", "instance-profile"]
 			.into_iter()
@@ -956,7 +956,7 @@ mod test {
 					AwsRegion::new("us-west-2"),
 				),
 				|parent| {
-					parent.spawn(S3BucketBlock::new("repo"));
+					parent.spawn(S3BucketBlock::new("package"));
 				},
 			);
 			(scope.finish().unwrap(), dir)
@@ -991,7 +991,7 @@ mod test {
 	#[beet_core::test]
 	fn boundary_conditions_deny_rather_than_allow() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 		});
 		let (stack, _deployment, config) = scope.finish().unwrap();
@@ -1057,7 +1057,7 @@ mod test {
 
 	/// One deploy user carries one policy PER APP and an explicit deny is a
 	/// union across all of them, so a boundary deny on `*` would make each
-	/// app's policy refuse every other app's deploys. The repo that found this
+	/// app's policy refuse every other app's deploys. The package that found this
 	/// has three apps on one user.
 	#[beet_core::test]
 	fn one_app_s_deny_does_not_reach_another_s() {
@@ -1068,7 +1068,7 @@ mod test {
 					AwsRegion::new("us-west-2"),
 				),
 				|parent| {
-					parent.spawn(HomeStoreBlock::test_store());
+					parent.spawn(PackageStoreBlock::test_store());
 					parent.spawn(LambdaBlock::default());
 				},
 			);
@@ -1091,7 +1091,7 @@ mod test {
 				.unwrap()
 				.clone()
 		};
-		// the two apps a repo really carries on one user, each scoped to its
+		// the two apps a package really carries on one user, each scoped to its
 		// own principals, so neither reaches the other's
 		let site = deny("beet-site");
 		let social = deny("beet-social");

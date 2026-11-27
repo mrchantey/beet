@@ -48,7 +48,7 @@ impl TemplateSource {
 		match self {
 			Self::Document(document) => {
 				let package = entity
-					.with_state::<PackageQuery, _>(|entity, packages| {
+					.with_state::<PackageFilesQuery, _>(|entity, packages| {
 						packages.get(entity)
 					})
 					.await??;
@@ -71,7 +71,7 @@ impl TemplateSource {
 #[derive(Clone)]
 pub enum LoadedTemplate {
 	/// A document and the package it is of.
-	Document(PackageStore, Arc<InstancePrefab>),
+	Document(PackageFiles, Arc<InstancePrefab>),
 	/// A rust template by its type path.
 	Template(ReflectName),
 }

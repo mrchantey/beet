@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// outside a build), deferring [`Ready`] until the document has loaded, so a
 /// load verb (`CallOnReady`) dispatching a deploy under the same root finds
 /// the credentials in its environment. Any failure is one warning and
-/// nothing inserted, never an error: a cloud box's home store never carries
+/// nothing inserted, never an error: a cloud box's package store never carries
 /// an identity, and a contributor without one must still build and run.
 pub(crate) fn load_on_insert(
 	ev: On<Insert<Secrets>>,
@@ -316,8 +316,8 @@ mod test {
 		// from this entry's process), keeps its own documents
 		//
 		// REGRESSION: `site/` and `examples/beetmania` gained documents of
-		// their own holding copies of the repo document's records, and
-		// `beet check site` from the repo's root refused to open the site's
+		// their own holding copies of the root document's records, and
+		// `beet check site` from the workspace root refused to open the site's
 		let store = fixture.store();
 		let entry = fixture.world.spawn(store).id();
 		let checked = fixture

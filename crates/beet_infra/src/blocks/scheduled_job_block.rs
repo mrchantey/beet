@@ -313,7 +313,7 @@ mod test {
 
 	fn build_config(block: &ScheduledJobBlock) -> Result<terra::Config> {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			let lambda = parent
 				.spawn(LambdaBlock::default().with_label("rollup"))
 				.id();
@@ -362,7 +362,7 @@ mod test {
 	fn targets_the_ident_the_lambda_emits() {
 		let lambda = LambdaBlock::default().with_label("rollup");
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			let target = parent
 				.spawn(LambdaBlock::default().with_label("rollup"))
 				.id();
@@ -433,7 +433,7 @@ mod test {
 	#[beet_core::test(timeout_ms = 60_000)]
 	async fn validate() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			let target = parent
 				.spawn(LambdaBlock::default().with_label("rollup"))
 				.id();
@@ -455,7 +455,7 @@ mod test {
 	#[beet_core::test]
 	fn an_unpointed_schedule_fails_the_deploy() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			parent.spawn(rollup_daily());
 		});
 		scope
@@ -466,7 +466,7 @@ mod test {
 			.xpect_contains("rollup-daily");
 		// a target carrying no LambdaBlock is a dangling reference, not a timer
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			let target = parent.spawn(()).id();
 			parent.spawn((rollup_daily(), InvokeTarget(target)));
 		});

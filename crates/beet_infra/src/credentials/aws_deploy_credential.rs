@@ -1833,7 +1833,7 @@ mod test {
 	/// The app a lambda stack renders, whose principal its boundary caps.
 	fn lambda_app() -> AppPolicies {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(HomeStoreBlock::test_store());
+			parent.spawn(PackageStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 		});
 		let (stack, _deployment, config) = scope.finish().unwrap();
@@ -1984,7 +1984,7 @@ mod test {
 	/// detached from it is deleted only when the count says it was the one
 	/// attachment.
 	///
-	/// REGRESSION: the repo's one `beet-deploy` user held every entry's
+	/// REGRESSION: the package's one `beet-deploy` user held every entry's
 	/// policies; naming the credential per entry must leave no user behind.
 	#[beet_core::test]
 	fn retires_the_user_a_renamed_credential_replaced() {

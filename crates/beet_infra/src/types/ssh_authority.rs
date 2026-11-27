@@ -7,7 +7,7 @@
 //! address. Both authorities are ed25519 keys in the stack's secret store,
 //! minted by `<EnsureSshAuthority/>` before the apply that boots a box.
 //!
-//! One authority per stack rather than per repo: the secret store is scoped
+//! One authority per stack rather than per package: the secret store is scoped
 //! per stack, so a stage's authority lives and is sealed beside the rest of
 //! its secrets, a drill or dev stage can never sign its way into production,
 //! and rolling one replaces that stack's boxes alone.

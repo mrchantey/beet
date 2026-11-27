@@ -8,7 +8,7 @@
 //! ([`StandardSiteDocument::render`]), uploads each blob the record references
 //! from the tree ([`LivePage::upload_blob_refs`]), then writes the record,
 //! all before the scope releases the tree. The render writes nothing to a
-//! repo, so a dry run renders exactly what a publish writes, and the upload
+//! PDS, so a dry run renders exactly what a publish writes, and the upload
 //! and the write land minutes apart in one run, well inside a PDS's grace for
 //! an unreferenced blob (several hours recommended, one hour the floor).
 use crate::prelude::*;
@@ -29,7 +29,7 @@ impl StandardSitePub {
 }
 
 impl StandardSiteDocument {
-	/// The most a document may weigh as the repo block it is stored as, its
+	/// The most a document may weigh as the record block it is stored as, its
 	/// canonical DAG-CBOR: a block is capped at a megabyte and a reader
 	/// fetches a record whole.
 	pub const BUDGET: usize = 1_000_000;
@@ -112,8 +112,8 @@ impl LivePage {
 	/// Upload to `pds` every blob `record` references, each from the
 	/// [`InlineBlob`] on this page's tree with its cid, answering them. A
 	/// referenced cid no [`InlineBlob`] holds is an error naming it, since a
-	/// record pointing at a blob its repo never received is refused by the
-	/// repo, and uploading the same bytes again is a no-op.
+	/// record pointing at a blob its public repo never received is refused by the
+	/// PDS, and uploading the same bytes again is a no-op.
 	pub async fn upload_blob_refs(
 		&self,
 		pds: &Pds,
@@ -164,7 +164,7 @@ mod test {
 	}
 
 	/// A router serving the fixture post at `blog/full-stack-bevy`, an image
-	/// in its body and a cover in its frontmatter, the media in its repo
+	/// in its body and a cover in its frontmatter, the media in its public repo
 	/// store.
 	async fn site() -> (World, Entity) {
 		let store = BlobStore::temp();
@@ -192,7 +192,7 @@ mod test {
 		(world, router)
 	}
 
-	/// Render the fixture post's document and, given a repo, upload what it
+	/// Render the fixture post's document and, given a PDS, upload what it
 	/// references and write it, all inside the one scope, answering the
 	/// document and the blobs uploaded.
 	async fn publish(
@@ -331,7 +331,7 @@ mod test {
 			.xpect_eq(vec![Value::str("/media/photo.png")]);
 	}
 
-	/// The document stored as the DAG-CBOR block a repo holds and read back,
+	/// The document stored as the DAG-CBOR block a record is and read back,
 	/// its `content` parsed into a fresh world, renders the html the page's
 	/// own content does, byte for byte: the reader's half of the format.
 	#[beet_core::test]

@@ -15,7 +15,7 @@ use beet_net::prelude::Request;
 /// CloudflareAccess::new::<Self>(&[TokenPermission::CACHE_PURGE]))]`, so the
 /// declaration sits beside the calls it describes. The deploy credential
 /// ([`CloudflareDeployCredential`]) lowers every one in the world into the
-/// repo's deploy token ([`CloudflareDeployToken::lower_access`]), and the
+/// package's deploy token ([`CloudflareDeployToken::lower_access`]), and the
 /// action holds that token only through [`resolve`](Self::resolve) on its own
 /// entity.
 ///

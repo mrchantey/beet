@@ -89,7 +89,7 @@ impl Plugin for TestPlugin {
 		console_error_panic_hook::set_once();
 
 		// a test has no entry to declare its document, so the runner loads a
-		// developer's `.env` and the nearest `secrets.<format>` (the repo's)
+		// developer's `.env` and the nearest `secrets.<format>` (the source directory's)
 		// by convention rather than relying on the caller (`just`, a js host)
 		env_ext::load_dotenv().ok();
 		#[cfg(feature = "vault")]

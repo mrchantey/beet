@@ -437,7 +437,7 @@ serde_plain = ["serde", "beet_core/serde_plain"]
 vault = ["beet_core/vault", "beet_net?/vault", "beet_router?/vault", "beet_infra?/vault"]
 # The AT Protocol's network half (`beet_net/atproto`): a real PDS over xrpc
 # through the credential seam, did and handle resolution, an
-# `<AtprotoAccount/>` landing its repo, the Bluesky record shapes beet
+# `<AtprotoAccount/>` landing its PDS, the Bluesky record shapes beet
 # writes and the AppView it reads them back through; with `router` an
 # article's comments (`beet_router/atproto`); with `infra` the handle block
 # and its probe (`beet_infra/atproto`). The data model and the `Pds` family

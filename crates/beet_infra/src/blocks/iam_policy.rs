@@ -69,7 +69,7 @@ impl IamPolicy {
 		self
 	}
 
-	/// Seed a bucket this compute reads on its own account, ie the repo bucket
+	/// Seed a bucket this compute reads on its own account, ie the package bucket
 	/// a box pulls its binary from at boot, whose declaration may grant
 	/// nothing (a `StoreUriBlock`). Call before [`lower`](Self::lower), which
 	/// renders the read statement, deduplicated against the declared grants.
