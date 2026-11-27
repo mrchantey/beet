@@ -153,7 +153,7 @@ Every other scene in `examples/action/` exits 0 (`wgpu-action.bsx` requires `fea
 Documented so future passes don't waste time on them:
 
 - **Spatial / ML scenes:** `flock`, `seek`, `fetch`, `frozen_lake_run` etc. are no longer `--example` targets — they live as scene modules in `beet_extra`, reached only by building the `examples,spatial` / `examples,ml` features.
-- **Thread scenes:** `chat`, `multi_agent`, `oneshot`, `persistent_chat`, `tool_call`, `self_evolving`, `coding_agent` are `.bsx` markup scenes under `examples/thread/`, not `--example` targets. Several also need an LLM key (`OPENAI_API_KEY` / `BEDROCK_*`).
+- **Thread scenes:** `chat`, `multi_agent`, `oneshot`, `persistent_chat`, `long_chat`, `tool_call`, `self_evolving`, `coding_agent` are `.bsx` markup scenes under `examples/thread/`, not `--example` targets. Several also need an LLM key (`OPENAI_API_KEY` / `BEDROCK_*`).
 - **Interactive TUI/stdin:** `ui/term_input`, `ui/tui`, `ui/state` — real examples that block on stdin.
 - **Browser required:** `ui/crud`, `ui/syntax_highlighting`, `ui/media_renderer` (interactive output).
 - **Needs sshd:** `ssh_server`, `ssh_client`, `ssh_tui`.

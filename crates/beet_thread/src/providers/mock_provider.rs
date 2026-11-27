@@ -50,7 +50,10 @@ fn next_id(prefix: &str) -> String {
 /// - **Without tools**: echoes the last post by a User actor prefixed with
 ///   "you said:"
 ///
-/// Text answers are [`custom_response`](Self::custom_response) when set.
+/// Text answers are [`custom_response`](Self::custom_response) when set. Each
+/// response reports its input as the estimate of its agent's context
+/// ([`ThreadRecords::context_tokens`]), as a provider reports what it read,
+/// so a [`Compact`] compacts on the mock as it would on a model.
 #[derive(Debug, Clone, Default, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_add = hook_ext::entity_hook(|entity| {
@@ -228,45 +231,60 @@ impl PostStreamer for MockPostStreamer {
 
 		Box::pin(async move {
 			let turn = Self::next_turn(&caller).await?;
-			let (agent_id, thread_id, last_user_text, first_tool) = caller
-				.with_state::<ThreadQuery, _>(
-					|actor_entity,
-					 query|
-					 -> Result<(
-						ActorId,
-						ThreadId,
-						String,
-						Option<(String, JsonSchema)>,
-					)> {
-						let (_, thread, records) =
-							query.thread_and_records(actor_entity)?;
-						let agent_id = query.actor_id(actor_entity)?;
+			let (agent_id, thread_id, last_user_text, first_tool, input) =
+				caller
+					.with_state::<ThreadQuery, _>(
+						|actor_entity,
+						 query|
+						 -> Result<(
+							ActorId,
+							ThreadId,
+							String,
+							Option<(String, JsonSchema)>,
+							u32,
+						)> {
+							let (_, thread, records) =
+								query.thread_and_records(actor_entity)?;
+							let agent_id = query.actor_id(actor_entity)?;
 
-						// the last text a User actor posted
-						let last_text = records
-							.content_posts()
-							.filter(|view| view.actor.kind() == ActorKind::User)
-							.last()
-							.and_then(|view| view.post.text())
-							.unwrap_or_default()
-							.to_string();
+							// the last text a User actor posted
+							let last_text = records
+								.content_posts()
+								.filter(|view| {
+									view.actor.kind() == ActorKind::User
+								})
+								.last()
+								.and_then(|view| view.post.text())
+								.unwrap_or_default()
+								.to_string();
 
-						// the first tool, if any
-						let first_tool = query
-							.tools(actor_entity)?
-							.into_iter()
-							.find_map(|(_, tool_def)| match tool_def {
-								ToolDefinition::Function(func) => Some((
-									func.path().to_string(),
-									func.params_schema().clone(),
-								)),
-								_ => None,
-							});
+							// the first tool, if any
+							let first_tool = query
+								.tools(actor_entity)?
+								.into_iter()
+								.find_map(|(_, tool_def)| match tool_def {
+									ToolDefinition::Function(func) => Some((
+										func.path().to_string(),
+										func.params_schema().clone(),
+									)),
+									_ => None,
+								});
 
-						(agent_id, thread.id(), last_text, first_tool).xok()
-					},
-				)
-				.await??;
+							// what a provider would report it read
+							let input = records
+								.context_tokens(&records.shown(..), &agent_id)
+								as u32;
+							(
+								agent_id,
+								thread.id(),
+								last_text,
+								first_tool,
+								input,
+							)
+								.xok()
+						},
+					)
+					.await??;
 
 			let response_id = next_id("mock-resp");
 
@@ -284,6 +302,7 @@ impl PostStreamer for MockPostStreamer {
 						thread_id,
 						response_id,
 						text,
+						input,
 					);
 				}
 				Some(MockTurn::Hold(text)) => {
@@ -293,6 +312,7 @@ impl PostStreamer for MockPostStreamer {
 						response_id,
 						text,
 						gate,
+						input,
 					)
 					.xok();
 				}
@@ -324,29 +344,38 @@ impl PostStreamer for MockPostStreamer {
 						thread_id,
 						response_id,
 						text,
+						input,
 					);
 				}
 			};
-			Self::stream_partials(agent_id, thread_id, response_id, posts)
+			Self::stream_partials(
+				agent_id,
+				thread_id,
+				response_id,
+				posts,
+				input,
+			)
 		})
 	}
 }
 
 impl MockPostStreamer {
-	/// A stream of one completed text answer.
+	/// A stream of one completed text answer, having read `input` tokens.
 	fn stream(
 		agent_id: ActorId,
 		thread_id: ThreadId,
 		response_id: String,
 		text: String,
+		input: u32,
 	) -> Result<PostStream> {
 		let partial =
-			Self::text_partial(response_id, text, PostStatus::Completed);
+			Self::text_partial(response_id, text, PostStatus::Completed, input);
 		Self::stream_partials(
 			agent_id,
 			thread_id,
 			partial.response_id.clone(),
 			partial.posts,
+			input,
 		)
 	}
 
@@ -357,15 +386,18 @@ impl MockPostStreamer {
 		response_id: String,
 		text: String,
 		gate: MockGate,
+		input: u32,
 	) -> PostStream {
 		let mut held = Self::text_partial(
 			response_id.clone(),
 			text.clone(),
 			PostStatus::InProgress,
+			input,
 		);
 		held.status = ResponseStatus::InProgress;
 		held.token_usage = None;
-		let done = Self::text_partial(response_id, text, PostStatus::Completed);
+		let done =
+			Self::text_partial(response_id, text, PostStatus::Completed, input);
 		let stream: ResPartialStream =
 			Box::pin(futures::stream::once(async move { Ok(held) }).chain(
 				futures::stream::once(async move {
@@ -381,8 +413,9 @@ impl MockPostStreamer {
 		response_id: String,
 		text: String,
 		status: PostStatus,
+		input: u32,
 	) -> ResponsePartial {
-		Self::response(response_id.clone(), vec![PostPartial {
+		Self::response(response_id.clone(), input, vec![PostPartial {
 			key: PostPartialKey::Content {
 				responses_id: response_id,
 				content_index: 0,
@@ -395,9 +428,10 @@ impl MockPostStreamer {
 		}])
 	}
 
-	/// A completed response carrying `posts`.
+	/// A completed response carrying `posts`, having read `input` tokens.
 	fn response(
 		response_id: String,
+		input: u32,
 		posts: Vec<PostPartial>,
 	) -> ResponsePartial {
 		ResponsePartial {
@@ -405,9 +439,9 @@ impl MockPostStreamer {
 			response_stored: false,
 			status: ResponseStatus::Completed,
 			token_usage: Some(TokenUsage {
-				input_tokens: 10,
+				input_tokens: input,
 				output_tokens: 10,
-				total_tokens: 20,
+				total_tokens: input + 10,
 				cached_input_tokens: None,
 				reasoning_tokens: None,
 			}),
@@ -421,8 +455,9 @@ impl MockPostStreamer {
 		thread_id: ThreadId,
 		response_id: String,
 		posts: Vec<PostPartial>,
+		input: u32,
 	) -> Result<PostStream> {
-		let partial = Self::response(response_id, posts);
+		let partial = Self::response(response_id, input, posts);
 		let stream: ResPartialStream =
 			Box::pin(futures::stream::once(async move { Ok(partial) }));
 		PostStream::new("mock", "mock-model", agent_id, thread_id, stream).xok()

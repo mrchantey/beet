@@ -217,10 +217,11 @@ impl PostChange {
 					);
 				}
 				changed.set_body(content.body().clone());
-				changed.release_bytes();
-				if let Some(bytes) = content.bytes() {
-					changed.set_bytes(bytes.clone());
-				}
+				changed.set_bytes(
+					(0..content.files().len())
+						.filter_map(|index| content.file_bytes(index).cloned())
+						.collect(),
+				);
 				Post::new_log(actor.clone(), thread.id(), &PostEdited {
 					was: read.body().clone(),
 				})?
@@ -867,7 +868,7 @@ mod test {
 			format!("{:?}", reloaded.posts()).xpect_contains(*secret);
 		}
 		store
-			.read_blob(photo.file().unwrap().blob())
+			.read_blob(photo.files()[0].blob())
 			.await
 			.unwrap()
 			.to_vec()

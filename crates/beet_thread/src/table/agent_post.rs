@@ -229,32 +229,23 @@ impl AgentPost<'static> {
 		.with_subject(call)
 	}
 
-	/// A tool's answer of bytes to the call `call`: the output holds them by
-	/// reference as a `media` post does, its text the file's line
-	/// ([`PostFile::line`]) for a reader that cannot carry it.
-	pub fn new_function_call_output_file(
+	/// A tool's answer to the call `call` holding `files`, each a
+	/// [`MediaBytes`] and its stem, by reference as a `media` post holds its
+	/// one, beside the answer's `text`, which a reader not sent a file reads
+	/// with each file's line ([`RequestBlobs::output_text`]).
+	pub fn new_function_call_output_files(
 		author: ActorId,
 		thread: ThreadId,
 		call: PostId,
 		call_id: impl Into<String>,
-		media: MediaBytes,
-		file_stem: Option<String>,
+		text: impl Into<String>,
+		files: impl IntoIterator<Item = (MediaBytes, Option<String>)>,
 		status: PostStatus,
 	) -> Post {
-		let (media_type, bytes) = media.take();
-		let mut post = Self::new_function_call_output(
-			author,
-			thread,
-			call,
-			call_id,
-			String::new(),
-			status,
+		Self::new_function_call_output(
+			author, thread, call, call_id, text, status,
 		)
-		.with_file(media_type, bytes, file_stem);
-		if let Some(file) = post.file() {
-			post.set_text(file.line());
-		}
-		post
+		.with_files(files)
 	}
 }
 
@@ -325,7 +316,9 @@ pub struct MediaView<'a> {
 
 impl<'a> MediaView<'a> {
 	/// The file the post holds, `None` for a malformed row.
-	pub fn file(&self) -> Option<PostFile> { self.post.file() }
+	pub fn file(&self) -> Option<PostFile> {
+		self.post.files().into_iter().next()
+	}
 	/// The file's media type.
 	pub fn media_type(&self) -> MediaType {
 		self.file()
@@ -401,12 +394,12 @@ impl<'a> FunctionCallOutputView<'a> {
 	}
 	/// The call answered, the post's subject.
 	pub fn call(&self) -> Option<PostId> { self.post.subject() }
-	/// The output, for an answer of bytes its file's line.
+	/// The answer's text, beside any files it holds.
 	pub fn output(&self) -> &'a str {
 		self.post.field("text").unwrap_or_default()
 	}
-	/// The file the tool answered, if it answered bytes.
-	pub fn file(&self) -> Option<PostFile> { self.post.file() }
+	/// The files the tool answered.
+	pub fn files(&self) -> Vec<PostFile> { self.post.files() }
 	pub fn post(&self) -> &'a Post { self.post }
 }
 

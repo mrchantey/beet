@@ -46,6 +46,11 @@ pub struct ThreadRecords {
 	in_progress: BTreeSet<PostId>,
 	/// Each `edited` or `deleted` log by its id, with its subject.
 	changes: BTreeMap<PostId, PostId>,
+	/// Each `compaction` post by its id, with its author.
+	compactions: BTreeMap<PostId, ActorId>,
+	/// The seed's last post ([`Thread::seed`], a branch's its lineage
+	/// root's), which a context reads apart from a summary.
+	seed: Option<PostId>,
 	/// The oldest post of the run when the thread holds older posts the
 	/// records lack, `None` when the run reaches back to its first post or
 	/// to the seed held before it.
@@ -149,9 +154,12 @@ impl ThreadRecords {
 		{
 			self.changes.insert(id, subject);
 		}
-		match post.bytes() {
-			Some(_) => self.held.insert(id),
-			None => self.held.remove(&id),
+		if post.kind() == &PostKind::Compaction {
+			self.compactions.insert(id, post.author().clone());
+		}
+		match post.holds_bytes() {
+			true => self.held.insert(id),
+			false => self.held.remove(&id),
 		};
 		match post.in_progress() {
 			true => self.in_progress.insert(id),
@@ -198,6 +206,34 @@ impl ThreadRecords {
 		let start = self.run_start?;
 		let index = self.index_of(start).ok()?;
 		index.checked_sub(1).map(|index| self.posts[index].id())
+	}
+
+	/// The seed's last post, if the thread has a seed: what a context
+	/// reads apart from a summary that does not hold it.
+	pub fn seed(&self) -> Option<PostId> { self.seed }
+
+	/// Name the seed's last post.
+	pub fn set_seed(&mut self, seed: Option<PostId>) { self.seed = seed; }
+
+	/// Each `compaction` post, oldest first, with its author.
+	pub(crate) fn compactions(
+		&self,
+	) -> impl DoubleEndedIterator<Item = (PostId, &ActorId)> {
+		self.compactions.iter().map(|(id, author)| (*id, author))
+	}
+
+	/// Each `edited` or `deleted` log after `read`, oldest first, with the
+	/// post it changed.
+	pub(crate) fn changes_after(
+		&self,
+		read: PostId,
+	) -> impl Iterator<Item = (PostId, PostId)> {
+		self.changes
+			.range((
+				core::ops::Bound::Excluded(read),
+				core::ops::Bound::Unbounded,
+			))
+			.map(|(log, subject)| (*log, *subject))
 	}
 
 	/// Whether a change to `post` reaches these records: a post they lack
@@ -266,32 +302,66 @@ impl ThreadRecords {
 	}
 
 	/// What the agent `reader` reads of `shown`, after an exclusive cursor,
-	/// in model order (a call followed at once by its output): its own posts
-	/// and anyone else's that is not a log, another actor's call and its
-	/// output as one item, and each run of joins, edits and deletions between
-	/// them as one note ([`Self::note`]). An edited post reads as it now
-	/// stands; a deleted post, reasoning whoever wrote it and any other log
-	/// stay out, so none splits a run.
+	/// in model order (a call followed at once by its output): its context
+	/// ([`Self::context_bounds`]), the seed it reads apart, its compaction's
+	/// note ([`Self::compaction_note`]) and every post after the
+	/// compaction's subject, else the whole of `shown`. Of those, its own
+	/// posts and anyone else's that is not a log, another actor's call and
+	/// its output as one item, and each run of joins, edits and deletions
+	/// between them as one note ([`Self::note`]). An edited post reads as it
+	/// now stands; a deleted post, reasoning whoever wrote it and any other
+	/// log stay out, so none splits a run.
 	pub fn model_posts<'a>(
 		&'a self,
 		shown: &'a ShownPosts,
 		reader: &ActorId,
 		after: Option<PostId>,
 	) -> Vec<ModelPost<'a>> {
-		let ordered = self.model_order(shown);
-		let start = after
-			.and_then(|after| {
-				ordered.iter().position(|view| view.post.id() == after)
-			})
-			.map_or(0, |index| index + 1);
+		let bounds = self.context_bounds(shown, reader);
+		let ordered = self
+			.model_order(shown)
+			.into_iter()
+			.filter(|view| Self::in_context(view.post, bounds))
+			.collect::<Vec<_>>();
 		let outputs = ordered
 			.iter()
 			.filter_map(|view| Some((view.post.subject()?, *view)))
 			.filter(|(_, view)| view.post.kind() == &PostKind::ToolOutput)
 			.collect::<HashMap<_, _>>();
+		// the seed read apart, the compaction's note, then the rest
+		let seed = bounds.and_then(|(seed, _)| seed);
+		let split = ordered
+			.iter()
+			.position(|view| seed.is_none_or(|seed| view.post.id() > seed))
+			.unwrap_or(ordered.len());
+		let split = match bounds {
+			Some(_) => split,
+			None => 0,
+		};
+		let mut entries =
+			ordered[..split].iter().copied().map(Ok).collect::<Vec<_>>();
+		if let Some((_, compaction)) = bounds {
+			entries.push(Err(Self::compaction_note(compaction)));
+		}
+		entries.extend(ordered[split..].iter().copied().map(Ok));
+		let start = after
+			.and_then(|after| {
+				entries.iter().position(|entry| {
+					entry.as_ref().is_ok_and(|view| view.post.id() == after)
+				})
+			})
+			.map_or(0, |index| index + 1);
 		let mut items = Vec::new();
 		let mut noted = Vec::new();
-		for view in ordered.into_iter().skip(start) {
+		for entry in entries.into_iter().skip(start) {
+			let view = match entry {
+				Ok(view) => view,
+				Err(note) => {
+					self.push_note(&mut items, &mut noted);
+					items.push(ModelPost::Note(note));
+					continue;
+				}
+			};
 			if view.post.kind().is_noted() {
 				noted.push(view);
 				continue;
@@ -383,12 +453,7 @@ impl ThreadRecords {
 	/// read: an `edited` or `deleted` log newer than `read` names a post at
 	/// or before it, so the provider holds what was taken back.
 	pub fn changed_under(&self, read: PostId) -> bool {
-		self.changes
-			.range((
-				core::ops::Bound::Excluded(read),
-				core::ops::Bound::Unbounded,
-			))
-			.any(|(_, subject)| *subject <= read)
+		self.changes_after(read).any(|(_, subject)| subject <= read)
 	}
 
 	/// The authored posts of `shown` in the order a model reads them: by
@@ -461,8 +526,12 @@ impl ThreadRecords {
 			posts,
 			metas,
 			run_start,
+			seed,
 			..
 		} = stored;
+		if seed.is_some() {
+			self.seed = seed;
+		}
 		for actor in &actors {
 			self.insert_actor_absent(actor);
 		}
@@ -614,24 +683,31 @@ impl ThreadRecords {
 	/// matches the provider and model, for `previous_response_id` patterns,
 	/// never one whose `read` covers a post changed since
 	/// ([`Self::changed_under`]): the provider holds what was taken back, so
-	/// a request chains to an older one, else sends everything.
+	/// a request chains to an older one, else sends everything. A
+	/// compaction starts a new chain, so none older than the agent's newest
+	/// is chained to, and the provider never carries the old text on.
 	pub fn stored_response(
 		&self,
 		agent_id: &ActorId,
 		provider_slug: &str,
 		model_slug: &str,
 	) -> Option<(PostId, &ResponseMeta)> {
-		self.posts.iter().rev().find_map(|post| {
-			if post.author() != agent_id {
-				return None;
-			}
-			let meta = self.metas.get(&post.id())?;
-			(meta.provider_slug == provider_slug
-				&& meta.model_slug == model_slug
-				&& meta.response_stored
-				&& meta.read.is_some_and(|read| !self.changed_under(read)))
-			.then_some((post.id(), meta))
-		})
+		let floor = self.newest_compaction(agent_id).map(Post::id);
+		self.posts
+			.iter()
+			.rev()
+			.take_while(|post| floor.is_none_or(|floor| post.id() > floor))
+			.find_map(|post| {
+				if post.author() != agent_id || post.is_log() {
+					return None;
+				}
+				let meta = self.metas.get(&post.id())?;
+				(meta.provider_slug == provider_slug
+					&& meta.model_slug == model_slug
+					&& meta.response_stored
+					&& meta.read.is_some_and(|read| !self.changed_under(read)))
+				.then_some((post.id(), meta))
+			})
 	}
 
 	// ── bytes ───────────────────────────────────────────────────────────
@@ -640,12 +716,13 @@ impl ThreadRecords {
 	/// included: what the window's memory may hold. A context carries or lists
 	/// the files of what is shown ([`ShownPosts::files`], [`KeepBlobs`]).
 	pub fn files(&self) -> impl DoubleEndedIterator<Item = PostFile> {
-		self.posts.iter().filter_map(|post| post.file())
+		self.posts.iter().flat_map(|post| post.files())
 	}
 
-	/// Drop the bytes held in memory of every post but those of the newest
-	/// `keep` files, and those `releasable` refuses, ie not yet written to
-	/// the blob store. Nothing is marked changed: the row is untouched.
+	/// Drop the bytes held in memory of every post but those holding one of
+	/// the newest `keep` files, and those `releasable` refuses, ie not yet
+	/// written to the blob store. Nothing is marked changed: the row is
+	/// untouched.
 	pub fn release_bytes(
 		&mut self,
 		keep: usize,
@@ -654,7 +731,10 @@ impl ThreadRecords {
 		if self.held.len() <= keep {
 			return;
 		}
-		let carried = PostFile::newest(self.files(), keep);
+		let carried = PostFile::newest(self.files(), keep)
+			.into_iter()
+			.map(|(post, _)| post)
+			.collect::<HashSet<_>>();
 		let released = self
 			.held
 			.iter()
@@ -1020,6 +1100,10 @@ impl Reduction<'_, '_> {
 			}
 		}
 
+		// a kept seed is every post the records hold before anyone joins
+		if keep_seeds {
+			records.set_seed(records.last_post().map(Post::id));
+		}
 		commands.entity(entity).insert(records);
 		Ok(())
 	}

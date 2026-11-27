@@ -6,7 +6,15 @@ use beet_net::prelude::*;
 /// `response_meta` table keyed by the post it is about, for analysis and for
 /// chaining the next request to it.
 #[derive(
-	Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Reflect, Component,
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	Serialize,
+	Deserialize,
+	Reflect,
+	Component,
 )]
 #[reflect(Serialize, Deserialize, Component)]
 pub struct ResponseMeta {

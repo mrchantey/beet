@@ -38,6 +38,8 @@ pub struct ThreadWindows<'w, 's> {
 	>,
 	#[cfg(feature = "action")]
 	actor_refs: Query<'w, 's, &'static ActorRef, With<ActionMeta>>,
+	#[cfg(feature = "action")]
+	compacts: Query<'w, 's, &'static Compact>,
 }
 
 impl ThreadWindows<'_, '_> {
@@ -76,6 +78,37 @@ impl ThreadWindows<'_, '_> {
 					.actor(actor)
 					.is_ok_and(|actor| actor.kind() == ActorKind::Agent)
 			})
+	}
+
+	/// The agents of the window `entity` when every one compacts by
+	/// [`CompactMethod::Rolling`], so the window reads back through their
+	/// compactions ([`Reach::Compacted`]); `None` when it holds none, or one
+	/// that reads the whole thread.
+	#[cfg(feature = "action")]
+	pub fn compacting_agents(
+		&self,
+		entity: Entity,
+		records: &ThreadRecords,
+	) -> Option<Vec<ActorId>> {
+		let mut agents = Vec::new();
+		for child in self.children.iter_descendants(entity) {
+			let Ok(actor) = self.actor_refs.get(child) else {
+				continue;
+			};
+			if !records
+				.actor(actor)
+				.is_ok_and(|actor| actor.kind() == ActorKind::Agent)
+			{
+				continue;
+			}
+			match self.compacts.get(child) {
+				Ok(compact) if compact.method == CompactMethod::Rolling => {
+					agents.push(actor.0.clone());
+				}
+				_ => return None,
+			}
+		}
+		(!agents.is_empty()).then_some(agents)
 	}
 
 	/// The behavior entity of every actor in every window of the stored

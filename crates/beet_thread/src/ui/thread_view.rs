@@ -677,13 +677,27 @@ pub(crate) fn follow_thread_scroll(
 const FOLLOW_FRAMES: u8 = 4;
 
 /// The text a row shows: a log post as a divider line, a join naming its
-/// actor and any other kind by its name, and any other post as its body.
+/// actor, a compaction how far it covers, never its text, and any other kind
+/// by its name, and any other post as its body.
 fn row_text(view: &AuthoredPost) -> String {
 	if view.post.is_deleted() {
 		return "(deleted)".to_string();
 	}
 	if SessionOpened::opens(view.post) {
 		return format!("── {} joined ──", view.actor.name());
+	}
+	if view.post.kind() == &PostKind::Compaction {
+		let through = view
+			.post
+			.subject()
+			.map(|subject| {
+				format!(" up to {}", subject.created().format_iso8601_mins())
+			})
+			.unwrap_or_default();
+		return format!(
+			"── {} summarised the conversation{through} ──",
+			view.actor.name()
+		);
 	}
 	if view.post.is_log() {
 		return format!("── {} ──", view.post.kind());
@@ -720,7 +734,8 @@ mod test {
 	use bevy::math::UVec2;
 
 	/// A log post's row is a divider in its own words, beside the posts of
-	/// the conversation.
+	/// the conversation, a compaction saying how far it covers and never its
+	/// text.
 	#[beet_core::test]
 	fn log_posts_are_dividers() {
 		let mut records = ThreadRecords::new();
@@ -733,6 +748,16 @@ mod test {
 			PostStatus::Completed,
 		));
 		records.join(thread, [user], &default()).unwrap();
+		let hello = records.posts()[0].id();
+		records.insert_actor(Actor::agent());
+		records.upsert_post(
+			Post::new_log(ActorId::AGENT, thread, &Compaction {
+				text: "SUMMARY-TEXT".into(),
+				..default()
+			})
+			.unwrap()
+			.with_subject(hello),
+		);
 		let rows = |field: &str| {
 			records
 				.authored_posts()
@@ -746,10 +771,18 @@ mod test {
 				})
 				.collect::<Vec<_>>()
 		};
-		rows("kind").xpect_eq(vec!["user".to_string(), "log".to_string()]);
+		rows("kind").xpect_eq(vec![
+			"user".to_string(),
+			"log".to_string(),
+			"log".to_string(),
+		]);
 		rows("text").xpect_eq(vec![
 			"hello".to_string(),
 			"── User joined ──".to_string(),
+			format!(
+				"── Agent summarised the conversation up to {} ──",
+				hello.created().format_iso8601_mins()
+			),
 		]);
 	}
 

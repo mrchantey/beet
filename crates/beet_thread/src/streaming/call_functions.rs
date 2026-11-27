@@ -12,8 +12,10 @@ use beet_net::prelude::*;
 /// input. Whatever answers is the call's output, the router's not-found
 /// with its "did you mean" included, so an agent reaches only the tools it
 /// was given. An answer of bytes, ie an image, is kept as the output's file
-/// ([`AgentPost::new_function_call_output_file`]), so any route answering
-/// media is a tool an agent can look through.
+/// ([`AgentPost::new_function_call_output_files`]), so any route answering
+/// media is a tool an agent can look through, and any route's
+/// `multipart/mixed` answer is split into its text and its files
+/// ([`Multipart`]).
 ///
 /// [`Router`]: beet_router::prelude::Router
 pub(crate) async fn call_functions(
@@ -50,14 +52,14 @@ pub(crate) async fn call_functions(
 								PostStatus::Completed,
 							)
 						}
-						ToolAnswer::File(media) => {
-							AgentPost::new_function_call_output_file(
+						ToolAnswer::Files { text, files } => {
+							AgentPost::new_function_call_output_files(
 								actor_id,
 								thread_id,
 								call.post(),
 								call.call_id().to_string(),
-								media,
-								call.file_stem(),
+								text,
+								files,
 								PostStatus::Completed,
 							)
 						}
@@ -71,10 +73,50 @@ pub(crate) async fn call_functions(
 	Ok(())
 }
 
-/// What a tool answered: text, or bytes a model reads as a file.
+/// What a tool answered: text, or files beside any text, each a model reads
+/// as a file.
 enum ToolAnswer {
 	Text(String),
-	File(MediaBytes),
+	Files {
+		text: String,
+		files: Vec<(MediaBytes, Option<String>)>,
+	},
+}
+
+impl ToolAnswer {
+	/// A `multipart/mixed` answer: each part without a filename that is
+	/// text joins the answer's text, a line each, and every other part is a
+	/// file, its stem its filename's, else the call's.
+	fn multipart(multipart: Multipart, call: &OwnedFunctionCall) -> Self {
+		let mut text = Vec::new();
+		let mut files = Vec::new();
+		for part in multipart.into_parts() {
+			match (part.filename(), part.media_type().is_text()) {
+				(None, true) => {
+					text.push(
+						String::from_utf8_lossy(part.bytes()).to_string(),
+					);
+				}
+				_ => {
+					let stem = part
+						.file_stem()
+						.map(str::to_string)
+						.or_else(|| call.file_stem());
+					files.push((
+						MediaBytes::new(
+							part.media_type().clone(),
+							part.bytes().clone(),
+						),
+						stem,
+					));
+				}
+			}
+		}
+		Self::Files {
+			text: text.join("\n"),
+			files,
+		}
+	}
 }
 
 /// The answer of one call exchanged with the agent's `router`: a JSON body
@@ -107,6 +149,16 @@ async fn call_function(
 			));
 		}
 	};
+	let res = match Multipart::from_response(res).await {
+		Ok(Ok(multipart)) => return ToolAnswer::multipart(multipart, call),
+		Ok(Err(res)) => res,
+		Err(err) => {
+			return ToolAnswer::Text(format!(
+				"Failed to read the multipart answer of '{}': {err}",
+				call.name()
+			));
+		}
+	};
 	let media_type = res
 		.parts
 		.headers
@@ -121,9 +173,13 @@ async fn call_function(
 		// bytes, ie an image or a pdf
 		Some(media_type) if !media_type.is_text() => {
 			match res.body.into_bytes().await {
-				Ok(bytes) => {
-					ToolAnswer::File(MediaBytes::new(media_type, bytes))
-				}
+				Ok(bytes) => ToolAnswer::Files {
+					text: String::new(),
+					files: vec![(
+						MediaBytes::new(media_type, bytes),
+						call.file_stem(),
+					)],
+				},
 				Err(err) => ToolAnswer::Text(format!(
 					"Failed to read response body: {err}"
 				)),

@@ -1,0 +1,40 @@
+<!--
+A chat long enough to compact. Run it through the one binary:
+
+    beet --entry=examples/thread/long_chat.bsx
+    beet --entry=examples/thread/long_chat.bsx --new   # start fresh
+
+The agent carries `{Compact}` with a small `at`, so a person sees it compact within a
+few messages: once its context passes `at` tokens, everything but the newest `keep`
+tokens is summarised by `templates/Compactor.bsx`, a thread of its own, built for
+one compaction, run and despawned, on a smaller model than the conversation's. The
+view shows a divider where the summary stands in for the posts, which a person
+still reads. Edit or delete a post the summary covers and the agent's next answer
+waits on a refresh, which leaves out what was taken back.
+
+The agent holds `<ReadPosts/>`, so it reads a post the summary cites by its id. The
+thread persists as rows of `{JsonTableStore}` under `target/long_chat`, so a re-run
+opens back through the newest summary rather than reading every post.
+-->
+<CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
+	<RequireCfg cfg="feature:thread && feature:tui && feature:ssh"/>
+	<Router {Layout(Template("AppShell"))}>
+		<Route path="/" {FixedPage}>
+			<ThreadView {OfThread($thread)}/>
+			<CreatePostForm {OfThread($thread)}/>
+		</Route>
+		<FsStore path="target/long_chat" {JsonTableStore}>
+			<Repeat {RunThread}>
+				<Thread bx:ref="thread" {(Sequence, MountThreadStore{path:"long_chat"})}>
+					<CreateActor name="System" kind="System">
+						<CreatePost text="You are a patient tutor. Ask the user what they want to learn, then teach it in short steps, checking their understanding as you go."/>
+					</CreateActor>
+					<CreateActor name="Agent" kind="Agent" {(ModelStreamer{provider:OpenAi, size:Large}, Compact{template:Document("templates/Compactor.bsx"), at:2000, keep:500})}>
+						<Router><ReadPosts/></Router>
+					</CreateActor>
+					<CreateActor name="User" kind="User" {UserInput}/>
+				</Thread>
+			</Repeat>
+		</FsStore>
+	</Router>
+</CallOnReady>

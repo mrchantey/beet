@@ -200,7 +200,7 @@ pub async fn image_roundtrip(streamer: impl Component + PostStreamer + Clone) {
 			AgentPost::Media(view) if view.media_type().is_image() => {
 				Some(IntoPost::Bytes {
 					media_type: view.media_type(),
-					bytes: post.bytes()?.to_vec(),
+					bytes: post.file_bytes(0)?.to_vec(),
 					file_stem: None,
 				})
 			}

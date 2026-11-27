@@ -48,6 +48,12 @@ impl Plugin for ThreadPlugin {
 			// short
 			.register_type::<UserInput>()
 			.register_type::<InterruptOnPost>()
+			// compaction: on the agent, its compactor's seed and its one tool
+			.register_type::<Compact>()
+			.register_type::<CompactMethod>()
+			.register_type::<CompactSeed>()
+			.install_types::<(CompactInstructions, ReadPosts)>()
+			.register_type::<ReadPostsCall>()
 			.add_observer(interrupt_turn)
 			.add_systems(
 				PostUpdate,

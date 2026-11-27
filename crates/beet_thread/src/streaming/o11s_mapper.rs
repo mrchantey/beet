@@ -48,16 +48,18 @@ pub fn post_to_o11s_input(
 			let text = call.call_text(
 				output.as_ref().map(|output| blobs.output_text(output)),
 			);
-			let content =
-				match output.and_then(|output| blobs.file(output.post)) {
-					Some(RequestFile::Carried(file, bytes)) => {
-						MessageContent::Parts(vec![
-							ContentPart::input_text(text),
-							file_part(&file, &bytes),
-						])
-					}
-					_ => MessageContent::Text(text),
-				};
+			let carried = output
+				.map(|output| carried_parts(blobs, output.post))
+				.unwrap_or_default();
+			let content = match carried.is_empty() {
+				true => MessageContent::Text(text),
+				false => MessageContent::Parts(
+					[ContentPart::input_text(text)]
+						.into_iter()
+						.chain(carried)
+						.collect(),
+				),
+			};
 			return message(MessageRole::User, content).xok();
 		}
 	};
@@ -88,14 +90,16 @@ pub fn post_to_o11s_input(
 			})
 		}
 		AgentPost::FunctionCallOutput(fco) => {
-			let output = match blobs.file(post.post) {
-				Some(RequestFile::Carried(file, bytes)) => {
-					FunctionOutputContent::Parts(vec![
-						ContentPart::input_text(fco.output()),
-						file_part(&file, &bytes),
-					])
-				}
-				_ => FunctionOutputContent::Text(blobs.output_text(post.post)),
+			let text = blobs.output_text(post.post);
+			let carried = carried_parts(blobs, post.post);
+			let output = match carried.is_empty() {
+				true => FunctionOutputContent::Text(text),
+				false => FunctionOutputContent::Parts(
+					[ContentPart::input_text(text)]
+						.into_iter()
+						.chain(carried)
+						.collect(),
+				),
 			};
 			InputItem::FunctionCallOutput(FunctionCallOutputParam {
 				id: None,
@@ -118,13 +122,15 @@ pub fn post_to_o11s_input(
 				file_url: Some(view.url().to_string()),
 			})),
 		),
-		AgentPost::Media(_) => match blobs.file(post.post) {
-			Some(RequestFile::Carried(file, bytes)) => {
-				message(role, parts(file_part(&file, &bytes)))
+		AgentPost::Media(_) => {
+			match blobs.files(post.post).into_iter().next() {
+				Some(RequestFile::Carried(file, bytes)) => {
+					message(role, parts(file_part(&file, &bytes)))
+				}
+				Some(file) => message(role, text(&file.text())),
+				None => message(role, text(RequestBlobs::UNAVAILABLE)),
 			}
-			Some(file) => message(role, text(&file.text())),
-			None => message(role, text(RequestBlobs::UNAVAILABLE)),
-		},
+		}
 		AgentPost::Text(view)
 		| AgentPost::Refusal(view)
 		| AgentPost::Error(view)
@@ -135,6 +141,17 @@ pub fn post_to_o11s_input(
 		}
 	}
 	.xok()
+}
+
+/// The content parts carrying each file of `post` that `blobs` carries, as
+/// one call's several parts.
+fn carried_parts(blobs: &RequestBlobs, post: &Post) -> Vec<ContentPart> {
+	blobs
+		.files(post)
+		.iter()
+		.filter_map(RequestFile::carried)
+		.map(|(file, bytes)| file_part(file, bytes))
+		.collect()
 }
 
 /// The content part carrying `bytes` of `file`, base64 encoded: an image as

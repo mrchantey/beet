@@ -60,7 +60,7 @@ pub struct ThreadStore {
 }
 
 /// How far back a window opens onto its thread ([`ThreadStore::open`]).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Reach {
 	/// Every post, for a window holding an agent, whose context is the
 	/// whole thread until a compaction bounds it.
@@ -72,6 +72,14 @@ pub enum Reach {
 		count: usize,
 		/// Whether the seed is held apart from the run.
 		seed: bool,
+	},
+	/// Back through the newest compaction of each of `agents`, a window
+	/// whose every agent compacts ([`Compact`](crate::prelude::Compact)):
+	/// each agent's context, and the seed held apart; the whole thread when
+	/// any of them has no compaction yet.
+	Compacted {
+		/// The agents whose contexts the window holds.
+		agents: Vec<ActorId>,
 	},
 }
 
@@ -202,6 +210,132 @@ impl ThreadStore {
 		Ok(false)
 	}
 
+	/// The post `id` of `thread`'s history, its own or for a branch its
+	/// parent's up to the branch point, everything included.
+	///
+	/// ## Errors
+	///
+	/// Errors as [`Self::open`].
+	pub async fn read_post(
+		&self,
+		thread: &Thread,
+		id: PostId,
+	) -> Result<Option<Post>> {
+		for (partition, until) in self.lineage(thread).await? {
+			if until.is_some_and(|until| id > until) {
+				continue;
+			}
+			if let Some(mut post) =
+				self.partition(partition)?.table::<Post>().get(id).await?
+			{
+				post.set_thread(partition);
+				return post.xsome().xok();
+			}
+		}
+		Ok(None)
+	}
+
+	/// Up to `count` posts of `thread`'s history from `from` on, oldest
+	/// first, across a branch's lineage, with their authors and metadata:
+	/// everything, a deleted post's body and an edit's original included.
+	///
+	/// ## Errors
+	///
+	/// Errors as [`Self::open`].
+	pub async fn read_from(
+		&self,
+		thread: &Thread,
+		from: PostId,
+		count: usize,
+	) -> Result<ThreadRecords> {
+		let lineage = self.lineage(thread).await?;
+		let mut posts = Vec::new();
+		// the root's segment is the oldest, so read from it forward
+		for (partition, until) in lineage.iter().rev() {
+			if posts.len() >= count {
+				break;
+			}
+			let mut scan = Scan::default().from(from);
+			if let Some(until) = until {
+				scan = scan.through(*until);
+			}
+			// a branch's own posts follow the point it left its parent at
+			if let Some(after) = posts.last().map(Post::id) {
+				scan = scan.after(after);
+			}
+			let mut rows = self
+				.partition(*partition)?
+				.table::<Post>()
+				.scan_first(scan, count - posts.len())
+				.await?;
+			for post in &mut rows {
+				post.set_thread(*partition);
+			}
+			posts.append(&mut rows);
+		}
+		self.records_of(&lineage, posts, None).await
+	}
+
+	/// The oldest of each of `agents`' newest compaction across `thread`'s
+	/// lineage, found by the `by_kind` index, `None` when any of them has
+	/// none. On a backend whose index lags, ie Dynamo, an older compaction
+	/// may be found, which reads more posts, never fewer.
+	///
+	/// ## Errors
+	///
+	/// Errors as [`Self::open`].
+	pub async fn oldest_newest_compaction(
+		&self,
+		thread: &Thread,
+		agents: &[ActorId],
+	) -> Result<Option<Post>> {
+		let lineage = self.lineage(thread).await?;
+		let mut oldest: Option<Post> = None;
+		for agent in agents {
+			let mut newest = None;
+			for (partition, until) in &lineage {
+				let mut scan = IndexScan::default()
+					.from([
+						Value::from(PostKind::Compaction.as_str()),
+						Value::from(agent.as_str()),
+					])
+					.reverse()
+					.limit(1);
+				scan = match until {
+					Some(until) => scan.through([
+						Value::from(PostKind::Compaction.as_str()),
+						Value::from(agent.as_str()),
+						Value::from(until.to_string()),
+					]),
+					None => scan.through([
+						Value::from(PostKind::Compaction.as_str()),
+						Value::from(agent.as_str()),
+					]),
+				};
+				let page = self
+					.partition(*partition)?
+					.table::<Post>()
+					.scan_index("by_kind", scan)
+					.await?;
+				if let Some(mut post) = page.rows.into_iter().next() {
+					post.set_thread(*partition);
+					newest = Some(post);
+					break;
+				}
+			}
+			let Some(newest) = newest else {
+				return Ok(None);
+			};
+			if oldest
+				.as_ref()
+				.is_none_or(|oldest| newest.id() < oldest.id())
+			{
+				oldest = Some(newest);
+			}
+		}
+		oldest.xok()
+	}
+
 	/// The records a window opens `thread` with, as far back as `reach`:
 	/// posts in [`PostId`] order across a branch's lineage, each read from
 	/// its own partition, the actors that authored them and their metadata,
@@ -219,18 +353,43 @@ impl ThreadStore {
 		reach: Reach,
 	) -> Result<ThreadRecords> {
 		let lineage = self.lineage(thread).await?;
+		// a compacting window reads back through each agent's newest
+		// compaction, else the whole thread
+		let (reach, stop) = match reach {
+			Reach::Compacted { agents } => {
+				match self.oldest_newest_compaction(thread, &agents).await? {
+					Some(compaction) => (
+						Reach::Newest {
+							count: self.load,
+							seed: true,
+						},
+						compaction.subject(),
+					),
+					None => (Reach::Whole, None),
+				}
+			}
+			reach => (reach, None),
+		};
 		let (count, seed) = match reach {
-			Reach::Whole => (None, false),
 			Reach::Newest { count, seed } => (Some(count.max(1)), seed),
+			_ => (None, false),
 		};
 		let mut posts = match seed {
 			true => self.seed_posts(&lineage).await?,
 			false => Vec::new(),
 		};
 		let floor = posts.last().map(Post::id);
-		// the newest `count`, then older runs of as many until one is said
 		let mut run = Vec::new();
 		let mut more = true;
+		// every post after the compaction's subject
+		if let Some(stop) = stop {
+			let (after, _) = self
+				.posts_back(&lineage, None, floor.max(Some(stop)), None)
+				.await?;
+			run = after;
+			more = !run.iter().any(Post::is_word);
+		}
+		// the newest `count`, then older runs of as many until one is said
 		while more {
 			let before = run.first().map(Post::id);
 			let (mut older, has_more) =
@@ -243,9 +402,13 @@ impl ThreadStore {
 				break;
 			}
 		}
+		// a compacting run leaves the posts its compaction covers unread
+		let more = more || (stop.is_some() && stop > floor);
 		let run_start = more.then(|| run.first().map(Post::id)).flatten();
 		posts.append(&mut run);
-		self.records_of(&lineage, posts, run_start).await
+		let mut records = self.records_of(&lineage, posts, run_start).await?;
+		records.set_seed(self.lineage_seed(&lineage).await?);
+		records.xok()
 	}
 
 	/// The [`Self::load`] posts before the run of `records`, a window of
@@ -375,23 +538,35 @@ impl ThreadStore {
 		(found, more).xok()
 	}
 
+	/// The seed's last post of `lineage`, its root's ([`Thread::seed`]),
+	/// no later than where the branch from the root leaves it.
+	async fn lineage_seed(
+		&self,
+		lineage: &[(ThreadId, Option<PostId>)],
+	) -> Result<Option<PostId>> {
+		let Some((root, until)) = lineage.last() else {
+			return Ok(None);
+		};
+		let seed = self
+			.read_thread(*root)
+			.await?
+			.and_then(|thread| thread.seed());
+		seed.map(|seed| until.map_or(seed, |until| until.min(seed)))
+			.xok()
+	}
+
 	/// The seed of `lineage`, its root's posts through the root's seed
 	/// ([`Thread::seed`]), a branch's being its lineage root's.
 	async fn seed_posts(
 		&self,
 		lineage: &[(ThreadId, Option<PostId>)],
 	) -> Result<Vec<Post>> {
-		let Some((root, until)) = lineage.last() else {
+		let Some((root, _)) = lineage.last() else {
 			return Ok(Vec::new());
 		};
-		let Some(seed) = self
-			.read_thread(*root)
-			.await?
-			.and_then(|thread| thread.seed())
-		else {
+		let Some(through) = self.lineage_seed(lineage).await? else {
 			return Ok(Vec::new());
 		};
-		let through = until.map_or(seed, |until| until.min(seed));
 		let mut posts = self
 			.partition(*root)?
 			.table::<Post>()
@@ -587,7 +762,10 @@ impl ThreadStore {
 			return Ok(());
 		};
 		for post in posts {
-			if let (Some(bytes), Some(file)) = (post.bytes(), post.file()) {
+			for file in post.files() {
+				let Some(bytes) = post.file_bytes(file.index()) else {
+					continue;
+				};
 				let path = Self::blob_path(file.blob());
 				if !blobs.exists(&path).await? {
 					blobs.insert(&path, bytes.clone()).await?;
@@ -1278,9 +1456,9 @@ pub(crate) mod thread_store_test {
 		let posts = store.posts(thread.id()).await.unwrap();
 		posts.len().xpect_eq(2);
 		for post in &posts {
-			post.bytes().xpect_none();
+			post.holds_bytes().xpect_false();
 			store
-				.read_blob(post.file().unwrap().blob())
+				.read_blob(post.files()[0].blob())
 				.await
 				.unwrap()
 				.to_vec()

@@ -104,11 +104,11 @@
 //! | `reasoning` | `text` | nothing, whoever wrote it | its text |
 //! | `reasoning_summary` | `text` | nothing, whoever wrote it | its text |
 //! | `tool_call` | `name`, `call_id`, `arguments` | the reading agent's own as a call; another's with its output as one message in the author's role | its arguments |
-//! | `tool_output` | `call_id`, `text`, `blob`?, `file_stem`?; `subject` its call | for the reading agent's own call, its output at once after the call, a `blob` as content parts on open responses and on completions as the output's text then a user message holding it; for another's, part of the call's message | its text, for a `blob` the file's line |
+//! | `tool_output` | `call_id`, `text`, `files`?, each `blob` and `file_stem`?; `subject` its call | for the reading agent's own call, its output at once after the call, its files as content parts on open responses and on completions as the output's text then one user message holding them all; for another's, part of the call's message | its text, then each file's line |
 //! | `session_opened` | `spawned_by`? | a join's note (Sessions) | `── Coach joined ──` |
 //! | `edited` | `was`, the original body; `subject` the post | a note where the change was made, `<system>Ann edited a post from 2026-11-20T09:10Z.</system>`, the time the post's own | no row: the post shows its new body and that it was edited |
 //! | `deleted` | none; `subject` the post | a note as an edit's | no row: the post shows that it was deleted, with no body |
-//! | `compaction` | `text`, `from`, `previous`, `seed`; `subject` the last post it covers | its author's newest, unless stale, as a note opening its context (Contexts and compaction); no other | a divider saying how much it covers |
+//! | `compaction` | `text`, `from`, `previous`, `seed`; `subject` the last post it covers | its author's newest, unless stale, as a note opening its context (Contexts and compaction); no other | a divider saying how far it covers |
 //! | any other log | that kind's fields | nothing | a divider naming its kind |
 //!
 //! A post's **role** is relative to the agent reading it, the same on every
@@ -139,8 +139,13 @@
 //! `count` blobs in its context and lists each older one as a line naming its
 //! post, media type, name and size; without it every blob is carried. Records
 //! are never rewritten to shrink a request. A tool may answer with bytes,
-//! kept as its output's `blob`, so any route answering media is a tool an
-//! agent can look through, and a listed blob a tool reads back is the newest,
+//! kept as its output's `files`, so any route answering media is a tool an
+//! agent can look through; an answer of several files is one
+//! `multipart/mixed` body (RFC 2046, [`Multipart`](beet_net::prelude::Multipart)),
+//! split into the output's text and each file. [`KeepBlobs`] counts files,
+//! whatever post holds them, and a listing names a file by its post and its
+//! index there, ie `[file: cat.png, image/png, 3 B] file 2 in post 3mw..`
+//! ([`PostFile::listing`]). A listed blob a tool reads back is the newest,
 //! carried again. Encoding bytes for a provider,
 //! base64 included, is that provider's mapper's own, and a reference is never
 //! sent as a url, since a provider could not fetch it.
@@ -154,8 +159,9 @@
 //!   receives what other windows post. How far back it opens is its
 //!   [`Reach`]: a view's window opens on enough posts to fill it
 //!   ([`MountThreadStore::load`]) and holds what its reader has scrolled to;
-//!   a canonical window holds at least its agents' contexts, and always the
-//!   seed; every run reaches back to the last word. A post in progress stays
+//!   a canonical window holds at least its agents' contexts, back through
+//!   each agent's newest compaction where every one compacts, else the whole
+//!   thread, and always the seed; every run reaches back to the last word. A post in progress stays
 //!   in memory and is stored when it completes. A view keeps one small
 //!   document per loaded post, written only when that post changes, and
 //!   every reader of the records, a view, window sync and the flush, asks
@@ -330,32 +336,48 @@
 //!
 //! # Contexts and compaction
 //!
-//! - **Context.** What one model call reads: the seed unless a compaction
-//!   holds it, the reading agent's newest compaction as a note, then every
+//! - **Context.** What one model call reads ([`ThreadRecords::model_posts`]):
+//!   the seed unless a compaction holds it, the reading agent's newest
+//!   compaction as a note ([`ThreadRecords::compaction_note`]), then every
 //!   shown post after that compaction's subject, with the notes among them.
-//!   With no compaction it is the whole shown thread.
+//!   With no compaction it is the whole shown thread. Its size is the last
+//!   response's recorded input, plus the estimate of what followed what that
+//!   response read ([`ThreadRecords::context_tokens`]), the one estimate a
+//!   quarter of a post's row length and a thousand a file
+//!   ([`ThreadRecords::estimate`]).
 //! - **Chaining.** A request continuing a provider's stored response sends
 //!   only what follows the newest post that response read (its
 //!   [`ResponseMeta`]'s `read`), never chaining to one whose `read` covers a
 //!   post changed since ([`ThreadRecords::stored_response`]), but to the
 //!   newest that does not, else sending everything; a compaction starts a
-//!   new chain.
+//!   new chain, so no response older than the agent's newest is chained to.
 //! - **Compaction.** A stored summary of everything up to one post, a
-//!   `compaction` post authored by the agent whose context it is. It is opt
-//!   in, on the agent (`Compact{template, ..}`), and done by another: a
-//!   thread of its own, built from the named template for one compaction,
-//!   run as a function and despawned, its model named there and never
-//!   assumed to be the conversation's. It is told the newest summary, what
-//!   changed under it and what to fold in, may read the thread's posts
-//!   through its one tool (`<ReadPosts/>`), and answers the new summary.
-//!   Every post is summarised or read verbatim, with no gap.
-//! - **Stale.** A compaction covering a post edited or deleted after it was
-//!   made. Only an agent's newest compaction is read, and never a stale one:
-//!   it is refreshed before the agent's next model call.
+//!   `compaction` post authored by the agent whose context it is
+//!   ([`Compaction`]: its text, the first post it was given verbatim, the
+//!   compaction it folds in and whether the seed is inside). It is opt in,
+//!   on the agent ([`Compact`](crate::prelude::Compact)`{template, at, keep, step, method, seed, backfill}`),
+//!   and done by another: a thread of its own, built from the named template
+//!   for one compaction, run as a function and despawned, its model named
+//!   there and never assumed to be the conversation's. It is told the newest
+//!   summary, what changed under it and what to fold in, may read the
+//!   thread's posts through its one tool
+//!   ([`<ReadPosts/>`](crate::prelude::ReadPosts)), is seeded with the rule
+//!   ([`<CompactInstructions/>`](crate::prelude::CompactInstructions)), and
+//!   answers the new summary. It runs inside the agent's turn, before a model
+//!   call, so an interrupt drops it and leaves the older one in force. Every
+//!   post is summarised or read verbatim, with no gap: each compaction is
+//!   given the posts after the last one's subject, and the boundary never
+//!   falls between a call and its output or on a post in progress.
+//! - **Stale.** A compaction covering a post edited or deleted after its
+//!   message was built ([`ThreadRecords::is_stale`]). Only an agent's newest
+//!   compaction is read ([`ThreadRecords::compaction`]), and never a stale
+//!   one: it is refreshed before the agent's next model call, one call however
+//!   many changed, and a refresh that fails ends the turn on its error.
 //!
 //! What was edited away or deleted is sensitive: a compaction thread reads
 //! it, to know what to take out, and a summary holds none of it. People see
-//! the original posts wherever nobody edited or deleted them.
+//! the original posts wherever nobody edited or deleted them, and a view
+//! shows a compaction as a divider saying how far it covers, never its text.
 //!
 //! # Tools
 //!
@@ -400,10 +422,7 @@
 //! - a summary leaves out what was deleted because its model is told to,
 //!   which nothing can prove;
 //! - a `JsonTableStore` rewrites its partition on each write, and a browser's
-//!   local storage holds about 5 MB in all;
-//! - compaction, as Contexts and compaction gives it, is not built: nothing
-//!   bounds a thread by post count, and a long thread outgrows its model's
-//!   context.
+//!   local storage holds about 5 MB in all.
 mod actor;
 mod create_actor;
 pub use create_actor::*;
@@ -451,6 +470,8 @@ pub use thread_records::*;
 pub use window::*;
 mod response_meta;
 pub use response_meta::*;
+mod compaction;
+pub use compaction::Compaction;
 mod shown_posts;
 pub use shown_posts::ShownPosts;
 mod edit_post;

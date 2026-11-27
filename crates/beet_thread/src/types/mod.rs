@@ -7,6 +7,18 @@ mod run_thread;
 #[cfg(feature = "action")]
 pub use run_thread::*;
 #[cfg(feature = "action")]
+pub(crate) mod compact;
+#[cfg(feature = "action")]
+pub use compact::*;
+#[cfg(feature = "action")]
+mod compact_instructions;
+#[cfg(feature = "action")]
+pub use compact_instructions::*;
+#[cfg(feature = "action")]
+mod thread_function;
+#[cfg(feature = "action")]
+pub(crate) use thread_function::*;
+#[cfg(feature = "action")]
 mod thread_route;
 #[cfg(feature = "action")]
 pub use thread_route::*;

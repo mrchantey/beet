@@ -133,6 +133,9 @@ pub enum MediaType {
 	FormUrlEncoded,
 	/// `multipart/form-data`
 	FormData,
+	/// `multipart/mixed` (RFC 2046), several bodies in one, each part its own
+	/// `Content-Type`.
+	MultipartMixed,
 	/// `application/protobuf`
 	Protobuf,
 	/// `application/msgpack`
@@ -216,6 +219,7 @@ impl MediaType {
 	const TOML: &'static str = "application/toml";
 	const FORM_URL_ENCODED: &'static str = "application/x-www-form-urlencoded";
 	const FORM_DATA: &'static str = "multipart/form-data";
+	const MULTIPART_MIXED: &'static str = "multipart/mixed";
 	const PROTOBUF: &'static str = "application/protobuf";
 	const MESSAGE_PACK: &'static str = "application/msgpack";
 	const SHELL: &'static str = "application/x-sh";
@@ -306,6 +310,9 @@ impl MediaType {
 				MediaType::FormUrlEncoded
 			}
 			val if val.contains(Self::FORM_DATA) => MediaType::FormData,
+			val if val.contains(Self::MULTIPART_MIXED) => {
+				MediaType::MultipartMixed
+			}
 			val if val.contains(Self::PROTOBUF) => MediaType::Protobuf,
 			val if val.contains(Self::MESSAGE_PACK) => MediaType::MessagePack,
 			val if val.contains(Self::SHELL) => MediaType::Shell,
@@ -549,6 +556,7 @@ impl MediaType {
 			MediaType::Toml => Self::TOML,
 			MediaType::FormUrlEncoded => Self::FORM_URL_ENCODED,
 			MediaType::FormData => Self::FORM_DATA,
+			MediaType::MultipartMixed => Self::MULTIPART_MIXED,
 			MediaType::Protobuf => Self::PROTOBUF,
 			MediaType::MessagePack => Self::MESSAGE_PACK,
 			MediaType::Shell => Self::SHELL,
@@ -897,6 +905,7 @@ mod test {
 			MediaType::Toml,
 			MediaType::DagCbor,
 			MediaType::Protobuf,
+			MediaType::MultipartMixed,
 			MediaType::AnsiTerm,
 		];
 		for media_type in types {

@@ -33,8 +33,11 @@ struct ChoiceInput {
 }
 
 /// Parse + spawn + reduce a scene, returning the reduced app.
-///
-async fn reduce(source: &str) -> App {
+async fn reduce(source: &str) -> App { reduce_in(source, None).await }
+
+/// As [`reduce`], the scene spawned beneath the package `package`, which its
+/// documents resolve in, if given.
+async fn reduce_in(source: &str, package: Option<BlobStore>) -> App {
 	ensure_auth_env();
 	let mut app = App::new();
 	app.add_plugins(MinimalPlugins)
@@ -49,7 +52,14 @@ async fn reduce(source: &str) -> App {
 		.register_type::<AgentChoiceAction>();
 	app.world_mut().spawn(cli_registration());
 	AsyncRunner::settle_async_tasks(app.world_mut()).await;
-	BsxParser::spawn(app.world_mut(), source).unwrap();
+	let scene = BsxParser::spawn(app.world_mut(), source).unwrap();
+	if let Some(package) = package {
+		let root = app
+			.world_mut()
+			.spawn((PackageStore::new(package.clone()), package))
+			.id();
+		app.world_mut().entity_mut(scene).insert(ChildOf(root));
+	}
 	ThreadRecords::reduce_now(app.world_mut());
 	app.world_mut().flush();
 	app
@@ -361,6 +371,100 @@ async fn function_scene_declares_its_route() {
 	agent_count(&mut app).xpect_eq(0);
 	app.world_mut()
 		.query_once::<&RouteToolCall>()
+		.len()
+		.xpect_eq(1);
+}
+
+/// The long chat compacts on the mock: its agent's context past `at` is
+/// summarised by the thread its compactor template builds, from the package,
+/// whose compactor reads posts before it answers, and the summary stands in
+/// for the posts it covers in the agent's context.
+#[beet::test]
+async fn long_chat_compacts_on_the_mock() {
+	let mock = |source: &str| {
+		source
+			.replace(
+				"ModelStreamer{provider:OpenAi, size:Large}",
+				"MockPostStreamer{custom_response:\"ok\"}",
+			)
+			.replace(
+				"ModelStreamer{provider:OpenAi, size:Small}",
+				r#"MockPostStreamer{script:[Call{tool:"read-posts", arguments:{from:"2222222222222", count:2}}, Text("THE-SUMMARY")]}"#,
+			)
+	};
+	let package = BlobStore::temp();
+	package
+		.insert(
+			&RelPath::new("templates/Compactor.bsx"),
+			mock(include_str!("../examples/thread/templates/Compactor.bsx")),
+		)
+		.await
+		.unwrap();
+	let mut app = reduce_in(
+		&mock(include_str!("../examples/thread/long_chat.bsx")),
+		Some(package),
+	)
+	.await;
+	enter_mounted(&mut app).await;
+	assert_crate_check_passed(&mut app);
+	let window = app
+		.world_mut()
+		.query_filtered_once::<Entity, With<ThreadRecords>>()[0];
+	let agent = app
+		.world_mut()
+		.query_once::<(Entity, &ActorRef)>()
+		.into_iter()
+		.find(|(_, actor)| actor.0 == ActorId::from_static("agent"))
+		.unwrap()
+		.0;
+	// a person says enough for the agent's context to pass `at`
+	for turn in 0..12 {
+		let mut entity = app.world_mut().entity_mut(window);
+		let thread = entity.get::<Thread>().unwrap().id();
+		entity.get_mut::<ThreadRecords>().unwrap().upsert_post(
+			AgentPost::new_text(
+				ActorId::from_static("user"),
+				thread,
+				format!("TURN-{turn} {}", "a long thought ".repeat(60)),
+				PostStatus::Completed,
+			),
+		);
+		app.world_mut()
+			.entity_mut(agent)
+			.call::<(), Outcome>(())
+			.await
+			.unwrap();
+	}
+	let records = app.world().get::<ThreadRecords>(window).unwrap();
+	let compaction = records
+		.compaction(&ActorId::from_static("agent"))
+		.unwrap()
+		.clone();
+	compaction
+		.log::<Compaction>()
+		.unwrap()
+		.text
+		.xpect_eq("THE-SUMMARY");
+	let shown = records.shown(..);
+	let read = records
+		.model_posts(&shown, &ActorId::from_static("agent"), None)
+		.into_iter()
+		.map(|item| match item {
+			ModelPost::Note(note) => note,
+			ModelPost::Post(view) => view.post.to_string(),
+			ModelPost::Call { call, .. } => call.post.to_string(),
+		})
+		.collect::<Vec<_>>()
+		.join("\n");
+	read.as_str()
+		.xpect_contains("THE-SUMMARY")
+		.xpect_contains("patient tutor")
+		.xnot()
+		.xpect_contains("TURN-0 ")
+		.xpect_contains("TURN-11 ");
+	// only the conversation is left: each compaction thread despawned
+	app.world_mut()
+		.query_filtered_once::<Entity, With<Thread>>()
 		.len()
 		.xpect_eq(1);
 }

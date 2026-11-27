@@ -1,0 +1,16 @@
+<!--
+The compaction thread `long_chat.bsx`'s agent compacts through: `<CompactInstructions/>`
+seeds the rule, the Reader posts the message the compaction is entered with, and
+the Compactor answers the new summary, reading posts by id with `<ReadPosts/>` when
+the message does not say enough. Its model is its own, smaller than the
+conversation's. It holds no other tool: it is the one agent reading the originals.
+-->
+<RepeatWhileFunctionCallOutput>
+	<Thread {Sequence}>
+		<CompactInstructions/>
+		<CreateActor name="Reader" kind="User"/>
+		<CreateActor name="Compactor" kind="Agent" {ModelStreamer{provider:OpenAi, size:Small}}>
+			<Router><ReadPosts/></Router>
+		</CreateActor>
+	</Thread>
+</RepeatWhileFunctionCallOutput>

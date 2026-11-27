@@ -9,10 +9,10 @@ use beet_net::prelude::*;
 ///
 /// Its id carries its time and its partition is its thread, so the row
 /// stores neither: [`Self::thread`] is set by whatever loaded it, since a
-/// branch's records hold several threads' posts. The bytes of a file a post
-/// holds ([`Self::file`]) are never in its row: they ride on the post in
-/// memory ([`Self::bytes`]) until a flush writes them to the blob store, and
-/// are read back for a request.
+/// branch's records hold several threads' posts. The bytes of the files a
+/// post holds ([`Self::files`]) are never in its row: they ride on the post in
+/// memory ([`Self::file_bytes`]) until a flush writes them to the blob store,
+/// and are read back for a request.
 ///
 /// Read a post's content through its typed view ([`AgentPost`]), a log's
 /// through its kind ([`Self::log`]). Posts order by id.
@@ -38,10 +38,11 @@ pub struct Post {
 	/// The kind's own fields.
 	#[serde(default)]
 	body: Map,
-	/// The bytes of the file the post holds, in memory and never serialized.
+	/// The bytes of each file the post holds, in [`Self::files`] order, in
+	/// memory and never serialized: empty once released.
 	#[serde(skip)]
 	#[reflect(ignore)]
-	bytes: Option<Bytes>,
+	bytes: Vec<Bytes>,
 }
 
 impl std::fmt::Debug for Post {
@@ -54,7 +55,14 @@ impl std::fmt::Debug for Post {
 			.field("status", &self.status)
 			.field("subject", &self.subject)
 			.field("body", &self.body)
-			.field("bytes", &self.bytes.as_ref().map(|bytes| bytes.len()))
+			.field(
+				"bytes",
+				&self
+					.bytes
+					.iter()
+					.map(|bytes| bytes.len())
+					.collect::<Vec<_>>(),
+			)
 			.finish()
 	}
 }
@@ -110,8 +118,9 @@ pub enum PostKind {
 	ReasoningSummary,
 	/// `{name, call_id, arguments}`: a tool called.
 	ToolCall,
-	/// `{call_id, text, blob?, file_stem?}`, its subject the call: what a
-	/// tool answered, its bytes by reference.
+	/// `{call_id, text, files?}`, its subject the call: what a tool
+	/// answered, each file of `files` `{blob, file_stem?}`, its bytes by
+	/// reference.
 	ToolOutput,
 	/// A log: an actor joined ([`SessionOpened`]).
 	SessionOpened,
@@ -304,7 +313,7 @@ impl Post {
 			status,
 			subject: None,
 			body,
-			bytes: None,
+			bytes: Vec::new(),
 		}
 	}
 
@@ -387,22 +396,27 @@ impl Post {
 	pub(crate) fn emptied(&self) -> Self {
 		Self {
 			body: Map::default(),
-			bytes: None,
+			bytes: Vec::new(),
 			..self.clone()
 		}
 	}
 
-	/// The bytes of the file this post holds ([`Self::file`]), while it
+	/// The bytes of the file at `index` of [`Self::files`], while the post
 	/// holds them in memory.
-	pub fn bytes(&self) -> Option<&Bytes> { self.bytes.as_ref() }
+	pub fn file_bytes(&self, index: usize) -> Option<&Bytes> {
+		self.bytes.get(index)
+	}
 
-	/// Hold `bytes` in memory on this post.
-	pub(crate) fn set_bytes(&mut self, bytes: Bytes) {
-		self.bytes = Some(bytes);
+	/// Whether the post holds its files' bytes in memory.
+	pub fn holds_bytes(&self) -> bool { !self.bytes.is_empty() }
+
+	/// Hold the bytes of each of [`Self::files`] in memory, in order.
+	pub(crate) fn set_bytes(&mut self, bytes: Vec<Bytes>) {
+		self.bytes = bytes;
 	}
 
 	/// Drop the bytes held in memory, which the blob store, if any, holds.
-	pub(crate) fn release_bytes(&mut self) { self.bytes = None; }
+	pub(crate) fn release_bytes(&mut self) { self.bytes.clear(); }
 }
 
 impl std::fmt::Display for Post {
@@ -410,7 +424,7 @@ impl std::fmt::Display for Post {
 		if let Some(text) = self.text() {
 			return f.write_str(text);
 		}
-		match self.file() {
+		match self.files().first() {
 			Some(file) => {
 				write!(f, "[{}, {} bytes]", file.media_type(), file.size())
 			}

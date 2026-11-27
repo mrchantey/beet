@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 /// A run of a thread without what was edited away or deleted (the model
 /// page, [`crate::table`], "Everything and shown"): the same posts as the
-/// records, with a deleted post's body and an edit's original emptied.
+/// records, with a deleted post's body, an edit's original and a compaction
+/// that may not be read emptied, which is every compaction but each agent's
+/// newest, and that one while it is stale.
 ///
 /// Derived in memory and stored nowhere, it is a whole list made in one place
 /// ([`ThreadRecords::shown`]) with no way to change a post of it, so a list in
@@ -24,7 +26,18 @@ impl ShownPosts {
 	/// The files these posts hold, oldest first, a deleted post's gone with
 	/// its body.
 	pub fn files(&self) -> impl DoubleEndedIterator<Item = PostFile> {
-		self.0.iter().filter_map(|post| post.file())
+		self.0.iter().flat_map(|post| post.files())
+	}
+
+	/// The posts of these that `keep` holds, still shown: ie an agent's
+	/// context within the thread.
+	pub fn within(&self, keep: impl Fn(&Post) -> bool) -> Self {
+		self.0
+			.iter()
+			.filter(|post| keep(post))
+			.cloned()
+			.collect::<Vec<_>>()
+			.xmap(Self)
 	}
 
 	/// The post `id`, if shown here.
@@ -35,10 +48,15 @@ impl ShownPosts {
 			.map(|index| &*self.0[index])
 	}
 
-	/// `post` as shown: a deleted post and an `edited` log a copy with the
-	/// body emptied, any other the records' own.
-	fn show(post: &Arc<Post>) -> Arc<Post> {
-		match post.is_deleted() || post.kind() == &PostKind::Edited {
+	/// `post` as shown: a deleted post, an `edited` log and a compaction not
+	/// in `readable` a copy with the body emptied, any other the records'
+	/// own.
+	fn show(post: &Arc<Post>, readable: &HashSet<PostId>) -> Arc<Post> {
+		let emptied = post.is_deleted()
+			|| post.kind() == &PostKind::Edited
+			|| (post.kind() == &PostKind::Compaction
+				&& !readable.contains(&post.id()));
+		match emptied {
 			true => Arc::new(post.emptied()),
 			false => post.clone(),
 		}
@@ -72,9 +90,10 @@ impl ThreadRecords {
 			}
 			Bound::Unbounded => self.posts().len(),
 		};
+		let readable = self.readable_compactions();
 		self.posts()[start..end.max(start)]
 			.iter()
-			.map(ShownPosts::show)
+			.map(|post| ShownPosts::show(post, &readable))
 			.collect::<Vec<_>>()
 			.xmap(ShownPosts)
 	}

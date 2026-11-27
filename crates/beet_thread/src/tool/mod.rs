@@ -3,6 +3,10 @@ pub use execution_outcome::*;
 mod tool_definition;
 pub use tool_definition::*;
 #[cfg(feature = "action")]
+mod read_posts;
+#[cfg(feature = "action")]
+pub use read_posts::*;
+#[cfg(feature = "action")]
 mod route_tool;
 #[cfg(feature = "action")]
 pub use route_tool::*;

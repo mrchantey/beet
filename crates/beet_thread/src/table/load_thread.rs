@@ -26,8 +26,9 @@ use beet_net::prelude::*;
 ///
 /// A window opens on the newest posts and reads older ones as its reader
 /// scrolls to them, `load` at a time; a window holding an agent opens on the
-/// whole thread, its agent's context, and a canonical window holds the seed
-/// too ([`Reach`]).
+/// whole thread, its agent's context, or back through each agent's newest
+/// compaction where every one compacts ([`Compact`]), and a canonical window
+/// holds the seed too ([`Reach`]).
 ///
 /// A deferred mount:
 /// [`Thread::enter`] fills it, picks the stored thread and only then inserts
@@ -164,6 +165,19 @@ impl ThreadEntry {
 		self.message = Some(self.fill(message)?);
 		self.actor = actor;
 		self.xok()
+	}
+
+	/// Post `message` as it is once the thread is entered, filling nothing,
+	/// authored by `actor`, else the first User actor the scene authors: a
+	/// message a program composed, ie a compaction's.
+	pub fn with_text(
+		mut self,
+		message: impl Into<String>,
+		actor: Option<ActorId>,
+	) -> Self {
+		self.message = Some(message.into());
+		self.actor = actor;
+		self
 	}
 
 	/// `text` with each `{param}` replaced by the request's value for it, the
@@ -383,8 +397,9 @@ impl Thread {
 	///    scene keeping its seed posts;
 	/// 4. continuing, or branching: reduce the scene dropping its seed posts,
 	///    reading no seed source;
-	/// 5. load the stored posts the window opens on ([`Reach`]: the whole
-	///    thread for a window holding an agent, else the newest
+	/// 5. load the stored posts the window opens on ([`Reach`]: back through
+	///    each agent's newest compaction where every agent compacts, the
+	///    whole thread for a window holding an agent, else the newest
 	///    [`MountThreadStore::load`], with the seed for a canonical window),
 	///    take a live window's unstored posts, post a join for each actor the
 	///    scene authors that is not of kind System and no other window holds
@@ -495,11 +510,16 @@ impl Thread {
 								|(windows, records)| {
 									let records = records.get(entity)?;
 									match (
+										windows
+											.compacting_agents(entity, records),
 										windows.holds_agent(entity, records),
 										windows.holds_behavior(entity),
 									) {
-										(true, _) => Reach::Whole,
-										(false, seed) => {
+										(Some(agents), ..) => {
+											Reach::Compacted { agents }
+										}
+										(None, true, _) => Reach::Whole,
+										(None, false, seed) => {
 											Reach::Newest { count: load, seed }
 										}
 									}
@@ -549,7 +569,9 @@ impl Thread {
 					.ok_or_else(|| bevyhow!("thread {entity} despawned"))?;
 				// a fresh thread's seed is its posts before anyone joins
 				if creating && keep_seeds {
-					record.set_seed(records.last_post().map(Post::id));
+					let seed = records.last_post().map(Post::id);
+					record.set_seed(seed);
+					records.set_seed(seed);
 				}
 				records.merge_stored(loaded);
 				if let Some(live) = live {

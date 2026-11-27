@@ -86,6 +86,8 @@ where
 	T: Clone + Component + PostStreamer,
 {
 	let streamer = cx.input;
+	// a compacting agent refreshes or compacts its context before each call
+	Compact::prepare(&cx.caller).await?;
 	let mut stream = streamer.stream_posts(cx.caller.clone()).await?;
 	let mut function_calls = HashMap::new();
 	let mut last_created = None;

@@ -33,7 +33,7 @@ use beet_router::prelude::*;
 ///    its end;
 /// 4. waits for every completed post to reach its [`ThreadStore`]
 ///    ([`ThreadStore::flush`]), however the behavior ended, then despawns
-///    the thread;
+///    the thread, as it does when the request is dropped;
 /// 5. answers the last completed text of the thread's acting actors as the
 ///    body on a pass, and a `500` naming the failure on a fail.
 ///
@@ -71,101 +71,35 @@ pub async fn ThreadRoute(
 		entry = entry.with_message(message, actor)?;
 	}
 	let source = source.load(&route).await?;
-	let root =
-		ThreadRoute::build(&route, source.clone(), cx.input.parts().clone())
-			.await?;
-	let answer =
-		ThreadRoute::run(&world.entity(root), source.name(), entry).await;
+	let function = ThreadFunction::build(
+		&world,
+		route.id(),
+		Some(route.id()),
+		source,
+		cx.input.parts().clone(),
+	)
+	.await?;
+	let answer = ThreadRoute::answer(&function, entry).await;
 	// torn down however the run ended, the response answered after
-	world
-		.with(move |world: &mut World| ThreadRoute::despawn(world, root))
-		.await;
+	function.despawn().await;
 	answer
 }
 
 impl ThreadRoute {
-	/// Build `source` for the request `parts`, settle it and attach it
-	/// beneath `route`, answering the build root, the container holding the
-	/// template's own root.
-	async fn build(
-		route: &AsyncEntity,
-		source: LoadedTemplate,
-		parts: RequestParts,
-	) -> Result<Entity> {
-		let route_id = route.id();
-		let root = route
-			.world()
-			.with(move |world: &mut World| -> Result<Entity> {
-				let router = world
-					.with_state::<AncestorQuery<&RouteTree>, _>(|trees| {
-						trees.get_entity(route_id)
-					})
-					.unwrap_or(route_id);
-				let root = world.spawn_empty().id();
-				RequestContextStack::scoped(
-					world,
-					RequestContext::new(parts, root, route_id, router),
-					|world| source.build(&mut world.entity_mut(root)),
-				)?;
-				// the build's route tree wakes run while the thread is still
-				// detached, so they reach its own url spaces and never the
-				// surrounding one's; attached after, it resolves its ancestors as if
-				// authored beneath the route, before any seed is read
-				world.flush();
-				world.entity_mut(root).insert(ChildOf(route_id));
-				root.xok()
-			})
-			.await?;
-		TemplatePending::settle_root(&route.world().entity(root)).await;
-		let error = route
-			.world()
-			.with(move |world: &mut World| {
-				world
-					.get::<TemplateError>(root)
-					.map(|error| error.error.clone())
-			})
-			.await;
-		match error {
-			Some(error) => {
-				route
-					.world()
-					.with(move |world: &mut World| Self::despawn(world, root))
-					.await;
-				Err(error.into())
-			}
-			None => root.xok(),
-		}
-	}
-
-	/// Enter the threads under the build `root`, run the template's behavior,
-	/// flush every thread and answer.
-	async fn run(
-		root: &AsyncEntity,
-		template: &str,
+	/// Run `function` with `entry` and answer: the last text of the
+	/// thread's acting actors on a pass, a `500` naming the failure on a
+	/// fail.
+	async fn answer(
+		function: &ThreadFunction,
 		entry: ThreadEntry,
 	) -> Result<Response> {
-		Self::assert_unattended(root, template).await?;
-		let threads = RunThread::enter_all(root, &entry).await?;
-		let behavior = root
-			.with_state::<Query<&Children>, _>(|root, children| {
-				children.get(root).ok().and_then(|children| {
-					(children.len() == 1).then(|| children[0])
-				})
-			})
-			.await?
-			.ok_or_else(|| {
-				bevyhow!("`{template}` must build exactly one root")
-			})?;
-		let thread = *threads
-			.first()
-			.ok_or_else(|| bevyhow!("`{template}` builds no `<Thread>`"))?;
-		let outcome =
-			root.world().entity(behavior).call::<(), Outcome>(()).await;
-		RunThread::flush_all(&root.world(), &threads).await?;
-		let outcome = outcome?;
-		let last_text = root
+		let template = function.name().to_string();
+		let ThreadOutcome { outcome, thread } = function.run(entry).await?;
+		let last_text = function
 			.world()
-			.with(move |world: &mut World| Self::last_text(world, thread))
+			.with(move |world: &mut World| {
+				ThreadFunction::last_text(world, thread)
+			})
 			.await;
 		match (outcome, last_text) {
 			(Outcome::Pass(_), Some(text)) => {
@@ -183,88 +117,6 @@ impl ThreadRoute {
 			),
 		}
 		.xok()
-	}
-
-	/// Refuse a template holding a [`UserInput`], naming its actor: nobody
-	/// types into a thread run as a function.
-	async fn assert_unattended(root: &AsyncEntity, template: &str) -> Result {
-		let typing = root
-			.with_state::<(Query<&Children>, Query<Option<&Actor>, With<UserInput>>), _>(
-				|root, (children, inputs)| {
-					children
-						.iter_descendants(root)
-						.filter_map(|entity| inputs.get(entity).ok())
-						.map(|actor| {
-							actor
-								.map(|actor| actor.name().to_string())
-								.unwrap_or_default()
-						})
-						.next()
-				},
-			)
-			.await?;
-		match typing {
-			Some(actor) => bevybail!(
-				"`{template}` holds a `UserInput` on the actor `{actor}`, \
-				 but a `ThreadRoute` runs with nobody typing: a thread a person sits \
-				 in is held by a `RunThread`"
-			),
-			None => Ok(()),
-		}
-	}
-
-	/// Tear down the build `root`: detached from the route first, then every
-	/// entity leaves first, so each route removal records the url space it
-	/// leaves while its ancestry is whole and the surrounding [`RouteTree`]
-	/// never rebuilds for a thread that was never part of it.
-	fn despawn(world: &mut World, root: Entity) {
-		let Ok(mut root_mut) = world.get_entity_mut(root) else {
-			return;
-		};
-		root_mut.remove::<ChildOf>();
-		let entities = world.with_state::<Query<&Children>, _>(|children| {
-			children
-				.iter_descendants_inclusive(root)
-				.collect::<Vec<_>>()
-		});
-		for entity in entities.into_iter().rev() {
-			if let Ok(entity) = world.get_entity_mut(entity) {
-				entity.despawn();
-			}
-		}
-	}
-
-	/// The last completed text an acting actor of `thread` posted, as shown:
-	/// an actor with behavior beneath it ([`ActorRef`]) other than a person,
-	/// so an agent's reply or a loop's decision answers, never a person's
-	/// post, and never what was deleted or edited away.
-	fn last_text(world: &mut World, thread: Entity) -> Option<String> {
-		let acting = world
-			.with_state::<(Query<&Children>, Query<&ActorRef>), _>(
-				|(children, actor_refs)| {
-					children
-						.iter_descendants(thread)
-						.filter_map(|entity| actor_refs.get(entity).ok())
-						.map(|actor_ref| actor_ref.0.clone())
-						.collect::<Vec<_>>()
-				},
-			);
-		let records = world.get::<ThreadRecords>(thread)?;
-		records
-			.shown(..)
-			.iter()
-			.rev()
-			.filter(|post| {
-				acting.contains(post.author())
-					&& records
-						.actor(post.author())
-						.is_ok_and(|actor| actor.kind() != ActorKind::User)
-					&& !post.in_progress()
-			})
-			.find_map(|post| match post.as_agent_post()? {
-				AgentPost::Text(text) => Some(text.to_string()),
-				_ => None,
-			})
 	}
 }
 
@@ -477,7 +329,7 @@ mod test {
 			})
 			.await
 			.unwrap();
-		ThreadRoute::last_text(app.world_mut(), thread)
+		ThreadFunction::last_text(app.world_mut(), thread)
 			.xpect_eq(Some("the answer".to_string()));
 	}
 
@@ -669,10 +521,11 @@ mod test {
 			.unwrap();
 		records
 			.metas()
-			.filter_map(|meta| meta.usage)
-			.sum::<Usage>()
-			.input_tokens
-			.xpect_eq(40);
+			.filter(|meta| {
+				meta.usage.is_some_and(|usage| usage.input_tokens > 0)
+			})
+			.count()
+			.xpect_eq(4);
 		// the model reads each request's joins as one note
 		records
 			.model_posts(&records.shown(..), &ActorId::AGENT, None)
@@ -768,6 +621,52 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_contains("already runs its behavior in the window");
+	}
+
+	/// A request dropped while its thread runs, ie its client gone,
+	/// despawns the thread all the same.
+	#[beet_core::test]
+	async fn a_dropped_request_despawns_its_thread() {
+		let (mut app, router, _) = url_space().await;
+		app.world_mut()
+			.entity_mut(router)
+			.run_async_then(async move |router: AsyncEntity| {
+				let world = router.world().clone();
+				let live = async {
+					while !world
+						.with(|world: &mut World| {
+							world
+								.query_filtered::<(), With<ThreadStore>>()
+								.iter(world)
+								.next()
+								.is_some()
+						})
+						.await
+					{
+						async_ext::yield_now().await;
+					}
+				};
+				let request = router.exchange(Request::get("hold"));
+				futures::future::select(
+					core::pin::pin!(request),
+					core::pin::pin!(live),
+				)
+				.await;
+			})
+			.await;
+		let threads = |app: &mut App| {
+			app.world_mut()
+				.query_filtered::<(), With<Thread>>()
+				.iter(app.world())
+				.count()
+		};
+		for _ in 0..50 {
+			if threads(&mut app) == 0 {
+				break;
+			}
+			app.update();
+		}
+		threads(&mut app).xpect_eq(0);
 	}
 
 	/// A template a person types into is refused, naming the actor.

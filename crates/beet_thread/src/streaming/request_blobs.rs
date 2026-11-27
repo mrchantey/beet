@@ -8,20 +8,20 @@ use beet_net::exports::bytes::Bytes;
 /// steps, the records answering its posts and then the bytes they reference
 /// read.
 ///
-/// The newest files its agent's [`KeepBlobs`] keeps are carried, their
-/// bytes held in memory on the post or read from the window's
-/// [`ThreadStore`]; any older one is listed. A carried file that cannot be
-/// read is unavailable, a warning and never a failed turn. The default
-/// carries every file a post holds in memory.
+/// The newest files its agent's [`KeepBlobs`] keeps are carried, counted by
+/// file whatever post holds them, their bytes held in memory on the post or
+/// read from the window's [`ThreadStore`]; any older one is listed. A carried
+/// file that cannot be read is unavailable, a warning and never a failed
+/// turn. The default carries every file a post holds in memory.
 #[derive(Debug, Default, Clone)]
 pub struct RequestBlobs {
 	/// The bytes read from the store, by content.
 	read: HashMap<Cid, Bytes>,
-	/// The posts whose files are listed rather than carried.
-	listed: HashSet<PostId>,
+	/// The files listed rather than carried.
+	listed: HashSet<FileKey>,
 }
 
-/// One file as a request sends it ([`RequestBlobs::file`]).
+/// One file as a request sends it ([`RequestBlobs::files`]).
 #[derive(Debug, Clone)]
 pub enum RequestFile {
 	/// Its bytes, carried.
@@ -44,6 +44,14 @@ impl RequestFile {
 			Self::Unavailable(_) => RequestBlobs::UNAVAILABLE.to_string(),
 		}
 	}
+
+	/// The file and its bytes, if carried.
+	pub fn carried(&self) -> Option<(&PostFile, &Bytes)> {
+		match self {
+			Self::Carried(file, bytes) => Some((file, bytes)),
+			_ => None,
+		}
+	}
 }
 
 impl RequestBlobs {
@@ -61,18 +69,18 @@ impl RequestBlobs {
 		let is_carried = |file: &PostFile| {
 			carried
 				.as_ref()
-				.is_none_or(|carried| carried.contains(&file.post()))
+				.is_none_or(|carried| carried.contains(&file.key()))
 		};
 		let listed = shown
 			.files()
 			.filter(|file| !is_carried(file))
-			.map(|file| file.post())
+			.map(|file| file.key())
 			.collect();
 		let mut missing = Vec::<BlobRef>::new();
 		for file in shown.files().filter(is_carried) {
 			let held = shown
 				.post(file.post())
-				.is_some_and(|post| post.bytes().is_some());
+				.is_some_and(|post| post.file_bytes(file.index()).is_some());
 			if !held && !missing.iter().any(|blob| blob.cid == file.blob().cid)
 			{
 				missing.push(file.blob().clone());
@@ -117,9 +125,9 @@ impl RequestBlobs {
 		self.xok()
 	}
 
-	/// The files of the records of the window of the agent at `caller`, by
-	/// its [`KeepBlobs`], with the bytes it carries that no post holds in
-	/// memory read.
+	/// The files of the context of the agent at `caller`, by its
+	/// [`KeepBlobs`], with the bytes it carries that no post holds in memory
+	/// read: a post a compaction folded away carries nothing.
 	#[cfg(feature = "action")]
 	pub async fn for_agent(caller: &AsyncEntity) -> Result<Self> {
 		let (thread, blobs, missing) = caller
@@ -127,8 +135,13 @@ impl RequestBlobs {
 				|entity, (query, keep)| -> Result<_> {
 					let (thread, _, records) =
 						query.thread_and_records(entity)?;
+					let reader = query.actor_id(entity)?;
 					let keep = keep.get(entity).ok().map(|keep| keep.count);
-					let (blobs, missing) = Self::plan(&records.shown(..), keep);
+					let shown = records.shown(..);
+					let bounds = records.context_bounds(&shown, &reader);
+					let context = shown
+						.within(|post| ThreadRecords::in_context(post, bounds));
+					let (blobs, missing) = Self::plan(&context, keep);
 					(thread, blobs, missing).xok()
 				},
 			)
@@ -136,31 +149,38 @@ impl RequestBlobs {
 		blobs.read(&caller.world().entity(thread), missing).await
 	}
 
-	/// The text a tool's output reads as where its bytes are not sent: a
-	/// file's ([`RequestFile::text`]), else the output.
+	/// The text a tool's output reads as where its files' bytes are not
+	/// sent: its answer's text, then each file's text
+	/// ([`RequestFile::text`]), a line each.
 	pub fn output_text(&self, output: &Post) -> String {
-		match self.file(output) {
-			Some(file) => file.text(),
-			None => output.field("text").unwrap_or_default().to_string(),
-		}
+		output
+			.field("text")
+			.filter(|text| !text.is_empty())
+			.map(str::to_string)
+			.into_iter()
+			.chain(self.files(output).iter().map(RequestFile::text))
+			.collect::<Vec<_>>()
+			.join("\n")
 	}
 
-	/// How a request sends the file `post` holds, `None` for a post holding
-	/// none.
-	pub fn file(&self, post: &Post) -> Option<RequestFile> {
-		let file = post.file()?;
-		if self.listed.contains(&post.id()) {
-			return RequestFile::Listed(file).xsome();
-		}
-		match post
-			.bytes()
-			.cloned()
-			.or_else(|| self.read.get(&file.blob().cid).cloned())
-		{
-			Some(bytes) => RequestFile::Carried(file, bytes),
-			None => RequestFile::Unavailable(file),
-		}
-		.xsome()
+	/// How a request sends each file `post` holds, in order.
+	pub fn files(&self, post: &Post) -> Vec<RequestFile> {
+		post.files()
+			.into_iter()
+			.map(|file| {
+				if self.listed.contains(&file.key()) {
+					return RequestFile::Listed(file);
+				}
+				match post
+					.file_bytes(file.index())
+					.cloned()
+					.or_else(|| self.read.get(&file.blob().cid).cloned())
+				{
+					Some(bytes) => RequestFile::Carried(file, bytes),
+					None => RequestFile::Unavailable(file),
+				}
+			})
+			.collect()
 	}
 }
 
@@ -314,7 +334,7 @@ mod test {
 		let cat =
 			app.world().get::<ThreadRecords>(window).unwrap().posts()[0].id();
 		let listing =
-			format!("[file: photo.png, image/png, 3 B] in post {cat}");
+			format!("[file: photo.png, image/png, 3 B] file 1 in post {cat}");
 		for request in request_test::requests(&mut app, agent).await {
 			count(&request, &listing).xpect_eq(1);
 			count(&request, &data_url(CAT)).xpect_eq(0);

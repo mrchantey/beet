@@ -34,6 +34,7 @@ pub mod header;
 pub use header as headers;
 mod header_map;
 mod media_bytes_ext;
+mod multipart;
 mod parts;
 mod request;
 mod response;
@@ -47,6 +48,7 @@ pub use header_map::*;
 #[cfg(feature = "http")]
 pub(crate) use http_interop::*;
 pub use media_bytes_ext::*;
+pub use multipart::*;
 pub use response::*;
 mod param_pattern;
 pub use param_pattern::*;

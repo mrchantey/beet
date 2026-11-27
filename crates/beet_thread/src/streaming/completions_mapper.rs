@@ -46,8 +46,8 @@ use beet_core::prelude::*;
 ///
 /// Each file is as `blobs` sends it. Completions carries an image as an
 /// image and a text file as its text; any other file reads as its line
-/// ([`PostFile::line`]). A tool message is text alone, so a carried file a
-/// tool answered follows it as a user message holding it.
+/// ([`PostFile::line`]). A tool message is text alone, so the carried files
+/// a tool answered follow it as one user message holding them all.
 pub fn post_to_completions_message(
 	agent_id: &ActorId,
 	post: ModelPost,
@@ -63,12 +63,14 @@ pub fn post_to_completions_message(
 				output.as_ref().map(|output| blobs.output_text(output)),
 			);
 			let name = Some(call.actor.name().to_string());
-			let content = match output
-				.and_then(|output| blobs.file(output.post))
-				.and_then(|file| carried_part(&file))
-			{
-				Some(part) => UserContent::Array(vec![text_part(text), part]),
-				None => UserContent::Text(text),
+			let carried = output
+				.map(|output| carried_parts(blobs, output.post))
+				.unwrap_or_default();
+			let content = match carried.is_empty() {
+				true => UserContent::Text(text),
+				false => UserContent::Array(
+					[text_part(text)].into_iter().chain(carried).collect(),
+				),
 			};
 			return user_message(content, name).xvec().xok();
 		}
@@ -111,10 +113,9 @@ pub fn post_to_completions_message(
 					tool_call_id: fco.call_id().to_string(),
 				},
 			);
-			let held = blobs
-				.file(post.post)
-				.and_then(|file| carried_part(&file))
-				.map(|part| user_message(UserContent::Array(vec![part]), None));
+			let carried = carried_parts(blobs, post.post);
+			let held = (!carried.is_empty())
+				.then(|| user_message(UserContent::Array(carried), None));
 			return [tool].into_iter().chain(held).collect::<Vec<_>>().xok();
 		}
 		AgentPost::Url(view) if view.media_type().is_image() => {
@@ -132,7 +133,7 @@ pub fn post_to_completions_message(
 			build_text_message(&post, view.url(), kind, is_self)
 		}
 		AgentPost::Media(_) => {
-			let file = blobs.file(post.post);
+			let file = blobs.files(post.post).into_iter().next();
 			match file.as_ref().and_then(carried_part) {
 				Some(UserPart::ImageUrl(image)) => {
 					build_image_user_message(&post, image.image_url.url)
@@ -163,6 +164,12 @@ pub fn post_to_completions_message(
 		}
 	};
 	msg.xvec().xok()
+}
+
+/// The parts carrying each file of `post` completions carries, all of one
+/// call's files in one user message.
+fn carried_parts(blobs: &RequestBlobs, post: &Post) -> Vec<UserPart> {
+	blobs.files(post).iter().filter_map(carried_part).collect()
 }
 
 /// The part carrying a carried file: an image as an image, its bytes
