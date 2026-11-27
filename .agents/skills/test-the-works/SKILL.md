@@ -1,6 +1,6 @@
 ---
 name: test-the-works
-description: Maximal project health pass. Run core tests, all tests, the example smoke set, the rsx_site verification and every downstream repo in sequence, fixing every failure and warning surfaced along the way. Use when asked to run 'the works' or fully verify the project.
+description: Maximal project health pass. Run core tests, all tests, the example smoke set, the rsx_site verification and every downstream package in sequence, fixing every failure and warning surfaced along the way. Use when asked to run 'the works' or fully verify the project.
 ---
 
 # The Works
@@ -9,7 +9,7 @@ This task is for maximally ensuring the project is running smoothly, beet and ev
 
 ## Ownership
 
-Every failure, error and warning this skill surfaces is yours to fix, wherever it lives. That includes code you never touched, code another agent just committed, a feature or target combination no recipe names but a step happened to build (a downstream's wasm build, a bare-metal `testing_embedded` build), and every downstream repo in step 5.
+Every failure, error and warning this skill surfaces is yours to fix, wherever it lives. That includes code you never touched, code another agent just committed, a feature or target combination no recipe names but a step happened to build (a downstream's wasm build, a bare-metal `testing_embedded` build), and every downstream package in step 5.
 
 None of these are reasons to leave something unfixed, they are exactly the findings this skill exists to produce:
 
@@ -48,9 +48,9 @@ run this skill to completion: `.agents/skills/test-examples/SKILL.md`
 
 Both must exit 0, and step 2 must show the page content wrapped in the site shell. Fix any breakage (a common cause is generated route code drifting from a `beet_router` API change) and rerun.
 
-## 5. verify the downstream repos
+## 5. verify the downstream packages
 
-Every repo in the `downstream-sync` skill's list (`.agents/skills/downstream-sync/SKILL.md`) builds on beet by path, so an upstream change can still break a downstream. Read each downstream's `AGENTS.md` header and manifest first, preserve its declared upstream checkout, and run its own test recipe (its `justfile` `test`, plus `build-wasm` where it has one). beet_eval uses `/home/pete/me/worktrees/beet/eval/beet`; beetmash uses `/home/pete/me/worktrees/beet/misc/beet`. Never repoint a dependency or deploy `workspace_dir` merely to make this verification exercise another checkout. Fix failures upstream in the checkout the downstream owns when beet is at fault (a prelude name collision, an API narrowed below what a downstream consumes), and in the downstream when it has drifted from a deliberate beet change. A downstream's own uncommitted work is left in place and built on, never reverted.
+Every package in the `downstream-sync` skill's list (`.agents/skills/downstream-sync/SKILL.md`) builds on beet by path, so an upstream change can still break a downstream. Read each downstream's `AGENTS.md` header and manifest first, preserve its declared upstream checkout, and run its own test recipe (its `justfile` `test`, plus `build-wasm` where it has one). beet_eval uses `/home/pete/me/worktrees/beet/eval/beet`; beetmash uses the primary checkout, `/home/pete/me/beet`. Never repoint a dependency or deploy `workspace_dir` merely to make this verification exercise another checkout. Fix failures upstream in the checkout the downstream owns when beet is at fault (a prelude name collision, an API narrowed below what a downstream consumes), and in the downstream when it has drifted from a deliberate beet change. A downstream's own uncommitted work is left in place and built on, never reverted.
 
 Report the resolved upstream path and commit for each downstream, including whether that checkout has uncommitted changes, and distinguish it from the checkout tested in steps 1 to 4. A passing downstream suite against another checkout does not validate this checkout's changes: when those changes have not reached the declared upstream, report the operator tree sync and downstream rerun as an explicit verification prerequisite, not a failure to fix by rewriting paths or an already-passed check.
 
