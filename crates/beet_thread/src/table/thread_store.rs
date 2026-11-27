@@ -36,6 +36,12 @@ use std::sync::atomic::Ordering;
 /// only once its records are written. The bytes of a file a post holds are
 /// written to `blobs/<cid>` in the nearest blob store before its row, so a
 /// stored reference always resolves.
+///
+/// The store holds everything, a deleted post's body and an edit's original
+/// included, and so does every read of it ([`Self::posts`], [`Self::open`]):
+/// what a person or an agent reads is the records shown
+/// ([`ThreadRecords::shown`]). An edit or a deletion is written by the window
+/// making it, as one batch ([`EditPost`], [`DeletePost`]).
 #[derive(Clone, Component)]
 #[require(SyncedRecords)]
 pub struct ThreadStore {
@@ -157,7 +163,8 @@ impl ThreadStore {
 	}
 
 	/// Every post of `thread` alone, by [`PostId`], its whole table, for a
-	/// program reading everything: a window reads only as far as it needs
+	/// program reading everything, what was edited away and deleted
+	/// included: a window reads only as far as it needs
 	/// ([`Self::open`]), and a branch's inherited posts are its parent's.
 	pub async fn posts(&self, thread: ThreadId) -> Result<Vec<Post>> {
 		let mut posts =
@@ -535,7 +542,7 @@ impl ThreadStore {
 	}
 
 	/// The partition of `thread`.
-	fn partition(&self, thread: ThreadId) -> Result<TableStore> {
+	pub(super) fn partition(&self, thread: ThreadId) -> Result<TableStore> {
 		self.root.partition(thread.to_string())
 	}
 
@@ -575,7 +582,7 @@ impl ThreadStore {
 	/// addressed by content so the same bytes twice are one blob. Without a
 	/// blob store the bytes stay in memory on the window. Nothing removes a
 	/// blob: a post edited or deleted keeps its file, as it keeps its row.
-	async fn write_blobs(&self, posts: &[Post]) -> Result {
+	pub(super) async fn write_blobs(&self, posts: &[Post]) -> Result {
 		let Some(blobs) = &self.blobs else {
 			return Ok(());
 		};
@@ -958,8 +965,8 @@ pub(crate) mod thread_store_test {
 	}
 
 	/// The text of each of `posts`.
-	fn texts(posts: &[Post]) -> Vec<String> {
-		posts.iter().map(|post| post.to_string()).collect()
+	fn texts(posts: &[impl core::borrow::Borrow<Post>]) -> Vec<String> {
+		posts.iter().map(|post| post.borrow().to_string()).collect()
 	}
 
 	/// Create `thread` in `store` holding `posts` by `actor`.
@@ -1138,6 +1145,39 @@ pub(crate) mod thread_store_test {
 			.await
 			.unwrap_err();
 
+		// a change puts the post under the cid it was read at with its log,
+		// and a second change from the same stale read is refused
+		let stored_mine = store
+			.posts(thread.id())
+			.await
+			.unwrap()
+			.into_iter()
+			.find(|post| post.id() == mine.id())
+			.unwrap();
+		let change = |text: &str| {
+			let mut changed = stored_mine.clone();
+			changed.set_text(text);
+			let log =
+				Post::new_log(actor_id.clone(), thread.id(), &PostEdited {
+					was: stored_mine.body().clone(),
+				})
+				.unwrap()
+				.with_subject(mine.id());
+			[changed, log]
+		};
+		store.change(&stored_mine, &change("edited")).await.unwrap();
+		store
+			.change(&stored_mine, &change("again"))
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("changed since it was read");
+		let posts = store.posts(thread.id()).await.unwrap();
+		texts(&posts[..6]).xpect_eq(vec![
+			"post 0", "post 1", "post 2", "edited", "theirs", "[edited]",
+		]);
+		posts.len().xpect_eq(6);
+
 		// a partition whose index row never landed is an orphan no read lists
 		let orphan = Thread::new("Orphan");
 		let partition = table.partition(orphan.id().to_string()).unwrap();
@@ -1277,11 +1317,11 @@ pub(crate) mod thread_store_test {
 			.posts()
 			.iter()
 			.rev()
-			.map(Post::id)
+			.map(|post| post.id())
 			.collect::<Vec<_>>();
 		while records.has_older() {
 			let older = store.read_older(thread, records).await.unwrap();
-			read.extend(older.posts().iter().rev().map(Post::id));
+			read.extend(older.posts().iter().rev().map(|post| post.id()));
 			records.merge_stored(older);
 		}
 		read
@@ -1314,7 +1354,7 @@ pub(crate) mod thread_store_test {
 		records
 			.posts()
 			.iter()
-			.map(Post::id)
+			.map(|post| post.id())
 			.collect::<Vec<_>>()
 			.xpect_eq(ids.clone());
 		read.into_iter().rev().collect::<Vec<_>>().xpect_eq(ids);

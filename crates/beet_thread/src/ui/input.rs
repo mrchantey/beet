@@ -1,5 +1,6 @@
 //! The composer: the [`CreatePostForm`] widget, which posts to its thread the
-//! moment it is submitted and stops the thread's turns on request.
+//! moment it is submitted, edits and deletes its actor's own posts, and stops
+//! the thread's turns on request.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -23,6 +24,14 @@ use bevy::input::keyboard::KeyboardInput;
 /// Its stop control, the `Stop` button or Escape in the focused input,
 /// triggers [`InterruptTurn`] on every actor of its thread, in every window of
 /// the runtime.
+///
+/// A [`ThreadView`] beside it on its page, bound to the same window, is bound
+/// to it ([`ViewComposer`]): each post of the composer's actor that it may
+/// change carries `edit` and `delete`. `edit` hands the post's text to the
+/// composer, whose next submit edits that post ([`EditingPost`],
+/// [`EditPost`]) and whose Escape leaves the edit rather than stopping;
+/// `delete` deletes it ([`DeletePost`]). A refused or conflicting change
+/// raises through the error handler.
 ///
 /// Host-agnostic content bound to a window with an [`OfThread`] relationship.
 /// From markup the two spread together onto one entity:
@@ -67,14 +76,130 @@ fn create_post_form_on_add(mut world: DeferredWorld, cx: HookContext) {
 	});
 }
 
-/// Post the submitted message of a [`CreatePostForm`] to its thread.
+/// The post a [`CreatePostForm`] is editing, its text handed to the
+/// composer's input: the next submit edits that post rather than posting,
+/// and Escape leaves the edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Component)]
+pub struct EditingPost(pub PostId);
+
+/// The composer a [`ThreadView`] is bound to: a [`CreatePostForm`] beside it
+/// on its page, bound to the same window.
+#[derive(SystemParam)]
+pub struct ViewComposer<'w, 's> {
+	parents: Query<'w, 's, &'static ChildOf>,
+	children: Query<'w, 's, &'static Children>,
+	forms: Query<'w, 's, (&'static CreatePostForm, &'static OfThread)>,
+	views: Query<'w, 's, &'static OfThread, With<ThreadView>>,
+	rows: Query<'w, 's, &'static ThreadRow>,
+	elements: Query<'w, 's, &'static Element>,
+}
+
+impl ViewComposer<'_, '_> {
+	/// The composer of the view `view` of the window `window`, if its page
+	/// holds one.
+	pub fn of(&self, view: Entity, window: Entity) -> Option<&CreatePostForm> {
+		self.form_of(view, window)
+			.and_then(|form| self.forms.get(form).ok())
+			.map(|(form, _)| form)
+	}
+
+	/// The entity of the composer of the view `view` of the window `window`.
+	fn form_of(&self, view: Entity, window: Entity) -> Option<Entity> {
+		let parent = self.parents.get(view).ok()?.parent();
+		self.children.get(parent).ok()?.iter().find(|sibling| {
+			self.forms
+				.get(*sibling)
+				.is_ok_and(|(_, of_thread)| of_thread.thread() == window)
+		})
+	}
+
+	/// The post of the row holding `control`, the window its view shows and
+	/// the entity of the view's composer, for a row's control acting on it.
+	fn control(&self, control: Entity) -> Option<(PostId, Entity, Entity)> {
+		let post = self
+			.parents
+			.iter_ancestors_inclusive(control)
+			.find_map(|entity| self.rows.get(entity).ok())?
+			.0;
+		let (view, window) = self
+			.parents
+			.iter_ancestors_inclusive(control)
+			.find_map(|entity| {
+				self.views
+					.get(entity)
+					.ok()
+					.map(|of_thread| (entity, of_thread.thread()))
+			})?;
+		(post, window, self.form_of(view, window)?).xsome()
+	}
+
+	/// The `<input>` of the composer `form`.
+	fn input(&self, form: Entity) -> Option<Entity> {
+		self.children.iter_descendants(form).find(|entity| {
+			self.elements
+				.get(*entity)
+				.is_ok_and(|element| element.tag() == "input")
+		})
+	}
+}
+
+/// A row's `edit`: hand the post's text to the view's composer, focused,
+/// its next submit editing the post.
+pub(crate) fn edit_on_click(
+	ev: On<PointerUp>,
+	composers: ViewComposer,
+	records: Query<&ThreadRecords>,
+	mut commands: Commands,
+) {
+	let Some((post, window, form)) = composers.control(ev.event_target())
+	else {
+		return;
+	};
+	let text = records
+		.get(window)
+		.ok()
+		.and_then(|records| records.post(post))
+		.and_then(|post| post.text())
+		.unwrap_or_default()
+		.to_string();
+	commands.entity(form).insert(EditingPost(post));
+	if let Some(input) = composers.input(form) {
+		commands.entity(input).insert((Value::str(text), Focus));
+	}
+}
+
+/// A row's `delete`: delete the post as the view's composer's actor.
+pub(crate) fn delete_on_click(
+	ev: On<PointerUp>,
+	composers: ViewComposer,
+	records: Query<&ThreadRecords>,
+	commands: AsyncCommands,
+) -> Result {
+	let Some((post, window, form)) = composers.control(ev.event_target())
+	else {
+		return Ok(());
+	};
+	let actor = records
+		.get(window)?
+		.author(composers.forms.get(form)?.0.actor.as_ref())?;
+	commands.run(async move |world: AsyncWorld| -> Result {
+		DeletePost::new(actor, post)
+			.apply(&world.entity(window))
+			.await
+	});
+	Ok(())
+}
+
+/// Post the submitted message of a [`CreatePostForm`] to its thread, or,
+/// while it is editing a post ([`EditingPost`]), edit that post.
 pub(super) fn post_on_submit(
 	ev: On<Submit>,
 	parents: Query<&ChildOf>,
-	forms: Query<(&CreatePostForm, &OfThread)>,
+	forms: Query<(Entity, &CreatePostForm, &OfThread, Option<&EditingPost>)>,
 	mut threads: Query<(&Thread, &mut ThreadRecords)>,
+	mut commands: AsyncCommands,
 ) -> Result {
-	let Some((form, of_thread)) = parents
+	let Some((entity, form, of_thread, editing)) = parents
 		.iter_ancestors_inclusive(ev.form)
 		.find_map(|entity| forms.get(entity).ok())
 	else {
@@ -96,6 +221,16 @@ pub(super) fn post_on_submit(
 			)
 		})?;
 	let author = records.author(form.actor.as_ref())?;
+	if let Some(EditingPost(post)) = editing.copied() {
+		let (window, text) = (of_thread.thread(), text.to_string());
+		commands.entity(entity).remove::<EditingPost>();
+		commands.run(async move |world: AsyncWorld| -> Result {
+			EditPost::new(author, post, text)
+				.apply(&world.entity(window))
+				.await
+		});
+		return Ok(());
+	}
 	let post =
 		AgentPost::new_text(author, thread.id(), text, PostStatus::Completed);
 	records.upsert_post(post);
@@ -118,12 +253,14 @@ fn stop_on_click(
 }
 
 /// Escape in a composer's focused input, on the surface it was pressed on:
-/// interrupt every actor of its thread.
+/// leave the post it is editing, its input emptied, else interrupt every
+/// actor of its thread.
 pub(super) fn stop_on_escape(
 	mut keys: MessageReader<KeyboardInput>,
 	focused: Query<Entity, With<Focus>>,
 	parents: Query<&ChildOf>,
-	forms: Query<&OfThread, With<CreatePostForm>>,
+	forms: Query<(Entity, &OfThread, Has<EditingPost>), With<CreatePostForm>>,
+	composers: ViewComposer,
 	surfaces: SurfaceQuery,
 	mut stop: StopThread,
 ) {
@@ -139,11 +276,18 @@ pub(super) fn stop_on_escape(
 			.iter()
 			.any(|window| surfaces.matches(*target, *window))
 	}) {
-		if let Some(of_thread) = parents
+		match parents
 			.iter_ancestors_inclusive(target)
 			.find_map(|entity| forms.get(entity).ok())
 		{
-			stop.stop(of_thread.thread());
+			Some((form, _, true)) => {
+				stop.commands.entity(form).remove::<EditingPost>();
+				if let Some(input) = composers.input(form) {
+					stop.commands.entity(input).insert(Value::str(""));
+				}
+			}
+			Some((_, of_thread, false)) => stop.stop(of_thread.thread()),
+			None => {}
 		}
 	}
 }

@@ -115,9 +115,9 @@ pub enum PostKind {
 	ToolOutput,
 	/// A log: an actor joined ([`SessionOpened`]).
 	SessionOpened,
-	/// A log: a post was edited, its subject the post.
+	/// A log: a post was edited, its subject the post ([`PostEdited`]).
 	Edited,
-	/// A log: a post was deleted, its subject the post.
+	/// A log: a post was deleted, its subject the post ([`PostDeleted`]).
 	Deleted,
 	/// A log: a summary of everything up to its subject.
 	Compaction,
@@ -180,6 +180,12 @@ impl PostKind {
 		)
 	}
 
+	/// Whether a model reads a post of this kind as a note: a join, an edit
+	/// or a deletion ([`ThreadRecords::note`]).
+	pub fn is_noted(&self) -> bool {
+		matches!(self, Self::SessionOpened | Self::Edited | Self::Deleted)
+	}
+
 	/// The body field a post of this kind streams into, `None` for a kind
 	/// that never streams.
 	pub fn text_field(&self) -> Option<&'static str> {
@@ -236,7 +242,9 @@ impl<'de> Deserialize<'de> for PostKind {
 // PostStatus
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Whether a post is complete, in progress, or closed by an interrupt.
+/// Whether a post is complete, in progress, closed by an interrupt, or
+/// deleted by its author, a tombstone whose row keeps its body (the model
+/// page, [`crate::table`], "Editing and deleting").
 #[derive(
 	Debug,
 	Clone,
@@ -258,6 +266,19 @@ pub enum PostStatus {
 	Completed,
 	Interrupted,
 	InProgress,
+	Deleted,
+}
+
+impl PostStatus {
+	/// The status's written name, ie `in_progress`.
+	pub fn as_str(&self) -> &'static str {
+		match self {
+			Self::Completed => "completed",
+			Self::Interrupted => "interrupted",
+			Self::InProgress => "in_progress",
+			Self::Deleted => "deleted",
+		}
+	}
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -312,6 +333,9 @@ impl Post {
 	/// Whether the post is still streaming.
 	pub fn in_progress(&self) -> bool { self.status == PostStatus::InProgress }
 
+	/// Whether the post's author deleted it.
+	pub fn is_deleted(&self) -> bool { self.status == PostStatus::Deleted }
+
 	pub fn set_status(&mut self, status: PostStatus) { self.status = status; }
 
 	/// Name the thread whose partition holds this post, as it loads.
@@ -354,6 +378,19 @@ impl Post {
 
 	/// The body, mutably.
 	pub(crate) fn body_mut(&mut self) -> &mut Map { &mut self.body }
+
+	/// Replace the body, as an edit does.
+	pub(crate) fn set_body(&mut self, body: Map) { self.body = body; }
+
+	/// A copy with its body and bytes emptied, as shown in place of what was
+	/// taken back ([`ShownPosts`]).
+	pub(crate) fn emptied(&self) -> Self {
+		Self {
+			body: Map::default(),
+			bytes: None,
+			..self.clone()
+		}
+	}
 
 	/// The bytes of the file this post holds ([`Self::file`]), while it
 	/// holds them in memory.

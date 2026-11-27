@@ -234,9 +234,10 @@ impl ThreadRoute {
 		}
 	}
 
-	/// The last completed text an acting actor of `thread` posted: an actor
-	/// with behavior beneath it ([`ActorRef`]) other than a person, so an
-	/// agent's reply or a loop's decision answers, never a person's post.
+	/// The last completed text an acting actor of `thread` posted, as shown:
+	/// an actor with behavior beneath it ([`ActorRef`]) other than a person,
+	/// so an agent's reply or a loop's decision answers, never a person's
+	/// post, and never what was deleted or edited away.
 	fn last_text(world: &mut World, thread: Entity) -> Option<String> {
 		let acting = world
 			.with_state::<(Query<&Children>, Query<&ActorRef>), _>(
@@ -250,14 +251,17 @@ impl ThreadRoute {
 			);
 		let records = world.get::<ThreadRecords>(thread)?;
 		records
-			.authored_posts()
+			.shown(..)
+			.iter()
 			.rev()
-			.filter(|authored| {
-				acting.contains(&authored.actor.id())
-					&& authored.actor.kind() != ActorKind::User
-					&& !authored.post.in_progress()
+			.filter(|post| {
+				acting.contains(post.author())
+					&& records
+						.actor(post.author())
+						.is_ok_and(|actor| actor.kind() != ActorKind::User)
+					&& !post.in_progress()
 			})
-			.find_map(|authored| match authored.post.as_agent_post()? {
+			.find_map(|post| match post.as_agent_post()? {
 				AgentPost::Text(text) => Some(text.to_string()),
 				_ => None,
 			})
@@ -437,6 +441,44 @@ mod test {
 		threads.len().xpect_eq(1);
 		let posts = records.posts(threads[0].id()).await.unwrap();
 		(threads[0].clone(), posts)
+	}
+
+	/// The answer is what is shown: an acting agent's text it deleted is
+	/// never the answer, its text before that is.
+	#[beet_core::test]
+	async fn the_answer_leaves_out_what_was_deleted() {
+		let mut app = App::new();
+		app.add_plugins(MinimalPlugins)
+			.install_types::<ThreadPlugin>();
+		let thread = app
+			.world_mut()
+			.spawn((Thread::default(), children![
+				Actor::user(),
+				(Actor::agent(), MockPostStreamer::default()),
+			]))
+			.id();
+		app.update();
+		let id = app.world().get::<Thread>(thread).unwrap().id();
+		let said = |text: &str| {
+			AgentPost::new_text(ActorId::AGENT, id, text, PostStatus::Completed)
+		};
+		let secret = said("DELETED-SECRET");
+		for post in [said("the answer"), secret.clone()] {
+			app.world_mut()
+				.get_mut::<ThreadRecords>(thread)
+				.unwrap()
+				.upsert_post(post);
+		}
+		app.world_mut()
+			.run_async_local_then(async move |world: AsyncWorld| {
+				DeletePost::new(ActorId::AGENT, secret.id())
+					.apply(&world.entity(thread))
+					.await
+			})
+			.await
+			.unwrap();
+		ThreadRoute::last_text(app.world_mut(), thread)
+			.xpect_eq(Some("the answer".to_string()));
 	}
 
 	/// The thread answers with its agent's last text, and is gone once it has,
@@ -633,7 +675,7 @@ mod test {
 			.xpect_eq(40);
 		// the model reads each request's joins as one note
 		records
-			.model_posts(&ActorId::AGENT, None)
+			.model_posts(&records.shown(..), &ActorId::AGENT, None)
 			.iter()
 			.filter(|item| matches!(item, ModelPost::Note(_)))
 			.count()

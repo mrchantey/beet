@@ -158,6 +158,9 @@ pub fn post_to_completions_message(
 		| AgentPost::ReasoningSummary(view) => {
 			build_text_message(&post, view.text(), kind, is_self)
 		}
+		AgentPost::Deleted(_) => {
+			bevybail!("the deleted post {} is no model input", post.post.id())
+		}
 	};
 	msg.xvec().xok()
 }
@@ -651,8 +654,9 @@ mod test {
 		let mut records = ThreadRecords::new();
 		records.insert_actor(Actor::user());
 		records.upsert_post(post);
+		let shown = records.shown(..);
 		let item = records
-			.model_posts(&ActorId::AGENT, None)
+			.model_posts(&shown, &ActorId::AGENT, None)
 			.into_iter()
 			.next()
 			.unwrap();
@@ -712,9 +716,10 @@ mod test {
 		let mut records = ThreadRecords::new();
 		records.insert_actor(Actor::user());
 		records.upsert_post(url("https://example.com/cat.png"));
+		let shown = records.shown(..);
 		let item = || {
 			records
-				.model_posts(&ActorId::AGENT, None)
+				.model_posts(&shown, &ActorId::AGENT, None)
 				.into_iter()
 				.next()
 				.unwrap()

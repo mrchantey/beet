@@ -130,6 +130,9 @@ pub fn post_to_o11s_input(
 		| AgentPost::Error(view)
 		| AgentPost::ReasoningContent(view)
 		| AgentPost::ReasoningSummary(view) => message(role, text(view.text())),
+		AgentPost::Deleted(_) => {
+			bevybail!("the deleted post {} is no model input", post.post.id())
+		}
 	}
 	.xok()
 }

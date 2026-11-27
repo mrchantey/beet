@@ -3,9 +3,10 @@
 //! A log's [`PostKind`] names it and its body is that kind's fields. beet's
 //! own logs are in the closed list of kinds; any other crate adds one by
 //! implementing [`LogKind`], its name prefixing the crate, and it needs no
-//! registration: a model reads a join ([`SessionOpened`]) as a note and no
-//! other log of these ([`ThreadRecords::model_posts`]), and a view renders a
-//! kind it knows its own way and any other by its name.
+//! registration: a model reads a join ([`SessionOpened`]), an edit
+//! ([`PostEdited`]) and a deletion ([`PostDeleted`]) as notes and no other
+//! log of these ([`ThreadRecords::model_posts`]), and a view renders a kind
+//! it knows its own way and any other by its name.
 use crate::prelude::*;
 use beet_core::prelude::*;
 

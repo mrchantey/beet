@@ -3,7 +3,8 @@ use beet_core::prelude::*;
 use beet_net::exports::bytes::Bytes;
 
 /// A typed view of a [`Post`] that is not a log, whoever its author, by its
-/// [`PostKind`]: the content a model reads or writes.
+/// [`PostKind`]: the content a model reads or writes. A deleted post is
+/// [`Self::Deleted`] whatever its kind, so no reader takes its body.
 pub enum AgentPost<'a> {
 	Text(TextView<'a>),
 	Refusal(TextView<'a>),
@@ -14,6 +15,8 @@ pub enum AgentPost<'a> {
 	FunctionCallOutput(FunctionCallOutputView<'a>),
 	ReasoningContent(TextView<'a>),
 	ReasoningSummary(TextView<'a>),
+	/// A post its author deleted, a tombstone with nothing to read.
+	Deleted(DeletedView<'a>),
 }
 
 impl std::ops::Deref for AgentPost<'_> {
@@ -26,6 +29,9 @@ impl<'a> AgentPost<'a> {
 	/// content.
 	pub fn new(post: &'a Post) -> Option<Self> {
 		let text = TextView { post };
+		if post.is_deleted() && !post.is_log() {
+			return Self::Deleted(DeletedView { post }).xsome();
+		}
 		match post.kind() {
 			PostKind::Text => Self::Text(text),
 			PostKind::Refusal => Self::Refusal(text),
@@ -55,13 +61,19 @@ impl<'a> AgentPost<'a> {
 			Self::Media(view) => view.post,
 			Self::FunctionCall(view) => view.post,
 			Self::FunctionCallOutput(view) => view.post,
+			Self::Deleted(view) => view.post,
 		}
 	}
 
 	/// Whether a model reads this post: every kind but reasoning, which stays
-	/// in the records and the view whoever wrote it.
+	/// in the records and the view whoever wrote it, and nothing deleted.
 	pub fn is_model_input(&self) -> bool {
-		!matches!(self, Self::ReasoningContent(_) | Self::ReasoningSummary(_))
+		!matches!(
+			self,
+			Self::ReasoningContent(_)
+				| Self::ReasoningSummary(_)
+				| Self::Deleted(_)
+		)
 	}
 }
 
@@ -257,6 +269,17 @@ fn fields(pairs: impl IntoIterator<Item = (&'static str, String)>) -> Map {
 // ═══════════════════════════════════════════════════════════════════════
 // View types
 // ═══════════════════════════════════════════════════════════════════════
+
+/// A post its author deleted: its status and when it was made, and nothing
+/// of what it said.
+#[derive(Deref)]
+pub struct DeletedView<'a> {
+	post: &'a Post,
+}
+
+impl<'a> DeletedView<'a> {
+	pub fn post(&self) -> &'a Post { self.post }
+}
 
 /// A post whose body is `{text}`: text, a refusal, an error or reasoning.
 #[derive(Deref)]

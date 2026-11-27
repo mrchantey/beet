@@ -106,7 +106,7 @@
 //! | `tool_call` | `name`, `call_id`, `arguments` | the reading agent's own as a call; another's with its output as one message in the author's role | its arguments |
 //! | `tool_output` | `call_id`, `text`, `blob`?, `file_stem`?; `subject` its call | for the reading agent's own call, its output at once after the call, a `blob` as content parts on open responses and on completions as the output's text then a user message holding it; for another's, part of the call's message | its text, for a `blob` the file's line |
 //! | `session_opened` | `spawned_by`? | a join's note (Sessions) | `── Coach joined ──` |
-//! | `edited` | `was`, the original body; `subject` the post | a note where the change was made, `<system>Ann edited a post from 09:10.</system>` | no row: the post shows its new body and that it was edited |
+//! | `edited` | `was`, the original body; `subject` the post | a note where the change was made, `<system>Ann edited a post from 2026-11-20T09:10Z.</system>`, the time the post's own | no row: the post shows its new body and that it was edited |
 //! | `deleted` | none; `subject` the post | a note as an edit's | no row: the post shows that it was deleted, with no body |
 //! | `compaction` | `text`, `from`, `previous`, `seed`; `subject` the last post it covers | its author's newest, unless stale, as a note opening its context (Contexts and compaction); no other | a divider saying how much it covers |
 //! | any other log | that kind's fields | nothing | a divider naming its kind |
@@ -235,11 +235,12 @@
 //!   each response's [`ResponseMeta`], and a session's duration is the span
 //!   of its posts.
 //! - **Note.** How a model reads a join, one convention for every provider
-//!   ([`ThreadRecords::join_note`]):
+//!   ([`ThreadRecords::note`]):
 //!   `<system>Coach joined at 2026-11-22T09:10Z, 2 days 3 hours after the last post.</system>`.
 //!   The gap is measured from the last post that is not a log, and omitted
-//!   when there is none or it is under a minute. Consecutive joins are one
-//!   message, a line each inside one `<system>`. A note is sent in the user
+//!   when there is none or it is under a minute. Consecutive notes, joins,
+//!   edits and deletions alike, are one message, a line each inside one
+//!   `<system>`. A note is sent in the user
 //!   role whoever joined, the reading agent's own join included
 //!   ([`ModelPost::Note`]): it is something that happened, never something
 //!   the agent said. An edit, a deletion and a compaction are read as notes
@@ -292,25 +293,30 @@
 //! # Editing and deleting
 //!
 //! Only its author may edit or delete a post, and only a completed `text` or
-//! `media` post of the thread itself, never one a branch inherits. An edit
-//! replaces the row's body and appends an `edited` log holding the original.
-//! A deletion is a tombstone: the row's status becomes `deleted` and its body
-//! stays, with a `deleted` log saying when. Each is one atomic batch, the row
-//! replaced under the cid it was read at, so a conflicting change is refused
-//! to whoever made it, never retried over another's. Nothing is scrubbed,
-//! and a post changed twice has two logs, so its history reads by
-//! `by_subject`.
+//! `media` post of the thread itself, never one a branch inherits
+//! ([`Post::check_change`]). An edit ([`EditPost`]) replaces the row's body
+//! and appends an `edited` log holding the original ([`PostEdited`]). A
+//! deletion ([`DeletePost`]) is a tombstone: the row's status becomes
+//! `deleted` and its body stays, with a `deleted` log saying when
+//! ([`PostDeleted`]). Each is one atomic batch, the row replaced under the
+//! cid its window read it at, so a conflicting change is refused to whoever
+//! made it, never retried over another's. Window sync carries the change to
+//! every window of the runtime that loaded the post, and only the window
+//! making it writes it. Nothing is scrubbed, and a post changed twice has
+//! two logs, so its history reads by `by_subject`.
 //!
 //! # Everything and shown
 //!
-//! The store and a window's records hold everything. **Shown** is a thread
-//! without what was edited away or deleted: `ShownPosts`, derived from the
-//! records in memory and stored nowhere, the same posts with a deleted post's
-//! body, an edit's original and a compaction that may no longer be read each
-//! emptied. A deleted post stays in it, so a view can say it was there. It is
-//! the whole list as one immutable type, made in one place
-//! (`ThreadRecords::shown`), so a list in hand is known clean and no reader
-//! judges a post at a time.
+//! The store and a window's records hold everything ([`ThreadStore::posts`],
+//! [`ThreadRecords::posts`]). **Shown** is a thread without what was edited
+//! away or deleted: [`ShownPosts`], derived from the records in memory and
+//! stored nowhere, the same posts with a deleted post's body, an edit's
+//! original and a compaction that may no longer be read each emptied. A
+//! deleted post stays in it, so a view can say it was there, and
+//! [`AgentPost`] reads it as deleted and nothing else. It is the whole list
+//! as one immutable type, made in one place ([`ThreadRecords::shown`]), so a
+//! list in hand is known clean and no reader judges a post at a time; a post
+//! nobody touched is the records' own, shared rather than copied.
 //!
 //! | reader | reads |
 //! | --- | --- |
@@ -331,7 +337,9 @@
 //! - **Chaining.** A request continuing a provider's stored response sends
 //!   only what follows the newest post that response read (its
 //!   [`ResponseMeta`]'s `read`), never chaining to one whose `read` covers a
-//!   post changed since; a compaction starts a new chain.
+//!   post changed since ([`ThreadRecords::stored_response`]), but to the
+//!   newest that does not, else sending everything; a compaction starts a
+//!   new chain.
 //! - **Compaction.** A stored summary of everything up to one post, a
 //!   `compaction` post authored by the agent whose context it is. It is opt
 //!   in, on the agent (`Compact{template, ..}`), and done by another: a
@@ -443,6 +451,10 @@ pub use thread_records::*;
 pub use window::*;
 mod response_meta;
 pub use response_meta::*;
+mod shown_posts;
+pub use shown_posts::ShownPosts;
+mod edit_post;
+pub use edit_post::*;
 mod revision;
 pub use revision::PostRevision;
 pub use revision::Revision;

@@ -8,8 +8,8 @@ impl Post {
 	///
 	/// You **call the thread**, not "the agent": the scene reduces into a
 	/// [`ThreadRecords`], then calling the thread's `Sequence` runs each actor's turn
-	/// in document order. Whatever posts land after the seed are returned, ie
-	/// the replies. This presumes no topology, so it works for zero, one, or many
+	/// in document order. Whatever posts land after the seed are returned as
+	/// shown ([`ThreadRecords::shown`]), ie the replies. This presumes no topology, so it works for zero, one, or many
 	/// agents, with or without a user actor.
 	///
 	/// The non-interactive counterpart to a long-running server scene: the `oneshot`
@@ -47,11 +47,15 @@ impl Post {
 
 		world.with_state::<Query<&ThreadRecords>, _>(
 			move |thread_records| -> Result<Vec<Post>> {
+				let start = cursor
+					.map_or(core::ops::Bound::Unbounded, |cursor| {
+						core::ops::Bound::Excluded(cursor)
+					});
 				thread_records
 					.get(thread)?
-					.posts_after(cursor)
-					.into_iter()
-					.map(|view| view.post.clone())
+					.shown((start, core::ops::Bound::Unbounded))
+					.iter()
+					.map(|post| (**post).clone())
 					.collect::<Vec<_>>()
 					.xok()
 			},

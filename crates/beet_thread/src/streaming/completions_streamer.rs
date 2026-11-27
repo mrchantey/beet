@@ -125,7 +125,8 @@ impl CompletionsStreamer {
 					}
 
 					// Convert the thread's posts to completions messages
-					for post in records.request_posts(&agent_id, None) {
+					let shown = records.shown(..);
+					for post in records.request_posts(&shown, &agent_id, None) {
 						messages.extend(
 							completions_mapper::post_to_completions_message(
 								&agent_id, post, &blobs,

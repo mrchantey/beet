@@ -44,7 +44,12 @@ use std::collections::BTreeMap;
 /// <ThreadView {OfThread($thread)}/>
 /// ```
 ///
-/// Log posts render as dividers, a join naming its actor.
+/// Log posts render as dividers, a join naming its actor. The view reads
+/// what is shown ([`ThreadRecords::shown`]): an edited post shows its new
+/// body and that it was edited, a deleted one that it was, with no body, and
+/// neither log is a row of its own. A view whose page also holds a composer
+/// of its window ([`CreatePostForm`]) is bound to it: the composer's actor's
+/// own posts carry `edit` and `delete`, which the composer acts on.
 #[derive(Debug, Default, Clone, Copy, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(ThreadRows)]
@@ -67,6 +72,8 @@ pub struct ThreadRows {
 	read: Revision,
 	/// The row entity of each loaded post.
 	rows: BTreeMap<PostId, Entity>,
+	/// The `edit` and `delete` controls of each row that carries them.
+	controls: BTreeMap<PostId, Entity>,
 }
 
 impl ThreadRows {
@@ -145,17 +152,20 @@ impl Default for ThreadScroll {
 	}
 }
 
-/// The document of the row showing `view`: `{author, kind, status, text}`,
-/// `kind` the row's display role ([`row_kind`]).
-fn row_document(view: &AuthoredPost) -> Document {
-	let status = match view.post.status() {
-		PostStatus::Completed => "completed",
-		PostStatus::Interrupted => "interrupted",
-		PostStatus::InProgress => "in_progress",
+/// The document of the row showing `view`, a post as shown:
+/// `{author, label, kind, status, text}`, `label` the author line, which
+/// says when the post was `edited`, and `kind` the row's display role
+/// ([`row_kind`]).
+fn row_document(view: &AuthoredPost, edited: bool) -> Document {
+	let status = view.post.status().as_str();
+	let label = match edited && !view.post.is_deleted() {
+		true => format!("{} (edited)", view.actor.name()),
+		false => view.actor.name().to_string(),
 	};
 	Document::new(Value::Map(
 		[
 			("author".into(), Value::new(view.actor.name())),
+			("label".into(), Value::new(label)),
 			("kind".into(), Value::new(row_kind(view))),
 			("status".into(), Value::new(status)),
 			("text".into(), Value::new(row_text(view))),
@@ -178,7 +188,7 @@ fn post_row(document: &Document) -> OnSpawn {
 			.unwrap_or_default()
 			.to_string()
 	};
-	let (author, kind, text) = (field("author"), field("kind"), field("text"));
+	let (label, kind, text) = (field("label"), field("kind"), field("text"));
 	// each seeded with its value at build time so a new row paints on the
 	// first frame, bound so a change re-syncs in place
 	if kind == LOG_ROW {
@@ -188,7 +198,7 @@ fn post_row(document: &Document) -> OnSpawn {
 	}
 	OnSpawn::insert(rsx! {
 		<div {message_block(&kind)}>
-			<div {author_label(&kind)}>{(Value::new(author), FieldRef::new("author"))}</div>
+			<div {author_label(&kind)}>{(Value::new(label), FieldRef::new("label"))}</div>
 			<div {body_text()}>{(Value::new(text), FieldRef::new("text"))}</div>
 		</div>
 	})
@@ -314,12 +324,15 @@ fn body_text() -> impl Bundle {
 // ═══════════════════════════════════════════════════════════════════════
 
 /// Draw what changed in each view's window since the view last looked: a
-/// changed post's row has its [`Document`] written, a new post gets a row in
-/// [`PostId`] order, and nothing else is touched. A view bound to another
-/// window draws it afresh.
+/// changed post's row has its [`Document`] written from the post as shown,
+/// a new post gets a row in [`PostId`] order, and nothing else is touched;
+/// an `edited` or `deleted` log gets none, the post it names showing the
+/// change. A row the view's composer may change carries its controls while
+/// it may. A view bound to another window draws it afresh.
 pub(crate) fn sync_thread_rows(
 	mut commands: Commands,
-	windows: Query<&ThreadRecords>,
+	windows: Query<(&Thread, &ThreadRecords)>,
+	composers: ViewComposer,
 	mut views: Query<
 		(
 			Entity,
@@ -333,13 +346,14 @@ pub(crate) fn sync_thread_rows(
 ) {
 	for (view, of_thread, mut rows, mut thread_scroll) in views.iter_mut() {
 		let window = of_thread.thread();
-		let Ok(records) = windows.get(window) else {
+		let Ok((thread, records)) = windows.get(window) else {
 			continue;
 		};
 		if rows.window != Some(window) {
 			for row in core::mem::take(&mut rows.rows).into_values() {
 				commands.entity(row).despawn();
 			}
+			rows.controls.clear();
 			rows.window = Some(window);
 			rows.read = Revision::default();
 		}
@@ -347,7 +361,12 @@ pub(crate) fn sync_thread_rows(
 			continue;
 		}
 		let since = core::mem::replace(&mut rows.read, records.revision());
+		// the actor whose posts carry controls, its composer's
+		let editor = composers
+			.of(view, window)
+			.and_then(|form| records.author(form.actor.as_ref()).ok());
 		let mut spawned = Vec::new();
+		let mut controlled = Vec::new();
 		for (id, _) in records
 			.changed_since(since)
 			.filter(|(_, change)| change.post_after(since))
@@ -355,7 +374,20 @@ pub(crate) fn sync_thread_rows(
 			let Some(post) = records.authored(id) else {
 				continue;
 			};
-			let document = row_document(&post);
+			if matches!(post.kind(), PostKind::Edited | PostKind::Deleted) {
+				continue;
+			}
+			let shown = records.shown(id..=id);
+			let shown = AuthoredPost {
+				post: &shown[0],
+				actor: post.actor,
+			};
+			let document = row_document(&shown, records.was_edited(id));
+			let controls = editor
+				.as_ref()
+				.filter(|editor| post.check_change(editor, thread.id()).is_ok())
+				.map(|_| post.kind() == &PostKind::Text);
+			controlled.push((id, controls));
 			match rows.rows.get(&id) {
 				Some(row) => {
 					if let Ok(mut existing) = documents.get_mut(*row) {
@@ -394,7 +426,71 @@ pub(crate) fn sync_thread_rows(
 				place_row(world, view, row, next);
 			});
 		}
+		// controls follow whether the composer may change the post, added
+		// once the row's own content is in place
+		for (id, controls) in controlled {
+			match (controls, rows.controls.get(&id).copied()) {
+				(Some(edit), None) => {
+					let Some(row) = rows.row(id) else {
+						continue;
+					};
+					let entity = commands.spawn_empty().id();
+					rows.controls.insert(id, entity);
+					commands.queue(move |world: &mut World| {
+						if world.get_entity(row).is_ok()
+							&& let Ok(mut entity) = world.get_entity_mut(entity)
+						{
+							entity.insert((ChildOf(row), row_controls(edit)));
+						}
+					});
+				}
+				(None, Some(entity)) => {
+					rows.controls.remove(&id);
+					commands.entity(entity).try_despawn();
+				}
+				_ => {}
+			}
+		}
 	}
+}
+
+/// The `edit` and `delete` controls of a row, `edit` for a text post alone,
+/// since the composer takes text.
+fn row_controls(edit: bool) -> impl Bundle {
+	let delete = rsx! {
+		<button type="button" {(control_style(), OnSpawn::observe(delete_on_click))}>"delete"</button>
+	};
+	match edit {
+		true => OnSpawn::insert(rsx! {
+			<div {controls_style()}>
+				<button type="button" {(control_style(), OnSpawn::observe(edit_on_click))}>"edit"</button>
+				{delete}
+			</div>
+		}),
+		false => OnSpawn::insert(rsx! {
+			<div {controls_style()}>{delete}</div>
+		}),
+	}
+}
+
+/// A row's controls: a gapped row of small buttons.
+fn controls_style() -> OnSpawn {
+	inline_class![
+		(style::common_props::DisplayProp, style::Display::Flex),
+		(
+			style::common_props::FlexDirectionProp,
+			style::Direction::Horizontal
+		),
+		(style::common_props::ColumnGapProp, style::Length::Rem(1.)),
+	]
+}
+
+/// A row's control: dim until focused, beside the post it changes.
+fn control_style() -> OnSpawn {
+	inline_class![Declaration::token(
+		style::common_props::ForegroundColor,
+		colors::Outline
+	),]
 }
 
 /// Place `row` among `view`'s children before its successor `next`, else
@@ -583,6 +679,9 @@ const FOLLOW_FRAMES: u8 = 4;
 /// The text a row shows: a log post as a divider line, a join naming its
 /// actor and any other kind by its name, and any other post as its body.
 fn row_text(view: &AuthoredPost) -> String {
+	if view.post.is_deleted() {
+		return "(deleted)".to_string();
+	}
 	if SessionOpened::opens(view.post) {
 		return format!("── {} joined ──", view.actor.name());
 	}
@@ -638,7 +737,7 @@ mod test {
 			records
 				.authored_posts()
 				.map(|view| {
-					super::row_document(&view)
+					super::row_document(&view, false)
 						.get(field)
 						.unwrap()
 						.as_str()

@@ -28,6 +28,15 @@ impl PostFile {
 		.xsome()
 	}
 
+	/// The posts of the newest `keep` of `files`, given oldest first: the
+	/// ones a context keeping `keep` carries ([`KeepBlobs`]).
+	pub fn newest(
+		files: impl DoubleEndedIterator<Item = Self>,
+		keep: usize,
+	) -> HashSet<PostId> {
+		files.rev().take(keep).map(|file| file.post).collect()
+	}
+
 	/// The post holding the file.
 	pub fn post(&self) -> PostId { self.post }
 	/// The reference to the file's bytes.

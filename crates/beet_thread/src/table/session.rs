@@ -6,7 +6,7 @@
 //! runtime holds and that is not of kind System, authored by that actor. It
 //! is the only session post: nothing is written when an actor leaves.
 //!
-//! A model reads a run of joins as one note ([`ThreadRecords::join_note`],
+//! A model reads a run of joins as one note ([`ThreadRecords::note`],
 //! placed by [`ThreadRecords::model_posts`]) and a `ThreadView` renders each
 //! join as a divider naming its actor.
 use crate::prelude::*;
@@ -55,42 +55,53 @@ impl ThreadRecords {
 		Ok(())
 	}
 
-	/// The note a model reads the run of consecutive `joins` as, the one
-	/// convention for every provider: a line for each join inside one
-	/// `<system>`, saying who joined, when, and how long after the last post.
+	/// The note a model reads a run of consecutive joins, edits and
+	/// deletions as, the one convention for every provider: a line each
+	/// inside one `<system>`. A join says who joined, when, and how long
+	/// after the last post; an edit or a deletion who made it and when the
+	/// post it changed was made.
 	///
 	/// ```text
-	/// <system>Coach joined at 2026-11-22T09:10Z, 2 days 3 hours after the last post.</system>
+	/// <system>Coach joined at 2026-11-22T09:10Z, 2 days 3 hours after the last post.
+	/// Ann edited a post from 2026-11-20T06:00Z.</system>
 	/// ```
 	///
 	/// The gap is measured from the last post before the run that is not a
 	/// log, and omitted when there is none or it is under a minute.
-	pub fn join_note(&self, joins: &[AuthoredPost]) -> String {
-		let last_said = joins.first().and_then(|first| {
+	pub fn note(&self, run: &[AuthoredPost]) -> String {
+		let last_said = run.first().and_then(|first| {
 			self.posts()
 				.iter()
 				.take_while(|post| post.id() != first.post.id())
 				.filter(|post| !post.is_log())
 				.last()
-				.map(Post::created)
+				.map(|post| post.created())
 		});
-		let lines = joins
+		let lines = run
 			.iter()
-			.map(|join| {
-				let joined = join.post.created();
-				let gap = last_said
-					.and_then(|said| gap_text(joined.millis() - said.millis()))
-					.map(|gap| format!(", {gap} after the last post"))
-					.unwrap_or_default();
-				format!(
-					"{} joined at {}{gap}.",
-					join.actor.name(),
-					joined.format_iso8601_mins()
-				)
+			.map(|view| match view.post.kind() {
+				PostKind::SessionOpened => SessionOpened::line(view, last_said),
+				_ => PostEdited::line(view),
 			})
 			.collect::<Vec<_>>()
 			.join("\n");
 		format!("<system>{lines}</system>")
+	}
+}
+
+impl SessionOpened {
+	/// The line of a join's note, its gap measured from `last_said`.
+	fn line(join: &AuthoredPost, last_said: Option<Timestamp>) -> String {
+		let joined = join.post.created();
+		let gap = last_said
+			.and_then(|said| gap_text(joined.millis() - said.millis()))
+			.map(|gap| format!(", {gap} after the last post"))
+			.unwrap_or_default();
+		format!(
+			"{} joined at {}{gap}.",
+			join.actor.name(),
+			joined.format_iso8601_mins()
+		)
 	}
 }
 
@@ -314,7 +325,7 @@ mod test {
 		records
 			.posts()
 			.iter()
-			.map(SessionOpened::opens)
+			.map(|post| SessionOpened::opens(post))
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![true, true, false, true, true]);
 		let joined =

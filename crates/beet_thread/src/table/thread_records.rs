@@ -2,7 +2,9 @@ use crate::prelude::*;
 #[cfg(feature = "action")]
 use beet_action::prelude::*;
 use beet_core::prelude::*;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 /// A window's records: the actors, posts and response metadata of the
 /// stored thread it is open onto, held in memory.
@@ -15,6 +17,11 @@ use std::collections::BTreeSet;
 /// flush, each ask what changed since they last looked
 /// ([`Self::changed_since`]), so each does work proportional to the change.
 ///
+/// The records hold everything, a deleted post's body and an edit's original
+/// included ([`Self::posts`]). What a person or an agent reads is shown
+/// ([`Self::shown`]), the same posts with those emptied, so a reader handed
+/// a [`ShownPosts`] is known clean.
+///
 /// Author resolution is in memory (`records.actor(post.author())`), with no
 /// entity walk; ordering is by [`PostId`], a time sortable [`Tid`]. Loading
 /// another runtime's posts lifts this process's minter past the newest of
@@ -24,8 +31,9 @@ pub struct ThreadRecords {
 	/// The actors the window's scene authors, in author order, then those
 	/// that authored a stored post.
 	actors: Vec<Actor>,
-	/// Ordered list of posts (by [`PostId`]).
-	posts: Vec<Post>,
+	/// Every post, in [`PostId`] order, each shared with any [`ShownPosts`]
+	/// or [`ThreadChanges`] holding it unchanged.
+	posts: Vec<Arc<Post>>,
 	/// Per-post response metadata, used for `previous_response_id` chaining.
 	metas: HashMap<PostId, ResponseMeta>,
 	/// How each post last changed, for the readers asking since when.
@@ -36,6 +44,8 @@ pub struct ThreadRecords {
 	held: BTreeSet<PostId>,
 	/// The posts still in progress.
 	in_progress: BTreeSet<PostId>,
+	/// Each `edited` or `deleted` log by its id, with its subject.
+	changes: BTreeMap<PostId, PostId>,
 	/// The oldest post of the run when the thread holds older posts the
 	/// records lack, `None` when the run reaches back to its first post or
 	/// to the seed held before it.
@@ -101,28 +111,44 @@ impl ThreadRecords {
 
 	// ── posts ───────────────────────────────────────────────────────────
 
-	pub fn posts(&self) -> &[Post] { &self.posts }
+	/// Every post, everything included: a deleted post's body and an edit's
+	/// original are here, so a person or an agent reads [`Self::shown`].
+	pub fn posts(&self) -> &[Arc<Post>] { &self.posts }
 	pub fn is_empty(&self) -> bool { self.posts.is_empty() }
-	pub fn last_post(&self) -> Option<&Post> { self.posts.last() }
+	pub fn last_post(&self) -> Option<&Post> {
+		self.posts.last().map(|post| &**post)
+	}
 
 	/// Append a post, or replace the existing post with the same id, for window
 	/// sync to apply to the thread's other windows. New posts keep insertion
 	/// (ie [`PostId`]) order; modified posts update in place.
 	pub fn upsert_post(&mut self, post: Post) {
 		self.log.local(post.id());
-		self.upsert_quiet(post);
+		self.upsert_quiet(Arc::new(post));
+	}
+
+	/// Upsert `post`, a change this window wrote to the store itself, ie an
+	/// edit: window sync carries it and the flush never writes it again.
+	pub(crate) fn upsert_stored(&mut self, post: Post) {
+		self.log.stored(post.id());
+		self.upsert_quiet(Arc::new(post));
 	}
 
 	/// Upsert `post` loaded from the store or received from another window,
 	/// found by its id and kept in id order.
-	fn upsert_received(&mut self, post: Post) {
+	fn upsert_received(&mut self, post: Arc<Post>) {
 		self.log.received(post.id());
 		self.upsert_quiet(post);
 	}
 
 	/// Upsert `post` without recording a change.
-	fn upsert_quiet(&mut self, post: Post) {
+	fn upsert_quiet(&mut self, post: Arc<Post>) {
 		let id = post.id();
+		if let Some(subject) = post.subject()
+			&& matches!(post.kind(), PostKind::Edited | PostKind::Deleted)
+		{
+			self.changes.insert(id, subject);
+		}
 		match post.bytes() {
 			Some(_) => self.held.insert(id),
 			None => self.held.remove(&id),
@@ -131,10 +157,15 @@ impl ThreadRecords {
 			true => self.in_progress.insert(id),
 			false => self.in_progress.remove(&id),
 		};
-		match self.posts.binary_search_by_key(&id, Post::id) {
+		match self.index_of(id) {
 			Ok(index) => self.posts[index] = post,
 			Err(index) => self.posts.insert(index, post),
 		}
+	}
+
+	/// Where the post `id` is, or would be, in [`PostId`] order.
+	fn index_of(&self, id: PostId) -> Result<usize, usize> {
+		self.posts.binary_search_by_key(&id, |post| post.id())
 	}
 
 	// ── what changed ────────────────────────────────────────────────────
@@ -165,7 +196,7 @@ impl ThreadRecords {
 	/// reading older posts stops at.
 	pub fn run_floor(&self) -> Option<PostId> {
 		let start = self.run_start?;
-		let index = self.posts.binary_search_by_key(&start, Post::id).ok()?;
+		let index = self.index_of(start).ok()?;
 		index.checked_sub(1).map(|index| self.posts[index].id())
 	}
 
@@ -188,7 +219,7 @@ impl ThreadRecords {
 	}
 
 	/// The posts after `since`, in [`PostId`] order, every post for `None`.
-	pub fn posts_since(&self, since: Option<PostId>) -> &[Post] {
+	pub fn posts_since(&self, since: Option<PostId>) -> &[Arc<Post>] {
 		let start = since.map_or(0, |since| {
 			self.posts.partition_point(|post| post.id() <= since)
 		});
@@ -207,19 +238,6 @@ impl ThreadRecords {
 		AuthoredPost { post, actor }.xsome()
 	}
 
-	/// The authored posts after an exclusive cursor. A missing or unknown cursor
-	/// returns them all (the caller has seen none of these posts).
-	pub fn posts_after(&self, after: Option<PostId>) -> Vec<AuthoredPost<'_>> {
-		self.posts_since(after.filter(|after| self.post(*after).is_some()))
-			.iter()
-			.filter_map(|post| {
-				self.actor(post.author())
-					.ok()
-					.map(|actor| AuthoredPost { post, actor })
-			})
-			.collect()
-	}
-
 	/// Every authored post that is not a log: what was said, rather than
 	/// what happened.
 	pub fn content_posts(&self) -> impl Iterator<Item = AuthoredPost<'_>> {
@@ -228,7 +246,11 @@ impl ThreadRecords {
 
 	/// The newest post that is not a log.
 	pub fn last_content_post(&self) -> Option<&Post> {
-		self.posts.iter().rev().find(|post| !post.is_log())
+		self.posts
+			.iter()
+			.rev()
+			.find(|post| !post.is_log())
+			.map(|post| &**post)
 	}
 
 	/// The thread's last word: the newest post that is neither a log nor a
@@ -236,21 +258,27 @@ impl ThreadRecords {
 	/// that cut a tool call is the last word, though the output closing that
 	/// call was written after it.
 	pub fn last_word(&self) -> Option<&Post> {
-		self.posts.iter().rev().find(|post| post.is_word())
+		self.posts
+			.iter()
+			.rev()
+			.find(|post| post.is_word())
+			.map(|post| &**post)
 	}
 
-	/// What the agent `reader` reads, after an exclusive cursor, in model
-	/// order (a call followed at once by its output): its own posts and
-	/// anyone else's that is not a log, another actor's call and its output
-	/// as one item, and each run of joins between them as one note
-	/// ([`Self::join_note`]). Reasoning, whoever wrote it, and any other log
-	/// stay out, so neither splits a run.
-	pub fn model_posts(
-		&self,
+	/// What the agent `reader` reads of `shown`, after an exclusive cursor,
+	/// in model order (a call followed at once by its output): its own posts
+	/// and anyone else's that is not a log, another actor's call and its
+	/// output as one item, and each run of joins, edits and deletions between
+	/// them as one note ([`Self::note`]). An edited post reads as it now
+	/// stands; a deleted post, reasoning whoever wrote it and any other log
+	/// stay out, so none splits a run.
+	pub fn model_posts<'a>(
+		&'a self,
+		shown: &'a ShownPosts,
 		reader: &ActorId,
 		after: Option<PostId>,
-	) -> Vec<ModelPost<'_>> {
-		let ordered = self.model_order();
+	) -> Vec<ModelPost<'a>> {
+		let ordered = self.model_order(shown);
 		let start = after
 			.and_then(|after| {
 				ordered.iter().position(|view| view.post.id() == after)
@@ -262,10 +290,10 @@ impl ThreadRecords {
 			.filter(|(_, view)| view.post.kind() == &PostKind::ToolOutput)
 			.collect::<HashMap<_, _>>();
 		let mut items = Vec::new();
-		let mut joins = Vec::new();
+		let mut noted = Vec::new();
 		for view in ordered.into_iter().skip(start) {
-			if SessionOpened::opens(view.post) {
-				joins.push(view);
+			if view.post.kind().is_noted() {
+				noted.push(view);
 				continue;
 			}
 			let Some(content) = view.post.as_agent_post() else {
@@ -289,25 +317,26 @@ impl ThreadRecords {
 				}
 				_ => ModelPost::Post(view),
 			};
-			self.push_note(&mut items, &mut joins);
+			self.push_note(&mut items, &mut noted);
 			items.push(item);
 		}
-		self.push_note(&mut items, &mut joins);
+		self.push_note(&mut items, &mut noted);
 		items
 	}
 
-	/// What a request of `reader` sends, chained to the stored response
-	/// `chained` if any: the posts after the newest that response read, less
-	/// that response's own posts, which the provider holds.
-	pub fn request_posts(
-		&self,
+	/// What a request of `reader` sends of `shown`, chained to the stored
+	/// response `chained` if any: the posts after the newest that response
+	/// read, less that response's own posts, which the provider holds.
+	pub fn request_posts<'a>(
+		&'a self,
+		shown: &'a ShownPosts,
 		reader: &ActorId,
 		chained: Option<&ResponseMeta>,
-	) -> Vec<ModelPost<'_>> {
+	) -> Vec<ModelPost<'a>> {
 		let Some(chained) = chained else {
-			return self.model_posts(reader, None);
+			return self.model_posts(shown, reader, None);
 		};
-		self.model_posts(reader, chained.read)
+		self.model_posts(shown, reader, chained.read)
 			.into_iter()
 			.filter(|item| {
 				item.post().is_none_or(|post| {
@@ -324,37 +353,67 @@ impl ThreadRecords {
 	/// next chained request.
 	pub fn read_through(&self) -> Option<PostId> {
 		let Some(first) = self.in_progress.first() else {
-			return self.posts.last().map(Post::id);
+			return self.posts.last().map(|post| post.id());
 		};
-		let index = self.posts.binary_search_by_key(first, Post::id).ok()?;
+		let index = self.index_of(*first).ok()?;
 		index.checked_sub(1).map(|index| self.posts[index].id())
 	}
 
 	/// The post `id`, if the records hold it.
 	pub fn post(&self, id: PostId) -> Option<&Post> {
-		self.posts
-			.binary_search_by_key(&id, Post::id)
-			.ok()
-			.map(|index| &self.posts[index])
+		self.shared(id).map(|post| &**post)
 	}
 
-	/// The authored posts in the order a model reads them: by [`PostId`],
-	/// except that a call is followed at once by the output whose subject it
-	/// is, so a post landing between the two, ie a person's note typed mid
-	/// tool call, is read after the output and never breaks a provider's
-	/// pairing of call and output. A call with no output yet holds nothing
-	/// back.
-	fn model_order(&self) -> Vec<AuthoredPost<'_>> {
-		let answered = self
-			.posts
+	/// The post `id` as the records share it.
+	fn shared(&self, id: PostId) -> Option<&Arc<Post>> {
+		self.index_of(id).ok().map(|index| &self.posts[index])
+	}
+
+	/// Whether its author edited the post `id`: an `edited` log names it.
+	pub fn was_edited(&self, id: PostId) -> bool {
+		self.changes.range(id..).any(|(log, subject)| {
+			*subject == id
+				&& self
+					.post(*log)
+					.is_some_and(|log| log.kind() == &PostKind::Edited)
+		})
+	}
+
+	/// Whether a post a response read through `read` changed after it was
+	/// read: an `edited` or `deleted` log newer than `read` names a post at
+	/// or before it, so the provider holds what was taken back.
+	pub fn changed_under(&self, read: PostId) -> bool {
+		self.changes
+			.range((
+				core::ops::Bound::Excluded(read),
+				core::ops::Bound::Unbounded,
+			))
+			.any(|(_, subject)| *subject <= read)
+	}
+
+	/// The authored posts of `shown` in the order a model reads them: by
+	/// [`PostId`], except that a call is followed at once by the output whose
+	/// subject it is, so a post landing between the two, ie a person's note
+	/// typed mid tool call, is read after the output and never breaks a
+	/// provider's pairing of call and output. A call with no output yet holds
+	/// nothing back.
+	fn model_order<'a>(
+		&'a self,
+		shown: &'a ShownPosts,
+	) -> Vec<AuthoredPost<'a>> {
+		let answered = shown
 			.iter()
 			.filter(|post| post.kind() == &PostKind::ToolOutput)
-			.filter_map(Post::subject)
+			.filter_map(|post| post.subject())
 			.collect::<HashSet<_>>();
-		let mut ordered = Vec::with_capacity(self.posts.len());
+		let mut ordered = Vec::with_capacity(shown.len());
 		let mut held = Vec::new();
 		let mut pending = HashSet::<PostId>::default();
-		for view in self.authored_posts() {
+		for view in shown.iter().filter_map(|post| {
+			self.actor(post.author())
+				.ok()
+				.map(|actor| AuthoredPost { post, actor })
+		}) {
 			match view.post.kind() {
 				PostKind::ToolCall => {
 					if answered.contains(&view.post.id()) {
@@ -379,15 +438,15 @@ impl ThreadRecords {
 		ordered
 	}
 
-	/// Push the note of `joins` onto `items`, if any joined, leaving none.
+	/// Push the note of the run `noted` onto `items`, if any, leaving none.
 	fn push_note<'a>(
 		&self,
 		items: &mut Vec<ModelPost<'a>>,
-		joins: &mut Vec<AuthoredPost<'a>>,
+		noted: &mut Vec<AuthoredPost<'a>>,
 	) {
-		if !joins.is_empty() {
-			items.push(ModelPost::Note(self.join_note(joins)));
-			joins.clear();
+		if !noted.is_empty() {
+			items.push(ModelPost::Note(self.note(noted)));
+			noted.clear();
 		}
 	}
 
@@ -437,7 +496,7 @@ impl ThreadRecords {
 			return;
 		}
 		for post in self.posts.iter_mut().filter(|post| post.thread() == from) {
-			post.set_thread(to);
+			Arc::make_mut(post).set_thread(to);
 		}
 	}
 
@@ -450,7 +509,7 @@ impl ThreadRecords {
 			.log
 			.since(sent)
 			.filter(|(_, change)| {
-				change.local_after(sent) || change.meta_after(sent)
+				change.sent_after(sent) || change.meta_after(sent)
 			})
 			.map(|(id, _)| id)
 			.collect::<Vec<_>>();
@@ -463,7 +522,7 @@ impl ThreadRecords {
 		ids: impl IntoIterator<Item = PostId>,
 	) -> ThreadChanges {
 		let mut changes = ThreadChanges::default();
-		for post in ids.into_iter().filter_map(|id| self.post(id)) {
+		for post in ids.into_iter().filter_map(|id| self.shared(id)) {
 			if let Ok(actor) = self.actor(post.author())
 				&& !changes.actors.iter().any(|known| known.id() == actor.id())
 			{
@@ -480,7 +539,7 @@ impl ThreadRecords {
 	/// Whether this window changed anything since window sync last took it.
 	pub fn has_changes(&self) -> bool {
 		self.log.since(self.sent).any(|(_, change)| {
-			change.local_after(self.sent) || change.meta_after(self.sent)
+			change.sent_after(self.sent) || change.meta_after(self.sent)
 		})
 	}
 
@@ -527,7 +586,7 @@ impl ThreadRecords {
 		});
 		let mut ids = self.posts[after..]
 			.iter()
-			.map(Post::id)
+			.map(|post| post.id())
 			.chain(self.in_progress.iter().copied())
 			.chain(synced.unwritten(self))
 			.collect::<Vec<_>>();
@@ -552,7 +611,10 @@ impl ThreadRecords {
 	}
 
 	/// The most recent post authored by `agent_id` whose stored [`ResponseMeta`]
-	/// matches the provider and model, for `previous_response_id` patterns.
+	/// matches the provider and model, for `previous_response_id` patterns,
+	/// never one whose `read` covers a post changed since
+	/// ([`Self::changed_under`]): the provider holds what was taken back, so
+	/// a request chains to an older one, else sends everything.
 	pub fn stored_response(
 		&self,
 		agent_id: &ActorId,
@@ -567,27 +629,18 @@ impl ThreadRecords {
 			(meta.provider_slug == provider_slug
 				&& meta.model_slug == model_slug
 				&& meta.response_stored
-				&& meta.read.is_some())
+				&& meta.read.is_some_and(|read| !self.changed_under(read)))
 			.then_some((post.id(), meta))
 		})
 	}
 
 	// ── bytes ───────────────────────────────────────────────────────────
 
-	/// The file of every post holding one, oldest first: what a context
-	/// carries or lists ([`KeepBlobs`]).
+	/// The file of every post holding one, oldest first, a deleted post's
+	/// included: what the window's memory may hold. A context carries or lists
+	/// the files of what is shown ([`ShownPosts::files`], [`KeepBlobs`]).
 	pub fn files(&self) -> impl DoubleEndedIterator<Item = PostFile> {
-		self.posts.iter().filter_map(Post::file)
-	}
-
-	/// The posts of the newest `keep` files, the ones a context keeping
-	/// `keep` carries.
-	pub fn carried_files(&self, keep: usize) -> HashSet<PostId> {
-		self.files()
-			.rev()
-			.take(keep)
-			.map(|file| file.post())
-			.collect()
+		self.posts.iter().filter_map(|post| post.file())
 	}
 
 	/// Drop the bytes held in memory of every post but those of the newest
@@ -601,7 +654,7 @@ impl ThreadRecords {
 		if self.held.len() <= keep {
 			return;
 		}
-		let carried = self.carried_files(keep);
+		let carried = PostFile::newest(self.files(), keep);
 		let released = self
 			.held
 			.iter()
@@ -609,8 +662,8 @@ impl ThreadRecords {
 			.filter(|id| !carried.contains(id) && releasable(*id))
 			.collect::<Vec<_>>();
 		for id in released {
-			if let Ok(index) = self.posts.binary_search_by_key(&id, Post::id) {
-				self.posts[index].release_bytes();
+			if let Ok(index) = self.index_of(id) {
+				Arc::make_mut(&mut self.posts[index]).release_bytes();
 			}
 			self.held.remove(&id);
 		}
@@ -627,7 +680,7 @@ pub struct ThreadChanges {
 	/// The authors of [`Self::posts`].
 	pub actors: Vec<Actor>,
 	/// Each post as it stands, a post in progress included.
-	pub posts: Vec<Post>,
+	pub posts: Vec<Arc<Post>>,
 	/// The metadata of [`Self::posts`].
 	pub metas: Vec<ResponseMeta>,
 }
@@ -693,9 +746,10 @@ pub enum ModelPost<'a> {
 	/// A post that is not a log, sent in the role its author has to the
 	/// reading agent.
 	Post(AuthoredPost<'a>),
-	/// The note of a run of joins ([`ThreadRecords::join_note`]), sent as
-	/// it is in the user role whoever joined, the reading agent included:
-	/// something that happened, never something the agent said.
+	/// The note of a run of joins, edits and deletions
+	/// ([`ThreadRecords::note`]), sent as it is in the user role whoever it
+	/// is about, the reading agent included: something that happened, never
+	/// something the agent said.
 	Note(String),
 	/// Another actor's call and its output, if answered: one message in the
 	/// caller's role ([`AuthoredPost::call_text`]), since the reader never
@@ -1215,7 +1269,7 @@ mod test {
 		}
 		let read = |after| {
 			records
-				.model_posts(&agent, after)
+				.model_posts(&records.shown(..), &agent, after)
 				.into_iter()
 				.map(|item| match item {
 					ModelPost::Note(_) => "note".to_string(),
@@ -1294,7 +1348,8 @@ mod test {
 		] {
 			records.upsert_post(post);
 		}
-		let items = records.model_posts(&ActorId::AGENT, None);
+		let shown = records.shown(..);
+		let items = records.model_posts(&shown, &ActorId::AGENT, None);
 		items.len().xpect_eq(1);
 		let ModelPost::Call { call, output } = &items[0] else {
 			panic!("expected a call, found {:?}", items[0]);
@@ -1309,7 +1364,7 @@ mod test {
 		);
 		// the caller reads its own call as a call
 		records
-			.model_posts(other.id(), None)
+			.model_posts(&shown, other.id(), None)
 			.into_iter()
 			.filter(|item| matches!(item, ModelPost::Post(_)))
 			.count()

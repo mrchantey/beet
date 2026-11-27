@@ -18,6 +18,11 @@ const TABLE_PATH_PARAM: &str = "table_path";
 /// precondition. Anything that can reach the mount can write the
 /// store, so it belongs behind whatever authenticates its callers.
 ///
+/// It serves everything, exactly as stored: a row is never filtered for who
+/// asks, so a thread's partitions answer with what its people edited away or
+/// deleted, which only a thread's own readers leave out (`beet_thread`'s
+/// `ShownPosts`).
+///
 /// ```html
 /// <SqliteStore path="data.db">
 /// 	<ServeTables prefix="tables"/>

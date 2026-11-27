@@ -50,26 +50,27 @@ impl RequestBlobs {
 	/// What a model and a view read in place of a file whose bytes are gone.
 	pub const UNAVAILABLE: &'static str = "[file unavailable]";
 
-	/// The files of `records` an agent keeping `keep` lists, and the
+	/// The files of `shown` an agent keeping `keep` lists, and the
 	/// references of those it carries that no post holds in memory, to read.
+	/// A deleted post's file is in neither, its body gone from what is shown.
 	pub fn plan(
-		records: &ThreadRecords,
+		shown: &ShownPosts,
 		keep: Option<usize>,
 	) -> (Self, Vec<BlobRef>) {
-		let carried = keep.map(|keep| records.carried_files(keep));
+		let carried = keep.map(|keep| PostFile::newest(shown.files(), keep));
 		let is_carried = |file: &PostFile| {
 			carried
 				.as_ref()
 				.is_none_or(|carried| carried.contains(&file.post()))
 		};
-		let listed = records
+		let listed = shown
 			.files()
 			.filter(|file| !is_carried(file))
 			.map(|file| file.post())
 			.collect();
 		let mut missing = Vec::<BlobRef>::new();
-		for file in records.files().filter(is_carried) {
-			let held = records
+		for file in shown.files().filter(is_carried) {
+			let held = shown
 				.post(file.post())
 				.is_some_and(|post| post.bytes().is_some());
 			if !held && !missing.iter().any(|blob| blob.cid == file.blob().cid)
@@ -127,7 +128,7 @@ impl RequestBlobs {
 					let (thread, _, records) =
 						query.thread_and_records(entity)?;
 					let keep = keep.get(entity).ok().map(|keep| keep.count);
-					let (blobs, missing) = Self::plan(records, keep);
+					let (blobs, missing) = Self::plan(&records.shown(..), keep);
 					(thread, blobs, missing).xok()
 				},
 			)

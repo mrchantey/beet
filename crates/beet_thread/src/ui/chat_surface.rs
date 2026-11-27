@@ -132,6 +132,30 @@ mod test {
 		})
 	}
 
+	/// The composer's first `<button>` of `type`, ie its `Stop` as `button`,
+	/// never a row's control.
+	fn composer_button(app: &mut App, r#type: &str) -> Entity {
+		let form = app
+			.world_mut()
+			.query_filtered::<Entity, With<CreatePostForm>>()
+			.single(app.world())
+			.unwrap();
+		app.world_mut()
+			.with_state::<(ElementQuery, Query<&Children>), _>(
+				|(elements, children)| {
+					children
+						.iter_descendants(form)
+						.filter_map(|entity| elements.get(entity).ok())
+						.find(|view| {
+							view.tag() == "button"
+								&& view.attribute_string("type") == r#type
+						})
+						.map(|view| view.entity)
+						.unwrap()
+				},
+			)
+	}
+
 	/// Spawn a thread and serve its view + composer, the shape every interactive
 	/// example declares. Returns `(app, surface, thread)`.
 	async fn serve_thread(
@@ -676,6 +700,129 @@ mod test {
 			.xpect_contains("line 000180");
 	}
 
+	/// The `<button>`s of the view's rows, never the composer's, in document
+	/// order.
+	fn row_buttons(app: &mut App) -> Vec<Entity> {
+		app.world_mut().with_state::<(
+			ElementQuery,
+			Query<&Children>,
+			Query<Entity, With<ThreadView>>,
+		), _>(|(elements, children, views)| {
+			views
+				.iter()
+				.flat_map(|view| children.iter_descendants(view))
+				.filter_map(|entity| elements.get(entity).ok())
+				.filter(|view| view.tag() == "button")
+				.map(|view| view.entity)
+				.collect()
+		})
+	}
+
+	/// Click `button`.
+	fn click(app: &mut App, button: Entity) {
+		app.world_mut()
+			.entity_mut(button)
+			.trigger(PointerUp::new(button));
+		app.update();
+	}
+
+	/// The composer's input's value.
+	fn composer_text(app: &mut App) -> String {
+		let input = element_by_tag(app, "input").unwrap();
+		app.world()
+			.get::<Value>(input)
+			.and_then(|value| value.as_str().ok().map(String::from))
+			.unwrap_or_default()
+	}
+
+	/// A person's own posts carry `edit` and `delete` on the terminal, and
+	/// nobody else's do. `edit` hands the text to the composer, whose submit
+	/// edits the post and whose Escape leaves the edit; `delete` leaves a
+	/// tombstone with no body. Neither change's log is a row of its own,
+	/// and the records keep what was there.
+	#[beet_core::test]
+	async fn the_composer_edits_and_deletes_its_own_posts() {
+		let (mut app, surface, thread) = serve_thread(
+			UVec2::new(48, 20),
+			(Thread::default(), children![Actor::user(), Actor::agent()]),
+		)
+		.await;
+		drive_until(&mut app, surface, "Send");
+		let id = app.world().get::<Thread>(thread).unwrap().id();
+		app.world_mut()
+			.get_mut::<ThreadRecords>(thread)
+			.unwrap()
+			.upsert_post(AgentPost::new_text(
+				ActorId::AGENT,
+				id,
+				"from the agent",
+				PostStatus::Completed,
+			));
+		submit(&mut app, "helo");
+		drive_until(&mut app, surface, "delete");
+		// the person's post alone carries controls, the same `<button>`s in
+		// the browser's dom
+		let buttons = row_buttons(&mut app);
+		buttons.len().xpect_eq(2);
+		let view = app
+			.world_mut()
+			.query_filtered::<Entity, With<ThreadView>>()
+			.single(app.world())
+			.unwrap();
+		let html = HtmlRenderer::new()
+			.render(&mut RenderContext::new(
+				app.world_mut(),
+				view,
+				&RequestParts::default(),
+			))
+			.unwrap()
+			.to_string();
+		html.as_str()
+			.xpect_contains(">edit</button>")
+			.xpect_contains(">delete</button>");
+		html.matches("</button>").count().xpect_eq(2);
+
+		click(&mut app, buttons[0]);
+		composer_text(&mut app).xpect_eq("helo");
+		submit(&mut app, "hello");
+		// `helo` is no part of `hello`, so the original is nowhere on screen
+		drive_until(&mut app, surface, "(edited)")
+			.xpect_contains("hello")
+			.xnot()
+			.xpect_contains("helo");
+
+		// Escape leaves an edit, stopping nothing
+		let buttons = row_buttons(&mut app);
+		click(&mut app, buttons[0]);
+		composer_text(&mut app).xpect_eq("hello");
+		app.world_mut()
+			.get_mut::<ChannelTerminal>(surface)
+			.unwrap()
+			.send_input(b"\x1b")
+			.unwrap();
+		for _ in 0..5 {
+			app.update();
+		}
+		composer_text(&mut app).xpect_eq("");
+		app.world_mut()
+			.query::<&EditingPost>()
+			.iter(app.world())
+			.count()
+			.xpect_eq(0);
+
+		let buttons = row_buttons(&mut app);
+		click(&mut app, buttons[1]);
+		let frame = drive_until(&mut app, surface, "(deleted)");
+		frame.as_str().xnot().xpect_contains("hello");
+		frame.as_str().xpect_contains("from the agent");
+		row_buttons(&mut app).xpect_empty();
+		// the records keep it
+		said(&app, thread).xpect_eq(vec![
+			"from the agent".to_string(),
+			"hello (Deleted)".to_string(),
+		]);
+	}
+
 	/// A chat whose agent thinks until stopped: `Repeat[Sequence[person,
 	/// agent]]`, the person having said `go`.
 	fn thinking_chat() -> impl Bundle {
@@ -719,17 +866,7 @@ mod test {
 	#[beet_core::test]
 	async fn stop_button_interrupts_the_thread() {
 		stops_the_thinking_chat(|app, _| {
-			let stop =
-				app.world_mut().with_state::<ElementQuery, _>(|elements| {
-					elements
-						.iter()
-						.find(|view| {
-							view.tag() == "button"
-								&& view.attribute_string("type") == "button"
-						})
-						.map(|view| view.entity)
-						.unwrap()
-				});
+			let stop = composer_button(app, "button");
 			app.world_mut()
 				.entity_mut(stop)
 				.trigger(PointerUp::new(stop));

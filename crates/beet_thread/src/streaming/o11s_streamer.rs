@@ -125,8 +125,10 @@ impl O11sStreamer {
 					};
 
 					// get input items (from last received if caching)
+					let shown = records.shown(..);
 					let items = records
 						.request_posts(
+							&shown,
 							&agent_id,
 							last_received.map(|(_, meta)| meta),
 						)

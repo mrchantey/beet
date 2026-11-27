@@ -190,7 +190,7 @@ impl ThreadRecords {
 		let answered = turn
 			.iter()
 			.filter(|post| post.kind() == &PostKind::ToolOutput)
-			.filter_map(Post::subject)
+			.filter_map(|post| post.subject())
 			.collect::<HashSet<_>>();
 		let unanswered = turn
 			.iter()
@@ -483,8 +483,13 @@ mod test {
 				.map(String::from)
 				.to_vec(),
 		);
-		records(app.world())
-			.model_posts(&ActorId::from_static("agent-2"), None)
+		let records = records(app.world());
+		records
+			.model_posts(
+				&records.shown(..),
+				&ActorId::from_static("agent-2"),
+				None,
+			)
 			.iter()
 			.filter_map(ModelPost::post)
 			.map(|view| describe(view.post))
