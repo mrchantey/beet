@@ -25,6 +25,15 @@ pub struct Rule {
 	/// Optional `@media` gate; `None` means the rule always applies.
 	#[set_with(unwrap_option)]
 	media: Option<MediaQuery>,
+	/// Optional colour scheme gate: the rule applies only to an element whose
+	/// nearest scheme class (`.light-scheme`/`.dark-scheme`, the page's own on
+	/// both targets) is this scheme, or, where the cascade's context states a
+	/// scheme, only in that scheme. Serialized as
+	/// `@scope (.dark-scheme) to (.light-scheme) { … }`, so a region pinned to
+	/// the other scheme inside it is left out, as the cascade leaves it.
+	#[set_with(unwrap_option)]
+	#[cfg_attr(feature = "serde", serde(default))]
+	scheme: Option<ColorScheme>,
 	/// The cascade origin, [`Author`](RuleOrigin::Author) by default.
 	#[cfg_attr(feature = "serde", serde(default))]
 	origin: RuleOrigin,

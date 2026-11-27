@@ -380,10 +380,12 @@ impl SidebarState {
 		}
 	}
 
-	/// The display label: explicit override, else the prettified last segment.
+	/// The display label: the page's own (its `sidebar_label`, else its
+	/// title), else its last segment in title case, so a page with no title,
+	/// `color_schemes`, reads `Color Schemes`.
 	fn label(&self, path: &RelPath, info: Option<&SidebarInfo>) -> String {
 		info.and_then(|info| info.label.clone()).unwrap_or_else(|| {
-			path.last_segment().unwrap_or("home").to_string()
+			path.last_segment_title().unwrap_or_else(|| "Home".into())
 		})
 	}
 
@@ -539,8 +541,8 @@ mod test {
 		// home + about + docs
 		nodes.len().xpect_eq(3);
 		nodes[0].display_name.as_str().xpect_eq("Home");
-		nodes[1].display_name.as_str().xpect_eq("about");
-		nodes[2].display_name.as_str().xpect_eq("docs");
+		nodes[1].display_name.as_str().xpect_eq("About");
+		nodes[2].display_name.as_str().xpect_eq("Docs");
 	}
 
 	#[beet_core::test]
@@ -584,13 +586,13 @@ mod test {
 
 		let nodes = SidebarState::new("docs/intro").collect(&tree);
 		// home, about, docs(branch)
-		let docs = nodes.iter().find(|n| n.display_name == "docs").unwrap();
+		let docs = nodes.iter().find(|n| n.display_name == "Docs").unwrap();
 		docs.expanded.xpect_true();
 		docs.path.is_none().xpect_true();
 		// the active leaf is inside the branch
 		docs.children
 			.iter()
-			.find(|n| n.display_name == "intro")
+			.find(|n| n.display_name == "Intro")
 			.unwrap()
 			.active
 			.xpect_true();
@@ -610,13 +612,13 @@ mod test {
 		let nodes = SidebarState::new("docs/intro").collect(&tree);
 		nodes
 			.iter()
-			.find(|n| n.display_name == "docs")
+			.find(|n| n.display_name == "Docs")
 			.unwrap()
 			.expanded
 			.xpect_true();
 		nodes
 			.iter()
-			.find(|n| n.display_name == "blog")
+			.find(|n| n.display_name == "Blog")
 			.unwrap()
 			.expanded
 			.xpect_false();
@@ -640,7 +642,7 @@ mod test {
 			.xpect_true();
 		nodes
 			.iter()
-			.any(|n| n.display_name == "about")
+			.any(|n| n.display_name == "About")
 			.xpect_false();
 	}
 
@@ -679,11 +681,11 @@ mod test {
 			.collect(&tree);
 		nodes
 			.iter()
-			.any(|node| node.display_name == "about")
+			.any(|node| node.display_name == "About")
 			.xpect_false();
 		let docs = nodes
 			.iter()
-			.find(|node| node.display_name == "docs")
+			.find(|node| node.display_name == "Docs")
 			.unwrap();
 		docs.path.is_none().xpect_true();
 		docs.children.len().xpect_eq(1);
@@ -705,8 +707,8 @@ mod test {
 			})
 			.collect(&tree);
 		// nodes[0] is Home, then zulu, then alpha
-		nodes[1].display_name.as_str().xpect_eq("zulu");
-		nodes[2].display_name.as_str().xpect_eq("alpha");
+		nodes[1].display_name.as_str().xpect_eq("Zulu");
+		nodes[2].display_name.as_str().xpect_eq("Alpha");
 	}
 
 	#[beet_core::test]
@@ -746,7 +748,7 @@ mod test {
 			.collect(&tree);
 		nodes
 			.iter()
-			.find(|n| n.display_name == "docs")
+			.find(|n| n.display_name == "Docs")
 			.unwrap()
 			.expanded
 			.xpect_true();
@@ -763,7 +765,7 @@ mod test {
 		let tree = tree_of(&mut world, root);
 
 		let nodes = SidebarState::new("docs").collect(&tree);
-		let docs = nodes.iter().find(|n| n.display_name == "docs").unwrap();
+		let docs = nodes.iter().find(|n| n.display_name == "Docs").unwrap();
 		// branch carries its own route, and is active at /docs
 		docs.path.is_some().xpect_true();
 		docs.active.xpect_true();

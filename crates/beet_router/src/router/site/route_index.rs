@@ -135,8 +135,9 @@ fn index_entry(
 	let heading = format!(
 		"#{number} — {}",
 		meta.title
-			.as_deref()
-			.unwrap_or_else(|| path.last_segment().unwrap_or_default())
+			.clone()
+			.or_else(|| path.last_segment_title())
+			.unwrap_or_default()
 	);
 	let byline = article_byline(meta);
 	// the entry's own thumbnail, alt-texted by the heading it illustrates

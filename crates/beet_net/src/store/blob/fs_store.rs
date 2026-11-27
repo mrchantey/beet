@@ -317,11 +317,25 @@ impl BlobProvider for FsStore {
 	}
 
 	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+		let key = path.clone();
 		let path = self.resolve_path(path);
 		Box::pin(async move {
+			// a miss is a 404 naming the blob, as every backend's is, so a
+			// caller answering with it says what was missing; any other failure
+			// is itself
 			fs_ext::read_async(&path)
 				.await
-				.map_err(|_| HttpError::not_found())?
+				.map_err(|err| -> BevyError {
+					match err {
+						FsError::FileNotFound { .. }
+						| FsError::DirNotFound { .. } => HttpError::new(
+							StatusCode::NOT_FOUND,
+							format!("blob `{key}` not found"),
+						)
+						.into(),
+						err => err.into(),
+					}
+				})?
 				.xmap(Bytes::from)
 				.xok()
 		})

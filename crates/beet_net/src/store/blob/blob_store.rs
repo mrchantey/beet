@@ -574,6 +574,13 @@ pub mod store_test {
 		let path = RelPath::from("test_path");
 		let body = bytes::Bytes::from("test_body");
 		store.exists(&path).await.unwrap().xpect_false();
+		// a miss names what was missed, so whoever reports it says which
+		store
+			.get(&path)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("test_path");
 		store.remove(&path).await.xpect_err();
 		store.insert(&path, body.clone()).await.unwrap();
 		store.store_exists().await.unwrap().xpect_true();

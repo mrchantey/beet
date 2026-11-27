@@ -18,9 +18,10 @@ bold, so the wordmark and every display heading would arrive at the wrong weight
 
 The header is the shell's own restated, its title the logo beside the site
 name, the name dropping on a narrow screen (`Styles.bsx`). The logo is two
-images, the light and dark files `main.bsx`'s `<ScriptDerivation>` draws, the
-page's scheme class showing one: an image cannot see the page it sits in, so
-one file following the OS would miss a scheme the visitor pinned. The nav
+images, the light and dark files `main.bsx`'s `<ScriptDerivation>` draws, a
+scheme-gated `<Rule>` in `Styles.bsx` showing the one of the page's scheme on
+both targets: an image cannot see the page it sits in, so one file following
+the OS would miss a scheme the visitor pinned. The nav
 carries the site's own links ahead of the repository link and the scheme
 toggle. The Docs link is `hidden`, like the unlisted pages it leads to: in
 production they serve to whoever holds a url, and nobody browsing the site is
@@ -34,15 +35,12 @@ in-world navigator instead).
 	<Fragment slot="head">
 		<link rel="preload" href="/assets/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
 		<link rel="stylesheet" href="/assets/fonts/inter.css"/>
-		<style>
-			.light-scheme .beet-logo.beet-logo-dark, .dark-scheme .beet-logo.beet-logo-light { display: none; }
-		</style>
 	</Fragment>
 	<Header slot="header">
 		<MenuButton slot="leading"/>
 		<span slot="title" class="site-title">
-			<img class="beet-logo beet-logo-light site-title-logo terminal-hidden" src="/assets/logo/logo-light.svg" alt=""/>
-			<img class="beet-logo beet-logo-dark site-title-logo terminal-hidden" src="/assets/logo/logo-dark.svg" alt=""/>
+			<img class="beet-logo-light site-title-logo" src="/assets/logo/logo-light.svg" alt=""/>
+			<img class="beet-logo-dark site-title-logo" src="/assets/logo/logo-dark.svg" alt=""/>
 			<span class="site-title-text">Beet</span>
 		</span>
 		<Link slot="nav" href="/docs" variant=ButtonVariant::Text hidden>Docs</Link>

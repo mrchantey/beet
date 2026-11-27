@@ -191,8 +191,10 @@ impl RuleSet {
 	/// runs once per element instead of once per property.
 	///
 	/// `@media`-gated rules apply per [`MediaQuery::matches`] against the
-	/// element's `media`. A context stating a scheme leaves out every scheme
-	/// class rule ([`Self::is_scheme_rule`]), which apply at the root instead
+	/// element's `media`, and scheme-gated ones ([`Rule::scheme`]) in the
+	/// element's scheme, the context's or its nearest scheme class. A context
+	/// stating a scheme leaves out every scheme class rule
+	/// ([`Self::is_scheme_rule`]), which apply at the root instead
 	/// ([`Self::scheme_value`]).
 	fn matching_rule_indices(
 		&self,
@@ -206,6 +208,10 @@ impl RuleSet {
 				rule.media().is_none_or(|query| {
 					query.matches(*media.medium(), *media.viewport())
 				}) && !(media.scheme().is_some() && Self::is_scheme_rule(rule))
+					&& rule.scheme().is_none_or(|scheme| {
+						media.scheme().or_else(|| ColorScheme::nearest(el, ancestors))
+							== Some(scheme)
+					})
 					&& rule.selector().matches(el, ancestors)
 			})
 			.map(|(index, _)| index)
@@ -255,11 +261,13 @@ impl RuleSet {
 	}
 
 	/// Whether any registered rule uses a combinator selector (`>` or
-	/// descendant), ie whether the cascade must build the ancestor element chain
-	/// to match. Combinator-free rule sets (the common case) skip that work.
+	/// descendant) or a scheme gate, ie whether the cascade must build the
+	/// ancestor element chain to match. Rule sets with neither (the common case)
+	/// skip that work.
 	fn has_combinator_rules(&self) -> bool {
-		self.rules()
-			.any(|rule| rule.selector().is_combinator_deep())
+		self.rules().any(|rule| {
+			rule.scheme().is_some() || rule.selector().is_combinator_deep()
+		})
 	}
 
 	/// Pick the winning declaration for `key` among the pre-matched rules. The

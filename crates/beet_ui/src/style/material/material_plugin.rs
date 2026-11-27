@@ -561,6 +561,68 @@ mod tests {
 		});
 	}
 
+	/// A scheme-gated rule applies where the element's nearest scheme class
+	/// is its scheme, so a region pinned to the other scheme inside it is
+	/// left out, and nowhere in a tree carrying no scheme.
+	#[beet_core::test]
+	fn scheme_gate_follows_the_nearest_scheme() {
+		let mut world = MaterialStylePlugin::world();
+		world.resource_mut::<RuleSet>().insert_rule(
+			Rule::class("probe")
+				.with_scheme(ColorScheme::Dark)
+				.with_value(common_props::FontSize, Length::Rem(3.)),
+		);
+		let probe = |world: &mut World, parent: Option<Entity>| {
+			let mut entity =
+				world.spawn((rsx! { <span/> }, Classes::new(["probe"])));
+			if let Some(parent) = parent {
+				entity.insert(ChildOf(parent));
+			}
+			entity.id()
+		};
+		let dark = world
+			.spawn((rsx! { <div/> }, Classes::new([classes::DARK_SCHEME])))
+			.id();
+		let in_dark = probe(&mut world, Some(dark));
+		let light = world
+			.spawn((
+				rsx! { <div/> },
+				Classes::new([classes::LIGHT_SCHEME]),
+				ChildOf(dark),
+			))
+			.id();
+		let in_light = probe(&mut world, Some(light));
+		let bare = probe(&mut world, None);
+		world.with_state::<RuleSetQuery, _>(|query| {
+			let size = |entity| {
+				query
+					.resolve(entity, common_props::FontSize, &mut default())
+					.ok()
+			};
+			size(in_dark).xpect_eq(Some(Length::Rem(3.)));
+			(size(in_light) != Some(Length::Rem(3.))).xpect_true();
+			(size(bare) != Some(Length::Rem(3.))).xpect_true();
+		});
+	}
+
+	/// The web form of a scheme gate scopes the rule to its scheme's class,
+	/// stopping at the other's.
+	#[beet_core::test]
+	fn scheme_gate_serializes_as_a_scope() {
+		CssBuilder::default()
+			.build(
+				&default_token_map().with_extend(common_props::token_map()),
+				&RuleSet::new(Rule::new()).with_rules(vec![
+					Rule::class("probe")
+						.with_scheme(ColorScheme::Light)
+						.with_value(common_props::DisplayProp, Display::None),
+				]),
+			)
+			.unwrap()
+			.xpect_contains("@scope (.light-scheme) to (.dark-scheme)")
+			.xpect_contains(".probe");
+	}
+
 	/// A descendant with no scheme class of its own inherits the nearest
 	/// ancestor's scheme through the cascade, overriding the light `:root`
 	/// default.

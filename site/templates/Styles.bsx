@@ -87,3 +87,9 @@ to a Material colour token, resolving on both the web and terminal targets.
       column-gap=Rem(0.5) />
 <Rule class="site-title-logo" height=Rem(1.75) />
 <Rule class="site-title-text" media="max-width: 600px" display=None />
+
+<!-- The logo, two images, each shown only in its own scheme: the nearest
+     scheme class of the page, so a pinned scheme and the terminal's own both
+     pick the right one. -->
+<Rule class="beet-logo-light" scheme="dark" display=None />
+<Rule class="beet-logo-dark" scheme="light" display=None />

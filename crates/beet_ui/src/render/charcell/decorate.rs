@@ -161,14 +161,10 @@ fn collect_cell_rows(
 /// body and points the caret down (`▾`).
 ///
 /// A plain `<details>` gets a left caret [`Marker`] on its summary; a sidebar
-/// group (`SIDEBAR_GROUP`) instead has the markup `.sidebar-caret` glyph flipped
-/// in place (the web rotates it via CSS, which the terminal can't). Either way
-/// the body collapses when closed, so the disclosure is interactive on both —
-/// driven by [`toggle_details_on_click`].
-///
-/// Built from raw queries rather than [`ElementQuery`]/`AttributeQuery` so it can
-/// take `&mut Value` (to flip the sidebar caret) without a query conflict over
-/// the shared `Value` access those system params hold.
+/// group (`SIDEBAR_GROUP`) carries its own caret, whose glyph the cascade picks
+/// by the `open` attribute, so it is left alone. Either way the body collapses
+/// when closed, so the disclosure is interactive on both — driven by
+/// [`toggle_details_on_click`].
 pub(crate) fn apply_disclosure(
 	mut commands: Commands,
 	elements: Query<(Entity, &Element)>,
@@ -177,7 +173,6 @@ pub(crate) fn apply_disclosure(
 	attr_keys: Query<&Attribute>,
 	children: Query<&Children>,
 	mut layouts: Query<&mut LayoutStyle>,
-	mut values: Query<&mut Value>,
 ) {
 	for (details, element) in &elements {
 		if element.tag() != "details" {
@@ -195,16 +190,7 @@ pub(crate) fn apply_disclosure(
 				.get(child)
 				.is_ok_and(|(_, element)| element.tag() == "summary");
 			if is_summary {
-				if is_sidebar {
-					// flip the markup caret glyph (terminal can't rotate it)
-					flip_sidebar_caret(
-						child,
-						open,
-						&class_q,
-						&children,
-						&mut values,
-					);
-				} else {
+				if !is_sidebar {
 					let caret = if open { "▾ " } else { "▸ " };
 					commands.entity(child).insert(Marker(caret.into()));
 				}
@@ -226,38 +212,6 @@ fn has_open_attr(
 	attr_keys: &Query<&Attribute>,
 ) -> bool {
 	attr_entity(attributes, attr_keys, entity, "open").is_some()
-}
-
-/// Point a sidebar group's `.sidebar-caret` glyph down (`▾`, open) or right
-/// (`▸`, closed) by rewriting its text node, the terminal stand-in for the web's
-/// CSS caret rotation.
-fn flip_sidebar_caret(
-	summary: Entity,
-	open: bool,
-	class_q: &Query<&Classes>,
-	children: &Query<&Children>,
-	values: &mut Query<&mut Value>,
-) {
-	let glyph = if open { " ▾" } else { " ▸" };
-	// the caret span sits directly under the summary; find it and rewrite its
-	// sole text child.
-	let Ok(kids) = children.get(summary) else {
-		return;
-	};
-	for child in kids.iter() {
-		if !class_q.get(child).is_ok_and(|class_set| {
-			class_set.contains_name(&classes::SIDEBAR_CARET)
-		}) {
-			continue;
-		}
-		if let Ok(text_kids) = children.get(child) {
-			for text in text_kids.iter() {
-				if let Ok(mut value) = values.get_mut(text) {
-					value.set_if_neq(Value::str(glyph));
-				}
-			}
-		}
-	}
 }
 
 /// Observer: clicking a `<summary>` toggles its `<details>` open/closed, the
@@ -753,26 +707,34 @@ mod disclosure_test {
 		host.frame_plain().xnot().xpect_contains("second");
 	}
 
-	/// Clicking a sidebar group's caret collapses and expands it, flipping the
-	/// in-place caret glyph rather than adding a left marker.
+	/// Clicking a sidebar group's caret collapses and expands it, the cascade
+	/// showing the caret's right glyph rather than a left marker, and nothing
+	/// rewriting the scene: the web, rendering the same scene, rotates the
+	/// down glyph instead, so a rewrite here once reached the web rotated
+	/// (`▲`).
 	#[beet_core::test]
 	fn click_caret_toggles_sidebar_group() {
 		let mut host = TestHost::sized(UVec2::new(40, 12));
+		// the caret's glyphs are the material sidebar rules' to pick
+		host.app
+			.add_plugins(crate::style::material::MaterialStylePlugin::default());
 		host.spawn_content(rsx! {
 			<details {Classes::new([classes::SIDEBAR_GROUP])} open>
 				<summary {Classes::new([classes::SIDEBAR_SUMMARY])}>
 					<span {Classes::new([classes::SIDEBAR_LABEL])}>"Group"</span>
-					<span {Classes::new([classes::SIDEBAR_CARET])}>" ▾"</span>
+					{crate::widgets::sidebar_caret_glyphs()}
 				</summary>
 				<ul {Classes::new([classes::SIDEBAR_LIST])}><li>"Child link"</li></ul>
 			</details>
 		});
 		host.step();
-		// open: caret down, child visible. No left marker (sidebar flips in place).
+		// open: caret down, child visible. No left marker.
 		host.frame_plain()
 			.as_str()
 			.xpect_contains("▾")
-			.xpect_contains("Child link");
+			.xpect_contains("Child link")
+			.xnot()
+			.xpect_contains("▸");
 		host.frame_plain().xnot().xpect_contains("▾ Group");
 
 		// click the caret span: collapses — caret right, child gone.
@@ -787,7 +749,22 @@ mod disclosure_test {
 			.map(|(entity, _)| entity)
 			.unwrap();
 		click(&mut host, caret);
-		host.frame_plain().as_str().xpect_contains("▸");
+		host.frame_plain()
+			.as_str()
+			.xpect_contains("▸")
+			.xnot()
+			.xpect_contains("▾");
 		host.frame_plain().xnot().xpect_contains("Child link");
+		// the scene's glyphs are as authored, both of them
+		let mut glyphs = host
+			.app
+			.world_mut()
+			.query::<&Value>()
+			.iter(host.app.world())
+			.filter_map(|value| value.as_str().ok().map(str::to_string))
+			.filter(|text| text.contains(['▾', '▸']))
+			.collect::<Vec<_>>();
+		glyphs.sort();
+		glyphs.xpect_eq(vec![" ▸".to_string(), " ▾".to_string()]);
 	}
 }

@@ -12,8 +12,11 @@ use beet_core::prelude::*;
 /// `.light-scheme`/`.dark-scheme` classes.
 ///
 /// Query it to read the current scheme; mutate it to switch themes at runtime.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Component, Reflect)]
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Component, Reflect,
+)]
 #[reflect(Component)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ColorScheme {
 	/// Dark text on a light surface.
 	Light,
@@ -44,6 +47,25 @@ impl ColorScheme {
 			Self::Light => Self::LIGHT_CLASS,
 			Self::Dark => Self::DARK_CLASS,
 		}
+	}
+
+	/// The other scheme.
+	pub fn other(self) -> Self {
+		match self {
+			Self::Light => Self::Dark,
+			Self::Dark => Self::Light,
+		}
+	}
+
+	/// The scheme an element resolves in by the classes of the tree: the
+	/// nearest scheme class on `el` or its `ancestors` (nearest first), `None`
+	/// for a tree carrying neither.
+	pub fn nearest(el: &ElementView, ancestors: &[ElementView]) -> Option<Self> {
+		core::iter::once(el).chain(ancestors).find_map(|view| {
+			[Self::Light, Self::Dark]
+				.into_iter()
+				.find(|scheme| view.contains_class(&scheme.class().as_selector()))
+		})
 	}
 
 	/// Flip between light and dark.

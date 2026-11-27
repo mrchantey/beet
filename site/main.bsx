@@ -157,7 +157,9 @@ re-caches the old responses for the full edge TTL.
 
 The assets bucket lives on its own `shared` stage under the `shared/` route
 prefix, provisioned as its own stack since a source shared by developers is a
-different process from a stage deploy. No stage deploy or destroy touches it.
+different process from a stage deploy. No stage deploy or destroy touches it,
+but its own deploy publishes `site/assets` to it as `push` does, so the package
+deploy keeps the source of record level with what the stage just shipped.
 
 ## One deploy for the package
 
@@ -216,7 +218,7 @@ beetmania audit --stage=prod`), so a stray under them is still found.
     just site-social probe --stage=prod    # after the claim: does each handle resolve
     just site-audit --stage=prod           # the zone holds exactly what we declare
 
-    just beet-deploy [--stage=prod]        # the package: site, shared, social, in that order
+    just beet-deploy [--stage=prod]        # the package: site, shared (and its asset push), social, in that order
     just site-stage deploy [--stage=prod]  # the stage stack alone: build -> stores -> sync -> release -> watch -> purge
     just beet-sync --stage=prod            # re-publish the site + restart (no redeploy)
     just beet-watch                        # tail the instance logs
@@ -559,12 +561,20 @@ binary serves the records and the comments (`atproto`).
 		     binary, including the lean one where the verbs around it are inert -->
 		<Stack stage="shared">
 			<S3BucketBlock bx:ref="shared_assets" label="assets" deploy_versioned=false public_read=true force_destroy=false object_versioning=true/>
-			<!-- one resource and no step outside terraform, so the deploy is an
-			     apply and the teardown is that read backwards. `force_destroy` is
+			<!-- one resource, so the deploy is an apply and the teardown is that
+			     read backwards. The deploy then publishes `site/assets` to it, as
+			     `push` does, so a package deploy (`all/deploy`) never leaves the
+			     source of record behind the site it just shipped: a stage deploy
+			     ships the assets of the checkout it ran from, and a file only that
+			     checkout holds would otherwise be missing from the next one's
+			     `pull`, and from the site deployed from there. `force_destroy` is
 			     off, so `destroy` REFUSES while the bucket holds anything: that
 			     is the guard working, since these assets are a source of record. -->
 			<Group bx:ref="shared_up">
 				<TofuApply/>
+				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb"/>
+				<Derive/>
+				<StoreSync src="fs:site/assets" dest={$shared_assets}/>
 			</Group>
 			<Group bx:ref="shared_down">
 				<StackTeardown/>

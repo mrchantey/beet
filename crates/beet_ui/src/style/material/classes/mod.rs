@@ -158,6 +158,8 @@ pub fn all_rules() -> Vec<Rule> {
 		sidebar_summary(),
 		sidebar_branch(),
 		sidebar_caret(),
+		sidebar_caret_web(),
+		sidebar_caret_closed(),
 		sidebar_caret_collapsed(),
 		sidebar_list(),
 		sidebar(),
@@ -226,6 +228,9 @@ pub fn all_rules() -> Vec<Rule> {
 	// prose heading sizes (the MD3 type scale per `<h1>`..`<h6>`); appended so
 	// these tag rules win the cascade over the user-agent heading defaults.
 	rules.extend(heading_sizes());
+	// the terminal's collapsed caret, outranking `sidebar_caret_closed` by
+	// specificity rather than order
+	rules.extend(sidebar_caret_collapsed_terminal());
 	rules
 }
 

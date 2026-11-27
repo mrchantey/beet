@@ -24,6 +24,13 @@
 //! writing nothing, so the same tree may be on screen as it writes. The web
 //! needs neither: the browser cascades the serialized stylesheet itself.
 //!
+//! A rule may also be gated on a colour scheme ([`Rule::scheme`](crate::prelude::Rule),
+//! `<Rule scheme="dark">`): it applies where the element's nearest
+//! `.light-scheme`/`.dark-scheme` class names that scheme, the page's own on
+//! both targets, so whatever looks different per scheme (an image, a border)
+//! is one rule rather than a script, and the web serializes it as an
+//! `@scope (.dark-scheme) to (.light-scheme)` block.
+//!
 //! Conventions:
 //! - Colocate a widget's own classes with the widget: a class only that widget
 //!   emits is declared and styled beside it, never in a central rules file.

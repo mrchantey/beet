@@ -125,6 +125,23 @@ pub fn MenuButton() -> impl Bundle {
 	}
 }
 
+/// A sidebar group's disclosure caret, at the right edge of its summary row.
+///
+/// It holds both glyphs and the cascade shows one by the group's `open`
+/// attribute, so nothing rewrites the scene as a group opens and closes: the
+/// web shows the down caret alone and rotates it to point right while the
+/// group is collapsed, which animates, and the terminal, which cannot rotate,
+/// shows the right caret instead ([`classes::sidebar_caret_collapsed`] and
+/// its terminal twins).
+pub(crate) fn sidebar_caret_glyphs() -> impl Bundle {
+	rsx! {
+		<span {Classes::new([classes::SIDEBAR_CARET])}>
+			<span {Classes::new([classes::SIDEBAR_CARET_OPEN])}>" ▾"</span>
+			<span {Classes::new([classes::SIDEBAR_CARET_CLOSED])}>" ▸"</span>
+		</span>
+	}
+}
+
 /// Native twin of `sidebar.js`'s init/`resize` wiring: seed the rail's
 /// `aria-hidden` from the surface width, and re-seed when a resize crosses
 /// [`classes::SIDEBAR_BREAKPOINT_PX`] — so the width-gated `sidebar-hidden`
@@ -234,14 +251,10 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Snippet {
 			.map(|child| sidebar_item(child, false))
 			.collect();
 		let summary = summary_content(display_name, href, active);
-		// One down-caret glyph, pushed to the right edge (flex). The web rotates
-		// it to point right when the group is collapsed (`details:not([open])`),
-		// tracking the disclosure state reactively; the terminal can't rotate, so
-		// `flip_sidebar_caret` rewrites the glyph with the state instead.
 		let summary_row = rsx! {
 			<summary {Classes::new([classes::SIDEBAR_SUMMARY])}>
 				{summary}
-				<span {Classes::new([classes::SIDEBAR_CARET])}>" ▾"</span>
+				{sidebar_caret_glyphs()}
 			</summary>
 		};
 		// the `open` attribute can't be conditionally interpolated, so fork.

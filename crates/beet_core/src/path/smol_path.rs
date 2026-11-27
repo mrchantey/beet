@@ -155,6 +155,13 @@ impl SmolPath {
 		self.0.rsplit('/').find(|seg| !seg.is_empty())
 	}
 
+	/// The last named segment in title case, the label of a page that names
+	/// none: `docs/color_schemes` reads `Color Schemes`.
+	pub fn last_segment_title(&self) -> Option<String> {
+		use heck::ToTitleCase;
+		self.last_segment().map(|segment| segment.to_title_case())
+	}
+
 	/// The final segment of the path, if any. Alias for
 	/// [`SmolPath::last_segment`] mirroring [`std::path::Path::file_name`].
 	pub fn file_name(&self) -> Option<&str> { self.last_segment() }
@@ -516,6 +523,19 @@ mod test {
 			.xpect_eq(vec!["api", "users"]);
 		SmolPath::new("/").segments().xpect_eq(Vec::<&str>::new());
 		SmolPath::default().segments().xpect_eq(Vec::<&str>::new());
+	}
+
+	#[crate::test]
+	fn last_segment_title() {
+		SmolPath::new("docs/color_schemes")
+			.last_segment_title()
+			.unwrap()
+			.xpect_eq("Color Schemes");
+		SmolPath::new("design/text-field")
+			.last_segment_title()
+			.unwrap()
+			.xpect_eq("Text Field");
+		SmolPath::default().last_segment_title().xpect_none();
 	}
 
 	#[crate::test]

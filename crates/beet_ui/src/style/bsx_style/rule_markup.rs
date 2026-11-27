@@ -16,7 +16,8 @@
 //!       background-color="@token:Primary" color="@token:OnPrimary" />
 //! ```
 //!
-//! The selector comes from `class`/`tag`/`state`/`media`; every other attribute
+//! The selector comes from `class`/`tag`/`state`, its gates from `media` and
+//! `scheme` (`light`/`dark`, [`Rule::scheme`]); every other attribute
 //! is a declaration whose key is a kebab property name
 //! [`PropResolver::name_map`] and whose value is the BSX
 //! enum form (`Flex`, `Rem(1.0)`), parsed identically to the typed
@@ -92,6 +93,9 @@ fn parse_rule(el: &BsxElement) -> Result<Rule> {
 	if let Some(media) = parse_media(el)? {
 		rule = rule.with_media(media);
 	}
+	if let Some(scheme) = parse_scheme(el)? {
+		rule = rule.with_scheme(scheme);
+	}
 	let declarations = el
 		.plain_attributes()
 		.filter(|attr| !is_selector_attr(&attr.key))
@@ -143,7 +147,7 @@ pub(crate) fn apply_declarations<'a>(
 /// The selector attributes, which name the rule's target rather than a
 /// declaration.
 fn is_selector_attr(key: &str) -> bool {
-	matches!(key, "class" | "tag" | "state" | "media")
+	matches!(key, "class" | "tag" | "state" | "media" | "scheme")
 }
 
 /// Build the rule's [`Selector`] from `class`/`tag`/`state`. Multiple of these
@@ -229,6 +233,20 @@ fn parse_media(el: &BsxElement) -> Result<Option<MediaQuery>> {
 				"`<Rule>` `media=\"{other}\"` is not a known media query (terminal/screen/print/reduced-motion, or `max-width: 1024px`)"
 			),
 		},
+	}
+}
+
+/// Parse the `scheme` gate, `light` or `dark` ([`Rule::scheme`]).
+fn parse_scheme(el: &BsxElement) -> Result<Option<ColorScheme>> {
+	let Some(value) = attr(el, "scheme") else {
+		return Ok(None);
+	};
+	let scheme = string_value(value, "scheme")?;
+	match ColorScheme::parse(&scheme) {
+		Some(scheme) => Ok(Some(scheme)),
+		None => bevybail!(
+			"`<Rule>` `scheme=\"{scheme}\"` is not a colour scheme (light/dark)"
+		),
 	}
 }
 
@@ -427,6 +445,13 @@ mod test {
 		rule_from(r#"<Rule class="d" media="terminal" display=None/>"#)
 			.media()
 			.xpect_eq(Some(MediaQuery::Terminal));
+	}
+
+	#[beet_core::test]
+	fn scheme_parses() {
+		rule_from(r#"<Rule class="a" scheme="dark" display=None/>"#)
+			.scheme()
+			.xpect_eq(Some(ColorScheme::Dark));
 	}
 
 	#[beet_core::test]

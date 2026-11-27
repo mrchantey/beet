@@ -205,6 +205,19 @@ impl CssBuilder {
 			)
 		};
 
+		// scope a scheme-gated rule to its scheme's class, stopping at the
+		// other's, so a region pinned to the other scheme is left out
+		let rule = match css_rule.scheme() {
+			None => rule,
+			Some(scheme) => self.wrap(
+				&format!(
+					"@scope (.{}) to (.{})",
+					scheme.class(),
+					scheme.other().class()
+				),
+				rule,
+			),
+		};
 		// gate behind an `@media (…)` at-rule when the rule carries a media query
 		// with a CSS equivalent (`Terminal` has none and is filtered out before
 		// serialization, so `as_css` returning `None` falls through to the bare rule).

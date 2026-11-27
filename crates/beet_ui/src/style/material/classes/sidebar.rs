@@ -25,6 +25,10 @@ pub const SIDEBAR_GROUP: ClassName = ClassName::new_static("sidebar-group");
 pub const SIDEBAR_SUMMARY: ClassName = ClassName::new_static("sidebar-summary");
 /// The disclosure caret on a sidebar group's summary.
 pub const SIDEBAR_CARET: ClassName = ClassName::new_static("sidebar-caret");
+/// The caret's down glyph, an open group's, which the web rotates.
+pub const SIDEBAR_CARET_OPEN: ClassName = ClassName::new_static("sidebar-caret-open");
+/// The caret's right glyph, a collapsed group's on the terminal.
+pub const SIDEBAR_CARET_CLOSED: ClassName = ClassName::new_static("sidebar-caret-closed");
 /// The label/link of a `<summary>` branch row, grown to fill the row so its
 /// (active) highlight reaches the right-hand caret.
 pub const SIDEBAR_BRANCH: ClassName = ClassName::new_static("sidebar-branch");
@@ -61,23 +65,72 @@ pub fn sidebar_branch() -> Rule {
 }
 
 /// Sidebar disclosure caret - faint, sitting at the right edge of its summary,
-/// larger than the row text so it reads as a clear affordance. A single
-/// down-caret glyph; the web rotates it to point right when the group is
+/// larger than the row text so it reads as a clear affordance. It holds a down
+/// glyph and a right one (the `Sidebar` widget's `sidebar_caret_glyphs`): the web shows
+/// the down glyph alone and rotates it to point right when the group is
 /// collapsed (see [`sidebar_caret_collapsed`]), the transition smoothing the
-/// flip. The terminal can't rotate, so `flip_sidebar_caret` rewrites the glyph
-/// (`▸`/`▾`) with the disclosure state instead.
+/// turn, and the terminal, which can't rotate, shows the right glyph instead
+/// ([`sidebar_caret_collapsed_terminal`]).
 pub fn sidebar_caret() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR_CARET))
 		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
 		.with_value(common_props::FontSize, Length::Rem(1.5))
 		.with_value(common_props::TransitionDurationProp, Duration::from_millis(150))
 }
 
+/// Web caret - a square toggle button as tall as its row, the glyph centred,
+/// so its hover highlight is one tidy square whether or not it is rotated, its
+/// own beside the link's. Screen-gated: a terminal cell is the caret's box.
+pub fn sidebar_caret_web() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Screen)
+		.with_selector(Selector::class(SIDEBAR_CARET))
+		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::AlignItemsProp, AlignItems::Center)
+		.with_value(common_props::JustifyContentProp, JustifyContent::Center)
+		.with_value(common_props::Width, Length::Rem(2.))
+		.with_value(common_props::Height, Length::Rem(2.))
+}
+
+/// The caret's right glyph - hidden on every target but a terminal's collapsed
+/// group, see [`sidebar_caret_collapsed_terminal`].
+pub fn sidebar_caret_closed() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SIDEBAR_CARET_CLOSED))
+		.with_value(common_props::DisplayProp, Display::None)
+}
+
+/// The caret of a terminal's collapsed group - the right glyph shown and the
+/// down glyph hidden, the terminal's stand-in for [`sidebar_caret_collapsed`]'s
+/// rotation. Terminal-gated, so the web keeps its single rotating glyph.
+pub fn sidebar_caret_collapsed_terminal() -> [Rule; 2] {
+	let collapsed = |glyph: ClassName| {
+		Selector::descendant(
+			Selector::AllOf(vec![
+				Selector::tag("details"),
+				Selector::not(Selector::attribute("open", None)),
+			]),
+			Selector::class(glyph),
+		)
+	};
+	[
+		Rule::new()
+			.with_media(MediaQuery::Terminal)
+			.with_selector(collapsed(SIDEBAR_CARET_OPEN))
+			.with_value(common_props::DisplayProp, Display::None),
+		Rule::new()
+			.with_media(MediaQuery::Terminal)
+			.with_selector(collapsed(SIDEBAR_CARET_CLOSED))
+			.with_value(common_props::DisplayProp, Display::Inline),
+	]
+}
+
 /// Web caret rotation - a collapsed `<details>` (no `open` attribute) points its
 /// caret right via a 90° rotation. Screen-gated: the terminal can't rotate a
-/// glyph, so its caret is *rewritten* to `▸`/`▾` by `flip_sidebar_caret`
-/// instead.
+/// glyph, so it shows the right glyph instead
+/// ([`sidebar_caret_collapsed_terminal`]).
 pub fn sidebar_caret_collapsed() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Screen)

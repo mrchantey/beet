@@ -3,8 +3,8 @@ title = "Beet"
 +++
 
 <div bx:style="display=Flex flex-direction=Vertical align-items=Center text-align=Center row-gap=Rem(1.5)">
-	<img class="beet-logo beet-logo-light terminal-hidden" src="/assets/logo/logo-light.svg" alt="" width="256" height="256"/>
-	<img class="beet-logo beet-logo-dark terminal-hidden" src="/assets/logo/logo-dark.svg" alt="" width="256" height="256"/>
+	<img class="beet-logo-light" src="/assets/logo/logo-light.svg" alt="" width="256" height="256"/>
+	<img class="beet-logo-dark" src="/assets/logo/logo-dark.svg" alt="" width="256" height="256"/>
 	<h1 class="text-wordmark">Beet</h1>
 	<p class="text-title-large">
 		<b>An Atmospheric OS for homegrown tech</b>

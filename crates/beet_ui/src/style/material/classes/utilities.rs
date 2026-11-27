@@ -175,14 +175,19 @@ pub fn hover_dim_fallback() -> Rule {
 /// The container-less interactives that need a hover *fill* (the opacity dim is
 /// invisible on them in a light scheme): text/outline buttons, links, sidebar
 /// rows, and disclosure summaries/carets — the latter so a `<details>` arrow
-/// hovers like a text button.
+/// hovers like a text button. A sidebar group's summary is no target of its
+/// own: its link and its caret each highlight alone, so the row never paints
+/// two fills at once.
 fn container_less_hover() -> Selector {
 	hovered(Selector::AnyOf(vec![
 		Selector::class(super::BTN_TEXT),
 		Selector::class(super::BTN_OUTLINED),
 		Selector::class(super::SIDEBAR_LINK),
 		Selector::class(super::SIDEBAR_CARET),
-		Selector::tag("summary"),
+		Selector::AllOf(vec![
+			Selector::tag("summary"),
+			Selector::not(Selector::class(super::SIDEBAR_SUMMARY)),
+		]),
 	]))
 }
 
