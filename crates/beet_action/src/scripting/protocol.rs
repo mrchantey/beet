@@ -415,7 +415,7 @@ mod test {
 			call: WorldCall {
 				id: 0,
 				op: WorldOp::Entities {
-					component: "Name".to_string(),
+					component: ReflectName::new("Name"),
 				},
 			},
 		}

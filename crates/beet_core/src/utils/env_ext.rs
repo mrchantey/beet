@@ -302,6 +302,17 @@ pub fn vars() -> Vec<(SmolStr, SmolStr)> {
 	}
 }
 
+/// The name of every `BEET_*` variable in this environment: what a beet
+/// child scrubs, reaching names outside the bootstrap knob table
+/// (`BEET_AGE_IDENTITY`, `BEET_SSH_HOST_KEY`, ..) that no enumeration would.
+pub fn beet_var_names() -> Vec<SmolStr> {
+	vars()
+		.into_iter()
+		.map(|(key, _)| key)
+		.filter(|key| key.starts_with("BEET_"))
+		.collect()
+}
+
 /// Get all environment variables that match the given filter.
 pub fn vars_filtered(filter: GlobFilter) -> Vec<(SmolStr, SmolStr)> {
 	vars()

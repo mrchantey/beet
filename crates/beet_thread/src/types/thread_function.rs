@@ -143,25 +143,29 @@ impl ThreadFunction {
 	}
 
 	/// Refuse a template holding a [`UserInput`], naming its actor: nobody
-	/// types into a thread run as a function.
+	/// types into a thread run as a function. The actor is its entity's own
+	/// until its thread reduces, then its window's, by [`ActorRef`].
 	async fn assert_unattended(&self) -> Result {
 		let template = &self.name;
 		let typing = self
 			.world
 			.entity(self.root)
-			.with_state::<(Query<&Children>, Query<Option<&Actor>, With<UserInput>>), _>(
-				|root, (children, inputs)| {
-					children
-						.iter_descendants(root)
-						.filter_map(|entity| inputs.get(entity).ok())
-						.map(|actor| {
-							actor
-								.map(|actor| actor.name().to_string())
-								.unwrap_or_default()
-						})
-						.next()
-				},
-			)
+			.with_state::<(
+				Query<&Children>,
+				Query<(Entity, Option<&Actor>), With<UserInput>>,
+				ThreadRecordsQuery,
+			), _>(|root, (children, inputs, records)| {
+				children
+					.iter_descendants(root)
+					.filter_map(|entity| inputs.get(entity).ok())
+					.map(|(entity, actor)| {
+						actor
+							.or_else(|| records.actor(entity).ok())
+							.map(|actor| actor.name().to_string())
+							.unwrap_or_default()
+					})
+					.next()
+			})
 			.await?;
 		match typing {
 			Some(actor) => bevybail!(

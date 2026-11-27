@@ -637,6 +637,7 @@ pub(super) mod test {
 
 		/// Delete every record the publication wrote, so a live account is
 		/// left as it was found.
+		#[cfg(not(target_arch = "wasm32"))]
 		pub async fn clean(&self) {
 			let url = Uri::parse(&self.publishing_url()).unwrap();
 			for post in self.posts().await {

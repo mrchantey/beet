@@ -245,17 +245,10 @@ impl ChildProcess {
 
 	/// Remove every inherited `BEET_*` variable, the prefix rule both
 	/// [`with_bootstrap`](Self::with_bootstrap) and
-	/// [`without_launch_env`](Self::without_launch_env) start from: it reaches
-	/// the names outside the knob table (`BEET_AGE_IDENTITY`,
-	/// `BEET_SSH_HOST_KEY`, ..) that no enumeration would.
+	/// [`without_launch_env`](Self::without_launch_env) start from, see
+	/// [`env_ext::beet_var_names`].
 	fn scrub_beet_env(mut self) -> Self {
-		self.env_removals.extend(
-			env_ext::vars()
-				.into_iter()
-				.map(|(key, _)| key)
-				.filter(|key| key.starts_with("BEET_"))
-				.map(SmolStr::from),
-		);
+		self.env_removals.extend(env_ext::beet_var_names());
 		self
 	}
 

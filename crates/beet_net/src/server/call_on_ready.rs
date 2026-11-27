@@ -383,15 +383,14 @@ mod test {
 			};
 			process_ext::exit(code);
 		}
-		let output =
-			std::process::Command::new(std::env::current_exe().unwrap())
-				.args([
-					"a_failed_command_reports_once",
-					"--quiet",
-					FAILED_COMMAND_CHILD,
-				])
-				.output()
-				.unwrap();
+		let output = process_ext::this_test([
+			"a_failed_command_reports_once",
+			"--quiet",
+			FAILED_COMMAND_CHILD,
+		])
+		.unwrap()
+		.output()
+		.unwrap();
 		output.status.code().xpect_eq(Some(70));
 		output.stdout.is_empty().xpect_true();
 		let stderr = String::from_utf8_lossy(&output.stderr).to_string();

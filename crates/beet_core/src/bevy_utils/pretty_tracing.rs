@@ -557,9 +557,13 @@ mod test {
 			});
 			process_ext::exit(0);
 		}
-		std::process::Command::new(std::env::current_exe().unwrap())
-			.args(["tolerates_a_closed_stream", "--quiet", CLOSED_STREAM_CHILD])
-			.output()
+		process_ext::this_test([
+			"tolerates_a_closed_stream",
+			"--quiet",
+			CLOSED_STREAM_CHILD,
+		])
+		.unwrap()
+		.output()
 			.unwrap()
 			.status
 			.code()

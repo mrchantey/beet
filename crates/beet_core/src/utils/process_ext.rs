@@ -27,10 +27,43 @@ pub fn exit(exit_code: i32) {
 	}
 }
 
+/// This test binary run again as a child with `args`, ie a test name and a
+/// marker flag, for a test that needs a second process.
+///
+/// Every `BEET_*` variable is scrubbed: a test sets one process-wide (the
+/// vault fixture's throwaway `BEET_AGE_IDENTITY`), and the child's runner
+/// would otherwise open the nearest `secrets.toml` with it. A variable the
+/// child is told by is set on the returned command after.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn this_test(
+	args: impl IntoIterator<Item = impl AsRef<std::ffi::OsStr>>,
+) -> Result<std::process::Command> {
+	let mut cmd = std::process::Command::new(std::env::current_exe()?);
+	for key in env_ext::beet_var_names() {
+		cmd.env_remove(key.as_str());
+	}
+	cmd.args(args);
+	cmd.xok()
+}
+
 #[cfg(all(test, unix))]
 mod test {
 	use crate::prelude::*;
 	use std::io::Write;
+
+	/// A `BEET_*` variable a test set process-wide never reaches the child,
+	/// whose runner would otherwise read it at launch.
+	#[crate::test]
+	fn this_test_scrubs_beet_vars() {
+		const KEY: &str = "BEET_TEST_THIS_TEST_SCRUB";
+		// SAFETY: test-only, a name no other test reads
+		unsafe { env_ext::set_var(KEY, "leaked") }.unwrap();
+		process_ext::this_test(["some_test"])
+			.unwrap()
+			.get_envs()
+			.any(|(key, value)| key == KEY && value.is_none())
+			.xpect_true();
+	}
 
 	/// Marks the child run of [`exit_skips_library_teardown`].
 	const CHILD_FLAG: &str = "--process-ext-exit-child";
@@ -51,11 +84,14 @@ mod test {
 			std::io::stdout().write_all(b"answer").unwrap();
 			process_ext::exit(3);
 		}
-		let output =
-			std::process::Command::new(std::env::current_exe().unwrap())
-				.args(["exit_skips_library_teardown", "--quiet", CHILD_FLAG])
-				.output()
-				.unwrap();
+		let output = process_ext::this_test([
+			"exit_skips_library_teardown",
+			"--quiet",
+			CHILD_FLAG,
+		])
+		.unwrap()
+		.output()
+		.unwrap();
 		output.status.code().xpect_eq(Some(3));
 		String::from_utf8_lossy(&output.stdout)
 			.xpect_contains("answer")

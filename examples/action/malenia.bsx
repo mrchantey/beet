@@ -12,14 +12,15 @@ chosen by utility AI scoring.
         + Waterfoul Dance      random score
         + Scarlet Aeonia       low fixed score (a desperate move)
 
-The action tree is spawned under Malenia, so `AgentQuery` resolves her as the
-agent the attacks operate on. The `Elden Lord` player carries `{AttackTarget}` so
+Malenia is marked `{AgentRoot}`, so `AgentQuery` resolves her as the agent the
+attacks operate on: a loaded document mounts under its entry, whose root would
+otherwise be the agent. The `Elden Lord` player carries `{AttackTarget}` so
 the attacks resolve their target by query. The loop runs until someone falls.
 
     beet --entry=examples/action/malenia.bsx
 -->
 <RequireCfg cfg="feature:extra"/>
-<Name("Malenia") {(Health(100.0), HealingPotions(2), Repeat, CallOnReady)}>
+<Name("Malenia") {(Health(100.0), HealingPotions(2), AgentRoot, Repeat, CallOnReady)}>
 	<Fallback>
 		<TryHealSelf/>
 		<HighestScore>

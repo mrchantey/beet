@@ -1143,6 +1143,11 @@ impl ThreadRecordsQuery<'_, '_> {
 			.map_err(|_| bevyhow!("entity {entity} has no ActorRef"))
 	}
 
+	/// The [`Actor`] a behavior entity acts as, from the window's records.
+	pub fn actor(&self, entity: Entity) -> Result<&Actor> {
+		self.records(entity)?.actor(&self.actor_id(entity)?)
+	}
+
 	/// The [`ThreadId`] of the thread a behavior entity belongs to.
 	pub fn thread_id(&self, entity: Entity) -> Result<ThreadId> {
 		let thread_entity = self.thread_entity(entity)?;

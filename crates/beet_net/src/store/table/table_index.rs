@@ -293,8 +293,12 @@ impl IndexKey {
 						(u64::from_be_bytes(bytes[8..16].try_into()?)
 							^ (1 << 63)) as i64;
 					bytes = &bytes[16..];
+					// integral within i64 when a truncating cast round-trips,
+					// since `f64::fract` is std-only and this builds bare metal
 					values.push(
-						match float.fract() == 0.0 && float.abs() < 9.3e18 {
+						match float.abs() < 9.3e18
+							&& (float as i64) as f64 == float
+						{
 							true => Value::Int(
 								(float as i128 + residual as i128) as i64,
 							),

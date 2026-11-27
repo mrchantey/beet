@@ -654,8 +654,8 @@ mod test {
 
 	#[cfg(unix)]
 	fn spawn_second_process(dir: &AbsPath, part: &str) -> std::process::Child {
-		std::process::Command::new(std::env::current_exe().unwrap())
-			.args(["second_process", "--ignored"])
+		process_ext::this_test(["second_process", "--ignored"])
+			.unwrap()
 			.env(SECOND_PROCESS, format!("{part}:{dir}"))
 			.stdout(std::process::Stdio::null())
 			.spawn()

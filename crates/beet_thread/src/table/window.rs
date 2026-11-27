@@ -508,10 +508,11 @@ mod test {
 			.post
 			.clone();
 		changed.set_text("seed 0, changed");
+		// an edit of a stored post, which its editor writes to the store
 		app.world_mut()
 			.get_mut::<ThreadRecords>(whole)
 			.unwrap()
-			.upsert_post(changed);
+			.upsert_stored(changed);
 		post(&mut app, whole, "new");
 		pump(&mut app);
 		// the newest three: the last post and the whole window's two joins

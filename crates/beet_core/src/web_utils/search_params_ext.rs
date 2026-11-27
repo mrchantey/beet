@@ -282,7 +282,6 @@ mod tests {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 
 	/// A location's path becomes positionals and its query becomes `--key=value`
 	/// flags, the browser equivalent of process argv.

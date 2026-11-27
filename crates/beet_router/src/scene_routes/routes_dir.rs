@@ -313,6 +313,12 @@ impl RoutesDir {
 		// local for the same reason the scan is: the bridge poll is only
 		// guaranteed on the runtime's local executor.
 		entity_mut.run_async_local(async move |route: AsyncEntity| -> Result {
+			// a removal marks the blob too, but dropping the route is the
+			// owning dir's rescan, which the same event triggers
+			if !blob.exists().await? {
+				route.world().with(move |world| guard.resolve(world)).await;
+				return Ok(());
+			}
 			let (package, frontmatter_type) = route
 				.with_state::<(PackageFilesQuery, FrontmatterTypeQuery), _>(
 					|entity, (packages, types)| {
@@ -775,6 +781,50 @@ mod test {
 			.unwrap()
 			.find(&["about"])
 			.xpect_some();
+	}
+
+	/// A removed file marks its route's blob changed as well as the dir's
+	/// store: the rescan drops the route, and the refresh the blob triggers
+	/// stands down rather than raising its failed read of the missing file.
+	#[beet_core::test]
+	async fn removed_file_rescans_the_dir() {
+		use bevy::ecs::error::BevyError;
+		use bevy::ecs::error::ErrorContext;
+		use bevy::ecs::error::FallbackErrorHandler;
+		use core::sync::atomic::AtomicUsize;
+		use core::sync::atomic::Ordering;
+		/// Errors this test's world raised, read by this test alone.
+		static RAISED: AtomicUsize = AtomicUsize::new(0);
+		fn count(_: BevyError, _: ErrorContext) {
+			RAISED.fetch_add(1, Ordering::SeqCst);
+		}
+
+		let mut world = reactive_world();
+		world.insert_resource(FallbackErrorHandler(count));
+		let (inner, handle) =
+			reactive_fixture(&[("index.md", "# Home"), ("about.md", "# About")])
+				.await;
+		let root = spawn_routes(
+			&mut world,
+			inner,
+			(Router, children![RoutesDir::default()]),
+		)
+		.await;
+		let about = RouteTree::of(&world, root)
+			.unwrap()
+			.find(&["about"])
+			.unwrap()
+			.entity;
+		let blob = world.get::<Blob>(about).unwrap().clone();
+		handle.remove(&RelPath::from("about.md")).await.unwrap();
+		// the refresh the removal triggers, run before the rescan it races
+		RoutesDir::refresh_route(&mut world, about, blob);
+		react(&mut world).await;
+		RouteTree::of(&world, root)
+			.unwrap()
+			.find(&["about"])
+			.xpect_none();
+		RAISED.load(Ordering::SeqCst).xpect_eq(0);
 	}
 
 	/// Write a routes dir fixture in a fresh [`TempDir`], returning it beside a

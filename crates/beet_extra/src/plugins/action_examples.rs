@@ -214,9 +214,9 @@ struct RandomScore;
 /// reference: `{GoTo($next)}`. Held apart from the action so a terminal state
 /// simply omits it. The target is required: an authored `<GoTo/>` with no entity
 /// is rejected by the BSX loader.
-#[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
-pub struct GoTo(#[reflect(@RequiredField)] pub Entity);
+#[derive(Debug, Clone, Component, Reflect, MapEntities)]
+#[reflect(Component, MapEntities, Default)]
+pub struct GoTo(#[reflect(@RequiredField)] #[entities] pub Entity);
 
 impl Default for GoTo {
 	fn default() -> Self { Self(Entity::PLACEHOLDER) }
@@ -316,5 +316,62 @@ impl Plugin for ActionExamplesPlugin {
 		// scripting, on every target: the embedded engine compiles to wasm too
 		#[cfg(feature = "scripting")]
 		app.install_types::<(NumberScript, TextScript)>();
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_action::prelude::*;
+	use beet_core::prelude::*;
+	use beet_scene::prelude::*;
+
+	/// Load `scene` as an entry does, its document mounted under the entry's
+	/// root, and run the action it holds beside its `<RequireCfg>` to the
+	/// [`Outcome`] it resolves.
+	async fn run_scene(scene: &str) -> Outcome {
+		let mut app = App::new();
+		app.add_plugins((
+			MinimalPlugins,
+			AsyncPlugin,
+			TemplatePlugin,
+			ScenePlugin,
+			ActionPlugin,
+			ActionExamplesPlugin,
+		));
+		let world = app.world_mut();
+		let mount = world.spawn_empty().id();
+		let root = BsxParser::spawn(world, scene).unwrap();
+		world.entity_mut(root).insert(ChildOf(mount));
+		let action = world
+			.get::<Children>(root)
+			.unwrap()
+			.iter()
+			.find(|child| world.entity(*child).contains::<ActionMeta>())
+			.unwrap();
+		world
+			.entity_mut(action)
+			.run_async_then(async |action: AsyncEntity| {
+				action.call::<(), Outcome>(()).await
+			})
+			.await
+			.unwrap()
+	}
+
+	/// The scene's [`GoTo`] references bind, so each state jumps to the next.
+	#[beet_core::test]
+	async fn state_machine_scene_runs() {
+		run_scene(include_str!("../../../../examples/action/state_machine.bsx"))
+			.await
+			.xpect_eq(Outcome::PASS);
+	}
+
+	/// Malenia, mounted below the document root, is still the agent her
+	/// attacks resolve, so the fight runs until someone falls.
+	#[beet_core::test]
+	async fn malenia_scene_runs() {
+		run_scene(include_str!("../../../../examples/action/malenia.bsx"))
+			.await
+			.xpect_eq(Outcome::FAIL);
 	}
 }

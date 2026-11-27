@@ -223,11 +223,13 @@ impl ValueSource {
 }
 
 /// The value typed or piped in: one line asked of the operator when stdin
-/// is a terminal, else all of stdin with one trailing newline dropped.
+/// is a terminal, else all of stdin with one trailing newline dropped. A host
+/// with no stdin asks its operator prompt, which refuses naming what to pass
+/// where nobody can answer.
 async fn read_stdin_value() -> Result<String> {
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {
-			bevybail!("pass the value with `--value`, `--from-env` or `--generate`: this host has no stdin to read it from")
+			OperatorPrompt::ask(SecretsSet::value_ask()).await
 		} else {
 			use std::io::IsTerminal;
 			use std::io::Read;
