@@ -303,7 +303,7 @@ mod tests {
 			.spawn((
 				Stack::new("mail").with_stage("prod"),
 				BlobStore::temp(),
-				RepoStore,
+				HomeStore,
 				DocumentSecrets::new("store.toml"),
 				children![Secrets::default(), Router::with_defaults()],
 			))

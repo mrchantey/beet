@@ -991,7 +991,7 @@ mod test {
 	#[beet_core::test]
 	fn boundary_conditions_deny_rather_than_allow() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 		});
 		let (stack, _deployment, config) = scope.finish().unwrap();
@@ -1068,7 +1068,7 @@ mod test {
 					AwsRegion::new("us-west-2"),
 				),
 				|parent| {
-					parent.spawn(RepoStoreBlock::test_store());
+					parent.spawn(HomeStoreBlock::test_store());
 					parent.spawn(LambdaBlock::default());
 				},
 			);

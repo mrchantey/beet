@@ -377,14 +377,14 @@ mod test {
 			.xpect_eq("cd /tmp/lam && zip -j bootstrap.zip bootstrap");
 		CargoBuild::default()
 			.with_bootstrap(BootstrapConfig {
-				repo: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+				home: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
 				server: Some(ServerFilter::new("http")),
 				..default()
 			})
 			.lambda_zip_cmd(dir)
 			.unwrap()
 			.xpect_contains(
-				"exec /var/task/beet --repo=s3://beet--dev--app --server=http",
+				"exec /var/task/beet --home=s3://beet--dev--app --server=http",
 			);
 	}
 

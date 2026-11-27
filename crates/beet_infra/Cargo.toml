@@ -136,7 +136,6 @@ beet_action = { workspace = true, features = ["std", "reflect", "json"] }
 beet_router = { workspace = true, optional = true, features = ["json"] }
 serde.workspace = true
 heck.workspace = true
-semver.workspace = true
 # not optional: a block's machine-config digest (`LightsailBlock::machine_config_hash`)
 # decides whether a deploy rebuilds the box, so it must render on every target.
 sha2 = { workspace = true }

@@ -18,11 +18,11 @@ use alloc::collections::BTreeMap;
 	Eq,
 	Component,
 	Reflect,
-	Def,
+	LexiconDef,
 	Serialize,
 	Deserialize,
 )]
-#[reflect(Component, Default, Def, Serialize, Deserialize)]
+#[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
 pub struct Imports(pub BTreeMap<RelPath, ImportEdge>);
 
 impl Imports {
@@ -100,11 +100,11 @@ pub struct Preload;
 	Eq,
 	Component,
 	Reflect,
-	Def,
+	LexiconDef,
 	Serialize,
 	Deserialize,
 )]
-#[reflect(Component, Default, Def, Serialize, Deserialize)]
+#[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
 pub struct Props(pub BTreeMap<SmolStr, PropSchema>);
 
 /// One named argument as [`Props`] holds it.
@@ -208,11 +208,11 @@ impl SceneMeta for Prop {
 	Eq,
 	Component,
 	Reflect,
-	Def,
+	LexiconDef,
 	Serialize,
 	Deserialize,
 )]
-#[reflect(Component, Default, Def, Serialize, Deserialize)]
+#[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
 pub struct Scenes(pub BTreeMap<RelPath, SceneRef>);
 
 /// A document of a package record or a release: its content-keyed scene
@@ -244,11 +244,11 @@ pub struct SceneRef {
 	Eq,
 	Component,
 	Reflect,
-	Def,
+	LexiconDef,
 	Serialize,
 	Deserialize,
 )]
-#[reflect(Component, Default, Def, Serialize, Deserialize)]
+#[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
 pub struct LoadSets(pub BTreeMap<RelPath, LoadSet>);
 
 /// One document's load set.

@@ -89,7 +89,7 @@ impl SiteFixture {
 	}
 
 	/// Serve the fixture exactly as `beet --entry=<dir> --watch` does: the
-	/// entry resolves through its own fs repo store and builds through the
+	/// entry resolves through its own fs home store and builds through the
 	/// `--watch` driver path, so its declared `<HttpServer>` boots on
 	/// [`Self::port`] and a structural edit rebuilds the whole scene.
 	async fn serve(&self) -> PageHarness {
@@ -105,12 +105,12 @@ impl SiteFixture {
 				.clone();
 			app.world_mut().run_async_local(async move |world| {
 				let ResolvedEntry {
-					repo_store,
+					home_store,
 					entry_name,
 					..
 				} = entry_build::resolve_entry_path(&prescans, None, None, &dir)
 					.await?;
-				entry_build::build_watched(&world, repo_store, entry_name).await
+				entry_build::build_watched(&world, home_store, entry_name).await
 			});
 		})
 		.await

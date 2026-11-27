@@ -2,7 +2,7 @@
 # Wasm: a beet program running in the browser
 
 Serves a page that boots the wasm `beet` binary with a launch of its own: the
-page's `<Wasm src repo entry>` names the served repo store and the entry within
+page's `<Wasm src home entry>` names the served home store and the entry within
 it, the browser process resolves and builds that entry exactly as the native
 binary does its `--entry`, runs it headless, and `<RenderConsole>` renders its
 console output. Honors `?color-scheme=dark`.
@@ -20,7 +20,7 @@ runtime, so its entry sticks to the core vocabulary), `/render` boots
 (`web_full`, the kitchen sink, so `just build-wasm-full` first). Any
 `examples/action/*.bsx` runs off the full binary: point a page's `<Wasm repo
 entry>` at eg `repo="/examples/action" entry="malenia.bsx"`. The entry roots at
-the workspace (`<RepoRoot>`), so `<AssetsDir>` serves the examples the browser
+the workspace (`<HomeRoot>`), so `<AssetsDir>` serves the examples the browser
 reads as its repo and `--watch` live-reloads the browser on any edit under them.
 
 `<RoutesDir>` serves examples/wasm/routes (the pages); `<AssetsDir>` mounts the
@@ -30,7 +30,7 @@ moment the entry loads) and the router is its dispatch child.
 -->
 <HttpServer {CallOnReady}>
 <Router>
-	<RepoRoot src="../.."/>
+	<HomeRoot src="../.."/>
 	<PackageConfig title="Beet Wasm" description="A headless beet program running in the browser"/>
 	<Theme color={Srgba(Srgba{red:0.0, green:0.8, blue:0.6, alpha:1.0})}/>
 	<!-- the whole document tracks the scheme: surface bg + on-surface text, bound to
@@ -40,8 +40,8 @@ moment the entry loads) and the router is its dispatch child.
 	<DefaultAppRoutes/>
 	<RoutesDir src="examples/wasm/routes"/>
 	<!-- the wasm build outputs at /wasm (the wasm/js binaries the pages boot), and
-	     the examples tree at /examples, the repo store a page's
-	     `<Wasm repo="/examples/..">` names, read over http. -->
+	     the examples tree at /examples, the home store a page's
+	     `<Wasm home="/examples/..">` names, read over http. -->
 	<AssetsDir src="target/wasm" prefix="wasm"/>
 	<AssetsDir src="examples" prefix="examples"/>
 </Router>

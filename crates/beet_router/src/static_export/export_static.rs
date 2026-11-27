@@ -506,7 +506,7 @@ mod test {
 	/// discovery scan (an async task) completes before the export walks the routes.
 	#[cfg(all(feature = "markdown", not(target_arch = "wasm32")))]
 	async fn spawn_routes_dir(world: &mut World, root: AbsPath) -> Entity {
-		// compose the repo store on the router root so `RoutesDir` resolves it by
+		// compose the home store on the router root so `RoutesDir` resolves it by
 		// ancestry, then settle the discovery scan before the export walks the routes.
 		let router = world
 			.spawn((FsStore::new(root), Router::with_defaults(), children![

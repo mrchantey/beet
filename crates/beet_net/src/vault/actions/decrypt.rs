@@ -21,7 +21,7 @@ pub async fn VaultDecrypt(
 	/// Write the plaintext to this file, owner-only, instead of printing it:
 	/// the way out for a file that is not text.
 	#[param]
-	out: Option<String>,
+	out: Option<SmolPath>,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let vault = vault.resolve()?;

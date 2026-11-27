@@ -24,7 +24,7 @@ pub async fn Check(
 	/// Also write a JSON diagnostics manifest (the tags/classes/routes/style-props
 	/// a future editor would autocomplete against) to this path, or `-` for stdout.
 	#[param]
-	manifest: Option<String>,
+	manifest: Option<SmolPath>,
 	entry_params: Params<EntryParams>,
 	cx: ActionContext<RequestParts>,
 ) -> Result<Response> {
@@ -60,14 +60,18 @@ pub async fn Check(
 /// Build the entry's [`DiagnosticsManifest`] and write it as pretty JSON to `out`
 /// (a file path, or `-` for stdout). Runs in the loaded world so the registries,
 /// `RuleSet` and `RouteTree` are all live.
-async fn write_manifest(world: &AsyncWorld, root: Entity, out: &str) -> Result {
+async fn write_manifest(
+	world: &AsyncWorld,
+	root: Entity,
+	out: &SmolPath,
+) -> Result {
 	let manifest = world
 		.with(move |world: &mut World| DiagnosticsManifest::build(world, root))
 		.await?;
 	let json = json_ext::to_string_pretty(&manifest)?;
 	// `-` streams the manifest to stdout (the program's actual output, never a log
 	// prefix); any other value is a file path written via the cross-platform fs.
-	if out == "-" {
+	if out.as_str() == "-" {
 		cross_log!("{json}");
 	} else {
 		fs_ext::write(out, &json)?;

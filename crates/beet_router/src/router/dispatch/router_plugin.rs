@@ -224,10 +224,10 @@ impl Plugin for RouterPlugin {
 						.in_set(BlobReactions),
 				);
 			// the declarations that act before the entry builds (see `Prescan`),
-			// in preload order: the entry-declared store root (`<RepoRoot
+			// in preload order: the entry-declared store root (`<HomeRoot
 			// src="../.."/>`) first, so nothing runs against a store it has not
 			// rebased, then the crate check and the secrets load.
-			app.install_types::<(RepoRoot, RequireCfg)>();
+			app.install_types::<(HomeRoot, RequireCfg)>();
 			// the declaration resolves in every build, so an entry loaded by
 			// a binary that never reads secrets (a cloud box's) builds it
 			// inert rather than warning it unregistered; `vault` adds the

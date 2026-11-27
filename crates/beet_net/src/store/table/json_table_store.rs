@@ -34,7 +34,7 @@ use bytes::Bytes;
 ///   that was read ([`BlobCondition::Matches`]), and read again when it is
 ///   not, so only a row's own [`Precondition`] fails a write. Batches are
 ///   atomic and an index is a sort, both within the partition.
-/// - **Its files are not content**: a watched repo store it sits in reloads
+/// - **Its files are not content**: a watched home store it sits in reloads
 ///   nothing on a write to one.
 /// - **It needs conditional writes**, so a blob store without them (one read
 ///   over http, a [`StoreFork`]) is refused.

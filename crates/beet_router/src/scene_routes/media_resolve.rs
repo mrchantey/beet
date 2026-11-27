@@ -17,7 +17,7 @@
 //! # Fetching
 //!
 //! The site's own media is fetched by an ordinary in-process request to the
-//! page's router, served from the repo store like any visitor's, so nothing
+//! page's router, served from the home store like any visitor's, so nothing
 //! reads a filesystem and the step runs on every target; another host's is
 //! fetched over the network. Every source is collected first and deduplicated
 //! by its resolved link, then all are fetched through one bounded join, never
@@ -310,7 +310,7 @@ mod test {
 	use std::sync::atomic::AtomicUsize;
 	use std::sync::atomic::Ordering;
 
-	/// A router serving `page` at `/blog/post` and the repo store's media (a
+	/// A router serving `page` at `/blog/post` and the home store's media (a
 	/// 4 by 3 photo, a 2 by 1 poster, a clip) at `/media`, plus `routes`.
 	async fn site<Func, B>(page: Func, routes: impl Bundle) -> (World, Entity)
 	where
@@ -393,10 +393,10 @@ mod test {
 		blobs.iter().map(|blob| blob.link.to_string()).collect()
 	}
 
-	/// The site's own image is fetched from the repo store through the router,
+	/// The site's own image is fetched from the home store through the router,
 	/// its blob computed from the bytes with no network.
 	#[beet_core::test]
-	async fn fetches_a_repo_store_image() {
+	async fn fetches_a_home_store_image() {
 		let (mut world, router) =
 			site(|| rsx! { <img src="/media/photo.png"/> }, ()).await;
 		let blobs = resolved(&mut world, router, "upload").await.unwrap();

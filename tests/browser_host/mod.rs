@@ -36,7 +36,7 @@ pub const RUNTIME: &str = "target/wasm/beet-ui.wasm";
 pub const BUILD_RECIPE: &str = "just build-wasm-ui";
 
 /// How long a case waits for the tab to paint: the runtime fetched,
-/// instantiated and booted through the served repo store, generous for a
+/// instantiated and booted through the served home store, generous for a
 /// loaded host.
 const PAINT_DEADLINE: Duration = Duration::from_secs(120);
 
@@ -250,22 +250,22 @@ async fn serve_entry(
 			.clone();
 		app.world_mut().run_async_local(async move |world| {
 			let ResolvedEntry {
-				repo_store,
+				home_store,
 				entry_name,
 				prescan,
 				..
-			} = entry_build::resolve_in_repo_store(store, &prescans, entry)
+			} = entry_build::resolve_in_home_store(store, &prescans, entry)
 				.await?;
 			let sources =
-				entry_build::read_sources(&repo_store, entry_name, prescan)
+				entry_build::read_sources(&home_store, entry_name, prescan)
 					.await?;
 			let root = world
 				.with(move |world: &mut World| {
 					entry_build::build_root(
 						world,
-						repo_store,
+						home_store,
 						sources,
-						(RepoStore, DisableCallOnReady),
+						(HomeStore, DisableCallOnReady),
 					)
 				})
 				.await?;

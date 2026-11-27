@@ -362,11 +362,11 @@ mod test {
 			.xpect_eq(vec![RelPath::new("a.md")]);
 	}
 
-	/// Both halves rebase together through an entry's `<RepoRoot>`, so a key
+	/// Both halves rebase together through an entry's `<HomeRoot>`, so a key
 	/// keeps naming the same file on each side.
 	/// An event keyed to either half or to the fork's own base (what its
 	/// watcher keys to) is a change to a scoped fork and to its blob, so a
-	/// fork-backed repo store reloads and its documents re-read; a sibling
+	/// fork-backed home store reloads and its documents re-read; a sibling
 	/// object or an unrelated store is neither.
 	#[beet_core::test]
 	fn routes_events_from_either_half_and_its_base() {
@@ -406,7 +406,7 @@ mod test {
 			.unwrap();
 		let fork = BlobStore::new(StoreFork::new(local, upstream));
 		let (rebased, entry_name) =
-			fork.rebase_repo("site/app/main.bsx", "..").unwrap();
+			fork.rebase_home("site/app/main.bsx", "..").unwrap();
 		entry_name.xpect_eq("app/main.bsx");
 		rebased
 			.exists(&RelPath::new("app/main.bsx"))

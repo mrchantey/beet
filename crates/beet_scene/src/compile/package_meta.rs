@@ -17,7 +17,7 @@ pub(super) struct SceneSet {
 
 impl SceneSet {
 	/// The scene meta `T` of the document at `path`.
-	fn meta<T: Def + DeserializeOwned>(
+	fn meta<T: LexiconDef + DeserializeOwned>(
 		&self,
 		path: &RelPath,
 	) -> Result<Option<T>> {
@@ -198,7 +198,7 @@ impl SceneSet {
 			let applies = record
 				.components()
 				.filter_map(|(nsid, _)| {
-					ReflectDef::registration(registry, nsid)
+					ReflectLexiconDef::registration(registry, nsid)
 				})
 				.filter_map(|registration| {
 					registration.data::<ReflectPackageMeta>().cloned()

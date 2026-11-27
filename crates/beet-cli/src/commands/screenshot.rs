@@ -46,7 +46,7 @@ pub async fn CaptureScreenshot(
 	wait_duration: Option<Duration>,
 	/// Output path (default `screenshot.png`).
 	#[param]
-	output: Option<String>,
+	output: Option<SmolPath>,
 	cx: ActionContext<RequestParts>,
 ) -> Result<Response> {
 	// like `run-wasm`, the greedy capture keeps the url as intact trailing
@@ -62,7 +62,7 @@ pub async fn CaptureScreenshot(
 
 	let width = width.unwrap_or(1280);
 	let height = height.unwrap_or(800);
-	let output = output.unwrap_or_else(|| "screenshot.png".to_string());
+	let output = output.unwrap_or_else(|| SmolPath::new("screenshot.png"));
 
 	// owned args + a helper fn: inline borrows across the awaits here trip
 	// the action macro's `Send` bound ("implementation of `Send` is not

@@ -9,7 +9,7 @@ use alloc::collections::BTreeMap;
 /// take the data model's forms.
 ///
 /// The key is the sole source of truth: a `$type` inside a value is written
-/// for a stranger's benefit and never read. Only a [`Def`] type is read or
+/// for a stranger's benefit and never read. Only a [`LexiconDef`] type is read or
 /// written by type; any other key is stored untouched, a plugin's component
 /// in a binary without the plugin included.
 ///
@@ -80,7 +80,7 @@ impl EntityBodyRecord {
 	/// The `T` this body holds, an error naming it when absent, so a required
 	/// component reads with `?`.
 	#[cfg(feature = "serde")]
-	pub fn get<T: Def + DeserializeOwned>(&self) -> Result<T> {
+	pub fn get<T: LexiconDef + DeserializeOwned>(&self) -> Result<T> {
 		self.try_get::<T>()?.ok_or_else(|| {
 			bevyhow!("`{}` holds no `{}`", self.collection, T::NSID)
 		})
@@ -88,7 +88,9 @@ impl EntityBodyRecord {
 
 	/// The `T` this body holds, `None` when absent.
 	#[cfg(feature = "serde")]
-	pub fn try_get<T: Def + DeserializeOwned>(&self) -> Result<Option<T>> {
+	pub fn try_get<T: LexiconDef + DeserializeOwned>(
+		&self,
+	) -> Result<Option<T>> {
 		self.components
 			.get(&T::NSID)
 			.map(|value| {
@@ -105,7 +107,7 @@ impl EntityBodyRecord {
 
 	/// Store `value` under its NSID, replacing any there.
 	#[cfg(feature = "serde")]
-	pub fn insert<T: Def + Serialize>(&mut self, value: &T) -> Result {
+	pub fn insert<T: LexiconDef + Serialize>(&mut self, value: &T) -> Result {
 		self.components
 			.insert(T::NSID, AtprotoValue::from_serde(value)?);
 		Ok(())
@@ -113,7 +115,10 @@ impl EntityBodyRecord {
 
 	/// This body with `value` stored under its NSID.
 	#[cfg(feature = "serde")]
-	pub fn with<T: Def + Serialize>(mut self, value: &T) -> Result<Self> {
+	pub fn with<T: LexiconDef + Serialize>(
+		mut self,
+		value: &T,
+	) -> Result<Self> {
 		self.insert(value)?;
 		self.xok()
 	}
@@ -183,6 +188,7 @@ impl TryFrom<AtprotoValue> for EntityBodyRecord {
 /// `#[serde(try_from = "EntityBodyRecord", into = "EntityBodyRecord")]`),
 /// reading through [`accept`](Self::accept), so [`rkey`](Self::rkey) is total
 /// afterwards.
+#[cfg(feature = "serde")]
 pub trait EntityCollection: AtprotoRecord + Sized {
 	/// The identity components; the rkey is a function of these alone.
 	const REQUIRED: &'static [Nsid];

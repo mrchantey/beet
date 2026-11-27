@@ -42,3 +42,5 @@ pub use entity_key::*;
 mod scene_body;
 #[cfg(feature = "serde")]
 pub use scene_body::*;
+mod version;
+pub use version::*;

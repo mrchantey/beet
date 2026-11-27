@@ -3,13 +3,13 @@
 
 Deploys `examples/beetmania` as an http-only Fargate service. The generic `beet`
 binary runs in the container and reads the site from an S3 bucket at request time
-(the block bakes `--repo=s3://<bucket> --server=http serve` into the container
+(the block bakes `--home=s3://<bucket> --server=http serve` into the container
 `CMD`, `serve` being the example's command that IS the site), so a site change
 re-publishes by re-running `sync` with no image rebuild. The ALB serves http on
 its own DNS name (no custom domain). Run `just beetmania assets` first, so the
 files the site borrows and derives are in the tree it publishes.
 
-Unlike the lambda/lightsail blocks (whose binary rides the repo store's artifact
+Unlike the lambda/lightsail blocks (whose binary rides the home store's artifact
 ledger, so the block + build share one entity), fargate bakes the binary into a
 container image:
 `<BeetBinaryBuild/>` and `<BuildDockerImage/>` are separate steps, the image build
@@ -34,21 +34,21 @@ and a container engine.
 			<FargateSiteBlock exec_route="serve"/>
 			<!-- deploy-versioned by default: each deploy publishes the site under
 			     its own id and ships a binary baked to read that prefix -->
-			<S3BucketBlock label="repo" {RepoStoreBlock}/>
+			<S3BucketBlock label="repo" {HomeStoreBlock}/>
 			<BeetBinaryBuild features="aws"/>
 			<!-- the stores the deploy publishes into: the image registry and the
 			     bucket the site is served from -->
 			<TofuApply layer="storage"/>
 			<!-- bake the freshly built binary into the container image; the block's
-			     bootstrap config (`--repo=s3://<bucket> --server=http`) rides the CMD -->
+			     bootstrap config (`--home=s3://<bucket> --server=http`) rides the CMD -->
 			<BuildDockerImage/>
 			<!-- publish the site: assemble it, then one mirror into this deploy's
-			     version of the repo store -->
+			     version of the home store -->
 			<!-- the wasm runtime the site's pages boot, built by this verb rather
 			     than borrowed: the assemble reads it through the site's `wasm/` links -->
 			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<RepoAssemble src="examples/beetmania"/>
-			<RepoSync/>
+			<HomeAssemble src="examples/beetmania"/>
+			<HomeSync/>
 			<!-- the full apply rolls the service, onto an image that is pushed and a
 			     bucket that is filled -->
 			<TofuApply/>
@@ -66,8 +66,8 @@ and a container engine.
 			<!-- the wasm runtime the site's pages boot, built by this verb rather
 			     than borrowed: the assemble reads it through the site's `wasm/` links -->
 			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<RepoAssemble src="examples/beetmania"/>
-			<RepoSync/>
+			<HomeAssemble src="examples/beetmania"/>
+			<HomeSync/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>
 			<FargateWatch/>

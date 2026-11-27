@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// outside a build), deferring [`Ready`] until the document has loaded, so a
 /// load verb (`CallOnReady`) dispatching a deploy under the same root finds
 /// the credentials in its environment. Any failure is one warning and
-/// nothing inserted, never an error: a cloud box's repo store never carries
+/// nothing inserted, never an error: a cloud box's home store never carries
 /// an identity, and a contributor without one must still build and run.
 pub(crate) fn load_on_insert(
 	ev: On<Insert<Secrets>>,

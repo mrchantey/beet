@@ -228,7 +228,7 @@ impl ChildProcess {
 	///
 	/// ```ignore
 	/// let child = BootstrapConfig {
-	///     repo: config.repo.clone(), // deliberate inheritance
+	///     home: config.home.clone(), // deliberate inheritance
 	///     ..default()                  // everything else: not inherited
 	/// };
 	/// ChildProcess::new("beet").with_bootstrap(&child)?
@@ -265,7 +265,7 @@ impl ChildProcess {
 	///
 	/// The opposite of [`with_bootstrap`](Self::with_bootstrap), and for the
 	/// opposite child. A FOREIGN tool inheriting `BEET_WORKSPACE_ROOT` or
-	/// `BEET_REPO` is not configured, it is rebound: a beet binary of another
+	/// `BEET_HOME` is not configured, it is rebound: a beet binary of another
 	/// repo run this way resolves this repo's workspace and addresses this
 	/// repo's stacks. A beet child that *does* belong to this launch is
 	/// [`with_bootstrap`](Self::with_bootstrap)'s job, which constructs the

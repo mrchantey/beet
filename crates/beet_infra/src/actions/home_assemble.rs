@@ -4,8 +4,8 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<RepoAssemble src="site">` — assemble the tree this deploy publishes as its
-/// document, in the assembled copy [`RepoSync`] mirrors from.
+/// `<HomeAssemble src="site">` — assemble the tree this deploy publishes as its
+/// document, in the assembled copy [`HomeSync`] mirrors from.
 ///
 /// A published document is rarely one checkout directory: the site's own tree
 /// plus a few files owned elsewhere in the workspace. The assemble composes them
@@ -22,11 +22,11 @@ use beet_net::prelude::*;
 /// borrows a derivation may read.
 ///
 /// ```bsx
-/// <RepoAssemble src="site">
+/// <HomeAssemble src="site">
 ///     <DirCopy src="assets" dest="assets" paths="databases/country.mmdb"/>
 ///     <Derive/>
-/// </RepoAssemble>
-/// <RepoSync/>
+/// </HomeAssemble>
+/// <HomeSync/>
 /// ```
 ///
 /// The dir lives under the deploy work directory (`target/infra/<app>/repo`)
@@ -43,7 +43,7 @@ use beet_net::prelude::*;
 		ChildError::NO_ACTION | ChildError::ACTION_MISMATCH | ChildError::NONE_VALID
 	)
 )]
-pub async fn RepoAssemble(
+pub async fn HomeAssemble(
 	/// The workspace-relative directory to publish.
 	#[field]
 	src: WsPath,
@@ -58,7 +58,7 @@ pub async fn RepoAssemble(
 	let dir = cx
 		.caller
 		.with_state::<StackQuery, _>(|entity, stacks| {
-			RepoAssemble::dir(&stacks, entity)
+			HomeAssemble::dir(&stacks, entity)
 		})
 		.await??;
 	let src = src.into_abs();
@@ -75,8 +75,8 @@ pub async fn RepoAssemble(
 			DirCopy::copy_paths(&src, &dir, &paths)?;
 		}
 	}
-	let documents = RepoAssemble::secrets_documents(&cx.caller).await?;
-	for document in RepoAssemble::leave_out(&dir, &documents)? {
+	let documents = HomeAssemble::secrets_documents(&cx.caller).await?;
+	for document in HomeAssemble::leave_out(&dir, &documents)? {
 		info!("left the secrets document {document} out of the assembled copy");
 	}
 	info!("assembled {src} -> {dir}");
@@ -102,7 +102,7 @@ pub async fn RepoAssemble(
 	Outcome::Pass(input).xok()
 }
 
-impl RepoAssemble {
+impl HomeAssemble {
 	/// An assemble of the workspace-relative `src`, whole.
 	pub fn new(src: impl Into<WsPath>) -> Self {
 		Self {
@@ -180,7 +180,7 @@ mod test {
 			.filter_map(Secrets::within_store)
 			.map(SmolStr::from)
 			.collect::<Vec<_>>();
-		RepoAssemble::leave_out(&root, &documents)
+		HomeAssemble::leave_out(&root, &documents)
 			.unwrap()
 			.xpect_eq(vec![SmolStr::from("secrets.toml")]);
 		fs_ext::exists(root.join("secrets.toml"))

@@ -22,7 +22,7 @@ pub async fn VaultBackup(
 	/// The file to write; defaults to `beet-identity-<date>.age` in the
 	/// current directory.
 	#[param]
-	out: Option<String>,
+	out: Option<SmolPath>,
 	/// Also print the armored text as a QR code, for paper.
 	#[param]
 	qr: bool,
@@ -43,8 +43,9 @@ pub async fn VaultBackup(
 	}
 	let ciphertext = AgePassphrase::new(passphrase)
 		.encrypt(identities.to_string().as_bytes())?;
-	let out =
-		out.unwrap_or_else(|| format!("beet-identity-{}.age", Date::today()));
+	let out = out.unwrap_or_else(|| {
+		SmolPath::new(format!("beet-identity-{}.age", Date::today()))
+	});
 	fs_ext::write_private(&out, &ciphertext)?;
 	let mut text = format!(
 		"wrote `{out}` ({} identities). Keep it on a stick in a drawer and \

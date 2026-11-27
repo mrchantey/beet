@@ -148,7 +148,7 @@ impl ErasedStoreBlock {
 	/// [`Local`](ServiceAccess::Local) reads the host's stand-in, a table's a
 	/// [`JsonTableStore`] over it. The ONE place the two-way choice is made, so
 	/// a declaration runs both ways without any consumer knowing there are two;
-	/// an exact store (`<S3Store/>`, `--repo=s3://..`) never chooses, and a
+	/// an exact store (`<S3Store/>`, `--home=s3://..`) never chooses, and a
 	/// [`StoreSync`] end is the remote root whatever the launch's access.
 	pub fn runtime_uri(
 		&self,

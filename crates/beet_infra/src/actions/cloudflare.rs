@@ -462,7 +462,7 @@ pub async fn CloudflareWorkerDeployAction(
 }
 
 /// The Worker's `vars`: the boot config the deploy bakes, ie the stack's repo
-/// store ([`RepoStoreQuery::bootstrap`], the block itself) under the names the
+/// store ([`HomeStoreQuery::bootstrap`], the block itself) under the names the
 /// runtime parses, exactly as the lambda and lightsail blocks bake theirs; then
 /// the block's own, resolved against the request.
 async fn worker_vars(
@@ -471,7 +471,7 @@ async fn worker_vars(
 ) -> Result<BTreeMap<SmolStr, SmolStr>> {
 	let mut vars = cx
 		.caller
-		.with_state::<RepoStoreQuery, _>(|entity, repos| {
+		.with_state::<HomeStoreQuery, _>(|entity, repos| {
 			repos.bootstrap(entity)
 		})
 		.await??
@@ -1093,15 +1093,15 @@ mod test {
 	}
 
 	/// The bucket is bound under the block's binding, and the `vars` carry the
-	/// repo store as `BEET_REPO=r2://<binding>`, so the Worker boots from the
+	/// home store as `BEET_HOME=r2://<binding>`, so the Worker boots from the
 	/// same binding wrangler bound.
 	#[beet_core::test]
-	fn binds_the_bucket_and_bakes_the_repo_store() {
+	fn binds_the_bucket_and_bakes_the_home_store() {
 		let block = CloudflareWorkerBlock::new("hello")
 			.with_bucket("hello-site")
 			.with_binding("SITE");
 		let vars = BootstrapConfig {
-			repo: Some(
+			home: Some(
 				block
 					.store_uri(&Stack::default().resolve(&default()))
 					.unwrap(),
@@ -1116,7 +1116,7 @@ mod test {
 			.as_str()
 			.xpect_contains("\"binding\": \"SITE\"")
 			.xpect_contains("\"bucket_name\": \"hello-site\"")
-			.xpect_contains("\"BEET_REPO\": \"r2://SITE\"");
+			.xpect_contains("\"BEET_HOME\": \"r2://SITE\"");
 	}
 
 	/// Each table object namespace is bound to the one class, made a SQLite

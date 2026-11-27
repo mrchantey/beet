@@ -153,7 +153,7 @@ impl BlobStoreProvider {
 	}
 
 	/// The store `uri` names forked into `store_fork` ([`StoreFork`]), or the
-	/// store alone. The composition behind `--repo` + `--store-fork`, erased
+	/// store alone. The composition behind `--home` + `--store-fork`, erased
 	/// since the pair has no single component. The fork is marked for the
 	/// repo it forks ([`StoreUri::fork_mark`]), so a browser's first edit
 	/// says so to the next served page.

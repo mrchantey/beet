@@ -39,7 +39,7 @@ pub async fn AdoptCurrentDeploy(
 ) -> Result<Outcome<Request, Response>> {
 	let client = cx
 		.caller
-		.with_state::<RepoStoreQuery, _>(|entity, repos| {
+		.with_state::<HomeStoreQuery, _>(|entity, repos| {
 			repos.artifacts_client(entity)
 		})
 		.await??;

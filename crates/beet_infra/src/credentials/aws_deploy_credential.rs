@@ -1833,7 +1833,7 @@ mod test {
 	/// The app a lambda stack renders, whose principal its boundary caps.
 	fn lambda_app() -> AppPolicies {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 		});
 		let (stack, _deployment, config) = scope.finish().unwrap();

@@ -10,7 +10,7 @@ use syn::DeriveInput;
 use syn::LitStr;
 use syn::parse_macro_input;
 
-pub(crate) fn impl_def(
+pub(crate) fn impl_lexicon_def(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
@@ -26,14 +26,14 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	let (impl_generics, type_generics, where_clause) =
 		input.generics.split_for_impl();
 	Ok(quote! {
-		impl #impl_generics #beet_core::prelude::Def for #ident #type_generics #where_clause {
+		impl #impl_generics #beet_core::prelude::LexiconDef for #ident #type_generics #where_clause {
 			const NSID: #beet_core::prelude::Nsid =
 				#beet_core::prelude::Nsid::new_static(#nsid);
 		}
 	})
 }
 
-/// `#[def(nsid = "..")]` verbatim, else the lexicon (`#[def(lexicon = "..")]`
+/// `#[lexicon_def(nsid = "..")]` verbatim, else the lexicon (`#[lexicon_def(lexicon = "..")]`
 /// or the crate's own) and the type name camel cased.
 fn nsid(input: &DeriveInput) -> syn::Result<String> {
 	let mut nsid = None;
@@ -41,7 +41,7 @@ fn nsid(input: &DeriveInput) -> syn::Result<String> {
 	for attr in input
 		.attrs
 		.iter()
-		.filter(|attr| attr.path().is_ident("def"))
+		.filter(|attr| attr.path().is_ident("lexicon_def"))
 	{
 		attr.parse_nested_meta(|meta| {
 			let value = meta.value()?.parse::<LitStr>()?.value();
@@ -63,8 +63,8 @@ fn nsid(input: &DeriveInput) -> syn::Result<String> {
 		None => {
 			return Err(syn::Error::new_spanned(
 				&input.ident,
-				"`Def` derives its lexicon from a `beet_*` crate's name; name \
-				 this crate's with `#[def(lexicon = \"com.example.plugin\")]`",
+				"`LexiconDef` derives its lexicon from a `beet_*` crate's name; name \
+				 this crate's with `#[lexicon_def(lexicon = \"com.example.plugin\")]`",
 			));
 		}
 	};

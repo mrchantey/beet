@@ -478,7 +478,7 @@ mod test {
 	#[beet_core::test]
 	fn lowers_a_lambda_stack() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent.spawn(
 				S3BucketBlock::new("app")
@@ -523,7 +523,7 @@ mod test {
 	fn only_a_credentialed_deploy_bounds_its_principals() {
 		let render = |bounded: bool| {
 			let (scope, _dir) = RenderScope::test_render(|parent| {
-				parent.spawn(RepoStoreBlock::test_store());
+				parent.spawn(HomeStoreBlock::test_store());
 				parent.spawn(LambdaBlock::default());
 				if bounded {
 					parent.spawn(BoundedDeploy);
@@ -564,9 +564,9 @@ mod test {
 	/// A launch of any stage lowers `prod`'s boundary exactly as a `prod`
 	/// launch does, since an elevated deploy of any stage converges it.
 	///
-	/// REGRESSION: the repo store's root was read as it landed, at the
+	/// REGRESSION: the home store's root was read as it landed, at the
 	/// launch's stage, so an elevated `dev` deploy converged a prod boundary
-	/// naming `beet-site--dev--repo` wherever the box names its repo store,
+	/// naming `beet-site--dev--repo` wherever the box names its home store,
 	/// its certificate backup on `caddy/*` included, and prod's `caddy-backup`
 	/// was denied by its own boundary from then on.
 	#[cfg(feature = "lightsail_block")]
@@ -585,7 +585,7 @@ mod test {
 						S3BucketBlock::new("repo")
 							.with_deploy_versioned(true)
 							.with_accept_data_loss(true),
-						RepoStoreBlock
+						HomeStoreBlock
 					),
 					LightsailBlock::default(),
 				],
@@ -622,7 +622,7 @@ mod test {
 	#[beet_core::test]
 	fn identical_statements_render_once() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent.spawn(
 				S3BucketBlock::new("app")
@@ -649,7 +649,7 @@ mod test {
 	#[beet_core::test]
 	fn resolves_a_terraform_reference() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			let lambda = parent
 				.spawn(LambdaBlock::default().with_label("rollup"))
 				.id();

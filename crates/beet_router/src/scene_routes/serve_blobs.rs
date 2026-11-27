@@ -19,7 +19,7 @@ pub(crate) const STORE_PATH_PARAM: &str = "store_path";
 /// request/response adapter are private details ServeBlobs inserts for itself.
 ///
 /// The mount is also a store another process reads: `<ServeBlobs prefix="repo"/>`
-/// publishes a site's repo store, and an `HttpStore` at `/repo` (a browser the
+/// publishes a site's home store, and an `HttpStore` at `/repo` (a browser the
 /// site's page boots, a terminal pulling the site) reads it key for key. Its
 /// listing rides the same route under `json`: `GET /repo/docs?list` answers the
 /// keys under `docs` as a JSON array, relative to it.
@@ -264,7 +264,7 @@ mod test {
 	}
 
 	/// A secrets document in the served store, as an entry's conventional
-	/// `secrets.toml` sits beside it in its repo store, is neither served nor
+	/// `secrets.toml` sits beside it in its home store, is neither served nor
 	/// listed, while the rest of the store is.
 	///
 	/// REGRESSION: `examples/beetmania` gained its own document, and its

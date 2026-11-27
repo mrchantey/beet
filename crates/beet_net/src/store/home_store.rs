@@ -1,25 +1,25 @@
-//! The repo store: the one canonical store an app runs from.
+//! The home store: the one canonical store an app runs from.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::world::DeferredWorld;
 
-/// Marks the entity carrying the app's **repo store**, the single canonical
+/// Marks the entity carrying the app's **home store**, the single canonical
 /// [`BlobStore`] an entry loads through: the entry document, its templates,
 /// routes and assets all live in it, and a relative path anywhere in the app
 /// means a path in it.
 ///
-/// A repo store is to content what a router is to urls, with one difference
-/// that matters: an app may declare many routers, but only ever one repo store.
-/// Inserting a second anywhere in the world is an error, so "the repo store" is
+/// A home store is to content what a router is to urls, with one difference
+/// that matters: an app may declare many routers, but only ever one home store.
+/// Inserting a second anywhere in the world is an error, so "the home store" is
 /// always unambiguous. Every other [`BlobStore`] is a plain store, declared for
 /// a purpose and reached by name through a `StoreRef` or scoped out of an
 /// ancestor by a [`DirPath`].
 ///
 /// Consumers usually resolve it by ancestry (the `AncestorQuery<&BlobStore>`
 /// idiom), which finds the nearest store and so honours any intervening scope;
-/// [`RepoStore::get`] is the direct lookup for code that wants *the* repo store
+/// [`HomeStore::get`] is the direct lookup for code that wants *the* home store
 /// wherever it sits.
 ///
 /// It marks the store rather than holding it, since [`BlobStore`] erases a
@@ -34,32 +34,32 @@ use bevy::ecs::world::DeferredWorld;
 #[derive(Debug, Default, Clone, Copy, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_insert = hook_ext::chain(
-	hook_ext::exclusive_with::<RepoStore>(
+	hook_ext::exclusive_with::<HomeStore>(
 		"tear the previous entry scene down before building the next"
 	),
-	RepoStore::assert_store
+	HomeStore::assert_store
 ))]
-pub struct RepoStore;
+pub struct HomeStore;
 
-impl RepoStore {
-	/// The app's repo store, erroring when no entity carries one.
+impl HomeStore {
+	/// The app's home store, erroring when no entity carries one.
 	///
 	/// # Example
 	/// ```
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// let mut world = StorePlugin.into_world();
-	/// world.spawn((BlobStore::temp(), RepoStore));
-	/// RepoStore::get(&mut world).unwrap();
+	/// world.spawn((BlobStore::temp(), HomeStore));
+	/// HomeStore::get(&mut world).unwrap();
 	/// ```
 	pub fn get(world: &mut World) -> Result<BlobStore> {
-		let mut query = world.query_filtered::<&BlobStore, With<RepoStore>>();
+		let mut query = world.query_filtered::<&BlobStore, With<HomeStore>>();
 		match query.single(world) {
 			Ok(store) => store.clone().xok(),
 			// the singleton is enforced on insert, so absence is the only failure
 			Err(_) => bevybail!(
-				"no repo store in this world: an entry load composes one on its \
-				root, ie `(store, RepoStore)`"
+				"no home store in this world: an entry load composes one on its \
+				root, ie `(store, HomeStore)`"
 			),
 		}
 	}
@@ -74,13 +74,13 @@ impl RepoStore {
 				return Ok(());
 			};
 			match (
-				entity_ref.contains::<RepoStore>(),
+				entity_ref.contains::<HomeStore>(),
 				entity_ref.contains::<BlobStore>(),
 			) {
 				(true, false) => bevybail!(
-					"entity {entity} is marked `RepoStore` but carries no \
+					"entity {entity} is marked `HomeStore` but carries no \
 					 `BlobStore`: insert the store in the same bundle, ie \
-					 `(store, RepoStore)`"
+					 `(store, HomeStore)`"
 				),
 				_ => Ok(()),
 			}
@@ -95,25 +95,25 @@ mod test {
 
 	fn store_world() -> World { StorePlugin.into_world() }
 
-	/// The repo store resolves wherever it sits, without walking ancestry.
+	/// The home store resolves wherever it sits, without walking ancestry.
 	#[beet_core::test]
 	fn resolves() {
 		let mut world = store_world();
-		RepoStore::get(&mut world)
+		HomeStore::get(&mut world)
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("no repo store");
-		world.spawn((children![(BlobStore::temp(), RepoStore)],));
-		RepoStore::get(&mut world).unwrap();
+			.xpect_contains("no home store");
+		world.spawn((children![(BlobStore::temp(), HomeStore)],));
+		HomeStore::get(&mut world).unwrap();
 	}
 
-	/// A second repo store anywhere in the world is an error.
+	/// A second home store anywhere in the world is an error.
 	#[beet_core::test]
 	#[should_panic = "already carries one"]
-	fn rejects_second_repo_store() {
+	fn rejects_second_home_store() {
 		let mut world = store_world();
-		world.spawn((BlobStore::temp(), RepoStore));
-		world.spawn((BlobStore::temp(), RepoStore));
+		world.spawn((BlobStore::temp(), HomeStore));
+		world.spawn((BlobStore::temp(), HomeStore));
 		world.flush();
 	}
 
@@ -122,7 +122,7 @@ mod test {
 	#[should_panic = "carries no `BlobStore`"]
 	fn rejects_storeless_marker() {
 		let mut world = store_world();
-		world.spawn(RepoStore);
+		world.spawn(HomeStore);
 		world.flush();
 	}
 }

@@ -12,6 +12,8 @@ pub mod cloudwatch_ext;
 mod derive;
 mod dir_copy;
 mod ensure_secret;
+mod home_assemble;
+mod home_sync;
 #[cfg(feature = "lambda_block")]
 mod lambda_restart;
 #[cfg(feature = "aws")]
@@ -19,8 +21,6 @@ mod lifecycle_probe;
 #[cfg(feature = "lightsail_block")]
 mod lightsail_release;
 mod prune_versions;
-mod repo_assemble;
-mod repo_sync;
 mod secrets_export;
 mod secrets_restore;
 mod secrets_revoke;
@@ -43,6 +43,8 @@ pub use cloudwatch_ext::MetricDatum;
 pub use derive::*;
 pub use dir_copy::*;
 pub use ensure_secret::*;
+pub use home_assemble::*;
+pub use home_sync::*;
 #[cfg(feature = "lambda_block")]
 pub use lambda_restart::*;
 #[cfg(feature = "aws")]
@@ -50,8 +52,6 @@ pub use lifecycle_probe::*;
 #[cfg(feature = "lightsail_block")]
 pub use lightsail_release::*;
 pub use prune_versions::*;
-pub use repo_assemble::*;
-pub use repo_sync::*;
 pub use secrets_export::*;
 pub use secrets_restore::*;
 pub use secrets_revoke::*;

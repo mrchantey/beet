@@ -1,4 +1,4 @@
-//! An [`AtprotoValue`] in canonical DAG-CBOR, the encoding a repo stores a
+//! An [`AtprotoValue`] in canonical DAG-CBOR, the encoding a home stores a
 //! record as and computes its cid over.
 //!
 //! The json form and DAG-CBOR differ in exactly two places: a link is

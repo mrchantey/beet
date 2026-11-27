@@ -20,11 +20,11 @@ pub async fn VaultKeygen(
 	/// The identity file to append to; defaults to the OS config,
 	/// `~/.config/beet/age/keys.txt`.
 	#[param]
-	out: Option<String>,
+	out: Option<SmolPath>,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let path = match out {
-		Some(out) => PathBuf::from(out),
+		Some(out) => out.to_path_buf(),
 		None => AgeIdentityFile::default_path()?,
 	};
 	let mut file = match fs_ext::exists(&path)? {

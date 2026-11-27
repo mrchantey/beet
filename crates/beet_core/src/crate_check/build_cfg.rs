@@ -351,10 +351,7 @@ impl Default for BsxConditions {
 			))
 		});
 		conditions.insert("version", |cx, argument| {
-			Ok(CrateRegistration::meets_version_item(
-				cx.registrations,
-				argument,
-			))
+			CrateRegistration::meets_version_item(cx.registrations, argument)
 		});
 		// the process environment: set and non-empty, or equal to a value.
 		conditions.insert("env", |_cx, argument| {
@@ -699,9 +696,12 @@ mod test {
 		let mut world = World::new();
 		world.init_resource::<BsxConditions>();
 		let conditions = world.resource::<BsxConditions>();
-		let registrations = [CrateRegistration::new("test_bin", "1.2.3")
-			.with_feature("infra")
-			.with_skip_prefix()];
+		let registrations = [CrateRegistration::new(
+			"test_bin",
+			Version::parse("1.2.3").unwrap(),
+		)
+		.with_feature("infra")
+		.with_skip_prefix()];
 		let cx = ConditionCx {
 			world: &world,
 			registrations: &registrations,

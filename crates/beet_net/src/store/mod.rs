@@ -26,13 +26,13 @@
 //! - [`StoreFork`]: a local store forked off an upstream one, the fork a
 //!   process keeps of a repo it reads but does not own
 //!
-//! ## The repo store
+//! ## The home store
 //!
-//! One store in an app is special: the [`RepoStore`], the canonical store an
+//! One store in an app is special: the [`HomeStore`], the canonical store an
 //! entry loads through, holding the entry document, its templates, routes and
 //! assets. A world carries exactly one (the marker errors on a second), and a
 //! consumer reaches it either by ancestry (`AncestorQuery<&BlobStore>`, which
-//! honours any intervening scope) or directly through [`RepoStore::get`]. Every
+//! honours any intervening scope) or directly through [`HomeStore::get`]. Every
 //! other store is a plain one: declared for a purpose and named by a
 //! [`StoreRef`], or scoped out of an ancestor by a [`DirPath`].
 //!
@@ -69,10 +69,10 @@ pub use store_backend::*;
 mod loading;
 pub use loading::*;
 // the one canonical store an app runs from, and the singleton it enforces.
+mod home_store;
 mod package_store;
-mod repo_store;
+pub use home_store::*;
 pub use package_store::*;
-pub use repo_store::*;
 
 // the analytics types + emission need only serde (which `std` pulls); the store
 // persistence inside needs `json` (the TableStore surface) and gates itself.
@@ -131,9 +131,9 @@ impl Plugin for StorePlugin {
 			// ancestor store, kept correct as stores churn above them.
 			.register_type::<DirPath>()
 			.register_type::<BlobPath>()
-			// the repo store marker: one canonical store per app, the one an
+			// the home store marker: one canonical store per app, the one an
 			// entry loads through, enforced by its own insert hook.
-			.register_type::<RepoStore>()
+			.register_type::<HomeStore>()
 			.add_observer(on_insert_dir_path)
 			.add_observer(on_insert_blob_path)
 			.add_observer(on_insert_child_of)

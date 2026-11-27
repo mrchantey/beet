@@ -13,7 +13,7 @@ use beet_net::prelude::*;
 /// deploy_versioned=false/>`. The label alone is declared; the
 /// `<app>--<stage>--<label>` name composes at resolution through the ancestor
 /// [`Stack`], so both sides read the same string. The bucket an app is served
-/// from carries the [`RepoStoreBlock`] marker.
+/// from carries the [`HomeStoreBlock`] marker.
 #[derive(
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]

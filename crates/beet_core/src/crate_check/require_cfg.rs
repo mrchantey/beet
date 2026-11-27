@@ -26,8 +26,10 @@ use crate::prelude::*;
 /// Reporting goes through [`BuildCondition::explain`], which walks a false
 /// condition without short-circuiting, so a rebuild fixes everything the error
 /// named rather than revealing the next missing item one run at a time.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect, Def)]
-#[reflect(Component, Default, Def)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, Component, Reflect, LexiconDef,
+)]
+#[reflect(Component, Default, LexiconDef)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize, SceneMeta))]
 pub struct RequireCfg {
@@ -206,12 +208,19 @@ mod test {
 		world.init_resource::<Messages<AppExit>>();
 		world.add_observer(RequireCfg::check_on_insert);
 		world.spawn(
-			CrateRegistration::new("beet-cli", "0.0.9")
-				.with_feature("sockets")
-				.with_skip_prefix(),
+			CrateRegistration::new(
+				"beet-cli",
+				Version::parse("0.0.9").unwrap(),
+			)
+			.with_feature("sockets")
+			.with_skip_prefix(),
 		);
 		world.spawn(
-			CrateRegistration::new("beet_esp", "0.5.3").with_feature("alvik"),
+			CrateRegistration::new(
+				"beet_esp",
+				Version::parse("0.5.3").unwrap(),
+			)
+			.with_feature("alvik"),
 		);
 		world
 	}
@@ -223,10 +232,17 @@ mod test {
 	fn covers_the_feature_and_version_vocabulary() {
 		let world = world();
 		let registrations = [
-			CrateRegistration::new("beet-cli", "0.0.9")
-				.with_feature("sockets")
-				.with_skip_prefix(),
-			CrateRegistration::new("beet_esp", "0.5.3").with_feature("alvik"),
+			CrateRegistration::new(
+				"beet-cli",
+				Version::parse("0.0.9").unwrap(),
+			)
+			.with_feature("sockets")
+			.with_skip_prefix(),
+			CrateRegistration::new(
+				"beet_esp",
+				Version::parse("0.5.3").unwrap(),
+			)
+			.with_feature("alvik"),
 		];
 		let conditions = world.resource::<BsxConditions>();
 		let cx = ConditionCx {

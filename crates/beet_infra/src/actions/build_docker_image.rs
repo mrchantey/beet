@@ -138,7 +138,7 @@ pub async fn BuildDockerImage(
 		expose.push_str(&format!("EXPOSE {}\n", block.ssh_container_port()));
 	}
 	// the `CMD` runs the copied binary at `/app` with the block's argv-channel
-	// bootstrap config and the route it boots, eg `["/app", "--repo=s3://<bucket>",
+	// bootstrap config and the route it boots, eg `["/app", "--home=s3://<bucket>",
 	// "--server=http,ssh", "serve"]`, so deploy config reaches the binary as argv
 	// (the site itself is pulled from S3 at boot, not baked in). Rendered as a
 	// real JSON array, so the encoding is correct by construction rather than by

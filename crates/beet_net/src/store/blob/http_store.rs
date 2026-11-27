@@ -5,10 +5,10 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
-/// A store published over http, read-only: a site's repo store as its
+/// A store published over http, read-only: a site's home store as its
 /// `<ServeBlobs prefix="repo"/>` serves it, read by the browser process the
 /// site's page boots and by a native process pulling the site into a terminal
-/// (`beet --repo=https://beet.org/repo --server=tui`).
+/// (`beet --home=https://beet.org/repo --server=tui`).
 ///
 /// Every key is fetched at `{base}/{key}` through [`Request::send`], so an
 /// origin-relative base (`http:repo`) resolves against the page's origin in a

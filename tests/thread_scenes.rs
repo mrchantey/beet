@@ -76,7 +76,10 @@ fn cli_registration() -> CrateRegistration {
 	["thread", "tui", "ssh", "extra"]
 		.into_iter()
 		.fold(
-			CrateRegistration::new("beet", env!("CARGO_PKG_VERSION")),
+			CrateRegistration::new(
+				"beet",
+				Version::parse(env!("CARGO_PKG_VERSION")).unwrap(),
+			),
 			CrateRegistration::with_feature,
 		)
 		.with_skip_prefix()

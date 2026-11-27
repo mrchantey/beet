@@ -218,7 +218,7 @@ Now, with the server still running, edit `main.bsx`. Change the heading and add 
 Save the file and watch the first terminal:
 
 ```text
-DEBUG repo store changed, reloading: main.bsx
+DEBUG home store changed, reloading: main.bsx
 INFO Mini HTTP server listening on http://127.0.0.1:8080
 ```
 

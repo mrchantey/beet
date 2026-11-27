@@ -1,4 +1,4 @@
-//! The `Startup` entry loader: resolve a repo store and an entry document name,
+//! The `Startup` entry loader: resolve a home store and an entry document name,
 //! build the entry into a root that carries the store, and let the loaded tree
 //! run itself.
 //!
@@ -27,7 +27,7 @@ impl Plugin for LaunchPlugin {
 	fn build(&self, app: &mut App) { app.add_systems(Startup, load_entry); }
 }
 
-/// Positional commands that run ANOTHER program, so the `--entry`, `--repo` and
+/// Positional commands that run ANOTHER program, so the `--entry`, `--home` and
 /// `--store-fork` on this process's argv belong to that program and are forwarded
 /// untouched rather than read as this launch's own.
 ///
@@ -44,7 +44,7 @@ impl ArgvPassthrough {
 	}
 
 	/// Whether `args` names one of them, ie whether this launch's `--entry`,
-	/// `--repo` and `--store-fork` are somebody else's.
+	/// `--home` and `--store-fork` are somebody else's.
 	pub fn forwards(&self, args: &CliArgs) -> bool {
 		args.path
 			.first()
@@ -52,7 +52,7 @@ impl ArgvPassthrough {
 	}
 }
 
-/// `Startup`: resolve the repo store + name and build the entry, all on the async
+/// `Startup`: resolve the home store + name and build the entry, all on the async
 /// runtime so discovery (a store walk), template registration, and every store read
 /// (the entry document, `<RoutesDir>`, a document it instantiates) go through the
 /// one [`BlobStore`] without ever blocking the runtime (which is single-threaded on
@@ -91,24 +91,24 @@ fn load_entry(world: &mut World) {
 	let prescans = world.get_resource_or_init::<PrescanRegistry>().clone();
 	world.run_async_local(async move |world: AsyncWorld| {
 		// the wasm runner forwards the *module's* flags on this same argv, so a
-		// `beet run-wasm <module> --entry=<wasm-entry> --repo=fs ...` invocation
-		// carries a `--entry`/`--repo` meant for the wasm module, not this native
+		// `beet run-wasm <module> --entry=<wasm-entry> --home=fs ...` invocation
+		// carries a `--entry`/`--home` meant for the wasm module, not this native
 		// runner. When acting as the runner (first positional `run-wasm`), drop
 		// them and discover the workspace command entry; the `<RunWasm/>` route
 		// forwards the module's own config on via `ChildProcess::with_bootstrap`.
-		let (repo_uri, store_fork, entry) = match forwards_argv {
+		let (home_uri, store_fork, entry) = match forwards_argv {
 			true => (None, None, None),
 			false => (
-				config.repo.as_ref(),
+				config.home.as_ref(),
 				config.store_fork.as_ref(),
 				config.entry.as_deref(),
 			),
 		};
 		// resolve on the runtime, since discovery now awaits the store. A
 		// browser resolves exactly as every other runtime: its served page's
-		// bootstrap named an http repo, which forks into IndexedDB.
+		// bootstrap named an http home store, which forks into IndexedDB.
 		let resolved = match entry_build::resolve_entry(
-			&prescans, repo_uri, store_fork, entry,
+			&prescans, home_uri, store_fork, entry,
 		)
 		.await
 		{
@@ -137,7 +137,7 @@ async fn build_entry(
 	resolved: ResolvedEntry,
 ) -> Result {
 	let ResolvedEntry {
-		repo_store,
+		home_store,
 		entry_name,
 		prescan,
 		#[cfg(not(target_arch = "wasm32"))]
@@ -151,7 +151,7 @@ async fn build_entry(
 	// binary without `client_io` has no reload channel to serve.
 	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	if watch_dir.is_some() && config.watch {
-		return entry_build::build_watched(world, repo_store, entry_name).await;
+		return entry_build::build_watched(world, home_store, entry_name).await;
 	}
 	// otherwise the plain one-shot build. The binary stays unopinionated: it
 	// simply loads, and the entry's own markup decides how it runs by carrying
@@ -161,11 +161,11 @@ async fn build_entry(
 	#[cfg(all(not(feature = "client_io"), not(target_arch = "wasm32")))]
 	let _ = watch_dir;
 	let sources =
-		entry_build::read_sources(&repo_store, entry_name.clone(), prescan)
+		entry_build::read_sources(&home_store, entry_name.clone(), prescan)
 			.await?;
 	world
 		.with(move |world: &mut World| -> Result {
-			entry_build::build_root(world, repo_store, sources, RepoStore)?;
+			entry_build::build_root(world, home_store, sources, HomeStore)?;
 			Ok(())
 		})
 		.await

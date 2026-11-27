@@ -313,7 +313,7 @@ mod test {
 	fn purges_the_proxied_hostnames() {
 		let (scope, _dir) =
 			RenderScope::test_render_zoned("example.org", |parent| {
-				parent.spawn(RepoStoreBlock::test_store());
+				parent.spawn(HomeStoreBlock::test_store());
 				parent.spawn(
 					LambdaBlock::default()
 						.with_dns(

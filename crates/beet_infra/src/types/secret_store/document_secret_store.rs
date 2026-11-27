@@ -8,7 +8,7 @@ use beet_net::prelude::*;
 /// Declares that the stack's secrets live in a secrets document:
 /// `<Stack {DocumentSecrets{path:"infra/secrets/app--prod.toml"}}>`, on the
 /// stack or an ancestor, the file in the nearest ancestor `BlobStore` (the
-/// repo store). Target-agnostic, so the same file on either launch.
+/// home store). Target-agnostic, so the same file on either launch.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct DocumentSecrets {
@@ -333,7 +333,7 @@ impl SecretStoreProvider for DocumentSecretStore {
 
 /// Observer: land the [`SecretStore`] a `<DocumentSecrets/>` declares on
 /// its entity, the document at its path in the nearest ancestor store (the
-/// repo store), scoped to the stack it is declared on or under and seeded
+/// home store), scoped to the stack it is declared on or under and seeded
 /// from the entry's declared document. Deferred through the command queue
 /// because the stack and the store are ancestors, which land after
 /// insertion.
@@ -423,7 +423,7 @@ pub(crate) mod test_support {
 		SecretStore::new(memory_store(stack))
 	}
 
-	/// A stack root carrying the repo store and a region, with
+	/// A stack root carrying the home store and a region, with
 	/// `declarations` (a store declaration, ie) spread on it.
 	pub(crate) fn stack_root(
 		world: &mut World,
@@ -434,7 +434,7 @@ pub(crate) mod test_support {
 				Stack::new("app").with_stage("prod"),
 				AwsRegion::new(Stack::TEST_AWS_REGION),
 				BlobStore::temp(),
-				RepoStore,
+				HomeStore,
 				declarations,
 			))
 			.id();

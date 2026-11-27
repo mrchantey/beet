@@ -54,8 +54,10 @@ use beet_scene::prelude::ReflectFrontmatter;
 /// `FrontmatterType`, so its
 /// keys are written unsectioned; a route's own keys sit in a `[RouteMeta]`
 /// table (see [`RouteMeta`](crate::prelude::RouteMeta)).
-#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect, Def)]
-#[reflect(Component, Default, Def)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, Component, Reflect, LexiconDef,
+)]
+#[reflect(Component, Default, LexiconDef)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 // read field by field, as authored: no `ReflectDeserialize`
 #[cfg_attr(feature = "serde", reflect(SceneMeta))]

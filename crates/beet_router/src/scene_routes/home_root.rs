@@ -1,16 +1,16 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Declares where an entry's repo store begins: `src` names a position relative
+/// Declares where an entry's home store begins: `src` names a position relative
 /// to the entry document's own location *in its store*, so its
 /// `<RoutesDir>`/`<AssetsDir>` mounts can reach paths outside
 /// the entry's own directory.
 ///
-/// The declaration half of the repo store, and the only half an entry document
-/// carries: `RepoRoot` says where the store should be rooted, `RepoStore` marks
+/// The declaration half of the home store, and the only half an entry document
+/// carries: `HomeRoot` says where the store should be rooted, `HomeStore` marks
 /// the store entry resolution actually built on the root.
 ///
-/// Rebasing is one store operation (`BlobStore::rebase_repo`), uniform across
+/// Rebasing is one store operation (`BlobStore::rebase_home`), uniform across
 /// kinds: a filesystem store re-roots at the resolved directory (walking above
 /// the entry's directory is the point), a self-rooted store (a bucket, browser
 /// storage) takes a key-prefix view for a root at or under its own and fails
@@ -19,7 +19,7 @@ use beet_core::prelude::*;
 /// `examples/wasm/main.bsx` declaring:
 ///
 /// ```html
-/// <RepoRoot src="../.."/>
+/// <HomeRoot src="../.."/>
 /// <AssetsDir src="assets" prefix="assets"/>
 /// ```
 ///
@@ -30,19 +30,19 @@ use beet_core::prelude::*;
 /// second is ignored rather than silently re-rooting the store mid-document.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-pub struct RepoRoot {
-	/// The repo store root, relative to the entry document's location in its store.
+pub struct HomeRoot {
+	/// The home store root, relative to the entry document's location in its store.
 	pub src: String,
 }
 
 /// Read by entry resolution, which rebases the store before any other
 /// declaration's preload runs against it.
-impl Prescan for RepoRoot {
+impl Prescan for HomeRoot {
 	fn describe() -> &'static str {
-		"roots the repo store at `src`, relative to the entry document, before it is built"
+		"roots the home store at `src`, relative to the entry document, before it is built"
 	}
 }
 
-impl TypeInstaller<PrescanMarker> for RepoRoot {
+impl TypeInstaller<PrescanMarker> for HomeRoot {
 	fn install(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
 }

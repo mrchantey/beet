@@ -185,15 +185,15 @@ judge or delete.
 	<Stack app_name="beetmania">
 		<!-- the block + its build artifact share one entity, booting `serve` -->
 		<LambdaSiteBlock features="lambda,atproto" authorities="beetmania.beet.org" exec_route="serve"/>
-		<S3BucketBlock label="repo" {RepoStoreBlock}/>
+		<S3BucketBlock label="repo" {HomeStoreBlock}/>
 		<Group bx:ref="beetmania_up">
 			<TofuApply layer="storage"/>
 			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<RepoAssemble src="examples/beetmania">
+			<HomeAssemble src="examples/beetmania">
 				<DirCopy src="assets" dest="assets" paths="fonts/FiraSans-Bold.ttf"/>
 				<Derive/>
-			</RepoAssemble>
-			<RepoSync/>
+			</HomeAssemble>
+			<HomeSync/>
 			<TofuApply/>
 			<!-- after the apply rolls the function, so the edge refills from it -->
 			<CloudflarePurgeCache/>
@@ -208,11 +208,11 @@ judge or delete.
 		<Route path="sync" {ExchangeSequence}>
 			<AdoptCurrentDeploy/>
 			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<RepoAssemble src="examples/beetmania">
+			<HomeAssemble src="examples/beetmania">
 				<DirCopy src="assets" dest="assets" paths="fonts/FiraSans-Bold.ttf"/>
 				<Derive/>
-			</RepoAssemble>
-			<RepoSync/>
+			</HomeAssemble>
+			<HomeSync/>
 			<!-- a page's bytes are read per request, so the sync above is live
 			     already; the restart is for what a boot resolves once: route
 			     discovery, this document, the publication's index. Before the

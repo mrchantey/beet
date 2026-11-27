@@ -362,7 +362,7 @@ mod test {
 			.xpect_eq("2026/09/15/000000Z.json");
 	}
 
-	/// A document at a store root (the repo store's `secrets.toml`) looks
+	/// A document at a store root (the home store's `secrets.toml`) looks
 	/// for its series by descending dated directories, so a sibling tree
 	/// (`target/`) is never walked and never mistaken for one.
 	#[beet_core::test]

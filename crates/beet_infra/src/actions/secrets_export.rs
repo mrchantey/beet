@@ -4,7 +4,7 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<SecretsExport document={$repo_export}/>` — write every secret the
+/// `<SecretsExport document={$home_export}/>` — write every secret the
 /// stack's store holds into the secrets document `document` declares, keyed
 /// by label, so a destroyed stack's secrets survive in git (the committed
 /// repo document) and, with `dated=true`, as a dated series in the other
@@ -31,9 +31,9 @@ use beet_net::prelude::*;
 /// the document is written. `<SecretsRestore/>` is the inverse.
 ///
 /// ```bsx
-/// <Secrets bx:ref="repo_export" label="mail-prod" path="infra/secrets/mail--prod.toml"/>
+/// <Secrets bx:ref="home_export" label="mail-prod" path="infra/secrets/mail--prod.toml"/>
 /// <Secrets bx:ref="cold_export" label="mail-cold" path="secrets/export.toml" {StoreRef($cold_backups)}/>
-/// <SecretsExport document={$repo_export}/>
+/// <SecretsExport document={$home_export}/>
 /// <SecretsExport document={$cold_export} dated=true/>
 /// ```
 #[action]
@@ -251,7 +251,7 @@ pub(crate) async fn export_target(
 	if declaration == Entity::PLACEHOLDER {
 		bevybail!(
 			"no document to export to: name a `<Secrets>` declaration, ie \
-			`<SecretsExport document={{$repo_export}}/>`"
+			`<SecretsExport document={{$home_export}}/>`"
 		);
 	}
 	let entity = caller.world().entity(declaration);
@@ -286,7 +286,7 @@ pub(crate) mod tests {
 	use crate::types::test_support::*;
 
 	/// A stack with a document store, two secrets in it, and an export
-	/// declaration in the repo store.
+	/// declaration in the home store.
 	pub(crate) async fn exported_stack(
 		world: &mut World,
 	) -> (Entity, Entity, SecretStore) {
@@ -295,7 +295,7 @@ pub(crate) mod tests {
 			.spawn((
 				Stack::new("mail").with_stage("prod"),
 				BlobStore::temp(),
-				RepoStore,
+				HomeStore,
 				DocumentSecrets::new("store.toml"),
 			))
 			.id();
@@ -502,7 +502,7 @@ pub(crate) mod tests {
 			.spawn((
 				Stack::new("mail").with_stage("dev"),
 				BlobStore::temp(),
-				RepoStore,
+				HomeStore,
 				DocumentSecrets::new("store.toml"),
 			))
 			.id();

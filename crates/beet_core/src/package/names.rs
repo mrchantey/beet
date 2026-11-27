@@ -1,4 +1,5 @@
-//! The validated names a package, its branches, versions and runtimes go by.
+//! The validated names a package, its branches and runtimes go by, and its
+//! address; its [`Version`] is beet's one semver type.
 use crate::prelude::*;
 
 /// A package's name: lowercase `a-z0-9` and dashes, starting with a letter,
@@ -107,90 +108,6 @@ impl RuntimeName {
 	}
 }
 
-/// A semver version, `0.1.2` or `0.1.2-alpha.3`; a prerelease is how a branch
-/// publishes a checkpoint.
-///
-/// ```
-/// # use beet_core::prelude::*;
-/// Version::parse("0.1.2-alpha.3").unwrap().is_prerelease().xpect_true();
-/// Version::parse("0.1").unwrap_err();
-/// ```
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, StringPrimitive,
-)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(try_from = "SmolStr", into = "SmolStr"))]
-#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
-pub struct Version(SmolStr);
-
-impl Version {
-	/// The version an implicit package, one declaring none, compiles at.
-	pub const IMPLICIT: Self = Self(SmolStr::new_inline("0.0.0"));
-
-	/// Parse `MAJOR.MINOR.PATCH`, a `-prerelease` and a `+build` allowed.
-	pub fn parse(text: &str) -> Result<Self> {
-		let core = text.split(['-', '+']).next().unwrap_or_default();
-		let numbers = core.split('.').collect::<Vec<_>>();
-		let valid = numbers.len() == 3
-			&& numbers.iter().all(|number| {
-				!number.is_empty()
-					&& number.bytes().all(|byte| byte.is_ascii_digit())
-					&& (number.len() == 1 || !number.starts_with('0'))
-			}) && text[core.len()..].bytes().all(|byte| {
-			byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'+')
-		});
-		match valid {
-			true => Self(SmolStr::new(text)).xok(),
-			false => bevybail!(
-				"`{text}` is no version: semver, `MAJOR.MINOR.PATCH` with an \
-				 optional `-prerelease`"
-			),
-		}
-	}
-
-	/// Whether this is a prerelease, which `latest` never names.
-	pub fn is_prerelease(&self) -> bool {
-		self.0.split('+').next().unwrap_or_default().contains('-')
-	}
-}
-
-impl Default for Version {
-	fn default() -> Self { Self::IMPLICIT }
-}
-
-/// Cargo's requirement grammar verbatim: `0.1` (caret), `0.1.*`, `=0.1.2`.
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, StringPrimitive,
-)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(try_from = "SmolStr", into = "SmolStr"))]
-#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
-pub struct VersionReq(SmolStr);
-
-impl VersionReq {
-	/// Parse a requirement, refusing a character Cargo's grammar never holds.
-	pub fn parse(text: &str) -> Result<Self> {
-		let valid = !text.trim().is_empty()
-			&& text.bytes().all(|byte| {
-				byte.is_ascii_alphanumeric()
-					|| matches!(
-						byte,
-						b'.' | b'*'
-							| b'^' | b'~' | b'=' | b'<'
-							| b'>' | b',' | b' ' | b'-'
-							| b'+'
-					)
-			});
-		match valid {
-			true => Self(SmolStr::new(text)).xok(),
-			false => bevybail!(
-				"`{text}` is no version requirement: Cargo's grammar, ie \
-				 `0.1`, `0.1.*`, `=0.1.2`"
-			),
-		}
-	}
-}
-
 /// An Automerge change hash; a set of them is a point in a document's
 /// history.
 #[derive(
@@ -235,7 +152,7 @@ impl ChangeHash {
 /// let parts = address.parts();
 /// parts.account.unwrap().as_str().xpect_eq("beet.org");
 /// parts.name.unwrap().as_str().xpect_eq("foo-bar");
-/// parts.requirement.unwrap().as_str().xpect_eq("0.1");
+/// parts.requirement.unwrap().to_string().xpect_eq("^0.1");
 /// PackageAddress::parse("my-package#main").unwrap().parts().branch.unwrap()
 /// 	.xpect_eq(BranchName::MAIN);
 /// ```
@@ -334,19 +251,5 @@ mod test {
 			.xpect_eq("did:plc:abc");
 		PackageAddress::parse("@beet.org#main").unwrap_err();
 		PackageAddress::parse("Bad").unwrap_err();
-	}
-
-	#[crate::test]
-	fn validates_versions() {
-		Version::parse("1.2.3")
-			.unwrap()
-			.is_prerelease()
-			.xpect_false();
-		Version::parse("1.2.3+build.1")
-			.unwrap()
-			.is_prerelease()
-			.xpect_false();
-		Version::parse("01.2.3").unwrap_err();
-		Version::parse("1.2.x").unwrap_err();
 	}
 }

@@ -71,7 +71,7 @@ pub async fn StandardSitePub(
 	#[field(no_clone)]
 	media_ingest: MediaIngestPolicy,
 	/// The derived index's path in the store the declaration resolves by
-	/// ancestry, the repo store's `derived/` in a site.
+	/// ancestry, the home store's `derived/` in a site.
 	#[field(no_clone, default = RelPath::new(StandardSitePub::INDEX))]
 	index: RelPath,
 	cx: ActionContext<BlobStore>,

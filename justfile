@@ -435,7 +435,7 @@ check-wasm-render *args:
 	cargo test -p beet-cli --lib {{ args }} -- --include-ignored --include '*browser_render_boot*'
 
 # Headless-chrome verification of the browser bootstrap: builds the runtimes,
-# serves them at pages naming an entry through `<Wasm repo entry>` and reads
+# serves them at pages naming an entry through `<Wasm home entry>` and reads
 # from the console that the entry resolved through the http repo and ran,
 # headless (beet-min.wasm on the `serve-wasm` hello entry) and under
 # `--server=dom` (beet-ui.wasm on the scene editor entry, its DOM host painting
@@ -528,9 +528,9 @@ build-wasm-full:
 
 # Build and serve the browser-wasm example at http://127.0.0.1:8337. Open the page
 # to run a headless beet entry (examples/wasm/hello.bsx) in the browser, read out
-# of the served repo through the page's `<Wasm repo entry>` launch; its console
+# of the served repo through the page's `<Wasm home entry>` launch; its console
 # output renders on the page via <RenderConsole>. The entry roots at the
-# workspace (<RepoRoot>) so the served examples are reachable and --watch
+# workspace (<HomeRoot>) so the served examples are reachable and --watch
 # live-reloads on edit. Its /render and /scripting pages boot the render and full
 # binaries, so build those first (`just build-wasm-render build-wasm-full`) to
 # serve them too.

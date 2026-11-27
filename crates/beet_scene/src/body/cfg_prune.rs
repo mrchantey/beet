@@ -266,9 +266,12 @@ mod test {
 			registry.register::<CfgExcluded>();
 		}
 		world.spawn(
-			CrateRegistration::new("test_bin", "1.2.3")
-				.with_feature("infra")
-				.with_skip_prefix(),
+			CrateRegistration::new(
+				"test_bin",
+				Version::parse("1.2.3").unwrap(),
+			)
+			.with_feature("infra")
+			.with_skip_prefix(),
 		);
 		let body = BsxParser::body(&world, markup)?;
 		let root = world.spawn_template(body)?.id();

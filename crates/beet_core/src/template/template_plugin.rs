@@ -36,8 +36,6 @@ impl Plugin for TemplatePlugin {
 			.register_type::<Instance>()
 			.register_type::<Prop>()
 			.register_type::<HeldTemplate>()
-			.register_type::<LoadRoot>()
-			.register_type::<Preload>()
 			// the markup nodes every front-end authors: registered here rather
 			// than by a renderer, so a page forked into a scene keeps its
 			// elements and attributes whichever binary dumps it
@@ -61,7 +59,9 @@ impl Plugin for TemplatePlugin {
 			.add_systems(Update, sweep_dropped_pending);
 		// what a package declares and its records are made of
 		#[cfg(feature = "serde")]
-		app.register_type::<Provenance>()
+		app.register_type::<LoadRoot>()
+			.register_type::<Preload>()
+			.register_type::<Provenance>()
 			.register_type::<BlobRef>()
 			.register_type::<Package>()
 			.register_type::<Export>()

@@ -1275,7 +1275,7 @@ mod tests {
 				.with_container_port(9001)
 				.with_bootstrap(BootstrapConfig {
 					service_access: ServiceAccess::Remote,
-					repo: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+					home: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
 					..default()
 				}),
 		);
@@ -1293,7 +1293,7 @@ mod tests {
 			// one app bucket is the only store there is: no second bucket name
 			// reaches the container.
 			.xnot()
-			.xpect_contains("BEET_REPO")
+			.xpect_contains("BEET_HOME")
 			.xnot()
 			.xpect_contains("BEET_ASSETS_BUCKET");
 	}
@@ -1303,7 +1303,7 @@ mod tests {
 	#[beet_core::test]
 	fn splits_cmd_and_env_channels() {
 		let block = FargateBlock::default().with_bootstrap(BootstrapConfig {
-			repo: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+			home: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
 			server: Some(ServerFilter::new("http,ssh")),
 			stage: "staging".into(),
 			..default()
@@ -1313,7 +1313,7 @@ mod tests {
 			.to_cmd_json("/app", "")
 			.unwrap()
 			.xpect_eq(
-				r#"["/app", "--repo=s3://beet--dev--app", "--server=http,ssh"]"#,
+				r#"["/app", "--home=s3://beet--dev--app", "--server=http,ssh"]"#,
 			);
 		build_json(&block)
 			.as_str()

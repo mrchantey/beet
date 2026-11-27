@@ -1,11 +1,10 @@
 use beet::prelude::*;
 
 /// Compiles a package's branch into scene records and a package record, in
-/// the package's space under the home directory's `.beet/pds/`
-/// ([`PackageCompiler`]). The home directory is where `beet` runs unless
-/// `--home` names another, the entry a document or the directory holding it,
-/// relative to the home directory, and a second run over unchanged files
-/// writes nothing:
+/// the package's space under the home store's `.beet/pds/`
+/// ([`PackageCompiler`]). The entry is a document or the directory holding
+/// it, relative to the home store, which the launch's `--home` selects, and a
+/// second run over unchanged files writes nothing:
 ///
 /// ```sh
 /// beet compile site                    # site/main.bsx, its `main` branch
@@ -17,26 +16,20 @@ use beet::prelude::*;
 pub async fn Compile(
 	/// The branch compiled, `main` when absent.
 	#[param]
-	branch: Option<String>,
-	/// The home directory, whose `.beet/pds/` the compile writes to, the
-	/// working directory when absent.
-	#[param]
-	home: Option<String>,
+	branch: Option<BranchName>,
 	cx: ActionContext<RequestParts>,
 ) -> Result<String> {
 	let entry = RelPath::new(crate::commands::entry_arg(&cx.input)?);
-	let home = BlobStore::from_uri(&StoreUri::parse(&format!(
-		"fs:{}",
-		home.as_deref().unwrap_or(".")
-	))?)?;
-	let parsers = cx
+	let (home, parsers) = cx
 		.world()
-		.with(|world: &mut World| DocParsers::of(world))
-		.await;
+		.with(|world: &mut World| -> Result<_> {
+			(HomeStore::get(world)?, DocParsers::of(world)).xok()
+		})
+		.await?;
 	let mut compiler =
 		PackageCompiler::new(parsers, PackageCompiler::local_pds(&home));
 	if let Some(branch) = branch {
-		compiler = compiler.with_branch(BranchName::parse(&branch)?);
+		compiler = compiler.with_branch(branch);
 	}
 	let entry = compiler.entry_of(&home, &entry).await?;
 	compiler.compile(&home, &entry).await?.to_string().xok()
@@ -46,22 +39,23 @@ pub async fn Compile(
 mod test {
 	use super::*;
 
-	/// The verb compiles a package into the home directory's PDS, and a
+	/// The verb compiles a package into the home store's PDS, and a
 	/// second run writes nothing.
 	#[beet::test]
 	async fn compiles_a_package() {
 		let mut world = crate::commands::render_world();
-		let host = world.spawn((Router, children![Compile])).id();
 		let site = crate::commands::clean_site();
+		world.spawn((
+			BlobStore::new(FsStore::new(AbsPath::new(site.path()).unwrap())),
+			HomeStore,
+		));
+		let host = world.spawn((Router, children![Compile])).id();
 		let run = async |world: &mut World| {
 			world
 				.entity_mut(host)
 				.call::<Request, Response>(
-					Request::from_cli_args(CliArgs::parse(&format!(
-						"compile . --home={}",
-						site.path()
-					)))
-					.with_header::<header::Accept>(vec![MediaType::Text]),
+					Request::from_cli_args(CliArgs::parse("compile ."))
+						.with_header::<header::Accept>(vec![MediaType::Text]),
 				)
 				.await
 				.unwrap()

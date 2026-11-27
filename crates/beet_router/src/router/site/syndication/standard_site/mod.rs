@@ -179,7 +179,7 @@ pub(crate) mod test_fixtures {
 			.xpect_true();
 	}
 
-	/// `record` exactly as a repo stores it: in the data model, its `$type`
+	/// `record` exactly as a home stores it: in the data model, its `$type`
 	/// written as its collection, as indented json with its keys sorted.
 	pub fn wire<T: AtprotoRecord>(record: &T) -> String {
 		let record = AtprotoValue::from_serde(record)

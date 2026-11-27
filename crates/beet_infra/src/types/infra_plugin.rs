@@ -47,16 +47,16 @@ impl Plugin for InfraPlugin {
 
 		// the store declarations' shared vocabulary, feature-free so a lean
 		// binary reads the same declaration a deploy does: the marker
-		// naming which store block is the repo store (one per world by its own
+		// naming which store block is the home store (one per world by its own
 		// insert hook, storeless markers checked at render) and the block
 		// naming a store this deploy does not create.
-		app.register_type::<crate::prelude::RepoStoreBlock>()
+		app.register_type::<crate::prelude::HomeStoreBlock>()
 			.register_type::<crate::prelude::StoreUriBlock>()
 			.register_type::<crate::prelude::PrefixExpiry>()
 			.register_type::<crate::prelude::S3StorageClass>()
 			.add_systems(
 				DeployRender,
-				crate::blocks::assert_repo_store_blocks
+				crate::blocks::assert_home_store_blocks
 					.in_set(DeployRenderSet::Render),
 			);
 		// ..and the runtime half of every store declaration: one observer on
@@ -476,7 +476,7 @@ impl Plugin for InfraPlugin {
 			)>();
 
 		// publishing the document: the assemble composing it, the mirror of
-		// the assembled copy into the repo store, the borrowed-paths copy
+		// the assembled copy into the home store, the borrowed-paths copy
 		// (`<DirCopy src=".." dest=".." paths=".."/>`) and the derived files
 		// (`<Derive/>`) the assemble hosts, the wasm runtime a deploy builds
 		// before publishing it (`<WasmRuntime/>`), the one sync between any two
@@ -484,8 +484,8 @@ impl Plugin for InfraPlugin {
 		// window over the versions the store holds. Plain fs and `BlobStore`
 		// work, so none needs a cloud backend.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-		app.register_type::<crate::prelude::RepoAssemble>()
-			.register_type::<crate::prelude::RepoSync>()
+		app.register_type::<crate::prelude::HomeAssemble>()
+			.register_type::<crate::prelude::HomeSync>()
 			.register_type::<crate::prelude::DirCopy>()
 			.register_type::<crate::prelude::Derive>()
 			.register_type::<crate::prelude::WasmRuntime>()

@@ -6,8 +6,8 @@ renders the whole document directly (no layout middleware): `<Stylesheet>` +
 `<ColorSchemeScript>` + `<LiveReloadScript>` in the head, the console panel and the
 wasm loader in the body.
 
-`<Wasm src repo entry>` boots the wasm `beet` binary with its launch: the served
-repo store and the entry within it, which the binary resolves and runs headless.
+`<Wasm src home entry>` boots the wasm `beet` binary with its launch: the served
+home store and the entry within it, which the binary resolves and runs headless.
 `<RenderConsole>` mirrors its console output onto the page, and sits before `<Wasm>`
 so its console wrap installs before the (deferred) module boots.
 -->
@@ -33,5 +33,5 @@ so its console wrap installs before the (deferred) module boots.
 		browser.
 	</p>
 	<RenderConsole/>
-	<Wasm src="/wasm/beet-min.wasm" repo="/examples/wasm" entry="hello.bsx"/>
+	<Wasm src="/wasm/beet-min.wasm" home="/examples/wasm" entry="hello.bsx"/>
 </HtmlDocument>

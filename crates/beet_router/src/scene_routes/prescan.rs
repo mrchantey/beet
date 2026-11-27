@@ -1,6 +1,6 @@
 //! The registered set of declarations that act before the entry builds.
 //!
-//! Three declarations must act before the tree exists: `<RepoRoot>` widens the
+//! Three declarations must act before the tree exists: `<HomeRoot>` widens the
 //! store before it is built, `<RequireCfg>` fires even when the tree cannot
 //! build, and `<Secrets>` sets the environment before any constructor reads it. None has a meaning after
 //! the build that differs, so the set is a registry of TYPES rather than a
@@ -30,7 +30,7 @@ use std::sync::Arc;
 /// names something the build resolves, ie another store), a `bx:cfg` subtree
 /// is left to the build, and a non-literal attribute is skipped.
 ///
-/// Installed by type, `app.install_types::<RepoRoot>()`, in the order its
+/// Installed by type, `app.install_types::<HomeRoot>()`, in the order its
 /// [`preload`](Self::preload) should run. Its [`TypeInstaller`] impl, a
 /// supertrait so no prescan skips it, forwards to
 /// [`PrescanRegistry::register_on`].
@@ -41,15 +41,15 @@ pub trait Prescan:
 	/// `--help` under "before the build".
 	fn describe() -> &'static str;
 
-	/// The pre-build effect, run against the rebased repo store for every
+	/// The pre-build effect, run against the rebased home store for every
 	/// collected declaration, types in registration order and declarations
 	/// in document order. A declaration resolution or the build reads for
-	/// itself (`<RepoRoot>`, `<RequireCfg>`) leaves the
+	/// itself (`<HomeRoot>`, `<RequireCfg>`) leaves the
 	/// default no-op; an error fails the launch, so a declaration whose
 	/// failure is tolerable (`<Secrets>` on a box with no identity) warns and
 	/// answers `Ok`.
-	fn preload(&self, repo_store: &BlobStore) -> SendBoxedFuture<Result> {
-		let _ = repo_store;
+	fn preload(&self, home_store: &BlobStore) -> SendBoxedFuture<Result> {
+		let _ = home_store;
 		Box::pin(async { Ok(()) })
 	}
 }
@@ -109,16 +109,16 @@ impl PrescanRegistry {
 	}
 
 	/// Run every collected declaration's [`Prescan::preload`] against
-	/// `repo_store`: types in registration order, declarations in document
+	/// `home_store`: types in registration order, declarations in document
 	/// order, the first error ending the run.
 	pub async fn preload(
 		&self,
 		prescan: &EntryPrescan,
-		repo_store: &BlobStore,
+		home_store: &BlobStore,
 	) -> Result {
 		for registration in &self.registrations {
 			for declaration in prescan.declarations_of(registration.type_id) {
-				(registration.preload)(declaration.as_ref(), repo_store)
+				(registration.preload)(declaration.as_ref(), home_store)
 					.await
 					.map_err(|err| {
 						bevyhow!("<{}> preload: {err}", registration.tag)
@@ -181,10 +181,10 @@ impl PrescanRegistration {
 
 	fn preload<T: Prescan>(
 		value: &dyn Reflect,
-		repo_store: &BlobStore,
+		home_store: &BlobStore,
 	) -> SendBoxedFuture<Result> {
 		match value.as_any().downcast_ref::<T>() {
-			Some(value) => value.preload(repo_store),
+			Some(value) => value.preload(home_store),
 			None => Box::pin(async { Ok(()) }),
 		}
 	}
@@ -328,7 +328,7 @@ impl TypeInstaller<PrescanMarker> for RequireCfg {
 /// the build walk and every verb dispatched on ready finds them set, and no
 /// `main` knows any of this. A document that cannot be loaded (no identity, an
 /// identity in none of its groups, a corrupt file) is one warning and nothing
-/// set, never an error: a cloud box's repo store carries no identity, and a
+/// set, never an error: a cloud box's home store carries no identity, and a
 /// contributor without one must still build and run. A declaration naming
 /// another store (a `{StoreRef(..)}` spread) is an export target the verbs
 /// read, which the spread rule already leaves uncollected.
@@ -338,12 +338,12 @@ impl Prescan for Secrets {
 		"loads the document's `EnvVar` records into the process environment (existing wins)"
 	}
 
-	fn preload(&self, repo_store: &BlobStore) -> SendBoxedFuture<Result> {
+	fn preload(&self, home_store: &BlobStore) -> SendBoxedFuture<Result> {
 		let secrets = self.clone();
-		let repo_store = repo_store.clone();
+		let home_store = home_store.clone();
 		Box::pin(async move {
 			let loaded = async {
-				SecretsHandle::in_store(repo_store, &secrets)?
+				SecretsHandle::in_store(home_store, &secrets)?
 					.load_env_vars()
 					.await
 			};
@@ -383,7 +383,7 @@ mod test {
 	fn parses_every_declaration() {
 		let prescan = parse(
 			r#"<Router>
-				<RepoRoot src="../.."/>
+				<HomeRoot src="../.."/>
 				<RequireCfg cfg="feature:sockets && version:0.1.0"/>
 				<div>
 					<RequireCfg cfg="feature:ssh"/>
@@ -391,7 +391,7 @@ mod test {
 			</Router>"#,
 			&registry(),
 		);
-		prescan.first::<RepoRoot>().unwrap().src.xpect_eq("../..");
+		prescan.first::<HomeRoot>().unwrap().src.xpect_eq("../..");
 		prescan
 			.iter::<RequireCfg>()
 			.cloned()
@@ -417,15 +417,15 @@ mod test {
 		.xpect_true();
 	}
 
-	/// The first `<RepoRoot>` wins, and a document declaring nothing yields the
+	/// The first `<HomeRoot>` wins, and a document declaring nothing yields the
 	/// default.
 	#[beet_core::test]
-	fn first_repo_root_wins() {
+	fn first_home_root_wins() {
 		parse(
-			r#"<Router><RepoRoot src="../.."/><RepoRoot src="nope"/></Router>"#,
+			r#"<Router><HomeRoot src="../.."/><HomeRoot src="nope"/></Router>"#,
 			&registry(),
 		)
-		.first::<RepoRoot>()
+		.first::<HomeRoot>()
 		.unwrap()
 		.src
 		.xpect_eq("../..");
@@ -484,9 +484,9 @@ mod test {
 			fn describe() -> &'static str { "warms a cache" }
 			fn preload(
 				&self,
-				repo_store: &BlobStore,
+				home_store: &BlobStore,
 			) -> SendBoxedFuture<Result> {
-				let (store, cache) = (repo_store.clone(), self.cache.clone());
+				let (store, cache) = (home_store.clone(), self.cache.clone());
 				Box::pin(async move {
 					store
 						.insert(&RelPath::from("order.txt"), cache.to_string())
@@ -498,9 +498,9 @@ mod test {
 			fn describe() -> &'static str { "runs second" }
 			fn preload(
 				&self,
-				repo_store: &BlobStore,
+				home_store: &BlobStore,
 			) -> SendBoxedFuture<Result> {
-				let store = repo_store.clone();
+				let store = home_store.clone();
 				Box::pin(async move {
 					let first = store
 						.get_media(&RelPath::from("order.txt"))

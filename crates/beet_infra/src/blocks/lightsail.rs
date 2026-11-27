@@ -92,7 +92,7 @@ pub struct LightsailBlock {
 	#[set_with(unwrap_option)]
 	app_port: Option<u16>,
 	/// The positional route the unit dispatches on boot, appended after the
-	/// argv channel: `exec /opt/<app>/app --repo=.. --server=.. serve`.
+	/// argv channel: `exec /opt/<app>/app --home=.. --server=.. serve`.
 	///
 	/// An entry whose root is a `CliServer` dispatcher selects its command with
 	/// a positional arg, so a deployed site says which of its routes *is* the
@@ -260,7 +260,7 @@ impl LightsailBlock {
 	fn runtime_policy(
 		&self,
 		stack: &ResolvedStack,
-		repo_bucket: &str,
+		home_bucket: &str,
 		access: &AccessGrants,
 		secrets: &[SecretRef],
 	) -> Result<String> {
@@ -271,13 +271,13 @@ impl LightsailBlock {
 			"Effect": "Allow",
 			"Action": ["s3:PutObject"],
 			"Resource": format!(
-				"arn:aws:s3:::{repo_bucket}/{}/*",
+				"arn:aws:s3:::{home_bucket}/{}/*",
 				Self::CADDY_STORE_PREFIX
 			)
 		});
 		IamPolicy::new(region.clone(), "lightsail instance")
-			// seeded, since a bare `StoreUriBlock` repo store declares no grant
-			.read_bucket(repo_bucket)
+			// seeded, since a bare `StoreUriBlock` home store declares no grant
+			.read_bucket(home_bucket)
 			.lower(access)?
 			.xmap(|policy| match self.caddy_hostnames().is_empty() {
 				true => policy,
@@ -401,7 +401,7 @@ impl LightsailBlock {
 	fn build_user_data(
 		&self,
 		stack: &ResolvedStack,
-		repo_bucket: &str,
+		home_bucket: &str,
 		refs: &MachineRefs,
 	) -> Result<SmolStr> {
 		let app_name = Self::service_name(stack);
@@ -489,7 +489,7 @@ CADDY_EOF
 
 # the certificate store outlives the box (see `CADDY_STORE_PREFIX`): restore
 # what the last box saved so this one serves without an issuance
-aws s3 sync --no-progress "s3://{repo_bucket}/{caddy_store_prefix}/" /var/lib/caddy/ >&2 \
+aws s3 sync --no-progress "s3://{home_bucket}/{caddy_store_prefix}/" /var/lib/caddy/ >&2 \
   || echo "beet: no saved certificate store, caddy will obtain one" >&2
 chown -R caddy:caddy /var/lib/caddy
 
@@ -500,7 +500,7 @@ After=caddy.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/aws s3 sync --no-progress /var/lib/caddy/ s3://{repo_bucket}/{caddy_store_prefix}/
+ExecStart=/usr/bin/aws s3 sync --no-progress /var/lib/caddy/ s3://{home_bucket}/{caddy_store_prefix}/
 CADDY_BACKUP_EOF
 
 cat > /etc/systemd/system/caddy-backup.timer <<'CADDY_TIMER_EOF'
@@ -638,7 +638,7 @@ fi
 
 		// the two release scripts, the whole of the machine's knowledge about
 		// finding its binary. Neither names a version.
-		let fetch_script = self.fetch_script(stack, repo_bucket);
+		let fetch_script = self.fetch_script(stack, home_bucket);
 		let run_script = self.run_script(stack, &exec_args);
 
 		// uses __PLACEHOLDER__ tokens for terraform refs that contain ${}
@@ -752,7 +752,7 @@ systemctl enable --now {app_name}.service
 	/// A fetch failure is not fatal while a binary is already installed. A
 	/// restart after a crash must not be blocked by a transient S3 error, and
 	/// the box keeps serving what it has rather than serving nothing.
-	fn fetch_script(&self, stack: &ResolvedStack, repo_bucket: &str) -> String {
+	fn fetch_script(&self, stack: &ResolvedStack, home_bucket: &str) -> String {
 		Self::render_script(
 			r#"#!/bin/bash
 # Install the release the repo bucket currently points at.
@@ -789,7 +789,7 @@ touch /etc/__APP__/deploy.env
 "#,
 			stack,
 			&[
-				("__BUCKET__", repo_bucket),
+				("__BUCKET__", home_bucket),
 				(
 					"__POINTER__",
 					&ArtifactLedger::release_pointer_key(&self.label)
@@ -847,8 +847,8 @@ exec /opt/__APP__/app__EXEC_ARGS__
 	/// own port is reachable from the box alone — which is exactly "the app
 	/// itself serves", independent of Caddy, DNS and certificate state.
 	///
-	/// With `serves_repo` (the stack declares a [`RepoStoreBlock`]) the identity is
-	/// also the repo store: the prefix reaches this box through the release
+	/// With `serves_home` (the stack declares a [`HomeStoreBlock`]) the identity is
+	/// also the home store: the prefix reaches this box through the release
 	/// pointer alone, so a pointer without one boots a process reading no
 	/// document, and nothing else would notice.
 	///
@@ -867,12 +867,12 @@ exec /opt/__APP__/app__EXEC_ARGS__
 		&self,
 		stack: &ResolvedStack,
 		deploy_id: &str,
-		serves_repo: bool,
+		serves_home: bool,
 		timeout: Duration,
 		poll: Duration,
 	) -> String {
-		let repo_check = if serves_repo {
-			" && [ -n \"$(running_env BEET_REPO)\" ]"
+		let home_check = if serves_home {
+			" && [ -n \"$(running_env BEET_HOME)\" ]"
 		} else {
 			""
 		};
@@ -880,7 +880,7 @@ exec /opt/__APP__/app__EXEC_ARGS__
 			stack,
 			&format!(
 				"expect={deploy_id}\n\
-				identity_ok() {{ [ \"$(running_env BEET_DEPLOY_ID)\" = \"$expect\" ]{repo_check}; }}"
+				identity_ok() {{ [ \"$(running_env BEET_DEPLOY_ID)\" = \"$expect\" ]{home_check}; }}"
 			),
 			r#"if identity_ok; then
 	echo "beet: already serving $expect" >&2
@@ -896,7 +896,7 @@ fi"#,
 	}
 
 	/// The script [`LightsailRestart`] runs on the box: bounce the unit so it
-	/// re-reads the repo store, and prove it came back serving.
+	/// re-reads the home store, and prove it came back serving.
 	///
 	/// The counterpart to [`release_script`](Self::release_script) for a content
 	/// sync, which publishes no artifact and moves no release pointer. A page's
@@ -1127,15 +1127,15 @@ impl LightsailBlock {
 		mut scopes: AncestorQuery<&mut RenderScope>,
 		stacks: StackQuery,
 		blocks: Query<(Entity, &LightsailBlock)>,
-		repos: RepoStoreQuery,
+		repos: HomeStoreQuery,
 		reads: ReadsSecretsQuery,
 	) {
 		for (entity, block) in blocks.iter() {
 			let Ok(mut scope) = scopes.get_mut(entity) else {
 				continue;
 			};
-			// the box pulls its release from the stack's repo store
-			let repo_bucket =
+			// the box pulls its release from the stack's home store
+			let home_bucket =
 				match repos.get(entity).and_then(|repo| repo.bucket_name()) {
 					Ok(bucket) => bucket,
 					Err(err) => {
@@ -1152,7 +1152,7 @@ impl LightsailBlock {
 			if let Err(err) = reads.of(entity).and_then(|secrets| {
 				block.emit(
 					&stack,
-					&repo_bucket,
+					&home_bucket,
 					deployment,
 					&access,
 					&secrets,
@@ -1172,7 +1172,7 @@ impl LightsailBlock {
 	fn emit(
 		&self,
 		stack: &ResolvedStack,
-		repo_bucket: &str,
+		home_bucket: &str,
 		deployment: &Deployment,
 		access: &AccessGrants,
 		secrets: &[SecretBlock],
@@ -1220,7 +1220,7 @@ impl LightsailBlock {
 				policy: self
 					.runtime_policy(
 						stack,
-						repo_bucket,
+						home_bucket,
 						access,
 						&secrets
 							.iter()
@@ -1249,7 +1249,7 @@ impl LightsailBlock {
 
 		// the machine config, rendered once and used twice: as the instance's
 		// user data, and as the identity the key roll keys on.
-		let user_data = self.build_user_data(stack, repo_bucket, &refs)?;
+		let user_data = self.build_user_data(stack, home_bucket, &refs)?;
 
 		// Roll the access key with every machine-config change, bounding a
 		// leaked credential to the next rebuild rather than forever (see
@@ -1514,7 +1514,7 @@ mod tests {
 		let script = block
 			.build_user_data(
 				&stack,
-				RepoStoreBlock::TEST_BUCKET,
+				HomeStoreBlock::TEST_BUCKET,
 				&MachineRefs::test(),
 			)
 			.unwrap();
@@ -1527,7 +1527,7 @@ mod tests {
 		let block = block.clone();
 		RenderScope::test_render_zoned("example.org", move |parent| {
 			parent.spawn(block);
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 		})
 	}
 
@@ -1670,7 +1670,7 @@ mod tests {
 		block
 			.build_user_data(
 				&stack,
-				RepoStoreBlock::TEST_BUCKET,
+				HomeStoreBlock::TEST_BUCKET,
 				&MachineRefs::test(),
 			)
 			.unwrap()
@@ -1829,7 +1829,7 @@ mod tests {
 			)
 			.xpect_contains(&format!(
 				"aws s3 cp --no-progress \"s3://{}/${}\"",
-				RepoStoreBlock::TEST_BUCKET,
+				HomeStoreBlock::TEST_BUCKET,
 				ArtifactLedger::ARTIFACT_KEY_VAR
 			))
 			// a pointer missing the key lands in the narrated keep-serving
@@ -1859,7 +1859,7 @@ mod tests {
 		let script = LightsailBlock::default()
 			.build_user_data(
 				&stack,
-				RepoStoreBlock::TEST_BUCKET,
+				HomeStoreBlock::TEST_BUCKET,
 				&MachineRefs::test(),
 			)
 			.unwrap();
@@ -2065,7 +2065,7 @@ mod tests {
 		let host_key = SecretBlock::new("ssh-host-key", "BEET_SSH_HOST_KEY");
 		let other = SecretBlock::new("other-secret", "OTHER_SECRET");
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			parent.spawn(host_key.test_index(1));
 			parent.spawn(other.test_index(1));
 			let reads = parent.spawn(host_key.clone()).id();
@@ -2146,7 +2146,7 @@ mod tests {
 	#[beet_core::test]
 	fn reads_secrets_is_checked_at_render() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			let not_a_secret = parent.spawn(LambdaBlock::default()).id();
 			parent.spawn((
 				LightsailBlock::default(),
@@ -2159,7 +2159,7 @@ mod tests {
 			.to_string()
 			.xpect_contains("no `<SecretBlock/>`");
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			let block = SecretBlock::new("ssh-host-key", "BEET_SSH_HOST_KEY");
 			parent.spawn(block.test_index(1));
 			let secret = parent.spawn(block).id();
@@ -2186,7 +2186,7 @@ mod tests {
 			let block = block.clone();
 			move |parent| {
 				parent.spawn(block);
-				parent.spawn(RepoStoreBlock::test_store());
+				parent.spawn(HomeStoreBlock::test_store());
 				parent.spawn(
 					S3BucketBlock::new("app")
 						.with_deploy_versioned(false)
@@ -2207,7 +2207,7 @@ mod tests {
 			))
 			.xpect_contains(&format!(
 				"arn:aws:s3:::{}/*",
-				RepoStoreBlock::TEST_BUCKET
+				HomeStoreBlock::TEST_BUCKET
 			))
 			.xpect_contains(&format!(
 				"table/{}",
@@ -2237,7 +2237,7 @@ mod tests {
 		let policy = LightsailBlock::default()
 			.runtime_policy(
 				&stack,
-				RepoStoreBlock::TEST_BUCKET,
+				HomeStoreBlock::TEST_BUCKET,
 				&AccessGrants::new(vec![
 					AccessGrant::read_write(
 						S3BucketBlock::ACCESS_KIND,
@@ -2281,7 +2281,7 @@ mod tests {
 		LightsailBlock::default()
 			.runtime_policy(
 				&stack,
-				RepoStoreBlock::TEST_BUCKET,
+				HomeStoreBlock::TEST_BUCKET,
 				&AccessGrants::new(vec![AccessGrant::read(
 					"gcs_bucket",
 					"some-bucket",
@@ -2304,7 +2304,7 @@ mod tests {
 		LightsailBlock::default()
 			.runtime_policy(
 				&stack,
-				RepoStoreBlock::TEST_BUCKET,
+				HomeStoreBlock::TEST_BUCKET,
 				&AccessGrants::new(Block::grants(
 					&DynamoTableBlock::new("analytics"),
 					&stack,
@@ -2363,7 +2363,7 @@ mod tests {
 	fn rebuild_restores_the_certificate_store() {
 		let block = LightsailBlock::default()
 			.with_dns(DnsProvider::cloudflare("example.org"));
-		let bucket = RepoStoreBlock::TEST_BUCKET;
+		let bucket = HomeStoreBlock::TEST_BUCKET;
 		let (script, _dir) = build_user_data(&block);
 		let restore = format!(
 			"aws s3 sync --no-progress \"s3://{bucket}/caddy/\" /var/lib/caddy/"
@@ -2430,23 +2430,23 @@ mod tests {
 			.xpect_contains("tls_unit=\n");
 	}
 
-	/// A box serving a repo store must carry the prefix the release pointer
+	/// A box serving a home store must carry the prefix the release pointer
 	/// named, or it booted reading no document: the pointer is the ONLY channel
 	/// the prefix reaches a Lightsail box by, so the running process's
 	/// environment is where it is proven.
 	#[beet_core::test]
-	fn release_proves_the_repo_store_when_served() {
+	fn release_proves_the_home_store_when_served() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		let poll = Duration::from_secs(5);
 		LightsailBlock::default()
 			.release_script(&stack, "my-deploy-id", true, poll, poll)
 			.as_str()
-			.xpect_contains("[ -n \"$(running_env BEET_REPO)\" ]");
+			.xpect_contains("[ -n \"$(running_env BEET_HOME)\" ]");
 		LightsailBlock::default()
 			.release_script(&stack, "my-deploy-id", false, poll, poll)
 			.as_str()
 			.xnot()
-			.xpect_contains("BEET_REPO");
+			.xpect_contains("BEET_HOME");
 	}
 
 	/// REGRESSION: Caddy is installed from the upstream static binary, never the
@@ -2519,21 +2519,21 @@ mod tests {
 		let stack = stack.with_stage("staging");
 		let script = LightsailBlock::default()
 			.with_bootstrap(BootstrapConfig {
-				repo: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+				home: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
 				server: Some(ServerFilter::new("http")),
 				..default()
 			})
 			.with_exec_route("serve")
 			.build_user_data(
 				&stack,
-				RepoStoreBlock::TEST_BUCKET,
+				HomeStoreBlock::TEST_BUCKET,
 				&MachineRefs::test(),
 			)
 			.unwrap();
 		script
 			.as_str()
 			.xpect_contains(
-				"exec /opt/beet_infra/app --repo=s3://beet--dev--app \
+				"exec /opt/beet_infra/app --home=s3://beet--dev--app \
 				--server=http serve",
 			)
 			// the unit runs the launcher, which resolves the release per start
@@ -2541,7 +2541,7 @@ mod tests {
 			.xpect_contains("Environment=BEET_STAGE=staging")
 			// the store never leaks onto the env channel
 			.xnot()
-			.xpect_contains("BEET_REPO");
+			.xpect_contains("BEET_HOME");
 	}
 
 	/// No boot route renders the bare invocation, ie an entry whose root boots
@@ -2556,7 +2556,7 @@ mod tests {
 			})
 			.build_user_data(
 				&stack,
-				RepoStoreBlock::TEST_BUCKET,
+				HomeStoreBlock::TEST_BUCKET,
 				&MachineRefs::test(),
 			)
 			.unwrap()
@@ -2576,7 +2576,7 @@ mod tests {
 			})
 			.build_user_data(
 				&stack,
-				RepoStoreBlock::TEST_BUCKET,
+				HomeStoreBlock::TEST_BUCKET,
 				&MachineRefs::test(),
 			)
 			.unwrap_err()

@@ -3,7 +3,7 @@
 //!
 //! Inserting a [`RoutesDir`] (eg from a `main.bsx` entry via
 //! `<RoutesDir src="routes"/>`) derives a [`DirPath`] scoping the nearest
-//! ancestor [`BlobStore`] (the repo store composed on the loaded root) to `src`
+//! ancestor [`BlobStore`] (the home store composed on the loaded root) to `src`
 //! onto the dir entity, which also registers the dir's [`WatchDir`] for live
 //! reload, and triggers [`RoutesDir::spawn_on_insert`]: the scoped store is
 //! listed, and each content file (`.md`/`.mdx`/`.bsx`/`.html`) spawns a
@@ -634,7 +634,7 @@ mod test {
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
-	/// Compose `store` on the root (the repo store an entry carries) so the
+	/// Compose `store` on the root (the home store an entry carries) so the
 	/// [`RoutesDir`] resolves it by ancestry, then settle the async runtime so the
 	/// discovery task (an async store scan) completes. Mirrors a boot path settling
 	/// before it serves.

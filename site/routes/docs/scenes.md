@@ -35,7 +35,7 @@ Every value is the serialized form of strongly typed data, which keeps a scene b
 
 ## Representations
 
-The encoding is not the scene. JSON is the record, the form a repo stores and beet edits at the component grain. BSX markup and markdown are ways of writing one for a person, imported into the record rather than kept beside it, because text is easy to lose structure in. The guestbook's `main.bsx` is a scene written in BSX:
+The encoding is not the scene. JSON is the record, the form a home stores and beet edits at the component grain. BSX markup and markdown are ways of writing one for a person, imported into the record rather than kept beside it, because text is easy to lose structure in. The guestbook's `main.bsx` is a scene written in BSX:
 
 ```jsx
 <CallOnReady {CliServer}>

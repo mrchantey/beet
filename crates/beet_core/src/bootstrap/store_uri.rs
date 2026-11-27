@@ -1,4 +1,4 @@
-//! The store-selection grammar behind `--repo` / `BEET_REPO` and every store
+//! The store-selection grammar behind `--home` / `BEET_HOME` and every store
 //! declaration.
 
 use crate::prelude::*;
@@ -48,7 +48,7 @@ use core::str::FromStr;
 ///    a store published over http (a site's `<ServeBlobs prefix="repo"/>`),
 ///    read-only. The scheme-only form is origin-relative, the `fs:<path>` of
 ///    the web: a browser reads it against `location.origin`, a native process
-///    against its canonical loopback server. A process forks a remote repo
+///    against its canonical loopback server. A process forks a remote home store
 ///    into a local store (`--store-fork`) rather than writing to it.
 /// 8. `sqlite:<path>`: a SQLite database file, a table store or a blob store by
 ///    which is asked for. Relative paths resolve against the context dir and `~`
@@ -229,8 +229,8 @@ impl StoreUri {
 	}
 
 	/// The http store `url` names: its authority is the origin (absent, the
-	/// page's own) and its path the prefix. How a page spells the repo its
-	/// browser process reads, `<Wasm repo="/repo"/>`.
+	/// page's own) and its path the prefix. How a page spells the home store its
+	/// browser process reads, `<Wasm home="/repo"/>`.
 	pub fn http(url: &Url) -> Self {
 		Self::Http {
 			origin: url.authority().map(|authority| {
@@ -360,7 +360,7 @@ impl StoreUri {
 	pub fn is_self_rooted(&self) -> bool { !matches!(self, Self::Fs { .. }) }
 
 	/// Whether this store is read through the network rather than owned by the
-	/// process: a process on such a repo forks its edits into a store fork
+	/// process: a process on such a home store forks its edits into a store fork
 	/// (`--store-fork`) rather than writing back.
 	pub fn is_remote(&self) -> bool { matches!(self, Self::Http { .. }) }
 
@@ -368,7 +368,7 @@ impl StoreUri {
 	/// store says so: one bit the fork writes on its first write and a served
 	/// page's pre-boot script reads before the world exists, hiding the
 	/// published page from a returning editor until their fork paints. Both
-	/// sides spell the store as the launch does (`--repo`), so they agree by
+	/// sides spell the store as the launch does (`--home`), so they agree by
 	/// construction.
 	pub fn fork_mark(&self) -> String { format!("beet:fork:{self}") }
 
@@ -437,7 +437,7 @@ impl StoreUri {
 	/// `dir`, a relative `fs:<path>` or `sqlite:<path>` at `<path>` under it,
 	/// an absolute one stands alone, and every self-rooted kind is untouched.
 	/// The entry resolver calls this with the resolved entry directory, so a
-	/// `--repo=fs` means "the entry's own directory" rather than the cwd.
+	/// `--home=fs` means "the entry's own directory" rather than the cwd.
 	pub fn rooted_at(&self, dir: &AbsPath) -> Self {
 		let under_dir = |path: &SmolPath| match path.is_absolute() {
 			true => path.clone(),
@@ -743,7 +743,7 @@ mod test {
 			.xpect_eq(format!("sqlite:{home}/data.db"));
 	}
 
-	/// A page names its repo as a url: an authority is the origin, a bare
+	/// A page names its home store as a url: an authority is the origin, a bare
 	/// path the page's own.
 	#[crate::test]
 	fn http_from_url() {

@@ -20,10 +20,10 @@ pub fn watch(target: WatchTarget, timeout: Option<Duration>) -> AwsWatch {
 	}
 }
 
-/// The stack's repo store ([`RepoStoreQuery::bootstrap`]) constrained to the
+/// The stack's home store ([`HomeStoreQuery::bootstrap`]) constrained to the
 /// http transport; a deploy serving more transports overrides `server`.
 pub fn http_bootstrap(
-	repos: &RepoStoreQuery,
+	repos: &HomeStoreQuery,
 	entity: Entity,
 ) -> Result<BootstrapConfig> {
 	BootstrapConfig {
@@ -34,13 +34,13 @@ pub fn http_bootstrap(
 }
 
 /// Bakes `build` into a lambda's [`BuildArtifact`] booting from the stack's
-/// repo store ([`http_bootstrap`]), on [`Ready`] once the `{RepoStoreBlock}`
+/// home store ([`http_bootstrap`]), on [`Ready`] once the `{HomeStoreBlock}`
 /// declaration has settled: the lambda runtime offers no argv, so the boot
 /// config rides the zip's `bootstrap` script.
 pub fn lambda_artifact(build: CargoBuild) -> impl Bundle {
 	OnSpawn::observe(
 		move |ev: On<Ready>,
-		      repos: RepoStoreQuery,
+		      repos: HomeStoreQuery,
 		      mut commands: Commands|
 		      -> Result {
 			commands.entity(ev.entity).insert(

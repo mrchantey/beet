@@ -277,7 +277,7 @@ pub trait PdsProvider: 'static + Send + Sync {
 	) -> SendBoxedFuture<Result<BlobRef>>;
 }
 
-/// One record as a repo stores it: its address, its cid and its body, the
+/// One record as a home stores it: its address, its cid and its body, the
 /// `getRecord` answer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RecordEntry<T = AtprotoValue> {

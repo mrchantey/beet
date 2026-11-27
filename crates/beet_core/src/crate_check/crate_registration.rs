@@ -15,21 +15,18 @@ pub struct CrateRegistration {
 	/// crate (`beet-cli`) sets this.
 	skip_prefix: bool,
 	/// The compiled crate version, ie `CARGO_PKG_VERSION`.
-	version: SmolStr,
+	version: Version,
 	/// The cargo features the crate was compiled with.
 	features: HashSet<SmolStr>,
 }
 
 impl CrateRegistration {
 	/// A registration with no features, usually via [`crate_registration!`].
-	pub fn new(
-		crate_name: impl Into<SmolStr>,
-		version: impl Into<SmolStr>,
-	) -> Self {
+	pub fn new(crate_name: impl Into<SmolStr>, version: Version) -> Self {
 		Self {
 			crate_name: crate_name.into(),
 			skip_prefix: false,
-			version: version.into(),
+			version,
 			features: HashSet::default(),
 		}
 	}
@@ -55,7 +52,7 @@ impl CrateRegistration {
 	pub fn skip_prefix(&self) -> bool { self.skip_prefix }
 
 	/// The compiled crate version.
-	pub fn version(&self) -> &str { &self.version }
+	pub fn version(&self) -> &Version { &self.version }
 
 	/// Whether `feature` was compiled in.
 	pub fn has_feature(&self, feature: &str) -> bool {
@@ -117,15 +114,20 @@ impl CrateRegistration {
 
 	/// Whether a `version:` requirement item holds across `registrations`, ie
 	/// `0.0.9` (the primary crate) or `beet_esp@0.5.9` (a named one). The
-	/// comparison is a minimum, so a newer compiled version satisfies it.
-	pub fn meets_version_item(registrations: &[Self], item: &str) -> bool {
+	/// comparison is a minimum by semver precedence, so a newer compiled
+	/// version satisfies it and a prerelease of it does not.
+	pub fn meets_version_item(
+		registrations: &[Self],
+		item: &str,
+	) -> Result<bool> {
 		let (crate_name, version) = match item.split_once('@') {
 			Some((crate_name, version)) => (Some(crate_name), version),
 			None => (None, item),
 		};
-		Self::resolve(registrations, crate_name).is_some_and(|registration| {
-			parse_version(registration.version()) >= parse_version(version)
-		})
+		let minimum = Version::parse(version)?;
+		Self::resolve(registrations, crate_name)
+			.is_some_and(|registration| registration.version() >= &minimum)
+			.xok()
 	}
 
 	/// The registration for `crate_name`, or the primary one when unprefixed.
@@ -138,24 +140,6 @@ impl CrateRegistration {
 			None => registration.skip_prefix(),
 		})
 	}
-}
-
-/// A lenient semver triple for ordering, ignoring pre-release/build suffixes.
-fn parse_version(version: &str) -> (u32, u32, u32) {
-	let mut parts = version
-		.split('.')
-		.map(|part| {
-			part.split(|char: char| !char.is_ascii_digit())
-				.next()
-				.and_then(|digits| digits.parse().ok())
-				.unwrap_or(0)
-		})
-		.chain(core::iter::repeat(0));
-	(
-		parts.next().unwrap_or(0),
-		parts.next().unwrap_or(0),
-		parts.next().unwrap_or(0),
-	)
 }
 
 /// Builds a [`CrateRegistration`] for the calling crate from compile-time
@@ -174,7 +158,8 @@ macro_rules! crate_registration {
 	() => {
 		$crate::prelude::CrateRegistration::new(
 			env!("CARGO_PKG_NAME"),
-			env!("CARGO_PKG_VERSION"),
+			$crate::prelude::Version::parse(env!("CARGO_PKG_VERSION"))
+				.expect("cargo versions are semver"),
 		)
 	};
 	({ features: [$($feature:literal),* $(,)?] $(,)? }) => {{
@@ -202,7 +187,10 @@ mod test {
 		let registration =
 			crate_registration!({ features: ["std", "not-a-feature"] });
 		registration.crate_name().xpect_eq("beet_core");
-		registration.version().xpect_eq(env!("CARGO_PKG_VERSION"));
+		registration
+			.version()
+			.to_string()
+			.xpect_eq(env!("CARGO_PKG_VERSION"));
 		registration.has_feature("std").xpect_true();
 		registration.has_feature("not-a-feature").xpect_false();
 	}
@@ -211,9 +199,12 @@ mod test {
 	/// by its path.
 	#[crate::test]
 	fn names_its_cargo_run() {
-		let registration = CrateRegistration::new("beet-cli", "0.0.1")
-			.with_feature("infra")
-			.with_feature("extra");
+		let registration = CrateRegistration::new(
+			"beet-cli",
+			Version::parse("0.0.1").unwrap(),
+		)
+		.with_feature("infra")
+		.with_feature("extra");
 		let workspace = AbsPath::new_unchecked("/beet");
 		let run = |program: &str| {
 			registration

@@ -14,13 +14,13 @@ pub use atproto_handle_block::*;
 #[cfg(feature = "atproto")]
 pub use atproto_handle_probe::*;
 // A block whose resource is a store, its erased half and the generic runtime
-// attach; the marker naming which store block is the repo store, and the
+// attach; the marker naming which store block is the home store, and the
 // block naming a store this deploy does not create. Feature-free, so a lean
 // binary reads the same declarations a deploy does.
 mod store_block;
 pub use store_block::*;
-mod repo_store_block;
-pub use repo_store_block::*;
+mod home_store_block;
+pub use home_store_block::*;
 mod store_uri_block;
 pub use store_uri_block::*;
 // A secret a deployed runtime reads from its stack's secret store, and the

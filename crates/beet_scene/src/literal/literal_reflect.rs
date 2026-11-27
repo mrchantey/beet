@@ -923,7 +923,7 @@ mod test {
 	}
 
 	/// A store uri string coerces to its [`StoreUri`], the one spelling the
-	/// `--repo` flag and a markup `uri="s3://.."` share, and a malformed one
+	/// `--home` flag and a markup `uri="s3://.."` share, and a malformed one
 	/// errors rather than keeping the field's default.
 	#[beet_core::test]
 	fn coerces_to_store_uri() {

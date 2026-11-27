@@ -211,7 +211,7 @@ mod test {
 	}
 
 	/// Every dated post of the fixture site, the fields its metadata fills, in
-	/// the wire form a repo stores.
+	/// the wire form a home stores.
 	#[beet_core::test]
 	fn builds_from_the_fixture_site() {
 		blog_pages()

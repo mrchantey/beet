@@ -41,7 +41,6 @@ use crate::prelude::*;
 use crate::terra::Resource;
 use crate::terra::*;
 use beet_core::prelude::*;
-use semver::Version;
 use serde::Serialize;
 
 /// A Terraform variable definition.

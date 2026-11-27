@@ -58,12 +58,12 @@ pub(crate) use media_resolve::test_fixtures::*;
 pub use media_resolve::*;
 mod route_query;
 pub use route_query::*;
-// the entry-declared store root (`<RepoRoot src="../.."/>`), pre-scanned by
+// the entry-declared store root (`<HomeRoot src="../.."/>`), pre-scanned by
 // entry resolution.
 #[cfg(feature = "scene")]
-mod repo_root;
+mod home_root;
 #[cfg(feature = "scene")]
-pub use repo_root::*;
+pub use home_root::*;
 // the registered set of declarations that act before the entry builds, and the
 // one registry-free walk entry resolution reads them from.
 #[cfg(feature = "scene")]

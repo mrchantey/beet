@@ -15,9 +15,9 @@ binding="TABLES"/>` the site declares lives in: one object per partition, the
 class the Worker exports, bound with its `new_sqlite_classes` migration because
 the deploy route declares the store. `examples/infra/cloudflare_tables.bsx` is a
 document mounting those tables, for a local `wrangler dev`. The bucket is one
-declaration: `<CloudflareWorkerBlock>` is the stack's repo store, so `deploy` bakes
-`BEET_REPO=r2://<binding>` into the Worker's `vars` and the Worker boots from it
-exactly as a native binary boots from `--repo`. The Worker is generic: it loads
+declaration: `<CloudflareWorkerBlock>` is the stack's home store, so `deploy` bakes
+`BEET_HOME=r2://<binding>` into the Worker's `vars` and the Worker boots from it
+exactly as a native binary boots from `--home`. The Worker is generic: it loads
 `main.bsx`, `routes/` and `templates/` from R2 and version-checks the entry on every
 request, so a `sync` updates the entire site behavior with no redeploy, live on the
 very next fetch. `build` compiles the Worker alone, to inspect it before an

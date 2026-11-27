@@ -128,11 +128,11 @@ impl terra::Project {
 	}
 }
 
-/// The [`ArtifactsClient`] of the stack's repo store, see
-/// [`RepoStoreQuery::artifacts_client`].
+/// The [`ArtifactsClient`] of the stack's home store, see
+/// [`HomeStoreQuery::artifacts_client`].
 async fn artifacts_client(caller: &AsyncEntity) -> Result<ArtifactsClient> {
 	caller
-		.with_state::<RepoStoreQuery, _>(|entity, repos| {
+		.with_state::<HomeStoreQuery, _>(|entity, repos| {
 			repos.artifacts_client(entity)
 		})
 		.await?

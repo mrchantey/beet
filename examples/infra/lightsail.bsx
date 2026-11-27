@@ -3,7 +3,7 @@
 
 Deploys `examples/beetmania` as an http-only Lightsail instance. The generic `beet`
 binary runs under systemd and reads the site from an S3 bucket at request time
-(its `ExecStart` passes `--repo=s3://<bucket> --server=http serve`, `serve`
+(its `ExecStart` passes `--home=s3://<bucket> --server=http serve`, `serve`
 being the example's command that IS the site), so a site change re-publishes by
 re-running `sync` with no redeploy. Served on the instance's public address. Run
 `just beetmania assets` first, so the files the site borrows and derives are in
@@ -30,19 +30,19 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 		<Group bx:ref="deploy_up">
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 			<LightsailSiteBlock features="aws" exec_route="serve"/>
-			<S3BucketBlock label="repo" {RepoStoreBlock}/>
+			<S3BucketBlock label="repo" {HomeStoreBlock}/>
 			<!-- the ssh authority the box trusts, before the apply that boots it -->
 			<EnsureSshAuthority/>
 			<!-- the bucket first, so the site is in place before the instance that
 			     serves it boots -->
 			<TofuApply layer="storage"/>
 			<!-- publish the site: assemble it, then one mirror into this deploy's
-			     version of the repo store -->
+			     version of the home store -->
 			<!-- the wasm runtime the site's pages boot, built by this verb rather
 			     than borrowed: the assemble reads it through the site's `wasm/` links -->
 			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<RepoAssemble src="examples/beetmania"/>
-			<RepoSync/>
+			<HomeAssemble src="examples/beetmania"/>
+			<HomeSync/>
 			<TofuApply/>
 			<LightsailWatch timeout="30s"/>
 		</Group>
@@ -60,8 +60,8 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 			<!-- the wasm runtime the site's pages boot, built by this verb rather
 			     than borrowed: the assemble reads it through the site's `wasm/` links -->
 			<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
-			<RepoAssemble src="examples/beetmania"/>
-			<RepoSync/>
+			<HomeAssemble src="examples/beetmania"/>
+			<HomeSync/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>
 			<LightsailWatch/>

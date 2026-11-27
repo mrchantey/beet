@@ -8,7 +8,7 @@ use beet_net::prelude::*;
 use bytes::Bytes;
 
 /// Metadata about a deployed version, published by [`ArtifactsClient`] into
-/// the stack's repo store under this layout:
+/// the stack's home store under this layout:
 ///
 /// ```text
 /// <id>/repo/           the document, the mirror root a process boots from
@@ -28,7 +28,7 @@ pub struct ArtifactLedger {
 	pub deploy_id: Uuid,
 	pub timestamp: String,
 	pub artifacts: HashMap<SmolStr, ArtifactEntry>,
-	/// The repo store this version's documents were published to, rooted at this
+	/// The home store this version's documents were published to, rooted at this
 	/// version's own prefix.
 	///
 	/// It rides the ledger because a machine that resolves its release per start
@@ -40,11 +40,11 @@ pub struct ArtifactLedger {
 	/// rollback targets, and a deploy that could not parse them could not roll
 	/// back to them.
 	#[serde(default)]
-	pub repo: Option<StoreUri>,
+	pub home: Option<StoreUri>,
 	/// The source tree this version was built from, see [`DeploySource`].
 	///
 	/// Defaulted on read to [`DeploySource::default`], which reads as not
-	/// recorded, for the same reason as [`repo`](Self::repo).
+	/// recorded, for the same reason as [`home`](Self::home).
 	#[serde(default)]
 	pub source: DeploySource,
 }
@@ -60,7 +60,7 @@ impl ArtifactLedger {
 			deploy_id,
 			timestamp,
 			artifacts: default(),
-			repo: None,
+			home: None,
 			source: default(),
 		}
 	}
@@ -72,10 +72,10 @@ impl ArtifactLedger {
 		format!("version {} built from {}", self.deploy_id, self.source)
 	}
 
-	/// Record the repo store this version's documents live in, so the release
-	/// pointer can publish it. See [`repo`](Self::repo).
-	pub fn with_repo(mut self, repo: StoreUri) -> Self {
-		self.repo = Some(repo);
+	/// Record the home store this version's documents live in, so the release
+	/// pointer can publish it. See [`home`](Self::home).
+	pub fn with_home(mut self, home: StoreUri) -> Self {
+		self.home = Some(home);
 		self
 	}
 	#[cfg(test)]
@@ -159,13 +159,13 @@ impl ArtifactLedger {
 	/// The pointer body: an env file, so one file serves both readers a
 	/// deployed box needs, a shell `.` and a systemd `EnvironmentFile=`.
 	///
-	/// The deploy identity and the repo store render through
+	/// The deploy identity and the home store render through
 	/// [`BootstrapConfig::to_env`], the same table the runtime parses, so the
 	/// names cannot drift. The artifact key is the pointer's own knob, not a
 	/// bootstrap one: it tells the machine what to download, not the process how
 	/// to boot.
 	///
-	/// The repo store is here rather than on the machine's own config because it
+	/// The home store is here rather than on the machine's own config because it
 	/// changes every deploy, and a machine whose config changes every deploy is
 	/// rebuilt every deploy. Publishing it here means the box resolves its
 	/// binary AND the document that binary was built against from one file, at
@@ -180,7 +180,7 @@ impl ArtifactLedger {
 		let mut body = BootstrapConfig {
 			deploy_id: Some(self.deploy_id.to_string().into()),
 			deploy_timestamp: Some(self.timestamp.clone().into()),
-			repo: self.repo.clone(),
+			home: self.home.clone(),
 			..default()
 		}
 		.to_env()
@@ -229,11 +229,11 @@ impl ArtifactsClient {
 
 	pub fn deploy_id(&self) -> &Uuid { &self.ledger.deploy_id }
 
-	/// Record the repo store this deploy publishes its documents to, so the
+	/// Record the home store this deploy publishes its documents to, so the
 	/// ledger and every release pointer it writes name it. See
-	/// [`ArtifactLedger::repo`].
-	pub fn with_repo(mut self, repo: StoreUri) -> Self {
-		self.ledger.repo = Some(repo);
+	/// [`ArtifactLedger::home`].
+	pub fn with_home(mut self, home: StoreUri) -> Self {
+		self.ledger.home = Some(home);
 		self
 	}
 
@@ -439,16 +439,16 @@ mod tests {
 	/// store rides it beside the artifact key, and `set_current` rewrites both
 	/// together.
 	#[beet_core::test]
-	async fn the_pointer_carries_the_repo_store() {
+	async fn the_pointer_carries_the_home_store() {
 		let store = BlobStore::temp();
 		let uri = |version: &str| {
 			StoreUri::parse(&format!("s3://beet-site--prod--repo/{version}"))
 				.unwrap()
 		};
 		let first = test_ledger(vec![("app", "versions/v1/app", "h1")])
-			.with_repo(uri("v1"));
+			.with_home(uri("v1"));
 		let second = test_ledger(vec![("app", "versions/v2/app", "h2")])
-			.with_repo(uri("v2"));
+			.with_home(uri("v2"));
 		let client = ArtifactsClient::new(store.clone(), first.clone());
 		client.publish_ledger().await.unwrap();
 		ArtifactsClient::new(store.clone(), second.clone())
@@ -469,13 +469,13 @@ mod tests {
 		pointer()
 			.await
 			.as_str()
-			.xpect_contains("BEET_REPO=s3://beet-site--prod--repo/v2");
+			.xpect_contains("BEET_HOME=s3://beet-site--prod--repo/v2");
 		// the whole point: a rollback moves the document with the binary
 		client.set_current(&first.deploy_id).await.unwrap();
 		pointer()
 			.await
 			.as_str()
-			.xpect_contains("BEET_REPO=s3://beet-site--prod--repo/v1")
+			.xpect_contains("BEET_HOME=s3://beet-site--prod--repo/v1")
 			.xpect_contains("BEET_ARTIFACT_KEY=versions/v1/app");
 	}
 
@@ -537,7 +537,7 @@ mod tests {
 				.await
 				.unwrap()
 				.unwrap();
-		ledger.repo.xpect_none();
+		ledger.home.xpect_none();
 		ledger.source.xpect_eq(DeploySource::default());
 	}
 

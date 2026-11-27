@@ -19,7 +19,7 @@ of them yet, and a deployed site must not mount them.
 Build the Worker, put this document in the local site bucket as `main.bsx`, and
 start the dev server with the bindings `examples/infra/cloudflare_workers.bsx`
 deploys (`TABLES` bound to `BeetTableObject` with its `new_sqlite_classes`
-migration, the `SITE` and `ARCHIVE` buckets, `BEET_REPO=r2://SITE`):
+migration, the `SITE` and `ARCHIVE` buckets, `BEET_HOME=r2://SITE`):
 
     worker-build --release crates/beet-cli -- --no-default-features --features cloudflare,sqlite
     wrangler r2 object put probe-site/main.bsx --file examples/infra/cloudflare_tables.bsx --local

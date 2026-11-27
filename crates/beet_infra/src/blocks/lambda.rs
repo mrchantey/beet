@@ -136,7 +136,7 @@ impl LambdaBlock {
 		mut scopes: AncestorQuery<&mut RenderScope>,
 		stacks: StackQuery,
 		blocks: Query<(Entity, &LambdaBlock, Option<&BuildArtifact>)>,
-		repos: RepoStoreQuery,
+		repos: HomeStoreQuery,
 		reads: ReadsSecretsQuery,
 	) {
 		for (entity, block, artifact) in blocks.iter() {
@@ -147,8 +147,8 @@ impl LambdaBlock {
 				scope.error(bevyhow!("LambdaBlock '{}': {err}", block.label()));
 				continue;
 			}
-			// the function's code is read from the stack's repo store
-			let repo_bucket =
+			// the function's code is read from the stack's home store
+			let home_bucket =
 				match repos.get(entity).and_then(|repo| repo.bucket_name()) {
 					Ok(bucket) => bucket,
 					Err(err) => {
@@ -167,7 +167,7 @@ impl LambdaBlock {
 			if let Err(err) = block.emit(
 				source_hash,
 				&stack,
-				&repo_bucket,
+				&home_bucket,
 				deployment,
 				&access,
 				config,
@@ -185,7 +185,7 @@ impl LambdaBlock {
 		&self,
 		source_hash: Option<String>,
 		stack: &ResolvedStack,
-		repo_bucket: &str,
+		home_bucket: &str,
 		deployment: &Deployment,
 		access: &AccessGrants,
 		config: &mut terra::Config,
@@ -287,7 +287,7 @@ impl LambdaBlock {
 				runtime: Some("provided.al2023".into()),
 				handler: Some("bootstrap".into()),
 				filename: None,
-				s3_bucket: Some(repo_bucket.into()),
+				s3_bucket: Some(home_bucket.into()),
 				s3_key: Some(artifact_key.to_string().into()),
 				region: Some(region.clone()),
 				role: lambda_role.field_ref("arn").into(),
@@ -639,7 +639,7 @@ mod tests {
 	/// `example.org`.
 	fn build_json(block: LambdaBlock) -> String {
 		RenderScope::test_json_zoned("example.org", move |parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			parent.spawn(block);
 		})
 	}
@@ -655,7 +655,7 @@ mod tests {
 	fn an_invoke_only_lambda_publishes_no_endpoint() {
 		let block = LambdaBlock::default().with_http(false);
 		RenderScope::test_json(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			parent.spawn(block.clone());
 			parent.spawn(
 				S3BucketBlock::new("app")
@@ -696,7 +696,7 @@ mod tests {
 	#[beet_core::test]
 	fn grants_only_least_privilege_policies() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent.spawn(
 				S3BucketBlock::new("app")
@@ -728,7 +728,7 @@ mod tests {
 	#[beet_core::test]
 	fn lowers_permissions_per_grant() {
 		RenderScope::test_json(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent.spawn(
 				S3BucketBlock::new("assets")
@@ -741,7 +741,7 @@ mod tests {
 		.xpect_contains("s3:PutObject")
 		.xpect_contains("dynamodb:PutItem");
 		RenderScope::test_json(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent.spawn(S3BucketBlock::new("assets"));
 		})
@@ -776,7 +776,7 @@ mod tests {
 			.emit(
 				None,
 				&stack,
-				RepoStoreBlock::TEST_BUCKET,
+				HomeStoreBlock::TEST_BUCKET,
 				&deployment,
 				&AccessGrants::new(vec![AccessGrant::read(
 					"gcs_bucket",
@@ -800,7 +800,7 @@ mod tests {
 		let (scope, _dir) = RenderScope::test_render_stack(
 			(stack.with_stage("prod"), region),
 			|parent| {
-				parent.spawn(RepoStoreBlock::test_store());
+				parent.spawn(HomeStoreBlock::test_store());
 				parent.spawn(LambdaBlock::default());
 			},
 		);
@@ -887,7 +887,7 @@ mod tests {
 	#[beet_core::test(timeout_ms = 60_000)]
 	async fn validate() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(HomeStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 		});
 		StateEncryption::ensure_test_passphrase();

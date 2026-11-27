@@ -129,7 +129,7 @@ tui = ["beet/tui_server"]
 ssh = ["tui", "beet/ssh_tui"]
 # AWS over signed requests and the S3 and DynamoDB stores, so a deployed `beet`
 # task loads its entry (`main.bsx`, `routes/`, `templates/`) from an S3 bucket
-# instead of the local filesystem, selected at runtime by `--repo=s3://<bucket>`.
+# instead of the local filesystem, selected at runtime by `--home=s3://<bucket>`.
 # Adds no deploy/terraform machinery, keeping the container binary lean. `net`
 # is its native transport; a wasm build signs through fetch.
 aws = ["beet/aws", "net"]
@@ -149,7 +149,7 @@ lambda = ["scene", "beet/lambda", "aws"]
 # bindings' credential.
 cloudflare = ["scene", "beet/cloudflare", "dep:worker", "aws"]
 # The browser-wasm target (wasm32-only): builds the standalone `beet` binary for
-# the browser, which boots the launch its page's `<Wasm repo entry server>`
+# the browser, which boots the launch its page's `<Wasm home entry server>`
 # describes (an http repo forked into IndexedDB, resolved through the one
 # `LaunchPlugin` path) and paints the DOM under `--server=dom`, else runs headless
 # and logs to the console. The wasm-safe render base, no Worker SDK. `BuildWasm`

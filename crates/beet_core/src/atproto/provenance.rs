@@ -50,8 +50,10 @@ use crate::prelude::*;
 /// each input with the digest it had, and its freshness is the module docs'.
 /// `created` is written as ISO 8601, the form an atproto `datetime` takes and
 /// the one a reviewer reads in a committed file's diff.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect, Def)]
-#[reflect(Component, Default, Def)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, Component, Reflect, LexiconDef,
+)]
+#[reflect(Component, Default, LexiconDef)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub struct Provenance {

@@ -22,8 +22,10 @@ use beet_scene::prelude::ReflectFrontmatter;
 /// [`apply_slug`](Self::apply_slug) and
 /// [`declare_file_defaults`](Self::declare_file_defaults)): a `slug` renames
 /// the route's last segment, and a numbered filename orders it.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect, Def)]
-#[reflect(Component, Default, Def)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, Component, Reflect, LexiconDef,
+)]
+#[reflect(Component, Default, LexiconDef)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 // read field by field, as authored: no `ReflectDeserialize`
 #[cfg_attr(feature = "serde", reflect(SceneMeta))]

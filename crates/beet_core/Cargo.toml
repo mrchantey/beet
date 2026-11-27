@@ -262,6 +262,7 @@ bitflags = { workspace = true }
 #💡 path
 pathdiff = { version = "0.2", optional = true }
 either = { version = "1", default-features = false }
+semver.workspace = true
 
 #💡 serde
 # Workspace serde is no_std (default-features off); `std` builds re-enable

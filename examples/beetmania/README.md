@@ -36,7 +36,7 @@ beetmania/
   derived/       the blog's standard.site index, written by `social/publish`
 ```
 
-There is no `main.rs`. The `beet` binary discovers `main.bsx`, roots the repo store at this directory (which `<RoutesDir/>` and every document it names resolve against), and loads `main.bsx` as the app root. The root `<CliServer>` then dispatches the command line into its router: `serve` boots the servers, `--server=http` the HTTP listener, `--server=tui` the live terminal, `--server=dom` the page in a browser tab. Static export is a separate dev command, `beet export-static <site-dir>`.
+There is no `main.rs`. The `beet` binary discovers `main.bsx`, roots the home store at this directory (which `<RoutesDir/>` and every document it names resolve against), and loads `main.bsx` as the app root. The root `<CliServer>` then dispatches the command line into its router: `serve` boots the servers, `--server=http` the HTTP listener, `--server=tui` the live terminal, `--server=dom` the page in a browser tab. Static export is a separate dev command, `beet export-static <site-dir>`.
 
 ## The served site
 

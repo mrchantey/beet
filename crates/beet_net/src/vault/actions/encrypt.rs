@@ -24,7 +24,7 @@ pub async fn VaultEncrypt(
 	vault: Params<VaultParams>,
 	/// The plaintext file to encrypt; absent, stdin is read to its end.
 	#[param]
-	file: Option<String>,
+	file: Option<SmolPath>,
 	/// Encrypt to a group's recipients as a secrets document lists them:
 	/// the declared document's, or `--document`'s.
 	#[param]

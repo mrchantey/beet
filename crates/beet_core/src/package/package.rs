@@ -16,8 +16,8 @@ use alloc::collections::BTreeMap;
 /// 	<Import name="." from="widgets"/>
 /// </Package>
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect, Def)]
-#[reflect(Component, Def, SceneMeta, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect, LexiconDef)]
+#[reflect(Component, LexiconDef, SceneMeta, Serialize, Deserialize)]
 #[derive(Serialize, Deserialize)]
 pub struct Package {
 	/// The package's name, its space's key and every record's rkey prefix.
@@ -126,11 +126,11 @@ impl SceneMeta for Export {
 	Eq,
 	Component,
 	Reflect,
-	Def,
+	LexiconDef,
 	Serialize,
 	Deserialize,
 )]
-#[reflect(Component, Default, Def, Serialize, Deserialize)]
+#[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
 pub struct Exports(pub BTreeMap<SmolStr, RelPath>);
 
 /// One dependency, a child of [`Package`]: by address, by path, or both, the
@@ -228,11 +228,11 @@ impl SceneMeta for Dependency {
 	Eq,
 	Component,
 	Reflect,
-	Def,
+	LexiconDef,
 	Serialize,
 	Deserialize,
 )]
-#[reflect(Component, Default, Def, Serialize, Deserialize)]
+#[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
 pub struct Dependencies(pub BTreeMap<PackageName, Dependency>);
 
 /// What a [`Dependency`] resolved to: a release for a version requirement, a
@@ -390,9 +390,9 @@ impl Platform {
 	Eq,
 	Component,
 	Reflect,
-	Def,
+	LexiconDef,
 	Serialize,
 	Deserialize,
 )]
-#[reflect(Component, Default, Def, Serialize, Deserialize)]
+#[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
 pub struct ExportRuntimes(pub Vec<Runtime>);

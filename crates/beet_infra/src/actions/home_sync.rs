@@ -1,14 +1,14 @@
-//! Publishing the assembled document into the repo store.
+//! Publishing the assembled document into the home store.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<RepoSync/>` — mirror the assembled copy into this launch's version of the
-/// repo store, `<root>/<id>/repo/`.
+/// `<HomeSync/>` — mirror the assembled copy into this launch's version of the
+/// home store, `<root>/<id>/repo/`.
 ///
 /// One [`BlobSync`] with `delete`, so the store holds exactly what
-/// [`RepoAssemble`] assembled: a page renamed or removed at the source is
+/// [`HomeAssemble`] assembled: a page renamed or removed at the source is
 /// removed here rather than lingering (two routes for `/` is a boot panic),
 /// and an object already matching by size and digest is not re-sent. Which
 /// version it publishes into is the launch's answer: `deploy` mints one, and
@@ -22,15 +22,15 @@ use beet_net::prelude::*;
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn RepoSync(
+pub async fn HomeSync(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let (dir, dest) = cx
 		.caller
-		.with_state::<(StackQuery, RepoStoreQuery), _>(
+		.with_state::<(StackQuery, HomeStoreQuery), _>(
 			|entity, (stacks, repos)| -> Result<_> {
 				(
-					RepoAssemble::dir(&stacks, entity)?,
+					HomeAssemble::dir(&stacks, entity)?,
 					repos.store_uri(entity)?,
 				)
 					.xok()
@@ -39,7 +39,7 @@ pub async fn RepoSync(
 		.await??;
 	if fs_ext::is_dir_empty(&dir)? {
 		bevybail!(
-			"nothing assembled at {dir}: declare a `<RepoAssemble src=\"..\"/>` \
+			"nothing assembled at {dir}: declare a `<HomeAssemble src=\"..\"/>` \
 			 before this sync"
 		);
 	}
@@ -114,17 +114,17 @@ mod test {
 				(
 					StoreUriBlock::new("repo", root.clone())
 						.with_deploy_versioned(true),
-					RepoStoreBlock
+					HomeStoreBlock
 				),
 				(
-					RepoAssemble::new(site.clone()).with_paths(paths),
+					HomeAssemble::new(site.clone()).with_paths(paths),
 					children![DirCopy::new(
 						workspace.clone(),
 						"assets",
 						"databases/country.mmdb"
 					)]
 				),
-				RepoSync::default(),
+				HomeSync::default(),
 			]))
 			.exchange(Request::get(""))
 			.await

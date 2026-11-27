@@ -60,7 +60,7 @@ impl S3Store {
 	}
 
 	/// Create a store whose region the launch names, the process-boundary
-	/// convention: a `--repo=s3://<bucket>` names a bucket, not a region.
+	/// convention: a `--home=s3://<bucket>` names a bucket, not a region.
 	///
 	/// `pub(crate)` deliberately. A store is below [`Stack`] in the crate graph
 	/// (`beet_infra` depends on `beet_net`, never the reverse), so it cannot

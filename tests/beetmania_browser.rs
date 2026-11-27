@@ -4,7 +4,7 @@
 //! again through the world running in the tab.
 //!
 //! The site is served exactly as `beet --entry=examples/beetmania` serves it
-//! (the entry resolved through its own fs repo store, built through the plain
+//! (the entry resolved through its own fs home store, built through the plain
 //! one-shot path, its declared `<HttpServer>` booting), the harness reading the
 //! url off the listener the entry binds. The page's `<Wasm/>` boots the entry
 //! again in the browser under `--server=dom`; once its `DomHost` paints, a

@@ -273,7 +273,7 @@ impl CompiledDocument {
 
 	/// The scene meta of `body`: its skeleton spawned in a throwaway world,
 	/// every [`SceneMeta`] applied in body order, and the meta entity read
-	/// back as a record of every component that is a [`Def`].
+	/// back as a record of every component that is a [`LexiconDef`].
 	fn scene_meta(
 		types: &AppTypeRegistry,
 		registry: &TypeRegistry,
@@ -349,7 +349,7 @@ impl CompiledDocument {
 	}
 
 	/// The components of `entity` as a record of `collection`, each keyed by
-	/// its [`Def`], in its serde form where it registers one and its
+	/// its [`LexiconDef`], in its serde form where it registers one and its
 	/// reflected form otherwise, which is the same for plain data; one that is
 	/// no def is left off.
 	pub fn record_of(
@@ -373,12 +373,12 @@ impl CompiledDocument {
 			};
 			let path = registration.type_info().type_path();
 			let (Some(def), Some(component)) = (
-				registration.data::<ReflectDef>(),
+				registration.data::<ReflectLexiconDef>(),
 				registration.data::<ReflectComponent>(),
 			) else {
 				warn!(
 					"`{path}` on a record's meta entity is no def, so it is \
-					 left off: derive and reflect `Def`"
+					 left off: derive and reflect `LexiconDef`"
 				);
 				continue;
 			};

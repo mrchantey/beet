@@ -14,7 +14,7 @@
 //!   verbatim) that names one
 //! - [`Cid`], content addressing for bytes and records; [`StrongRef`] and
 //!   [`BlobRef`], the two references a record holds
-//! - [`Def`], the NSID a type is keyed by in a record, and [`ReflectDef`], a
+//! - [`LexiconDef`], the NSID a type is keyed by in a record, and [`ReflectLexiconDef`], a
 //!   registry's lookup both ways
 //! - [`AtprotoRecord`], one shape for every record type beet reads or writes,
 //!   the body alone, and [`Rkeyed`], a body paired with the rkey it lives at
@@ -65,9 +65,9 @@ mod blob_ref;
 mod cid;
 #[cfg(feature = "dag_cbor")]
 mod dag_cbor;
-mod def;
 mod did;
 mod entity_body_record;
+mod lexicon_def;
 mod nsid;
 mod open_union;
 mod provenance;
@@ -83,9 +83,9 @@ pub use atproto_record::*;
 pub use atproto_value::*;
 pub use blob_ref::*;
 pub use cid::*;
-pub use def::*;
 pub use did::*;
 pub use entity_body_record::*;
+pub use lexicon_def::*;
 pub use nsid::*;
 pub use open_union::*;
 pub use provenance::*;

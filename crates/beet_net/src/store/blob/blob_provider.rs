@@ -152,7 +152,7 @@ pub trait BlobProvider: StoreBackend {
 	/// A view of this store rooted at `root` (a cleaned path relative to the
 	/// store, which may climb above it with a leading `..`), plus `entry_name`
 	/// re-expressed relative to that root. The seam behind
-	/// [`BlobStore::rebase_repo`].
+	/// [`BlobStore::rebase_home`].
 	///
 	/// The default is the key-prefix view every provider supports
 	/// ([`with_subdir`](Self::with_subdir)), erroring loudly when `root` walks
@@ -168,7 +168,7 @@ pub trait BlobProvider: StoreBackend {
 	) -> Result<(Box<dyn BlobProvider>, RelPath)> {
 		if root.first_segment() == Some("..") {
 			bevybail!(
-				"entry `{entry_name}` declares a `<RepoRoot>` above the store \
+				"entry `{entry_name}` declares a `<HomeRoot>` above the store \
 				itself (`{root}`), and a `{}` store has no parent universe. \
 				This usually means a mis-published store: the entry's directory \
 				was synced instead of its declared root.",

@@ -130,7 +130,7 @@ inbound assertion rather than failing the deploy.
 		<VpcBlock bx:ref="net" label="net" zones={["a"]} private_tier=false/>
 		<!-- the REPO STORE the observer function's code is published into and
 		     boots from; every stack with a lambda marks one -->
-		<S3BucketBlock label="repo" {RepoStoreBlock}/>
+		<S3BucketBlock label="repo" {HomeStoreBlock}/>
 		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
 			runtime_write=true object_versioning=true/>
 		<S3BucketBlock label="archive" deploy_versioned=false runtime_write=true

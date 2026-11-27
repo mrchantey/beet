@@ -13,7 +13,7 @@ opening at the page's own url, so the page's world runs in the tab and its
 event scripts (`routes/counter.bsx`) run on click.
 -->
 <SiteLayout>
-	<Wasm src="/wasm/beet-ui.wasm" repo="/repo" entry="main.bsx" server="dom" route="serve" slot="head"/>
+	<Wasm src="/wasm/beet-ui.wasm" home="/repo" entry="main.bsx" server="dom" route="serve" slot="head"/>
 	<Link slot="nav" href="/recipes" variant=ButtonVariant::Text>Recipes</Link>
 	<Link slot="nav" href="/guides" variant=ButtonVariant::Text>Guides</Link>
 	<Link slot="nav" href="/blog" variant=ButtonVariant::Text>Almanac</Link>

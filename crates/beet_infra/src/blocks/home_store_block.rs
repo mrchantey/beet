@@ -1,4 +1,4 @@
-//! The deploy-side declaration of the repo store, and how a consumer finds it.
+//! The deploy-side declaration of the home store, and how a consumer finds it.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -6,63 +6,63 @@ use beet_net::prelude::*;
 
 /// Marks the store block an app is served from: the one [`StoreBlock`] the
 /// deploy publishes the entry document to and every compute it ships boots
-/// from, ie `<S3BucketBlock label="repo" {RepoStoreBlock}/>`.
+/// from, ie `<S3BucketBlock label="repo" {HomeStoreBlock}/>`.
 ///
 /// A marker on the store's own declaration rather than a block of its own,
 /// because the store may be any [`StoreBlock`]: a bucket the deploy creates, a
 /// [`StoreUriBlock`] naming one it does not. The only thing left to say is
-/// WHICH, and consumers find it by this type ([`RepoStoreQuery`]) rather than
+/// WHICH, and consumers find it by this type ([`HomeStoreQuery`]) rather than
 /// by a label convention. One per world, enforced by its own insert hook
-/// exactly as the runtime `RepoStore` is.
+/// exactly as the runtime `HomeStore` is.
 ///
-/// Distinct from `RepoStore`, which marks the live `BlobStore` a process
+/// Distinct from `HomeStore`, which marks the live `BlobStore` a process
 /// actually booted from. That store exists before any document is read (the
 /// document is read out of it), so a declaration inside the document can
-/// describe the repo store but never be it. Not a [`Block`] despite the name:
-/// it reads as "the block that is the repo store", which is what it marks.
+/// describe the home store but never be it. Not a [`Block`] despite the name:
+/// it reads as "the block that is the home store", which is what it marks.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_insert = hook_ext::exclusive::<RepoStoreBlock>())]
-pub struct RepoStoreBlock;
+#[component(on_insert = hook_ext::exclusive::<HomeStoreBlock>())]
+pub struct HomeStoreBlock;
 
-impl RepoStoreBlock {
+impl HomeStoreBlock {
 	/// The error for a marker on an entity declaring no store block, shared by
 	/// the render assertion and the query so the two cannot drift.
 	fn storeless(entity: Entity) -> BevyError {
 		bevyhow!(
-			"entity {entity} is marked `RepoStoreBlock` but declares no store \
+			"entity {entity} is marked `HomeStoreBlock` but declares no store \
 			 block: the marker goes on the store's own declaration, ie \
-			 `<S3BucketBlock label=\"repo\" {{RepoStoreBlock}}/>`"
+			 `<S3BucketBlock label=\"repo\" {{HomeStoreBlock}}/>`"
 		)
 	}
 }
 
 /// Render-set: a marker on an entity declaring no store block is a collected
 /// error, so `validate` names it before any deploy consults the store.
-pub(crate) fn assert_repo_store_blocks(
+pub(crate) fn assert_home_store_blocks(
 	mut scopes: AncestorQuery<&mut RenderScope>,
-	markers: Query<Entity, (With<RepoStoreBlock>, Without<ErasedStoreBlock>)>,
+	markers: Query<Entity, (With<HomeStoreBlock>, Without<ErasedStoreBlock>)>,
 ) {
 	for entity in markers.iter() {
 		if let Ok(mut scope) = scopes.get_mut(entity) {
-			scope.error(RepoStoreBlock::storeless(entity));
+			scope.error(HomeStoreBlock::storeless(entity));
 		}
 	}
 }
 
 /// The declaration a consumer resolved: the entity carrying
-/// [`RepoStoreBlock`], its label and its erased store half. No launch state
+/// [`HomeStoreBlock`], its label and its erased store half. No launch state
 /// lives here; the uri this launch publishes at is read through
-/// [`RepoStoreQuery::store_uri`] as it is needed.
+/// [`HomeStoreQuery::store_uri`] as it is needed.
 #[derive(Debug, Clone, Get)]
-pub struct RepoStoreDecl {
+pub struct HomeStoreDecl {
 	entity: Entity,
 	/// The declaration's [`label`](Block::label).
 	label: SmolStr,
 	store: ErasedStoreBlock,
 }
 
-impl RepoStoreDecl {
+impl HomeStoreDecl {
 	/// The store's root, every version of the document below it.
 	pub fn root(&self) -> &StoreUri { self.store.root() }
 
@@ -77,9 +77,9 @@ impl RepoStoreDecl {
 		match self.root() {
 			StoreUri::S3 { name, .. } => name.clone().xok(),
 			other => bevybail!(
-				"the repo store `{}` is `{other}`, but this compute reads its \
+				"the home store `{}` is `{other}`, but this compute reads its \
 				 binary from an s3:// bucket: declare it as one, ie \
-				 `<S3BucketBlock label=\"repo\" {{RepoStoreBlock}}/>`",
+				 `<S3BucketBlock label=\"repo\" {{HomeStoreBlock}}/>`",
 				self.label
 			),
 		}
@@ -87,11 +87,11 @@ impl RepoStoreDecl {
 }
 
 #[cfg(test)]
-impl RepoStoreBlock {
+impl HomeStoreBlock {
 	/// The bucket [`test_store`](Self::test_store) names.
 	pub(crate) const TEST_BUCKET: &'static str = "test-repo";
 
-	/// A versioned S3 repo store for a render test, declared as a bare uri so
+	/// A versioned S3 home store for a render test, declared as a bare uri so
 	/// it emits no resource and no grant of its own.
 	pub(crate) fn test_store() -> impl Bundle {
 		(
@@ -101,19 +101,19 @@ impl RepoStoreBlock {
 					.unwrap(),
 			)
 			.with_deploy_versioned(true),
-			RepoStoreBlock,
+			HomeStoreBlock,
 		)
 	}
 }
 
-/// Resolves the [`RepoStoreBlock`] a consumer reads.
+/// Resolves the [`HomeStoreBlock`] a consumer reads.
 ///
 /// A template needing the store at build (a compute baking the uri it boots
 /// from) resolves it in an `On<Ready>` observer rather than at spawn: a sibling
 /// declaration, possibly a forward one, lands its erased half through the
 /// command queue, and by [`Ready`] every declaration in the document has.
 #[derive(SystemParam)]
-pub struct RepoStoreQuery<'w, 's> {
+pub struct HomeStoreQuery<'w, 's> {
 	stacks: StackQuery<'w, 's>,
 	repos: Query<
 		'w,
@@ -123,16 +123,16 @@ pub struct RepoStoreQuery<'w, 's> {
 			Option<&'static ErasedBlock>,
 			Option<&'static ErasedStoreBlock>,
 		),
-		With<RepoStoreBlock>,
+		With<HomeStoreBlock>,
 	>,
 }
 
-impl RepoStoreQuery<'_, '_> {
-	/// The repo store declared under `entity`'s stack, `None` when it declares
+impl HomeStoreQuery<'_, '_> {
+	/// The home store declared under `entity`'s stack, `None` when it declares
 	/// none: a stack that serves no document (a bucket-only example) has no
-	/// repo store, and one under ANOTHER stack is that stack's. A consumer
+	/// home store, and one under ANOTHER stack is that stack's. A consumer
 	/// outside every stack sees the process's one.
-	pub fn find(&self, entity: Entity) -> Result<Option<RepoStoreDecl>> {
+	pub fn find(&self, entity: Entity) -> Result<Option<HomeStoreDecl>> {
 		let declared = self.stacks.declared(entity).ok();
 		let Some((marker, erased, store)) =
 			self.repos.iter().find(|(marker, ..)| {
@@ -144,9 +144,9 @@ impl RepoStoreQuery<'_, '_> {
 			return Ok(None);
 		};
 		let (Some(erased), Some(store)) = (erased, store) else {
-			return Err(RepoStoreBlock::storeless(marker));
+			return Err(HomeStoreBlock::storeless(marker));
 		};
-		Some(RepoStoreDecl {
+		Some(HomeStoreDecl {
 			entity: marker,
 			label: erased.label.clone(),
 			// the stack as this query sees it rather than as the declaration
@@ -157,21 +157,21 @@ impl RepoStoreQuery<'_, '_> {
 	}
 
 	/// [`find`](Self::find) for a consumer that cannot do without it, ie a
-	/// compute baking the uri it boots from: an undeclared repo store is an
+	/// compute baking the uri it boots from: an undeclared home store is an
 	/// error naming what to declare and where.
-	pub fn get(&self, entity: Entity) -> Result<RepoStoreDecl> {
+	pub fn get(&self, entity: Entity) -> Result<HomeStoreDecl> {
 		self.find(entity)?
 			.ok_or_else(|| match self.repos.iter().next() {
 				Some((other, ..)) => bevyhow!(
-					"the repo store is declared on entity {other}, under a \
+					"the home store is declared on entity {other}, under a \
 					 different stack than this consumer's: a compute only reads \
 					 the stores declared under its own `<Stack>`, so declare it \
 					 there"
 				),
 				None => bevyhow!(
-					"no repo store declared: mark the store block the app is \
+					"no home store declared: mark the store block the app is \
 					 served from, ie `<S3BucketBlock label=\"repo\" \
-					 {{RepoStoreBlock}}/>`"
+					 {{HomeStoreBlock}}/>`"
 				),
 			})
 	}
@@ -188,8 +188,8 @@ impl RepoStoreQuery<'_, '_> {
 			.xok()
 	}
 
-	/// The client publishing this launch's version into the repo store, `None`
-	/// for a stack declaring no repo store or an unversioned one: a store read
+	/// The client publishing this launch's version into the home store, `None`
+	/// for a stack declaring no home store or an unversioned one: a store read
 	/// at its root has no version prefix to hold a ledger. Its ledger records
 	/// the document at [`store_uri`](Self::store_uri), so the release pointer
 	/// publishes the same uri a compute bakes.
@@ -207,7 +207,7 @@ impl RepoStoreQuery<'_, '_> {
 			*deployment.deploy_id(),
 			deployment.deploy_timestamp().to_string(),
 		)
-		.with_repo(repo.store.store_uri(Some(deployment.deploy_id())));
+		.with_home(repo.store.store_uri(Some(deployment.deploy_id())));
 		ArtifactsClient::new(BlobStore::from_uri(repo.root())?, ledger)
 			.xmap(Some)
 			.xok()
@@ -215,12 +215,12 @@ impl RepoStoreQuery<'_, '_> {
 
 	/// [`find_artifacts_client`](Self::find_artifacts_client) for a verb that
 	/// cannot do without one (an artifact upload, an adopt, a rollback): an
-	/// undeclared or unversioned repo store is an error naming what to declare.
+	/// undeclared or unversioned home store is an error naming what to declare.
 	pub fn artifacts_client(&self, entity: Entity) -> Result<ArtifactsClient> {
 		self.find_artifacts_client(entity)?.ok_or_else(|| {
 			match self.get(entity) {
 				Ok(repo) => bevyhow!(
-					"the repo store `{}` is not deploy-versioned, so it has no \
+					"the home store `{}` is not deploy-versioned, so it has no \
 					 version prefix to hold a ledger or a binary: declare it \
 					 `deploy_versioned=true`",
 					repo.label()
@@ -231,7 +231,7 @@ impl RepoStoreQuery<'_, '_> {
 	}
 
 	/// The [`BootstrapConfig`] a process this launch deploys boots with: the
-	/// repo store at [`store_uri`](Self::store_uri) and nothing else, a deploy
+	/// home store at [`store_uri`](Self::store_uri) and nothing else, a deploy
 	/// target adding only what its transport needs.
 	///
 	/// ## Why the deploy id is baked in rather than resolved at run time
@@ -260,7 +260,7 @@ impl RepoStoreQuery<'_, '_> {
 	/// [`ArtifactLedger::repo`].
 	pub fn bootstrap(&self, entity: Entity) -> Result<BootstrapConfig> {
 		BootstrapConfig {
-			repo: Some(self.store_uri(entity)?),
+			home: Some(self.store_uri(entity)?),
 			..default()
 		}
 		.xok()
@@ -279,7 +279,7 @@ mod test {
 		world
 	}
 
-	fn repo_block() -> StoreUriBlock {
+	fn home_block() -> StoreUriBlock {
 		StoreUriBlock::new("repo", StoreUri::parse("s3://bucket").unwrap())
 			.with_deploy_versioned(true)
 	}
@@ -306,7 +306,7 @@ mod test {
 	/// The uri a consumer under `world`'s one stack boots from.
 	fn store_uri(world: &mut World, consumer: Entity) -> String {
 		world
-			.with_state::<RepoStoreQuery, _>(|repos| repos.store_uri(consumer))
+			.with_state::<HomeStoreQuery, _>(|repos| repos.store_uri(consumer))
 			.unwrap()
 			.to_string()
 	}
@@ -316,10 +316,10 @@ mod test {
 	#[beet_core::test]
 	fn resolves_the_marked_store() {
 		let mut world = world();
-		let consumer = stack_with(&mut world, (repo_block(), RepoStoreBlock));
+		let consumer = stack_with(&mut world, (home_block(), HomeStoreBlock));
 		let deploy_id = *world.resource::<Deployment>().deploy_id();
 		let repo = world
-			.with_state::<RepoStoreQuery, _>(|repos| repos.get(consumer))
+			.with_state::<HomeStoreQuery, _>(|repos| repos.get(consumer))
 			.unwrap();
 		repo.label().as_str().xpect_eq("repo");
 		repo.root().to_string().xpect_eq("s3://bucket");
@@ -332,7 +332,7 @@ mod test {
 	/// same document uri a compute bakes. An unversioned store has no version
 	/// prefix to publish into, so a verb needing the client is told why.
 	#[beet_core::test]
-	fn artifacts_client_publishes_into_the_repo_store() {
+	fn artifacts_client_publishes_into_the_home_store() {
 		let mut world = world();
 		let memory = StoreUri::parse("memory://repo-client").unwrap();
 		let consumer = stack_with(
@@ -340,12 +340,12 @@ mod test {
 			(
 				StoreUriBlock::new("repo", memory.clone())
 					.with_deploy_versioned(true),
-				RepoStoreBlock,
+				HomeStoreBlock,
 			),
 		);
 		let deploy_id = *world.resource::<Deployment>().deploy_id();
 		let client = world
-			.with_state::<RepoStoreQuery, _>(|repos| {
+			.with_state::<HomeStoreQuery, _>(|repos| {
 				repos.artifacts_client(consumer)
 			})
 			.unwrap();
@@ -355,7 +355,7 @@ mod test {
 			.xpect_eq(BlobStore::from_uri(&memory).unwrap().root_key());
 		client
 			.ledger()
-			.repo
+			.home
 			.as_ref()
 			.unwrap()
 			.to_string()
@@ -374,10 +374,10 @@ mod test {
 					"repo",
 					StoreUri::parse("memory://repo-unversioned").unwrap(),
 				),
-				RepoStoreBlock,
+				HomeStoreBlock,
 			),
 		);
-		world.with_state::<RepoStoreQuery, _>(|repos| {
+		world.with_state::<HomeStoreQuery, _>(|repos| {
 			repos.find_artifacts_client(consumer).unwrap().xpect_none();
 			repos
 				.artifacts_client(consumer)
@@ -392,7 +392,7 @@ mod test {
 	#[beet_core::test]
 	fn reads_the_deploy_id_when_called() {
 		let mut world = world();
-		let consumer = stack_with(&mut world, (repo_block(), RepoStoreBlock));
+		let consumer = stack_with(&mut world, (home_block(), HomeStoreBlock));
 		let first = *world.resource::<Deployment>().deploy_id();
 		store_uri(&mut world, consumer)
 			.xpect_eq(format!("s3://bucket/{first}/repo"));
@@ -404,30 +404,30 @@ mod test {
 			.xpect_eq(format!("s3://bucket/{}/repo", ledger.deploy_id));
 	}
 
-	/// A stack declaring no repo store finds none, and a consumer that cannot
+	/// A stack declaring no home store finds none, and a consumer that cannot
 	/// do without one is told what to declare.
 	#[beet_core::test]
 	fn an_undeclared_store_is_none_or_a_named_error() {
 		let mut world = world();
-		let consumer = stack_with(&mut world, repo_block());
-		world.with_state::<RepoStoreQuery, _>(|repos| {
+		let consumer = stack_with(&mut world, home_block());
+		world.with_state::<HomeStoreQuery, _>(|repos| {
 			repos.find(consumer).unwrap().xpect_none();
 			repos
 				.get(consumer)
 				.unwrap_err()
 				.to_string()
-				.xpect_contains("no repo store declared");
+				.xpect_contains("no home store declared");
 		});
 	}
 
-	/// Another stack's repo store is that stack's: a consumer elsewhere finds
+	/// Another stack's home store is that stack's: a consumer elsewhere finds
 	/// none, and the error names where the store actually is.
 	#[beet_core::test]
 	fn another_stacks_store_is_not_this_ones() {
 		let mut world = world();
-		stack_with(&mut world, (repo_block(), RepoStoreBlock));
+		stack_with(&mut world, (home_block(), HomeStoreBlock));
 		let consumer = stack_with(&mut world, ());
-		world.with_state::<RepoStoreQuery, _>(|repos| {
+		world.with_state::<HomeStoreQuery, _>(|repos| {
 			repos.find(consumer).unwrap().xpect_none();
 			repos
 				.get(consumer)
@@ -442,8 +442,8 @@ mod test {
 	#[beet_core::test]
 	fn a_storeless_marker_errors() {
 		let mut world = world();
-		let consumer = stack_with(&mut world, RepoStoreBlock);
-		world.with_state::<RepoStoreQuery, _>(|repos| {
+		let consumer = stack_with(&mut world, HomeStoreBlock);
+		world.with_state::<HomeStoreQuery, _>(|repos| {
 			repos
 				.find(consumer)
 				.unwrap_err()
@@ -451,7 +451,7 @@ mod test {
 				.xpect_contains("declares no store block");
 		});
 		RenderScope::test_render(|parent| {
-			parent.spawn(RepoStoreBlock);
+			parent.spawn(HomeStoreBlock);
 		})
 		.0
 		.finish()
@@ -460,13 +460,13 @@ mod test {
 		.xpect_contains("declares no store block");
 	}
 
-	/// One repo store per world, whatever the stacks.
+	/// One home store per world, whatever the stacks.
 	#[beet_core::test]
-	#[should_panic = "exactly one `RepoStoreBlock`"]
+	#[should_panic = "exactly one `HomeStoreBlock`"]
 	fn rejects_a_second_marker() {
 		let mut world = world();
-		world.spawn((repo_block(), RepoStoreBlock));
-		world.spawn((repo_block(), RepoStoreBlock));
+		world.spawn((home_block(), HomeStoreBlock));
+		world.spawn((home_block(), HomeStoreBlock));
 		world.flush();
 	}
 }

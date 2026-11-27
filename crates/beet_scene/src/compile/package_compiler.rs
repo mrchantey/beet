@@ -403,7 +403,7 @@ impl PackageCompiler {
 	}
 
 	/// Copy `T` from `from` into `into` where it holds one, else `fallback`.
-	fn copy<T: Def + Serialize + DeserializeOwned>(
+	fn copy<T: LexiconDef + Serialize + DeserializeOwned>(
 		from: &EntityBodyRecord,
 		into: &mut EntityBodyRecord,
 		fallback: Option<&T>,
@@ -577,15 +577,15 @@ mod test {
 		PartialEq,
 		Component,
 		Reflect,
-		Def,
+		LexiconDef,
 		Serialize,
 		Deserialize,
 	)]
-	#[def(lexicon = "com.example.router")]
+	#[lexicon_def(lexicon = "com.example.router")]
 	#[reflect(
 		Component,
 		Default,
-		Def,
+		LexiconDef,
 		SceneMeta,
 		PackageMeta,
 		Serialize,
@@ -620,12 +620,12 @@ mod test {
 		PartialEq,
 		Component,
 		Reflect,
-		Def,
+		LexiconDef,
 		Serialize,
 		Deserialize,
 	)]
-	#[def(lexicon = "com.example.router")]
-	#[reflect(Component, Default, Def, Serialize, Deserialize)]
+	#[lexicon_def(lexicon = "com.example.router")]
+	#[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
 	struct RouteTable(BTreeMap<SmolStr, RelPath>);
 
 	static FIRED: AtomicBool = AtomicBool::new(false);
@@ -793,7 +793,7 @@ mod test {
 		body.get::<Package>()
 			.unwrap()
 			.version
-			.as_str()
+			.to_string()
 			.xpect_eq("0.1.0");
 		body.get::<Exports>().unwrap().0[&SmolStr::new(".")]
 			.xpect_eq(RelPath::new("widgets/Card.bsx"));
@@ -1126,7 +1126,7 @@ mod test {
 			.resolved
 			.clone()
 			.unwrap();
-		resolved.version.as_str().xpect_eq("0.2.0");
+		resolved.version.to_string().xpect_eq("0.2.0");
 		resolved.record.xpect_eq(dependency.package_record.clone());
 		// the dependency's card is in the entry's set
 		package.body().get::<LoadSets>().unwrap().0[&RelPath::new("main.bsx")]

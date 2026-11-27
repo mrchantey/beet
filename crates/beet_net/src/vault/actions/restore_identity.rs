@@ -18,11 +18,11 @@ use std::path::PathBuf;
 pub async fn VaultRestoreIdentity(
 	/// The backup `vault/backup` wrote.
 	#[param]
-	file: String,
+	file: SmolPath,
 	/// The identity file to append to; defaults to the OS config,
 	/// `~/.config/beet/age/keys.txt`.
 	#[param]
-	out: Option<String>,
+	out: Option<SmolPath>,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let ciphertext = fs_ext::read(&file)?;
@@ -34,7 +34,7 @@ pub async fn VaultRestoreIdentity(
 		.map_err(|_| bevyhow!("the backup is not an identity file"))?
 		.xmap(|text| AgeIdentityFile::parse(&text))?;
 	let path = match out {
-		Some(out) => PathBuf::from(out),
+		Some(out) => out.to_path_buf(),
 		None => AgeIdentityFile::default_path()?,
 	};
 	let mut file = match fs_ext::exists(&path)? {

@@ -6,9 +6,17 @@ use alloc::collections::BTreeMap;
 /// `org.beet.core#branch`, the identity of a branch record and of the package
 /// record compiled from it, rkey `<package>:<branch>`, ie `todos:main`.
 #[derive(
-	Debug, Clone, PartialEq, Eq, Component, Reflect, Def, Serialize, Deserialize,
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	Component,
+	Reflect,
+	LexiconDef,
+	Serialize,
+	Deserialize,
 )]
-#[reflect(Component, Def, Serialize, Deserialize)]
+#[reflect(Component, LexiconDef, Serialize, Deserialize)]
 pub struct Branch {
 	/// The package.
 	pub package: PackageName,
@@ -41,11 +49,11 @@ impl Branch {
 	Eq,
 	Component,
 	Reflect,
-	Def,
+	LexiconDef,
 	Serialize,
 	Deserialize,
 )]
-#[reflect(Component, Default, Def, Serialize, Deserialize)]
+#[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
 pub struct SourceBranch(pub StrongRef);
 
 impl SourceBranch {
@@ -66,11 +74,11 @@ impl SourceBranch {
 	Eq,
 	Component,
 	Reflect,
-	Def,
+	LexiconDef,
 	Serialize,
 	Deserialize,
 )]
-#[reflect(Component, Default, Def, Serialize, Deserialize)]
+#[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
 pub struct Files(pub BTreeMap<RelPath, BlobRef>);
 
 impl Files {

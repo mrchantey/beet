@@ -21,7 +21,7 @@ const DIST_DIR: &str = "dist";
 pub async fn ExportStatic(
 	/// Output directory for the rendered entry (default `<entry>/dist`).
 	#[param]
-	out: Option<String>,
+	out: Option<SmolPath>,
 	entry_params: Params<EntryParams>,
 	cx: ActionContext<RequestParts>,
 ) -> Result<Response> {
@@ -46,7 +46,7 @@ pub async fn ExportStatic(
 
 	// the output is a local write target, so an `fs` store: `--out` (absolute, or
 	// relative to the cwd) overrides the default `<entry>/dist` (the entry's own
-	// dir, not a `<RepoRoot>`-widened root).
+	// dir, not a `<HomeRoot>`-widened root).
 	let out_dir = match out {
 		Some(out) => AbsPath::new(out)?,
 		None => entry_dir(&entry_path)?.join(DIST_DIR),

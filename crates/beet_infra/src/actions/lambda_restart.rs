@@ -22,7 +22,7 @@ use beet_net::prelude::*;
 /// fresh environment. The bucket, key and code are the ones the stack's tofu
 /// state holds, so the next plan sees no drift.
 ///
-/// Declared under the sync sequence after the [`RepoSync`] that publishes and
+/// Declared under the sync sequence after the [`HomeSync`] that publishes and
 /// before the `<CloudflarePurgeCache/>`: purging while the old environments
 /// still serve re-caches their responses.
 #[action]
@@ -37,7 +37,7 @@ pub async fn LambdaRestart(
 ) -> Result<Outcome<Request, Response>> {
 	let (region, function, bucket, key) = cx
 		.caller
-		.with_state::<(StackQuery, RepoStoreQuery), _>(
+		.with_state::<(StackQuery, HomeStoreQuery), _>(
 			move |entity, (stacks, repos)| -> Result<_> {
 				let stack = stacks.resolve(entity);
 				let block = LambdaBlock::default().with_label(label);
@@ -61,7 +61,7 @@ pub async fn LambdaRestart(
 	// meets a warm environment
 	.await_update(LambdaFunction::POLL_INTERVAL)
 	.await?;
-	info!("restarted {function}: the next request boots from the repo store");
+	info!("restarted {function}: the next request boots from the home store");
 	Pass(cx.input).xok()
 }
 

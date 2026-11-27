@@ -1,4 +1,4 @@
-//! [`Def`]: a type's name in a record, and the registry's lookup both ways.
+//! [`LexiconDef`]: a type's name in a record, and the registry's lookup both ways.
 use crate::prelude::*;
 use bevy::reflect::CreateTypeData;
 use bevy::reflect::TypeRegistration;
@@ -10,8 +10,8 @@ use core::any::TypeId;
 /// `org.beet.core#provenance`. A bare lexicon is a def too, its `main` the
 /// type: `org.beet.scene`.
 ///
-/// Derived, never written by hand (`#[derive(Def)]`, see its docs for the
-/// naming rules); `#[reflect(Def)]` registers [`ReflectDef`], so a registry
+/// Derived, never written by hand (`#[derive(LexiconDef)]`, see its docs for the
+/// naming rules); `#[reflect(LexiconDef)]` registers [`ReflectLexiconDef`], so a registry
 /// answers the type of an NSID and the NSID of a type. A component is a def
 /// used as a record's key, which is what makes a plugin's component
 /// self-describing to any tool.
@@ -20,19 +20,19 @@ use core::any::TypeId;
 /// # use beet_core::prelude::*;
 /// Provenance::NSID.as_str().xpect_eq("org.beet.core#provenance");
 /// ```
-pub trait Def {
+pub trait LexiconDef {
 	/// The def's name.
 	const NSID: Nsid;
 }
 
-/// [`Def`] as type data, registered by `#[reflect(Def)]`: the NSID a record
+/// [`LexiconDef`] as type data, registered by `#[reflect(LexiconDef)]`: the NSID a record
 /// keys this type by.
 #[derive(Debug, Clone)]
-pub struct ReflectDef {
+pub struct ReflectLexiconDef {
 	nsid: Nsid,
 }
 
-impl ReflectDef {
+impl ReflectLexiconDef {
 	/// The NSID this type is keyed by.
 	pub fn nsid(&self) -> &Nsid { &self.nsid }
 
@@ -57,7 +57,7 @@ impl ReflectDef {
 	}
 }
 
-impl<T: Def> CreateTypeData<T> for ReflectDef {
+impl<T: LexiconDef> CreateTypeData<T> for ReflectLexiconDef {
 	fn create_type_data(_input: ()) -> Self { Self { nsid: T::NSID } }
 }
 
@@ -67,17 +67,17 @@ mod test {
 	use bevy::reflect::TypeRegistry;
 	use core::any::TypeId;
 
-	#[derive(Def, Reflect)]
-	#[reflect(Def)]
+	#[derive(LexiconDef, Reflect)]
+	#[reflect(LexiconDef)]
 	struct LoadSetsLike;
 
-	#[derive(Def, Reflect)]
-	#[def(lexicon = "com.example.plugin")]
-	#[reflect(Def)]
+	#[derive(LexiconDef, Reflect)]
+	#[lexicon_def(lexicon = "com.example.plugin")]
+	#[reflect(LexiconDef)]
 	struct Thing;
 
-	#[derive(Def)]
-	#[def(nsid = "com.example.record")]
+	#[derive(LexiconDef)]
+	#[lexicon_def(nsid = "com.example.record")]
 	struct Record;
 
 	#[crate::test]
@@ -97,12 +97,13 @@ mod test {
 	fn looks_up_both_ways() {
 		let mut registry = TypeRegistry::default();
 		registry.register::<Thing>();
-		ReflectDef::nsid_of(&registry, TypeId::of::<Thing>())
+		ReflectLexiconDef::nsid_of(&registry, TypeId::of::<Thing>())
 			.xpect_eq(Some(Thing::NSID));
-		ReflectDef::registration(&registry, &Thing::NSID)
+		ReflectLexiconDef::registration(&registry, &Thing::NSID)
 			.unwrap()
 			.type_id()
 			.xpect_eq(TypeId::of::<Thing>());
-		ReflectDef::registration(&registry, &LoadSetsLike::NSID).xpect_none();
+		ReflectLexiconDef::registration(&registry, &LoadSetsLike::NSID)
+			.xpect_none();
 	}
 }

@@ -57,7 +57,7 @@ pub async fn ExportPdf(
 	/// Output path: the merged file (default `<entry>/site.pdf`), or with
 	/// `--separate` the directory for per-route files (default `<entry>/pdf`).
 	#[param]
-	output: Option<String>,
+	output: Option<SmolPath>,
 	/// Disable page margins.
 	#[param]
 	no_margin: bool,
@@ -181,7 +181,7 @@ pub async fn ExportPdf(
 
 	// `--separate` writes one file per route to a dir; the default merges into one
 	// file (which needs the `pdf` feature). The default lands in the entry's own
-	// dir (not a `<RepoRoot>`-widened root).
+	// dir (not a `<HomeRoot>`-widened root).
 	let output = match output {
 		Some(output) => AbsPath::new(output)?,
 		None => entry_dir(&entry_path)?.join(if separate {

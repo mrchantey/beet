@@ -18,11 +18,11 @@ use bevy::ecs::system::SystemParam;
 pub struct PackageStore(BlobStore);
 
 impl PackageStore {
-	/// The package whose entry is at `entry` in `repo_store`.
-	pub fn of_entry(repo_store: &BlobStore, entry: &RelPath) -> Self {
+	/// The package whose entry is at `entry` in `home_store`.
+	pub fn of_entry(home_store: &BlobStore, entry: &RelPath) -> Self {
 		match entry.parent().filter(|dir| !dir.is_empty()) {
-			Some(dir) => Self(repo_store.with_subdir(dir)),
-			None => Self(repo_store.clone()),
+			Some(dir) => Self(home_store.with_subdir(dir)),
+			None => Self(home_store.clone()),
 		}
 	}
 

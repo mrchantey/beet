@@ -18,8 +18,9 @@
 //!   [`RequireCfg`]'s union), and the use site's [`LoadRoot`] and [`Preload`]
 //! - the package meta, [`Branch`], [`SourceBranch`], [`Files`], [`Scenes`]
 //!   and [`LoadSets`]
-//! - the names, [`PackageName`], [`BranchName`], [`RuntimeName`],
-//!   [`Version`], [`VersionReq`] and [`PackageAddress`]
+//! - the names, [`PackageName`], [`BranchName`], [`RuntimeName`] and
+//!   [`PackageAddress`], versions being beet's one [`Version`] and
+//!   [`VersionReq`]
 mod branch;
 mod names;
 #[allow(clippy::module_inception)]

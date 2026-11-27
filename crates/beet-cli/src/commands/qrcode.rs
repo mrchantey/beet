@@ -15,7 +15,7 @@ pub async fn QrCode(
 	input: String,
 	/// The output file path, defaults to `qrcode.png`.
 	#[param]
-	output: Option<String>,
+	output: Option<SmolPath>,
 	/// Light module color as `r,g,b`, defaults to `255,255,255`.
 	#[param]
 	light: Option<String>,
@@ -23,7 +23,7 @@ pub async fn QrCode(
 	#[param]
 	dark: Option<String>,
 ) -> Result<String> {
-	let output = output.as_deref().unwrap_or("qrcode.png");
+	let output = output.unwrap_or_else(|| SmolPath::new("qrcode.png"));
 	let light = parse_rgb(light.as_deref().unwrap_or("255,255,255"))?;
 	let dark = parse_rgb(dark.as_deref().unwrap_or("0,0,0"))?;
 
@@ -32,7 +32,7 @@ pub async fn QrCode(
 		.dark_color(Rgb(dark))
 		.light_color(Rgb(light))
 		.build();
-	image.save(output)?;
+	image.save(&output)?;
 	Ok(format!("wrote qr code to {output}"))
 }
 

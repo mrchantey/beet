@@ -221,11 +221,27 @@ fn add_domain(table: &mut Table) {
 			}
 		})
 		// a store uri, so `<StoreUriBlock uri="s3://my-bucket"/>` authors a
-		// store as a process is told to read it, in the one spelling `--repo`
+		// store as a process is told to read it, in the one spelling `--home`
 		// parses. A malformed uri errors with the supported kinds.
 		.add_hinted("a store uri, eg \"s3://<bucket>\"", |value: &Value| {
 			match value {
 				Value::Str(string) => StoreUri::parse(string.as_str()).map(Some),
+				_ => Ok(None),
+			}
+		})
+		// a semver version and a Cargo requirement, so `<Package version="0.1.0"/>`
+		// authors one in the spelling a manifest uses
+		.add_hinted("a semver version, eg \"0.1.0\"", |value: &Value| {
+			match value {
+				Value::Str(string) => Version::parse(string.as_str()).map(Some),
+				_ => Ok(None),
+			}
+		})
+		.add_hinted("a version requirement, eg \"0.1\"", |value: &Value| {
+			match value {
+				Value::Str(string) => {
+					VersionReq::parse(string.as_str()).map(Some)
+				}
 				_ => Ok(None),
 			}
 		})

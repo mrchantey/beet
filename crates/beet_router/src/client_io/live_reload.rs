@@ -1,7 +1,7 @@
-//! Dev-mode live reload: subscribe to the repo store, refresh the world, tell
+//! Dev-mode live reload: subscribe to the home store, refresh the world, tell
 //! clients.
 //!
-//! The trigger is a [`BlobEvent`], not a filesystem watcher: the repo store's own
+//! The trigger is a [`BlobEvent`], not a filesystem watcher: the home store's own
 //! watcher (fs notify, in-memory broadcast, localStorage) emits one, drained into
 //! the global `On<BlobEvent>` by [`StorePlugin`]. So an in-memory or remote store
 //! drives reloads the same way a local dir does, and nothing here touches the
@@ -130,7 +130,7 @@ pub(crate) fn reload_site_on_change(
 			store.did_change(ev.event()) && site.filter.passes(ev.path.as_str())
 		})
 		.for_each(|(entity, _, _, needs)| {
-			debug!("repo store changed, reloading: {}", ev.path);
+			debug!("home store changed, reloading: {}", ev.path);
 			match needs {
 				Some(mut needs) => {
 					needs.structural |= structural;
@@ -439,7 +439,7 @@ mod test {
 		card(&mut world).await.xpect_contains("second card");
 	}
 
-	/// A row written to a table store kept in the watched repo store reloads
+	/// A row written to a table store kept in the watched home store reloads
 	/// nothing, its first write and the next alike, where a page beside it
 	/// does.
 	#[cfg(feature = "json")]
@@ -746,7 +746,7 @@ mod test {
 		let mut world = reload_world();
 		let site_dir = deck_fixture();
 		// a deck router marked for live reload: the CardDeck marker (declared in the
-		// deck's markup spread); the repo store on the root backs the `RoutesDir` scan
+		// deck's markup spread); the home store on the root backs the `RoutesDir` scan
 		// by ancestry.
 		let router = world
 			.spawn((
@@ -867,7 +867,7 @@ mod test {
 
 		let mut app = tui_app();
 		let site_dir = deck_fixture();
-		// the repo store on the router root backs the `RoutesDir` scan by ancestry.
+		// the home store on the router root backs the `RoutesDir` scan by ancestry.
 		let router = app
 			.world_mut()
 			.spawn((
@@ -932,7 +932,7 @@ mod test {
 
 		let mut app = tui_app();
 		let site_dir = deck_fixture();
-		// the repo store on the root backs the `RoutesDir` scan by ancestry.
+		// the home store on the root backs the `RoutesDir` scan by ancestry.
 		let router = app
 			.world_mut()
 			.spawn((
