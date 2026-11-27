@@ -349,7 +349,7 @@ mod test {
 			.spawn((
 				ChildOf(root),
 				Thread::default(),
-				MountThreadStore::new("threads"),
+				MountThreadStore::new(fwd_path!("threads")),
 				children![
 					Actor::new("Ann", ActorKind::User).unwrap(),
 					Actor::new("Bob", ActorKind::User).unwrap(),
@@ -739,7 +739,7 @@ mod test {
 			.spawn((
 				ChildOf(root),
 				Thread::default(),
-				MountThreadStore::new("threads"),
+				MountThreadStore::new(fwd_path!("threads")),
 				children![
 					Actor::new("Ann", ActorKind::User).unwrap(),
 					(

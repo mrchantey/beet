@@ -21,7 +21,7 @@ impl StandardSitePub {
 	/// with: the route's own content, nothing a layout contributed, its images
 	/// resolved under the publication's standard site media ingest policy,
 	/// named explicitly since a request naming none fetches nothing.
-	pub fn request(&self, path: &RelPath) -> Request {
+	pub fn request(&self, path: &FwdPath) -> Request {
 		Request::get(path.with_leading_slash())
 			.with_param("root", "content")
 			.with_param("media-ingest", self.media_ingest.as_str())
@@ -52,7 +52,7 @@ impl StandardSiteDocument {
 	pub async fn render(
 		publication: &StandardSitePub,
 		site: AtUri,
-		path: &RelPath,
+		path: &FwdPath,
 		meta: &DocMeta,
 		live: &LivePage,
 	) -> Result<Self> {
@@ -79,7 +79,7 @@ impl StandardSiteDocument {
 
 	/// Refuse a document over [`BUDGET`](Self::BUDGET), naming the page at
 	/// `path`, the record's size, its `content`'s and the budget.
-	fn assert_within_budget(&self, path: &RelPath) -> Result {
+	fn assert_within_budget(&self, path: &FwdPath) -> Result {
 		let block = |value: AtprotoValue| -> Result<usize> {
 			MediaType::DagCbor.serialize(&value)?.len().xok()
 		};
@@ -171,7 +171,7 @@ mod test {
 		for (path, bytes) in
 			[("photo.png", png(4, 3)), ("cover.png", png(2, 1))]
 		{
-			store.insert(&RelPath::from(path), bytes).await.unwrap();
+			store.insert(&FwdPath::new(path).unwrap(), bytes).await.unwrap();
 		}
 		let mut world = syndication_world(Some("https://beet.org"));
 		let router = world
@@ -212,7 +212,7 @@ mod test {
 	) -> Result<(StandardSiteDocument, Vec<BlobRef>)> {
 		world
 			.run_async_then(async move |world| {
-				let path = RelPath::new("blog/full-stack-bevy");
+				let path = fwd_path!("blog/full-stack-bevy");
 				LivePage::scoped(
 					&world.entity(router),
 					publication.request(&path),
@@ -340,7 +340,7 @@ mod test {
 		let (document, html) = world
 			.run_async_then(async move |world| {
 				let (publication, path) =
-					(harvest(), RelPath::new("blog/full-stack-bevy"));
+					(harvest(), fwd_path!("blog/full-stack-bevy"));
 				LivePage::scoped(
 					&world.entity(router),
 					publication.request(&path),

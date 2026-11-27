@@ -323,7 +323,7 @@ mod test {
 			("poster.png", png(2, 1)),
 			("clip.mp4", b"not really a video".to_vec()),
 		] {
-			store.insert(&RelPath::from(path), bytes).await.unwrap();
+			store.insert(&FwdPath::new(path).unwrap(), bytes).await.unwrap();
 		}
 		let mut world = syndication_world(Some("https://beet.org"));
 		let router = world
@@ -638,7 +638,7 @@ mod test {
 	async fn another_hosts_image_under_each_policy() {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("remote.png"), png(8, 8))
+			.insert(&fwd_path!("remote.png"), png(8, 8))
 			.await
 			.unwrap();
 		let (mut server, on_spawn) =

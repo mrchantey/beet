@@ -57,8 +57,11 @@ impl ServiceAccess {
 	/// Keyed by the composed resource name rather than the bare label, so two
 	/// apps or two stages in one workspace never share a directory, exactly as
 	/// they never share a bucket.
-	pub fn local_store_dir(name: impl AsRef<str>) -> WsPath {
-		WsPath::new("target/stores").join(name)
+	///
+	/// # Errors
+	/// Errors when `name` is no path within the workspace.
+	pub fn local_store_dir(name: impl AsRef<str>) -> Result<WsPath> {
+		WsPath::from(fwd_path!("target/stores")).try_join(name)
 	}
 
 	/// The store a [`Local`](Self::Local) process attaches for the resource
@@ -68,11 +71,14 @@ impl ServiceAccess {
 	/// resource the same declaration names when [`Remote`](Self::Remote), so
 	/// one markup declaration runs both ways, and one directory or database
 	/// per declaration either way.
-	pub fn local_store_uri(name: &str) -> StoreUri {
+	///
+	/// # Errors
+	/// Errors when `name` is no path within the workspace.
+	pub fn local_store_uri(name: &str) -> Result<StoreUri> {
 		match Self::host_has_fs() {
 			true => StoreUri::Fs {
 				path_prefix: Some(
-					Self::local_store_dir(name).into_abs().into(),
+					Self::local_store_dir(name)?.into_abs().into(),
 				),
 			},
 			false => StoreUri::IndexedDb {
@@ -80,6 +86,7 @@ impl ServiceAccess {
 				path_prefix: None,
 			},
 		}
+		.xok()
 	}
 
 	/// Whether this host reaches a filesystem: every native target, and a js

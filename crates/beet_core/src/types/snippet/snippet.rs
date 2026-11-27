@@ -136,7 +136,6 @@ pub trait StrProp: for<'a> From<&'a str> {}
 impl StrProp for SmolStr {}
 impl StrProp for String {}
 impl StrProp for Url {}
-impl StrProp for RelPath {}
 
 /// Lift `self` into a [`Bundle`] for an `rsx!` markup position (text, `{expr}`,
 /// attribute value, child list). The marker `M` disambiguates the blanket impls,

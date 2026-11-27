@@ -100,7 +100,7 @@ pub enum ProvenanceSource {
 	/// A file by its path in the store it was read from, and its content id.
 	File {
 		/// The file's path.
-		path: RelPath,
+		path: FwdPath,
 		/// Its content id when the derivation read it.
 		cid: Cid,
 	},
@@ -123,7 +123,7 @@ pub enum ProvenanceSource {
 
 impl ProvenanceSource {
 	/// The file at `path` as read, its digest the raw cid of `bytes`.
-	pub fn file(path: impl Into<RelPath>, bytes: &[u8]) -> Self {
+	pub fn file(path: impl Into<FwdPath>, bytes: &[u8]) -> Self {
 		Self::File {
 			path: path.into(),
 			cid: Cid::raw(bytes),
@@ -208,7 +208,7 @@ mod test {
 	fn created_reads_as_iso8601() {
 		let provenance = Provenance {
 			created: Timestamp::from_secs(0),
-			sources: vec![ProvenanceSource::file("logo.png", b"logo")],
+			sources: vec![ProvenanceSource::file(fwd_path!("logo.png"), b"logo")],
 			ttl: None,
 		};
 		let json = MediaType::Json.serialize(&provenance).unwrap();

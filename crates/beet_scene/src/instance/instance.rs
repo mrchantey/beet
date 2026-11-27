@@ -21,7 +21,7 @@ use bevy::ecs::template::TemplateContext;
 #[derive(Debug, Component)]
 pub struct Activation {
 	/// The document's path in its package.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// What the use site asked for.
 	pub instance: Instance,
 	/// The root of what was built.
@@ -279,7 +279,7 @@ mod test {
 		let store = BlobStore::temp();
 		for (path, source) in documents {
 			store
-				.insert(&RelPath::new(path), source.to_string())
+				.insert(&FwdPath::new(path).unwrap(), source.to_string())
 				.await
 				.unwrap();
 		}
@@ -295,7 +295,7 @@ mod test {
 	) -> Entity {
 		let body = BsxParser::body(world, markup).unwrap();
 		let template =
-			DynamicTemplate::reflect_at(world, &body, &RelPath::new(path))
+			DynamicTemplate::reflect_at(world, &body, &FwdPath::new(path).unwrap())
 				.unwrap();
 		let root = world.spawn(PackageFiles::new(store.clone())).id();
 		world.entity_mut(root).insert_template(template).unwrap();
@@ -486,14 +486,14 @@ mod test {
 		let markup = r#"<main><Instance document="./Card"/></main>"#;
 		spawn(&mut world, &store, "main.bsx", markup).await;
 		store
-			.insert(&RelPath::new("Card.bsx"), "<b/>")
+			.insert(&fwd_path!("Card.bsx"), "<b/>")
 			.await
 			.unwrap();
 		let root = spawn(&mut world, &store, "main.bsx", markup).await;
 		outline(&world, root).xpect_eq("<main><i></i></main>");
 		world.trigger(BlobEvent::new(
 			store.clone(),
-			RelPath::new("Card.bsx"),
+			fwd_path!("Card.bsx"),
 			BlobEventKind::Changed,
 		));
 		world.flush();

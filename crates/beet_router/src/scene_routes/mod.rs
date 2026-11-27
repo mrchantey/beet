@@ -115,7 +115,7 @@ pub(crate) fn scoped_store(
 	stores: &Query<&BlobStore>,
 	entity: Entity,
 	tag: &str,
-	src: &RelPath,
+	src: &FwdPath,
 ) -> Result<BlobStore> {
 	stores.get(entity).cloned().ok().ok_or_else(|| {
 		bevyhow!(

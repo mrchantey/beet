@@ -41,7 +41,7 @@ pub struct SecretsHandle {
 	/// The store the document lives in.
 	pub store: BlobStore,
 	/// The document within the store, its extension naming the format.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// The `<Secrets label>` this handle resolved from, for messages.
 	pub label: Option<SmolStr>,
 }
@@ -53,7 +53,7 @@ impl SecretsHandle {
 		SecretsDocument::media_type_of(path.as_ref())?;
 		Self {
 			store,
-			path: RelPath::new(path),
+			path: FwdPath::new(path)?,
 			label: None,
 		}
 		.xok()
@@ -162,7 +162,7 @@ impl SecretsHandle {
 		let suffix = SmolStr::new(format!("Z.{}", self.extension()?));
 		Self::newest_in(
 			self.store.clone(),
-			RelPath::new(self.dir_prefix()),
+			FwdPath::new(self.dir_prefix())?,
 			&[4, 2, 2],
 			suffix,
 		)
@@ -179,10 +179,10 @@ impl SecretsHandle {
 	/// holding no series; at the leaf the newest `HHMMSSZ.<ext>` file.
 	fn newest_in(
 		store: BlobStore,
-		dir: RelPath,
+		dir: FwdPath,
 		widths: &'static [usize],
 		suffix: SmolStr,
-	) -> SendBoxedFuture<Result<Option<RelPath>>> {
+	) -> SendBoxedFuture<Result<Option<FwdPath>>> {
 		Box::pin(async move {
 			let listing = store.list_dir(&dir).await?;
 			let Some((&width, rest)) = widths.split_first() else {
@@ -194,8 +194,8 @@ impl SecretsHandle {
 							.is_some_and(|clock| Self::is_digits(clock, 6))
 					})
 					.max()
-					.map(|name| dir.join(name))
-					.xok();
+					.map(|name| dir.try_join(name))
+					.transpose();
 			};
 			for name in listing
 				.dirs
@@ -205,7 +205,7 @@ impl SecretsHandle {
 			{
 				let found = Self::newest_in(
 					store.clone(),
-					dir.join(name),
+					dir.try_join(name)?,
 					rest,
 					suffix.clone(),
 				)
@@ -289,7 +289,7 @@ mod test {
 		// the index is plaintext toml
 		String::from_utf8(
 			store
-				.get(&RelPath::new("secrets.toml"))
+				.get(&fwd_path!("secrets.toml"))
 				.await
 				.unwrap()
 				.to_vec(),
@@ -341,7 +341,7 @@ mod test {
 		later.write(&document).await.unwrap();
 		// a stray file beside the series is not one of it
 		store
-			.insert(&RelPath::new("secrets/notes.toml"), "x")
+			.insert(&fwd_path!("secrets/notes.toml"), "x")
 			.await
 			.unwrap();
 		handle
@@ -375,7 +375,7 @@ mod test {
 			"2026/09/15/badclock.toml",
 			"2025/12/31/235959Z.toml",
 		] {
-			store.insert(&RelPath::new(path), "x").await.unwrap();
+			store.insert(&FwdPath::new(path).unwrap(), "x").await.unwrap();
 		}
 		handle
 			.newest_dated()
@@ -386,7 +386,7 @@ mod test {
 			.as_str()
 			.xpect_eq("2025/12/31/235959Z.toml");
 		store
-			.insert(&RelPath::new("2026/09/15/010101Z.toml"), "x")
+			.insert(&fwd_path!("2026/09/15/010101Z.toml"), "x")
 			.await
 			.unwrap();
 		handle

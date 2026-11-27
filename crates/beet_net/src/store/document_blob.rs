@@ -51,7 +51,7 @@ use bevy::platform::sync::Mutex;
 #[require(Loading)]
 pub struct DocumentBlob {
 	/// The document's path within the nearest ancestor store.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// Coalesces the reads: a burst of changes is at most one read in flight
 	/// plus one queued behind it, and the queued one reads the latest bytes.
 	#[reflect(ignore)]
@@ -89,7 +89,7 @@ impl LastWritten {
 
 impl DocumentBlob {
 	/// The document at `path` in the nearest ancestor store.
-	pub fn new(path: impl Into<RelPath>) -> Self {
+	pub fn new(path: impl Into<FwdPath>) -> Self {
 		Self {
 			path: path.into(),
 			..default()
@@ -178,13 +178,14 @@ async fn read_document_blob(
 			}
 		})
 		.await?;
-	document.schema = document.schema.resolve_documents(&path);
+	document.schema = document.schema.resolve_documents(&path)?;
 	// a schema document is a `ValueSchema` stored as data, so its own declared
 	// schema is the meta-schema by definition; that is the whole test for one.
 	let schema = (document.schema == ValueSchema::type_ref::<ValueSchema>())
 		.then(|| document.to_schema())
 		.transpose()?
-		.map(|schema| schema.resolve_documents(&path));
+		.map(|schema| schema.resolve_documents(&path))
+		.transpose()?;
 	entity
 		.with(move |mut entity| {
 			// registered before the document lands, so the read backstop and
@@ -311,14 +312,14 @@ mod test {
 		let store = BlobStore::new(inner.clone());
 		store
 			.insert_document(
-				&RelPath::from("schema.json"),
+				&fwd_path!("schema.json"),
 				&TypedDocument::schema_document(&todo_schema()).unwrap(),
 			)
 			.await
 			.unwrap();
 		store
 			.insert_document(
-				&RelPath::from("todos.json"),
+				&fwd_path!("todos.json"),
 				&TypedDocument::new(
 					rows_schema(),
 					value!([{ "label": "buy milk", "done": false }]),
@@ -336,8 +337,8 @@ mod test {
 		app.add_plugins((MinimalPlugins, AsyncPlugin, StorePlugin));
 		let store = todo_store().await;
 		let schema =
-			app.world_mut().spawn(DocumentBlob::new("schema.json")).id();
-		let data = app.world_mut().spawn(DocumentBlob::new("todos.json")).id();
+			app.world_mut().spawn(DocumentBlob::new(fwd_path!("schema.json"))).id();
+		let data = app.world_mut().spawn(DocumentBlob::new(fwd_path!("todos.json"))).id();
 		app.world_mut().spawn(store).add_children(&[schema, data]);
 		app.update_async().await;
 		(app, schema, data)
@@ -422,7 +423,7 @@ mod test {
 		store
 			.get_document(
 				SchemaResolver::default(),
-				&RelPath::from("todos.json"),
+				&fwd_path!("todos.json"),
 			)
 			.await
 			.unwrap()
@@ -442,7 +443,7 @@ mod test {
 		count_loads(&mut app);
 		store_of(&mut app)
 			.insert_document(
-				&RelPath::from("todos.json"),
+				&fwd_path!("todos.json"),
 				&TypedDocument::new(rows_schema(), value!([])),
 			)
 			.await

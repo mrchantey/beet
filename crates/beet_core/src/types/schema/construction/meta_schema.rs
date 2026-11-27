@@ -380,7 +380,7 @@ mod test {
 		vec![
 			SchemaRef::Name("TodoItem".into()),
 			SchemaRef::TypePath("bevy_color::color::Color".into()),
-			SchemaRef::Document(RelPath::new("schema/todo.json").into()),
+			SchemaRef::Document(fwd_path!("schema/todo.json").into()),
 			SchemaRef::AtField("schema".into()),
 		]
 	}

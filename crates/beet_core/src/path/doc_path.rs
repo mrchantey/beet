@@ -12,16 +12,19 @@ use crate::prelude::*;
 ///
 /// ```
 /// # use beet_core::prelude::*;
-/// let page = RelPath::new("routes/blog/index.md");
+/// let page = fwd_path!("routes/blog/index.md");
 /// DocPath::parse("./Card").unwrap()
 /// 	.resolve(&page)
-/// 	.xpect_eq(RelPath::new("routes/blog/Card"));
+/// 	.unwrap()
+/// 	.xpect_eq(fwd_path!("routes/blog/Card"));
 /// DocPath::parse("../Card.bsx").unwrap()
 /// 	.resolve(&page)
-/// 	.xpect_eq(RelPath::new("routes/Card.bsx"));
+/// 	.unwrap()
+/// 	.xpect_eq(fwd_path!("routes/Card.bsx"));
 /// DocPath::parse("widgets/Card.bsx").unwrap()
 /// 	.resolve(&page)
-/// 	.xpect_eq(RelPath::new("widgets/Card.bsx"));
+/// 	.unwrap()
+/// 	.xpect_eq(fwd_path!("widgets/Card.bsx"));
 /// DocPath::parse("https://example.com/Card.bsx").unwrap_err();
 /// ```
 #[derive(
@@ -45,7 +48,12 @@ impl DocPath {
 				 package, ie `./Card` or `widgets/Card.bsx`"
 			);
 		}
-		Self(SmolStr::new(text)).xok()
+		let path = Self(SmolStr::new(text));
+		// a package absolute reference is a path within the package
+		if !path.is_relative() {
+			path.fwd_path()?;
+		}
+		path.xok()
 	}
 
 	/// Whether the reference is relative to the document holding it.
@@ -55,24 +63,35 @@ impl DocPath {
 
 	/// The package absolute path this names, held by the document at
 	/// `document`. The extension stays as authored.
-	pub fn resolve(&self, document: &RelPath) -> RelPath {
+	///
+	/// # Errors
+	/// Errors when a relative reference climbs above the package.
+	pub fn resolve(&self, document: &FwdPath) -> Result<FwdPath> {
 		match self.is_relative() {
-			true => document.parent().unwrap_or_default().join(&self.0),
-			false => self.rel_path(),
+			true => document
+				.parent()
+				.unwrap_or_default()
+				.as_smol_path()
+				.join(&self.0)
+				.xmap(FwdPath::new),
+			false => self.fwd_path(),
 		}
 	}
 
 	/// The path as written, package absolute once resolved.
-	pub fn rel_path(&self) -> RelPath { RelPath::new(&self.0) }
+	///
+	/// # Errors
+	/// Errors when the reference is rooted or climbs out of the package.
+	pub fn fwd_path(&self) -> Result<FwdPath> { FwdPath::new(&self.0) }
 }
 
 /// A package absolute path as the reference that names it.
-impl From<RelPath> for DocPath {
-	fn from(path: RelPath) -> Self { Self(path.into()) }
+impl From<FwdPath> for DocPath {
+	fn from(path: FwdPath) -> Self { Self(path.into()) }
 }
 
-impl From<&RelPath> for DocPath {
-	fn from(path: &RelPath) -> Self { path.clone().into() }
+impl From<&FwdPath> for DocPath {
+	fn from(path: &FwdPath) -> Self { path.clone().into() }
 }
 
 #[cfg(test)]
@@ -84,7 +103,8 @@ mod test {
 		let resolve = |path: &str, document: &str| {
 			DocPath::parse(path)
 				.unwrap()
-				.resolve(&RelPath::new(document))
+				.resolve(&FwdPath::new(document).unwrap())
+				.unwrap()
 				.to_string()
 		};
 		resolve("./Card", "Page.bsx").xpect_eq("Card");
@@ -99,5 +119,10 @@ mod test {
 	fn refuses_what_names_no_file() {
 		DocPath::parse("").unwrap_err();
 		DocPath::parse("s3://bucket/Card.bsx").unwrap_err();
+		DocPath::parse("/Card.bsx").unwrap_err();
+		DocPath::parse("../../Card")
+			.unwrap()
+			.resolve(&fwd_path!("a/Page.bsx"))
+			.unwrap_err();
 	}
 }

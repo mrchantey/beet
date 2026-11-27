@@ -87,7 +87,7 @@ impl SyncEnd {
 	}
 
 	/// This end a folder further in.
-	pub fn with_dir(mut self, dir: Option<RelPath>) -> Self {
+	pub fn with_dir(mut self, dir: Option<FwdPath>) -> Self {
 		if let Some(dir) = dir {
 			self.label = format!("{}/{dir}", self.label).into();
 			self.store = match self.store {
@@ -311,7 +311,7 @@ mod test {
 		let end = SyncEnd::from_uri(&uri).unwrap();
 		for (path, body) in entries {
 			end.blob_store()
-				.insert(&RelPath::new(path), body.to_string())
+				.insert(&FwdPath::new(path).unwrap(), body.to_string())
 				.await
 				.unwrap();
 		}
@@ -349,11 +349,11 @@ mod test {
 	async fn syncs_below_either_end() {
 		let src = memory("sync-dir-src", &[("a/x.txt", "x"), ("b.txt", "b")])
 			.await
-			.with_dir(Some(RelPath::new("a")));
+			.with_dir(Some(fwd_path!("a")));
 		let dest = memory("sync-dir-dest", &[("keep.txt", "k")]).await;
 		StoreMirror::new(
 			src,
-			dest.clone().with_dir(Some(RelPath::new("in/to"))),
+			dest.clone().with_dir(Some(fwd_path!("in/to"))),
 		)
 		.with_delete(true)
 		.run()
@@ -422,7 +422,7 @@ mod test {
 	fn names_its_end() {
 		SyncEnd::from_uri(&StoreUri::parse("s3://b/p?region=r").unwrap())
 			.unwrap()
-			.with_dir(Some(RelPath::new("in")))
+			.with_dir(Some(fwd_path!("in")))
 			.to_string()
 			.xpect_eq("s3://b/p?region=r/in");
 	}

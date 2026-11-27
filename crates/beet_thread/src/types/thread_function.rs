@@ -59,7 +59,7 @@ impl ThreadFunction {
 				let root = world.spawn_empty().id();
 				RequestContextStack::scoped(
 					world,
-					RequestContext::new(parts, root, anchor, router),
+					RequestContext::new(parts, root, anchor, router)?,
 					|world| source.build(&mut world.entity_mut(root)),
 				)?;
 				// the build's route tree wakes run while the thread is still

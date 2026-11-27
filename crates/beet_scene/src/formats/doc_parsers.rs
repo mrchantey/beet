@@ -237,7 +237,7 @@ impl DocParsers {
 	pub fn read(
 		&self,
 		bytes: &MediaBytes,
-		path: Option<&RelPath>,
+		path: Option<&FwdPath>,
 	) -> Result<DocumentSource, ParseError> {
 		match self.parse(bytes) {
 			Ok(document) => {
@@ -268,7 +268,7 @@ impl DocParsers {
 	pub fn root_components(
 		&self,
 		bytes: &MediaBytes,
-		path: Option<&RelPath>,
+		path: Option<&FwdPath>,
 	) -> Result<EntityBody> {
 		match self.choose(bytes.media_type()) {
 			Ok(parser) => parser

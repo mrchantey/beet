@@ -296,9 +296,9 @@ impl SceneHost {
 	async fn published(&self) -> Value {
 		let store = &self.store;
 		poll_ext::poll_async(async || {
-			match store.exists(&RelPath::from(FORK)).await? {
+			match store.exists(&FwdPath::from(FORK)).await? {
 				true => store
-					.get(&RelPath::from(FORK))
+					.get(&FwdPath::from(FORK))
 					.await
 					.map(ControlFlow::Break),
 				false => Ok(ControlFlow::Continue(())),

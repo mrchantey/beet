@@ -32,7 +32,7 @@ pub struct VaultHandle {
 	/// The store the file lives in.
 	pub store: BlobStore,
 	/// The file within the store, ending in `.age`.
-	pub path: RelPath,
+	pub path: FwdPath,
 }
 
 impl VaultHandle {
@@ -45,7 +45,7 @@ impl VaultHandle {
 		Self::validate_path(path.as_ref())?;
 		Self {
 			store,
-			path: RelPath::new(path),
+			path: FwdPath::new(path)?,
 		}
 		.xok()
 	}
@@ -126,7 +126,7 @@ mod test {
 			vault.exists().await.unwrap().xpect_true();
 			// armored, so it survives git and paper
 			String::from_utf8(
-				store.get(&RelPath::new(path)).await.unwrap().to_vec(),
+				store.get(&FwdPath::new(path).unwrap()).await.unwrap().to_vec(),
 			)
 			.unwrap()
 			.xpect_starts_with("-----BEGIN AGE ENCRYPTED FILE-----");

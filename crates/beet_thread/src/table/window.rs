@@ -225,7 +225,7 @@ mod test {
 		let mut window = app.world_mut().spawn((
 			ChildOf(root),
 			Thread::default(),
-			MountThreadStore::new("threads"),
+			MountThreadStore::new(fwd_path!("threads")),
 			children![Actor::new_with_id(
 				ActorId::from_static("actor-1"),
 				"Person",
@@ -256,7 +256,7 @@ mod test {
 		load: usize,
 	) -> Entity {
 		let entity = window(app, root, agent);
-		let mut mount = MountThreadStore::new("threads");
+		let mut mount = MountThreadStore::new(fwd_path!("threads"));
 		mount.load = load;
 		app.world_mut().entity_mut(entity).insert(mount);
 		if person_turn {
@@ -283,7 +283,7 @@ mod test {
 		count: usize,
 	) -> Thread {
 		let table = app.world().get::<TableStore>(root).unwrap().clone();
-		let store = ThreadStore::new(table, RelPath::new("threads")).unwrap();
+		let store = ThreadStore::new(table, fwd_path!("threads")).unwrap();
 		let mut thread = Thread::new("Long");
 		let id = thread.id();
 		let text = |text: String| {

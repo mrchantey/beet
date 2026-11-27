@@ -14,7 +14,7 @@ use core::any::TypeId;
 /// package meta checks of it.
 pub(super) struct CompiledDocument {
 	/// The document's path in its package.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// The document as it was read, for an error's position.
 	pub source: DocumentSource,
 	/// The scene body's blob, postcard bytes of the resolved body.
@@ -49,7 +49,7 @@ pub(super) struct InstanceUse {
 	/// The use site.
 	pub key: EntityKey,
 	/// The target, package absolute and complete.
-	pub document: RelPath,
+	pub document: FwdPath,
 	/// The props the use passes.
 	pub props: Map,
 }
@@ -72,22 +72,27 @@ impl Namespace {
 	/// extension they differ by.
 	pub fn complete(
 		&self,
-		document: &RelPath,
+		document: &FwdPath,
 		reference: &DocPath,
-	) -> Result<RelPath> {
-		let path = reference.resolve(document);
+	) -> Result<FwdPath> {
+		let path = reference.resolve(document)?;
 		let (prefix, files, within) =
 			match path.as_str().split_once('/').and_then(|(first, rest)| {
 				PackageName::parse(first)
 					.ok()
 					.and_then(|key| self.dependencies.get_key_value(&key))
-					.map(|(key, files)| (Some(key), files, RelPath::new(rest)))
+					.and_then(|(key, files)| {
+						FwdPath::new(rest).ok().map(|within| (Some(key), files, within))
+					})
 			}) {
 				Some(found) => found,
 				None => (None, &self.files, path.clone()),
 			};
-		let prefixed = |path: RelPath| match prefix {
-			Some(prefix) => RelPath::new(prefix.as_str()).join(path.as_str()),
+		let prefix_path = prefix
+			.map(|prefix| FwdPath::new(prefix.as_str()))
+			.transpose()?;
+		let prefixed = |path: FwdPath| match &prefix_path {
+			Some(prefix) => prefix.join(&path),
 			None => path,
 		};
 		match files.completions(&within).as_slice() {
@@ -118,7 +123,7 @@ impl CompiledDocument {
 	pub fn compile(
 		parsers: &DocParsers,
 		namespace: &Namespace,
-		path: &RelPath,
+		path: &FwdPath,
 		bytes: &MediaBytes,
 	) -> Result<Self> {
 		let source = parsers.read(bytes, Some(path))?;
@@ -180,7 +185,7 @@ impl CompiledDocument {
 	/// any reference can resolve.
 	pub fn declarations(
 		parsers: &DocParsers,
-		path: &RelPath,
+		path: &FwdPath,
 		bytes: &MediaBytes,
 	) -> Result<EntityBodyRecord> {
 		let source = parsers.read(bytes, Some(path))?;
@@ -207,7 +212,7 @@ impl CompiledDocument {
 		registry: &TypeRegistry,
 		keys: &EntityKeys,
 		namespace: &Namespace,
-		path: &RelPath,
+		path: &FwdPath,
 		key: &EntityKey,
 		entity: &mut EntityBody,
 		imports: &mut Imports,
@@ -278,7 +283,7 @@ impl CompiledDocument {
 		types: &AppTypeRegistry,
 		registry: &TypeRegistry,
 		body: &SceneBody,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> Result<EntityBodyRecord> {
 		let mut world = World::new();
 		world.insert_resource(types.clone());

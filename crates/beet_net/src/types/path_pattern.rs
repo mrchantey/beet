@@ -117,6 +117,8 @@ pub struct PathPattern {
 	/// true if all segments are static,
 	/// calculated on creation.
 	is_static: bool,
+	/// The segments joined with dynamic ones annotated, checked on creation.
+	annotated: FwdPath,
 }
 
 impl core::ops::Deref for PathPattern {
@@ -143,6 +145,11 @@ impl PathPattern {
 	pub fn from_segments(segments: Vec<PathPatternSegment>) -> Result<Self> {
 		let is_static = segments.iter().all(|segment| segment.is_static());
 		for (index, segment) in segments.iter().enumerate() {
+			if matches!(segment.to_string_annotated().as_str(), "." | "..") {
+				bevybail!(
+					"Malformed Route Path: `.` and `..` are no route segment"
+				);
+			}
 			if segment.is_greedy() && index != segments.len() - 1 {
 				bevybail!(
 					"Malformed Route Path: Greedy pattern (wildcard/repeating) must be last"
@@ -150,9 +157,16 @@ impl PathPattern {
 			}
 		}
 
+		let annotated = segments
+			.iter()
+			.map(|segment| segment.to_string_annotated())
+			.collect::<Vec<_>>()
+			.join("/")
+			.xmap(FwdPath::new)?;
 		Self {
 			segments,
 			is_static,
+			annotated,
 		}
 		.xok()
 	}
@@ -207,26 +221,21 @@ impl PathPattern {
 	pub fn _from_raw(
 		segments: Vec<PathPatternSegment>,
 		is_static: bool,
+		annotated: FwdPath,
 	) -> Self {
 		Self {
 			segments,
 			is_static,
+			annotated,
 		}
 	}
 
 	/// Returns true if all segments are static
 	pub fn is_static(&self) -> bool { self.is_static }
 
-	/// Convert the segments to a [`RelPath`] using annotations for dynamic segments,
-	/// ie `foo/:bar/*bazz`
-	pub fn annotated_path(&self) -> RelPath {
-		self.segments
-			.iter()
-			.map(|segment| segment.to_string_annotated())
-			.collect::<Vec<_>>()
-			.join("/")
-			.xmap(RelPath::new)
-	}
+	/// The segments as a [`FwdPath`], dynamic ones annotated, ie
+	/// `foo/:bar/*bazz`: a pattern holds no `.` or `..` segment.
+	pub fn annotated_path(&self) -> &FwdPath { &self.annotated }
 	/// Consume a segment of the path for each segment in [`Self::segments`],
 	/// returning the remaining path if all segments match.
 	/// Adjacent slashes are preserved as empty strings, allowing greedy segments
@@ -252,7 +261,7 @@ impl PathPattern {
 
 impl core::fmt::Display for PathPattern {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		write!(f, "{}", self.annotated_path())
+		f.write_str(self.annotated.as_str())
 	}
 }
 
@@ -303,7 +312,7 @@ pub type RouteMatchResult = Result<PathMatch, RouteMatchError>;
 /// Errors that can occur when matching a route pattern against a path.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum RouteMatchError {
-	/// A static segment did not match its corresponding [`RelPath`] part.
+	/// A static segment did not match its corresponding [`FwdPath`] part.
 	#[error(
 		"a static segment '{segment}' did not match its corresponding path part '{path}'"
 	)]

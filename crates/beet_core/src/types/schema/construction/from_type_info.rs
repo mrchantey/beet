@@ -356,7 +356,7 @@ fn type_path_schema(type_path: &str) -> ValueSchema {
 		// (eg `"30s"`), coerced by `scalar_to_reflect`, so validate it as a string;
 		// `Date` is opaque with `YYYY-MM-DD` as its serde form.
 		"String" | "str" | "char" | "Cow<str>" | "PathBuf" | "OsString"
-		| "SmolStr" | "SmolPath" | "RelPath" | "AbsPath" | "WsPath"
+		| "SmolStr" | "SmolPath" | "FwdPath" | "AbsPath" | "WsPath"
 		| "Duration" | "Date" => ValueSchema::String(StringSchema::default()),
 		"u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
 			ValueSchema::U64(U64Schema::default())

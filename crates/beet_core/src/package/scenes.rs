@@ -23,11 +23,11 @@ use alloc::collections::BTreeMap;
 	Deserialize,
 )]
 #[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
-pub struct Imports(pub BTreeMap<RelPath, ImportEdge>);
+pub struct Imports(pub BTreeMap<FwdPath, ImportEdge>);
 
 impl Imports {
 	/// Record a reference to `path`, keeping the eagerest edge reaching it.
-	pub fn insert(&mut self, path: RelPath, edge: ImportEdge) {
+	pub fn insert(&mut self, path: FwdPath, edge: ImportEdge) {
 		let entry = self.0.entry(path).or_insert(edge);
 		entry.kind = entry.kind.min(edge.kind);
 		entry.instance |= edge.instance;
@@ -213,7 +213,7 @@ impl SceneMeta for Prop {
 	Deserialize,
 )]
 #[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
-pub struct Scenes(pub BTreeMap<RelPath, SceneRef>);
+pub struct Scenes(pub BTreeMap<FwdPath, SceneRef>);
 
 /// A document of a package record or a release: its content-keyed scene
 /// record, and the heads of the Automerge document it was compiled from,
@@ -249,7 +249,7 @@ pub struct SceneRef {
 	Deserialize,
 )]
 #[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
-pub struct LoadSets(pub BTreeMap<RelPath, LoadSet>);
+pub struct LoadSets(pub BTreeMap<FwdPath, LoadSet>);
 
 /// One document's load set.
 #[derive(

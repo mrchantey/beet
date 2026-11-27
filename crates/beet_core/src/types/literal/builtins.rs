@@ -54,13 +54,14 @@ impl Table {
 
 	/// `T` parses from a path, one string or the segments a greedy route
 	/// capture collects, so `docs/plan.docx` and `["docs", "plan.docx"]` are
-	/// the same path; a list holding anything but strings declines.
+	/// the same path; a list holding anything but strings declines, and a
+	/// path `parse` refuses errors.
 	fn add_path<T: 'static + Send + Sync + PartialReflect>(
 		&mut self,
-		parse: impl 'static + Send + Sync + Fn(&str) -> T,
+		parse: impl 'static + Send + Sync + Fn(&str) -> Result<T>,
 	) -> &mut Self {
 		self.add(move |value: &Value| match value {
-			Value::Str(string) => Ok(Some(parse(string.as_str()))),
+			Value::Str(string) => parse(string.as_str()).map(Some),
 			Value::List(segments) => segments
 				.iter()
 				.map(|segment| match segment {
@@ -69,7 +70,7 @@ impl Table {
 				})
 				.collect::<Option<Vec<_>>>()
 				.map(|segments| parse(&segments.join("/")))
-				.xok(),
+				.transpose(),
 			_ => Ok(None),
 		})
 	}
@@ -134,10 +135,10 @@ fn add_strings(table: &mut Table) {
 		// plain string, so `<Name("Malenia")/>` builds via `Name::new`.
 		.add_str(|string| Name::new(string.to_string()))
 		// a logical path, so a markup `src="assets"` resolves to a `SmolPath`,
-		// and a store key to a `RelPath`, from a greedy route capture's
+		// and a store key to a `FwdPath`, from a greedy route capture's
 		// segments as readily as from one string
-		.add_path(|string| SmolPath::new(string))
-		.add_path(|string| RelPath::new(string))
+		.add_path(|string| SmolPath::new(string).xok())
+		.add_path(|string| FwdPath::new(string))
 		// a field path in its dotted spelling, so `{DocumentScope{path:"user"}}`
 		// and `bx:key="user.id"` author one
 		.add_str(|string| FieldPath::parse(string));
@@ -367,7 +368,7 @@ fn add_domain(table: &mut Table) {
 		"a workspace-relative path",
 		|value: &Value| match value {
 			Value::Str(string) => {
-				Ok(Some(WsPath::new(string.as_str()).into_abs()))
+				Ok(Some(WsPath::new(string.as_str())?.into_abs()))
 			}
 			_ => Ok(None),
 		},
@@ -531,20 +532,23 @@ mod test {
 		parse::<Vec<MediaType>>(Value::str("text/markdown, application/json"))
 			.unwrap()
 			.xpect_eq(Some(vec![MediaType::Markdown, MediaType::Json]));
-		// a store key drops its leading slash on coercion
-		parse::<RelPath>(Value::str("/assets/x"))
+		// a rooted or escaping path is refused rather than rewritten
+		parse::<FwdPath>(Value::str("assets/x"))
 			.unwrap()
-			.xpect_eq(Some(RelPath::new("assets/x")));
+			.xpect_eq(Some(fwd_path!("assets/x")));
+		parse::<FwdPath>(Value::str("/assets/x")).unwrap_err();
+		parse::<FwdPath>(Value::str("../assets/x")).unwrap_err();
 		// a greedy route capture's segments are one path
-		parse::<RelPath>(Value::List(vec![
+		parse::<FwdPath>(Value::List(vec![
 			Value::str("docs"),
 			Value::str("plan.docx"),
 		]))
 		.unwrap()
-		.xpect_eq(Some(RelPath::new("docs/plan.docx")));
-		parse::<WsPath>(Value::str("/assets/x"))
+		.xpect_eq(Some(fwd_path!("docs/plan.docx")));
+		parse::<WsPath>(Value::str("assets/x"))
 			.unwrap()
-			.xpect_eq(Some(WsPath::new("assets/x")));
+			.xpect_eq(Some(WsPath::from(fwd_path!("assets/x")).unwrap()));
+		parse::<WsPath>(Value::str("/assets/x")).unwrap_err();
 		parse::<Duration>(Value::str("50ms"))
 			.unwrap()
 			.xpect_eq(Some(Duration::from_millis(50)));
@@ -656,6 +660,6 @@ mod test {
 	fn parses_a_workspace_relative_path() {
 		parse::<AbsPath>(Value::str("assets"))
 			.unwrap()
-			.xpect_eq(Some(WsPath::new("assets").into_abs()));
+			.xpect_eq(Some(WsPath::from(fwd_path!("assets")).unwrap().into_abs()));
 	}
 }

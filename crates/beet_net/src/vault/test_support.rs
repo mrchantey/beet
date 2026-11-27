@@ -96,7 +96,7 @@ impl VerbWorld {
 	/// The default document, `secrets.toml` in the package store, empty until
 	/// written.
 	pub async fn document(&self) -> SecretsDocument {
-		self.secrets(Secrets::DEFAULT_PATH)
+		self.secrets(Secrets::DEFAULT_PATH.as_str())
 			.read_or_new()
 			.await
 			.unwrap()
@@ -115,7 +115,7 @@ impl VerbWorld {
 				record,
 			)
 			.unwrap();
-		self.secrets(Secrets::DEFAULT_PATH)
+		self.secrets(Secrets::DEFAULT_PATH.as_str())
 			.write(&document)
 			.await
 			.unwrap();

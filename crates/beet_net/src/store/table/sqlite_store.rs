@@ -60,7 +60,7 @@ static POOL: LazyPool<AbsPath, SharedConnection, Result<SharedConnection>> =
 /// makes the tag authorable at all: markup builds the default and writes the
 /// attributes over it.
 impl Default for SqliteStore {
-	fn default() -> Self { Self::new(WsPath::new("data.db")) }
+	fn default() -> Self { Self::new(WsPath::from(fwd_path!("data.db"))) }
 }
 
 impl SqliteStore {

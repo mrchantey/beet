@@ -94,7 +94,7 @@ impl Layout {
 	}
 
 	/// Wrap descendant routes in the document at `document` of their package.
-	pub fn document(document: impl Into<RelPath>) -> Self {
+	pub fn document(document: impl Into<FwdPath>) -> Self {
 		Self(TemplateSource::document(document))
 	}
 }
@@ -200,7 +200,7 @@ fn wrap_content(
 	// and any nested render are restored on completion.
 	let layout = RequestContextStack::scoped(
 		world,
-		RequestContext::new(parts, page_content, route, router),
+		RequestContext::new(parts, page_content, route, router)?,
 		|world| build_layout(world, source, rendered),
 	)?;
 
@@ -284,7 +284,7 @@ mod test {
 		let store = BlobStore::temp();
 		for (path, source) in documents {
 			store
-				.insert(&RelPath::new(path), source.to_string())
+				.insert(&FwdPath::new(path).unwrap(), source.to_string())
 				.await
 				.unwrap();
 		}
@@ -294,7 +294,7 @@ mod test {
 	/// A single route serving one page body under the `Layout.bsx` `source`.
 	async fn document_root(world: &mut World, source: &str) -> Entity {
 		let store = documents(&[("Layout.bsx", source)]).await;
-		let root = layout_root(world, Layout::document("Layout.bsx"));
+		let root = layout_root(world, Layout::document(fwd_path!("Layout.bsx")));
 		world.entity_mut(root).insert(store);
 		root
 	}
@@ -408,14 +408,14 @@ mod test {
 	async fn wraps_blob_page_markdown() {
 		let store = BlobStore::temp();
 		store
-			.insert(&"post.md".into(), "# Hello\n\nmarkdown body".to_owned())
+			.insert(&fwd_path!("post.md"), "# Hello\n\nmarkdown body".to_owned())
 			.await
 			.unwrap();
 
 		let mut world = router_world();
 		let root = world
 			.spawn((store, Router, Layout::of::<PageShell>(), children![
-				route::new("post", BlobPage::new("post.md"))
+				route::new("post", BlobPage::new(fwd_path!("post.md")))
 			]))
 			.flush();
 
@@ -438,7 +438,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&"post.md".into(),
+				&fwd_path!("post.md"),
 				"# Title\n\n```rust\nfn main() {}\n```\n\nbody".to_owned(),
 			)
 			.await
@@ -447,7 +447,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((store, Router, Layout::of::<PageShell>(), children![
-				route::new("post", BlobPage::new("post.md"))
+				route::new("post", BlobPage::new(fwd_path!("post.md")))
 			]))
 			.flush();
 
@@ -463,7 +463,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn missing_layout_errors() {
-		for layout in [Layout::template("Nope"), Layout::document("Nope.bsx")] {
+		for layout in [Layout::template("Nope"), Layout::document(fwd_path!("Nope.bsx"))] {
 			let mut world = router_world();
 			let root = layout_root(&mut world, layout);
 			world.entity_mut(root).insert(BlobStore::temp());
@@ -577,9 +577,9 @@ mod test {
 		])
 		.await;
 		let root = world
-			.spawn((store, Router, Layout::document("Outer.bsx"), children![(
+			.spawn((store, Router, Layout::document(fwd_path!("Outer.bsx")), children![(
 				PathPartial::new("nested"),
-				Layout::document("Inner.bsx"),
+				Layout::document(fwd_path!("Inner.bsx")),
 				children![render_action::fixed_func_route(
 					"page",
 					|| rsx! { <p>"page body"</p> }
@@ -644,15 +644,15 @@ mod test {
 			render_action::fixed_func_route("page", || rsx! { <p>"body"</p> })
 		};
 		let root = world
-			.spawn((store, Router, Layout::document("Outer.bsx"), children![
+			.spawn((store, Router, Layout::document(fwd_path!("Outer.bsx")), children![
 				(
 					PathPartial::new("blog"),
-					Layout::document("Blog.bsx"),
+					Layout::document(fwd_path!("Blog.bsx")),
 					children![page()]
 				),
 				(
 					PathPartial::new("docs"),
-					Layout::document("Docs.bsx"),
+					Layout::document(fwd_path!("Docs.bsx")),
 					children![page()]
 				),
 				page(),
@@ -713,7 +713,7 @@ mod test {
 		let mut world = router_world();
 		let store = meta_layout_store().await;
 		let root = world
-			.spawn((store, Router, Layout::document("Layout.bsx"), children![
+			.spawn((store, Router, Layout::document(fwd_path!("Layout.bsx")), children![
 				meta_route("alpha", "Alpha"),
 				meta_route("beta", "Beta"),
 			]))
@@ -737,10 +737,10 @@ mod test {
 		let mut world = router_world();
 		let store = meta_layout_store().await;
 		let root = world
-			.spawn((store, Router, Layout::document("Layout.bsx"), children![
+			.spawn((store, Router, Layout::document(fwd_path!("Layout.bsx")), children![
 				(
 					PathPartial::new("blog"),
-					Layout::document("ArticleLayout.bsx"),
+					Layout::document(fwd_path!("ArticleLayout.bsx")),
 					children![meta_route("post", "Post")]
 				)
 			]))
@@ -876,7 +876,7 @@ mod test {
 		let root = world
 			.spawn((store, Router, Layout::of::<MetaLayout>(), children![(
 				PathPartial::new("blog"),
-				Layout::document("ArticleLayout.bsx"),
+				Layout::document(fwd_path!("ArticleLayout.bsx")),
 				children![meta_route("post", "Post")]
 			)]))
 			.flush();

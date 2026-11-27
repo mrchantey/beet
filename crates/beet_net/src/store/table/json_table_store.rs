@@ -52,7 +52,7 @@ use bytes::Bytes;
 pub struct JsonTableStore {
 	/// The directory of the blob store the files are in, its root by default.
 	#[set_with(unwrap_option, into)]
-	path: Option<RelPath>,
+	path: Option<FwdPath>,
 }
 
 impl JsonTableStore {
@@ -91,7 +91,7 @@ pub struct JsonTableProvider {
 	partition: Option<PartitionId>,
 	/// The files read or written through any partition of this declaration,
 	/// so a watcher tells them from the blobs beside them.
-	opened: Arc<Mutex<HashSet<RelPath>>>,
+	opened: Arc<Mutex<HashSet<FwdPath>>>,
 }
 
 impl JsonTableProvider {
@@ -123,17 +123,20 @@ impl JsonTableProvider {
 		.xok()
 	}
 
-	/// The file this partition is.
-	fn file(&self) -> RelPath {
+	/// The file name this partition is.
+	fn file_name(&self) -> String {
 		let name = self
 			.partition
 			.as_ref()
 			.map_or(Self::ROOT, PartitionId::as_str);
-		RelPath::new(format!("{name}{}", Self::EXTENSION))
+		format!("{name}{}", Self::EXTENSION)
 	}
 
+	/// The file this partition is.
+	fn file(&self) -> Result<FwdPath> { FwdPath::new(self.file_name()) }
+
 	/// Whether `path` is named as a partition's file.
-	fn is_partition(path: &RelPath) -> bool {
+	fn is_partition(path: &FwdPath) -> bool {
 		path.as_str()
 			.strip_suffix(Self::EXTENSION)
 			.is_some_and(|name| {
@@ -144,7 +147,7 @@ impl JsonTableProvider {
 	/// The partition as it is now, and the version it was read at, `None` for
 	/// a partition never written.
 	async fn read(&self) -> Result<(PartitionRows, Option<BlobVersion>)> {
-		let file = self.file();
+		let file = self.file()?;
 		self.opened
 			.lock()
 			.unwrap_or_else(|err| err.into_inner())
@@ -171,7 +174,7 @@ impl JsonTableProvider {
 		&self,
 		func: impl Fn(&mut PartitionRows) -> Result<bool>,
 	) -> Result {
-		let file = self.file();
+		let file = self.file()?;
 		loop {
 			let (mut partition, version) = self.read().await?;
 			if !func(&mut partition)? {
@@ -203,7 +206,7 @@ impl StoreBackend for JsonTableProvider {
 	fn id(&self) -> &'static str { "json" }
 
 	fn describe(&self) -> String {
-		format!("json:{}/{}", self.blobs.describe(), self.file())
+		format!("json:{}/{}", self.blobs.describe(), self.file_name())
 	}
 
 	fn region(&self) -> Option<String> { self.blobs.region() }
@@ -532,9 +535,9 @@ mod test {
 	#[beet_core::test]
 	async fn under_a_path() {
 		let blobs = BlobStore::temp();
-		blobs.insert(&RelPath::new("other.txt"), "x").await.unwrap();
+		blobs.insert(&fwd_path!("other.txt"), "x").await.unwrap();
 		let tables = JsonTableStore::default()
-			.with_path(RelPath::new("tables"))
+			.with_path(fwd_path!("tables"))
 			.tables(&blobs)
 			.unwrap();
 		table_test::run_rows(&tables).await;
@@ -545,7 +548,7 @@ mod test {
 			.list()
 			.await
 			.unwrap()
-			.xpect_eq(vec![RelPath::new("other.txt")]);
+			.xpect_eq(vec![fwd_path!("other.txt")]);
 	}
 
 	/// The record-only cases a PDS answers hold of any backend holding
@@ -626,11 +629,11 @@ mod test {
 		let mut paths = blobs.list().await.unwrap();
 		paths.sort();
 		paths.xpect_eq(vec![
-			RelPath::new("@root.json"),
-			RelPath::new("did:plc:abc/child.json"),
+			fwd_path!("@root.json"),
+			fwd_path!("did:plc:abc/child.json"),
 		]);
 		blobs
-			.get(&RelPath::new("@root.json"))
+			.get(&fwd_path!("@root.json"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
@@ -668,7 +671,7 @@ mod test {
 		let blobs = BlobStore::temp();
 		let tables = JsonTableStore::over(blobs.clone()).unwrap();
 		let rows = tables.table::<table_test::NamedRow>();
-		let file = RelPath::new("@root.json");
+		let file = fwd_path!("@root.json");
 		blobs
 			.insert(
 				&file,
@@ -784,7 +787,7 @@ mod test {
 				.put(table_test::NamedRow::new("a", 1))
 				.await
 				.unwrap();
-			blobs.insert(&RelPath::new(path), text).await.unwrap();
+			blobs.insert(&FwdPath::new(path).unwrap(), text).await.unwrap();
 			tables
 				.store_remove()
 				.await
@@ -837,7 +840,7 @@ mod test {
 
 		// parented after it spawned
 		let child = world
-			.spawn(JsonTableStore::default().with_path(RelPath::new("t")))
+			.spawn(JsonTableStore::default().with_path(fwd_path!("t")))
 			.flush();
 		tables(&world, child).xpect_none();
 		let parent = world.spawn(InMemoryBlobStore::named("parent")).flush();
@@ -893,7 +896,7 @@ mod test {
 		let memory = world.spawn(InMemoryBlobStore::new()).flush();
 		world.entity(memory).contains::<BlobStore>().xpect_true();
 		world.entity(memory).contains::<TableStore>().xpect_false();
-		let fs = world.spawn(FsStore::new(WsPath::new("target"))).flush();
+		let fs = world.spawn(FsStore::new(WsPath::from(fwd_path!("target")))).flush();
 		world.entity(fs).contains::<BlobStore>().xpect_true();
 		world.entity(fs).contains::<TableStore>().xpect_false();
 		let http = world
@@ -935,7 +938,7 @@ mod test {
 		let database =
 			world.spawn(SqliteStore::memory("nested-lookup")).flush();
 		let directory = world
-			.spawn((FsStore::new(WsPath::new("target")), ChildOf(database)))
+			.spawn((FsStore::new(WsPath::from(fwd_path!("target"))), ChildOf(database)))
 			.flush();
 		let leaf = world.spawn(ChildOf(directory)).flush();
 		let found = world

@@ -39,7 +39,7 @@ pub async fn StandardSitePub(
 	/// The route path the publication roots at, ie `blog`, joined to the
 	/// site's homepage to form the publication's url. Empty for a whole site.
 	#[field(no_clone)]
-	path: RelPath,
+	path: FwdPath,
 	/// The publication's name.
 	#[field(no_clone)]
 	name: SmolStr,
@@ -72,8 +72,8 @@ pub async fn StandardSitePub(
 	media_ingest: MediaIngestPolicy,
 	/// The derived index's path in the store the declaration resolves by
 	/// ancestry, the package store's `derived/` in a site.
-	#[field(no_clone, default = RelPath::new(StandardSitePub::INDEX))]
-	index: RelPath,
+	#[field(no_clone, default = StandardSitePub::INDEX)]
+	index: FwdPath,
 	cx: ActionContext<BlobStore>,
 ) -> Result<EntityBody> {
 	let entity = cx.id();
@@ -104,12 +104,12 @@ pub async fn StandardSitePub(
 
 impl StandardSitePub {
 	/// The index's default path, beside the site's other derived files.
-	pub const INDEX: &str = "derived/standard-site.json";
+	pub const INDEX: FwdPath = fwd_path!("derived/standard-site.json");
 	/// The verb that alone writes the index.
 	pub const WRITTEN_BY: &str = "publish";
 	/// The well-known path a publication at the root of a site serves its
 	/// uri from, a publication at a path appending it.
-	const WELL_KNOWN: &str = ".well-known/site.standard.publication";
+	const WELL_KNOWN: FwdPath = fwd_path!(".well-known/site.standard.publication");
 
 	/// The `content` def a declaration names unless it says otherwise:
 	/// `org.beet.scene#body`, the post itself as a beet scene.
@@ -132,18 +132,15 @@ impl StandardSitePub {
 	/// The `path` a standard site document of the page at route `page` carries,
 	/// ie `/full-stack-bevy` for `blog/full-stack-bevy`, `None` for a page
 	/// outside the publication.
-	pub fn document_path(&self, page: &RelPath) -> Option<SmolStr> {
+	pub fn document_path(&self, page: &FwdPath) -> Option<SmolStr> {
 		page.strip_prefix(&self.path)
 			.map(|relative| format!("/{relative}").into())
 	}
 
 	/// The route path of the well-known file naming the publication, ie
 	/// `.well-known/site.standard.publication/blog`.
-	pub fn well_known_path(&self) -> RelPath {
-		match self.path.as_str() {
-			"" => RelPath::new(Self::WELL_KNOWN),
-			path => RelPath::new(Self::WELL_KNOWN).join(path),
-		}
+	pub fn well_known_path(&self) -> FwdPath {
+		Self::WELL_KNOWN.join(&self.path)
 	}
 
 	/// The [`Derivation`] declaring the index, which `publish` alone writes.

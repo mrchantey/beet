@@ -19,7 +19,7 @@ pub async fn Compile(
 	branch: Option<BranchName>,
 	cx: ActionContext<RequestParts>,
 ) -> Result<String> {
-	let entry = RelPath::new(crate::commands::entry_arg(&cx.input)?);
+	let entry = FwdPath::new(crate::commands::entry_arg(&cx.input)?)?;
 	let (source, parsers) = cx
 		.world()
 		.with(|world: &mut World| -> Result<_> {

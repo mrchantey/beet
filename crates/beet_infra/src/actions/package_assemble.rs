@@ -151,7 +151,7 @@ impl PackageAssemble {
 		let (_, stack) = stacks.root(entity)?;
 		stacks
 			.deployment()
-			.work_directory(&stack)
+			.work_directory(&stack)?
 			.into_abs()
 			.join("package")
 			.xok()

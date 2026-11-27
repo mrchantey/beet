@@ -28,7 +28,7 @@ static REGISTRY: LazyLock<Mutex<HashMap<SmolStr, Weak<InMemoryInner>>>> =
 /// # use beet_net::prelude::*;
 /// # async fn run() -> Result<()> {
 /// let store = BlobStore::new(InMemoryBlobStore::new());
-/// store.insert(&RelPath::from("hello.txt"), "world").await?;
+/// store.insert(&fwd_path!("hello.txt"), "world").await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -59,14 +59,14 @@ pub struct InMemoryBlobStore {
 	inner: Arc<InMemoryInner>,
 	/// Optional subdirectory prefix for all keys.
 	#[get(skip)]
-	subdir: Option<RelPath>,
+	subdir: Option<FwdPath>,
 }
 
 /// Backing state shared across every handle on one name.
 #[derive(Debug)]
 struct InMemoryInner {
 	/// Shared storage state, `None` until the store is created.
-	map: RwLock<Option<HashMap<RelPath, Bytes>>>,
+	map: RwLock<Option<HashMap<FwdPath, Bytes>>>,
 	/// Bus to emit [`BlobEvent`]s on, set while at least one watcher subscribes.
 	#[cfg(feature = "std")]
 	bus: Mutex<Option<async_channel::Sender<BlobEvent>>>,
@@ -77,7 +77,7 @@ struct InMemoryInner {
 }
 
 impl InMemoryInner {
-	fn new(map: Option<HashMap<RelPath, Bytes>>) -> Self {
+	fn new(map: Option<HashMap<FwdPath, Bytes>>) -> Self {
 		Self {
 			map: RwLock::new(map),
 			#[cfg(feature = "std")]
@@ -116,7 +116,7 @@ impl FromReflect for InMemoryBlobStore {
 		let name = SmolStr::from_reflect(dyn_struct.field("name")?)?;
 		let subdir = dyn_struct
 			.field("subdir")
-			.and_then(Option::<RelPath>::from_reflect)
+			.and_then(Option::<FwdPath>::from_reflect)
 			.flatten();
 		let mut store = Self::named(name);
 		store.subdir = subdir;
@@ -136,7 +136,7 @@ impl InMemoryBlobStore {
 	/// can ship compile-time bytes (eg `include_str!`) into a store synchronously
 	/// without an async `insert`. The store is then read like any other.
 	pub fn new_seeded(
-		entries: impl IntoIterator<Item = (RelPath, Bytes)>,
+		entries: impl IntoIterator<Item = (FwdPath, Bytes)>,
 	) -> Self {
 		Self::minted(Some(entries.into_iter().collect()))
 	}
@@ -158,14 +158,14 @@ impl InMemoryBlobStore {
 	}
 
 	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<FwdPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
 
 	/// A fresh backing with initial state `map`, registered under a minted
 	/// name no live backing holds (a hand-chosen name may share the spelling).
-	fn minted(map: Option<HashMap<RelPath, Bytes>>) -> Self {
+	fn minted(map: Option<HashMap<FwdPath, Bytes>>) -> Self {
 		let mut registry = REGISTRY.lock().unwrap();
 		let name = loop {
 			let name = SmolStr::from(format!(
@@ -186,7 +186,7 @@ impl InMemoryBlobStore {
 	fn register(
 		registry: &mut HashMap<SmolStr, Weak<InMemoryInner>>,
 		name: SmolStr,
-		map: Option<HashMap<RelPath, Bytes>>,
+		map: Option<HashMap<FwdPath, Bytes>>,
 	) -> Self {
 		let inner = Arc::new(InMemoryInner::new(map));
 		registry.insert(name.clone(), Arc::downgrade(&inner));
@@ -198,7 +198,7 @@ impl InMemoryBlobStore {
 	}
 
 	/// Resolve an external path to the internal key by prepending the subdir.
-	fn resolve_key(&self, path: &RelPath) -> RelPath {
+	fn resolve_key(&self, path: &FwdPath) -> FwdPath {
 		match &self.subdir {
 			Some(sub) => sub.join(path),
 			None => path.clone(),
@@ -223,7 +223,7 @@ impl InMemoryBlobStore {
 
 	/// Emit a [`BlobEvent`] built from `self` if a bus is subscribed.
 	#[cfg(feature = "std")]
-	fn emit(&self, path: &RelPath, kind: BlobEventKind) {
+	fn emit(&self, path: &FwdPath, kind: BlobEventKind) {
 		if let Some(sender) = self.inner.bus.lock().unwrap().as_ref() {
 			let event = BlobEvent::new(
 				BlobStore::new(self.clone()),
@@ -275,7 +275,7 @@ impl StoreBackend for InMemoryBlobStore {
 impl BlobProvider for InMemoryBlobStore {
 	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
+	fn with_subdir(&self, path: FwdPath) -> Box<dyn BlobProvider> {
 		Box::new(InMemoryBlobStore {
 			name: self.name.clone(),
 			inner: self.inner.clone(),
@@ -295,9 +295,9 @@ impl BlobProvider for InMemoryBlobStore {
 
 	fn root_key(&self) -> SmolStr { format!("memory:{}", self.name).into() }
 
-	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
+	fn subdir(&self) -> FwdPath { self.subdir.clone().unwrap_or_default() }
 
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &FwdPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		#[cfg(feature = "std")]
@@ -320,7 +320,7 @@ impl BlobProvider for InMemoryBlobStore {
 		})
 	}
 
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
@@ -332,7 +332,7 @@ impl BlobProvider for InMemoryBlobStore {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		let this = self.clone();
 		Box::pin(async move {
 			let guard = this.inner.map.read().unwrap();
@@ -354,7 +354,7 @@ impl BlobProvider for InMemoryBlobStore {
 		})
 	}
 
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
@@ -374,7 +374,7 @@ impl BlobProvider for InMemoryBlobStore {
 		})
 	}
 
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &FwdPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		let path = path.clone();
@@ -398,7 +398,7 @@ impl BlobProvider for InMemoryBlobStore {
 
 	fn get_versioned(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
@@ -417,7 +417,7 @@ impl BlobProvider for InMemoryBlobStore {
 	/// content's digest.
 	fn insert_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		body: Bytes,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result<BlobVersion>> {
@@ -447,7 +447,7 @@ impl BlobProvider for InMemoryBlobStore {
 
 	fn remove_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result> {
 		let this = self.clone();
@@ -474,7 +474,7 @@ impl BlobProvider for InMemoryBlobStore {
 
 	fn public_url(
 		&self,
-		_path: &RelPath,
+		_path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { None.xok() })
 	}
@@ -528,17 +528,17 @@ mod test {
 		first.root_key().xpect_eq(second.root_key());
 		first.root_key().xpect_eq("memory:shared-backing");
 		first
-			.insert(&RelPath::new("a.txt"), Bytes::from_static(b"hi"))
+			.insert(&fwd_path!("a.txt"), Bytes::from_static(b"hi"))
 			.await
 			.unwrap();
 		second
-			.get(&RelPath::new("a.txt"))
+			.get(&fwd_path!("a.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(Bytes::from_static(b"hi"));
 		first
 			.clone()
-			.with_subdir("sub")
+			.with_subdir(fwd_path!("sub"))
 			.root_key()
 			.xpect_eq(first.root_key());
 	}
@@ -550,11 +550,11 @@ mod test {
 		let second = InMemoryBlobStore::new();
 		(first.root_key() != second.root_key()).xpect_true();
 		first
-			.insert(&RelPath::new("a.txt"), Bytes::from_static(b"hi"))
+			.insert(&fwd_path!("a.txt"), Bytes::from_static(b"hi"))
 			.await
 			.unwrap();
 		second
-			.exists(&RelPath::new("a.txt"))
+			.exists(&fwd_path!("a.txt"))
 			.await
 			.unwrap()
 			.xpect_false();
@@ -568,14 +568,14 @@ mod test {
 			|name: &str| REGISTRY.lock().unwrap().contains_key(name);
 		let store = InMemoryBlobStore::named("ephemeral");
 		store
-			.insert(&RelPath::new("a.txt"), Bytes::from_static(b"hi"))
+			.insert(&fwd_path!("a.txt"), Bytes::from_static(b"hi"))
 			.await
 			.unwrap();
 		registered("ephemeral").xpect_true();
 		drop(store);
 		registered("ephemeral").xpect_false();
 		InMemoryBlobStore::named("ephemeral")
-			.exists(&RelPath::new("a.txt"))
+			.exists(&fwd_path!("a.txt"))
 			.await
 			.unwrap()
 			.xpect_false();
@@ -585,18 +585,18 @@ mod test {
 	/// scene round-trips a memory store onto its data.
 	#[beet_core::test]
 	async fn from_reflect_joins_the_backing() {
-		let store = InMemoryBlobStore::named("reflected").with_subdir("docs");
+		let store = InMemoryBlobStore::named("reflected").with_subdir(fwd_path!("docs"));
 		store
-			.insert(&RelPath::new("a.txt"), Bytes::from_static(b"hi"))
+			.insert(&fwd_path!("a.txt"), Bytes::from_static(b"hi"))
 			.await
 			.unwrap();
 		let dynamic = store.to_dynamic().unwrap();
 		let rebuilt =
 			InMemoryBlobStore::from_reflect(dynamic.as_ref()).unwrap();
 		rebuilt.name().xpect_eq("reflected");
-		rebuilt.subdir().xpect_eq(RelPath::new("docs"));
+		rebuilt.subdir().xpect_eq(fwd_path!("docs"));
 		rebuilt
-			.get(&RelPath::new("a.txt"))
+			.get(&fwd_path!("a.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(Bytes::from_static(b"hi"));

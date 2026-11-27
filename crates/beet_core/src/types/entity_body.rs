@@ -18,7 +18,7 @@ use serde::de::DeserializeOwned;
 /// ```
 /// # use beet_core::prelude::*;
 /// let body = EntityBody::default()
-/// 	.with_typed(&Provenance::new([ProvenanceSource::file("logo.png", b"logo")]))
+/// 	.with_typed(&Provenance::new([ProvenanceSource::file(fwd_path!("logo.png"), b"logo")]))
 /// 	.unwrap();
 /// body.get_typed::<Provenance>().unwrap().sources.len().xpect_eq(1);
 /// ```

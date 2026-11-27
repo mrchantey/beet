@@ -102,7 +102,7 @@ pub(crate) mod test_fixtures {
 	/// The blog of the syndication fixture site as a publication.
 	pub fn harvest() -> StandardSitePub {
 		StandardSitePub {
-			path: RelPath::new("blog"),
+			path: fwd_path!("blog"),
 			name: "The Full Moon Harvest".into(),
 			description: Some("Monthly news from the beet garden".into()),
 			..default()

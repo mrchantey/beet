@@ -22,7 +22,7 @@ use beet_net::prelude::*;
 pub async fn DocumentView(
 	/// The file's path in the store, ie `docs/plan.docx`.
 	#[param]
-	file: RelPath,
+	file: FwdPath,
 	cx: ActionContext<Request>,
 ) -> Result<PageRequest> {
 	DocumentView::page(&cx.caller, cx.input.parts().clone(), file).await
@@ -36,7 +36,7 @@ impl DocumentView {
 	pub(crate) async fn page(
 		caller: &AsyncEntity,
 		parts: RequestParts,
-		file: RelPath,
+		file: FwdPath,
 	) -> Result<PageRequest> {
 		let blob = caller
 			.with_state::<AncestorQuery<&BlobStore>, _>(|entity, stores| {
@@ -63,7 +63,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&"docs/plan.html".into(),
+				&fwd_path!("docs/plan.html"),
 				"<h1>Plan</h1><table><tr><th>a</th><th>b</th></tr><tr><td>c</td><td>d</td></tr></table>"
 					.to_owned(),
 			)
@@ -115,7 +115,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&"docs/plan.md".into(),
+				&fwd_path!("docs/plan.md"),
 				"+++\ntitle = \"Plan\"\n\n[Course]\nunit = \"BSBOPS404\"\nweeks = 12\n+++\n\n# Plan\n"
 					.to_owned(),
 			)

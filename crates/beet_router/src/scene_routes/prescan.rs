@@ -224,7 +224,7 @@ impl EntryPrescan {
 	/// it too.
 	pub fn parse(
 		entry: &MediaBytes,
-		path: Option<&RelPath>,
+		path: Option<&FwdPath>,
 		registry: &PrescanRegistry,
 	) -> Result<Self> {
 		if !matches!(entry.media_type(), MediaType::Bsx | MediaType::Html) {
@@ -494,7 +494,7 @@ mod test {
 					(package_store.clone(), self.cache.clone());
 				Box::pin(async move {
 					store
-						.insert(&RelPath::from("order.txt"), cache.to_string())
+						.insert(&fwd_path!("order.txt"), cache.to_string())
 						.await
 				})
 			}
@@ -508,13 +508,13 @@ mod test {
 				let store = package_store.clone();
 				Box::pin(async move {
 					let first = store
-						.get_media(&RelPath::from("order.txt"))
+						.get_media(&fwd_path!("order.txt"))
 						.await?
 						.as_utf8()?
 						.to_string();
 					store
 						.insert(
-							&RelPath::from("order.txt"),
+							&fwd_path!("order.txt"),
 							format!("{first},second"),
 						)
 						.await
@@ -551,7 +551,7 @@ mod test {
 		let store = BlobStore::temp();
 		registry.preload(&prescan, &store).await.unwrap();
 		store
-			.get_media(&RelPath::from("order.txt"))
+			.get_media(&fwd_path!("order.txt"))
 			.await
 			.unwrap()
 			.as_utf8()

@@ -95,7 +95,7 @@ impl BlobStore {
 	}
 
 	/// Returns a new store scoped to the given subdirectory.
-	pub fn with_subdir(&self, path: RelPath) -> BlobStore {
+	pub fn with_subdir(&self, path: FwdPath) -> BlobStore {
 		BlobStore::from_arc(Arc::from(self.provider.with_subdir(path)))
 	}
 
@@ -124,7 +124,7 @@ impl BlobStore {
 		entry_name: &str,
 		src: &str,
 	) -> Result<(BlobStore, String)> {
-		let entry_name = RelPath::new(entry_name);
+		let entry_name = FwdPath::new(entry_name)?;
 		// the root is a plain path: `..` may climb above the store
 		let root = entry_name
 			.as_smol_path()
@@ -148,7 +148,7 @@ impl BlobStore {
 	}
 
 	/// Get an object and infer the [`MediaType`] from its path extension.
-	pub async fn get_media(&self, path: &RelPath) -> Result<MediaBytes> {
+	pub async fn get_media(&self, path: &FwdPath) -> Result<MediaBytes> {
 		let media_type = path.media_type().unwrap_or(MediaType::Bytes);
 		MediaBytes::new(media_type, self.get(path).await?).xok()
 	}
@@ -160,9 +160,9 @@ impl BlobStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// let store = BlobStore::temp();
-	/// let blob = store.blob(RelPath::new("my-file.txt"));
+	/// let blob = store.blob(fwd_path!("my-file.txt"));
 	/// ```
-	pub fn blob(&self, path: RelPath) -> Blob { Blob::new(self.clone(), path) }
+	pub fn blob(&self, path: FwdPath) -> Blob { Blob::new(self.clone(), path) }
 
 	/// Component hook that reads a concrete store component from
 	/// the entity and inserts a [`BlobStore`] wrapping it.
@@ -199,13 +199,13 @@ impl BlobStore {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// store.insert(&RelPath::from("file.txt"), "content").await?;
+	/// store.insert(&fwd_path!("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn insert(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		body: impl Into<Bytes>,
 	) -> Result {
 		self.provider.insert(path, body.into()).await
@@ -214,7 +214,7 @@ impl BlobStore {
 	/// Insert the contents of a local file without holding it in memory, see
 	/// [`BlobProvider::insert_file`].
 	#[cfg(feature = "std")]
-	pub async fn insert_file(&self, path: &RelPath, file: &AbsPath) -> Result {
+	pub async fn insert_file(&self, path: &FwdPath, file: &AbsPath) -> Result {
 		self.provider.insert_file(path, file).await
 	}
 
@@ -226,13 +226,13 @@ impl BlobStore {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// store.try_insert(&RelPath::from("file.txt"), "content").await?;
+	/// store.try_insert(&fwd_path!("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn try_insert(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		body: impl Into<Bytes>,
 	) -> Result {
 		if self.exists(path).await? {
@@ -257,7 +257,7 @@ impl BlobStore {
 	///
 	/// # Caution
 	/// Expensive operation - prefer [`BlobProvider::list`] + [`BlobProvider::get`]
-	pub async fn get_all(&self) -> Result<Vec<(RelPath, Bytes)>> {
+	pub async fn get_all(&self) -> Result<Vec<(FwdPath, Bytes)>> {
 		self.list()
 			.await?
 			.into_iter()
@@ -301,55 +301,55 @@ impl StoreBackend for BlobStore {
 
 impl BlobProvider for BlobStore {
 	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
+	fn with_subdir(&self, path: FwdPath) -> Box<dyn BlobProvider> {
 		self.provider.with_subdir(path)
 	}
 	fn base(&self) -> Box<dyn BlobProvider> { self.provider.base() }
 	fn rebase(
 		&self,
-		entry_name: &RelPath,
+		entry_name: &FwdPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobProvider>, RelPath)> {
+	) -> Result<(Box<dyn BlobProvider>, FwdPath)> {
 		self.provider.rebase(entry_name, root)
 	}
 	fn root_key(&self) -> SmolStr { self.provider.root_key() }
-	fn subdir(&self) -> RelPath { self.provider.subdir() }
+	fn subdir(&self) -> FwdPath { self.provider.subdir() }
 	fn watch_dir(&self) -> Option<AbsPath> { self.provider.watch_dir() }
 	fn base_dir(&self) -> Option<AbsPath> { self.provider.base_dir() }
 	fn did_change(&self, event: &BlobEvent) -> bool {
 		self.provider.did_change(event)
 	}
-	fn matches_object(&self, event: &BlobEvent, path: &RelPath) -> bool {
+	fn matches_object(&self, event: &BlobEvent, path: &FwdPath) -> bool {
 		self.provider.matches_object(event, path)
 	}
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &FwdPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.provider.insert(path, body)
 	}
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		self.provider.list()
 	}
-	fn list_dir(&self, path: &RelPath) -> SendBoxedFuture<Result<BlobDir>> {
+	fn list_dir(&self, path: &FwdPath) -> SendBoxedFuture<Result<BlobDir>> {
 		self.provider.list_dir(path)
 	}
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.provider.get(path)
 	}
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 		self.provider.exists(path)
 	}
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &FwdPath) -> SendBoxedFuture<Result> {
 		self.provider.remove(path)
 	}
 	fn conditional_writes(&self) -> bool { self.provider.conditional_writes() }
 	fn get_versioned(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 		self.provider.get_versioned(path)
 	}
 	fn insert_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		body: Bytes,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result<BlobVersion>> {
@@ -357,29 +357,29 @@ impl BlobProvider for BlobStore {
 	}
 	fn remove_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result> {
 		self.provider.remove_if(path, condition)
 	}
 	fn stat(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
 		self.provider.stat(path)
 	}
-	fn size(&self, path: &RelPath) -> SendBoxedFuture<Result<Option<u64>>> {
+	fn size(&self, path: &FwdPath) -> SendBoxedFuture<Result<Option<u64>>> {
 		self.provider.size(path)
 	}
-	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
+	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(FwdPath, BlobStat)>>> {
 		self.provider.list_stats()
 	}
-	fn empty_links(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn empty_links(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		self.provider.empty_links()
 	}
 	fn public_url(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		self.provider.public_url(path)
 	}
@@ -395,11 +395,11 @@ mod test {
 	async fn nested_store() -> BlobStore {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("a/b/main.bsx"), "<Router/>")
+			.insert(&fwd_path!("a/b/main.bsx"), "<Router/>")
 			.await
 			.unwrap();
 		store
-			.insert(&RelPath::from("a/shared.txt"), "shared")
+			.insert(&fwd_path!("a/shared.txt"), "shared")
 			.await
 			.unwrap();
 		store
@@ -415,14 +415,14 @@ mod test {
 			store.rebase_package("a/b/main.bsx", "..").unwrap();
 		entry_name.xpect_eq("b/main.bsx");
 		rebased
-			.get_media(&RelPath::from("b/main.bsx"))
+			.get_media(&fwd_path!("b/main.bsx"))
 			.await
 			.unwrap()
 			.as_utf8()
 			.unwrap()
 			.xpect_eq("<Router/>");
 		rebased
-			.get_media(&RelPath::from("shared.txt"))
+			.get_media(&fwd_path!("shared.txt"))
 			.await
 			.unwrap()
 			.as_utf8()
@@ -492,7 +492,7 @@ pub mod store_test {
 	/// A conditional write checked and written as one step: absent on an
 	/// existing object, matches on a changed one, and removes alike.
 	async fn conditional(store: &BlobStore) {
-		let path = RelPath::from("conditional/object");
+		let path = fwd_path!("conditional/object");
 		let is_conflict = |err: BevyError| {
 			err.downcast_ref::<BlobConflict>().is_some().xpect_true();
 		};
@@ -571,7 +571,7 @@ pub mod store_test {
 	/// as empty as it found it.
 	pub async fn run_objects(store: &BlobStore) {
 		let store = store.clone();
-		let path = RelPath::from("test_path");
+		let path = fwd_path!("test_path");
 		let body = bytes::Bytes::from("test_body");
 		store.exists(&path).await.unwrap().xpect_false();
 		// a miss names what was missed, so whoever reports it says which
@@ -597,7 +597,7 @@ pub mod store_test {
 			.xpect_eq(Some(stat.clone()));
 		store.size(&path).await.unwrap().xpect_eq(Some(9));
 		store
-			.size(&RelPath::from("missing"))
+			.size(&fwd_path!("missing"))
 			.await
 			.unwrap()
 			.xpect_none();
@@ -608,12 +608,12 @@ pub mod store_test {
 			.xpect_eq(vec![(path.clone(), stat)]);
 
 		// one directory's children by name, a missing directory empty
-		let leaf = RelPath::from("dir/nested/leaf.txt");
-		let file = RelPath::from("dir/file.txt");
+		let leaf = fwd_path!("dir/nested/leaf.txt");
+		let file = fwd_path!("dir/file.txt");
 		store.insert(&leaf, body.clone()).await.unwrap();
 		store.insert(&file, body.clone()).await.unwrap();
 		store
-			.list_dir(&RelPath::default())
+			.list_dir(&FwdPath::default())
 			.await
 			.unwrap()
 			.xpect_eq(BlobDir {
@@ -621,7 +621,7 @@ pub mod store_test {
 				files: vec!["test_path".into()],
 			});
 		store
-			.list_dir(&RelPath::from("dir"))
+			.list_dir(&fwd_path!("dir"))
 			.await
 			.unwrap()
 			.xpect_eq(BlobDir {
@@ -629,22 +629,22 @@ pub mod store_test {
 				files: vec!["file.txt".into()],
 			});
 		store
-			.list_dir(&RelPath::from("missing"))
+			.list_dir(&fwd_path!("missing"))
 			.await
 			.unwrap()
 			.xpect_eq(BlobDir::default());
 		// a subdir lists its own keys, never a sibling sharing its name's start
-		let sibling = RelPath::from("dir.txt");
+		let sibling = fwd_path!("dir.txt");
 		store.insert(&sibling, body.clone()).await.unwrap();
 		let mut listed = store
-			.with_subdir(RelPath::from("dir"))
+			.with_subdir(fwd_path!("dir"))
 			.list()
 			.await
 			.unwrap();
 		listed.sort();
 		listed.xpect_eq(vec![
-			RelPath::from("file.txt"),
-			RelPath::from("nested/leaf.txt"),
+			fwd_path!("file.txt"),
+			fwd_path!("nested/leaf.txt"),
 		]);
 		store.remove(&sibling).await.unwrap();
 		store.remove(&leaf).await.unwrap();

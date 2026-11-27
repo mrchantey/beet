@@ -93,7 +93,7 @@ pub fn Wasm(
 	} else {
 		js
 	};
-	let package = package.as_ref().map(StoreUri::http);
+	let package = package.as_ref().map(StoreUri::http).transpose()?;
 	let fork_mark = package.as_ref().map(StoreUri::fork_mark);
 	let launch = BootstrapConfig {
 		package,

@@ -141,7 +141,7 @@ mod test {
 		let url = |homepage: &str, path: &str| {
 			StandardSitePublication::from_declaration(
 				&StandardSitePub {
-					path: RelPath::new(path),
+					path: FwdPath::new(path).unwrap(),
 					..harvest()
 				},
 				&package(homepage),

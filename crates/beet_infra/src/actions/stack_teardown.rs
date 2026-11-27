@@ -47,7 +47,7 @@ pub async fn StackTeardown(
 	let project = terra::Project::resolve(&cx.caller).await?;
 	let deployment = project.deployment();
 	let backend = project.backend();
-	let state_path = deployment.backend_path(&project);
+	let state_path = deployment.backend_path(&project)?;
 	let [state, lock, work_dir, secrets] = StackTeardown::CARRIERS;
 
 	let store = backend.store()?;
@@ -57,11 +57,11 @@ pub async fn StackTeardown(
 	report(
 		lock,
 		store
-			.remove(&RelPath::new(format!("{state_path}.tflock")))
+			.remove(&FwdPath::new(format!("{state_path}.tflock"))?)
 			.await,
 	);
 	// the rendered config, lockfile and scratch files
-	report(work_dir, fs_ext::remove_async(&project.work_dir()).await);
+	report(work_dir, fs_ext::remove_async(&project.work_dir()?).await);
 	// what the actions minted outside terraform, which nothing else removes
 	report(secrets, sweep_secrets(project.secret_store()?).await);
 

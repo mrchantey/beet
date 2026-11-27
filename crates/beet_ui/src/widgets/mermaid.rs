@@ -218,7 +218,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&RelPath::from("flow.mmd"),
+				&fwd_path!("flow.mmd"),
 				"sequenceDiagram\nAlice->>Bob: hi\n",
 			)
 			.await
@@ -260,7 +260,7 @@ mod test {
 			&mut world.entity_mut(root),
 			&MediaBytes::new_markdown(&md),
 		)
-		.with_path(RelPath::new("docs/design/diagrams.md"))
+		.with_path(fwd_path!("docs/design/diagrams.md"))
 		.parse()
 		.unwrap();
 		// the include reads its file off a task

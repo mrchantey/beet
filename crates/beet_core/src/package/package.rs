@@ -101,7 +101,7 @@ pub struct Export {
 	/// What a dependent names, ie `.` or `widgets/*`.
 	pub key: SmolStr,
 	/// The file it names in this package.
-	pub path: RelPath,
+	pub path: FwdPath,
 }
 
 impl SceneMeta for Export {
@@ -131,7 +131,7 @@ impl SceneMeta for Export {
 	Deserialize,
 )]
 #[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
-pub struct Exports(pub BTreeMap<SmolStr, RelPath>);
+pub struct Exports(pub BTreeMap<SmolStr, FwdPath>);
 
 /// One dependency, a child of [`Package`]: by address, by path, or both, the
 /// path while developing and the address for everyone else. Keyed in
@@ -341,29 +341,29 @@ pub enum Platform {
 	/// A browser: the wasm module and its js glue.
 	Browser {
 		/// The wasm module.
-		wasm: RelPath,
+		wasm: FwdPath,
 		/// Its js glue.
-		js: RelPath,
+		js: FwdPath,
 	},
 	/// `x86_64-unknown-linux-gnu`.
 	LinuxX64 {
 		/// The binary.
-		bin: RelPath,
+		bin: FwdPath,
 	},
 	/// `aarch64-unknown-linux-gnu`.
 	LinuxArm64 {
 		/// The binary.
-		bin: RelPath,
+		bin: FwdPath,
 	},
 	/// `aarch64-apple-darwin`.
 	MacosArm64 {
 		/// The binary.
-		bin: RelPath,
+		bin: FwdPath,
 	},
 	/// `xtensa-esp32-none-elf`.
 	Esp32 {
 		/// The binary.
-		bin: RelPath,
+		bin: FwdPath,
 	},
 }
 

@@ -919,7 +919,7 @@ mod test {
 	#[beet_core::test]
 	fn coerces_string_to_abs_path() {
 		resolve::<AbsPath>(DataLiteral::Scalar(Value::str("assets")))
-			.xpect_eq(WsPath::new("assets").into_abs());
+			.xpect_eq(WsPath::from(fwd_path!("assets")).into_abs());
 	}
 
 	/// A store uri string coerces to its [`StoreUri`], the one spelling the

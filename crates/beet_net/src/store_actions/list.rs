@@ -5,17 +5,17 @@ use beet_core::prelude::*;
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
 pub struct ListBlobsProps {
 	/// Subdirectory path to list relative to the store root.
-	pub path: RelPath,
+	pub path: FwdPath,
 }
 
 /// List all blobs in the given subdirectory of the nearest ancestor [`BlobStore`].
 ///
-/// Outputs a [`Vec<RelPath>`] of blob paths relative to the given subdirectory.
+/// Outputs a [`Vec<FwdPath>`] of blob paths relative to the given subdirectory.
 #[action]
 #[derive(Component, Reflect)]
 pub async fn ListBlobs(
 	cx: ActionContext<ListBlobsProps>,
-) -> Result<Vec<RelPath>> {
+) -> Result<Vec<FwdPath>> {
 	let store = cx
 		.caller
 		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {
@@ -39,7 +39,7 @@ mod test {
 	async fn lists_empty_subdir() {
 		let store = BlobStore::temp();
 		let result = store
-			.with_subdir(RelPath::from("empty"))
+			.with_subdir(fwd_path!("empty"))
 			.list()
 			.await
 			.unwrap();
@@ -50,24 +50,24 @@ mod test {
 	async fn lists_blobs_in_subdir() {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("subdir/a.txt"), "aaa")
+			.insert(&fwd_path!("subdir/a.txt"), "aaa")
 			.await
 			.unwrap();
 		store
-			.insert(&RelPath::from("subdir/b.txt"), "bbb")
+			.insert(&fwd_path!("subdir/b.txt"), "bbb")
 			.await
 			.unwrap();
 		store
-			.insert(&RelPath::from("other/c.txt"), "ccc")
+			.insert(&fwd_path!("other/c.txt"), "ccc")
 			.await
 			.unwrap();
 
 		let mut result = store
-			.with_subdir(RelPath::from("subdir"))
+			.with_subdir(fwd_path!("subdir"))
 			.list()
 			.await
 			.unwrap();
 		result.sort();
-		result.xpect_eq(vec![RelPath::from("a.txt"), RelPath::from("b.txt")]);
+		result.xpect_eq(vec![fwd_path!("a.txt"), fwd_path!("b.txt")]);
 	}
 }

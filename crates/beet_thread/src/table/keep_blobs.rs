@@ -113,7 +113,7 @@ mod test {
 			],
 		));
 		if stored {
-			window.insert(MountThreadStore::new("threads"));
+			window.insert(MountThreadStore::new(fwd_path!("threads")));
 		}
 		let window = window.id();
 		match stored {

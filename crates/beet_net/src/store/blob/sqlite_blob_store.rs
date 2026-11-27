@@ -25,7 +25,7 @@ pub struct SqliteBlobStore {
 	/// Optional key prefix for every blob.
 	#[get(skip)]
 	#[reflect(default)]
-	subdir: Option<RelPath>,
+	subdir: Option<FwdPath>,
 }
 
 /// [`SqliteStore`]'s own default, so the two tags alone share one file.
@@ -47,7 +47,7 @@ impl SqliteBlobStore {
 	}
 
 	/// Set the key prefix for all blobs.
-	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<FwdPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
@@ -95,7 +95,7 @@ impl SqliteBlobStore {
 	}
 
 	/// The `path` column `path` keys to: the path under this store's subdir.
-	fn qualify(&self, path: &RelPath) -> String {
+	fn qualify(&self, path: &FwdPath) -> String {
 		match &self.subdir {
 			Some(sub) => format!("{sub}/{path}"),
 			None => path.to_string(),
@@ -190,7 +190,7 @@ impl StoreBackend for SqliteBlobStore {
 impl BlobProvider for SqliteBlobStore {
 	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
+	fn with_subdir(&self, path: FwdPath) -> Box<dyn BlobProvider> {
 		Box::new(Self {
 			path: self.path.clone(),
 			subdir: Some(match &self.subdir {
@@ -206,9 +206,9 @@ impl BlobProvider for SqliteBlobStore {
 
 	fn root_key(&self) -> SmolStr { format!("sqlite:{}", self.path).into() }
 
-	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
+	fn subdir(&self) -> FwdPath { self.subdir.clone().unwrap_or_default() }
 
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &FwdPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let key = self.qualify(path);
 		self.run(move |conn| {
 			conn.execute(
@@ -219,7 +219,7 @@ impl BlobProvider for SqliteBlobStore {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		let prefix = self.prefix();
 		self.run(move |conn| {
 			// `substr` rather than `LIKE`: a prefix holding `%` or `_` needs
@@ -232,15 +232,12 @@ impl BlobProvider for SqliteBlobStore {
 				params![prefix, prefix.chars().count() as i64],
 				|row| row.get::<_, String>(0),
 			)?
-			.map(|path| {
-				path.map(|path| RelPath::new(&path[prefix.len()..]))
-					.map_err(BevyError::from)
-			})
+			.map(|path| FwdPath::new(&path?[prefix.len()..]))
 			.collect()
 		})
 	}
 
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 		let key = self.qualify(path);
 		self.run(move |conn| {
 			conn.query_row(
@@ -254,7 +251,7 @@ impl BlobProvider for SqliteBlobStore {
 		})
 	}
 
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 		let key = self.qualify(path);
 		self.run(move |conn| {
 			conn.query_row(
@@ -268,7 +265,7 @@ impl BlobProvider for SqliteBlobStore {
 		})
 	}
 
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &FwdPath) -> SendBoxedFuture<Result> {
 		let key = self.qualify(path);
 		self.run(move |conn| {
 			match conn
@@ -284,7 +281,7 @@ impl BlobProvider for SqliteBlobStore {
 
 	fn get_versioned(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 		let key = self.qualify(path);
 		self.run(move |conn| Self::versioned_blob(conn, &key))
@@ -294,7 +291,7 @@ impl BlobProvider for SqliteBlobStore {
 	/// content's digest.
 	fn insert_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		body: Bytes,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result<BlobVersion>> {
@@ -317,7 +314,7 @@ impl BlobProvider for SqliteBlobStore {
 
 	fn remove_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result> {
 		let key = self.qualify(path);
@@ -336,7 +333,7 @@ impl BlobProvider for SqliteBlobStore {
 
 	fn public_url(
 		&self,
-		_path: &RelPath,
+		_path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
 	}
@@ -391,13 +388,13 @@ mod test {
 		let table = tables.table::<table_test::NamedRow>();
 		table.put(table_test::NamedRow::new("a", 1)).await.unwrap();
 		blobs.store_exists().await.unwrap().xpect_false();
-		blobs.insert(&RelPath::new("a.txt"), "a").await.unwrap();
+		blobs.insert(&fwd_path!("a.txt"), "a").await.unwrap();
 		table.put(table_test::NamedRow::new("b", 2)).await.unwrap();
 		blobs
 			.list()
 			.await
 			.unwrap()
-			.xpect_eq(vec![RelPath::new("a.txt")]);
+			.xpect_eq(vec![fwd_path!("a.txt")]);
 		blobs.store_remove().await.unwrap();
 		blobs.store_exists().await.unwrap().xpect_false();
 		table.list().await.unwrap().len().xpect_eq(2);
@@ -407,17 +404,17 @@ mod test {
 	#[beet_core::test]
 	async fn subdir_scopes_blobs() {
 		let store = BlobStore::new(SqliteBlobStore::from(database("subdir")));
-		let docs = store.with_subdir(RelPath::new("docs"));
-		docs.insert(&RelPath::new("a.txt"), "a").await.unwrap();
-		store.insert(&RelPath::new("b.txt"), "b").await.unwrap();
+		let docs = store.with_subdir(fwd_path!("docs"));
+		docs.insert(&fwd_path!("a.txt"), "a").await.unwrap();
+		store.insert(&fwd_path!("b.txt"), "b").await.unwrap();
 		docs.list()
 			.await
 			.unwrap()
-			.xpect_eq(vec![RelPath::new("a.txt")]);
+			.xpect_eq(vec![fwd_path!("a.txt")]);
 		store
 			.list()
 			.await
 			.unwrap()
-			.xpect_eq(vec![RelPath::new("b.txt"), RelPath::new("docs/a.txt")]);
+			.xpect_eq(vec![fwd_path!("b.txt"), fwd_path!("docs/a.txt")]);
 	}
 }

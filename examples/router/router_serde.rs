@@ -75,7 +75,7 @@ struct GreetRequest {
 
 fn setup(async_commands: AsyncCommands) {
 	let store = BlobStore::new(FsStore::new(WsPath::default()));
-	let path = RelPath::new(WORLD_SERDE_FILE);
+	let path = FwdPath::new(WORLD_SERDE_FILE);
 	// the process request, read once: its `--new` picks which scene loads,
 	// then the loaded server serves it
 	let request = Request::from_cli_args(CliArgs::parse_env());

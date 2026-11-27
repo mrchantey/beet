@@ -462,7 +462,7 @@ mod test {
 			),
 			("talk.pptx", talk()),
 		] {
-			store.insert(&RelPath::from(path), body).await.unwrap();
+			store.insert(&FwdPath::new(path).unwrap(), body).await.unwrap();
 		}
 		store
 	}

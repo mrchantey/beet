@@ -100,7 +100,7 @@ pub async fn SocialCards(
 	/// The font the text is set in, a TTF or OTF in the store: `fontdb` reads
 	/// neither `woff` nor `woff2`. A variable face serves both weights.
 	#[field]
-	font: RelPath,
+	font: FwdPath,
 	cx: ActionContext<BlobStore>,
 ) -> Result<EntityBody> {
 	let cards = SocialCards { font };
@@ -123,31 +123,39 @@ pub async fn SocialCards(
 
 impl SocialCards {
 	/// The directory the set is written to, in the store.
-	const DIR: &str = "assets/og";
+	const DIR: FwdPath = fwd_path!("assets/og");
 	/// The derived document listing the set.
-	const DOCUMENT: &str = "social-cards.json";
+	const DOCUMENT: FwdPath = fwd_path!("social-cards.json");
 
 	/// The cards set in `font`.
-	pub fn new(font: impl Into<RelPath>) -> Self { Self { font: font.into() } }
+	pub fn new(font: impl Into<FwdPath>) -> Self { Self { font: font.into() } }
 
 	/// The [`Derivation`] this set declares, its document in `assets/og`
 	/// naming the font and the resources the frame is drawn from; the logo,
 	/// the pages and their values join it as the world names them
 	/// ([`refresh_inputs`](Self::refresh_inputs)).
 	pub fn derivation(&self) -> Derivation {
-		Derivation::new(RelPath::new(Self::DIR).join(Self::DOCUMENT))
+		Derivation::new(Self::DIR.join(&Self::DOCUMENT))
 			.with_input(self.font.clone())
 			.with_resource_type::<ThemeTones>()
 			.with_resource_type::<PackageConfig>()
 	}
 
 	/// The store path of the card for the page at route `path`.
-	pub fn card(path: &RelPath) -> RelPath {
-		let name = match path.as_str() {
-			"" => "index",
-			path => path,
-		};
-		RelPath::new(Self::DIR).join(format!("{name}.png"))
+	///
+	/// # Errors
+	/// Errors only when the card's name is no path, which a route's never is.
+	pub fn card(path: &FwdPath) -> Result<FwdPath> {
+		Self::DIR.try_join(Self::card_name(path))
+	}
+
+	/// The card's file name below [`DIR`](Self::DIR), the route's path with
+	/// `.png` appended, the root's `index.png`.
+	fn card_name(path: &FwdPath) -> String {
+		match path.as_str() {
+			"" => "index.png".into(),
+			path => format!("{path}.png"),
+		}
 	}
 
 	/// The page whose card a page at route `route` previews with: its own when
@@ -255,7 +263,7 @@ impl SocialCardQuery<'_, '_> {
 		let package = self.syndication.package();
 		SocialCards::previewed(&listed, route)
 			.and_then(|page| {
-				let href = IconSet::href(&SocialCards::card(&page.path));
+				let href = IconSet::href(&SocialCards::card(&page.path).ok()?);
 				let url = package.absolute_url(&href).ok()?;
 				Some((url, CardText::new(&page.meta, package).alt()))
 			})
@@ -325,7 +333,7 @@ impl SocialCardsQuery<'_, '_> {
 	fn pages(
 		&self,
 		cards: Entity,
-	) -> Result<Vec<(SyndicationPage, Option<RelPath>)>> {
+	) -> Result<Vec<(SyndicationPage, Option<FwdPath>)>> {
 		let store = self.stores.get(cards)?;
 		self.syndication
 			.listed(cards, &default())?
@@ -339,7 +347,7 @@ impl SocialCardsQuery<'_, '_> {
 
 	/// The sources the set at `cards` reads beside its font, as far as the
 	/// world can name them now: the logo and each page's source file.
-	fn inputs(&self, cards: Entity) -> Vec<RelPath> {
+	fn inputs(&self, cards: Entity) -> Vec<FwdPath> {
 		let logo = self.logo().ok().flatten().map(|logo| logo.src);
 		let sources = self
 			.pages(cards)
@@ -355,7 +363,7 @@ impl SocialCardsQuery<'_, '_> {
 	/// the drawing could.
 	fn values(&self, cards: Entity) -> Vec<ProvenanceValue> {
 		self.pages(cards).into_iter().flatten().map(|(page, _)| {
-			let card = SocialCards::card(&page.path);
+			let card = format!("{}/{}", SocialCards::DIR, SocialCards::card_name(&page.path));
 			// a poster url is only ever a video's, so the url implies the badge
 			let media = page.meta.social_image_url().map(|url| url.to_string());
 			let credit = page.meta.credit_line();
@@ -408,7 +416,7 @@ impl SocialCardsQuery<'_, '_> {
 		&self,
 		store: &BlobStore,
 		page: &SyndicationPage,
-	) -> Result<Option<RelPath>> {
+	) -> Result<Option<FwdPath>> {
 		let Ok(blob) = self.blobs.get(page.route) else {
 			return Ok(None);
 		};
@@ -423,7 +431,7 @@ impl SocialCardsQuery<'_, '_> {
 					blob.path()
 				)
 			})?;
-		subdir.join(blob.path().as_str()).xmap(Some).xok()
+		subdir.join(blob.path()).xmap(Some).xok()
 	}
 }
 
@@ -445,12 +453,12 @@ struct CardSet {
 #[cfg(feature = "site_images")]
 struct CardPage {
 	/// The route path, ie `blog/ecs-router`.
-	path: RelPath,
+	path: FwdPath,
 	/// The page's authored metadata.
 	meta: DocMeta,
 	/// The page's source file in the store the cards are derived in, `None`
 	/// for a page declared in code.
-	source: Option<RelPath>,
+	source: Option<FwdPath>,
 }
 
 #[cfg(feature = "site_images")]
@@ -529,7 +537,7 @@ impl CardSet {
 		font: Vec<u8>,
 		logo: Option<Vec<u8>>,
 		media: Vec<Option<Vec<u8>>>,
-	) -> Result<Vec<(RelPath, Vec<u8>)>> {
+	) -> Result<Vec<(FwdPath, Vec<u8>)>> {
 		let font = CardFont::new(font)?;
 		let logo = self
 			.logo
@@ -551,7 +559,7 @@ impl CardSet {
 					.transpose()?;
 				let card = Card::new(&font, &self.package, page, media)?
 					.render(&font, &palette, logo.as_deref())?;
-				(SocialCards::card(&page.path), card).xok()
+				(SocialCards::card(&page.path)?, card).xok()
 			})
 			.collect()
 	}
@@ -568,7 +576,7 @@ impl CardSources {
 	async fn file(
 		&mut self,
 		store: &BlobStore,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> Result<Vec<u8>> {
 		let bytes = store.get(path).await?.to_vec();
 		self.push(ProvenanceSource::file(path.clone(), &bytes));
@@ -587,14 +595,17 @@ impl CardSources {
 	) -> Result<Vec<u8>> {
 		if !url.is_external() {
 			let path = match url.is_rooted() {
-				true => RelPath::from_segments(url.path()),
+				true => url.fwd_path()?,
 				// a page-relative image resolves beside the page, as a
-				// browser resolves it against the page's url
+				// browser resolves it against the page's url, never above
+				// the site's root
 				false => page
 					.path
 					.parent()
 					.unwrap_or_default()
-					.join(url.path().join("/")),
+					.as_smol_path()
+					.join(url.path().join("/"))
+					.xmap(FwdPath::new)?,
 			};
 			return self.file(store, &path).await.map_err(|err| {
 				bevyhow!(
@@ -1236,7 +1247,7 @@ mod test {
 	/// A Latin subset of Inter Bold, the font every test card is set in.
 	const FONT: &[u8] = include_bytes!("fixtures/inter-bold-latin.ttf");
 	/// Where the test store holds [`FONT`].
-	const FONT_PATH: &str = "fonts/inter.ttf";
+	const FONT_PATH: FwdPath = fwd_path!("fonts/inter.ttf");
 
 	/// A `width` by `height` png of one `color`.
 	fn png(width: u32, height: u32, color: [u8; 4]) -> Vec<u8> {
@@ -1278,19 +1289,19 @@ mod test {
 		let inner = InMemoryBlobStore::new();
 		let store = BlobStore::new(inner.clone());
 		store
-			.insert(&RelPath::new(FONT_PATH), FONT.to_vec())
+			.insert(&FwdPath::new(FONT_PATH).unwrap(), FONT.to_vec())
 			.await
 			.unwrap();
 		for (path, bytes) in files {
 			store
-				.insert(&RelPath::new(*path), bytes.clone())
+				.insert(&FwdPath::new(*path).unwrap(), bytes.clone())
 				.await
 				.unwrap();
 		}
 		let mut world = world();
 		world
 			.spawn((inner, Router, children![
-				RoutesDir::new("routes"),
+				RoutesDir::new(fwd_path!("routes")),
 				SocialCards::new(FONT_PATH),
 			]))
 			.flush();
@@ -1341,7 +1352,7 @@ mod test {
 
 	/// The card at `path` in `store`.
 	async fn card(store: &BlobStore, path: &str) -> image::RgbaImage {
-		image::load_from_memory(&store.get(&RelPath::new(path)).await.unwrap())
+		image::load_from_memory(&store.get(&FwdPath::new(path).unwrap()).await.unwrap())
 			.unwrap()
 			.into_rgba8()
 	}
@@ -1377,12 +1388,12 @@ mod test {
 		let (mut world, cards, store) = setup(&two_pages()).await;
 		ensure(&mut world, cards, &store).await;
 		let before = store
-			.get(&RelPath::new("assets/og/blog/post.png"))
+			.get(&fwd_path!("assets/og/blog/post.png"))
 			.await
 			.unwrap();
 		store
 			.insert(
-				&RelPath::new("routes/blog/post.md"),
+				&fwd_path!("routes/blog/post.md"),
 				post("A Renamed Post", ""),
 			)
 			.await
@@ -1393,7 +1404,7 @@ mod test {
 			.to_string()
 			.xpect_eq("value `assets/og/blog/post.png` changed");
 		(store
-			.get(&RelPath::new("assets/og/blog/post.png"))
+			.get(&fwd_path!("assets/og/blog/post.png"))
 			.await
 			.unwrap() != before)
 			.xpect_true();
@@ -1443,19 +1454,19 @@ mod test {
 		let (mut world, cards, store) = setup(&two_pages()).await;
 		ensure(&mut world, cards, &store).await;
 		store
-			.insert(&RelPath::new("routes/blog/next.md"), post("Next", ""))
+			.insert(&fwd_path!("routes/blog/next.md"), post("Next", ""))
 			.await
 			.unwrap();
 		settle(&mut world).await;
 		ensure(&mut world, cards, &store).await.xpect_eq(
-			Freshness::Redeclared(RelPath::new("routes/blog/next.md")),
+			Freshness::Redeclared(fwd_path!("routes/blog/next.md")),
 		);
 		outputs(&store)
 			.await
 			.contains(&"assets/og/blog/next.png".to_string())
 			.xpect_true();
 		store
-			.remove(&RelPath::new("routes/blog/post.md"))
+			.remove(&fwd_path!("routes/blog/post.md"))
 			.await
 			.unwrap();
 		settle(&mut world).await;
@@ -1467,7 +1478,7 @@ mod test {
 			.await
 			.xpect_eq(vec!["assets/og/index.png", "assets/og/blog/next.png"]);
 		store
-			.exists(&RelPath::new("assets/og/blog/post.png"))
+			.exists(&fwd_path!("assets/og/blog/post.png"))
 			.await
 			.unwrap()
 			.xpect_false();
@@ -1506,7 +1517,7 @@ mod test {
 		drawn.get_pixel(1150, 450).0.xpect_eq(background);
 		store
 			.insert(
-				&RelPath::new("media/cover.png"),
+				&fwd_path!("media/cover.png"),
 				png(800, 450, [0, 0, 255, 255]),
 			)
 			.await
@@ -1603,7 +1614,7 @@ mod test {
 		let palette = CardPalette::new(&ThemeTones::default()).unwrap();
 		let svg = |meta: DocMeta, media: Option<CardMedia>| {
 			let page = CardPage {
-				path: RelPath::new("post"),
+				path: fwd_path!("post"),
 				meta: DocMeta {
 					title: Some("A Post".into()),
 					description: Some("about it".into()),
@@ -1673,7 +1684,7 @@ mod test {
 		let font = CardFont::new(FONT.to_vec()).unwrap();
 		let lines = |title: &str, media: bool| {
 			let page = CardPage {
-				path: RelPath::new("post"),
+				path: fwd_path!("post"),
 				meta: DocMeta {
 					title: Some(title.into()),
 					description: Some("a beet in every pot ".repeat(60)),

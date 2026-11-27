@@ -214,7 +214,7 @@ mod test {
 			.flush();
 		world
 			.resource_mut::<RequestContextStack>()
-			.push(RequestContext::new(parts, route, route, route));
+			.push(RequestContext::new(parts, route, route, route).unwrap());
 		world
 	}
 
@@ -285,17 +285,17 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&RelPath::new("HeadLayout.bsx"),
+				&fwd_path!("HeadLayout.bsx"),
 				"<html><RouteHead/><body><slot/></body></html>",
 			)
 			.await
 			.unwrap();
 		let root = spawn_syndication_router(&mut world, rsx! {
-			<SocialCards font="fonts/inter.ttf"/>
+			<SocialCards font={fwd_path!("fonts/inter.ttf")}/>
 		});
 		world
 			.entity_mut(root)
-			.insert((store, Layout::document("HeadLayout.bsx")));
+			.insert((store, Layout::document(fwd_path!("HeadLayout.bsx"))));
 		let mut head = async |path: &str| {
 			world
 				.entity_mut(root)
@@ -330,7 +330,7 @@ mod test {
 			.xnot()
 			.xpect_contains("rel=\"icon\"");
 		let mut world = layout_world(request("", MediaType::Html));
-		world.spawn(IconSet::new("assets/logo/logo.png"));
+		world.spawn(IconSet::new(fwd_path!("assets/logo/logo.png")));
 		render_world(&mut world)
 			.xpect_contains("href=\"/assets/logo/favicon.ico\"")
 			.xpect_contains("href=\"/assets/logo/icon-180.png\"")

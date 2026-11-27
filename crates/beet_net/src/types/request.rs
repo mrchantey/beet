@@ -438,11 +438,6 @@ impl Request {
 		self
 	}
 
-	/// Returns the path as a [`RelPath`].
-	pub fn route_path(&self) -> RelPath {
-		RelPath::new(self.parts.path_string())
-	}
-
 	/// Returns a reference to the request parts
 	pub fn request_parts(&self) -> &RequestParts { &self.parts }
 
@@ -836,12 +831,6 @@ mod test {
 
 		request.get_param("limit").unwrap().xpect_eq("10");
 		request.get_param("offset").unwrap().xpect_eq("20");
-	}
-
-	#[beet_core::test]
-	fn request_route_path() {
-		let request = Request::get("/api/users/123");
-		request.route_path().to_string().xpect_eq("api/users/123");
 	}
 
 	#[beet_core::test]

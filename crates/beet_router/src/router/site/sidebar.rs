@@ -14,8 +14,8 @@
 //! # use beet_router::prelude::*;
 //! # use beet_core::prelude::*;
 //! # use beet_ui::prelude::*;
-//! let state = SidebarState::new("docs/getting-started")
-//!     .with_info("docs", SidebarInfo {
+//! let state = SidebarState::new(fwd_path!("docs/getting-started"))
+//!     .with_info(fwd_path!("docs"), SidebarInfo {
 //!         label: Some("Documentation".into()),
 //!         ..default()
 //!     });
@@ -72,20 +72,20 @@ pub fn RouteHead(
 	// no address of its own, so it claims none.
 	let omit_canonical =
 		statuses.get(cx.content()).is_ok_and(PageStatus::is_error);
-	let url = pkg.absolute_url(&cx.current_path()).ok();
+	let url = pkg.absolute_url(cx.current_path().as_str()).ok();
 	let noindex = route_metas
 		.get(cx.route())
 		.is_ok_and(|route| route.visibility == RouteVisibility::Unlisted);
 	let icons = match icon_sets.iter().collect::<Vec<_>>().as_slice() {
 		[] => None,
-		[icon_set] => Some(icon_links(icon_set)),
+		[icon_set] => Some(icon_links(icon_set)?),
 		_ => bevybail!(
 			"more than one `IconSet` declared: a site has one set of icons"
 		),
 	};
 	let (social_image, social_image_alt) = cards.preview(cx.route())?.unzip();
 	let records = standard_site
-		.links(&RelPath::new(cx.current_path()))
+		.links(cx.current_path())
 		.into_iter()
 		.map(|(rel, href)| rsx! { <link rel={rel} href={href}/> })
 		.collect::<Vec<_>>();
@@ -101,9 +101,9 @@ pub fn RouteHead(
 }
 
 /// The `<link>`s naming `icon_set`'s icons and its web app manifest.
-fn icon_links(icon_set: &IconSet) -> impl Bundle {
+fn icon_links(icon_set: &IconSet) -> Result<impl Bundle> {
 	let icons = icon_set
-		.links()
+		.links()?
 		.into_iter()
 		.map(|link| {
 			let dark = link.dark_href.map(|href| href.to_string());
@@ -123,6 +123,7 @@ fn icon_links(icon_set: &IconSet) -> impl Bundle {
 		{icons}
 		<link rel="manifest" href=manifest/>
 	}
+	.xok()
 }
 
 /// The bound text child of the route `<title>`: a [`Value`] seeded with the
@@ -189,7 +190,7 @@ pub fn RouteSidebar(
 		.get(cx.router())
 		.map(|tree| {
 			let mut state =
-				SidebarState::new(cx.current_path()).with_home(home);
+				SidebarState::new(cx.current_path().clone()).with_home(home);
 			for pattern in &exclude {
 				state = state.with_exclude(pattern);
 			}
@@ -254,9 +255,9 @@ impl SidebarInfo {
 #[derive(Debug, Clone)]
 pub struct SidebarState {
 	/// The current page path, used for active-link detection and auto-expansion.
-	pub current_path: RelPath,
+	pub current_path: FwdPath,
 	/// Per-path override configuration.
-	pub infos: HashMap<RelPath, SidebarInfo>,
+	pub infos: HashMap<FwdPath, SidebarInfo>,
 	/// Glob filter for paths whose subtree is omitted from the nav (eg infra
 	/// routes like `app-info`/`analytics`). Allows every path by default.
 	pub filter: GlobFilter,
@@ -267,7 +268,7 @@ pub struct SidebarState {
 
 impl SidebarState {
 	/// Create a new collector targeting the given current path.
-	pub fn new(current_path: impl Into<RelPath>) -> Self {
+	pub fn new(current_path: impl Into<FwdPath>) -> Self {
 		Self {
 			current_path: current_path.into(),
 			infos: HashMap::default(),
@@ -286,7 +287,7 @@ impl SidebarState {
 	/// Set the override for a specific path.
 	pub fn with_info(
 		mut self,
-		path: impl Into<RelPath>,
+		path: impl Into<FwdPath>,
 		info: SidebarInfo,
 	) -> Self {
 		self.infos.insert(path.into(), info);
@@ -329,7 +330,7 @@ impl SidebarState {
 	fn home_node(&self) -> SidebarNode {
 		SidebarNode {
 			display_name: "Home".into(),
-			path: Some(RelPath::default()),
+			path: Some(FwdPath::default()),
 			children: Vec::new(),
 			expanded: false,
 			active: self.current_path.segments().is_empty(),
@@ -339,7 +340,7 @@ impl SidebarState {
 	/// Recursively collect a tree node, returning `None` when it has neither a
 	/// route nor any routable children.
 	fn collect_node(&self, tree: &RouteTree) -> Option<SidebarNode> {
-		let path = tree.path.annotated_path();
+		let path = tree.path.annotated_path().clone();
 		let info = self.infos.get(&path);
 		let children: Vec<SidebarNode> = self
 			.sort_children(tree)
@@ -383,7 +384,7 @@ impl SidebarState {
 	/// The display label: the page's own (its `sidebar_label`, else its
 	/// title), else its last segment in title case, so a page with no title,
 	/// `color_schemes`, reads `Color Schemes`.
-	fn label(&self, path: &RelPath, info: Option<&SidebarInfo>) -> String {
+	fn label(&self, path: &FwdPath, info: Option<&SidebarInfo>) -> String {
 		info.and_then(|info| info.label.clone()).unwrap_or_else(|| {
 			path.last_segment_title().unwrap_or_else(|| "Home".into())
 		})
@@ -401,7 +402,7 @@ impl SidebarState {
 		children.sort_by(|a, b| {
 			let path_a = a.path.annotated_path();
 			let path_b = b.path.annotated_path();
-			let order = |path: &RelPath| {
+			let order = |path: &FwdPath| {
 				self.infos
 					.get(path)
 					.and_then(|info| info.order)
@@ -418,7 +419,7 @@ impl SidebarState {
 	}
 
 	/// Whether the current path is at or beneath the given path.
-	fn is_ancestor_of_current(&self, path: &RelPath) -> bool {
+	fn is_ancestor_of_current(&self, path: &FwdPath) -> bool {
 		let prefix = path.segments();
 		prefix.is_empty() || self.current_path.segments().starts_with(&prefix)
 	}
@@ -537,7 +538,7 @@ mod test {
 			.flush();
 		let tree = tree_of(&mut world, root);
 
-		let nodes = SidebarState::new("about").collect(&tree);
+		let nodes = SidebarState::new(fwd_path!("about")).collect(&tree);
 		// home + about + docs
 		nodes.len().xpect_eq(3);
 		nodes[0].display_name.as_str().xpect_eq("Home");
@@ -553,7 +554,7 @@ mod test {
 			.flush();
 		let tree = tree_of(&mut world, root);
 
-		let nodes = SidebarState::new("about").collect(&tree);
+		let nodes = SidebarState::new(fwd_path!("about")).collect(&tree);
 		// home is not active, the `about` leaf is
 		nodes[0].active.xpect_false();
 		nodes[1].active.xpect_true();
@@ -566,7 +567,7 @@ mod test {
 		let root = world.spawn(children![page_route("about")]).flush();
 		let tree = tree_of(&mut world, root);
 
-		let nodes = SidebarState::new("").collect(&tree);
+		let nodes = SidebarState::new(fwd_path!("")).collect(&tree);
 		nodes[0].active.xpect_true();
 	}
 
@@ -584,7 +585,7 @@ mod test {
 			.flush();
 		let tree = tree_of(&mut world, root);
 
-		let nodes = SidebarState::new("docs/intro").collect(&tree);
+		let nodes = SidebarState::new(fwd_path!("docs/intro")).collect(&tree);
 		// home, about, docs(branch)
 		let docs = nodes.iter().find(|n| n.display_name == "Docs").unwrap();
 		docs.expanded.xpect_true();
@@ -609,7 +610,7 @@ mod test {
 			.flush();
 		let tree = tree_of(&mut world, root);
 
-		let nodes = SidebarState::new("docs/intro").collect(&tree);
+		let nodes = SidebarState::new(fwd_path!("docs/intro")).collect(&tree);
 		nodes
 			.iter()
 			.find(|n| n.display_name == "Docs")
@@ -630,8 +631,8 @@ mod test {
 		let root = world.spawn(children![page_route("about")]).flush();
 		let tree = tree_of(&mut world, root);
 
-		let nodes = SidebarState::new("")
-			.with_info("about", SidebarInfo {
+		let nodes = SidebarState::new(fwd_path!(""))
+			.with_info(fwd_path!("about"), SidebarInfo {
 				label: Some("About Us".into()),
 				..default()
 			})
@@ -665,9 +666,9 @@ mod test {
 		};
 
 		// production: an unlisted page is reachable by its link alone
-		let nodes = SidebarState::new("about")
+		let nodes = SidebarState::new(fwd_path!("about"))
 			.with_info(
-				"about",
+				fwd_path!("about"),
 				SidebarInfo::of_page(
 					&page(RouteVisibility::Unlisted),
 					None,
@@ -675,7 +676,7 @@ mod test {
 				),
 			)
 			.with_info(
-				"docs",
+				fwd_path!("docs"),
 				SidebarInfo::of_page(&page(RouteVisibility::Draft), None, true),
 			)
 			.collect(&tree);
@@ -700,8 +701,8 @@ mod test {
 		let tree = tree_of(&mut world, root);
 
 		// give zulu a lower order so it sorts ahead of alpha
-		let nodes = SidebarState::new("")
-			.with_info("zulu", SidebarInfo {
+		let nodes = SidebarState::new(fwd_path!(""))
+			.with_info(fwd_path!("zulu"), SidebarInfo {
 				order: Some(0),
 				..default()
 			})
@@ -713,19 +714,19 @@ mod test {
 
 	#[beet_core::test]
 	fn is_ancestor_of_current() {
-		let state = SidebarState::new("docs/getting-started");
+		let state = SidebarState::new(fwd_path!("docs/getting-started"));
 		state
-			.is_ancestor_of_current(&RelPath::new("docs"))
+			.is_ancestor_of_current(&fwd_path!("docs"))
 			.xpect_true();
 		state
-			.is_ancestor_of_current(&RelPath::new("docs/getting-started"))
+			.is_ancestor_of_current(&fwd_path!("docs/getting-started"))
 			.xpect_true();
 		state
-			.is_ancestor_of_current(&RelPath::new("blog"))
+			.is_ancestor_of_current(&fwd_path!("blog"))
 			.xpect_false();
 		// root is ancestor of everything
 		state
-			.is_ancestor_of_current(&RelPath::default())
+			.is_ancestor_of_current(&FwdPath::default())
 			.xpect_true();
 	}
 
@@ -740,8 +741,8 @@ mod test {
 		let tree = tree_of(&mut world, root);
 
 		// current path is NOT under docs, but force expansion
-		let nodes = SidebarState::new("about")
-			.with_info("docs", SidebarInfo {
+		let nodes = SidebarState::new(fwd_path!("about"))
+			.with_info(fwd_path!("docs"), SidebarInfo {
 				expanded: Some(true),
 				..default()
 			})
@@ -764,7 +765,7 @@ mod test {
 			.flush();
 		let tree = tree_of(&mut world, root);
 
-		let nodes = SidebarState::new("docs").collect(&tree);
+		let nodes = SidebarState::new(fwd_path!("docs")).collect(&tree);
 		let docs = nodes.iter().find(|n| n.display_name == "Docs").unwrap();
 		// branch carries its own route, and is active at /docs
 		docs.path.is_some().xpect_true();
@@ -783,7 +784,7 @@ mod test {
 			])
 			.flush();
 		let tree = tree_of(&mut world, root);
-		let nodes = SidebarState::new("docs/intro").collect(&tree);
+		let nodes = SidebarState::new(fwd_path!("docs/intro")).collect(&tree);
 
 		let html = render_sidebar(&mut world, nodes);
 		html.xpect_contains("aria-current")

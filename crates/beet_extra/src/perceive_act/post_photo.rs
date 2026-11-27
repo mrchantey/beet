@@ -138,7 +138,7 @@ mod test {
 		for index in 0..2u8 {
 			store
 				.insert(
-					&RelPath::from(format!("assets/floor-photos/{index}.jpg")),
+					&FwdPath::new(format!("assets/floor-photos/{index}.jpg")).unwrap(),
 					vec![index],
 				)
 				.await

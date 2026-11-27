@@ -18,7 +18,7 @@ use std::path::PathBuf;
 /// - the empty path is `""` (see [`SmolPath::default`])
 ///
 /// A path with a known relationship to a root is one of the opinionated
-/// newtypes over it: a [`RelPath`] is a key within a store, an [`AbsPath`] a
+/// newtypes over it: a [`FwdPath`] is a key within a store, an [`AbsPath`] a
 /// filesystem location, a [`WsPath`] a location relative to the workspace.
 ///
 /// Backed by [`SmolStr`] for cheap clones and a small inline representation.
@@ -53,6 +53,12 @@ impl SmolPath {
 			"." => Self::default(),
 			cleaned => Self(SmolStr::new(cleaned)),
 		}
+	}
+
+	/// Wrap static text that is already [`path_ext::clean`] output, in a
+	/// `const` context.
+	pub(crate) const fn new_static_unchecked(path: &'static str) -> Self {
+		Self(SmolStr::new_static(path))
 	}
 
 	/// Wrap text that is already [`path_ext::clean`] output.

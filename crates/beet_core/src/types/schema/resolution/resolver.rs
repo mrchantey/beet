@@ -96,7 +96,9 @@ impl<'a> SchemaResolver<'a> {
 			SchemaRef::Name(name) | SchemaRef::TypePath(name) => {
 				self.schema(name)
 			}
-			SchemaRef::Document(path) => self.located(&path.rel_path()),
+			SchemaRef::Document(path) => {
+				path.fwd_path().ok().and_then(|path| self.located(&path))
+			}
 			SchemaRef::AtField(_) => None,
 		}
 	}
@@ -106,7 +108,7 @@ impl<'a> SchemaResolver<'a> {
 	///
 	/// Resolution by *location*: a second way in to the one stored schema, not
 	/// a second copy of it.
-	pub fn located(&self, path: &RelPath) -> Option<&'a ValueSchema> {
+	pub fn located(&self, path: &FwdPath) -> Option<&'a ValueSchema> {
 		self.schemas?.located(path)
 	}
 
@@ -146,7 +148,7 @@ impl ValueSchema {
 				.unwrap_or(ValueSchema::Any)
 				.xok(),
 			Self::Ref(SchemaRef::Document(path)) => resolver
-				.located(&path.rel_path())
+				.located(&path.fwd_path()?)
 				.cloned()
 				.unwrap_or(ValueSchema::Any)
 				.xok(),

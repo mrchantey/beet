@@ -263,7 +263,7 @@ fn failed_file_context(
 	// the panic location may sit in a dependency (an absolute path) or be
 	// unreadable on wasm; fall back to no source context rather than failing the
 	// whole suite log (which would mask the actual test error).
-	let path = outcome.path(test).into_abs();
+	let path = AbsPath::of_source_file(&outcome.path(test));
 	let Ok(file) = fs_ext::read_to_string(path) else {
 		return Ok(String::new());
 	};

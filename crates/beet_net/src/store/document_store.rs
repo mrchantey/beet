@@ -17,7 +17,7 @@ impl BlobStore {
 	pub async fn get_document(
 		&self,
 		resolver: SchemaResolver<'_>,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> Result<TypedDocument> {
 		let bytes =
 			MediaBytes::new(document_media_type(path), self.get(path).await?);
@@ -28,7 +28,7 @@ impl BlobStore {
 	/// re-saves identically.
 	pub async fn insert_document(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		document: &TypedDocument,
 	) -> Result {
 		let (_, bytes) = document.to_bytes(document_media_type(path))?.take();
@@ -38,7 +38,7 @@ impl BlobStore {
 
 /// The format a document at `path` is stored in: the one its extension names,
 /// json for a path naming none.
-pub(crate) fn document_media_type(path: &RelPath) -> MediaType {
+pub(crate) fn document_media_type(path: &FwdPath) -> MediaType {
 	path.media_type().unwrap_or(MediaType::Json)
 }
 
@@ -69,7 +69,9 @@ pub(crate) fn read_located_schemas(
 			continue;
 		};
 		let document = path.clone();
-		if registry.located(&document.rel_path()).is_some()
+		if document
+			.fwd_path()
+			.is_ok_and(|path| registry.located(&path).is_some())
 			|| !Loading::may_read(loading)
 		{
 			continue;
@@ -99,7 +101,7 @@ async fn read_located_schema(
 	snapshot: SchemaRegistry,
 	document: DocPath,
 ) -> Result<Read> {
-	let path = document.rel_path();
+	let path = document.fwd_path()?;
 	// `None` while no store has arrived above it: one legitimately lands frames
 	// after the tree that reads it
 	let Some(blob) = entity
@@ -117,7 +119,7 @@ async fn read_located_schema(
 		.get_document(SchemaResolver::default().with_schemas(&snapshot), &full)
 		.await?
 		.to_schema()?
-		.resolve_documents(&full);
+		.resolve_documents(&full)?;
 	entity
 		.world()
 		.with(move |world: &mut World| {
@@ -153,16 +155,16 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert_document(
-				&RelPath::from("schema.json"),
+				&fwd_path!("schema.json"),
 				&TypedDocument::schema_document(&todo_schema()).unwrap(),
 			)
 			.await
 			.unwrap();
 		store
 			.insert_document(
-				&RelPath::from("todos.json"),
+				&fwd_path!("todos.json"),
 				&TypedDocument::new(
-					ValueSchema::document("schema.json"),
+					ValueSchema::document(fwd_path!("schema.json")),
 					value!({ "label": "buy milk" }),
 				),
 			)
@@ -177,7 +179,7 @@ mod test {
 		let resolver = SchemaResolver::default().with_schemas(&registry);
 		let store = todo_store().await;
 		store
-			.get_document(resolver, &RelPath::from("schema.json"))
+			.get_document(resolver, &fwd_path!("schema.json"))
 			.await
 			.unwrap()
 			.to_schema()
@@ -191,12 +193,12 @@ mod test {
 	async fn a_located_schema_resolves_after_it_arrives() {
 		let mut registry = SchemaRegistry::default();
 		let store = todo_store().await;
-		let path = RelPath::from("schema.json");
+		let path = fwd_path!("schema.json");
 
 		let mut document = store
 			.get_document(
 				SchemaResolver::default().with_schemas(&registry),
-				&RelPath::from("todos.json"),
+				&fwd_path!("todos.json"),
 			)
 			.await
 			.unwrap();
@@ -244,13 +246,13 @@ mod test {
 			app.add_plugins((MinimalPlugins, AsyncPlugin, StorePlugin));
 			let store = todo_store().await;
 			app.world_mut().spawn((store, children![DocumentSchema(
-				ValueSchema::document(authored)
+				ValueSchema::document(FwdPath::new(authored).unwrap())
 			)]));
 			app.update_async().await;
 			let registry = app.world().resource::<SchemaRegistry>();
 			for path in [authored, "schema.json"] {
 				registry
-					.located(&RelPath::from(path))
+					.located(&FwdPath::new(path).unwrap())
 					.unwrap()
 					.xpect_eq(todo_schema());
 			}

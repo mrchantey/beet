@@ -13,17 +13,17 @@ use beet_net::prelude::*;
 /// never do.
 pub struct InstancePrefab {
 	/// The document's path in its package, its extension written.
-	path: RelPath,
+	path: FwdPath,
 	source: Arc<DocumentSource>,
 	/// The props the document declares.
 	props: Vec<Prop>,
 	/// The documents it instantiates, package absolute.
-	instances: Vec<RelPath>,
+	instances: Vec<FwdPath>,
 }
 
 impl InstancePrefab {
 	/// The document's path in its package.
-	pub fn path(&self) -> &RelPath { &self.path }
+	pub fn path(&self) -> &FwdPath { &self.path }
 
 	/// What one use builds.
 	///
@@ -47,8 +47,8 @@ pub struct PrefabCache(HashMap<PrefabKey, CachedPrefab>);
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct PrefabKey {
 	root_key: SmolStr,
-	subdir: RelPath,
-	path: RelPath,
+	subdir: FwdPath,
+	path: FwdPath,
 }
 
 impl PrefabKey {
@@ -94,11 +94,11 @@ impl PrefabCache {
 	pub async fn load_instances(
 		world: &AsyncWorld,
 		package: &PackageFiles,
-		path: &RelPath,
+		path: &FwdPath,
 		template: &DynamicTemplate,
 	) -> Result {
-		for document in template.instances() {
-			Self::load_under(world, &package.resolve(&document.into()), vec![
+		for document in template.instances()? {
+			Self::load_under(world, &package.resolve(&document.into())?, vec![
 				path.clone(),
 			])
 			.await?;
@@ -111,7 +111,7 @@ impl PrefabCache {
 	async fn load_under(
 		world: &AsyncWorld,
 		document: &Blob,
-		above: Vec<RelPath>,
+		above: Vec<FwdPath>,
 	) -> Result<Arc<InstancePrefab>> {
 		let loaded = {
 			let document = document.clone();
@@ -173,7 +173,7 @@ impl PrefabCache {
 					.map_err(|err| bevyhow!("`{full}`: {err}"))?;
 				let prefab = Arc::new(InstancePrefab {
 					props: template.props(),
-					instances: template.instances(),
+					instances: template.instances()?,
 					source,
 					path: full.clone(),
 				});

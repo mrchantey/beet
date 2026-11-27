@@ -247,7 +247,7 @@ async fn commit(
 			let mut registry = world.resource_mut::<SchemaRegistry>();
 			match &data.schema {
 				ValueSchema::Ref(SchemaRef::Document(path)) => {
-					registry.insert_located(path.rel_path(), next)
+					registry.insert_located(path.fwd_path()?, next)
 				}
 				_ => {
 					if let Some(name) = next.name().cloned() {

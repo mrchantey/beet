@@ -51,7 +51,7 @@ pub struct ThreadStore {
 	/// memory.
 	blobs: Option<BlobStore>,
 	/// The mount's filled directory, the prefix of every index key.
-	dir: RelPath,
+	dir: FwdPath,
 	/// How many posts a window without an agent opens on, and how many
 	/// more each read of older posts takes.
 	load: usize,
@@ -90,7 +90,7 @@ impl ThreadStore {
 	///
 	/// Errors when `root` lacks atomic batches or indexes, naming it and the
 	/// fix.
-	pub fn new(root: TableStore, dir: RelPath) -> Result<Self> {
+	pub fn new(root: TableStore, dir: FwdPath) -> Result<Self> {
 		for capability in [Capability::AtomicApply, Capability::Indexes] {
 			if !root.supports(capability) {
 				bevybail!(
@@ -127,7 +127,7 @@ impl ThreadStore {
 	}
 
 	/// The directory this store's threads are listed under.
-	pub fn dir(&self) -> &RelPath { &self.dir }
+	pub fn dir(&self) -> &FwdPath { &self.dir }
 
 	/// The blob store the bytes of posts' files are written to, if any.
 	pub fn blobs(&self) -> Option<&BlobStore> { self.blobs.as_ref() }
@@ -766,7 +766,7 @@ impl ThreadStore {
 				let Some(bytes) = post.file_bytes(file.index()) else {
 					continue;
 				};
-				let path = Self::blob_path(file.blob());
+				let path = Self::blob_path(file.blob())?;
 				if !blobs.exists(&path).await? {
 					blobs.insert(&path, bytes.clone()).await?;
 				}
@@ -778,14 +778,14 @@ impl ThreadStore {
 	/// Read the bytes of `blob` from the blob store.
 	pub async fn read_blob(&self, blob: &BlobRef) -> Result<Bytes> {
 		match &self.blobs {
-			Some(blobs) => blobs.get(&Self::blob_path(blob)).await,
+			Some(blobs) => blobs.get(&Self::blob_path(blob)?).await,
 			None => bevybail!("no blob store holds the bytes of {}", blob.cid),
 		}
 	}
 
 	/// Where the bytes of `blob` live, as a PDS keeps them.
-	fn blob_path(blob: &BlobRef) -> RelPath {
-		RelPath::new(format!("blobs/{}", blob.cid))
+	fn blob_path(blob: &BlobRef) -> Result<FwdPath> {
+		fwd_path!("blobs").try_join(blob.cid.to_string())
 	}
 
 	/// Apply `writes` as one batch, in chunks only past the backend's limit.
@@ -1177,7 +1177,7 @@ pub(crate) mod thread_store_test {
 	/// a retried flush and an orphan.
 	pub async fn run(table: TableStore) {
 		let store =
-			ThreadStore::new(table.clone(), RelPath::new("threads/a")).unwrap();
+			ThreadStore::new(table.clone(), fwd_path!("threads/a")).unwrap();
 		store.try_create().await.unwrap();
 		let actor = Actor::user();
 		let actor_id = actor.id().clone();
@@ -1202,7 +1202,7 @@ pub(crate) mod thread_store_test {
 		for dir in ["threads/a/nested", "threads/ab"] {
 			let other = Thread::new(dir);
 			create(
-				&ThreadStore::new(table.clone(), RelPath::new(dir)).unwrap(),
+				&ThreadStore::new(table.clone(), FwdPath::new(dir).unwrap()).unwrap(),
 				&other,
 				&actor,
 				vec![post(&actor_id, other.id(), dir)],
@@ -1231,7 +1231,7 @@ pub(crate) mod thread_store_test {
 		.await;
 		let nested = Thread::new("Nested and newest");
 		create(
-			&ThreadStore::new(table.clone(), RelPath::new("threads/a/z"))
+			&ThreadStore::new(table.clone(), fwd_path!("threads/a/z"))
 				.unwrap(),
 			&nested,
 			&actor,
@@ -1291,7 +1291,7 @@ pub(crate) mod thread_store_test {
 		// two stores on one directory, as two runtimes, each write rows of
 		// their own and never erase the other's
 		let other =
-			ThreadStore::new(table.clone(), RelPath::new("threads/a")).unwrap();
+			ThreadStore::new(table.clone(), fwd_path!("threads/a")).unwrap();
 		let (mine, theirs) = (
 			post(&actor_id, thread.id(), "mine"),
 			post(&actor_id, thread.id(), "theirs"),
@@ -1431,7 +1431,7 @@ pub(crate) mod thread_store_test {
 		let blobs = BlobStore::temp();
 		let store = ThreadStore::new(
 			TableStore::new(InMemoryTableStore::new()),
-			RelPath::new("threads"),
+			fwd_path!("threads"),
 		)
 		.unwrap()
 		.with_blobs(blobs.clone());
@@ -1470,7 +1470,7 @@ pub(crate) mod thread_store_test {
 	fn long_thread(load: usize) -> (ThreadStore, Actor) {
 		let store = ThreadStore::new(
 			TableStore::new(InMemoryTableStore::new()),
-			RelPath::new("threads"),
+			fwd_path!("threads"),
 		)
 		.unwrap()
 		.with_load(load);
@@ -1653,7 +1653,7 @@ pub(crate) mod thread_store_test {
 		let client = TableWireClient::new(
 			PartitionHost::memory("thread-refusal-host").transport(),
 		);
-		ThreadStore::new(TableStore::new(client), RelPath::new("threads"))
+		ThreadStore::new(TableStore::new(client), fwd_path!("threads"))
 			.err()
 			.unwrap()
 			.to_string()

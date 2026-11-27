@@ -74,17 +74,30 @@ impl Deployment {
 
 	/// The opentofu working directory for `stack`, ie `target/infra/beet-site`.
 	/// Per app rather than per stage, since one app's stacks share a checkout.
-	pub fn work_directory(&self, stack: &ResolvedStack) -> WsPath {
-		self.work_directory.clone().unwrap_or_else(|| {
-			WsPath::new(format!("target/infra/{}", stack.app_name()))
-		})
+	///
+	/// # Errors
+	/// Errors when the app's name is no path within the workspace.
+	pub fn work_directory(&self, stack: &ResolvedStack) -> Result<WsPath> {
+		match &self.work_directory {
+			Some(dir) => dir.clone().xok(),
+			None => WsPath::from(fwd_path!("target/infra")).try_join(stack.app_name()),
+		}
 	}
 
 	/// The state backend path for `stack`, ie `my-app--prod--tofu.tfstate`. It
 	/// composes through the stack's identity, so two stacks sharing this launch
 	/// still write distinct state.
-	pub fn backend_path(&self, stack: &ResolvedStack) -> RelPath {
-		RelPath::new(stack.resource_name(self.state_suffix.clone()))
+	///
+	/// # Errors
+	/// Errors when the stack's name is no file name.
+	pub fn backend_path(&self, stack: &ResolvedStack) -> Result<FwdPath> {
+		FwdPath::new(self.backend_name(stack))
+	}
+
+	/// The name of [`backend_path`](Self::backend_path), as the backend
+	/// block renders it.
+	pub fn backend_name(&self, stack: &ResolvedStack) -> String {
+		stack.resource_name(self.state_suffix.clone()).to_string()
 	}
 
 	/// Initialize `stack`'s config with the corresponding backend and state

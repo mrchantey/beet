@@ -33,13 +33,14 @@ use crate::prelude::*;
 )]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct FileSpan {
-	/// Workspace relative path to the file.
+	/// The source file as the compiler names it: workspace relative for the
+	/// workspace's own crates, absolute for a dependency's.
 	///
 	/// It's essential to use consistent paths as this struct is created in several
 	/// places from all kinds of concatenations, and we need [`PartialEq`] and [`Hash`]
-	/// to be identical. [`WsPath`] both cleans the path on construction and is
+	/// to be identical. [`SmolPath`] both cleans the path on construction and is
 	/// cheap to clone, as FileSpan is frequently cloned.
-	path: WsPath,
+	path: SmolPath,
 	/// The position of the first token in this span.
 	start: LineCol,
 	/// The position of the last token in this span.
@@ -57,7 +58,7 @@ impl core::fmt::Display for FileSpan {
 impl FileSpan {
 	/// Creates a new [`FileSpan`] with the given file path, start, and end positions.
 	pub fn new(
-		workspace_file_path: impl Into<WsPath>,
+		workspace_file_path: impl Into<SmolPath>,
 		start: LineCol,
 		end: LineCol,
 	) -> Self {
@@ -88,7 +89,7 @@ impl FileSpan {
 	/// Creates a new [`FileSpan`] from a syn spanned item.
 	#[cfg(feature = "tokens")]
 	pub fn new_from_span(
-		file: impl Into<WsPath>,
+		file: impl Into<SmolPath>,
 		spanned: &impl syn::spanned::Spanned,
 	) -> Self {
 		let span = spanned.span();
@@ -98,7 +99,7 @@ impl FileSpan {
 	/// Creates a new [`FileSpan`] representing an entire file.
 	///
 	/// The line and column are set to 1 and 0 respectively.
-	pub fn new_for_file(file: impl Into<WsPath>) -> Self {
+	pub fn new_for_file(file: impl Into<SmolPath>) -> Self {
 		Self::new(file, LineCol::default(), LineCol::default())
 	}
 
@@ -117,7 +118,7 @@ impl FileSpan {
 	///
 	/// Panics if the line number is 0; lines are 1-indexed.
 	pub fn new_with_start(
-		workspace_file_path: impl Into<WsPath>,
+		workspace_file_path: impl Into<SmolPath>,
 		line: u32,
 		col: u32,
 	) -> Self {
@@ -129,7 +130,7 @@ impl FileSpan {
 	}
 
 	/// Returns the file path.
-	pub fn path(&self) -> &WsPath { &self.path }
+	pub fn path(&self) -> &SmolPath { &self.path }
 
 	/// Returns the start position.
 	pub fn start(&self) -> LineCol { self.start }

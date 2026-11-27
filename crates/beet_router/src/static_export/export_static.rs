@@ -24,7 +24,7 @@ impl StaticExport {
 	pub async fn collect_paths(
 		world: &AsyncWorld,
 		router: Entity,
-	) -> Result<Vec<RelPath>> {
+	) -> Result<Vec<FwdPath>> {
 		// drafts are excluded only in production; the process stage defaults to
 		// dev (keep drafts) when neither transport named one.
 		let is_prod = BootstrapConfig::get().is_prod();
@@ -41,13 +41,13 @@ impl StaticExport {
 		world: &World,
 		router: Entity,
 		is_prod: bool,
-	) -> Result<Vec<RelPath>> {
+	) -> Result<Vec<FwdPath>> {
 		RouteTree::of(world, router)?
 			.clone()
 			.flatten_nodes()
 			.into_iter()
 			.filter(|node| Self::exports(world, node, is_prod))
-			.map(|node| node.path.annotated_path())
+			.map(|node| node.path.annotated_path().clone())
 			.collect::<Vec<_>>()
 			.xok()
 	}
@@ -85,7 +85,7 @@ impl StaticExport {
 async fn collect_static_files(
 	world: &AsyncWorld,
 	router: Entity,
-) -> Result<Vec<(RelPath, String)>> {
+) -> Result<Vec<(FwdPath, String)>> {
 	let paths = StaticExport::collect_paths(world, router).await?;
 	// the tree lives on the entry root, the dispatch on the router beneath it
 	let entity = world
@@ -124,7 +124,7 @@ impl StaticExport {
 		world: &AsyncWorld,
 		router: Entity,
 		out: &BlobStore,
-	) -> Result<Vec<RelPath>> {
+	) -> Result<Vec<FwdPath>> {
 		let mut files = collect_static_files(world, router).await?;
 		files.extend(
 			world
@@ -146,13 +146,13 @@ impl StaticExport {
 	/// answering anything but html (a well-known file) writes its raw file at
 	/// its path, so a page referencing it resolves and the export is
 	/// self-contained.
-	fn out_path(path: RelPath, is_html: bool) -> RelPath {
+	fn out_path(path: FwdPath, is_html: bool) -> FwdPath {
 		if path.segments().is_empty() {
-			RelPath::new("index.html")
+			fwd_path!("index.html")
 		} else if path.extension().is_some() || !is_html {
 			path
 		} else {
-			path.join("index.html")
+			path.join(&fwd_path!("index.html"))
 		}
 	}
 
@@ -168,7 +168,7 @@ impl StaticExport {
 	fn redirects(
 		world: &mut World,
 		router: Entity,
-	) -> Result<Vec<(RelPath, String)>> {
+	) -> Result<Vec<(FwdPath, String)>> {
 		let package = world.get_resource::<PackageConfig>().cloned();
 		RouteTree::of(world, router)?
 			.clone()
@@ -186,7 +186,7 @@ impl StaticExport {
 					package.absolute_url(&target.to_string()).ok()
 				});
 				Some((
-					node.path.annotated_path(),
+					node.path.annotated_path().clone(),
 					redirect_stub(&target, canonical.as_ref()),
 				))
 			})
@@ -263,17 +263,17 @@ mod test {
 		// the two user scene routes plus the `app-info` scene, wired by
 		// `Router::with_defaults`.
 		written.len().xpect_eq(3);
-		out.get(&RelPath::new("index.html"))
+		out.get(&fwd_path!("index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
 			.xpect_contains("Home");
-		out.get(&RelPath::new("about/index.html"))
+		out.get(&fwd_path!("about/index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
 			.xpect_contains("About");
-		out.get(&RelPath::new("app-info/index.html"))
+		out.get(&fwd_path!("app-info/index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
@@ -320,7 +320,7 @@ mod test {
 		exported(&written, "sitemap.xml").xpect_true();
 
 		let read = async |path: &str| {
-			out.get(&RelPath::new(path))
+			out.get(&FwdPath::new(path).unwrap())
 				.await
 				.unwrap()
 				.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
@@ -361,8 +361,8 @@ mod test {
 			})
 			.await
 			.unwrap()
-			.xpect_eq(vec![RelPath::new(".well-known/example")]);
-		out.get(&RelPath::new(".well-known/example"))
+			.xpect_eq(vec![fwd_path!(".well-known/example")]);
+		out.get(&fwd_path!(".well-known/example"))
 			.await
 			.unwrap()
 			.to_vec()
@@ -396,7 +396,7 @@ mod test {
 			})
 			.await
 			.unwrap();
-		out.get(&RelPath::new("blog/post-1/index.html"))
+		out.get(&fwd_path!("blog/post-1/index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
@@ -415,7 +415,7 @@ mod test {
 	/// Exports `router` to a temp store, returning the written paths. The process
 	/// stage decides the draft gate, so this is always the dev path; the prod
 	/// path is asserted against [`StaticExport::exports`] directly.
-	async fn export(world: &mut World, router: Entity) -> Vec<RelPath> {
+	async fn export(world: &mut World, router: Entity) -> Vec<FwdPath> {
 		let out = BlobStore::temp();
 		world
 			.run_async_then(async move |world| {
@@ -434,7 +434,7 @@ mod test {
 	}
 
 	/// Whether a route under `prefix` is in the exported set.
-	fn exported(paths: &[RelPath], prefix: &str) -> bool {
+	fn exported(paths: &[FwdPath], prefix: &str) -> bool {
 		paths.iter().any(|path| path.starts_with(prefix))
 	}
 

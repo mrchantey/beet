@@ -114,7 +114,7 @@ impl RouteMeta {
 	/// # Errors
 	/// Errors when the slug contains a `/`. A slug names ONE segment; a slug
 	/// quietly re-parenting a page is worse than a loud entry.
-	pub fn apply_slug(&self, route_path: &RelPath) -> Result<RelPath> {
+	pub fn apply_slug(&self, route_path: &FwdPath) -> Result<FwdPath> {
 		let Some(slug) = &self.slug else {
 			return Ok(route_path.clone());
 		};
@@ -128,7 +128,7 @@ impl RouteMeta {
 			Some(last) => *last = slug,
 			None => segments.push(slug),
 		}
-		RelPath::from_segments(&segments).xok()
+		FwdPath::from_segments(&segments)
 	}
 
 	/// Declare onto `declarations` the defaults a content file's NAME implies: a
@@ -148,7 +148,7 @@ impl RouteMeta {
 	#[cfg(feature = "scene")]
 	pub fn declare_file_defaults(
 		declarations: &mut EntityBody,
-		file: &RelPath,
+		file: &FwdPath,
 	) {
 		let Some(order) = file
 			.file_stem()
@@ -214,20 +214,20 @@ mod test {
 			slug: Some("full-stack-bevy".into()),
 			..default()
 		};
-		meta.apply_slug(&RelPath::new("blog/1-full-stack-bevy"))
+		meta.apply_slug(&fwd_path!("blog/1-full-stack-bevy"))
 			.unwrap()
-			.xpect_eq(RelPath::new("blog/full-stack-bevy"));
+			.xpect_eq(fwd_path!("blog/full-stack-bevy"));
 		// no slug declared, the filename-derived path stands
 		RouteMeta::default()
-			.apply_slug(&RelPath::new("blog/post-1"))
+			.apply_slug(&fwd_path!("blog/post-1"))
 			.unwrap()
-			.xpect_eq(RelPath::new("blog/post-1"));
+			.xpect_eq(fwd_path!("blog/post-1"));
 		// a nested slug is a loud error, never a silent re-parent
 		RouteMeta {
 			slug: Some("blog/nested".into()),
 			..default()
 		}
-		.apply_slug(&RelPath::new("blog/post-1"))
+		.apply_slug(&fwd_path!("blog/post-1"))
 		.unwrap_err()
 		.to_string()
 		.xpect_contains("single path segment");
@@ -245,7 +245,7 @@ mod test {
 					.unwrap();
 			RouteMeta::declare_file_defaults(
 				&mut declarations,
-				&RelPath::new(file),
+				&FwdPath::new(file).unwrap(),
 			);
 			declarations
 				.xmap(|body| BodyComponents::get::<RouteMeta>(&body, &registry))
@@ -275,7 +275,7 @@ mod test {
 		use beet_net::prelude::*;
 		let source = BlobStore::temp();
 		source.insert(
-			&RelPath::new("site/main.bsx"),
+			&fwd_path!("site/main.bsx"),
 			r#"<article {RouteMeta{visibility: RouteVisibility::Unlisted}} {DocMeta{title:"Counter", created:"2026-08-28"}}><p>hi</p></article>"#,
 		)
 		.await
@@ -288,7 +288,7 @@ mod test {
 		}
 		let pds = PackageCompiler::local_pds(&source);
 		let report = PackageCompiler::new(DocParsers::of(&world), pds.clone())
-			.compile(&source, &RelPath::new("site/main.bsx"))
+			.compile(&source, &fwd_path!("site/main.bsx"))
 			.await
 			.unwrap();
 		let space = pds.space(SpaceRef::package("site").unwrap()).unwrap();
@@ -299,7 +299,7 @@ mod test {
 			.unwrap()
 			.value;
 		let scene_ref = package.body().get::<Scenes>().unwrap().0
-			[&RelPath::new("main.bsx")]
+			[&fwd_path!("main.bsx")]
 			.clone();
 		let scene = space
 			.get::<SceneRecord>(scene_ref.record.uri.rkey())

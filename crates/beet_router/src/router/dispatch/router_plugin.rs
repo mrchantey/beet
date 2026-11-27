@@ -695,7 +695,7 @@ mod test {
 	async fn registers_the_store_file_routes() {
 		let store = BlobStore::temp();
 		store
-			.insert(&"guide.md".into(), "# Guide\n".to_owned())
+			.insert(&fwd_path!("guide.md"), "# Guide\n".to_owned())
 			.await
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();

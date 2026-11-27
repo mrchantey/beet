@@ -33,13 +33,13 @@ use std::collections::BTreeMap;
 pub async fn ScriptDerivation(
 	/// The script, a classic script answering `call`.
 	#[field]
-	src: RelPath,
+	src: FwdPath,
 	/// The expression the script answers with, called with its input.
 	#[field]
 	call: SmolStr,
 	/// The directory the files are written into.
 	#[field]
-	dir: RelPath,
+	dir: FwdPath,
 	/// The resources the script is handed, each by a short or full type path.
 	#[field]
 	resources: Vec<ReflectName>,
@@ -69,7 +69,7 @@ pub async fn ScriptDerivation(
 		world: false,
 		..default()
 	};
-	let files = Script::<Value, BTreeMap<RelPath, String>>::new(body)
+	let files = Script::<Value, BTreeMap<FwdPath, String>>::new(body)
 		.run(Value::Map(input), cx.world().clone(), &config)
 		.await?;
 	let mut outputs = DerivationOutputs::default();
@@ -97,7 +97,7 @@ impl ScriptDerivation {
 		self.resources
 			.iter()
 			.fold(
-				Derivation::new(self.dir.join(format!("{stem}.derived.json")))
+				Derivation::new(self.dir.try_join(format!("{stem}.derived.json"))?)
 					.with_input(self.src.clone()),
 				|derivation, resource| derivation.with_resource(resource.clone()),
 			)
@@ -105,9 +105,8 @@ impl ScriptDerivation {
 	}
 
 	/// The store path of the file at `path` in `dir` the script answered. A
-	/// [`RelPath`] holds no `..` above its root, so it cannot reach outside
-	/// `dir`, and an empty one, ie `../`, names no file.
-	fn output(&self, path: &RelPath) -> Result<RelPath> {
+	/// [`FwdPath`] cannot climb out of `dir`, and an empty one names no file.
+	fn output(&self, path: &FwdPath) -> Result<FwdPath> {
 		if path.as_str().is_empty() {
 			bevybail!(
 				"script `{}` answered a file with no path within `{}`",
@@ -139,7 +138,7 @@ mod test {
 	use beet_net::prelude::*;
 	use beet_ui::prelude::*;
 
-	const SRC: &str = "scripts/swatch.js";
+	const SRC: FwdPath = fwd_path!("scripts/swatch.js");
 
 	/// A world with the theme's tones, declaring a derivation of `script` into
 	/// `out` handed them, in a temp store.
@@ -154,16 +153,16 @@ mod test {
 		let store = BlobStore::temp();
 		let entity = world
 			.spawn(ScriptDerivation {
-				src: SRC.into(),
+				src: SRC,
 				call: "Swatch.files".into(),
-				dir: "out".into(),
+				dir: fwd_path!("out"),
 				resources: vec!["ThemeTones".into()],
 			})
 			.flush();
 		let inserted = store.clone();
 		let script = script.to_string();
 		async_ext::block_on(async move {
-			inserted.insert(&RelPath::new(SRC), script).await
+			inserted.insert(&SRC, script).await
 		})
 		.unwrap();
 		(world, entity, store)
@@ -191,7 +190,7 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(Freshness::Missing);
-		str::from_utf8(&store.get(&RelPath::new("out/swatch.svg")).await.unwrap())
+		str::from_utf8(&store.get(&fwd_path!("out/swatch.svg")).await.unwrap())
 			.unwrap()
 			.xpect_eq("<rect fill=\"#006C4F\"/>");
 		ensure(&mut world, entity, &store)
@@ -208,16 +207,28 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn keeps_its_files_within_its_dir() {
-		let (mut world, entity, store) = setup(
-			"const Swatch = { files: () => ({ '../escape.svg': '', 'icons/a.svg': '' }) };",
-		);
+	async fn writes_nested_files() {
+		let (mut world, entity, store) =
+			setup("const Swatch = { files: () => ({ 'icons/a.svg': '' }) };");
 		ensure(&mut world, entity, &store).await.unwrap();
-		for path in ["out/escape.svg", "out/icons/a.svg"] {
-			store.exists(&RelPath::new(path)).await.unwrap().xpect_true();
-		}
 		store
-			.exists(&RelPath::new("escape.svg"))
+			.exists(&fwd_path!("out/icons/a.svg"))
+			.await
+			.unwrap()
+			.xpect_true();
+	}
+
+	#[beet_core::test]
+	async fn refuses_a_path_climbing_out() {
+		let (mut world, entity, store) =
+			setup("const Swatch = { files: () => ({ '../escape.svg': '' }) };");
+		ensure(&mut world, entity, &store)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("climbs out");
+		store
+			.exists(&fwd_path!("escape.svg"))
 			.await
 			.unwrap()
 			.xpect_false();
@@ -226,7 +237,7 @@ mod test {
 	#[beet_core::test]
 	async fn refuses_a_file_with_no_path() {
 		let (mut world, entity, store) =
-			setup("const Swatch = { files: () => ({ '..': '' }) };");
+			setup("const Swatch = { files: () => ({ '': '' }) };");
 		ensure(&mut world, entity, &store)
 			.await
 			.unwrap_err()

@@ -223,7 +223,7 @@ fn server_cfg(collection: &RouteCollection) -> Option<syn::Attribute> {
 /// codegen knows no metadata type beyond the `slug` that named its url.
 fn emit_blob_route(
 	file: &RouteFile,
-	store_path: &RelPath,
+	store_path: &FwdPath,
 	declarations: &EntityBody,
 ) -> TokenStream {
 	let path = file.route_path.to_string();

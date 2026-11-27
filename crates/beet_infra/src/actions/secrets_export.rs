@@ -296,7 +296,7 @@ pub(crate) mod tests {
 				Stack::new("mail").with_stage("prod"),
 				BlobStore::temp(),
 				PackageStore,
-				DocumentSecrets::new("store.toml"),
+				DocumentSecrets::new(fwd_path!("store.toml")),
 			))
 			.id();
 		world.entity_mut(export).insert((
@@ -508,7 +508,7 @@ pub(crate) mod tests {
 				Stack::new("mail").with_stage("dev"),
 				BlobStore::temp(),
 				PackageStore,
-				DocumentSecrets::new("store.toml"),
+				DocumentSecrets::new(fwd_path!("store.toml")),
 			))
 			.id();
 		let export = world.spawn((Secrets::new("x.toml"), ChildOf(root))).id();

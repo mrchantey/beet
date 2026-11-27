@@ -226,7 +226,7 @@ pub async fn verify_assets(deploy: &TestDeploy, expected: &str) -> Result {
 		.iter()
 		.any(|path| path.contains("index.html"))
 		.xpect_true();
-	let bytes = store.get(&RelPath::new("index.html")).await?;
+	let bytes = store.get(&fwd_path!("index.html")).await?;
 	let content = String::from_utf8(bytes.to_vec())?;
 	content.contains(expected).xpect_true();
 	info!("verified assets contain '{expected}' at deploy {deploy_id}");

@@ -6,7 +6,7 @@ use bevy::ecs::template::TemplateContext;
 /// Builds a [`SceneBody`], the document at a path of its package where it has
 /// one, onto the entity of a [`TemplateContext`].
 type BuildBodyFn =
-	fn(&SceneBody, Option<&RelPath>, &mut TemplateContext) -> Result;
+	fn(&SceneBody, Option<&FwdPath>, &mut TemplateContext) -> Result;
 
 /// How a [`SceneBody`] builds into this world.
 ///
@@ -27,7 +27,7 @@ impl SceneBodyBuilder {
 	/// Errors when the world reads no documents, or the body does not build.
 	pub fn build(
 		body: &SceneBody,
-		path: Option<&RelPath>,
+		path: Option<&FwdPath>,
 		cx: &mut TemplateContext,
 	) -> Result {
 		let builder =

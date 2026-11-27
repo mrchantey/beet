@@ -560,7 +560,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&RelPath::from("site.bsx"),
+				&fwd_path!("site.bsx"),
 				r#"<Route path="site"><Route path="deploy" {ExchangeSequence}/></Route>"#,
 			)
 			.await

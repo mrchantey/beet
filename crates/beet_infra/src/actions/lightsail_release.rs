@@ -137,7 +137,7 @@ async fn run_gate_script(
 
 	// the script is a file rather than an argv token: it carries quotes, globs
 	// and newlines that would have to survive two shells to arrive intact.
-	let local_path = project.work_dir().join(format!("{name}.sh"));
+	let local_path = project.work_dir()?.join(format!("{name}.sh"));
 	fs_ext::write_async(&local_path, script.as_bytes()).await?;
 	// the ssh user's home dir, not /tmp: a predictable world-writable path is
 	// a symlink-planting target, and root runs this script

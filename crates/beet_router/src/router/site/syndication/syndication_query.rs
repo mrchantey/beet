@@ -10,7 +10,7 @@ use beet_ui::prelude::*;
 #[derive(Debug, Clone)]
 pub(crate) struct SyndicationPage {
 	/// The route path within the router's url space, ie `blog/ecs-router`.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// The page's authored metadata. Defaulted for a page that declared none,
 	/// which is public like any other.
 	pub meta: DocMeta,
@@ -30,7 +30,7 @@ pub(crate) struct SyndicationScope {
 	pub pages: Vec<SyndicationPage>,
 	/// The path this route is declared at, ie the url a feed names as its own
 	/// scope root.
-	pub root: RelPath,
+	pub root: FwdPath,
 	/// The site identity: the fallback title and description, and the origin
 	/// every absolute url is joined onto.
 	pub package: PackageConfig,
@@ -42,7 +42,7 @@ pub(crate) struct SyndicationScope {
 impl SyndicationScope {
 	/// A page path as an absolute url, ie
 	/// [`PackageConfig::absolute_url`] against this site's origin.
-	pub fn url(&self, path: &RelPath) -> Result<Url> {
+	pub fn url(&self, path: &FwdPath) -> Result<Url> {
 		self.package.absolute_url(path.as_str())
 	}
 
@@ -132,7 +132,7 @@ impl SyndicationQuery<'_, '_> {
 	pub fn listed(
 		&self,
 		entity: Entity,
-		root: &RelPath,
+		root: &FwdPath,
 	) -> Result<Vec<SyndicationPage>> {
 		let tree = self.trees.get(entity)?;
 		// a draft is invisible in production exactly as it is to dispatch and
@@ -149,7 +149,7 @@ impl SyndicationQuery<'_, '_> {
 				(node.is_public_page(route_meta, is_prod)
 					&& route_meta.is_none_or(RouteMeta::is_listed))
 				.then(|| SyndicationPage {
-					path: node.path.annotated_path(),
+					path: node.path.annotated_path().clone(),
 					meta: self
 						.metas
 						.get(node.entity)
@@ -284,13 +284,13 @@ pub(crate) mod test_fixtures {
 			),
 			("ArticleLayout.bsx", "<ArticleHeader/><slot/>"),
 		] {
-			store.insert(&RelPath::new(path), source).await.unwrap();
+			store.insert(&FwdPath::new(path).unwrap(), source).await.unwrap();
 		}
 		world
 			.spawn((
 				store,
 				Router,
-				Layout::document("FixtureLayout.bsx"),
+				Layout::document(fwd_path!("FixtureLayout.bsx")),
 				children![
 					page("", DocMeta {
 						title: Some("Beet".into()),
@@ -298,7 +298,7 @@ pub(crate) mod test_fixtures {
 					}),
 					(
 						PathPartial::new("blog"),
-						Layout::document("ArticleLayout.bsx"),
+						Layout::document(fwd_path!("ArticleLayout.bsx")),
 						children![page(
 							"full-stack-bevy",
 							post("Full Stack Bevy", "2025-07-11")

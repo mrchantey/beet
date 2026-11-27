@@ -74,12 +74,14 @@ pub(crate) async fn ServeBlobsHandler(
 			|entity, stores| stores.get(entity).cloned(),
 		)
 		.await??;
-	// an absent capture is the mount itself, its store's root
-	let path = cx
-		.input
-		.get_params(STORE_PATH_PARAM)
-		.map(|segments| RelPath::from_segments(segments))
-		.unwrap_or_default();
+	// an absent capture is the mount itself, its store's root, and a `..`
+	// climbing out of the mount is a bad request
+	let path = match cx.input.get_params(STORE_PATH_PARAM) {
+		Some(segments) => FwdPath::from_segments(segments).map_err(|err| {
+			HttpError::new(StatusCode::BAD_REQUEST, err.to_string())
+		})?,
+		None => FwdPath::default(),
+	};
 	// a secrets document sitting in the served store is never served or
 	// listed, however the store is mounted
 	let documents = cx
@@ -105,7 +107,7 @@ pub(crate) async fn ServeBlobsHandler(
 #[cfg(feature = "json")]
 async fn list_blobs(
 	store: &BlobStore,
-	path: &RelPath,
+	path: &FwdPath,
 	hidden: &(dyn Fn(&str) -> bool + Sync),
 ) -> Result<Response> {
 	match path.as_str().is_empty() {
@@ -113,7 +115,7 @@ async fn list_blobs(
 		false => store.with_subdir(path.clone()).list().await?,
 	}
 	.xmap(|mut keys| {
-		keys.retain(|key| !hidden(path.join(key.as_str()).as_str()));
+		keys.retain(|key| !hidden(path.join(key).as_str()));
 		keys.sort();
 		keys
 	})
@@ -125,7 +127,7 @@ async fn list_blobs(
 #[cfg(not(feature = "json"))]
 async fn list_blobs(
 	_store: &BlobStore,
-	path: &RelPath,
+	path: &FwdPath,
 	_hidden: &(dyn Fn(&str) -> bool + Sync),
 ) -> Result<Response> {
 	bevybail!(
@@ -181,7 +183,7 @@ fn unhydrated_hint(request: &RequestParts, err: BevyError) -> BevyError {
 pub fn AssetsDir(
 	/// The directory to mount, relative to the nearest ancestor store root.
 	#[prop]
-	src: RelPath,
+	src: FwdPath,
 	/// The url prefix to serve under; defaults to `src`.
 	#[prop(default)]
 	prefix: String,
@@ -215,7 +217,7 @@ mod test {
 	async fn css_store() -> BlobStore {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("style.css"), "body { color: red; }")
+			.insert(&fwd_path!("style.css"), "body { color: red; }")
 			.await
 			.unwrap();
 		store
@@ -247,6 +249,20 @@ mod test {
 			.xpect_contains("color: red");
 	}
 
+	/// A captured path climbing out of the mount is a bad request, never a
+	/// key clamped back inside the store.
+	#[beet_core::test]
+	async fn refuses_a_path_climbing_out() {
+		router_world()
+			.spawn((Router::with_defaults(), css_store().await, children![
+				serve_route("assets")
+			]))
+			.exchange(Request::get("assets/../../style.css"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::BAD_REQUEST);
+	}
+
 	/// A store co-located on the serve route entity also resolves (self is the
 	/// nearest match), eg the `src`-seeded local store.
 	#[beet_core::test]
@@ -275,7 +291,7 @@ mod test {
 	async fn never_serves_a_secrets_document() {
 		let store = css_store().await;
 		store
-			.insert(&RelPath::from("secrets.toml"), "sealed")
+			.insert(&fwd_path!("secrets.toml"), "sealed")
 			.await
 			.unwrap();
 		let mut world = router_world();
@@ -326,7 +342,7 @@ mod test {
 		router_world()
 			.spawn((Router::with_defaults(), FsStore::new(site), children![
 				AssetsDir {
-					src: "assets".into(),
+					src: fwd_path!("assets"),
 					prefix: default(),
 					cache: default(),
 				}
@@ -375,7 +391,7 @@ mod test {
 	async fn lists_keys_as_json() {
 		let store = BlobStore::temp();
 		for path in ["main.bsx", "docs/a.md", "docs/b/c.md"] {
-			store.insert(&RelPath::from(path), "x").await.unwrap();
+			store.insert(&FwdPath::new(path).unwrap(), "x").await.unwrap();
 		}
 		let mut world = router_world();
 		let root = world
@@ -383,7 +399,7 @@ mod test {
 				"package"
 			)]))
 			.flush();
-		let mut list = async |path: &str| -> Vec<RelPath> {
+		let mut list = async |path: &str| -> Vec<FwdPath> {
 			world
 				.entity_mut(root)
 				.exchange(
@@ -395,13 +411,13 @@ mod test {
 				.unwrap()
 		};
 		list("package").await.xpect_eq(vec![
-			RelPath::new("docs/a.md"),
-			RelPath::new("docs/b/c.md"),
-			RelPath::new("main.bsx"),
+			fwd_path!("docs/a.md"),
+			fwd_path!("docs/b/c.md"),
+			fwd_path!("main.bsx"),
 		]);
 		list("package/docs")
 			.await
-			.xpect_eq(vec![RelPath::new("a.md"), RelPath::new("b/c.md")]);
+			.xpect_eq(vec![fwd_path!("a.md"), fwd_path!("b/c.md")]);
 	}
 
 	/// The mount read back through an [`HttpStore`] over a real listener: a
@@ -422,7 +438,7 @@ mod test {
 			("docs/a.md", "# a"),
 			("docs/b/c.md", "# c"),
 		] {
-			store.insert(&RelPath::from(path), body).await.unwrap();
+			store.insert(&FwdPath::new(path).unwrap(), body).await.unwrap();
 		}
 		let (mut server, on_spawn) =
 			HttpServer::bind_loopback(HttpServer::start_mini_with_tcp);
@@ -440,28 +456,28 @@ mod test {
 				.run();
 		});
 		let http = BlobStore::new(HttpStore::new(format!("{url}/package")));
-		http.get_media(&RelPath::from("main.bsx"))
+		http.get_media(&fwd_path!("main.bsx"))
 			.await
 			.unwrap()
 			.as_utf8()
 			.unwrap()
 			.xpect_eq("<Router/>");
-		http.exists(&RelPath::from("docs/a.md"))
+		http.exists(&fwd_path!("docs/a.md"))
 			.await
 			.unwrap()
 			.xpect_true();
-		http.exists(&RelPath::from("missing.md"))
+		http.exists(&fwd_path!("missing.md"))
 			.await
 			.unwrap()
 			.xpect_false();
 		// an absent derived file reads as nothing, asked with a `HEAD` alone,
 		// so a browser reading an unpublished index sees no failed fetch
-		Derivation::new("derived/missing.json")
+		Derivation::new(fwd_path!("derived/missing.json"))
 			.read(&http)
 			.await
 			.unwrap()
 			.xpect_none();
-		http.get(&RelPath::from("missing.md"))
+		http.get(&fwd_path!("missing.md"))
 			.await
 			.unwrap_err()
 			.downcast_ref::<HttpError>()
@@ -469,15 +485,15 @@ mod test {
 			.status_code
 			.xpect_eq(StatusCode::NOT_FOUND);
 		http.list().await.unwrap().xpect_eq(vec![
-			RelPath::new("docs/a.md"),
-			RelPath::new("docs/b/c.md"),
-			RelPath::new("main.bsx"),
+			fwd_path!("docs/a.md"),
+			fwd_path!("docs/b/c.md"),
+			fwd_path!("main.bsx"),
 		]);
-		http.with_subdir(RelPath::new("docs"))
+		http.with_subdir(fwd_path!("docs"))
 			.list()
 			.await
 			.unwrap()
-			.xpect_eq(vec![RelPath::new("a.md"), RelPath::new("b/c.md")]);
+			.xpect_eq(vec![fwd_path!("a.md"), fwd_path!("b/c.md")]);
 	}
 
 	/// An extensionless path serves `<path>/index.html`, the static-host fallback.
@@ -485,7 +501,7 @@ mod test {
 	async fn serves_index_html() {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("bar/index.html"), "<div>fallback</div>")
+			.insert(&fwd_path!("bar/index.html"), "<div>fallback</div>")
 			.await
 			.unwrap();
 		router_world()

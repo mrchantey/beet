@@ -101,44 +101,51 @@ impl ArtifactLedger {
 	}
 
 	/// The ledger's own key relative to [`version_prefix`](Self::version_prefix).
-	const LEDGER_NAME: &'static str = "ledger.json";
+	const LEDGER_NAME: FwdPath = fwd_path!("ledger.json");
 	/// The directory under a version prefix holding the document.
-	const PACKAGE_DIR: &'static str = "package";
+	const PACKAGE_DIR: FwdPath = fwd_path!("package");
 	/// The directory under a version prefix holding the artifact binaries.
-	const BIN_DIR: &'static str = "bin";
+	const BIN_DIR: FwdPath = fwd_path!("bin");
 	/// The prefix holding what is current: the ledger and the release pointers.
-	const CURRENT_DIR: &'static str = "current";
+	const CURRENT_DIR: FwdPath = fwd_path!("current");
 
 	/// The key prefix holding everything one version owns: its document, its
 	/// ledger and each artifact binary it published.
-	pub fn version_prefix(uuid: &Uuid) -> RelPath {
-		RelPath::new(uuid.to_string())
-	}
+	pub fn version_prefix(uuid: &Uuid) -> FwdPath { FwdPath::from(*uuid) }
 	/// The mirror root of one version's document, the uri a process boots
 	/// from: `<id>/package`.
-	pub fn version_package_dir(uuid: &Uuid) -> RelPath {
-		Self::version_prefix(uuid).join(Self::PACKAGE_DIR)
+	pub fn version_package_dir(uuid: &Uuid) -> FwdPath {
+		Self::version_prefix(uuid).join(&Self::PACKAGE_DIR)
 	}
 	/// One version's artifact binary: `<id>/bin/<name>`.
-	pub fn version_artifact_key(uuid: &Uuid, artifact_name: &str) -> RelPath {
+	///
+	/// # Errors
+	/// Errors when `artifact_name` is no path within the version.
+	pub fn version_artifact_key(
+		uuid: &Uuid,
+		artifact_name: &str,
+	) -> Result<FwdPath> {
 		Self::version_prefix(uuid)
-			.join(Self::BIN_DIR)
-			.join(artifact_name)
+			.join(&Self::BIN_DIR)
+			.try_join(artifact_name)
 	}
-	fn version_ledger_key(uuid: &Uuid) -> RelPath {
-		Self::version_prefix(uuid).join(Self::LEDGER_NAME)
+	fn version_ledger_key(uuid: &Uuid) -> FwdPath {
+		Self::version_prefix(uuid).join(&Self::LEDGER_NAME)
 	}
 	/// This version's key for `artifact_name`, see
 	/// [`version_artifact_key`](Self::version_artifact_key).
-	pub fn artifact_key(&self, artifact_name: &str) -> RelPath {
+	///
+	/// # Errors
+	/// Errors when `artifact_name` is no path within the version.
+	pub fn artifact_key(&self, artifact_name: &str) -> Result<FwdPath> {
 		Self::version_artifact_key(&self.deploy_id, artifact_name)
 	}
-	fn ledger_key(&self) -> RelPath {
+	fn ledger_key(&self) -> FwdPath {
 		Self::version_ledger_key(&self.deploy_id)
 	}
 	/// The key naming the version being served: `current/ledger.json`.
-	fn current_ledger_key() -> RelPath {
-		RelPath::new(Self::CURRENT_DIR).join(Self::LEDGER_NAME)
+	fn current_ledger_key() -> FwdPath {
+		Self::CURRENT_DIR.join(&Self::LEDGER_NAME)
 	}
 
 	/// The stable key naming the current release of one artifact, ie
@@ -152,8 +159,11 @@ impl ArtifactLedger {
 	///
 	/// [`publish_ledger`]: ArtifactsClient::publish_ledger
 	/// [`set_current`]: ArtifactsClient::set_current
-	pub fn release_pointer_key(artifact_name: &str) -> RelPath {
-		RelPath::new(Self::CURRENT_DIR).join(format!("{artifact_name}.env"))
+	///
+	/// # Errors
+	/// Errors when `artifact_name` is no file name.
+	pub fn release_pointer_key(artifact_name: &str) -> Result<FwdPath> {
+		Self::CURRENT_DIR.try_join(format!("{artifact_name}.env"))
 	}
 
 	/// The pointer body: an env file, so one file serves both readers a
@@ -252,7 +262,7 @@ impl ArtifactsClient {
 		entry: ArtifactEntry,
 	) -> Result {
 		self.ledger.push_artifact(artifact_name, entry)?;
-		let key = self.ledger.artifact_key(artifact_name);
+		let key = self.ledger.artifact_key(artifact_name)?;
 		self.store.insert(&key, bytes).await
 	}
 
@@ -284,7 +294,7 @@ impl ArtifactsClient {
 		for artifact_name in ledger.artifacts.keys() {
 			self.store
 				.insert(
-					&ArtifactLedger::release_pointer_key(artifact_name),
+					&ArtifactLedger::release_pointer_key(artifact_name)?,
 					ledger.release_pointer(artifact_name)?.into_bytes(),
 				)
 				.await?;
@@ -308,7 +318,7 @@ impl ArtifactsClient {
 		artifact_name: &str,
 		version: &Uuid,
 	) -> Result<Bytes> {
-		let key = ArtifactLedger::version_artifact_key(version, artifact_name);
+		let key = ArtifactLedger::version_artifact_key(version, artifact_name)?;
 		self.store.get(&key).await
 	}
 
@@ -336,7 +346,7 @@ impl ArtifactsClient {
 			.filter_map(|key| {
 				let key = key.to_string();
 				let (version, name) = key.split_once('/')?;
-				(name == ArtifactLedger::LEDGER_NAME)
+				(name == ArtifactLedger::LEDGER_NAME.as_str())
 					.then(|| Uuid::parse_str(version).ok())
 					.flatten()
 			})
@@ -405,7 +415,7 @@ impl ArtifactsClient {
 		let store = self
 			.store
 			.with_subdir(ArtifactLedger::version_prefix(version));
-		let ledger = RelPath::new(ArtifactLedger::LEDGER_NAME);
+		let ledger = ArtifactLedger::LEDGER_NAME;
 		if store.exists(&ledger).await? {
 			store.remove(&ledger).await?;
 		}
@@ -459,7 +469,7 @@ mod tests {
 		let pointer = async || {
 			String::from_utf8(
 				store
-					.get(&ArtifactLedger::release_pointer_key("app"))
+					.get(&ArtifactLedger::release_pointer_key("app").unwrap())
 					.await
 					.unwrap()
 					.to_vec(),
@@ -606,7 +616,7 @@ mod tests {
 		let pointer = async || {
 			String::from_utf8(
 				store
-					.get(&ArtifactLedger::release_pointer_key("app"))
+					.get(&ArtifactLedger::release_pointer_key("app").unwrap())
 					.await
 					.unwrap()
 					.to_vec(),
@@ -729,7 +739,7 @@ mod tests {
 			.unwrap();
 		client.publish_ledger().await.unwrap();
 		let document =
-			ArtifactLedger::version_package_dir(&version).join("main.bsx");
+			ArtifactLedger::version_package_dir(&version).join(&fwd_path!("main.bsx"));
 		store.insert(&document, "<div/>").await.unwrap();
 		client.list_versions().await.unwrap().len().xpect_eq(1);
 
@@ -740,7 +750,7 @@ mod tests {
 			.unwrap()
 			.xpect_eq(Vec::<Uuid>::new());
 		store
-			.exists(&ArtifactLedger::version_artifact_key(&version, "app.zip"))
+			.exists(&ArtifactLedger::version_artifact_key(&version, "app.zip").unwrap())
 			.await
 			.unwrap()
 			.xpect_false();

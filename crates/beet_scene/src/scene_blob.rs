@@ -35,10 +35,10 @@ use beet_net::prelude::*;
 pub struct SceneBlob {
 	/// The fork's path within the nearest ancestor store, the boot source once
 	/// it exists. Its extension picks the format, json by default.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// The authored original's path within the same store, read on first boot
 	/// only.
-	pub from: RelPath,
+	pub from: FwdPath,
 	/// Coalesces the write-backs: a burst of edits is at most one write in
 	/// flight plus one queued behind it, and the queued one re-reads the
 	/// document so it persists the latest state.
@@ -48,7 +48,7 @@ pub struct SceneBlob {
 
 impl SceneBlob {
 	/// The scene at `path`, forked from the original at `from`.
-	pub fn new(path: impl Into<RelPath>, from: impl Into<RelPath>) -> Self {
+	pub fn new(path: impl Into<FwdPath>, from: impl Into<FwdPath>) -> Self {
 		Self {
 			path: path.into(),
 			from: from.into(),
@@ -194,7 +194,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&RelPath::from("app.bsx"),
+				&fwd_path!("app.bsx"),
 				"<main><h1>Todos</h1><span>milk</span></main>",
 			)
 			.await
@@ -215,7 +215,7 @@ mod test {
 		app.install_types::<MinimalTypesPlugin>();
 		let host = app
 			.world_mut()
-			.spawn((store, children![SceneBlob::new("app.json", "app.bsx")]))
+			.spawn((store, children![SceneBlob::new(fwd_path!("app.json"), fwd_path!("app.bsx"))]))
 			.flush();
 		let host = app.world().entity(host).get::<Children>().unwrap()[0];
 		app.update_async().await;
@@ -239,7 +239,7 @@ mod test {
 		app.install_types::<MinimalTypesPlugin>();
 		let host = app
 			.world_mut()
-			.spawn(SceneBlob::new("app.json", "app.bsx"))
+			.spawn(SceneBlob::new(fwd_path!("app.json"), fwd_path!("app.bsx")))
 			.id();
 		app.update_async().await;
 		app.update_async().await;
@@ -262,7 +262,7 @@ mod test {
 		let store = store().await;
 		let (app, host) = boot(store.clone()).await;
 		store
-			.exists(&RelPath::from("app.json"))
+			.exists(&fwd_path!("app.json"))
 			.await
 			.unwrap()
 			.xpect_true();
@@ -282,7 +282,7 @@ mod test {
 			.xpect_eq("app.bsx");
 		world.get::<ChildOf>(root).unwrap().parent().xpect_eq(host);
 		// the fork carries the record, and reads back as the document
-		let fork = store.get_media(&RelPath::from("app.json")).await.unwrap();
+		let fork = store.get_media(&fwd_path!("app.json")).await.unwrap();
 		SceneEntities::entity_value(&fork.deserialize::<Value>().unwrap(), 0)
 			.unwrap()
 			.get("beet_scene::body::scene_document::SceneFork")
@@ -305,19 +305,19 @@ mod test {
 		let (mut app, host) = boot(fork.clone()).await;
 		app.world().get::<SceneDocument>(host).xpect_some();
 		local
-			.exists(&RelPath::from("app.json"))
+			.exists(&fwd_path!("app.json"))
 			.await
 			.unwrap()
 			.xpect_false();
 		// the first edit is the visitor's fork
 		edit_heading(&mut app, host, &key, "Groceries").await;
 		local
-			.exists(&RelPath::from("app.json"))
+			.exists(&fwd_path!("app.json"))
 			.await
 			.unwrap()
 			.xpect_true();
 		upstream
-			.get_media(&RelPath::from("app.json"))
+			.get_media(&fwd_path!("app.json"))
 			.await
 			.unwrap()
 			.as_utf8()

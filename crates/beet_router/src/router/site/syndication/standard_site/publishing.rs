@@ -48,12 +48,12 @@ pub(super) struct Publishing {
 	pub pages: Vec<SyndicationPage>,
 	/// The route paths of the drafts beneath the publication, which a run
 	/// refuses to name.
-	pub drafts: Vec<RelPath>,
+	pub drafts: Vec<FwdPath>,
 	/// Each page renamed beneath the publication, as the document path a
 	/// `<Redirect>` sends to and the one it was renamed from.
 	renames: Vec<(SmolStr, SmolStr)>,
 	/// The world's `<IconSet>`, as the store it resolves and its 512's path.
-	icon: Option<(BlobStore, RelPath)>,
+	icon: Option<(BlobStore, FwdPath)>,
 	/// The store the world's `<SocialCards>` set is derived in.
 	cards: Option<BlobStore>,
 }
@@ -69,7 +69,7 @@ pub(super) struct DerivedImage {
 impl DerivedImage {
 	/// The image at `path` in `store`, an error naming the step that derives
 	/// it when absent.
-	async fn read(store: &BlobStore, path: &RelPath) -> Result<Self> {
+	async fn read(store: &BlobStore, path: &FwdPath) -> Result<Self> {
 		if !store.exists(path).await? {
 			bevybail!(
 				"`{path}` is not derived yet: the `assets` verb's `<Derive/>` \
@@ -142,14 +142,14 @@ impl Publishing {
 	/// The social card the page at route `page` previews with, the root
 	/// route's when the set holds no card of its own, `None` for a world
 	/// declaring no set.
-	pub async fn card(&self, page: &RelPath) -> Result<Option<DerivedImage>> {
+	pub async fn card(&self, page: &FwdPath) -> Result<Option<DerivedImage>> {
 		let Some(store) = &self.cards else {
 			return Ok(None);
 		};
-		let own = SocialCards::card(page);
+		let own = SocialCards::card(page)?;
 		let path = match store.exists(&own).await? {
 			true => own,
-			false => SocialCards::card(&default()),
+			false => SocialCards::card(&default())?,
 		};
 		DerivedImage::read(store, &path).await?.xmap(Some).xok()
 	}
@@ -184,7 +184,7 @@ impl Publishing {
 	/// dated page, listing the slugs that are.
 	pub fn page(&self, slug: &str) -> Result<&SyndicationPage> {
 		let slug = slug.trim_matches('/');
-		let route = self.declaration.path.join(slug);
+		let route = self.declaration.path.try_join(slug)?;
 		if let Some(page) = self.pages.iter().find(|page| page.path == route) {
 			return Ok(page);
 		}
@@ -341,7 +341,7 @@ impl PublishingQuery<'_, '_> {
 			.routes
 			.iter()
 			.filter(|(_, meta)| meta.is_draft())
-			.map(|(pattern, _)| pattern.annotated_path())
+			.map(|(pattern, _)| pattern.annotated_path().clone())
 			.filter(|path| declaration.document_path(path).is_some())
 			.collect();
 		let renames = self
@@ -349,11 +349,13 @@ impl PublishingQuery<'_, '_> {
 			.iter()
 			.filter_map(|(redirect, pattern)| {
 				let location = redirect.location(pattern);
+				// a target climbing out of the site names no document
 				let to = (!location.is_external())
-					.then(|| RelPath::from_segments(location.path()))?;
+					.then(|| location.fwd_path().ok())
+					.flatten()?;
 				(
 					declaration.document_path(&to)?,
-					declaration.document_path(&pattern.annotated_path())?,
+					declaration.document_path(pattern.annotated_path())?,
 				)
 					.xmap(Some)
 			})
@@ -362,10 +364,9 @@ impl PublishingQuery<'_, '_> {
 			.icon_sets
 			.iter()
 			.next()
-			.map(|(icon_entity, icon_set)| {
-				self.stores
-					.get(icon_entity)
-					.map(|store| (store.clone(), icon_set.publication_icon()))
+			.map(|(icon_entity, icon_set)| -> Result<_> {
+				(self.stores.get(icon_entity)?.clone(), icon_set.publication_icon()?)
+					.xok()
 			})
 			.transpose()?;
 		let cards = self
@@ -433,27 +434,29 @@ pub(super) mod test {
 		/// [`Site::new`] at `homepage`, its publication in `publisher`.
 		pub async fn with(homepage: &str, publisher: Pds) -> Self {
 			let store = BlobStore::temp();
-			let icon = IconSet::new("assets/logo/logo.png").publication_icon();
+			let icon = IconSet::new(fwd_path!("assets/logo/logo.png"))
+				.publication_icon()
+				.unwrap();
 			store.insert(&icon, png(512, 512)).await.unwrap();
 			store
-				.insert(&RelPath::new(CARD), png(1200, 630))
+				.insert(&FwdPath::new(CARD).unwrap(), png(1200, 630))
 				.await
 				.unwrap();
 			let mut world = syndication_world(Some(homepage));
 			store
 				.insert(
-					&RelPath::new("HeadLayout.bsx"),
+					&fwd_path!("HeadLayout.bsx"),
 					"<html><RouteHead/><body><slot/></body></html>",
 				)
 				.await
 				.unwrap();
 			let root = spawn_syndication_router_with(
 				&mut world,
-				(store.clone(), Layout::document("HeadLayout.bsx")),
+				(store.clone(), Layout::document(fwd_path!("HeadLayout.bsx"))),
 				rsx! {
-					<StandardSitePub path="blog" name="The Full Moon Harvest"/>
-					<IconSet src="assets/logo/logo.png"/>
-					<SocialCards font="assets/fonts/Inter.ttf"/>
+					<StandardSitePub path={fwd_path!("blog")} name="The Full Moon Harvest"/>
+					<IconSet src={fwd_path!("assets/logo/logo.png")}/>
+					<SocialCards font={fwd_path!("assets/fonts/Inter.ttf")}/>
 					<Redirect path="blog/full-stack" redirect="/blog/full-stack-bevy"/>
 				},
 			);
@@ -666,7 +669,7 @@ pub(super) mod test {
 
 		/// The committed index's bytes, `None` before the first publish.
 		pub async fn index(&self) -> Option<Bytes> {
-			let path = RelPath::new(StandardSitePub::INDEX);
+			let path = StandardSitePub::INDEX;
 			match self.store.exists(&path).await.unwrap() {
 				true => Some(self.store.get(&path).await.unwrap()),
 				false => None,

@@ -26,15 +26,15 @@ use beet_core::prelude::*;
 /// # async fn run() -> Result {
 /// let mut world = AsyncPlugin.into_world();
 /// let store = BlobStore::temp();
-/// store.insert(&RelPath::new("notes.md"), "# Notes").await?;
+/// store.insert(&fwd_path!("notes.md"), "# Notes").await?;
 /// let entity = world
 /// 	.spawn((
-/// 		Derivation::new("derived/notes.json"),
+/// 		Derivation::new(fwd_path!("derived/notes.json")),
 /// 		Action::<BlobStore, EntityBody>::new_async(
 /// 			async |cx: ActionContext<BlobStore>| {
-/// 				let notes = cx.input.get(&RelPath::new("notes.md")).await?;
+/// 				let notes = cx.input.get(&fwd_path!("notes.md")).await?;
 /// 				EntityBody::default().with_typed(&Provenance::new([
-/// 					ProvenanceSource::file("notes.md", &notes),
+/// 					ProvenanceSource::file(fwd_path!("notes.md"), &notes),
 /// 				]))
 /// 			},
 /// 		),
@@ -88,13 +88,13 @@ use beet_core::prelude::*;
 #[reflect(Component, Default)]
 pub struct Derivation {
 	/// The derived file's path in its store, its extension naming the format.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// How long a regeneration holds for an input nothing local can hash,
 	/// stamped onto the [`Provenance`] it writes.
 	pub ttl: Option<Duration>,
 	/// The file sources the declaration itself names, so a file computed from
 	/// another (a declaration edited to a new source) is stale.
-	pub inputs: Vec<RelPath>,
+	pub inputs: Vec<FwdPath>,
 	/// The values the declaration computes from the world, by name and
 	/// digest, stamped onto each regeneration's [`Provenance`].
 	pub values: Vec<ProvenanceValue>,
@@ -110,7 +110,7 @@ pub struct Derivation {
 
 impl Derivation {
 	/// The derived file at `path`, holding until a source changes.
-	pub fn new(path: impl Into<RelPath>) -> Self {
+	pub fn new(path: impl Into<FwdPath>) -> Self {
 		Self {
 			path: path.into(),
 			ttl: None,
@@ -122,7 +122,7 @@ impl Derivation {
 	}
 
 	/// This derivation declaring `input` as a file source it reads.
-	pub fn with_input(mut self, input: impl Into<RelPath>) -> Self {
+	pub fn with_input(mut self, input: impl Into<FwdPath>) -> Self {
 		self.inputs.push(input.into());
 		self
 	}
@@ -493,7 +493,7 @@ impl Derivation {
 /// # async fn run() -> Result {
 /// let store = BlobStore::temp();
 /// let mut outputs = DerivationOutputs::default();
-/// outputs.write(&store, "icons/icon-16.png", vec![0u8; 4]).await?;
+/// outputs.write(&store, fwd_path!("icons/icon-16.png"), vec![0u8; 4]).await?;
 /// let body = EntityBody::default().with_typed(&outputs)?;
 /// # let _ = body;
 /// # Ok(()) }
@@ -509,7 +509,7 @@ pub struct DerivationOutputs(pub Vec<DerivationOutput>);
 #[reflect(Serialize, Deserialize)]
 pub struct DerivationOutput {
 	/// The file's path in the store its document is in.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// Its content id as written.
 	pub cid: Cid,
 }
@@ -527,7 +527,7 @@ impl DerivationOutputs {
 	pub async fn write(
 		&mut self,
 		store: &BlobStore,
-		path: impl Into<RelPath>,
+		path: impl Into<FwdPath>,
 		bytes: impl Into<Vec<u8>>,
 	) -> Result {
 		let path = path.into();
@@ -540,7 +540,7 @@ impl DerivationOutputs {
 	}
 
 	/// The listed output at `path`.
-	pub fn get(&self, path: &RelPath) -> Option<&DerivationOutput> {
+	pub fn get(&self, path: &FwdPath) -> Option<&DerivationOutput> {
 		self.0.iter().find(|output| &output.path == path)
 	}
 
@@ -585,14 +585,14 @@ pub enum Freshness {
 	/// A source's digest changed, or the source is gone.
 	Changed(ProvenanceSource),
 	/// The declaration names a file source the file was not computed from.
-	Redeclared(RelPath),
+	Redeclared(FwdPath),
 	/// A value the declaration computes differs from the one the file was
 	/// computed from, or only one of them has it.
 	Revalued(SmolStr),
 	/// A file the document lists as written beside it is gone.
-	OutputMissing(RelPath),
+	OutputMissing(FwdPath),
 	/// A file the document lists as written beside it was altered.
-	OutputChanged(RelPath),
+	OutputChanged(FwdPath),
 }
 
 impl Freshness {
@@ -726,8 +726,8 @@ mod test {
 	)]
 	struct Echo(String);
 
-	const SOURCE: &str = "notes.md";
-	const DERIVED: &str = "derived/notes.json";
+	const SOURCE: FwdPath = fwd_path!("notes.md");
+	const DERIVED: FwdPath = fwd_path!("derived/notes.json");
 
 	/// A world declaring `derivation`, produced from [`SOURCE`] in a temp
 	/// store holding `text`, the producer counting its runs.
@@ -744,7 +744,7 @@ mod test {
 				Action::<BlobStore, EntityBody>::new_async(
 					move |cx: ActionContext<BlobStore>| async move {
 						runs.set(runs.get() + 1);
-						let bytes = cx.input.get(&RelPath::new(SOURCE)).await?;
+						let bytes = cx.input.get(&SOURCE).await?;
 						EntityBody::default()
 							.with_typed(&Provenance::new([
 								ProvenanceSource::file(SOURCE, &bytes),
@@ -759,7 +759,7 @@ mod test {
 		let text = text.to_string();
 		let inserted = store.clone();
 		async_ext::block_on(async move {
-			inserted.insert(&RelPath::new(SOURCE), text).await
+			inserted.insert(&SOURCE, text).await
 		})
 		.unwrap();
 		(world, entity, store, runs)
@@ -815,18 +815,18 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_true();
-		let written = store.get(&RelPath::new(DERIVED)).await.unwrap();
+		let written = store.get(&DERIVED).await.unwrap();
 		rewrite(&mut world, entity, &store)
 			.await
 			.unwrap()
 			.xpect_false();
 		runs.get().xpect_eq(2);
 		store
-			.get(&RelPath::new(DERIVED))
+			.get(&DERIVED)
 			.await
 			.unwrap()
 			.xpect_eq(written);
-		store.insert(&RelPath::new(SOURCE), "second").await.unwrap();
+		store.insert(&SOURCE, "second").await.unwrap();
 		rewrite(&mut world, entity, &store)
 			.await
 			.unwrap()
@@ -842,7 +842,7 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(Freshness::Missing);
-		let written = store.get(&RelPath::new(DERIVED)).await.unwrap();
+		let written = store.get(&DERIVED).await.unwrap();
 		// written pretty, so a committed one reads in a diff
 		str::from_utf8(&written).unwrap().xpect_contains("\n");
 		echo(&store).await.xpect_eq("first");
@@ -852,7 +852,7 @@ mod test {
 			.xpect_eq(Freshness::Fresh);
 		runs.get().xpect_eq(1);
 		store
-			.get(&RelPath::new(DERIVED))
+			.get(&DERIVED)
 			.await
 			.unwrap()
 			.xpect_eq(written);
@@ -863,7 +863,7 @@ mod test {
 		let (mut world, entity, store, runs) =
 			setup(Derivation::new(DERIVED), "first");
 		ensure(&mut world, entity, &store).await.unwrap();
-		store.insert(&RelPath::new(SOURCE), "second").await.unwrap();
+		store.insert(&SOURCE, "second").await.unwrap();
 		ensure(&mut world, entity, &store)
 			.await
 			.unwrap()
@@ -892,7 +892,7 @@ mod test {
 		.unwrap();
 		store
 			.insert(
-				&RelPath::new(DERIVED),
+				&DERIVED,
 				MediaType::Json.serialize(&body).unwrap(),
 			)
 			.await
@@ -909,12 +909,12 @@ mod test {
 		let (mut world, entity, store, runs) =
 			setup(Derivation::new(DERIVED), "first");
 		ensure(&mut world, entity, &store).await.unwrap();
-		store.remove(&RelPath::new(DERIVED)).await.unwrap();
+		store.remove(&DERIVED).await.unwrap();
 		ensure(&mut world, entity, &store)
 			.await
 			.unwrap()
 			.xpect_eq(Freshness::Missing);
-		store.insert(&RelPath::new(DERIVED), "{}").await.unwrap();
+		store.insert(&DERIVED, "{}").await.unwrap();
 		ensure(&mut world, entity, &store)
 			.await
 			.unwrap()
@@ -932,11 +932,11 @@ mod test {
 		ensure(&mut world, entity, &store).await.unwrap();
 		world
 			.entity_mut(entity)
-			.insert(Derivation::new(DERIVED).with_input("other.md"));
+			.insert(Derivation::new(DERIVED).with_input(fwd_path!("other.md")));
 		ensure(&mut world, entity, &store)
 			.await
 			.unwrap()
-			.xpect_eq(Freshness::Redeclared(RelPath::new("other.md")));
+			.xpect_eq(Freshness::Redeclared(fwd_path!("other.md")));
 		runs.get().xpect_eq(2);
 	}
 
@@ -1046,12 +1046,15 @@ mod test {
 				Derivation::new(DERIVED),
 				Action::<BlobStore, EntityBody>::new_async(
 					async |cx: ActionContext<BlobStore>| {
-						let bytes = cx.input.get(&RelPath::new(SOURCE)).await?;
+						let bytes = cx.input.get(&SOURCE).await?;
 						let mut outputs = DerivationOutputs::default();
 						outputs
 							.write(
 								&cx.input,
-								format!("{}.bin", str::from_utf8(&bytes)?),
+								FwdPath::new(format!(
+									"{}.bin",
+									str::from_utf8(&bytes)?
+								))?,
 								bytes.to_vec(),
 							)
 							.await?;
@@ -1070,9 +1073,9 @@ mod test {
 	#[beet_core::test]
 	async fn restores_its_outputs() {
 		let (mut world, entity, store) = with_outputs();
-		store.insert(&RelPath::new(SOURCE), "first").await.unwrap();
+		store.insert(&SOURCE, "first").await.unwrap();
 		ensure(&mut world, entity, &store).await.unwrap();
-		let output = RelPath::new("first.bin");
+		let output = fwd_path!("first.bin");
 		store.remove(&output).await.unwrap();
 		ensure(&mut world, entity, &store)
 			.await
@@ -1099,17 +1102,17 @@ mod test {
 	#[beet_core::test]
 	async fn removes_superseded_outputs() {
 		let (mut world, entity, store) = with_outputs();
-		store.insert(&RelPath::new(SOURCE), "first").await.unwrap();
+		store.insert(&SOURCE, "first").await.unwrap();
 		ensure(&mut world, entity, &store).await.unwrap();
-		store.insert(&RelPath::new(SOURCE), "second").await.unwrap();
+		store.insert(&SOURCE, "second").await.unwrap();
 		ensure(&mut world, entity, &store).await.unwrap();
 		store
-			.exists(&RelPath::new("first.bin"))
+			.exists(&fwd_path!("first.bin"))
 			.await
 			.unwrap()
 			.xpect_false();
 		store
-			.exists(&RelPath::new("second.bin"))
+			.exists(&fwd_path!("second.bin"))
 			.await
 			.unwrap()
 			.xpect_true();

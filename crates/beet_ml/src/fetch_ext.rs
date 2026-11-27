@@ -12,7 +12,7 @@ use beet_net::prelude::*;
 /// HTTP and written back to the cache before returning.
 pub async fn fetch_bytes(url: &str) -> Result<Vec<u8>> {
 	let store = cache_store()?;
-	let key = cache_key(url);
+	let key = cache_key(url)?;
 
 	if store.exists(&key).await.unwrap_or(false) {
 		log::info!("fetch_bytes: cache hit ({url})");
@@ -39,10 +39,10 @@ const STORE_NAME: &str = "beet_ml_cache";
 /// The cache is the host's local store named [`STORE_NAME`]: a workspace
 /// directory where there is a filesystem, IndexedDB in a browser.
 fn cache_store() -> Result<BlobStore> {
-	BlobStore::from_uri(&ServiceAccess::local_store_uri(STORE_NAME))
+	BlobStore::from_uri(&ServiceAccess::local_store_uri(STORE_NAME)?)
 }
 
 /// Hash the URL to keep cache keys short and filesystem-safe.
-fn cache_key(url: &str) -> RelPath {
-	RelPath::new(format!("{:016x}.bin", fs_ext::hash_string(url)))
+fn cache_key(url: &str) -> Result<FwdPath> {
+	FwdPath::new(format!("{:016x}.bin", fs_ext::hash_string(url)))
 }

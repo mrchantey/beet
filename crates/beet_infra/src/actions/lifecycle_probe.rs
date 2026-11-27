@@ -61,7 +61,7 @@ pub async fn LifecycleProbe(
 	);
 	info!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 
-	let path = RelPath::new("foo.md");
+	let path = fwd_path!("foo.md");
 	let content = "bar";
 	info!(
 		"📄 BlobStore File Exists: {}",

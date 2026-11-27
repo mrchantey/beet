@@ -44,8 +44,8 @@ pub fn RouteIndex(
 ) -> impl Bundle {
 	let cx = stack.current();
 	let is_prod = BootstrapConfig::get().is_prod();
-	let current = RelPath::new(cx.current_path());
-	let mut entries: Vec<(RelPath, DocMeta, Option<u32>)> = trees
+	let current = cx.current_path().clone();
+	let mut entries: Vec<(FwdPath, DocMeta, Option<u32>)> = trees
 		.get(cx.router())
 		.ok()
 		.and_then(|tree| tree.find_subtree(&current.segments()))
@@ -60,7 +60,7 @@ pub fn RouteIndex(
 					route.is_none_or(|route| route.is_browsable(is_prod)).then(
 						|| {
 							(
-								child.path.annotated_path(),
+								child.path.annotated_path().clone(),
 								meta.clone(),
 								route.and_then(|route| route.order),
 							)
@@ -78,7 +78,7 @@ pub fn RouteIndex(
 	});
 	// numbered in ascending order, then flipped for display, so `reverse`
 	// renumbers nothing
-	let mut items: Vec<(usize, RelPath, DocMeta)> = entries
+	let mut items: Vec<(usize, FwdPath, DocMeta)> = entries
 		.into_iter()
 		.enumerate()
 		.map(|(idx, (path, meta, _))| (idx + 1, path, meta))
@@ -123,7 +123,7 @@ pub(crate) fn route_index_rules() -> Vec<Rule> {
 /// the byline, thumbnail and description the frontmatter supplied.
 fn index_entry(
 	number: usize,
-	path: &RelPath,
+	path: &FwdPath,
 	meta: &DocMeta,
 	separator: bool,
 ) -> Snippet {
@@ -222,7 +222,8 @@ mod test {
 				root,
 				root,
 				root,
-			));
+			)
+			.unwrap());
 		world
 	}
 
@@ -275,7 +276,7 @@ mod test {
 				"+++\ntitle = \"ECS Router\"\ndescription = \"the second one\"\ncreated = \"2025-08-09\"\nauthors = [\"Pete Hayman\"]\n\n[RouteMeta]\nslug = \"ecs-router\"\n+++\n\n# Two",
 			),
 		] {
-			store.insert(&RelPath::from(path), content).await.unwrap();
+			store.insert(&FwdPath::new(path).unwrap(), content).await.unwrap();
 		}
 		let root = world
 			.spawn((store, Router, children![RoutesDir::default()]))

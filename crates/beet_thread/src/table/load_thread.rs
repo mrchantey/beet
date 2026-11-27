@@ -39,7 +39,7 @@ use beet_net::prelude::*;
 pub struct MountThreadStore {
 	/// The directory the thread's records persist under, each `{param}` the
 	/// entering request's value for it.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// Persist and never continue: every entry creates a thread, as if it
 	/// carried `--new`.
 	pub new: bool,
@@ -64,7 +64,7 @@ impl MountThreadStore {
 	pub const DEFAULT_LOAD: usize = 50;
 
 	/// A mount continuing the newest thread under `path`.
-	pub fn new(path: impl Into<RelPath>) -> Self {
+	pub fn new(path: impl Into<FwdPath>) -> Self {
 		Self {
 			path: path.into(),
 			..default()
@@ -200,14 +200,14 @@ impl ThreadEntry {
 
 	/// `path` filled as [`Self::fill`] fills text, refusing a value holding a
 	/// `..` segment, starting with `/` or empty, naming the param and the
-	/// mount. [`RelPath`] would drop such a value silently, so the check is
+	/// mount. [`FwdPath`] would drop such a value silently, so the check is
 	/// on the value before it is joined: what it protects is the mount's own
 	/// prefix, never just the store.
 	///
 	/// ## Errors
 	///
 	/// Errors as [`Self::fill`], and on an escaping value.
-	pub fn fill_path(&self, path: &RelPath) -> Result<RelPath> {
+	pub fn fill_path(&self, path: &FwdPath) -> Result<FwdPath> {
 		Self::fill_with(path.as_str(), &self.parts, |name, value| {
 			let refusal = if value.is_empty() {
 				"is empty"
@@ -222,8 +222,7 @@ impl ThreadEntry {
 				"the param `{name}` filling the mount `{path}` {refusal}: `{value}`"
 			)
 		})?
-		.xmap(RelPath::new)
-		.xok()
+		.xmap(FwdPath::new)
 	}
 
 	/// The fill shared by text and paths, `check` answering each param's
@@ -692,7 +691,9 @@ mod test {
 	}
 
 	/// A mount at `path`.
-	fn mount(path: &str) -> MountThreadStore { MountThreadStore::new(path) }
+	fn mount(path: &str) -> MountThreadStore {
+		MountThreadStore::new(FwdPath::new(path).unwrap())
+	}
 
 	/// A request with `params`.
 	fn request(params: &[(&str, &str)]) -> Request {
@@ -720,7 +721,7 @@ mod test {
 	fn threads(store: &BlobStore, path: &str) -> ThreadStore {
 		ThreadStore::new(
 			JsonTableStore::over(store.clone()).unwrap(),
-			RelPath::new(path),
+			FwdPath::new(path).unwrap(),
 		)
 		.unwrap()
 	}
@@ -751,7 +752,7 @@ mod test {
 	async fn a_continued_thread_reads_no_seed() {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::new("seeds/system.md"), "be brief".to_string())
+			.insert(&fwd_path!("seeds/system.md"), "be brief".to_string())
 			.await
 			.unwrap();
 		let (first, _) = enter(
@@ -872,7 +873,7 @@ mod test {
 		for _ in 0..2 {
 			enter(
 				&store,
-				MountThreadStore::new("threads").always_new(),
+				MountThreadStore::new(fwd_path!("threads")).always_new(),
 				Post::spawn("hi"),
 				request(&[]),
 			)

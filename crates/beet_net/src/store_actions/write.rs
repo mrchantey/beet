@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
 pub struct WriteBlobProps {
 	/// Path to write the blob to.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// Raw bytes to write.
 	pub bytes: Vec<u8>,
 }
@@ -26,7 +26,7 @@ pub async fn WriteBlob(cx: ActionContext<WriteBlobProps>) -> Result<()> {
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
 pub struct WriteTextProps {
 	/// Path to write the text to.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// The blob's whole text, written as UTF-8.
 	pub text: String,
 }
@@ -48,7 +48,7 @@ impl WriteBlob {
 	/// `bytes`, emitting the [`BlobEvent`] it caused.
 	async fn write(
 		caller: &AsyncEntity,
-		path: RelPath,
+		path: FwdPath,
 		bytes: Vec<u8>,
 	) -> Result {
 		let store = caller
@@ -90,7 +90,7 @@ mod test {
 			.await
 			.unwrap();
 		store
-			.get(&RelPath::from("file.bin"))
+			.get(&fwd_path!("file.bin"))
 			.await
 			.unwrap()
 			.to_vec()
@@ -100,7 +100,7 @@ mod test {
 	async fn writes_bytes() {
 		let bytes = vec![0, 159, 146, 150];
 		write(&BlobStore::temp(), WriteBlob, WriteBlobProps {
-			path: RelPath::from("file.bin"),
+			path: fwd_path!("file.bin"),
 			bytes: bytes.clone(),
 		})
 		.await
@@ -111,11 +111,11 @@ mod test {
 	async fn writes_text_over_bytes() {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("file.bin"), vec![1, 2])
+			.insert(&fwd_path!("file.bin"), vec![1, 2])
 			.await
 			.unwrap();
 		write(&store, WriteText, WriteTextProps {
-			path: RelPath::from("file.bin"),
+			path: fwd_path!("file.bin"),
 			text: "hello".into(),
 		})
 		.await

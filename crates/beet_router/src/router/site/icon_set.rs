@@ -95,10 +95,10 @@ use beet_ui::prelude::*;
 pub async fn IconSet(
 	/// The source image, a raster at least 512 square or an svg.
 	#[field]
-	src: RelPath,
+	src: FwdPath,
 	/// The favicon for a dark system, an svg, see the module docs.
 	#[field]
-	dark: Option<RelPath>,
+	dark: Option<FwdPath>,
 	cx: ActionContext<BlobStore>,
 ) -> Result<EntityBody> {
 	let icon_set = IconSet { src, dark };
@@ -149,24 +149,24 @@ pub struct IconLink {
 
 impl IconSet {
 	/// The derived document beside the source, listing the set.
-	const DOCUMENT: &str = "icon-set.json";
+	const DOCUMENT: FwdPath = fwd_path!("icon-set.json");
 	/// The multi-size favicon.
-	const FAVICON_ICO: &str = "favicon.ico";
+	const FAVICON_ICO: FwdPath = fwd_path!("favicon.ico");
 	/// The vector favicon, an svg source copied verbatim.
-	const FAVICON_SVG: &str = "favicon.svg";
+	const FAVICON_SVG: FwdPath = fwd_path!("favicon.svg");
 	/// The vector favicon for a dark system, the `dark` svg copied verbatim.
-	const FAVICON_DARK_SVG: &str = "favicon-dark.svg";
+	const FAVICON_DARK_SVG: FwdPath = fwd_path!("favicon-dark.svg");
 	/// The size the head declares the ico at, see the module docs.
 	const ICO_LINKED: u32 = 32;
 	/// The web app manifest.
-	const MANIFEST: &str = "site.webmanifest";
+	const MANIFEST: FwdPath = fwd_path!("site.webmanifest");
 	/// The largest size the set derives, and so the smallest source it accepts.
 	const LARGEST: u32 = 512;
 	/// The padded `apple-touch-icon` size, `icon-<size>.png`.
 	const APPLE_TOUCH: u32 = 180;
 
 	/// The set derived from `src`.
-	pub fn new(src: impl Into<RelPath>) -> Self {
+	pub fn new(src: impl Into<FwdPath>) -> Self {
 		Self {
 			src: src.into(),
 			dark: None,
@@ -174,7 +174,7 @@ impl IconSet {
 	}
 
 	/// This set with `dark` as the favicon for a dark system.
-	pub fn with_dark(self, dark: impl Into<RelPath>) -> Self {
+	pub fn with_dark(self, dark: impl Into<FwdPath>) -> Self {
 		Self {
 			dark: Some(dark.into()),
 			..self
@@ -185,7 +185,7 @@ impl IconSet {
 	/// reading the sources and the module docs' resources.
 	pub fn derivation(&self) -> Derivation {
 		self.dark.iter().fold(
-			Derivation::new(self.path(Self::DOCUMENT))
+			Derivation::new(self.path(&Self::DOCUMENT))
 				.with_input(self.src.clone())
 				.with_resource_type::<ThemeTones>()
 				.with_resource_type::<PackageConfig>(),
@@ -195,13 +195,16 @@ impl IconSet {
 
 	/// The store path of the 512, unpadded, which a standard.site publication
 	/// carries as its icon.
-	pub fn publication_icon(&self) -> RelPath { self.png(Self::LARGEST) }
+	///
+	/// # Errors
+	/// Errors only when the size names no file, which a number never does.
+	pub fn publication_icon(&self) -> Result<FwdPath> { self.png(Self::LARGEST) }
 
 	/// Whether the source is svg, which adds `favicon.svg` to the set.
 	pub fn is_svg(&self) -> bool { Self::is_svg_path(&self.src) }
 
 	/// Whether `path` names an svg.
-	fn is_svg_path(path: &RelPath) -> bool {
+	fn is_svg_path(path: &FwdPath) -> bool {
 		path.as_smol_path()
 			.extension()
 			.is_some_and(|ext| ext.eq_ignore_ascii_case("svg"))
@@ -209,8 +212,8 @@ impl IconSet {
 
 	/// The icon links a document head carries for the set, in the order the
 	/// module docs give.
-	pub fn links(&self) -> Vec<IconLink> {
-		let link = |rel, mime, sizes: String, path: RelPath| IconLink {
+	pub fn links(&self) -> Result<Vec<IconLink>> {
+		let link = |rel, mime, sizes: String, path: FwdPath| IconLink {
 			rel,
 			mime,
 			sizes: sizes.into(),
@@ -221,19 +224,19 @@ impl IconSet {
 			"icon",
 			"image/x-icon",
 			format!("{0}x{0}", Self::ICO_LINKED),
-			self.path(Self::FAVICON_ICO),
+			self.path(&Self::FAVICON_ICO),
 		)];
 		if self.is_svg() {
 			links.push(IconLink {
 				dark_href: self
 					.dark
 					.is_some()
-					.then(|| Self::href(&self.path(Self::FAVICON_DARK_SVG))),
+					.then(|| Self::href(&self.path(&Self::FAVICON_DARK_SVG))),
 				..link(
 					"icon",
 					"image/svg+xml",
 					"any".into(),
-					self.path(Self::FAVICON_SVG),
+					self.path(&Self::FAVICON_SVG),
 				)
 			});
 		}
@@ -241,30 +244,27 @@ impl IconSet {
 			"apple-touch-icon",
 			"image/png",
 			format!("{0}x{0}", Self::APPLE_TOUCH),
-			self.png(Self::APPLE_TOUCH),
+			self.png(Self::APPLE_TOUCH)?,
 		));
-		links
+		links.xok()
 	}
 
 	/// The url the web app manifest serves at.
 	pub fn manifest_href(&self) -> SmolStr {
-		Self::href(&self.path(Self::MANIFEST))
+		Self::href(&self.path(&Self::MANIFEST))
 	}
 
 	/// The url a file at `path` in the store serves at.
-	pub(crate) fn href(path: &RelPath) -> SmolStr { format!("/{path}").into() }
+	pub(crate) fn href(path: &FwdPath) -> SmolStr { format!("/{path}").into() }
 
 	/// The file `name` beside the source.
-	fn path(&self, name: &str) -> RelPath {
-		match self.src.parent() {
-			Some(dir) => dir.join(name),
-			None => RelPath::new(name),
-		}
+	fn path(&self, name: &FwdPath) -> FwdPath {
+		self.src.parent().unwrap_or_default().join(name)
 	}
 
 	/// The unpadded png of `size`.
-	fn png(&self, size: u32) -> RelPath {
-		self.path(&format!("icon-{size}.png"))
+	fn png(&self, size: u32) -> Result<FwdPath> {
+		self.path(&FwdPath::new(format!("icon-{size}.png"))?).xok()
 	}
 
 	/// The hook landing this set's [`Derivation`] on its entity.
@@ -283,7 +283,7 @@ impl IconSet {
 	/// The sizes `favicon.ico` holds.
 	const ICO_SIZES: [u32; 3] = [16, 32, 48];
 	/// The padded 512 for the `maskable` purpose.
-	const MASKABLE: &str = "icon-512-maskable.png";
+	const MASKABLE: FwdPath = fwd_path!("icon-512-maskable.png");
 	/// The maskable safe zone, as a fraction of the width.
 	const SAFE_ZONE: f32 = 0.8;
 
@@ -312,7 +312,7 @@ impl IconSet {
 		}
 		if self.is_svg() {
 			outputs
-				.write(store, self.path(Self::FAVICON_SVG), bytes.to_vec())
+				.write(store, self.path(&Self::FAVICON_SVG), bytes.to_vec())
 				.await?;
 		}
 		let mut sources =
@@ -326,13 +326,13 @@ impl IconSet {
 			}
 			sources.push(ProvenanceSource::file(path.clone(), &dark));
 			outputs
-				.write(store, self.path(Self::FAVICON_DARK_SVG), dark)
+				.write(store, self.path(&Self::FAVICON_DARK_SVG), dark)
 				.await?;
 		}
 		outputs
 			.write(
 				store,
-				self.path(Self::MANIFEST),
+				self.path(&Self::MANIFEST),
 				self.manifest(package, &tints, &background.to_hex())?,
 			)
 			.await?;
@@ -348,21 +348,21 @@ impl IconSet {
 		&self,
 		bytes: &[u8],
 		background: [u8; 4],
-	) -> Result<Vec<(RelPath, Vec<u8>)>> {
+	) -> Result<Vec<(FwdPath, Vec<u8>)>> {
 		let source = IconSource::decode(self, bytes)?;
 		let mut rasters = Self::PNG_SIZES
 			.iter()
-			.map(|size| (self.png(*size), source.png(*size)?).xok())
+			.map(|size| (self.png(*size)?, source.png(*size)?).xok())
 			.collect::<Result<Vec<_>>>()?;
 		rasters.push((
-			self.png(Self::APPLE_TOUCH),
+			self.png(Self::APPLE_TOUCH)?,
 			source.padded(Self::APPLE_TOUCH, background)?,
 		));
 		rasters.push((
-			self.path(Self::MASKABLE),
+			self.path(&Self::MASKABLE),
 			source.padded(Self::LARGEST, background)?,
 		));
-		rasters.push((self.path(Self::FAVICON_ICO), source.ico()?));
+		rasters.push((self.path(&Self::FAVICON_ICO), source.ico()?));
 		rasters.xok()
 	}
 
@@ -386,7 +386,7 @@ impl IconSet {
 			.into_iter()
 			.map(|size| icon(format!("icon-{size}.png"), size, "any"))
 			.collect::<Vec<_>>();
-		icons.push(icon(Self::MASKABLE.into(), Self::LARGEST, "maskable"));
+		icons.push(icon(Self::MASKABLE.to_string(), Self::LARGEST, "maskable"));
 		value!({
 			"name": &package.title,
 			"short_name": &package.title,
@@ -554,7 +554,7 @@ mod test {
 	use beet_net::prelude::*;
 	use beet_ui::prelude::*;
 
-	const SRC: &str = "branding/logo.png";
+	const SRC: FwdPath = fwd_path!("branding/logo.png");
 
 	/// A `width` by `height` png, a diagonal gradient so a resize has detail
 	/// to lose, its tint `seed`.
@@ -585,7 +585,7 @@ mod test {
 		let entity = world.spawn(IconSet::new(SRC)).flush();
 		let inserted = store.clone();
 		async_ext::block_on(async move {
-			inserted.insert(&RelPath::new(SRC), source).await
+			inserted.insert(&FwdPath::new(SRC).unwrap(), source).await
 		})
 		.unwrap();
 		(world, entity, store)
@@ -619,7 +619,7 @@ mod test {
 
 	/// The image at `path` in `store`.
 	async fn image(store: &BlobStore, path: &str) -> image::RgbaImage {
-		image::load_from_memory(&store.get(&RelPath::new(path)).await.unwrap())
+		image::load_from_memory(&store.get(&FwdPath::new(path).unwrap()).await.unwrap())
 			.unwrap()
 			.into_rgba8()
 	}
@@ -663,7 +663,7 @@ mod test {
 		ensure(&mut world, entity, &store).await;
 		let first = outputs(&store).await;
 		store
-			.insert(&RelPath::new(SRC), png(512, 512, 200))
+			.insert(&FwdPath::new(SRC).unwrap(), png(512, 512, 200))
 			.await
 			.unwrap();
 		ensure(&mut world, entity, &store)
@@ -693,7 +693,7 @@ mod test {
 	async fn restores_a_deleted_icon() {
 		let (mut world, entity, store) = setup(png(512, 512, 0));
 		ensure(&mut world, entity, &store).await;
-		let icon = RelPath::new("branding/icon-192.png");
+		let icon = fwd_path!("branding/icon-192.png");
 		store.remove(&icon).await.unwrap();
 		ensure(&mut world, entity, &store)
 			.await
@@ -728,7 +728,7 @@ mod test {
 			.0
 			.xpect_eq([0, 0, 0, 255]);
 		let manifest = store
-			.get(&RelPath::new("branding/site.webmanifest"))
+			.get(&fwd_path!("branding/site.webmanifest"))
 			.await
 			.unwrap();
 		str::from_utf8(&manifest)
@@ -761,12 +761,13 @@ mod test {
 		let icon_set = IconSet::new(SRC);
 		for href in icon_set
 			.links()
+			.unwrap()
 			.into_iter()
 			.map(|link| link.href)
 			.chain([icon_set.manifest_href()])
 		{
 			outputs
-				.get(&RelPath::new(href.trim_start_matches('/')))
+				.get(&FwdPath::new(href.trim_start_matches('/')).unwrap())
 				.is_some()
 				.xpect_true();
 		}
@@ -775,12 +776,12 @@ mod test {
 	/// An svg source is rasterised at each size and served as itself too.
 	#[beet_core::test]
 	async fn derives_an_svg_source() {
-		const SVG: &str = "branding/logo.svg";
+		const SVG: FwdPath = fwd_path!("branding/logo.svg");
 		let mut world = icon_world();
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&RelPath::new(SVG),
+				&FwdPath::new(SVG).unwrap(),
 				r##"<svg width="150" height="100" xmlns="http://www.w3.org/2000/svg"><rect width="150" height="100" fill="#f00"/></svg>"##,
 			)
 			.await
@@ -791,11 +792,11 @@ mod test {
 		// letterboxed: transparent above the art, red within it
 		icon.get_pixel(256, 10).0[3].xpect_eq(0);
 		icon.get_pixel(256, 256).0.xpect_eq([255, 0, 0, 255]);
-		IconSet::new(SVG).links()[1]
+		IconSet::new(SVG).links().unwrap()[1]
 			.href
 			.xpect_eq("/branding/favicon.svg");
 		store
-			.exists(&RelPath::new("branding/favicon.svg"))
+			.exists(&fwd_path!("branding/favicon.svg"))
 			.await
 			.unwrap()
 			.xpect_true();
@@ -805,8 +806,8 @@ mod test {
 	/// twin, the ico linked first at one exact size so the svg wins the tab.
 	#[beet_core::test]
 	async fn links_a_dark_favicon() {
-		const SVG: &str = "branding/logo.svg";
-		const DARK: &str = "branding/logo-dark.svg";
+		const SVG: FwdPath = fwd_path!("branding/logo.svg");
+		const DARK: FwdPath = fwd_path!("branding/logo-dark.svg");
 		let svg = |fill: &str| {
 			format!(
 				r#"<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg"><rect width="512" height="512" fill="{fill}"/></svg>"#
@@ -814,17 +815,17 @@ mod test {
 		};
 		let mut world = icon_world();
 		let store = BlobStore::temp();
-		store.insert(&RelPath::new(SVG), svg("#fff")).await.unwrap();
-		store.insert(&RelPath::new(DARK), svg("#000")).await.unwrap();
+		store.insert(&FwdPath::new(SVG).unwrap(), svg("#fff")).await.unwrap();
+		store.insert(&FwdPath::new(DARK).unwrap(), svg("#000")).await.unwrap();
 		let icon_set = IconSet::new(SVG).with_dark(DARK);
 		let entity = world.spawn(icon_set.clone()).flush();
 		ensure(&mut world, entity, &store).await;
 		store
-			.get(&RelPath::new("branding/favicon-dark.svg"))
+			.get(&fwd_path!("branding/favicon-dark.svg"))
 			.await
 			.unwrap()
 			.xpect_eq(svg("#000").into_bytes());
-		let links = icon_set.links();
+		let links = icon_set.links().unwrap();
 		(links[0].mime, links[0].sizes.as_str())
 			.xpect_eq(("image/x-icon", "32x32"));
 		links[1]
@@ -832,7 +833,7 @@ mod test {
 			.clone()
 			.xpect_eq(Some("/branding/favicon-dark.svg".into()));
 		// a changed dark drawing regenerates the set
-		store.insert(&RelPath::new(DARK), svg("#111")).await.unwrap();
+		store.insert(&FwdPath::new(DARK).unwrap(), svg("#111")).await.unwrap();
 		ensure(&mut world, entity, &store)
 			.await
 			.to_string()

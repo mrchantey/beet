@@ -81,7 +81,10 @@ impl LambdaBlock {
 	}
 
 	/// The function's code in the package bucket, under the version `deploy_id`.
-	pub fn code_key(&self, deploy_id: &Uuid) -> RelPath {
+	///
+	/// # Errors
+	/// Errors when the label names no file.
+	pub fn code_key(&self, deploy_id: &Uuid) -> Result<FwdPath> {
 		ArtifactLedger::version_artifact_key(deploy_id, &self.label)
 	}
 
@@ -194,7 +197,7 @@ impl LambdaBlock {
 	) -> Result {
 		self.validate()?;
 		let region = stack.aws_region()?.clone();
-		let artifact_key = self.code_key(deployment.deploy_id());
+		let artifact_key = self.code_key(deployment.deploy_id())?;
 
 		// CloudWatch log group for Lambda logs
 		// Must be created before the Lambda function to ensure proper cleanup

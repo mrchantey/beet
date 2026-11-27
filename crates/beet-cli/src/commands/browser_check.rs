@@ -8,7 +8,7 @@ use beet::prelude::*;
 
 /// Where the `just build-wasm-*` recipes write the runtimes under test,
 /// workspace-relative.
-const WASM_DIR: &str = "target/wasm";
+const WASM_DIR: FwdPath = fwd_path!("target/wasm");
 
 /// A whole document around `body`, rendered through the router's templates so
 /// the loader contract under test is the one a served page uses.
@@ -59,13 +59,13 @@ pub(crate) async fn serve_wasm_page(page: String) -> Result<u16> {
 					// the runtime and the entry's package store, from the ancestor
 					// workspace store
 					AssetsDir {
-						src: WASM_DIR.into(),
+						src: WASM_DIR,
 						prefix: "wasm".into(),
 						cache: default(),
 					}
 					.into_snippet_bundle(),
 					AssetsDir {
-						src: "examples".into(),
+						src: fwd_path!("examples"),
 						prefix: default(),
 						cache: default(),
 					}

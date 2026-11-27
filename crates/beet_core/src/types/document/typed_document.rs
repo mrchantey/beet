@@ -166,7 +166,7 @@ impl TypedDocument {
 		let mut overlay = resolver.registry().cloned().unwrap_or_default();
 		match &self.schema {
 			ValueSchema::Ref(SchemaRef::Document(path)) => {
-				overlay.insert_located(path.rel_path(), schema.clone())
+				overlay.insert_located(path.fwd_path()?, schema.clone())
 			}
 			// anything else reaches the declaration by name, if it has one
 			_ => {
@@ -282,7 +282,7 @@ mod test {
 	#[crate::test]
 	fn schema_arms() {
 		let resolver = SchemaResolver::default();
-		ValueSchema::document("schema.json")
+		ValueSchema::document(fwd_path!("schema.json"))
 			.resolve(resolver)
 			.unwrap()
 			.xpect_eq(ValueSchema::Any);
@@ -370,7 +370,7 @@ mod test {
 			TypedDocument::schema_document(&todo_schema(vec![label()]))
 				.unwrap();
 		let mut data = TypedDocument::new(
-			ValueSchema::document("schema.json"),
+			ValueSchema::document(fwd_path!("schema.json")),
 			value!({ "label": "buy milk" }),
 		);
 
@@ -399,7 +399,7 @@ mod test {
 			.unwrap()
 			.into_owned()
 			.xpect_eq(ValueSchema::Bool(default()));
-		data.schema.xpect_eq(ValueSchema::document("schema.json"));
+		data.schema.xpect_eq(ValueSchema::document(fwd_path!("schema.json")));
 	}
 
 	/// The todo app's own shape: the schema document holds the *row* schema and

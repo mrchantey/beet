@@ -106,7 +106,7 @@ impl ErasedStoreBlock {
 			root: block.store_uri(stack)?,
 			local: ServiceAccess::local_store_uri(
 				&stack.resource_name(block.label().clone()),
-			),
+			)?,
 			kind: block.kind(),
 			deploy_versioned: block.deploy_versioned(),
 			storage_class: block.storage_class(),
@@ -135,9 +135,9 @@ impl ErasedStoreBlock {
 	/// same store differently.
 	pub fn store_uri(&self, deploy_id: Option<&Uuid>) -> StoreUri {
 		match (self.deploy_versioned, deploy_id) {
-			(true, Some(deploy_id)) => self.root.with_subdir(
-				ArtifactLedger::version_package_dir(deploy_id).to_string(),
-			),
+			(true, Some(deploy_id)) => self
+				.root
+				.with_subdir(ArtifactLedger::version_package_dir(deploy_id)),
 			_ => self.root.clone(),
 		}
 	}
@@ -295,7 +295,7 @@ mod test {
 		);
 		world.flush();
 		world.get::<FsStore>(entity).unwrap().path().xpect_eq(
-			ServiceAccess::local_store_dir("app--prod--docs").into_abs(),
+			ServiceAccess::local_store_dir("app--prod--docs").unwrap().into_abs(),
 		);
 		world.get::<BlobStore>(entity).xpect_some();
 		world.get::<TableStore>(entity).xpect_none();
@@ -345,7 +345,7 @@ mod test {
 			.xpect_eq(format!("s3://bucket/{deploy_id}/package"));
 		erased
 			.runtime_uri(ServiceAccess::Local, Some(&deploy_id))
-			.xpect_eq(ServiceAccess::local_store_uri("app--prod--package"));
+			.xpect_eq(ServiceAccess::local_store_uri("app--prod--package").unwrap());
 	}
 
 	/// A declaration naming a memory store names ONE store: every remote read
@@ -370,9 +370,9 @@ mod test {
 			.into_blob_store()
 		};
 		let seeded = read();
-		seeded.insert(&RelPath::new("a.txt"), "hi").await.unwrap();
+		seeded.insert(&fwd_path!("a.txt"), "hi").await.unwrap();
 		read()
-			.get(&RelPath::new("a.txt"))
+			.get(&fwd_path!("a.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(bytes::Bytes::from_static(b"hi"));

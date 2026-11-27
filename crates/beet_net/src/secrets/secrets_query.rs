@@ -88,7 +88,7 @@ impl SecretsQuery<'_, '_> {
 			),
 			(None, _) => SecretsHandle::new(
 				self.entry_store(caller)?,
-				Secrets::DEFAULT_PATH,
+				Secrets::DEFAULT_PATH.as_str(),
 			)?
 			.with_label(Secrets::DEFAULT_LABEL)
 			.xok(),

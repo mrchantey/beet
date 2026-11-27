@@ -97,7 +97,7 @@ impl RedirectTo {
 	pub fn new(path: &str, target: impl Into<Url>) -> Self {
 		Self {
 			target: target.into(),
-			depth: RelPath::new(path).segments().len(),
+			depth: SmolPath::new(path).segments().len(),
 		}
 	}
 
@@ -112,11 +112,13 @@ impl RedirectTo {
 		if self.target.is_external() || self.target.is_rooted() {
 			return self.target.clone();
 		}
-		let path = pattern.annotated_path();
-		let mut segments = path.segments();
+		let mut segments = pattern
+			.iter()
+			.map(|segment| SmolStr::from(segment.to_string_annotated()))
+			.collect::<Vec<_>>();
 		segments.truncate(segments.len().saturating_sub(self.depth));
-		RelPath::from_segments(&segments)
-			.xmap(Url::from)
+		Url::default()
+			.with_path(segments)
 			.with_rooted(true)
 			// the scope is a directory, so the reference resolves inside it,
 			// exactly as a browser resolves `href` against `/blog/`

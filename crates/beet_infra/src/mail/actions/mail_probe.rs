@@ -230,7 +230,7 @@ pub async fn MailProbe(
 		&address,
 		&password,
 		&token,
-		&mail.project.work_dir(),
+		&mail.project.work_dir()?,
 	)
 	.await?;
 	if !send_inbound(
@@ -513,7 +513,7 @@ async fn send_inbound_local(
 		Inbound leg of the beet mail probe.\r\n",
 		MailProbe::subject(token)
 	);
-	let message = mail.project.work_dir().join("mail-probe-inbound.eml");
+	let message = mail.project.work_dir()?.join("mail-probe-inbound.eml");
 	fs_ext::write_async(&message, body.as_bytes()).await?;
 	ChildProcess::new("curl")
 		.with_args([

@@ -22,7 +22,7 @@ pub struct PackageFiles(BlobStore);
 
 impl PackageFiles {
 	/// The package whose entry is at `entry` in `package_store`.
-	pub fn of_entry(package_store: &BlobStore, entry: &RelPath) -> Self {
+	pub fn of_entry(package_store: &BlobStore, entry: &FwdPath) -> Self {
 		match entry.parent().filter(|dir| !dir.is_empty()) {
 			Some(dir) => Self(package_store.with_subdir(dir)),
 			None => Self(package_store.clone()),
@@ -34,13 +34,16 @@ impl PackageFiles {
 
 	/// The file `document` names, its extension as written
 	/// ([`Blob::complete`]).
-	pub fn resolve(&self, document: &DocPath) -> Blob {
-		self.0.blob(document.rel_path())
+	///
+	/// # Errors
+	/// Errors when the reference is no path within the package.
+	pub fn resolve(&self, document: &DocPath) -> Result<Blob> {
+		self.0.blob(document.fwd_path()?).xok()
 	}
 
 	/// The path of `blob` in the package, its path in its own store when that
 	/// store is elsewhere: the inverse of [`resolve`](Self::resolve).
-	pub fn path_of(&self, blob: &Blob) -> RelPath {
+	pub fn path_of(&self, blob: &Blob) -> FwdPath {
 		let subdir = self.0.subdir();
 		let full = blob.store().subdir().join(blob.path());
 		(blob.store().root_key() == self.0.root_key())
@@ -70,7 +73,7 @@ impl PackageFilesQuery<'_, '_> {
 	/// ## Errors
 	/// Errors when nothing above `entity` holds a store.
 	pub fn resolve(&self, entity: Entity, document: &DocPath) -> Result<Blob> {
-		self.get(entity)?.resolve(document).xok()
+		self.get(entity)?.resolve(document)
 	}
 
 	/// The package of `entity`, for a tree built apart from it to carry.
@@ -107,25 +110,25 @@ mod test {
 	fn resolves_in_the_package_not_the_nearest_store() {
 		let mut world = World::new();
 		let store = BlobStore::temp();
-		let entry = RelPath::new("app/main.bsx");
+		let entry = fwd_path!("app/main.bsx");
 		let root = world
 			.spawn((PackageFiles::of_entry(&store, &entry), store.clone()))
 			.id();
 		let scoped = world
 			.spawn((
 				ChildOf(root),
-				store.with_subdir(RelPath::new("elsewhere")),
+				store.with_subdir(fwd_path!("elsewhere")),
 			))
 			.id();
 		let document = DocPath::parse("widgets/Card.bsx").unwrap();
 		world.with_state::<PackageFilesQuery, _>(|packages| {
 			let blob = packages.resolve(scoped, &document).unwrap();
-			blob.store().subdir().xpect_eq(RelPath::new("app"));
+			blob.store().subdir().xpect_eq(fwd_path!("app"));
 			packages
 				.get(scoped)
 				.unwrap()
-				.path_of(&store.blob(RelPath::new("app/widgets/Card.bsx")))
-				.xpect_eq(document.rel_path());
+				.path_of(&store.blob(fwd_path!("app/widgets/Card.bsx")))
+				.xpect_eq(document.fwd_path().unwrap());
 		});
 	}
 }

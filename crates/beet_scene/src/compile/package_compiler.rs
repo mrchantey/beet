@@ -35,11 +35,11 @@ use bytes::Bytes;
 /// # use beet_scene::prelude::*;
 /// # async_ext::block_on(async {
 /// let source = BlobStore::temp();
-/// source.insert(&RelPath::new("todos/main.json"), r#"{"title":"todos"}"#).await?;
+/// source.insert(&fwd_path!("todos/main.json"), r#"{"title":"todos"}"#).await?;
 /// let world = ScenePlugin.into_world();
 /// let pds = PackageCompiler::local_pds(&source);
 /// let report = PackageCompiler::new(DocParsers::of(&world), pds)
-/// 	.compile(&source, &RelPath::new("todos/main.json"))
+/// 	.compile(&source, &fwd_path!("todos/main.json"))
 /// 	.await?;
 /// report.package.name.as_str().xpect_eq("todos");
 /// report.package_record.uri.to_string().xpect_contains("/org.beet.package/todos:main");
@@ -59,7 +59,7 @@ impl PackageCompiler {
 	/// it, its own repo in each space laid out under `self` all the same.
 	pub const LOCAL_DID: &'static str = "did:web:localhost";
 	/// Where a source directory keeps its compiled form.
-	pub const PDS_DIR: &'static str = ".beet/pds";
+	pub const PDS_DIR: FwdPath = fwd_path!(".beet/pds");
 	/// The stem an entry document is named by, ie `main.bsx`, which is how a
 	/// dependency's and a sub package's entry are found.
 	pub const ENTRY_STEM: &'static str = "main";
@@ -90,7 +90,7 @@ impl PackageCompiler {
 	pub fn local_pds(source: &BlobStore) -> Pds {
 		Pds::new(EmulatorPds::new(
 			Did::parse(Self::LOCAL_DID).expect("a valid did"),
-			source.with_subdir(RelPath::new(Self::PDS_DIR)),
+			source.with_subdir(Self::PDS_DIR),
 		))
 	}
 
@@ -99,7 +99,7 @@ impl PackageCompiler {
 	pub async fn compile(
 		&self,
 		source: &BlobStore,
-		entry: &RelPath,
+		entry: &FwdPath,
 	) -> Result<CompileReport> {
 		self.compile_package(source.clone(), entry.clone(), Vec::new())
 			.await
@@ -111,8 +111,8 @@ impl PackageCompiler {
 	pub async fn entry_of(
 		&self,
 		source: &BlobStore,
-		path: &RelPath,
-	) -> Result<RelPath> {
+		path: &FwdPath,
+	) -> Result<FwdPath> {
 		match PackageSource::is_entry_like(path, &self.parsers)
 			&& source.exists(path).await?
 		{
@@ -147,8 +147,8 @@ impl PackageCompiler {
 	fn compile_package(
 		&self,
 		directory: BlobStore,
-		entry: RelPath,
-		mut visiting: Vec<RelPath>,
+		entry: FwdPath,
+		mut visiting: Vec<FwdPath>,
 	) -> LifetimeSendBoxedFuture<'_, Result<CompiledPackage>> {
 		Box::pin(async move {
 			if visiting.contains(&entry) {
@@ -237,7 +237,7 @@ impl PackageCompiler {
 						 one"
 					);
 				}
-				let dependency_dir = RelPath::new(joined.as_str());
+				let dependency_dir = FwdPath::new(joined.as_str())?;
 				let dependency_entry = Self::find_entry(
 					&directory,
 					&dependency_dir,
@@ -256,9 +256,8 @@ impl PackageCompiler {
 					version: compiled.report.package.version.clone(),
 					record: compiled.report.package_record.clone(),
 				});
-				let prefixed = |path: &RelPath| {
-					RelPath::new(key.as_str()).join(path.as_str())
-				};
+				let key_path = FwdPath::new(key.as_str())?;
+				let prefixed = |path: &FwdPath| key_path.join(path);
 				for (path, blob) in &compiled.files.0 {
 					scenes.files.0.insert(prefixed(path), blob.clone());
 				}
@@ -421,14 +420,16 @@ impl PackageCompiler {
 	/// [`ENTRY_STEM`](Self::ENTRY_STEM).
 	async fn find_entry(
 		source: &BlobStore,
-		dir: &RelPath,
+		dir: &FwdPath,
 		parsers: &DocParsers,
-	) -> Result<RelPath> {
+	) -> Result<FwdPath> {
 		let listed = source.list_dir(dir).await?;
 		let entries = listed
 			.files
 			.iter()
-			.map(|file| dir.join(file.as_str()))
+			.map(|file| dir.try_join(file.as_str()))
+			.collect::<Result<Vec<_>>>()?
+			.into_iter()
 			.filter(|path| PackageSource::is_entry(path, parsers))
 			.collect::<Vec<_>>();
 		match entries.as_slice() {
@@ -454,7 +455,7 @@ impl PackageCompiler {
 /// One package compiled, what a package depending on it reads.
 struct CompiledPackage {
 	files: Files,
-	scenes: BTreeMap<RelPath, EntityBodyRecord>,
+	scenes: BTreeMap<FwdPath, EntityBodyRecord>,
 	report: CompileReport,
 }
 
@@ -462,9 +463,9 @@ struct CompiledPackage {
 /// and bytes.
 struct PackageSource {
 	files: Files,
-	bytes: BTreeMap<RelPath, Bytes>,
+	bytes: BTreeMap<FwdPath, Bytes>,
 	/// Which of the files are documents, by their parser.
-	documents: BTreeMap<RelPath, MediaType>,
+	documents: BTreeMap<FwdPath, MediaType>,
 }
 
 impl PackageSource {
@@ -501,7 +502,7 @@ impl PackageSource {
 
 	/// Whether `path` names an entry: a document whose stem is
 	/// [`PackageCompiler::ENTRY_STEM`].
-	fn is_entry(path: &RelPath, parsers: &DocParsers) -> bool {
+	fn is_entry(path: &FwdPath, parsers: &DocParsers) -> bool {
 		path.file_stem() == Some(PackageCompiler::ENTRY_STEM)
 			&& path
 				.media_type()
@@ -509,20 +510,20 @@ impl PackageSource {
 	}
 
 	/// Whether `path` names a document of a type `parsers` reads.
-	fn is_entry_like(path: &RelPath, parsers: &DocParsers) -> bool {
+	fn is_entry_like(path: &FwdPath, parsers: &DocParsers) -> bool {
 		path.media_type()
 			.is_some_and(|media_type| parsers.reads(&media_type))
 	}
 
 	/// The document at `path` as its bytes and media type.
-	fn media(&self, path: &RelPath) -> Option<MediaBytes> {
+	fn media(&self, path: &FwdPath) -> Option<MediaBytes> {
 		let media_type = self.documents.get(path)?;
 		MediaBytes::new(media_type.clone(), self.bytes.get(path)?.clone())
 			.xsome()
 	}
 
 	/// Every document, in path order.
-	fn documents(&self) -> Vec<(RelPath, MediaBytes)> {
+	fn documents(&self) -> Vec<(FwdPath, MediaBytes)> {
 		self.documents
 			.keys()
 			.filter_map(|path| Some((path.clone(), self.media(path)?)))
@@ -534,7 +535,7 @@ impl PackageSource {
 	fn drop_sub_packages(
 		&mut self,
 		parsers: &DocParsers,
-		entry: &RelPath,
+		entry: &FwdPath,
 	) -> Result {
 		let roots = self
 			.documents
@@ -550,7 +551,7 @@ impl PackageSource {
 				.contains(&Package::NSID)
 			{
 				let dir = root.parent().unwrap_or_default();
-				let within = |path: &RelPath| path.strip_prefix(&dir).is_some();
+				let within = |path: &FwdPath| path.strip_prefix(&dir).is_some();
 				self.files.0.retain(|path, _| !within(path));
 				self.bytes.retain(|path, _| !within(path));
 				self.documents.retain(|path, _| !within(path));
@@ -629,7 +630,7 @@ mod test {
 	)]
 	#[lexicon_def(lexicon = "com.example.router")]
 	#[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
-	struct RouteTable(BTreeMap<SmolStr, RelPath>);
+	struct RouteTable(BTreeMap<SmolStr, FwdPath>);
 
 	static FIRED: AtomicBool = AtomicBool::new(false);
 
@@ -661,7 +662,7 @@ mod test {
 		let source = BlobStore::temp();
 		for (path, text) in files {
 			source
-				.insert(&RelPath::new(path), text.to_string())
+				.insert(&FwdPath::new(path).unwrap(), text.to_string())
 				.await
 				.unwrap();
 		}
@@ -677,12 +678,12 @@ mod test {
 
 	async fn compile(source: &BlobStore) -> Result<CompileReport> {
 		compiler(source)
-			.compile(source, &RelPath::new("todos/main.bsx"))
+			.compile(source, &fwd_path!("todos/main.bsx"))
 			.await
 	}
 
 	/// Every file of `store` and its bytes, in path order.
-	async fn snapshot(store: &BlobStore) -> Vec<(RelPath, Vec<u8>)> {
+	async fn snapshot(store: &BlobStore) -> Vec<(FwdPath, Vec<u8>)> {
 		let mut files = store
 			.get_all()
 			.await
@@ -718,7 +719,7 @@ mod test {
 			package_record(source, report.package_record.uri.rkey().as_str())
 				.await;
 		let scenes = package.body().get::<Scenes>().unwrap();
-		let scene_ref = &scenes.0[&RelPath::new(path)];
+		let scene_ref = &scenes.0[&FwdPath::new(path).unwrap()];
 		space(source, "todos")
 			.get::<SceneRecord>(scene_ref.record.uri.rkey())
 			.await
@@ -731,10 +732,10 @@ mod test {
 	async fn body(source: &BlobStore, scene: &SceneRecord) -> SceneBody {
 		let blob = scene.body().get::<BlobRef>().unwrap();
 		let bytes = source
-			.get(&RelPath::new(format!(
+			.get(&FwdPath::new(format!(
 				".beet/pds/space/org.beet.space.package/todos/self/blobs/{}",
 				blob.cid
-			)))
+			)).unwrap())
 			.await
 			.unwrap();
 		Cid::raw(&bytes).xpect_eq(blob.cid.clone());
@@ -800,7 +801,7 @@ mod test {
 			.to_string()
 			.xpect_eq("0.1.0");
 		body.get::<Exports>().unwrap().0[&SmolStr::new(".")]
-			.xpect_eq(RelPath::new("widgets/Card.bsx"));
+			.xpect_eq(fwd_path!("widgets/Card.bsx"));
 		body.get::<Files>().unwrap().0.len().xpect_eq(4);
 		body.get::<Scenes>()
 			.unwrap()
@@ -818,21 +819,21 @@ mod test {
 			.unwrap()
 			.0
 			.xpect_eq(BTreeMap::from([
-				("/".into(), RelPath::new("main.bsx")),
-				("/about".into(), RelPath::new("pages/About.bsx")),
+				("/".into(), fwd_path!("main.bsx")),
+				("/about".into(), fwd_path!("pages/About.bsx")),
 			]));
 		// the entry's set stops at the lazy page, and carries the card's
 		// requirement
 		let card = scene(&source, &report, "widgets/Card.bsx").await;
 		let main = scene(&source, &report, "main.bsx").await;
 		let load_sets = body.get::<LoadSets>().unwrap();
-		let set = &load_sets.0[&RelPath::new("main.bsx")];
+		let set = &load_sets.0[&fwd_path!("main.bsx")];
 		set.scenes.xpect_eq(vec![
 			main.body().get::<BlobRef>().unwrap().cid,
 			card.body().get::<BlobRef>().unwrap().cid,
 		]);
 		set.requires.clone().xpect_eq(Some("feature:web".into()));
-		load_sets.0[&RelPath::new("pages/About.bsx")]
+		load_sets.0[&fwd_path!("pages/About.bsx")]
 			.requires
 			.clone()
 			.xpect_none();
@@ -856,11 +857,11 @@ mod test {
 			.as_str()
 			.xpect_eq("todos");
 		let imports = main.body().get::<Imports>().unwrap();
-		imports.0[&RelPath::new("widgets/Card.bsx")].xpect_eq(ImportEdge {
+		imports.0[&fwd_path!("widgets/Card.bsx")].xpect_eq(ImportEdge {
 			kind: ImportKind::Eager,
 			instance: true,
 		});
-		imports.0[&RelPath::new("pages/About.bsx")]
+		imports.0[&fwd_path!("pages/About.bsx")]
 			.kind
 			.xpect_eq(ImportKind::Lazy);
 		let card = scene(&source, &report, "widgets/Card.bsx").await;
@@ -908,7 +909,7 @@ mod test {
 		let first = compile(&source).await.unwrap();
 		source
 			.insert(
-				&RelPath::new("todos/widgets/Card.bsx"),
+				&fwd_path!("todos/widgets/Card.bsx"),
 				format!("{CARD}<footer/>"),
 			)
 			.await
@@ -938,7 +939,7 @@ mod test {
 		let main = compile(&source).await.unwrap();
 		let dev = compiler(&source)
 			.with_branch(BranchName::parse("dev").unwrap())
-			.compile(&source, &RelPath::new("todos/main.bsx"))
+			.compile(&source, &fwd_path!("todos/main.bsx"))
 			.await
 			.unwrap();
 		dev.package_record.uri.rkey().as_str().xpect_eq("todos:dev");
@@ -972,7 +973,7 @@ mod test {
 			.unwrap()
 			.value;
 		let mut files = record.body().get::<Files>().unwrap();
-		files.0.remove(&RelPath::new("logo.png"));
+		files.0.remove(&fwd_path!("logo.png"));
 		let mut body = record.into_body();
 		body.insert(&files).unwrap();
 		space
@@ -1081,7 +1082,7 @@ mod test {
 	async fn compiles_an_implicit_package() {
 		let source = source(&[("my-site/main.bsx", "<p>hi</p>")]).await;
 		let report = compiler(&source)
-			.compile(&source, &RelPath::new("my-site/main.bsx"))
+			.compile(&source, &fwd_path!("my-site/main.bsx"))
 			.await
 			.unwrap();
 		report.package.name.as_str().xpect_eq("my-site");
@@ -1136,7 +1137,7 @@ mod test {
 		resolved.version.to_string().xpect_eq("0.2.0");
 		resolved.record.xpect_eq(dependency.package_record.clone());
 		// the dependency's card is in the entry's set
-		package.body().get::<LoadSets>().unwrap().0[&RelPath::new("main.bsx")]
+		package.body().get::<LoadSets>().unwrap().0[&fwd_path!("main.bsx")]
 			.scenes
 			.len()
 			.xpect_eq(2);

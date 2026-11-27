@@ -25,7 +25,7 @@ impl StandardSiteQuery<'_, '_> {
 	/// innermost where two nest.
 	pub fn publication(
 		&self,
-		page: &RelPath,
+		page: &FwdPath,
 	) -> Option<(&StandardSitePub, &StandardSiteIndex)> {
 		self.publications
 			.iter()
@@ -38,7 +38,7 @@ impl StandardSiteQuery<'_, '_> {
 	/// The document the index remembers for the page at route `page`.
 	pub fn document(
 		&self,
-		page: &RelPath,
+		page: &FwdPath,
 	) -> Option<&StandardSiteIndexDocument> {
 		let (publication, index) = self.publication(page)?;
 		index.document(&publication.document_path(page)?)
@@ -49,7 +49,7 @@ impl StandardSiteQuery<'_, '_> {
 	/// The `(rel, href)` of each link the page at route `page` carries: the
 	/// publication's on every page at or under its path, the document's on a
 	/// page its index knows.
-	pub fn links(&self, page: &RelPath) -> Vec<(&'static str, String)> {
+	pub fn links(&self, page: &FwdPath) -> Vec<(&'static str, String)> {
 		cfg_if! {
 			if #[cfg(feature = "dag_cbor")] {
 				let Some((_, index)) = self.publication(page) else {

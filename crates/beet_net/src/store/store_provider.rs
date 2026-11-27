@@ -284,7 +284,7 @@ mod test {
 		.unwrap()
 		.into_blob_store()
 		.xmap(|store| (store.root_key(), store.subdir()))
-		.xpect_eq(("memory:m".into(), RelPath::new("docs")));
+		.xpect_eq(("memory:m".into(), fwd_path!("docs")));
 	}
 
 	/// A database file uri builds the sqlite blob store, its relative path
@@ -301,7 +301,7 @@ mod test {
 		store
 			.root_key()
 			.xpect_eq(format!("sqlite:{}", AbsPath::new("data.db").unwrap()));
-		store.subdir().xpect_eq(RelPath::default());
+		store.subdir().xpect_eq(FwdPath::default());
 	}
 
 	/// A uri is the kind it is asked for: a database file either, a Dynamo
@@ -371,9 +371,9 @@ mod test {
 		let build =
 			|| BlobStoreProvider::from_uri(&uri).unwrap().into_blob_store();
 		let seeded = build();
-		seeded.insert(&RelPath::new("a.txt"), "hi").await.unwrap();
+		seeded.insert(&fwd_path!("a.txt"), "hi").await.unwrap();
 		build()
-			.get(&RelPath::new("a.txt"))
+			.get(&fwd_path!("a.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(bytes::Bytes::from_static(b"hi"));
@@ -413,19 +413,19 @@ mod test {
 		let local = StoreUri::parse("memory://compose-local").unwrap();
 		// a memory backing lives as long as a handle does
 		let seeded = BlobStore::from_uri(&upstream).unwrap();
-		seeded.insert(&RelPath::new("a.txt"), "up").await.unwrap();
+		seeded.insert(&fwd_path!("a.txt"), "up").await.unwrap();
 		let store =
 			BlobStoreProvider::compose(&upstream, Some(&local)).unwrap();
 		store.id().xpect_eq("fork");
 		store
-			.get(&RelPath::new("a.txt"))
+			.get(&fwd_path!("a.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(bytes::Bytes::from_static(b"up"));
-		store.insert(&RelPath::new("b.txt"), "local").await.unwrap();
+		store.insert(&fwd_path!("b.txt"), "local").await.unwrap();
 		BlobStore::from_uri(&local)
 			.unwrap()
-			.exists(&RelPath::new("b.txt"))
+			.exists(&fwd_path!("b.txt"))
 			.await
 			.unwrap()
 			.xpect_true();

@@ -35,7 +35,7 @@ impl TemplateSource {
 	}
 
 	/// The document at `document` of the declaration's package.
-	pub fn document(document: impl Into<RelPath>) -> Self {
+	pub fn document(document: impl Into<FwdPath>) -> Self {
 		Self::Document(document.into().into())
 	}
 
@@ -54,7 +54,7 @@ impl TemplateSource {
 					.await??;
 				let prefab = PrefabCache::load(
 					&entity.world(),
-					&package.resolve(&document),
+					&package.resolve(&document)?,
 				)
 				.await?;
 				LoadedTemplate::Document(package, prefab).xok()

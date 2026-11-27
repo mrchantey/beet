@@ -29,7 +29,7 @@ pub struct CheckReport {
 	/// Every diagnostic found, route context attached.
 	pub diagnostics: Vec<Diagnostic>,
 	/// The static route paths that were rendered and scanned.
-	pub checked: Vec<RelPath>,
+	pub checked: Vec<FwdPath>,
 }
 
 impl CheckReport {
@@ -155,7 +155,7 @@ impl CheckReport {
 								routes.contains(&node.entity)
 							})
 					})
-					.map(|node| (node.entity, node.path.annotated_path()))
+					.map(|node| (node.entity, node.path.annotated_path().clone()))
 					.collect::<Vec<_>>();
 				let mut unserved = unregistered_tags(world, root, &config);
 				unserved.extend(failed_routes(world, root, &config));
@@ -351,7 +351,7 @@ fn checkable(node: &ActionNode) -> bool {
 async fn check_route(
 	world: &AsyncWorld,
 	entity: Entity,
-	path: RelPath,
+	path: FwdPath,
 	route_tree: Arc<RouteTree>,
 	config: RenderDiagnostics,
 ) -> Vec<Diagnostic> {
@@ -375,7 +375,7 @@ async fn check_route(
 async fn build_and_scan(
 	world: &AsyncWorld,
 	entity: Entity,
-	path: RelPath,
+	path: FwdPath,
 	route_tree: Arc<RouteTree>,
 	config: RenderDiagnostics,
 ) -> Vec<Diagnostic> {
@@ -575,7 +575,7 @@ mod test {
 			.await
 			.unwrap()
 			.checked
-			.xpect_eq(vec![RelPath::from("about")]);
+			.xpect_eq(vec![fwd_path!("about")]);
 	}
 
 	/// A caller cancelled while a route check is in flight (the reload tail
@@ -727,14 +727,14 @@ mod test {
 	async fn scene_route_survives_check_and_renders() {
 		let store = BlobStore::temp();
 		store
-			.insert(&"post.md".into(), "# Title\n\nbody".to_owned())
+			.insert(&fwd_path!("post.md"), "# Title\n\nbody".to_owned())
 			.await
 			.unwrap();
 		let mut world = check_world();
 		let router = world
 			.spawn((store, Router, children![route::new(
 				"post",
-				BlobPage::new("post.md")
+				BlobPage::new(fwd_path!("post.md"))
 			)]))
 			.flush();
 		// the boot-time diagnostics pass, the despawn hazard.
@@ -767,7 +767,7 @@ mod test {
 		for (path, source) in [
 			(
 				"post.md",
-				"+++\ntitle = \"Post\"\n+++\n\n# Title\n\n[gone](/gone)\n\n<div class=\"nope\"><Typo/></div>\n\n<Instance document=\"/Card\"/>",
+				"+++\ntitle = \"Post\"\n+++\n\n# Title\n\n[gone](/gone)\n\n<div class=\"nope\"><Typo/></div>\n\n<Instance document=\"Card\"/>",
 			),
 			(
 				"Card.bsx",
@@ -775,7 +775,7 @@ mod test {
 			),
 		] {
 			store
-				.insert(&RelPath::new(path), source.to_string())
+				.insert(&FwdPath::new(path).unwrap(), source.to_string())
 				.await
 				.unwrap();
 		}
@@ -785,7 +785,7 @@ mod test {
 				PackageFiles::new(store.clone()),
 				store,
 				Router,
-				children![route::new("post", BlobPage::new("post.md"))],
+				children![route::new("post", BlobPage::new(fwd_path!("post.md")))],
 			))
 			.flush();
 		let mut places = check(&mut world, router)
@@ -816,7 +816,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&"post.md".into(),
+				&fwd_path!("post.md"),
 				"# Title\n\n<p>\n<b bx:nope=\"x\"></b>\n</p>".to_owned(),
 			)
 			.await
@@ -825,7 +825,7 @@ mod test {
 		let router = world
 			.spawn((store, Router, children![route::new(
 				"post",
-				BlobPage::new("post.md")
+				BlobPage::new(fwd_path!("post.md"))
 			)]))
 			.flush();
 		check(&mut world, router).await.diagnostics[0]
@@ -841,7 +841,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&"post.md".into(),
+				&fwd_path!("post.md"),
 				"+++\ntags = [\"ecs\", \"Web\"]\n+++\n# Title\n\nbody"
 					.to_owned(),
 			)
@@ -855,7 +855,7 @@ mod test {
 		let router = world
 			.spawn((store, Router, children![route::new(
 				"post",
-				BlobPage::new("post.md")
+				BlobPage::new(fwd_path!("post.md"))
 			)]))
 			.flush();
 		let report = check(&mut world, router).await;
@@ -886,9 +886,9 @@ mod test {
 					Action::<BlobStore, EntityBody>::new_async(
 						async |cx: ActionContext<BlobStore>| {
 							let bytes =
-								cx.input.get(&"notes.md".into()).await?;
+								cx.input.get(&fwd_path!("notes.md")).await?;
 							EntityBody::default().with_typed(&Provenance::new(
-								[ProvenanceSource::file("notes.md", &bytes)],
+								[ProvenanceSource::file(fwd_path!("notes.md"), &bytes)],
 							))
 						}
 					)
@@ -921,12 +921,12 @@ mod test {
 	#[beet_core::test]
 	async fn reports_missing_and_stale_derived_files() {
 		let store = BlobStore::temp();
-		store.insert(&"notes.md".into(), "first").await.unwrap();
+		store.insert(&fwd_path!("notes.md"), "first").await.unwrap();
 		let mut world = check_world();
 		let router = derived_notes(
 			&mut world,
 			&store,
-			Derivation::new("derived/notes.json"),
+			Derivation::new(fwd_path!("derived/notes.json")),
 		);
 		check(&mut world, router)
 			.await
@@ -948,7 +948,7 @@ mod test {
 			.xmap(derived)
 			.is_empty()
 			.xpect_true();
-		store.insert(&"notes.md".into(), "second").await.unwrap();
+		store.insert(&fwd_path!("notes.md"), "second").await.unwrap();
 		check(&mut world, router)
 			.await
 			.xmap(derived)
@@ -967,7 +967,7 @@ mod test {
 		let router = derived_notes(
 			&mut world,
 			&store,
-			Derivation::new("derived/notes.json").with_written_by("publish"),
+			Derivation::new(fwd_path!("derived/notes.json")).with_written_by("publish"),
 		);
 		let report = check(&mut world, router).await;
 		report

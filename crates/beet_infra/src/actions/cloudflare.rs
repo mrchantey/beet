@@ -618,11 +618,11 @@ pub async fn CloudflareR2Sync(
 	/// Target R2 bucket.
 	#[field]
 	bucket: SmolStr,
-	/// Optional R2 key prefix: each uploaded key becomes `<prefix>/<relpath>`
-	/// instead of `<relpath>`, mounting a local directory under a sub-path of the
+	/// Optional R2 key prefix: each uploaded key becomes `<prefix>/<key>`
+	/// instead of `<key>`, mounting a local directory under a sub-path of the
 	/// bucket. Absent uploads to the bucket root.
 	#[field]
-	prefix: Option<RelPath>,
+	prefix: Option<FwdPath>,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let access = CloudflareAccess::resolve(&cx.caller).await?;
@@ -666,7 +666,7 @@ impl CloudflareR2Sync {
 /// workspace: the site is the user's, and a deploy `.bsx` may be run from a
 /// different repo than the beet workspace that holds the Worker source.
 ///
-/// `prefix`, when set, is prepended to every key (`<prefix>/<relpath>`), so a
+/// `prefix`, when set, is prepended to every key (`<prefix>/<key>`), so a
 /// directory can mount under a bucket sub-path (eg workspace `assets/` under
 /// the site's `assets/` prefix). `None` syncs to the bucket root.
 async fn sync_dir_to_r2(
@@ -681,7 +681,7 @@ async fn sync_dir_to_r2(
 	let store = S3Store::r2(account.id(), bucket)
 		.with_credentials(AwsCredentials::new(access_key, secret_key));
 	let store = match prefix {
-		Some(prefix) => store.with_subdir(prefix),
+		Some(prefix) => store.with_subdir(FwdPath::new(prefix)?),
 		None => store,
 	};
 	info!("syncing {root} to {}", store.s3_uri());

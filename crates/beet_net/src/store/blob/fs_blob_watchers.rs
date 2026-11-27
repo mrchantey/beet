@@ -296,9 +296,9 @@ mod native {
 		fn derives_minimal_roots() {
 			let mut world = watcher_world();
 			let store = fs_store("fs_blob_watchers_roots");
-			let routes = store.with_subdir(RelPath::from("routes"));
-			let templates = store.with_subdir(RelPath::from("templates"));
-			let blog = store.with_subdir(RelPath::from("routes/blog"));
+			let routes = store.with_subdir(fwd_path!("routes"));
+			let templates = store.with_subdir(fwd_path!("templates"));
+			let blog = store.with_subdir(fwd_path!("routes/blog"));
 
 			// descendants first: two roots ...
 			let routes_watch = watch(&mut world, &routes);
@@ -329,7 +329,7 @@ mod native {
 		fn shared_dir_forwards_per_base() {
 			let mut world = watcher_world();
 			let outer = fs_store("fs_blob_watchers_bases");
-			let scoped = outer.with_subdir(RelPath::from("inner"));
+			let scoped = outer.with_subdir(fwd_path!("inner"));
 			let inner = fs_store("fs_blob_watchers_bases/inner");
 			watch(&mut world, &outer);
 			watch(&mut world, &scoped);
@@ -369,7 +369,7 @@ mod native {
 			fs_ext::create_dir_all(base.join("sub")).unwrap();
 			// the base store keys events; the watcher covers only its `sub/` subdir
 			let store = BlobStore::new(FsStore::new(base.clone()));
-			let scoped = store.with_subdir(RelPath::from("sub"));
+			let scoped = store.with_subdir(fwd_path!("sub"));
 			app.world_mut()
 				.spawn(WatchDir::from_store(&scoped).unwrap());
 
@@ -418,7 +418,7 @@ mod native {
 				.xpect_eq("sub/style.css");
 			store.did_change(event).xpect_true();
 			scoped
-				.blob(RelPath::from("style.css"))
+				.blob(fwd_path!("style.css"))
 				.matches_event(event)
 				.xpect_true();
 		}

@@ -416,7 +416,7 @@ mod test {
 	/// server it stands in for: a wasm wait is not `Send`.
 	#[cfg(not(target_arch = "wasm32"))]
 	async fn server_reading(world: &mut World, stored: Option<&str>) -> Entity {
-		let root = stack_root(world, DocumentSecrets::new("secrets.toml"));
+		let root = stack_root(world, DocumentSecrets::new(fwd_path!("secrets.toml")));
 		let block = SecretBlock::new("ssh-host-key", "BEET_TEST_HOST_KEY");
 		let declaration = world.spawn((block.clone(), ChildOf(root))).id();
 		world.flush();

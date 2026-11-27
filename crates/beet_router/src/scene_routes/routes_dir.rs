@@ -56,7 +56,7 @@ use beet_ui::prelude::*;
 #[component(on_insert = hook_ext::component_hook(|dir: &RoutesDir| DirPath::derive(&dir.src)))]
 pub struct RoutesDir {
 	/// The content directory, relative to the nearest ancestor [`BlobStore`].
-	pub src: RelPath,
+	pub src: FwdPath,
 	/// Which of `src`'s content files to serve, matched against each file's
 	/// path relative to `src` (eg `blog/1-post.md`). Open by default.
 	///
@@ -77,7 +77,7 @@ const CONTENT_EXTENSIONS: &[&str] = &[
 
 impl RoutesDir {
 	/// Discover routes under `src`, relative to the nearest ancestor [`BlobStore`].
-	pub fn new(src: impl Into<RelPath>) -> Self {
+	pub fn new(src: impl Into<FwdPath>) -> Self {
 		Self {
 			src: src.into(),
 			..default()
@@ -281,7 +281,7 @@ impl RoutesDir {
 	fn resolve_spec(
 		world: &World,
 		spec: RouteSpec,
-	) -> Result<(EntityBody, RelPath)> {
+	) -> Result<(EntityBody, FwdPath)> {
 		let mut declarations = spec.declarations?;
 		RouteMeta::declare_file_defaults(&mut declarations, &spec.store_path);
 		let meta = BodyComponents::get::<RouteMeta>(
@@ -463,7 +463,7 @@ impl RoutesDir {
 	}
 
 	/// Whether `path`'s extension marks it as a servable content file.
-	pub(crate) fn is_content(path: &RelPath) -> bool {
+	pub(crate) fn is_content(path: &FwdPath) -> bool {
 		path.extension()
 			.is_some_and(|ext| CONTENT_EXTENSIONS.contains(&ext))
 	}
@@ -476,7 +476,7 @@ impl RoutesDir {
 	/// so a route path never depends on which scan found the file. The
 	/// frontmatter `slug` override is applied on top by the caller, which holds
 	/// the resolved [`RouteMeta`] (see [`RouteMeta::apply_slug`]).
-	pub(crate) fn route_path_of(rel: &RelPath) -> RelPath {
+	pub(crate) fn route_path_of(rel: &FwdPath) -> Result<FwdPath> {
 		let mut segments = rel.segments();
 		if let (Some(stem), Some(last)) = (rel.file_stem(), segments.last_mut())
 		{
@@ -485,7 +485,7 @@ impl RoutesDir {
 		if segments.last() == Some(&"index") {
 			segments.pop();
 		}
-		RelPath::from_segments(&segments)
+		FwdPath::from_segments(&segments)
 	}
 
 	/// The url a content file serves at: its filename-derived path
@@ -498,10 +498,10 @@ impl RoutesDir {
 	/// DIRECTORY, not the page: `blog/index.md` with `slug = "journal"` would
 	/// serve at `/journal` while every sibling post stayed under `/blog`.
 	fn route_path_for(
-		store_path: &RelPath,
+		store_path: &FwdPath,
 		meta: Option<&RouteMeta>,
-	) -> Result<RelPath> {
-		let route_path = Self::route_path_of(store_path);
+	) -> Result<FwdPath> {
+		let route_path = Self::route_path_of(store_path)?;
 		let Some(meta) = meta.filter(|meta| meta.slug.is_some()) else {
 			return Ok(route_path);
 		};
@@ -523,8 +523,8 @@ impl RoutesDir {
 	async fn scan_declarations(
 		parsers: &DocParsers,
 		store: &BlobStore,
-		path: &RelPath,
-		document: &RelPath,
+		path: &FwdPath,
+		document: &FwdPath,
 		frontmatter_type: &str,
 	) -> Result<EntityBody> {
 		parsers
@@ -541,21 +541,21 @@ impl RoutesDir {
 /// [`CheckReport`] reports a file that failed as an error of its own rather
 /// than only through the broken links its missing route leaves.
 #[derive(Debug, Default, Clone, Component)]
-pub struct FailedRoutes(Vec<(RelPath, String)>);
+pub struct FailedRoutes(Vec<(FwdPath, String)>);
 
 impl FailedRoutes {
 	/// Each failed file and why, in scan order.
-	pub fn iter(&self) -> impl Iterator<Item = (&RelPath, &str)> {
+	pub fn iter(&self) -> impl Iterator<Item = (&FwdPath, &str)> {
 		self.0.iter().map(|(path, reason)| (path, reason.as_str()))
 	}
 
 	/// Record `path` as failed for `err`, replacing an earlier failure.
-	fn set(&mut self, path: RelPath, err: impl core::fmt::Display) {
+	fn set(&mut self, path: FwdPath, err: impl core::fmt::Display) {
 		self.clear(&path);
 		self.0.push((path, err.to_string()));
 	}
 
-	fn clear(&mut self, path: &RelPath) {
+	fn clear(&mut self, path: &FwdPath) {
 		self.0.retain(|(failed, _)| failed != path);
 	}
 
@@ -571,7 +571,7 @@ impl FailedRoutes {
 	fn record(
 		world: &mut World,
 		route: Entity,
-		path: RelPath,
+		path: FwdPath,
 		outcome: &Result,
 	) {
 		let Some(dir) = world
@@ -596,10 +596,10 @@ impl FailedRoutes {
 /// read, carried per file so it is reported by name with the other spawn
 /// failures rather than aborting the scan.
 struct RouteSpec {
-	store_path: RelPath,
+	store_path: FwdPath,
 	/// The file's path in its package, which a [`DocPath`] it declares resolves
 	/// from.
-	document: RelPath,
+	document: FwdPath,
 	declarations: Result<EntityBody>,
 }
 
@@ -671,7 +671,7 @@ mod test {
 		let handle = BlobStore::new(inner.clone());
 		for (rel, content) in files {
 			handle
-				.insert(&RelPath::from(*rel), content.to_string())
+				.insert(&FwdPath::new(*rel).unwrap(), content.to_string())
 				.await
 				.unwrap();
 		}
@@ -709,7 +709,7 @@ mod test {
 
 		handle
 			.insert(
-				&RelPath::from("post.md"),
+				&fwd_path!("post.md"),
 				"+++\ntitle = \"Second\"\n+++\n\n# Post",
 			)
 			.await
@@ -743,7 +743,7 @@ mod test {
 
 		handle
 			.insert(
-				&RelPath::from("post.md"),
+				&fwd_path!("post.md"),
 				"+++\n[RouteMeta]\nslug = \"second\"\n+++\n\n# Post",
 			)
 			.await
@@ -767,7 +767,7 @@ mod test {
 		)
 		.await;
 		handle
-			.insert(&RelPath::from("about.md"), "# About")
+			.insert(&fwd_path!("about.md"), "# About")
 			.await
 			.unwrap();
 		react(&mut world).await;
@@ -796,7 +796,7 @@ mod test {
 		let store = BlobStore::temp();
 		for (rel, content) in files {
 			store
-				.insert(&RelPath::from(*rel), content.to_string())
+				.insert(&FwdPath::new(*rel).unwrap(), content.to_string())
 				.await
 				.unwrap();
 		}
@@ -805,14 +805,18 @@ mod test {
 
 	#[beet_core::test]
 	fn route_path_of() {
-		RoutesDir::route_path_of(&RelPath::from("docs/intro.md"))
-			.xpect_eq(RelPath::new("docs/intro"));
-		RoutesDir::route_path_of(&RelPath::from("index.md"))
-			.xpect_eq(RelPath::default());
-		RoutesDir::route_path_of(&RelPath::from("docs/index.md"))
-			.xpect_eq(RelPath::new("docs"));
-		RoutesDir::route_path_of(&RelPath::from("about.bsx"))
-			.xpect_eq(RelPath::new("about"));
+		RoutesDir::route_path_of(&fwd_path!("docs/intro.md"))
+			.unwrap()
+			.xpect_eq(fwd_path!("docs/intro"));
+		RoutesDir::route_path_of(&fwd_path!("index.md"))
+			.unwrap()
+			.xpect_eq(FwdPath::default());
+		RoutesDir::route_path_of(&fwd_path!("docs/index.md"))
+			.unwrap()
+			.xpect_eq(fwd_path!("docs"));
+		RoutesDir::route_path_of(&fwd_path!("about.bsx"))
+			.unwrap()
+			.xpect_eq(fwd_path!("about"));
 	}
 
 	/// Assert the three fixture routes render their content, shared by the
@@ -869,11 +873,11 @@ mod test {
 		let root = spawn_routes(
 			&mut world,
 			store.clone(),
-			(Router, children![RoutesDir::new("docs")]),
+			(Router, children![RoutesDir::new(fwd_path!("docs"))]),
 		)
 		.await;
 		let dir = world.entity(root).get::<Children>().unwrap()[0];
-		let scoped = store.with_subdir(RelPath::new("docs"));
+		let scoped = store.with_subdir(fwd_path!("docs"));
 		world
 			.entity(dir)
 			.get::<BlobStore>()
@@ -955,7 +959,7 @@ mod test {
 			.entity;
 
 		store
-			.insert(&RelPath::from("about.md"), "# About")
+			.insert(&fwd_path!("about.md"), "# About")
 			.await
 			.unwrap();
 		world.entity_mut(dir).insert(RoutesDir::default());
@@ -1014,17 +1018,17 @@ mod test {
 			..default()
 		};
 		RoutesDir::route_path_for(
-			&RelPath::from("blog/1-full-stack-bevy.md"),
+			&fwd_path!("blog/1-full-stack-bevy.md"),
 			Some(&slugged),
 		)
 		.unwrap()
-		.xpect_eq(RelPath::new("blog/full-stack-bevy"));
+		.xpect_eq(fwd_path!("blog/full-stack-bevy"));
 		// no slug declared, the filename stands
-		RoutesDir::route_path_for(&RelPath::from("blog/index.bsx"), None)
+		RoutesDir::route_path_for(&fwd_path!("blog/index.bsx"), None)
 			.unwrap()
-			.xpect_eq(RelPath::new("blog"));
+			.xpect_eq(fwd_path!("blog"));
 		RoutesDir::route_path_for(
-			&RelPath::from("blog/index.bsx"),
+			&fwd_path!("blog/index.bsx"),
 			Some(&slugged),
 		)
 		.unwrap_err()
@@ -1050,7 +1054,7 @@ mod test {
 			(Router, children![
 				RoutesDir::default()
 					.with_filter(GlobFilter::default().with_exclude("blog/**")),
-				(PathPartial::new("blog"), children![RoutesDir::new("blog")])
+				(PathPartial::new("blog"), children![RoutesDir::new(fwd_path!("blog"))])
 			]),
 		)
 		.await;
@@ -1131,7 +1135,7 @@ mod test {
 			.get::<Layout>()
 			.unwrap()
 			.clone()
-			.xpect_eq(Layout::document("templates/ArticleLayout.bsx"));
+			.xpect_eq(Layout::document(fwd_path!("templates/ArticleLayout.bsx")));
 	}
 
 	/// A dir declaring its own [`FrontmatterType`] redirects the unsectioned

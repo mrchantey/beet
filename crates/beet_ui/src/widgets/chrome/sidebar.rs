@@ -26,7 +26,7 @@ pub struct SidebarNode {
 	pub display_name: String,
 	/// Route for this node's link, or `None` if it's a group header. The href
 	/// is `path.with_leading_slash()`.
-	pub path: Option<RelPath>,
+	pub path: Option<FwdPath>,
 	/// Child nodes.
 	pub children: Vec<SidebarNode>,
 	/// `true` to render expanded by default (`<details open>`).
@@ -37,7 +37,7 @@ pub struct SidebarNode {
 
 impl SidebarNode {
 	/// All non-None paths in depth-first pre-order.
-	pub fn paths(&self) -> Vec<RelPath> {
+	pub fn paths(&self) -> Vec<FwdPath> {
 		let mut paths = Vec::new();
 		if let Some(path) = &self.path {
 			paths.push(path.clone());
@@ -345,7 +345,7 @@ mod test {
 		fn leaf(name: &str) -> SidebarNode {
 			SidebarNode {
 				display_name: name.into(),
-				path: Some(RelPath::new(name)),
+				path: Some(FwdPath::new(name).unwrap()),
 				..default()
 			}
 		}

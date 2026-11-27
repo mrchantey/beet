@@ -59,7 +59,7 @@ impl Project {
 		// `Deployment::create_config`, which knows only the declaration
 		let mut config = config;
 		config.set_backend(
-			backend.to_json(&deployment.backend_path(&stack).to_string()),
+			backend.to_json(&deployment.backend_name(&stack)),
 		);
 		Self {
 			config,
@@ -272,12 +272,15 @@ impl Project {
 
 	/// The absolute working directory for the tofu project, where its rendered
 	/// config, its lockfile and the deploy's scratch files live.
-	pub fn work_dir(&self) -> AbsPath {
-		self.deployment.work_directory(&self.stack).into_abs()
+	///
+	/// # Errors
+	/// Errors when the app's name is no path within the workspace.
+	pub fn work_dir(&self) -> Result<AbsPath> {
+		self.deployment.work_directory(&self.stack)?.into_abs().xok()
 	}
 
 	/// Short alias for [`Self::work_dir`], the tofu driver's `-chdir`.
-	fn dir(&self) -> AbsPath { self.work_dir() }
+	fn dir(&self) -> Result<AbsPath> { self.work_dir() }
 
 	/// The `main.tf.json` text, every map's keys sorted so the init stamp's
 	/// digest names the config's content and not the order its blocks
@@ -293,7 +296,7 @@ impl Project {
 	pub fn state_file(&self) -> Result<Blob> {
 		self.backend
 			.store()?
-			.blob(self.deployment.backend_path(&self.stack))
+			.blob(self.deployment.backend_path(&self.stack)?)
 			.xok()
 	}
 
@@ -305,7 +308,7 @@ impl Project {
 		/// project, so the stamp alone is not enough.
 		const TOFU_DIR: &str = ".terraform";
 
-		let dir = self.dir();
+		let dir = self.dir()?;
 		let rendered = self.rendered_config();
 		let digest = digest_ext::hex::<sha2::Sha256>(rendered.as_bytes());
 		let config_path = dir.join("main.tf.json");
@@ -343,7 +346,7 @@ impl Project {
 	/// Only downloads providers, no backend needed.
 	pub async fn validate(&self) -> Result<String> {
 		self.init().await?;
-		tofu::validate(&self.dir()).await
+		tofu::validate(&self.dir()?).await
 	}
 
 	/// [`validate`](Self::validate) with no network, for a test: the config
@@ -351,7 +354,7 @@ impl Project {
 	/// [`tofu::test_support::init_offline`].
 	#[cfg(test)]
 	pub(crate) async fn validate_offline(&self) -> Result<String> {
-		let dir = self.dir();
+		let dir = self.dir()?;
 		fs_ext::create_dir_all(&dir)?;
 		fs_ext::write(dir.join("main.tf.json"), self.rendered_config())?;
 		self.backend().ensure_exists().await?;
@@ -362,13 +365,13 @@ impl Project {
 	/// Show execution plan
 	pub async fn plan(&self) -> Result<String> {
 		self.init().await?;
-		tofu::plan(&self.dir(), &self.render_vars().await?).await
+		tofu::plan(&self.dir()?, &self.render_vars().await?).await
 	}
 
 	/// Apply the execution plan.
 	pub async fn apply(&self) -> Result<String> {
 		self.init().await?;
-		tofu::apply(&self.dir(), &self.apply_vars().await?).await
+		tofu::apply(&self.dir()?, &self.apply_vars().await?).await
 	}
 
 	/// Apply the execution plan with Terraform variables, narrowed to `targets`
@@ -384,7 +387,7 @@ impl Project {
 		self.init().await?;
 		let mut all_vars = self.apply_vars().await?;
 		all_vars.extend_from_slice(vars);
-		tofu::apply_with_vars(&self.dir(), &all_vars, targets).await
+		tofu::apply_with_vars(&self.dir()?, &all_vars, targets).await
 	}
 
 	/// The writes [`apply_with_vars`](Self::apply_with_vars) would make with
@@ -411,7 +414,7 @@ impl Project {
 			.extend(self.content_vars_or(AbsentContent::Placeholder).await?);
 		all_vars.extend(self.write_only_vars(false)?);
 		all_vars.extend_from_slice(vars);
-		tofu::planned_changes(&self.dir(), &all_vars, targets).await
+		tofu::planned_changes(&self.dir()?, &all_vars, targets).await
 	}
 
 	/// The deletions [`tofu_destroy`](Self::tofu_destroy) would make, planned
@@ -419,7 +422,7 @@ impl Project {
 	/// [`tofu::planned_destroy`].
 	pub async fn planned_destroy(&self) -> Result<Vec<tofu::PlannedChange>> {
 		self.init().await?;
-		tofu::planned_destroy(&self.dir(), &self.destroy_vars().await).await
+		tofu::planned_destroy(&self.dir()?, &self.destroy_vars().await).await
 	}
 
 	/// The values `request` carries for this project's ambient variables:
@@ -450,38 +453,38 @@ impl Project {
 		resources: &[String],
 	) -> Result<String> {
 		self.init().await?;
-		tofu::apply_replacing(&self.dir(), &self.apply_vars().await?, resources)
+		tofu::apply_replacing(&self.dir()?, &self.apply_vars().await?, resources)
 			.await
 	}
 
 	/// Show the current state.
 	pub async fn show(&self) -> Result<String> {
 		self.init().await?;
-		tofu::show(&self.dir(), &self.required_vars()?).await
+		tofu::show(&self.dir()?, &self.required_vars()?).await
 	}
 
 	/// Read a specific output value from the tofu state.
 	pub async fn output(&self, name: &str) -> Result<String> {
 		self.init().await?;
-		tofu::output(&self.dir(), &self.required_vars()?, name).await
+		tofu::output(&self.dir()?, &self.required_vars()?, name).await
 	}
 
 	/// List all resources in the state.
 	pub async fn list(&self) -> Result<String> {
 		self.init().await?;
-		tofu::list(&self.dir(), &self.required_vars()?).await
+		tofu::list(&self.dir()?, &self.required_vars()?).await
 	}
 
 	/// Remove a resource from the state.
 	pub async fn remove(&self, resource: &str) -> Result<String> {
 		self.init().await?;
-		tofu::remove(&self.dir(), &self.required_vars()?, resource).await
+		tofu::remove(&self.dir()?, &self.required_vars()?, resource).await
 	}
 
 	/// Mark a resource for replacement by the next apply.
 	pub async fn taint(&self, resource: &str) -> Result<String> {
 		self.init().await?;
-		tofu::taint(&self.dir(), &self.required_vars()?, resource).await
+		tofu::taint(&self.dir()?, &self.required_vars()?, resource).await
 	}
 
 	/// Run `tofu destroy`, and nothing else.
@@ -501,13 +504,13 @@ impl Project {
 			self.init().await.ok();
 			self.backend().clear_stale_locks();
 			return tofu::destroy_force(
-				&self.dir(),
+				&self.dir()?,
 				&self.destroy_vars().await,
 			)
 			.await;
 		}
 		self.init().await?;
-		tofu::destroy(&self.dir(), &self.destroy_vars().await).await
+		tofu::destroy(&self.dir()?, &self.destroy_vars().await).await
 	}
 
 	/// Re-encrypt this stack's state under the passphrase its declared
@@ -671,11 +674,11 @@ impl Project {
 	/// Whether the state reads under this project's own encryption: the init
 	/// reads it, and so does the pull when the init was skipped as current.
 	async fn reads_state(&self) -> bool {
-		let Ok(vars) = self.required_vars() else {
+		let (Ok(vars), Ok(dir)) = (self.required_vars(), self.dir()) else {
 			return false;
 		};
 		self.init().await.is_ok()
-			&& tofu::state_pull(&self.dir(), &vars).await.is_ok()
+			&& tofu::state_pull(&dir, &vars).await.is_ok()
 	}
 
 	/// Pull the state through this project's [`StateCrossing`] and push it
@@ -691,7 +694,7 @@ impl Project {
 	async fn rewrite_state(&self) -> Result<u64> {
 		self.init().await?;
 		let vars = self.required_vars()?;
-		let dir = self.dir();
+		let dir = self.dir()?;
 		let mut state = tofu::state_pull(&dir, &vars)
 			.await?
 			.xmap(|json| Value::parse_json(&json))?;
@@ -874,7 +877,7 @@ mod init {
 		first.init().await.unwrap();
 		let second = under("state-b");
 		fs_ext::write_async(
-			second.dir().join("main.tf.json"),
+			second.dir().unwrap().join("main.tf.json"),
 			second.rendered_config(),
 		)
 		.await
@@ -930,13 +933,13 @@ mod roll {
 		// a state written before encryption, as a stack predating it holds
 		let plaintext = under(StateEncryption::None);
 		plaintext.init().await.unwrap();
-		let seed = plaintext.dir().join("seed.tfstate");
+		let seed = plaintext.dir().unwrap().join("seed.tfstate");
 		fs_ext::write_private(
 			&seed,
 			br#"{"version":4,"terraform_version":"1.6.0","serial":1,"lineage":"0b8ad4af-4aed-60c5-89f2-6c4ad06ccc07","outputs":{},"resources":[]}"#,
 		)
 		.unwrap();
-		tofu::state_push(&plaintext.dir(), &[], &seed)
+		tofu::state_push(&plaintext.dir().unwrap(), &[], &seed)
 			.await
 			.unwrap();
 		plaintext

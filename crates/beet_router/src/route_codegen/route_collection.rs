@@ -44,7 +44,7 @@ pub struct RouteCollection {
 	/// Whether this is a pages or actions collection.
 	pub category: RouteCollectionCategory,
 	/// Route prefix prepended to every route in this collection, ie `docs`.
-	pub base_route: RelPath,
+	pub base_route: FwdPath,
 	/// Cargo feature gating server-only handlers (actions collections).
 	///
 	/// Defaults to `Some("server")`, matching the convention that server
@@ -66,7 +66,7 @@ impl RouteCollection {
 				.with_exclude("*mod.rs")
 				.with_exclude("*/codegen/*"),
 			category: RouteCollectionCategory::default(),
-			base_route: RelPath::default(),
+			base_route: FwdPath::default(),
 			server_feature: Some("server".into()),
 			codegen,
 		}
@@ -95,7 +95,7 @@ impl RouteCollection {
 	}
 
 	/// Sets the base route prepended to every route in this collection.
-	pub fn with_base_route(mut self, base_route: impl Into<RelPath>) -> Self {
+	pub fn with_base_route(mut self, base_route: impl Into<FwdPath>) -> Self {
 		self.base_route = base_route.into();
 		self
 	}
@@ -130,7 +130,7 @@ impl RouteCollection {
 				continue;
 			};
 			let route_path =
-				self.base_route.join(RoutesDir::route_path_of(&store_path));
+				self.base_route.join(&RoutesDir::route_path_of(&store_path)?);
 			match ext {
 				"rs" => {
 					let bytes = store.get(&store_path).await?;
@@ -185,7 +185,7 @@ impl RouteCollection {
 
 	/// The `#[path = ..]` value for a source file, relative to the codegen
 	/// output directory, using forward slashes.
-	fn mod_path(&self, store_path: &RelPath) -> Result<String> {
+	fn mod_path(&self, store_path: &FwdPath) -> Result<String> {
 		let abs = self.src.join(store_path.to_string());
 		let rel = path_ext::create_relative(self.codegen.output_dir()?, &abs)?;
 		Ok(path_ext::to_forward_slash(rel)
@@ -198,7 +198,7 @@ impl RouteCollection {
 #[derive(Debug, Clone)]
 pub struct RouteFile {
 	/// The full route path (including the collection base route).
-	pub route_path: RelPath,
+	pub route_path: FwdPath,
 	/// The kind of route file.
 	pub kind: RouteFileKind,
 }
@@ -218,7 +218,7 @@ pub enum RouteFileKind {
 	/// A content file (markdown/html) served via [`BlobPage`].
 	Blob {
 		/// Path of the content file relative to the store root.
-		store_path: RelPath,
+		store_path: FwdPath,
 		/// The components the file declares at its root, emitted as literals and
 		/// hoisted when the route spawns.
 		declarations: EntityBody,
@@ -245,7 +245,7 @@ pub struct RouteMethod {
 }
 
 /// Derives a unique module identifier from a source file path.
-fn mod_ident_from_file(store_path: &RelPath) -> Ident {
+fn mod_ident_from_file(store_path: &FwdPath) -> Ident {
 	let mut segments: Vec<String> = store_path
 		.segments()
 		.iter()

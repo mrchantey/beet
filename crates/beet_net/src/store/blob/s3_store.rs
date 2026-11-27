@@ -21,7 +21,7 @@ pub struct S3Store {
 	region: Option<SmolStr>,
 	/// Optional subdirectory prefix for all keys.
 	#[reflect(default)]
-	subdir: Option<RelPath>,
+	subdir: Option<FwdPath>,
 	/// Optional S3 endpoint override. Unset uses the default AWS endpoint;
 	/// set (with path-style addressing) targets an S3-compatible service such as
 	/// Cloudflare R2. See [`S3Store::r2`].
@@ -140,7 +140,7 @@ impl S3Store {
 	}
 
 	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<FwdPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
@@ -269,7 +269,7 @@ impl S3Store {
 
 	/// Every object under this store's prefix with its size and etag, paged
 	/// through `ListObjectsV2`.
-	async fn list_objects(&self) -> Result<Vec<(RelPath, BlobStat)>> {
+	async fn list_objects(&self) -> Result<Vec<(FwdPath, BlobStat)>> {
 		let prefix = self.subdir.as_ref().map(|subdir| format!("{subdir}/"));
 		self.list_pages(prefix.as_deref(), None)
 			.await?
@@ -288,10 +288,9 @@ impl S3Store {
 						.unwrap_or_default(),
 					md5: Self::etag_md5(object.text_at("ETag")),
 				};
-				Some((RelPath::new(rel), stat))
+				Some(FwdPath::new(rel).map(|path| (path, stat)))
 			})
-			.collect::<Vec<_>>()
-			.xok()
+			.collect()
 	}
 
 	/// Construct the full S3 URI including optional subdir.
@@ -457,8 +456,8 @@ impl S3Store {
 		}
 	}
 
-	/// Resolve the S3 object key from a [`RelPath`].
-	fn resolve_key(&self, path: &RelPath) -> String {
+	/// Resolve the S3 object key from a [`FwdPath`].
+	fn resolve_key(&self, path: &FwdPath) -> String {
 		match &self.subdir {
 			Some(sub) => format!("{}/{}", sub, path),
 			None => path.to_string(),
@@ -541,7 +540,7 @@ impl StoreBackend for S3Store {
 impl BlobProvider for S3Store {
 	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
+	fn with_subdir(&self, path: FwdPath) -> Box<dyn BlobProvider> {
 		Box::new(S3Store {
 			subdir: Some(match &self.subdir {
 				Some(existing) => existing.join(&path),
@@ -560,7 +559,7 @@ impl BlobProvider for S3Store {
 
 	fn root_key(&self) -> SmolStr { format!("s3:{}", self.bucket_name).into() }
 
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &FwdPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let request = AwsRequest::put(
 			"PutObject",
@@ -579,7 +578,7 @@ impl BlobProvider for S3Store {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		let this = self.clone();
 		Box::pin(async move {
 			this.list_objects()
@@ -594,14 +593,14 @@ impl BlobProvider for S3Store {
 	/// One listing answers every stat: `ListObjectsV2` carries each object's
 	/// size and etag, so a mirror of a whole prefix costs one round trip per
 	/// page rather than one `HeadObject` per key.
-	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
+	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(FwdPath, BlobStat)>>> {
 		let this = self.clone();
 		Box::pin(async move { this.list_objects().await })
 	}
 
 	/// `ListObjectsV2` with a `/` delimiter: the common prefixes are the
 	/// directories, the contents the files, one page per thousand.
-	fn list_dir(&self, path: &RelPath) -> SendBoxedFuture<Result<BlobDir>> {
+	fn list_dir(&self, path: &FwdPath) -> SendBoxedFuture<Result<BlobDir>> {
 		let this = self.clone();
 		let prefix = match path.as_str().is_empty() {
 			true => this.subdir.as_ref().map(|subdir| format!("{subdir}/")),
@@ -634,7 +633,7 @@ impl BlobProvider for S3Store {
 	/// `HeadObject`: the size and etag without the body.
 	fn stat(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
@@ -660,7 +659,7 @@ impl BlobProvider for S3Store {
 		})
 	}
 
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
@@ -683,12 +682,12 @@ impl BlobProvider for S3Store {
 		})
 	}
 
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 		let stat = self.stat(path);
 		Box::pin(async move { stat.await.map(|stat| stat.is_some()) })
 	}
 
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &FwdPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		let path = path.clone();
@@ -714,7 +713,7 @@ impl BlobProvider for S3Store {
 	/// `GetObject`, the version its `ETag`.
 	fn get_versioned(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
@@ -740,7 +739,7 @@ impl BlobProvider for S3Store {
 	/// write racing another conditional one) when the condition fails.
 	fn insert_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		body: Bytes,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result<BlobVersion>> {
@@ -772,7 +771,7 @@ impl BlobProvider for S3Store {
 	/// already removed.
 	fn remove_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result> {
 		let this = self.clone();
@@ -808,7 +807,7 @@ impl BlobProvider for S3Store {
 
 	fn public_url(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		if !self.public {
 			// a private bucket has no anonymous url, so the caller streams the
@@ -930,7 +929,7 @@ mod test {
 			.as_str()
 			.xpect_eq("https://abc123.r2.cloudflarestorage.com");
 		BlobStore::new(store.with_public(true))
-			.public_url(&RelPath::from("index.html"))
+			.public_url(&fwd_path!("index.html"))
 			.await
 			.unwrap()
 			.unwrap()
@@ -944,7 +943,7 @@ mod test {
 	#[beet_core::test]
 	async fn private_bucket_has_no_public_url() {
 		BlobStore::new(S3Store::new("beet--test--store", "us-west-2"))
-			.public_url(&RelPath::from("test-file.txt"))
+			.public_url(&fwd_path!("test-file.txt"))
 			.await
 			.unwrap()
 			.xpect_none();
@@ -955,7 +954,7 @@ mod test {
 	async fn s3_public_url() {
 		let provider =
 			S3Store::new("beet--test--store", "us-west-2").with_public(true);
-		let test_key = RelPath::from("test-file.txt");
+		let test_key = fwd_path!("test-file.txt");
 		BlobStore::new(provider)
 			.public_url(&test_key)
 			.await

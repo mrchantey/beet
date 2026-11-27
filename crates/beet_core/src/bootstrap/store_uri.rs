@@ -80,7 +80,7 @@ pub enum StoreUri {
 		/// The backing name.
 		name: SmolStr,
 		/// The key prefix the store roots at.
-		path_prefix: Option<RelPath>,
+		path_prefix: Option<FwdPath>,
 	},
 	/// An S3-compatible bucket, the store a deployed task serves from.
 	S3 {
@@ -88,7 +88,7 @@ pub enum StoreUri {
 		name: SmolStr,
 		/// The key prefix the store roots at, so one bucket holds many
 		/// independently addressed roots (a per-deploy document version).
-		path_prefix: Option<RelPath>,
+		path_prefix: Option<FwdPath>,
 		/// An S3-compatible service endpoint, eg
 		/// `https://<account>.r2.cloudflarestorage.com`. Selects region `auto`
 		/// by default, so one binary serves identically on AWS S3 and R2.
@@ -109,21 +109,21 @@ pub enum StoreUri {
 		/// stores.
 		name: SmolStr,
 		/// The key prefix the store roots at.
-		path_prefix: Option<RelPath>,
+		path_prefix: Option<FwdPath>,
 	},
 	/// Browser IndexedDB (wasm).
 	IndexedDb {
 		/// The database name, one database per store.
 		name: SmolStr,
 		/// The key prefix the store roots at.
-		path_prefix: Option<RelPath>,
+		path_prefix: Option<FwdPath>,
 	},
 	/// A Cloudflare R2 bucket through a Worker's binding.
 	R2 {
 		/// The binding name, as declared in the Worker's `wrangler.toml`.
 		name: SmolStr,
 		/// The key prefix the store roots at.
-		path_prefix: Option<RelPath>,
+		path_prefix: Option<FwdPath>,
 	},
 	/// A store published over http, read-only.
 	Http {
@@ -132,7 +132,7 @@ pub enum StoreUri {
 		/// natively.
 		origin: Option<SmolStr>,
 		/// The url path prefix the store roots at.
-		path_prefix: Option<RelPath>,
+		path_prefix: Option<FwdPath>,
 	},
 	/// A SQLite database file, a whole store with no key prefix.
 	Sqlite {
@@ -179,11 +179,15 @@ impl StoreUri {
 			}
 			return Self::Sqlite { path }.xok();
 		}
-		// `http:` and `http:/` are the origin itself, ie a bare `http`
+		// `http:` and `http:/` are the origin itself, ie a bare `http`, and
+		// the path is a url's, rooted at that origin
 		if let Some(path) = value.strip_prefix("http:") {
 			return Self::Http {
 				origin: None,
-				path_prefix: RelPath::new(path.trim()).xmap(non_empty),
+				path_prefix: match path.trim() {
+					"" => None,
+					path => Url::parse(path)?.fwd_path()?.xmap(non_empty),
+				},
 			}
 			.xok();
 		}
@@ -231,7 +235,10 @@ impl StoreUri {
 	/// The http store `url` names: its authority is the origin (absent, the
 	/// page's own) and its path the prefix. How a page spells the package store its
 	/// browser process reads, `<Wasm package="/package"/>`.
-	pub fn http(url: &Url) -> Self {
+	///
+	/// # Errors
+	/// Errors when the url's path climbs out of its origin.
+	pub fn http(url: &Url) -> Result<Self> {
 		Self::Http {
 			origin: url.authority().map(|authority| {
 				let scheme = match url.scheme() {
@@ -241,8 +248,9 @@ impl StoreUri {
 				};
 				format!("{scheme}://{authority}").into()
 			}),
-			path_prefix: RelPath::from_segments(url.path()).xmap(non_empty),
+			path_prefix: url.fwd_path()?.xmap(non_empty),
 		}
+		.xok()
 	}
 
 	/// Parse a `<scheme>://<name>[/<path_prefix>][?<params>]` uri, the shape every
@@ -353,6 +361,21 @@ impl StoreUri {
 		}
 	}
 
+	/// The key prefix of a keyed kind, `None` for a filesystem or whole store
+	/// or one with no prefix: the [`path_prefix`](Self::path_prefix) every
+	/// kind but `fs` holds as a [`FwdPath`].
+	pub fn key_prefix(&self) -> Option<&FwdPath> {
+		match self {
+			Self::Memory { path_prefix, .. }
+			| Self::S3 { path_prefix, .. }
+			| Self::LocalStorage { path_prefix, .. }
+			| Self::IndexedDb { path_prefix, .. }
+			| Self::R2 { path_prefix, .. }
+			| Self::Http { path_prefix, .. } => path_prefix.as_ref(),
+			Self::Fs { .. } | Self::Dynamo { .. } | Self::Sqlite { .. } => None,
+		}
+	}
+
 	/// Whether this store roots itself (a named memory store, a bucket, a table,
 	/// browser storage or an http origin), needing no local directory or
 	/// filesystem walk. For these an entry name addresses the document *within*
@@ -374,13 +397,12 @@ impl StoreUri {
 
 	/// This store rooted at `subdir` below its current root, the uri form of
 	/// `BlobStore::with_subdir`: every kind nests `subdir` under its path
-	/// prefix. A `subdir` is a key, so a leading `/` or an escaping `..`
-	/// cannot climb above the current root. A whole-store kind
+	/// prefix, which as a [`FwdPath`] cannot climb above it. A whole-store kind
 	/// (`dynamo:`, `sqlite:`) has no prefix to nest under and is returned as
 	/// is.
-	pub fn with_subdir(&self, subdir: impl Into<RelPath>) -> Self {
+	pub fn with_subdir(&self, subdir: impl Into<FwdPath>) -> Self {
 		let subdir = subdir.into();
-		let nest = |path_prefix: &Option<RelPath>| -> Option<RelPath> {
+		let nest = |path_prefix: &Option<FwdPath>| -> Option<FwdPath> {
 			match path_prefix {
 				Some(path_prefix) => path_prefix.join(&subdir),
 				None => subdir.clone(),
@@ -470,20 +492,20 @@ fn non_empty<T: AsRef<str>>(path: T) -> Option<T> {
 /// uri.
 struct ScopedTail {
 	name: SmolStr,
-	path_prefix: Option<RelPath>,
+	path_prefix: Option<FwdPath>,
 	params: Vec<(SmolStr, SmolStr)>,
 }
 
 impl ScopedTail {
 	/// Parse `rest`, accepting only the query `params` the kind declares. The
 	/// name is the first segment; everything after the first `/` is the key
-	/// the store roots at, a [`RelPath`] so `s3://b/p`, `s3://b/p/` and
-	/// `s3://b//p` are the one value.
+	/// the store roots at, a [`FwdPath`] so `s3://b/p` and `s3://b/p/` are the
+	/// one value.
 	fn parse(scheme: &str, rest: &str, allowed: &[&str]) -> Result<Self> {
 		let (locator, query) = rest.split_once('?').unwrap_or((rest, ""));
 		let (name, path_prefix) = match locator.split_once('/') {
 			Some((name, prefix)) => {
-				(name, RelPath::new(prefix).xmap(non_empty))
+				(name, FwdPath::new(prefix)?.xmap(non_empty))
 			}
 			None => (locator, None),
 		};
@@ -585,7 +607,7 @@ fn fmt_scoped(
 	f: &mut fmt::Formatter<'_>,
 	scheme: &str,
 	name: &str,
-	path_prefix: &Option<RelPath>,
+	path_prefix: &Option<FwdPath>,
 	params: &[(&str, &Option<SmolStr>)],
 ) -> fmt::Result {
 	write!(f, "{scheme}://{name}")?;
@@ -672,7 +694,7 @@ mod test {
 		StoreUri::parse("indexed-db://d/p").unwrap().xpect_eq(
 			StoreUri::IndexedDb {
 				name: "d".into(),
-				path_prefix: Some("p".into()),
+				path_prefix: Some(fwd_path!("p")),
 			},
 		);
 		StoreUri::parse("local-storage://s").unwrap().xpect_eq(
@@ -685,19 +707,19 @@ mod test {
 			.unwrap()
 			.xpect_eq(StoreUri::Memory {
 				name: "m".into(),
-				path_prefix: Some("p".into()),
+				path_prefix: Some(fwd_path!("p")),
 			});
 		StoreUri::parse("r2://SITE_BUCKET/p")
 			.unwrap()
 			.xpect_eq(StoreUri::R2 {
 				name: "SITE_BUCKET".into(),
-				path_prefix: Some("p".into()),
+				path_prefix: Some(fwd_path!("p")),
 			});
 		StoreUri::parse("https://beet.org/package")
 			.unwrap()
 			.xpect_eq(StoreUri::Http {
 				origin: Some("https://beet.org".into()),
-				path_prefix: Some("package".into()),
+				path_prefix: Some(fwd_path!("package")),
 			});
 		// the origin-relative spellings all root at the page's own origin
 		for uri in ["http", "http:", "http:/"] {
@@ -710,7 +732,7 @@ mod test {
 			.unwrap()
 			.xpect_eq(StoreUri::Http {
 				origin: None,
-				path_prefix: Some("package".into()),
+				path_prefix: Some(fwd_path!("package")),
 			});
 		StoreUri::parse("sqlite:data.db")
 			.unwrap()
@@ -748,12 +770,15 @@ mod test {
 	#[crate::test]
 	fn http_from_url() {
 		StoreUri::http(&Url::coerce("/examples/wasm"))
+			.unwrap()
 			.to_string()
 			.xpect_eq("http:examples/wasm");
 		StoreUri::http(&Url::coerce("https://beet.org/package/"))
+			.unwrap()
 			.to_string()
 			.xpect_eq("https://beet.org/package");
 		StoreUri::http(&Url::coerce("/"))
+			.unwrap()
 			.to_string()
 			.xpect_eq("http");
 	}
@@ -790,9 +815,9 @@ mod test {
 		parts("sqlite:data.db").xpect_eq((Some("data.db".into()), None));
 	}
 
-	/// A scoped path prefix is a key: the text is cleaned, a leading or
-	/// repeated `/` is dropped and an escaping `..` cannot climb above the
-	/// backing. A filesystem prefix keeps its text, root and `..` included.
+	/// A scoped path prefix is a [`FwdPath`]: the text is cleaned, and one
+	/// rooted or climbing above the backing is refused. A filesystem prefix
+	/// keeps its text, root and `..` included.
 	#[crate::test]
 	fn path_prefixes_are_keys() {
 		let prefix = |uri: &str| {
@@ -801,9 +826,10 @@ mod test {
 				.path_prefix()
 				.map(|prefix| prefix.to_string())
 		};
-		prefix("s3://b//p/").xpect_eq(Some("p".into()));
+		prefix("s3://b/p/").xpect_eq(Some("p".into()));
 		prefix("s3://b/./p/../q").xpect_eq(Some("q".into()));
-		prefix("s3://b/../p").xpect_eq(Some("p".into()));
+		StoreUri::parse("s3://b//p").unwrap_err();
+		StoreUri::parse("s3://b/../p").unwrap_err();
 		prefix("s3://b/").xpect_none();
 		prefix("memory://m/.").xpect_none();
 		prefix("fs:.").xpect_none();
@@ -883,24 +909,23 @@ mod test {
 	}
 
 	/// A subdir nests below whatever root the uri already has, uniformly
-	/// across every kind, and cannot climb above it.
+	/// across every kind.
 	#[crate::test]
 	fn with_subdir_nests_below_the_root() {
 		let nested = |uri: &str, subdir: &str| {
 			StoreUri::parse(uri)
 				.unwrap()
-				.with_subdir(subdir)
+				.with_subdir(FwdPath::new(subdir).unwrap())
 				.to_string()
 		};
 		nested("memory://m", "v1").xpect_eq("memory://m/v1");
 		nested("s3://site", "v1").xpect_eq("s3://site/v1");
-		nested("s3://site/docs?region=us-east-1", "/v1/")
+		nested("s3://site/docs?region=us-east-1", "v1")
 			.xpect_eq("s3://site/docs/v1?region=us-east-1");
-		nested("s3://site/docs", "../v1").xpect_eq("s3://site/docs/v1");
 		nested("s3://site", "").xpect_eq("s3://site");
 		nested("fs", "v1").xpect_eq("fs:v1");
 		nested("fs:../site", "v1").xpect_eq("fs:../site/v1");
-		nested("fs:/srv", "/v1").xpect_eq("fs:/srv/v1");
+		nested("fs:/srv", "v1").xpect_eq("fs:/srv/v1");
 		nested("indexed-db://d", "analytics")
 			.xpect_eq("indexed-db://d/analytics");
 		nested("local-storage://s/a", "b").xpect_eq("local-storage://s/a/b");

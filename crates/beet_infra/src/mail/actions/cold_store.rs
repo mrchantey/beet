@@ -174,7 +174,7 @@ impl RemoteBucket {
 
 	/// The object at `key`, written to `local`.
 	async fn download(&self, key: &str, local: &AbsPath) -> Result {
-		let bytes = self.store.get(&RelPath::new(key)).await?;
+		let bytes = self.store.get(&FwdPath::new(key)?).await?;
 		fs_ext::write_async(local, bytes).await?;
 		Ok(())
 	}

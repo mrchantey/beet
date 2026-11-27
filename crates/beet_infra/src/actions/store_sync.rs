@@ -45,10 +45,10 @@ pub async fn StoreSync(
 	dest: StoreEnd,
 	/// A folder of the source to sync from, its root by default.
 	#[field]
-	src_dir: Option<RelPath>,
+	src_dir: Option<FwdPath>,
 	/// A folder of the destination to sync into, its root by default.
 	#[field]
-	dest_dir: Option<RelPath>,
+	dest_dir: Option<FwdPath>,
 	/// Prune destination objects absent from the source (a mirror rather than
 	/// an additive sync).
 	#[field]
@@ -207,7 +207,7 @@ mod test {
 		Some(StoreUri::parse(uri).unwrap().into())
 	}
 
-	async fn listed(store: &BlobStore) -> Vec<RelPath> {
+	async fn listed(store: &BlobStore) -> Vec<FwdPath> {
 		let mut paths = store.list().await.unwrap();
 		paths.sort();
 		paths
@@ -269,15 +269,15 @@ mod test {
 
 		run(sync(false)).await.unwrap();
 		listed(&target).await.xpect_eq(vec![
-			RelPath::new("a.txt"),
-			RelPath::new("nested/b.txt"),
-			RelPath::new("stale.txt"),
+			fwd_path!("a.txt"),
+			fwd_path!("nested/b.txt"),
+			fwd_path!("stale.txt"),
 		]);
 
 		run(sync(true)).await.unwrap();
 		listed(&target).await.xpect_eq(vec![
-			RelPath::new("a.txt"),
-			RelPath::new("nested/b.txt"),
+			fwd_path!("a.txt"),
+			fwd_path!("nested/b.txt"),
 		]);
 	}
 
@@ -295,18 +295,18 @@ mod test {
 			("in/blobs/b.png", "b"),
 			("out.txt", "o"),
 		] {
-			src.insert(&RelPath::new(path), body).await.unwrap();
+			src.insert(&FwdPath::new(path).unwrap(), body).await.unwrap();
 		}
-		dest.insert(&RelPath::new("to/a.txt"), "old").await.unwrap();
+		dest.insert(&fwd_path!("to/a.txt"), "old").await.unwrap();
 		let sync = || StoreSync {
 			src: uri(&name("src")),
 			dest: uri(&name("dest")),
-			src_dir: Some(RelPath::new("in")),
-			dest_dir: Some(RelPath::new("to")),
+			src_dir: Some(fwd_path!("in")),
+			dest_dir: Some(fwd_path!("to")),
 			filter: GlobFilter::default().with_exclude("blobs/*"),
 			..default()
 		};
-		let read = async || dest.get(&RelPath::new("to/a.txt")).await.unwrap();
+		let read = async || dest.get(&fwd_path!("to/a.txt")).await.unwrap();
 		for skipped in [
 			StoreSync {
 				dry_run: true,
@@ -322,7 +322,7 @@ mod test {
 		}
 		run(sync()).await.unwrap();
 		read().await.xpect_eq(bytes::Bytes::from("new"));
-		listed(&dest).await.xpect_eq(vec![RelPath::new("to/a.txt")]);
+		listed(&dest).await.xpect_eq(vec![fwd_path!("to/a.txt")]);
 	}
 
 	/// An option for another kind of end, and a mirror of nothing, are refused.
@@ -383,7 +383,7 @@ mod test {
 		.await
 		.unwrap()
 		.xpect_eq((
-			format!("fs:{}", WsPath::new("site/assets").into_abs()),
+			format!("fs:{}", WsPath::from(fwd_path!("site/assets")).into_abs()),
 			"s3://app--prod--assets?region=eu-west-1".into(),
 		));
 		// a pull is the other order, and a forward reference resolves
@@ -477,7 +477,7 @@ mod test {
 		.await
 		.unwrap()
 		.0
-		.xpect_eq(format!("fs:{}", WsPath::new("store").into_abs()));
+		.xpect_eq(format!("fs:{}", WsPath::from(fwd_path!("store")).into_abs()));
 		resolved(
 			r#"<DynamoTableBlock bx:ref="table" label="table"/>
 			<StoreSync src={$table} dest="memory://d"/>"#,

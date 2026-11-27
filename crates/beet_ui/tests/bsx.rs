@@ -52,7 +52,7 @@ async fn package(documents: &[(&str, &str)]) -> (World, Entity) {
 	let store = BlobStore::temp();
 	for (path, source) in documents {
 		store
-			.insert(&RelPath::new(path), source.to_string())
+			.insert(&FwdPath::new(path).unwrap(), source.to_string())
 			.await
 			.unwrap();
 	}
@@ -919,7 +919,7 @@ async fn counter_bsx_repaints_in_live_tui() {
 	let store = BlobStore::temp();
 	store
 		.insert(
-			&RelPath::new("widgets/Card.bsx"),
+			&fwd_path!("widgets/Card.bsx"),
 			"<section><h2>{@prop:title}</h2><slot/></section>",
 		)
 		.await

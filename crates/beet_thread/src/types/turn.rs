@@ -763,7 +763,7 @@ mod test {
 			.spawn(TableStore::new(InMemoryTableStore::new()))
 			.id();
 		let gate = MockGate::default();
-		let mount = || MountThreadStore::new("threads");
+		let mount = || MountThreadStore::new(fwd_path!("threads"));
 		let canonical = app
 			.world_mut()
 			.spawn((ChildOf(root), Thread::default(), mount(), children![

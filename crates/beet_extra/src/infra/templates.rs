@@ -113,7 +113,7 @@ pub fn LambdaSiteBlock(
 	/// package carrying no beet crates of its own names one; a site inside the beet
 	/// workspace leaves it unset.
 	#[prop]
-	workspace_dir: Option<String>,
+	workspace_dir: Option<WsPath>,
 	stacks: StackQuery,
 	entity: Entity,
 ) -> impl Bundle {
@@ -131,7 +131,7 @@ pub fn LambdaSiteBlock(
 		build = build.with_exec_route(exec_route);
 	}
 	if let Some(workspace_dir) = workspace_dir {
-		build = build.with_workspace_dir(WsPath::new(workspace_dir).into_abs());
+		build = build.with_workspace_dir(workspace_dir.into_abs());
 	}
 	(block, infra_ext::lambda_artifact(build))
 }
@@ -452,7 +452,7 @@ mod test {
 	#[beet_core::test]
 	fn the_worker_example_bakes_its_package_store() {
 		let source = fs_ext::read_to_string(
-			WsPath::new("examples/infra/cloudflare_workers.bsx").into_abs(),
+			WsPath::from(fwd_path!("examples/infra/cloudflare_workers.bsx")).into_abs(),
 		)
 		.unwrap();
 		let mut world = test_world();
@@ -500,7 +500,9 @@ mod test {
 		.into_iter()
 		.filter_map(|name| {
 			let source = fs_ext::read_to_string(
-				WsPath::new(format!("examples/infra/{name}.bsx")).into_abs(),
+				WsPath::new(format!("examples/infra/{name}.bsx"))
+					.unwrap()
+					.into_abs(),
 			)
 			.unwrap();
 			let mut world = test_world();
@@ -671,7 +673,7 @@ mod test {
 	#[beet_core::test]
 	fn site_stores_survive_the_lean_binary() {
 		let source =
-			fs_ext::read_to_string(WsPath::new("site/main.bsx").into_abs())
+			fs_ext::read_to_string(WsPath::from(fwd_path!("site/main.bsx")).into_abs())
 				.unwrap();
 		let nodes =
 			BsxNode::parse_document(&source, &BsxParseConfig::bsx()).unwrap();
@@ -747,6 +749,7 @@ mod test {
 			.xpect_eq("bucket-example--dev--my-bucket");
 		attached_local_dir(&mut world).xpect_eq(
 			ServiceAccess::local_store_dir("bucket-example--dev--my-bucket")
+				.unwrap()
 				.into_abs(),
 		);
 	}
@@ -860,7 +863,7 @@ mod test {
 		// ..which locally is backed by a workspace directory rather than the
 		// remote bucket
 		attached_local_dir(&mut world)
-			.xpect_eq(ServiceAccess::local_store_dir(&expected).into_abs());
+			.xpect_eq(ServiceAccess::local_store_dir(&expected).unwrap().into_abs());
 	}
 
 	/// The analytics rollup stack the site entry declares end to end: the
@@ -1097,6 +1100,7 @@ mod test {
 			.xpect_eq("beet-site--shared--assets");
 		attached_local_dir(&mut world).xpect_eq(
 			ServiceAccess::local_store_dir("beet-site--shared--assets")
+				.unwrap()
 				.into_abs(),
 		);
 		// ..and the syncs name the declaration itself, either way round

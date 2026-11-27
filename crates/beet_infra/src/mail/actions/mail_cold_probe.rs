@@ -187,7 +187,7 @@ pub async fn MailColdProbe(
 			.stack
 			.resource_name(mail.mail_box.blob_bucket().clone()),
 	};
-	let work_dir = mail.project.work_dir().clone();
+	let work_dir = mail.project.work_dir()?;
 
 	// the snapshot: fresh by its own clock, identical to the live copy
 	let prefix = format!("{}/", StalwartBlock::BACKUP_PREFIX);

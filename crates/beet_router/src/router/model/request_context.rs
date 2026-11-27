@@ -82,6 +82,9 @@ impl RequestContextStack {
 pub struct RequestContext {
 	/// The parts of the request being rendered (method, url, headers, query).
 	parts: RequestParts,
+	/// The request's path below the router's root, checked as the context is
+	/// built.
+	path: FwdPath,
 	/// The rendered content entity for this route, carrying any per-route
 	/// components (eg [`DocMeta`](crate::prelude::DocMeta)) for widgets
 	/// to query. This may be a *detached* render root (a per-request page built
@@ -104,18 +107,27 @@ pub struct RequestContext {
 impl RequestContext {
 	/// Build a context for the given request, rendered content entity, matched
 	/// route entity, and the [`router`](Self::router) owning its route tree.
+	///
+	/// # Errors
+	/// Errors, a bad request, when the request's path climbs out of the
+	/// router's root.
 	pub fn new(
 		parts: RequestParts,
 		content: Entity,
 		route: Entity,
 		router: Entity,
-	) -> Self {
+	) -> Result<Self> {
+		let path = parts.url().fwd_path().map_err(|err| {
+			HttpError::new(StatusCode::BAD_REQUEST, err.to_string())
+		})?;
 		Self {
 			parts,
+			path,
 			content,
 			route,
 			router,
 		}
+		.xok()
 	}
 
 	/// The parts of the request being rendered.
@@ -134,9 +146,8 @@ impl RequestContext {
 	/// component get, no ancestor walk).
 	pub fn router(&self) -> Entity { self.router }
 
-	/// The current request path as `/`-joined segments (no leading slash), eg
-	/// `docs/intro`.
-	pub fn current_path(&self) -> String { self.parts.path().join("/") }
+	/// The current request path below the router's root, eg `docs/intro`.
+	pub fn current_path(&self) -> &FwdPath { &self.path }
 }
 
 #[cfg(test)]
@@ -156,14 +167,14 @@ mod test {
 			route,
 			route,
 			route,
-		));
+		).unwrap());
 		world.insert_resource(stack);
 		world
 			.run_system_cached(|stack: Res<RequestContextStack>| {
-				stack.current().current_path()
+				stack.current().current_path().clone()
 			})
 			.unwrap()
-			.xpect_eq("docs/intro".to_string());
+			.xpect_eq(fwd_path!("docs/intro"));
 	}
 
 	#[beet_core::test]
@@ -179,13 +190,13 @@ mod test {
 			outer,
 			outer,
 			outer,
-		));
+		).unwrap());
 		stack.push(RequestContext::new(
 			RequestParts::get("inner"),
 			inner,
 			inner,
 			inner,
-		));
+		).unwrap());
 		stack.current().route().xpect_eq(inner);
 		stack.pop();
 		stack.current().route().xpect_eq(outer);

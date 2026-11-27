@@ -97,7 +97,7 @@ impl SceneHost {
 
 	/// The fork as the store holds it: the record of the session.
 	async fn fork(&self) -> Value {
-		let bytes = self.store.get(&RelPath::from(FORK)).await.unwrap();
+		let bytes = self.store.get(&FwdPath::from(FORK)).await.unwrap();
 		json_ext::from_slice(&bytes).unwrap()
 	}
 

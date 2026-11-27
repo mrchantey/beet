@@ -290,7 +290,7 @@ fn parse_snapshot(
 	received: &str,
 	caller_loc: &Location,
 ) -> Result<Option<String>> {
-	let file_path = WsPath::new(caller_loc.file());
+	let file_path = WsPath::new(caller_loc.file())?;
 	// Location::caller() returns 1-indexed line and column, but LineCol stores 0-indexed column
 	let loc = LineCol::from_location(&caller_loc);
 

@@ -15,7 +15,7 @@ pub struct LocalStorageStore {
 	store_name: SmolStr,
 	/// Optional subdirectory prefix for all keys.
 	#[reflect(default)]
-	subdir: Option<RelPath>,
+	subdir: Option<FwdPath>,
 }
 
 impl LocalStorageStore {
@@ -28,7 +28,7 @@ impl LocalStorageStore {
 	}
 
 	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<FwdPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
@@ -36,7 +36,7 @@ impl LocalStorageStore {
 	fn store_prefix(&self) -> String { format!("store:{}:", self.store_name) }
 
 	/// Compose the localStorage key for the store and path.
-	fn storage_key(&self, path: &RelPath) -> String {
+	fn storage_key(&self, path: &FwdPath) -> String {
 		let effective = match &self.subdir {
 			Some(sub) => format!("{}/{}", sub, path),
 			None => path.to_string(),
@@ -100,7 +100,7 @@ impl StoreBackend for LocalStorageStore {
 impl BlobProvider for LocalStorageStore {
 	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
+	fn with_subdir(&self, path: FwdPath) -> Box<dyn BlobProvider> {
 		Box::new(LocalStorageStore {
 			store_name: self.store_name.clone(),
 			subdir: Some(match &self.subdir {
@@ -121,9 +121,9 @@ impl BlobProvider for LocalStorageStore {
 		format!("localstorage:{}", self.store_name).into()
 	}
 
-	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
+	fn subdir(&self) -> FwdPath { self.subdir.clone().unwrap_or_default() }
 
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &FwdPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let key = self.storage_key(path);
 		let value = BASE64_STANDARD.encode(body);
 		Box::pin(async move {
@@ -132,7 +132,7 @@ impl BlobProvider for LocalStorageStore {
 		})
 	}
 
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 		let key = self.storage_key(path);
 		Box::pin(async move {
 			let storage = Self::local_storage();
@@ -141,12 +141,12 @@ impl BlobProvider for LocalStorageStore {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		let prefix = self.store_prefix();
 		let subdir_prefix = self.subdir.as_ref().map(|s| format!("{}/", s));
 		Box::pin(async move {
 			let storage = Self::local_storage();
-			let keys: Vec<RelPath> = (0..storage.length().unwrap_or(0))
+			(0..storage.length().unwrap_or(0))
 				.filter_map(|i| storage.key(i).ok().flatten())
 				.filter_map(|key| {
 					let raw = key.strip_prefix(&prefix)?;
@@ -154,14 +154,13 @@ impl BlobProvider for LocalStorageStore {
 						Some(p) => raw.strip_prefix(p.as_str())?,
 						None => raw,
 					};
-					Some(RelPath::new(rel))
+					Some(FwdPath::new(rel))
 				})
-				.collect();
-			keys.xok()
+				.collect()
 		})
 	}
 
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 		let key = self.storage_key(path);
 		Box::pin(async move {
 			let value = Self::local_storage().get_item(&key).map_jserr()?;
@@ -179,7 +178,7 @@ impl BlobProvider for LocalStorageStore {
 		})
 	}
 
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &FwdPath) -> SendBoxedFuture<Result> {
 		let key = self.storage_key(path);
 		let this = self.clone();
 		let path = path.clone();
@@ -200,7 +199,7 @@ impl BlobProvider for LocalStorageStore {
 
 	fn get_versioned(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 		let key = self.storage_key(path);
 		Box::pin(async move {
@@ -217,7 +216,7 @@ impl BlobProvider for LocalStorageStore {
 	/// can interleave, the version the content's digest.
 	fn insert_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		body: Bytes,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result<BlobVersion>> {
@@ -239,7 +238,7 @@ impl BlobProvider for LocalStorageStore {
 
 	fn remove_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result> {
 		let key = self.storage_key(path);
@@ -258,7 +257,7 @@ impl BlobProvider for LocalStorageStore {
 
 	fn public_url(
 		&self,
-		_path: &RelPath,
+		_path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { None.xok() })
 	}
@@ -349,7 +348,8 @@ fn storage_event_to_blob(ev: &web_sys::StorageEvent) -> Option<BlobEvent> {
 		_ => BlobEventKind::Changed,
 	};
 	let store = BlobStore::new(LocalStorageStore::new(store_name));
-	Some(BlobEvent::new(store, RelPath::new(path), kind))
+	// a key no path names is no blob of this store
+	Some(BlobEvent::new(store, FwdPath::new(path).ok()?, kind))
 }
 
 #[cfg(test)]

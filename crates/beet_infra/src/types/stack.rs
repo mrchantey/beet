@@ -667,10 +667,12 @@ mod tests {
 		let shared = resolved(Stack::default().with_stage("shared"));
 		deployment
 			.backend_path(&stage)
+			.unwrap()
 			.to_string()
 			.xpect_eq("beet-site--dev--tofu-tfstate");
 		deployment
 			.backend_path(&shared)
+			.unwrap()
 			.to_string()
 			.xpect_eq("beet-site--shared--tofu-tfstate");
 	}

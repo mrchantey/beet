@@ -416,6 +416,14 @@ impl Url {
 	/// The path segments, decoded.
 	pub fn path(&self) -> &Vec<SmolStr> { &self.path }
 
+	/// The path below this url's root, ie `blog/post` for `/blog/post`: a
+	/// url's path is rooted at its origin, a router or a store, so the root is
+	/// the container the [`FwdPath`] names a location within.
+	///
+	/// # Errors
+	/// Errors on a `..` segment, which would climb out of the origin.
+	pub fn fwd_path(&self) -> Result<FwdPath> { FwdPath::from_segments(&self.path) }
+
 	/// A mutable reference to the path segments.
 	pub fn path_mut(&mut self) -> &mut Vec<SmolStr> { &mut self.path }
 
@@ -891,10 +899,10 @@ impl From<SmolPath> for Url {
 	fn from(value: SmolPath) -> Url { Url::coerce(value.as_str()) }
 }
 
-/// A key is a RELATIVE url: a [`RelPath`] has no root by design, so rooting
+/// A key is a RELATIVE url: a [`FwdPath`] has no root by design, so rooting
 /// one here would invent a distinction it never carried.
-impl From<RelPath> for Url {
-	fn from(value: RelPath) -> Url {
+impl From<FwdPath> for Url {
+	fn from(value: FwdPath) -> Url {
 		Url::coerce(value.as_str()).with_rooted(false)
 	}
 }

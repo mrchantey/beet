@@ -664,7 +664,7 @@ mod test {
 			.iter()
 			.any(|path| path.starts_with(ServerIsland::PREFIX))
 			.xpect_false();
-		out.get(&RelPath::new("blog/post/index.html"))
+		out.get(&fwd_path!("blog/post/index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())

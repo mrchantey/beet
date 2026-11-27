@@ -68,8 +68,8 @@ impl EmulatorPds {
 	/// The did a test repo answers for when none is given.
 	pub const TEST_DID: &'static str = "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa";
 
-	const RECORDS: &'static str = "records";
-	const BLOBS: &'static str = "blobs";
+	const RECORDS: FwdPath = fwd_path!("records");
+	const BLOBS: FwdPath = fwd_path!("blobs");
 	/// The author directory of the account's own repo in a space.
 	const SELF_AUTHOR: &'static str = "self";
 
@@ -85,11 +85,14 @@ impl EmulatorPds {
 	}
 
 	/// This account's repo `scope`, laid out beneath the same root.
-	pub fn with_scope(&self, scope: RepoScope) -> Self {
+	///
+	/// # Errors
+	/// Errors when a space's type or key is no path segment.
+	pub fn with_scope(&self, scope: RepoScope) -> Result<Self> {
 		let store = match &scope {
 			RepoScope::Public => self.root.clone(),
 			RepoScope::Space { space, author } => {
-				self.root.with_subdir(RelPath::new(format!(
+				self.root.with_subdir(FwdPath::new(format!(
 					"{}/{}/{}/{}",
 					RepoScope::SPACE_SEGMENT,
 					space.r#type,
@@ -98,7 +101,7 @@ impl EmulatorPds {
 						true => Self::SELF_AUTHOR,
 						false => author.as_str(),
 					}
-				)))
+				))?)
 			}
 		};
 		Self {
@@ -106,6 +109,7 @@ impl EmulatorPds {
 			store,
 			..self.clone()
 		}
+		.xok()
 	}
 
 	/// A repo in a fresh in-memory store, answering for [`Self::TEST_DID`].
@@ -121,7 +125,7 @@ impl EmulatorPds {
 	pub async fn sweep(&self) -> Result<Vec<Cid>> {
 		let blobs = self
 			.store
-			.list_dir(&RelPath::new(Self::BLOBS))
+			.list_dir(&Self::BLOBS)
 			.await?
 			.files
 			.into_iter()
@@ -136,20 +140,16 @@ impl EmulatorPds {
 		format!(".{}", self.storage_format.extension().unwrap_or("bin"))
 	}
 
-	fn record_path(&self, collection: &Nsid, rkey: &Rkey) -> RelPath {
-		RelPath::new(format!(
-			"{}/{collection}/{rkey}{}",
-			Self::RECORDS,
-			self.suffix()
-		))
+	fn record_path(&self, collection: &Nsid, rkey: &Rkey) -> Result<FwdPath> {
+		Self::RECORDS.try_join(format!("{collection}/{rkey}{}", self.suffix()))
 	}
 
-	fn blob_path(cid: &Cid) -> RelPath {
-		RelPath::new(format!("{}/{cid}", Self::BLOBS))
+	fn blob_path(cid: &Cid) -> Result<FwdPath> {
+		Self::BLOBS.try_join(cid.to_string())
 	}
 
 	/// The body stored at `path`, `None` when there is none.
-	async fn read(&self, path: &RelPath) -> Result<Option<AtprotoValue>> {
+	async fn read(&self, path: &FwdPath) -> Result<Option<AtprotoValue>> {
 		if !self.store.exists(path).await? {
 			return Ok(None);
 		}
@@ -165,7 +165,7 @@ impl EmulatorPds {
 		collection: &Nsid,
 		rkey: &Rkey,
 	) -> Result<Option<RecordEntry>> {
-		self.read(&self.record_path(collection, rkey))
+		self.read(&self.record_path(collection, rkey)?)
 			.await?
 			.map(|value| {
 				self.entry(collection, Rkeyed::new(rkey.clone(), value))
@@ -203,14 +203,14 @@ impl EmulatorPds {
 		let uri = self.uri(&collection, record.rkey());
 		let referenced = Self::blob_cids(&record);
 		for blob in &referenced {
-			if !self.store.exists(&Self::blob_path(blob)).await? {
+			if !self.store.exists(&Self::blob_path(blob)?).await? {
 				bevybail!(
 					"{uri} references blob {blob}, which was never uploaded \
 					 to this repo"
 				);
 			}
 		}
-		let path = self.record_path(&collection, record.rkey());
+		let path = self.record_path(&collection, record.rkey())?;
 		let dropped = self.dropped_blobs(&path, &referenced).await?;
 		self.store
 			.insert(&path, self.storage_format.serialize(&*record)?)
@@ -220,7 +220,7 @@ impl EmulatorPds {
 	}
 
 	async fn delete(&self, collection: Nsid, rkey: Rkey) -> Result {
-		let path = self.record_path(&collection, &rkey);
+		let path = self.record_path(&collection, &rkey)?;
 		let dropped = self.dropped_blobs(&path, &HashSet::default()).await?;
 		if self.store.exists(&path).await? {
 			self.store.remove(&path).await?;
@@ -233,7 +233,7 @@ impl EmulatorPds {
 		let suffix = self.suffix();
 		let mut rkeys = self
 			.store
-			.list_dir(&RelPath::new(format!("{}/{collection}", Self::RECORDS)))
+			.list_dir(&Self::RECORDS.try_join(collection.to_string())?)
 			.await?
 			.files
 			.into_iter()
@@ -257,7 +257,7 @@ impl EmulatorPds {
 		mime_type: MediaType,
 	) -> Result<BlobRef> {
 		let blob = BlobRef::of(&bytes, mime_type);
-		let path = Self::blob_path(&blob.cid);
+		let path = Self::blob_path(&blob.cid)?;
 		if !self.store.exists(&path).await? {
 			self.store.insert(&path, bytes).await?;
 		}
@@ -267,7 +267,7 @@ impl EmulatorPds {
 	/// The blobs the record at `path` references that `kept` does not.
 	async fn dropped_blobs(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		kept: &HashSet<Cid>,
 	) -> Result<HashSet<Cid>> {
 		self.read(path)
@@ -293,7 +293,7 @@ impl EmulatorPds {
 			.list()
 			.await?
 			.into_iter()
-			.filter(|path| path.as_str().starts_with(Self::RECORDS));
+			.filter(|path| path.strip_prefix(&Self::RECORDS).is_some());
 		for path in records {
 			if let Some(record) = self.read(&path).await? {
 				for cid in Self::blob_cids(&record) {
@@ -304,7 +304,7 @@ impl EmulatorPds {
 		let mut released = candidates.into_iter().collect::<Vec<_>>();
 		released.sort();
 		for cid in &released {
-			self.store.remove(&Self::blob_path(cid)).await?;
+			self.store.remove(&Self::blob_path(cid)?).await?;
 		}
 		released.xok()
 	}
@@ -329,7 +329,7 @@ impl PdsProvider for EmulatorPds {
 	fn scope(&self) -> &RepoScope { &self.scope }
 
 	fn scoped(&self, scope: RepoScope) -> Result<Box<dyn PdsProvider>> {
-		let scoped: Box<dyn PdsProvider> = Box::new(self.with_scope(scope));
+		let scoped: Box<dyn PdsProvider> = Box::new(self.with_scope(scope)?);
 		scoped.xok()
 	}
 
@@ -423,11 +423,11 @@ mod test {
 			let mut paths = emulator.store().list().await.unwrap();
 			paths.sort();
 			paths.xpect_eq(vec![
-				RelPath::new(format!("blobs/{}", blob.cid)),
-				RelPath::new(format!(
+				FwdPath::new(format!("blobs/{}", blob.cid)).unwrap(),
+				FwdPath::new(format!(
 					"records/com.example.card/a.{}",
 					emulator.storage_format().extension().unwrap()
-				)),
+				)).unwrap(),
 			]);
 			pds.get_record(&collection(), &rkey("a"))
 				.await
@@ -453,7 +453,7 @@ mod test {
 			.unwrap();
 		let file = emulator
 			.store()
-			.get(&RelPath::new("records/com.example.card/a.cbor"))
+			.get(&fwd_path!("records/com.example.card/a.cbor"))
 			.await
 			.unwrap();
 		Cid::new(Cid::DAG_CBOR, &file).xpect_eq(written.cid);
@@ -495,7 +495,7 @@ mod test {
 			));
 		emulator
 			.store()
-			.insert(&RelPath::new("records/com.example.card/a.json"), "{}")
+			.insert(&fwd_path!("records/com.example.card/a.json"), "{}")
 			.await
 			.unwrap();
 		pds.get_record(&collection(), &rkey("a"))
@@ -539,7 +539,7 @@ mod test {
 			let exists = async |blob: &BlobRef| {
 				emulator
 					.store()
-					.exists(&RelPath::new(format!("blobs/{}", blob.cid)))
+					.exists(&FwdPath::new(format!("blobs/{}", blob.cid)).unwrap())
 					.await
 					.unwrap()
 			};
@@ -595,13 +595,13 @@ mod test {
 		let mut paths = emulator.store().list().await.unwrap();
 		paths.sort();
 		paths.xpect_eq(vec![
-			RelPath::new(format!(
+			FwdPath::new(format!(
 				"space/org.beet.space.package/todos/self/blobs/{}",
 				blob.cid
-			)),
-			RelPath::new(
+			)).unwrap(),
+			FwdPath::new(
 				"space/org.beet.space.package/todos/self/records/com.example.card/a.cbor",
-			),
+			).unwrap(),
 		]);
 		public
 			.get_record(&collection(), &rkey("a"))
@@ -622,10 +622,10 @@ mod test {
 			.unwrap();
 		emulator
 			.store()
-			.exists(&RelPath::new(format!(
+			.exists(&FwdPath::new(format!(
 				"space/org.beet.space.package/todos/self/blobs/{}",
 				blob.cid
-			)))
+			)).unwrap())
 			.await
 			.unwrap()
 			.xpect_true();

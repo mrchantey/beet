@@ -32,7 +32,7 @@ pub async fn read_prescan(
 	prescans: &PrescanRegistry,
 	entry_name: &str,
 ) -> Result<EntryPrescan> {
-	let path = RelPath::from(entry_name);
+	let path = FwdPath::new(entry_name)?;
 	package_store
 		.get_media(&path)
 		.await?
@@ -164,7 +164,7 @@ pub fn default_store_fork(package_uri: &StoreUri) -> Option<StoreUri> {
 	{
 		return Some(StoreUri::IndexedDb {
 			name: "beet".into(),
-			path_prefix: package_uri.path_prefix().map(RelPath::new),
+			path_prefix: package_uri.key_prefix().cloned(),
 		});
 	}
 	let _ = package_uri;
@@ -283,7 +283,7 @@ pub async fn probe_entry_names(
 	package_store: &BlobStore,
 ) -> Result<Option<String>> {
 	for name in ENTRY_NAMES {
-		if package_store.exists(&RelPath::from(*name)).await? {
+		if package_store.exists(&FwdPath::new(*name)?).await? {
 			return Ok(Some(name.to_string()));
 		}
 	}
@@ -326,7 +326,7 @@ pub async fn read_sources(
 ) -> Result<EntrySources> {
 	let entry_name = entry_name.into();
 	let entry = package_store
-		.get_media(&RelPath::from(entry_name.as_str()))
+		.get_media(&FwdPath::new(entry_name.as_str())?)
 		.await?;
 	EntrySources {
 		entry_name,
@@ -360,7 +360,7 @@ pub fn build_root(
 		entry,
 		prescan,
 	} = sources;
-	let entry_path = RelPath::from(entry_name.as_str());
+	let entry_path = FwdPath::new(entry_name.as_str())?;
 	let package = PackageFiles::of_entry(&package_store, &entry_path);
 	// the root carries the store from the start (descendants resolve it by
 	// ancestry) and `extra`, which is where the `PackageStore` marker rides rather
@@ -375,7 +375,7 @@ pub fn build_root(
 	// tree itself cannot build (eg its root tag is not registered here).
 	RequireCfg::assert_all(world, prescan.iter::<RequireCfg>())?;
 	// its own path in its package, whose root is its directory
-	let path = RelPath::new(entry_path.file_name().unwrap_or_default());
+	let path = FwdPath::new(entry_path.file_name().unwrap_or_default())?;
 	let template = DocParsers::of(world)
 		.read(&entry, Some(&path))
 		.map_err(BevyError::from)
@@ -497,7 +497,7 @@ pub async fn rebuild_watched(
 		read_sources(&package_store, entry_name.clone(), prescan).await?;
 	// the entry is known before the build, so a first build that fails is
 	// rebuilt by its fix
-	let entry_path = RelPath::from(entry_name.as_str());
+	let entry_path = FwdPath::new(entry_name.as_str())?;
 	let known = entry_path.clone();
 	world
 		.with(move |world: &mut World| {
@@ -565,8 +565,8 @@ pub async fn rebuild_watched(
 fn entry_source_paths(
 	world: &mut World,
 	root: Entity,
-	entry: &RelPath,
-) -> HashSet<RelPath> {
+	entry: &FwdPath,
+) -> HashSet<FwdPath> {
 	let package = entry.parent().unwrap_or_default();
 	let instantiated = world.with_state::<(
 		Query<&Activation>,
@@ -610,7 +610,7 @@ mod test {
 	async fn build_source(world: &mut World, source: &str) -> Result<Entity> {
 		let package_store = BlobStore::temp();
 		package_store
-			.insert(&RelPath::from("main.bsx"), source.to_owned())
+			.insert(&fwd_path!("main.bsx"), source.to_owned())
 			.await?;
 		let prescan =
 			read_prescan(&package_store, &prescans(world), "main.bsx").await?;
@@ -753,7 +753,7 @@ mod test {
 		let package_store = BlobStore::temp();
 		package_store
 			.insert(
-				&RelPath::from("app/main.bsx"),
+				&fwd_path!("app/main.bsx"),
 				"<Router><PackageRoot src=\"..\"/><Secrets/></Router>",
 			)
 			.await
@@ -823,7 +823,7 @@ mod test {
 		resolved.watch_dir.xpect_eq(Some(tmp.path().clone()));
 		resolved
 			.package_store
-			.exists(&RelPath::from("app/main.bsx"))
+			.exists(&fwd_path!("app/main.bsx"))
 			.await
 			.unwrap()
 			.xpect_true();
@@ -838,7 +838,7 @@ mod test {
 		let package_store = BlobStore::temp();
 		package_store
 			.insert(
-				&RelPath::from("apps/site/main.bsx"),
+				&fwd_path!("apps/site/main.bsx"),
 				"<Router><PackageRoot src=\"..\"/></Router>",
 			)
 			.await
@@ -855,7 +855,7 @@ mod test {
 		resolved.watch_dir.xpect_none();
 		resolved
 			.package_store
-			.exists(&RelPath::from("site/main.bsx"))
+			.exists(&fwd_path!("site/main.bsx"))
 			.await
 			.unwrap()
 			.xpect_true();
@@ -868,7 +868,7 @@ mod test {
 		let package_store = BlobStore::temp();
 		package_store
 			.insert(
-				&RelPath::from("main.bsx"),
+				&fwd_path!("main.bsx"),
 				"<Router><PackageRoot src=\"../..\"/></Router>",
 			)
 			.await
@@ -927,7 +927,7 @@ mod test {
 		let local = StoreUri::parse("memory://fork-local").unwrap();
 		let seeded = BlobStore::from_uri(&upstream).unwrap();
 		seeded
-			.insert(&RelPath::from("main.bsx"), "<Router/>")
+			.insert(&fwd_path!("main.bsx"), "<Router/>")
 			.await
 			.unwrap();
 		let prescans = router_prescans();
@@ -939,17 +939,17 @@ mod test {
 		resolved.package_store.id().xpect_eq("fork");
 		resolved
 			.package_store
-			.insert(&RelPath::from("fork.json"), "{}")
+			.insert(&fwd_path!("fork.json"), "{}")
 			.await
 			.unwrap();
 		BlobStore::from_uri(&local)
 			.unwrap()
-			.exists(&RelPath::from("fork.json"))
+			.exists(&fwd_path!("fork.json"))
 			.await
 			.unwrap()
 			.xpect_true();
 		seeded
-			.exists(&RelPath::from("fork.json"))
+			.exists(&fwd_path!("fork.json"))
 			.await
 			.unwrap()
 			.xpect_false();
@@ -970,7 +970,7 @@ mod test {
 	async fn rebuild_fires_ready_every_time() {
 		let package_store = BlobStore::temp();
 		package_store
-			.insert(&RelPath::from("main.bsx"), "<Router/>")
+			.insert(&fwd_path!("main.bsx"), "<Router/>")
 			.await
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
@@ -1017,7 +1017,7 @@ mod test {
 			.run_async_local_then(move |world| async move {
 				for source in ["<Router/>", "<Router {", "<Router/>"] {
 					store
-						.insert(&RelPath::from("main.bsx"), source)
+						.insert(&fwd_path!("main.bsx"), source)
 						.await
 						.unwrap();
 					let built = rebuild_watched(
@@ -1071,7 +1071,7 @@ mod test {
 		];
 		for (path, source) in files {
 			package_store
-				.insert(&RelPath::from(path), source)
+				.insert(&FwdPath::new(path).unwrap(), source)
 				.await
 				.unwrap();
 		}
@@ -1093,7 +1093,7 @@ mod test {
 		let reloader = world.resource::<EntryReloader>();
 		files
 			.iter()
-			.map(|(path, _)| RelPath::from(*path))
+			.map(|(path, _)| FwdPath::new(*path).unwrap())
 			.filter(|path| reloader.is_structural(path))
 			.collect::<HashSet<_>>()
 			.xpect_eq(
@@ -1103,7 +1103,7 @@ mod test {
 					"app/templates/widgets/Swatch.bsx",
 				]
 				.into_iter()
-				.map(RelPath::from)
+				.map(|path| FwdPath::new(path).unwrap())
 				.collect::<HashSet<_>>(),
 			);
 	}
@@ -1122,7 +1122,7 @@ mod test {
 			("routes.bsx", r#"<Route path="hello"/>"#),
 		] {
 			package_store
-				.insert(&RelPath::from(path), source)
+				.insert(&FwdPath::new(path).unwrap(), source)
 				.await
 				.unwrap();
 		}

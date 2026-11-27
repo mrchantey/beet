@@ -910,7 +910,7 @@ pub(crate) mod test {
 				("Scrub", SCRUB),
 			] {
 				store
-					.insert(&RelPath::new(format!("{name}.bsx")), source)
+					.insert(&FwdPath::new(format!("{name}.bsx")).unwrap(), source)
 					.await
 					.unwrap();
 			}

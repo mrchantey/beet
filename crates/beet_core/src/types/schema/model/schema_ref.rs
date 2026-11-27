@@ -123,36 +123,39 @@ impl ValueSchema {
 
 	/// The schema held by the schema document at `path` of this document's own
 	/// package, resolved by location.
-	pub fn document(path: impl Into<RelPath>) -> Self {
+	pub fn document(path: impl Into<FwdPath>) -> Self {
 		Self::Ref(SchemaRef::Document(path.into().into()))
 	}
 
 	/// This schema as the document at `document` holds it, every
 	/// [`SchemaRef::Document`] in it package absolute ([`DocPath::resolve`]),
 	/// which is how the by-location index is keyed.
-	pub fn resolve_documents(mut self, document: &RelPath) -> Self {
-		self.resolve_documents_mut(document);
-		self
+	///
+	/// # Errors
+	/// Errors when a relative reference climbs above the package.
+	pub fn resolve_documents(mut self, document: &FwdPath) -> Result<Self> {
+		self.resolve_documents_mut(document)?;
+		self.xok()
 	}
 
-	fn resolve_documents_mut(&mut self, document: &RelPath) {
+	fn resolve_documents_mut(&mut self, document: &FwdPath) -> Result {
 		match self {
 			Self::Ref(SchemaRef::Document(path)) => {
-				*path = path.resolve(document).into();
+				*path = path.resolve(document)?.into();
 			}
-			Self::Optional(inner) => inner.resolve_documents_mut(document),
-			Self::List(list) => list.item.resolve_documents_mut(document),
+			Self::Optional(inner) => inner.resolve_documents_mut(document)?,
+			Self::List(list) => list.item.resolve_documents_mut(document)?,
 			Self::Map(MapSchema::Uniform { value }) => {
-				value.resolve_documents_mut(document)
+				value.resolve_documents_mut(document)?
 			}
 			Self::Struct(schema) => {
 				for field in &mut schema.fields {
-					field.schema.resolve_documents_mut(document);
+					field.schema.resolve_documents_mut(document)?;
 				}
 			}
 			Self::Tuple(schema) => {
 				for field in &mut schema.fields {
-					field.schema.resolve_documents_mut(document);
+					field.schema.resolve_documents_mut(document)?;
 				}
 			}
 			Self::Enum(schema) => {
@@ -161,11 +164,12 @@ impl ValueSchema {
 					.iter_mut()
 					.filter_map(|variant| variant.payload.as_mut())
 				{
-					payload.resolve_documents_mut(document);
+					payload.resolve_documents_mut(document)?;
 				}
 			}
 			_ => {}
 		}
+		Ok(())
 	}
 
 	/// The schema described by the value at `key` of the nearest enclosing

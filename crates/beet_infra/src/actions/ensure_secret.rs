@@ -120,7 +120,7 @@ mod tests {
 				Stack::new("app").with_stage("dev"),
 				BlobStore::temp(),
 				PackageStore,
-				DocumentSecrets::new("secrets.toml"),
+				DocumentSecrets::new(fwd_path!("secrets.toml")),
 			))
 			.id();
 		world.flush();

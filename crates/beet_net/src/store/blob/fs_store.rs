@@ -26,7 +26,7 @@ pub struct FsStore {
 	/// string attribute in markup, ie `<FsStore path="assets"/>`.
 	path: AbsPath,
 	/// Optional subdirectory from which all paths are resolved.
-	subdir: Option<RelPath>,
+	subdir: Option<FwdPath>,
 	/// Whether a listing reads through symbolic links, materializing a linked
 	/// directory's files as the store's own. On by default, as a path read
 	/// is; off, a link is invisible to [`list`](BlobProvider::list).
@@ -44,6 +44,14 @@ impl Default for FsStore {
 }
 
 impl FsStore {
+	/// The key of `path` in the store rooted at `root`, refusing a path
+	/// outside it, ie a followed link's own location.
+	fn key_of(root: &AbsPath, path: &AbsPath) -> Result<FwdPath> {
+		path.strip_prefix(root).ok_or_else(|| {
+			bevyhow!("`{path}` is listed outside the store root `{root}`")
+		})
+	}
+
 	/// Create a new filesystem store with the given store path.
 	pub fn new(path: impl Into<AbsPath>) -> Self {
 		Self {
@@ -59,7 +67,7 @@ impl FsStore {
 		self
 	}
 	/// Set the subdirectory from which all paths are resolved.
-	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<FwdPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
@@ -71,7 +79,7 @@ impl FsStore {
 		}
 	}
 	/// Resolve the full path for an object key.
-	fn resolve_path(&self, route: &RelPath) -> AbsPath {
+	fn resolve_path(&self, route: &FwdPath) -> AbsPath {
 		self.effective_root().join(route)
 	}
 }
@@ -109,7 +117,7 @@ impl FsStore {
 	/// free.
 	async fn conditional<T: 'static + Send>(
 		path: AbsPath,
-		rel: RelPath,
+		rel: FwdPath,
 		condition: BlobCondition,
 		write: impl 'static + Send + FnOnce(&AbsPath, bool) -> Result<T>,
 	) -> Result<T> {
@@ -171,7 +179,7 @@ impl StoreBackend for FsStore {
 impl BlobProvider for FsStore {
 	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
+	fn with_subdir(&self, path: FwdPath) -> Box<dyn BlobProvider> {
 		Box::new(FsStore {
 			subdir: Some(match &self.subdir {
 				Some(existing) => existing.join(&path),
@@ -194,9 +202,9 @@ impl BlobProvider for FsStore {
 	/// point of an fs `<PackageRoot>`.
 	fn rebase(
 		&self,
-		entry_name: &RelPath,
+		entry_name: &FwdPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobProvider>, RelPath)> {
+	) -> Result<(Box<dyn BlobProvider>, FwdPath)> {
 		let abs_root = self.effective_root().join(root);
 		let entry_name = self
 			.effective_root()
@@ -221,13 +229,13 @@ impl BlobProvider for FsStore {
 
 	fn root_key(&self) -> SmolStr { format!("fs:{}", self.path).into() }
 
-	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
+	fn subdir(&self) -> FwdPath { self.subdir.clone().unwrap_or_default() }
 
 	fn watch_dir(&self) -> Option<AbsPath> { Some(self.effective_root()) }
 
 	fn base_dir(&self) -> Option<AbsPath> { Some(self.path.clone()) }
 
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &FwdPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let path = self.resolve_path(path);
 		Box::pin(async move {
 			fs_ext::write_async(path, body).await?;
@@ -239,7 +247,7 @@ impl BlobProvider for FsStore {
 	/// through memory (and is a reflink where the filesystem has them).
 	fn insert_file(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		file: &AbsPath,
 	) -> SendBoxedFuture<Result> {
 		let path = self.resolve_path(path);
@@ -256,7 +264,7 @@ impl BlobProvider for FsStore {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		let root = self.effective_root();
 		let scoped = self.subdir.is_some();
 		let read = ReadDir {
@@ -279,17 +287,15 @@ impl BlobProvider for FsStore {
 					!path.to_string_lossy().ends_with(fs_ext::REPLACING_SUFFIX)
 				})
 				.map(|path| {
-					let path = AbsPath::new_unchecked(path.to_string_lossy());
-					path.strip_prefix(&root)
-						.unwrap_or_else(|| RelPath::new(path))
+					AbsPath::new_unchecked(path.to_string_lossy())
+						.xmap(|path| FsStore::key_of(&root, &path))
 				})
-				.collect::<Vec<_>>()
-				.xok()
+				.collect()
 		})
 	}
 
 	/// One `read_dir`, a missing directory empty.
-	fn list_dir(&self, path: &RelPath) -> SendBoxedFuture<Result<BlobDir>> {
+	fn list_dir(&self, path: &FwdPath) -> SendBoxedFuture<Result<BlobDir>> {
 		let dir = self.resolve_path(path);
 		Box::pin(async move {
 			if !fs_ext::exists_async(&dir).await? {
@@ -316,7 +322,7 @@ impl BlobProvider for FsStore {
 		})
 	}
 
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 		let key = path.clone();
 		let path = self.resolve_path(path);
 		Box::pin(async move {
@@ -341,12 +347,12 @@ impl BlobProvider for FsStore {
 		})
 	}
 
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 		let path = self.resolve_path(path);
 		Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
 	}
 
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &FwdPath) -> SendBoxedFuture<Result> {
 		let path = self.resolve_path(path);
 		Box::pin(async move { fs_ext::remove_async(path).await?.xok() })
 	}
@@ -355,7 +361,7 @@ impl BlobProvider for FsStore {
 
 	fn get_versioned(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 		let path = self.resolve_path(path);
 		Box::pin(async move {
@@ -368,7 +374,7 @@ impl BlobProvider for FsStore {
 	/// the file replaced whole so an unlocked reader never reads it torn.
 	fn insert_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		body: Bytes,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result<BlobVersion>> {
@@ -387,7 +393,7 @@ impl BlobProvider for FsStore {
 
 	fn remove_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result> {
 		let rel = path.clone();
@@ -404,7 +410,7 @@ impl BlobProvider for FsStore {
 	/// file never holds it.
 	fn stat(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
 		let path = self.resolve_path(path);
 		Box::pin(async move {
@@ -433,7 +439,7 @@ impl BlobProvider for FsStore {
 	}
 
 	/// From metadata, without reading the file.
-	fn size(&self, path: &RelPath) -> SendBoxedFuture<Result<Option<u64>>> {
+	fn size(&self, path: &FwdPath) -> SendBoxedFuture<Result<Option<u64>>> {
 		let path = self.resolve_path(path);
 		Box::pin(async move {
 			if !fs_ext::exists_async(&path).await? {
@@ -444,7 +450,7 @@ impl BlobProvider for FsStore {
 	}
 
 	/// Every followed link at any depth, a directory's own links included.
-	fn empty_links(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn empty_links(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		let root = self.effective_root();
 		let follow = self.follow_symlinks;
 		Box::pin(async move {
@@ -463,10 +469,7 @@ impl BlobProvider for FsStore {
 						{
 							let link =
 								AbsPath::new_unchecked(link.to_string_lossy());
-							found.push(
-								link.strip_prefix(&root)
-									.unwrap_or_else(|| RelPath::new(link)),
-							);
+							found.push(FsStore::key_of(&root, &link)?);
 						}
 					}
 					dirs.extend(ReadDir::dirs(&dir)?.into_iter().map(|dir| {
@@ -482,7 +485,7 @@ impl BlobProvider for FsStore {
 
 	fn public_url(
 		&self,
-		_path: &RelPath,
+		_path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
 	}
@@ -509,11 +512,11 @@ mod test {
 	async fn lists_a_missing_subdir_as_empty() {
 		let dir = TempDir::new_ws().unwrap();
 		BlobStore::new(FsStore::new(dir.path().clone()))
-			.with_subdir(RelPath::new("never/written"))
+			.with_subdir(fwd_path!("never/written"))
 			.list()
 			.await
 			.unwrap()
-			.xpect_eq(Vec::<RelPath>::new());
+			.xpect_eq(Vec::<FwdPath>::new());
 	}
 
 	/// The filesystem's parent universe lets a rebase walk above the store's
@@ -532,14 +535,14 @@ mod test {
 			store.rebase_package("main.bsx", "../..").unwrap();
 		entry_name.xpect_eq("a/b/main.bsx");
 		rebased
-			.get_media(&RelPath::from("a/b/main.bsx"))
+			.get_media(&fwd_path!("a/b/main.bsx"))
 			.await
 			.unwrap()
 			.as_utf8()
 			.unwrap()
 			.xpect_eq("<Router/>");
 		rebased
-			.get_media(&RelPath::from("shared.txt"))
+			.get_media(&fwd_path!("shared.txt"))
 			.await
 			.unwrap()
 			.as_utf8()
@@ -587,7 +590,7 @@ mod test {
 		let write = async move {
 			written
 				.insert_if(
-					&RelPath::new("a.txt"),
+					&fwd_path!("a.txt"),
 					"a".into(),
 					BlobCondition::Absent,
 				)
@@ -604,14 +607,14 @@ mod test {
 			beet_core::exports::futures_lite::future::zip(write, kill).await;
 		written.unwrap();
 		store
-			.exists(&RelPath::new("a.txt"))
+			.exists(&fwd_path!("a.txt"))
 			.await
 			.unwrap()
 			.xpect_true();
 		// nothing to clean up
 		let mut paths = store.list().await.unwrap();
 		paths.sort();
-		paths.xpect_eq(vec![RelPath::new("a.txt"), RelPath::new("held")]);
+		paths.xpect_eq(vec![fwd_path!("a.txt"), fwd_path!("held")]);
 	}
 
 	/// How many each process counts.

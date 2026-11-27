@@ -104,7 +104,7 @@ impl StandardSiteDocument {
 	pub fn from_page(
 		publication: &StandardSitePub,
 		site: AtUri,
-		path: &RelPath,
+		path: &FwdPath,
 		meta: &DocMeta,
 	) -> Result<Self> {
 		let document_path =
@@ -200,7 +200,7 @@ mod test {
 			.query::<(Entity, &PathPattern)>()
 			.iter(&world)
 			.find(|(_, pattern)| {
-				pattern.annotated_path() == RelPath::new("blog/rss.xml")
+				*pattern.annotated_path() == fwd_path!("blog/rss.xml")
 			})
 			.unwrap()
 			.0;
@@ -235,7 +235,7 @@ mod test {
 	/// Every field filled, the ones the publish step derives included.
 	fn filled() -> StandardSiteDocument {
 		let page = SyndicationPage {
-			path: RelPath::new("blog/full-stack-bevy"),
+			path: fwd_path!("blog/full-stack-bevy"),
 			meta: DocMeta {
 				title: Some("Full Stack Bevy".into()),
 				description: Some("One language across the stack.".into()),
@@ -300,7 +300,7 @@ mod test {
 	#[beet_core::test]
 	fn refuses_an_incomplete_page() {
 		let page = |path: &str, meta: DocMeta| SyndicationPage {
-			path: RelPath::new(path),
+			path: FwdPath::new(path).unwrap(),
 			meta,
 			route: Entity::PLACEHOLDER,
 		};

@@ -116,7 +116,7 @@ impl Default for SchemaBindingGenerator {
 	fn default() -> Self {
 		Self {
 			files: Vec::new(),
-			work_dir: WsPath::new("target/terra-bindings-generator").into_abs(),
+			work_dir: WsPath::from(fwd_path!("target/terra-bindings-generator")).into_abs(),
 			binding_generator: BindingGenerator::new()
 				.with_title_case(true)
 				.with_trait_impls(true)

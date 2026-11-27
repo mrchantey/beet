@@ -451,14 +451,14 @@ mod test {
 
 	impl BlobProvider for FailingStore {
 		fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
-		fn with_subdir(&self, _path: RelPath) -> Box<dyn BlobProvider> {
+		fn with_subdir(&self, _path: FwdPath) -> Box<dyn BlobProvider> {
 			Box::new(self.clone())
 		}
 		fn base(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 		fn root_key(&self) -> SmolStr { "no-such-store".into() }
 		fn insert(
 			&self,
-			_path: &RelPath,
+			_path: &FwdPath,
 			_body: Bytes,
 		) -> SendBoxedFuture<Result> {
 			Box::pin(async { bevybail!("store unavailable") })
@@ -467,36 +467,36 @@ mod test {
 
 		fn get_versioned(
 			&self,
-			_path: &RelPath,
+			_path: &FwdPath,
 		) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 			Box::pin(async { None.xok() })
 		}
 
 		fn insert_if(
 			&self,
-			_path: &RelPath,
+			_path: &FwdPath,
 			_body: Bytes,
 			_condition: BlobCondition,
 		) -> SendBoxedFuture<Result<BlobVersion>> {
 			self.attempts.fetch_add(1, Ordering::SeqCst);
 			Box::pin(async { bevybail!("store unavailable") })
 		}
-		fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+		fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 			Box::pin(async { Vec::new().xok() })
 		}
-		fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+		fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 			let path = path.clone();
 			Box::pin(async move { bevybail!("no object at {path}") })
 		}
-		fn exists(&self, _path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+		fn exists(&self, _path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 			Box::pin(async { false.xok() })
 		}
-		fn remove(&self, _path: &RelPath) -> SendBoxedFuture<Result> {
+		fn remove(&self, _path: &FwdPath) -> SendBoxedFuture<Result> {
 			Box::pin(async { Ok(()) })
 		}
 		fn public_url(
 			&self,
-			_path: &RelPath,
+			_path: &FwdPath,
 		) -> SendBoxedFuture<Result<Option<String>>> {
 			Box::pin(async { None.xok() })
 		}

@@ -67,8 +67,8 @@ mod test {
 			BlobStore::from_uri(&StoreUri::parse(&uri(part)).unwrap()).unwrap()
 		};
 		let (src, dest) = (store("src"), store("dest"));
-		src.insert(&RelPath::new("a.txt"), "a").await.unwrap();
-		dest.insert(&RelPath::new("stale.txt"), "s").await.unwrap();
+		src.insert(&fwd_path!("a.txt"), "a").await.unwrap();
+		dest.insert(&fwd_path!("stale.txt"), "s").await.unwrap();
 		let run = async |flags: &str| {
 			let mut world = crate::commands::render_world();
 			let router = world.spawn((Router, children![SyncStores])).id();
@@ -93,12 +93,12 @@ mod test {
 		dest.list()
 			.await
 			.unwrap()
-			.xpect_eq(vec![RelPath::new("stale.txt")]);
+			.xpect_eq(vec![fwd_path!("stale.txt")]);
 		run("--delete").await.status().is_success().xpect_true();
 		dest.list()
 			.await
 			.unwrap()
-			.xpect_eq(vec![RelPath::new("a.txt")]);
+			.xpect_eq(vec![fwd_path!("a.txt")]);
 		// a flag for another kind of store is refused, not ignored
 		run("--no-sign-request")
 			.await

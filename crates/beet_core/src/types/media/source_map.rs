@@ -100,7 +100,7 @@ impl From<SceneBody> for ParsedDocument {
 pub struct DocumentSource {
 	/// The document's path in its package, if it has one.
 	#[get(skip)]
-	path: Option<RelPath>,
+	path: Option<FwdPath>,
 	/// What it was read from.
 	bytes: MediaBytes,
 	#[get(skip)]
@@ -110,7 +110,7 @@ pub struct DocumentSource {
 impl DocumentSource {
 	/// `document`, read from `bytes`, the file at `path` of its package.
 	pub fn new(
-		path: Option<RelPath>,
+		path: Option<FwdPath>,
 		bytes: MediaBytes,
 		document: ParsedDocument,
 	) -> Self {
@@ -122,7 +122,7 @@ impl DocumentSource {
 	}
 
 	/// The document's path in its package, if it has one.
-	pub fn path(&self) -> Option<&RelPath> { self.path.as_ref() }
+	pub fn path(&self) -> Option<&FwdPath> { self.path.as_ref() }
 
 	/// The scene the document is.
 	pub fn body(&self) -> &SceneBody { &self.document.body }
@@ -144,14 +144,14 @@ impl DocumentSource {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct SourcePosition {
 	/// The document's path in its package.
-	pub path: Option<RelPath>,
+	pub path: Option<FwdPath>,
 	/// The line and column, [`LineCol`]'s column counting from zero.
 	pub line_col: Option<LineCol>,
 }
 
 impl SourcePosition {
 	/// The place `offset` bytes into `source`, the document at `path`.
-	pub fn new(path: Option<&RelPath>, source: &[u8], offset: u32) -> Self {
+	pub fn new(path: Option<&FwdPath>, source: &[u8], offset: u32) -> Self {
 		let before = &source[..(offset as usize).min(source.len())];
 		let line = before.iter().filter(|byte| **byte == b'\n').count() + 1;
 		let start = before
@@ -170,7 +170,7 @@ impl SourcePosition {
 	}
 
 	/// The document at `path`, nowhere in particular.
-	pub fn document(path: RelPath) -> Self {
+	pub fn document(path: FwdPath) -> Self {
 		Self {
 			path: Some(path),
 			line_col: None,
@@ -200,7 +200,7 @@ mod test {
 	fn a_position_counts_from_one() {
 		let show = |offset: u32| {
 			SourcePosition::new(
-				Some(&RelPath::new("a.md")),
+				Some(&fwd_path!("a.md")),
 				"één\nb\u{1F331}c".as_bytes(),
 				offset,
 			)
@@ -213,7 +213,7 @@ mod test {
 		show(11).xpect_eq("a.md:2:3");
 		// past the end is the end
 		show(99).xpect_eq("a.md:2:4");
-		SourcePosition::document(RelPath::new("a.md"))
+		SourcePosition::document(fwd_path!("a.md"))
 			.to_string()
 			.xpect_eq("a.md");
 	}

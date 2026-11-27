@@ -157,7 +157,7 @@ mod test {
 		parts.headers_mut().set::<header::Accept>(vec![accept]);
 		world
 			.resource_mut::<RequestContextStack>()
-			.push(RequestContext::new(parts, route, route, route));
+			.push(RequestContext::new(parts, route, route, route).unwrap());
 		world
 	}
 

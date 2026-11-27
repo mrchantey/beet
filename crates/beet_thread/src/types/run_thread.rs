@@ -157,7 +157,7 @@ mod test {
 	use beet_net::prelude::*;
 
 	/// The directory every scene keeps its thread records under.
-	const RECORDS: &str = "threads";
+	const RECORDS: FwdPath = fwd_path!("threads");
 
 	/// A persistent thread scene: pinned actor ids, one system seed and one
 	/// mock agent. One agent turn, no loop, so the run finishes.
@@ -274,7 +274,7 @@ mod test {
 	async fn stored_threads(store: &BlobStore) -> usize {
 		ThreadStore::new(
 			JsonTableStore::over(store.clone()).unwrap(),
-			RelPath::new(RECORDS),
+			FwdPath::new(RECORDS).unwrap(),
 		)
 		.unwrap()
 		.threads()

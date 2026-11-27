@@ -79,13 +79,13 @@ impl SourceBranch {
 	Deserialize,
 )]
 #[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
-pub struct Files(pub BTreeMap<RelPath, BlobRef>);
+pub struct Files(pub BTreeMap<FwdPath, BlobRef>);
 
 impl Files {
 	/// Every path that names `path` with its extension left off, ie
 	/// `layouts/Article.bsx` for `layouts/Article`: the file itself where it
 	/// exists, else every file of that stem.
-	pub fn completions(&self, path: &RelPath) -> Vec<RelPath> {
+	pub fn completions(&self, path: &FwdPath) -> Vec<FwdPath> {
 		if self.0.contains_key(path) {
 			return vec![path.clone()];
 		}

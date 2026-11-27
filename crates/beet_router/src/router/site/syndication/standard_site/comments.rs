@@ -66,7 +66,7 @@ impl StandardSiteReplyLink {
 		cx: &RequestContext,
 	) -> Option<StrongRef> {
 		standard_site
-			.document(&RelPath::new(cx.current_path()))
+			.document(cx.current_path())
 			.and_then(|document| document.bsky_post.clone())
 	}
 
@@ -269,7 +269,7 @@ mod test {
 		let origin = ORIGIN.get_or_init(|| {
 			let store = BlobStore::temp();
 			async_ext::block_on(store.insert(
-				&RelPath::from("recorded/xrpc/app.bsky.feed.getPostThread"),
+				&fwd_path!("recorded/xrpc/app.bsky.feed.getPostThread"),
 				include_str!("fixtures/post_thread.json"),
 			))
 			.unwrap();
@@ -319,7 +319,7 @@ mod test {
 		let mut world = syndication_world(Some("https://beet.org"));
 		store
 			.insert(
-				&RelPath::new("CommentsLayout.bsx"),
+				&fwd_path!("CommentsLayout.bsx"),
 				r#"<html><body><main><slot/></main>
 				<ServerIsland name="comments">
 					<StandardSiteComments/>
@@ -331,9 +331,9 @@ mod test {
 			.unwrap();
 		let root = spawn_syndication_router_with(
 			&mut world,
-			(store, Layout::document("CommentsLayout.bsx"), app_view),
+			(store, Layout::document(fwd_path!("CommentsLayout.bsx")), app_view),
 			rsx! {
-				<StandardSitePub path="blog" name="The Full Moon Harvest"/>
+				<StandardSitePub path={fwd_path!("blog")} name="The Full Moon Harvest"/>
 				<ServerIslands/>
 			},
 		);

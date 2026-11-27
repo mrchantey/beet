@@ -32,7 +32,7 @@ pub struct HttpStore {
 	base: Url,
 	/// Optional subdirectory prefix for all keys.
 	#[reflect(default)]
-	subdir: Option<RelPath>,
+	subdir: Option<FwdPath>,
 }
 
 impl HttpStore {
@@ -73,13 +73,13 @@ impl HttpStore {
 	}
 
 	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<FwdPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
 
 	/// The url `path` is fetched at: the base, the subdir, then the key.
-	fn url(&self, path: &RelPath) -> Url {
+	fn url(&self, path: &FwdPath) -> Url {
 		let root = match &self.subdir {
 			Some(subdir) => push_segments(self.base.clone(), subdir),
 			None => self.base.clone(),
@@ -99,7 +99,7 @@ impl HttpStore {
 
 /// `url` extended by every segment of `path`, so a key with a `/` lands as
 /// its own segments rather than one escaped one.
-fn push_segments(url: Url, path: &RelPath) -> Url {
+fn push_segments(url: Url, path: &FwdPath) -> Url {
 	path.segments()
 		.into_iter()
 		.fold(url, |url, segment| url.push(segment))
@@ -138,7 +138,7 @@ impl StoreBackend for HttpStore {
 impl BlobProvider for HttpStore {
 	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
+	fn with_subdir(&self, path: FwdPath) -> Box<dyn BlobProvider> {
 		Box::new(HttpStore {
 			base: self.base.clone(),
 			subdir: Some(match &self.subdir {
@@ -157,26 +157,26 @@ impl BlobProvider for HttpStore {
 
 	fn root_key(&self) -> SmolStr { format!("http:{}", self.base).into() }
 
-	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
+	fn subdir(&self) -> FwdPath { self.subdir.clone().unwrap_or_default() }
 
-	fn insert(&self, _path: &RelPath, _body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, _path: &FwdPath, _body: Bytes) -> SendBoxedFuture<Result> {
 		let err = self.read_only();
 		Box::pin(async move { Err(err) })
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
-		let url = self.url(&RelPath::default()).with_flag(Self::LIST_PARAM);
-		Box::pin(async move { fetch(url).await?.json::<Vec<RelPath>>().await })
+	fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
+		let url = self.url(&FwdPath::default()).with_flag(Self::LIST_PARAM);
+		Box::pin(async move { fetch(url).await?.json::<Vec<FwdPath>>().await })
 	}
 
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 		let url = self.url(path);
 		Box::pin(async move { fetch(url).await?.bytes().await })
 	}
 
 	/// A fetch whose status answers: a 404 is absence, any other failure is
 	/// the store's.
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 		let url = self.url(path);
 		Box::pin(async move {
 			let response = Request::head(url).send().await?;
@@ -188,7 +188,7 @@ impl BlobProvider for HttpStore {
 		})
 	}
 
-	fn remove(&self, _path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, _path: &FwdPath) -> SendBoxedFuture<Result> {
 		let err = self.read_only();
 		Box::pin(async move { Err(err) })
 	}
@@ -197,7 +197,7 @@ impl BlobProvider for HttpStore {
 	/// has no public url of its own, so a consumer streams the bytes instead.
 	fn public_url(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		let url = self.url(path);
 		Box::pin(async move {
@@ -218,19 +218,19 @@ mod test {
 			&StoreUri::parse("https://beet.org/package").unwrap(),
 		)
 		.unwrap()
-		.with_subdir("docs")
-		.url(&RelPath::new("a/b.md"))
+		.with_subdir(fwd_path!("docs"))
+		.url(&fwd_path!("a/b.md"))
 		.to_string()
 		.xpect_eq("https://beet.org/package/docs/a/b.md");
 		// an origin-relative mount is a rooted path, resolved by the transport
 		HttpStore::from_uri(&StoreUri::parse("http:package").unwrap())
 			.unwrap()
-			.url(&RelPath::new("main.bsx"))
+			.url(&fwd_path!("main.bsx"))
 			.to_string()
 			.xpect_eq("/package/main.bsx");
 		HttpStore::from_uri(&StoreUri::parse("http").unwrap())
 			.unwrap()
-			.url(&RelPath::new("main.bsx"))
+			.url(&fwd_path!("main.bsx"))
 			.to_string()
 			.xpect_eq("/main.bsx");
 	}
@@ -239,7 +239,7 @@ mod test {
 	#[beet_core::test]
 	async fn writes_are_refused() {
 		HttpStore::new("https://beet.org/package")
-			.insert(&RelPath::new("a.txt"), bytes::Bytes::from_static(b"hi"))
+			.insert(&fwd_path!("a.txt"), bytes::Bytes::from_static(b"hi"))
 			.await
 			.unwrap_err()
 			.to_string()

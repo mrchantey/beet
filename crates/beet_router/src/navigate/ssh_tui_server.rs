@@ -1036,14 +1036,14 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&"index.html".into(),
+				&fwd_path!("index.html"),
 				"<div><h3>Mind your step</h3></div>".to_string(),
 			)
 			.await
 			.unwrap();
 		store
 			.insert(
-				&"Layout.bsx".into(),
+				&fwd_path!("Layout.bsx"),
 				"<html><body><main><slot/></main></body></html>",
 			)
 			.await
@@ -1056,8 +1056,8 @@ mod test {
 				children![(
 					store,
 					Router,
-					Layout::document("Layout.bsx"),
-					children![route::new("", BlobPage::new("index.html"))]
+					Layout::document(fwd_path!("Layout.bsx")),
+					children![route::new("", BlobPage::new(fwd_path!("index.html")))]
 				)],
 			))
 			.flush();
@@ -1361,7 +1361,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&"counter.bsx".into(),
+				&fwd_path!("counter.bsx"),
 				r#"<article bx:scope="counter"><p>You have clicked {@doc:count=0} times.</p><button bx:onclick="target.with_field('count', count => count + 1)">More</button></article>"#
 					.to_string(),
 			)
@@ -1369,7 +1369,7 @@ mod test {
 			.unwrap();
 		store
 			.insert(
-				&"Layout.bsx".into(),
+				&fwd_path!("Layout.bsx"),
 				"<html><body><main><slot/></main></body></html>",
 			)
 			.await
@@ -1382,10 +1382,10 @@ mod test {
 				children![(
 					store,
 					Router,
-					Layout::document("Layout.bsx"),
+					Layout::document(fwd_path!("Layout.bsx")),
 					children![route::new(
 						"counter",
-						BlobPage::new("counter.bsx")
+						BlobPage::new(fwd_path!("counter.bsx"))
 					)]
 				)],
 			))

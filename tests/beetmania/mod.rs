@@ -22,7 +22,7 @@ pub async fn build_site(world: &mut World) -> Entity {
 	let store = BlobStore::new(FsStore::new(
 		AbsPath::new_workspace_rel("examples/beetmania").unwrap(),
 	));
-	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();
+	let entry = store.get_media(&fwd_path!("main.bsx")).await.unwrap();
 	let template = DocParsers::of(world).body(&entry).unwrap();
 	let root = world.spawn_empty().id();
 	world

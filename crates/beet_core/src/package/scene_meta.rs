@@ -74,7 +74,7 @@ pub struct SceneMetaContext<'a> {
 	/// meta components.
 	pub body: &'a SceneBody,
 	/// The document's path in its package.
-	pub document: &'a RelPath,
+	pub document: &'a FwdPath,
 	/// The skeleton entity carrying the component.
 	pub entity: Entity,
 	/// Its key in the body.
@@ -174,9 +174,9 @@ pub struct PackageMetaContext<'a> {
 	/// Every file of the branch.
 	pub files: &'a Files,
 	/// Every scene record in reach, by its document's path.
-	pub scenes: &'a BTreeMap<RelPath, EntityBodyRecord>,
+	pub scenes: &'a BTreeMap<FwdPath, EntityBodyRecord>,
 	/// The document whose scene carries the component.
-	pub document: &'a RelPath,
+	pub document: &'a FwdPath,
 	/// The package's meta entity, which becomes the package record.
 	pub meta: Entity,
 }

@@ -263,13 +263,13 @@ mod test {
 				.unwrap();
 		}
 		store
-			.get(&RelPath::new("a.txt"))
+			.get(&fwd_path!("a.txt"))
 			.await
 			.unwrap()
 			.to_vec()
 			.xpect_eq(b"hi".to_vec());
 		store
-			.exists(&RelPath::new("b.txt"))
+			.exists(&fwd_path!("b.txt"))
 			.await
 			.unwrap()
 			.xpect_false();

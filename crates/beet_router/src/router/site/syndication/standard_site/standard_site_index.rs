@@ -309,15 +309,15 @@ mod test {
 		let mut world = syndication_world(Some("https://beet.org"));
 		store
 			.insert(
-				&RelPath::new("HeadLayout.bsx"),
+				&fwd_path!("HeadLayout.bsx"),
 				"<html><RouteHead/><body><slot/></body></html>",
 			)
 			.await
 			.unwrap();
 		let root = spawn_syndication_router_with(
 			&mut world,
-			(store, Layout::document("HeadLayout.bsx")),
-			rsx! { <StandardSitePub path="blog" name="The Full Moon Harvest"/> },
+			(store, Layout::document(fwd_path!("HeadLayout.bsx"))),
+			rsx! { <StandardSitePub path={fwd_path!("blog")} name="The Full Moon Harvest"/> },
 		);
 		TemplatePending::settle_owned(&mut world).await;
 		(world, root)
@@ -418,7 +418,7 @@ mod test {
 			StandardSiteDocument::from_page(
 				&harvest(),
 				site.clone(),
-				&RelPath::new(format!("blog/{path}")),
+				&FwdPath::new(format!("blog/{path}")).unwrap(),
 				&post(title, "2025-07-11"),
 			)
 			.unwrap()

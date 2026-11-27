@@ -638,7 +638,7 @@ fi
 
 		// the two release scripts, the whole of the machine's knowledge about
 		// finding its binary. Neither names a version.
-		let fetch_script = self.fetch_script(stack, package_bucket);
+		let fetch_script = self.fetch_script(stack, package_bucket)?;
 		let run_script = self.run_script(stack, &exec_args);
 
 		// uses __PLACEHOLDER__ tokens for terraform refs that contain ${}
@@ -756,7 +756,7 @@ systemctl enable --now {app_name}.service
 		&self,
 		stack: &ResolvedStack,
 		package_bucket: &str,
-	) -> String {
+	) -> Result<String> {
 		Self::render_script(
 			r#"#!/bin/bash
 # Install the release the package bucket currently points at.
@@ -796,12 +796,13 @@ touch /etc/__APP__/deploy.env
 				("__BUCKET__", package_bucket),
 				(
 					"__POINTER__",
-					&ArtifactLedger::release_pointer_key(&self.label)
+					&ArtifactLedger::release_pointer_key(&self.label)?
 						.to_string(),
 				),
 				("__ARTIFACT_KEY_VAR__", ArtifactLedger::ARTIFACT_KEY_VAR),
 			],
 		)
+		.xok()
 	}
 
 	/// The unit's `ExecStart`, at `/usr/local/bin/<app>-run`: install the
@@ -1831,6 +1832,7 @@ mod tests {
 			.as_str()
 			.xpect_contains(
 				&ArtifactLedger::release_pointer_key("main-lightsail")
+					.unwrap()
 					.to_string(),
 			)
 			.xpect_contains(&format!(

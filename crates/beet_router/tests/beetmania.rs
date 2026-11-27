@@ -69,7 +69,7 @@ async fn site_store() -> BlobStore {
 			r#"<Fragment {DocMeta{title: "The Spread"}} {RouteMeta{order: 2}}><p>spread body</p></Fragment>"#,
 		),
 	] {
-		store.insert(&RelPath::from(path), content).await.unwrap();
+		store.insert(&FwdPath::new(path).unwrap(), content).await.unwrap();
 	}
 	store
 }
@@ -83,7 +83,7 @@ async fn spawn_site(world: &mut World) -> Entity {
 	// the same store-backed load the binary and Worker run: read the entry through
 	// the package store and build into a root carrying that store.
 	let store = site_store().await;
-	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();
+	let entry = store.get_media(&fwd_path!("main.bsx")).await.unwrap();
 	let template = BsxParser::body(world, entry.as_utf8().unwrap()).unwrap();
 	let root = world.spawn(store).id();
 	world.entity_mut(root).insert_template(template).unwrap();
@@ -400,20 +400,20 @@ async fn an_instance_carries_boot() {
 	let store = BlobStore::temp();
 	store
 		.insert(
-			&RelPath::from("serve.bsx"),
+			&fwd_path!("serve.bsx"),
 			"<CliServer {CallOnReady}><Router/></CliServer>",
 		)
 		.await
 		.unwrap();
 	store
 		.insert(
-			&RelPath::from("main.bsx"),
+			&fwd_path!("main.bsx"),
 			"<Instance document=\"serve.bsx\"/>",
 		)
 		.await
 		.unwrap();
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();
+	let entry = store.get_media(&fwd_path!("main.bsx")).await.unwrap();
 	let template = BsxParser::body(&world, entry.as_utf8().unwrap()).unwrap();
 	// the binary spawns the root with no load verb of its own (`build_root`'s
 	// empty `extra`), then builds the entry onto it; the server rides the markup.

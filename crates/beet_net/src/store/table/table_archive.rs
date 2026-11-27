@@ -24,7 +24,7 @@ use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// # async fn run(store: TableStore, bucket: BlobStore) -> Result<()> {
 /// let events = store.table::<TableItem<u32>>();
-/// let path = RelPath::new("archive/2026-09.db");
+/// let path = fwd_path!("archive/2026-09.db");
 /// TableArchive::new(&events, Scan::default().before("3m"))
 /// 	.run(&bucket, &path)
 /// 	.await?;
@@ -43,7 +43,7 @@ pub struct TableArchive {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TableArchiveReport {
 	/// Where the archive was written.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// The rows moved out of the table this run.
 	pub rows: usize,
 	/// The archive file's size, `0` when there was nothing to move.
@@ -70,7 +70,7 @@ impl TableArchive {
 	pub async fn run(
 		&self,
 		bucket: &BlobStore,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> Result<TableArchiveReport> {
 		let mut rows = self.scan_all(&self.store).await?;
 		let moved =
@@ -115,7 +115,7 @@ impl TableArchive {
 	/// [`store_remove`](StoreBackend::store_remove) frees it.
 	pub async fn open(
 		bucket: &BlobStore,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> Result<SqliteStore> {
 		let bytes = bucket.get(path).await?;
 		SqliteStore::from_bytes(
@@ -218,7 +218,7 @@ mod test {
 				.unwrap();
 		}
 		let cid = table.get_with_cid("a").await.unwrap().unwrap().1;
-		let path = RelPath::new("archive/named.db");
+		let path = fwd_path!("archive/named.db");
 		let report = TableArchive::new(&table, Scan::default().before("c"))
 			.run(&bucket, &path)
 			.await
@@ -264,7 +264,7 @@ mod test {
 		let store = TableStore::new(InMemoryTableStore::new());
 		let bucket = BlobStore::temp();
 		let table = rows(&store);
-		let path = RelPath::new("archive/named.db");
+		let path = fwd_path!("archive/named.db");
 		let archive = TableArchive::new(&table, Scan::default());
 		table.put(table_test::NamedRow::new("a", 1)).await.unwrap();
 		archive.run(&bucket, &path).await.unwrap();

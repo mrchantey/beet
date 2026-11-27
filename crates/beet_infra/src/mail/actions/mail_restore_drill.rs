@@ -284,7 +284,7 @@ async fn restore_onto(
 	}
 
 	let prefix = format!("{}/", StalwartBlock::BACKUP_PREFIX);
-	let local = mail.project.work_dir().join("mail-restore.db");
+	let local = mail.project.work_dir()?.join("mail-restore.db");
 	let key = match ask.source_snapshot {
 		SnapshotSource::Backups => {
 			let live = LiveStore {

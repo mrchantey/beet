@@ -29,7 +29,7 @@ pub enum ParseError {
 impl ParseError {
 	/// This as an error in `source`, the document at `path` of its package:
 	/// where a [`SourceError`] says it is, else the document alone.
-	pub fn locate(self, source: &[u8], path: Option<&RelPath>) -> Self {
+	pub fn locate(self, source: &[u8], path: Option<&FwdPath>) -> Self {
 		let Self::Other(error) = self else {
 			return self;
 		};

@@ -106,7 +106,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&RelPath::new("NotesThread.bsx"),
+				&fwd_path!("NotesThread.bsx"),
 				format!(
 					r#"
 <Thread {{(Sequence, MountThreadStore{{path:"threads"}})}}>
@@ -152,7 +152,7 @@ mod test {
 		review(&mut app, router).await.0.xpect_eq(StatusCode::OK);
 		let records = ThreadStore::new(
 			JsonTableStore::over(store).unwrap(),
-			RelPath::new("threads"),
+			fwd_path!("threads"),
 		)
 		.unwrap();
 		let thread = records.threads().await.unwrap()[0].id();

@@ -19,7 +19,7 @@ use std::sync::Arc;
 pub async fn BlobPage(
 	/// The store-relative path of the file this route serves.
 	#[field]
-	path: RelPath,
+	path: FwdPath,
 	cx: ActionContext<Request>,
 ) -> Result<PageRequest> {
 	// the route's blob, resolved from the nearest ancestor store; absent is an
@@ -40,7 +40,7 @@ pub async fn BlobPage(
 
 impl BlobPage {
 	/// Serve the store file at `path`.
-	pub fn new(path: impl Into<RelPath>) -> Self { Self { path: path.into() } }
+	pub fn new(path: impl Into<FwdPath>) -> Self { Self { path: path.into() } }
 
 	/// Parses `blob` into a fresh render root for the request `parts` to
 	/// `caller`, the route serving it.
@@ -115,7 +115,7 @@ impl BlobPage {
 				// layout, where it would have no request to read.
 				RequestContextStack::scoped(
 					world,
-					RequestContext::new(parts, content, route, router),
+					RequestContext::new(parts, content, route, router)?,
 					|world| -> Result<PageRequest> {
 						let mut entity = world.entity_mut(content);
 						template.build_document(&mut entity)?;

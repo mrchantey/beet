@@ -1090,7 +1090,7 @@ mod test {
 		let template = DynamicTemplate::reflect_at(
 			&world,
 			&body,
-			&RelPath::new("routes/blog/post.bsx"),
+			&fwd_path!("routes/blog/post.bsx"),
 		)
 		.unwrap();
 		let root = world.spawn_template(template).unwrap().id();

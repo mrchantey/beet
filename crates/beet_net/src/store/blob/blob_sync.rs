@@ -68,7 +68,7 @@ impl BlobSync {
 	async fn covered(
 		&self,
 		store: &BlobStore,
-	) -> Result<Vec<(RelPath, BlobStat)>> {
+	) -> Result<Vec<(FwdPath, BlobStat)>> {
 		store
 			.list_stats()
 			.await?
@@ -186,14 +186,14 @@ impl BlobSync {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct BlobSyncReport {
 	/// Objects sent to the destination, new or changed.
-	pub copied: Vec<RelPath>,
+	pub copied: Vec<FwdPath>,
 	/// Objects already matching at the destination, left alone.
-	pub unchanged: Vec<RelPath>,
+	pub unchanged: Vec<FwdPath>,
 	/// Objects removed from the destination, only under `delete`.
-	pub removed: Vec<RelPath>,
+	pub removed: Vec<FwdPath>,
 	/// Objects the destination holds and the source lacks, left in place by
 	/// an additive sync: a file never pushed, or a stale one a pull keeps.
-	pub kept: Vec<RelPath>,
+	pub kept: Vec<FwdPath>,
 	/// Total size of the copied objects.
 	pub copied_bytes: u64,
 	/// Total size of the unchanged objects.
@@ -247,15 +247,15 @@ mod test {
 		let store = BlobStore::temp();
 		for (path, body) in entries {
 			store
-				.insert(&RelPath::new(path), body.to_string())
+				.insert(&FwdPath::new(path).unwrap(), body.to_string())
 				.await
 				.unwrap();
 		}
 		store
 	}
 
-	fn paths(paths: &[&str]) -> Vec<RelPath> {
-		paths.iter().map(RelPath::new).collect()
+	fn paths(paths: &[&str]) -> Vec<FwdPath> {
+		paths.iter().map(|path| FwdPath::new(path).unwrap()).collect()
 	}
 
 	/// A filesystem destination not yet made is empty, so a dry run reports
@@ -289,17 +289,17 @@ mod test {
 		let sync = BlobSync::new(source.clone(), dest.clone());
 		let report = sync.run().await.unwrap();
 		report.copied.xpect_eq(paths(&["a.txt", "dir/b.txt"]));
-		report.unchanged.xpect_eq(Vec::<RelPath>::new());
+		report.unchanged.xpect_eq(Vec::<FwdPath>::new());
 		// one byte per seeded body, so the totals are the counts
 		report.copied_bytes.xpect_eq(2);
 		report.unchanged_bytes.xpect_eq(0);
-		dest.get(&RelPath::new("dir/b.txt"))
+		dest.get(&fwd_path!("dir/b.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(bytes::Bytes::from_static(b"b"));
 
 		let report = sync.run().await.unwrap();
-		report.copied.xpect_eq(Vec::<RelPath>::new());
+		report.copied.xpect_eq(Vec::<FwdPath>::new());
 		report.unchanged.xpect_eq(paths(&["a.txt", "dir/b.txt"]));
 		report.copied_bytes.xpect_eq(0);
 		report.unchanged_bytes.xpect_eq(2);
@@ -314,7 +314,7 @@ mod test {
 		let report = BlobSync::new(source, dest.clone()).run().await.unwrap();
 		report.copied.xpect_eq(paths(&["b.txt"]));
 		report.unchanged.xpect_eq(paths(&["a.txt"]));
-		dest.get(&RelPath::new("b.txt"))
+		dest.get(&fwd_path!("b.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(bytes::Bytes::from_static(b"two"));
@@ -329,19 +329,19 @@ mod test {
 		let dest = seeded(&[("keep.txt", "k"), ("stale.txt", "s")]).await;
 		let sync = BlobSync::new(source, dest.clone());
 		let report = sync.run().await.unwrap();
-		report.removed.xpect_eq(Vec::<RelPath>::new());
+		report.removed.xpect_eq(Vec::<FwdPath>::new());
 		report.kept.xpect_eq(paths(&["stale.txt"]));
 		report
 			.to_string()
 			.xpect_contains("kept 1 the source lacks");
-		dest.exists(&RelPath::new("stale.txt"))
+		dest.exists(&fwd_path!("stale.txt"))
 			.await
 			.unwrap()
 			.xpect_true();
 
 		let report = sync.clone().with_delete(true).run().await.unwrap();
 		report.removed.xpect_eq(paths(&["stale.txt"]));
-		report.kept.xpect_eq(Vec::<RelPath>::new());
+		report.kept.xpect_eq(Vec::<FwdPath>::new());
 		report.unchanged.xpect_eq(paths(&["keep.txt"]));
 		dest.list().await.unwrap().xpect_eq(paths(&["keep.txt"]));
 	}
@@ -464,8 +464,8 @@ mod test {
 			.await
 			.unwrap();
 		report.copied.xpect_eq(paths(&["records/a.json"]));
-		report.removed.xpect_eq(Vec::<RelPath>::new());
-		dest.exists(&RelPath::new("blobs/kept.png"))
+		report.removed.xpect_eq(Vec::<FwdPath>::new());
+		dest.exists(&fwd_path!("blobs/kept.png"))
 			.await
 			.unwrap()
 			.xpect_true();

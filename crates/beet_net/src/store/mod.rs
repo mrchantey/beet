@@ -52,8 +52,8 @@
 //! # use beet_core::prelude::*;
 //! # async fn run() -> Result<()> {
 //! let store = BlobStore::temp();
-//! store.insert(&RelPath::from("hello.txt"), "world").await?;
-//! let data = store.get(&RelPath::from("hello.txt")).await?;
+//! store.insert(&fwd_path!("hello.txt"), "world").await?;
+//! let data = store.get(&fwd_path!("hello.txt")).await?;
 //! # Ok(())
 //! # }
 //! ```

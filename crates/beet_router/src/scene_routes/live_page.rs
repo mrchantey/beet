@@ -128,7 +128,7 @@ impl LivePage {
 							trees.get_entity(route_id)
 						})
 						.unwrap_or(route_id);
-					let cx = RequestContext::new(parts, content, route_id, router);
+					let cx = RequestContext::new(parts, content, route_id, router)?;
 					(rendered, to_despawn, cx).xok()
 				},
 			)
@@ -776,7 +776,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&RelPath::new("BareLayout.bsx"),
+				&fwd_path!("BareLayout.bsx"),
 				"<header>Chrome</header><slot/>",
 			)
 			.await
@@ -792,7 +792,7 @@ mod test {
 			.spawn((store, Router, children![
 				(
 					PathPartial::new("bare"),
-					Layout::document("BareLayout.bsx"),
+					Layout::document(fwd_path!("BareLayout.bsx")),
 					children![route("post", || rsx! { <p>"page"</p> })]
 				),
 				route("mains", || {

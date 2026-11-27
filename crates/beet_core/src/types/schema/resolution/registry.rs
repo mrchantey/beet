@@ -34,9 +34,9 @@ pub struct SchemaRegistry {
 	/// A schema document's package absolute path, to the key its schema is stored under.
 	/// A pointer into `schemas` rather than a second copy, so the by-name and
 	/// by-location views of one schema can never disagree.
-	located: HashMap<RelPath, SmolStr>,
+	located: HashMap<FwdPath, SmolStr>,
 	/// A reference with its extension left off, to the document's path.
-	located_aliases: HashMap<RelPath, RelPath>,
+	located_aliases: HashMap<FwdPath, FwdPath>,
 }
 
 impl Default for SchemaRegistry {
@@ -115,7 +115,7 @@ impl SchemaRegistry {
 	/// it by either route is what the other route then reads.
 	pub fn insert_located(
 		&mut self,
-		path: impl Into<RelPath>,
+		path: impl Into<FwdPath>,
 		schema: ValueSchema,
 	) {
 		let path = self.full_path(&path.into()).clone();
@@ -128,7 +128,7 @@ impl SchemaRegistry {
 	}
 
 	/// The schema of the schema document at `path`, if it has arrived.
-	pub fn located(&self, path: &RelPath) -> Option<&ValueSchema> {
+	pub fn located(&self, path: &FwdPath) -> Option<&ValueSchema> {
 		self.located
 			.get(self.full_path(path))
 			.and_then(|key| self.schemas.get(key))
@@ -138,8 +138,8 @@ impl SchemaRegistry {
 	/// document at `path`.
 	pub fn alias_located(
 		&mut self,
-		alias: impl Into<RelPath>,
-		path: impl Into<RelPath>,
+		alias: impl Into<FwdPath>,
+		path: impl Into<FwdPath>,
 	) {
 		let (alias, path) = (alias.into(), path.into());
 		if alias != path {
@@ -148,7 +148,7 @@ impl SchemaRegistry {
 	}
 
 	/// The path `path` is [aliased](Self::alias_located) to, else itself.
-	fn full_path<'a>(&'a self, path: &'a RelPath) -> &'a RelPath {
+	fn full_path<'a>(&'a self, path: &'a FwdPath) -> &'a FwdPath {
 		self.located_aliases.get(path).unwrap_or(path)
 	}
 
@@ -466,10 +466,10 @@ mod test {
 	#[crate::test]
 	fn a_schema_document_is_keyed_by_its_name_or_its_path() {
 		let mut registry = SchemaRegistry::default();
-		registry.insert_located("schema/todo.json", todo_item());
+		registry.insert_located(fwd_path!("schema/todo.json"), todo_item());
 		registry.get("TodoItem").unwrap().xpect_eq(todo_item());
 
-		registry.insert_located("schema/count.json", ValueSchema::of::<i64>());
+		registry.insert_located(fwd_path!("schema/count.json"), ValueSchema::of::<i64>());
 		registry
 			.get("schema/count.json")
 			.unwrap()
@@ -481,7 +481,7 @@ mod test {
 	#[crate::test]
 	fn a_located_schema_is_stored_once() {
 		let mut registry = SchemaRegistry::default();
-		let path = RelPath::from("schema/todo.json");
+		let path = fwd_path!("schema/todo.json");
 		registry.insert_located(path.clone(), todo_item());
 		registry.insert("TodoItem", ValueSchema::of::<i64>());
 		registry

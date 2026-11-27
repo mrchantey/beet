@@ -32,7 +32,7 @@ use beet_core::prelude::*;
 /// `assets/` subdir.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
-pub struct DirPath(pub RelPath);
+pub struct DirPath(pub FwdPath);
 
 impl DirPath {
 	/// The `on_insert` hook body for a component declaring a `src` dir
@@ -40,7 +40,7 @@ impl DirPath {
 	/// component's store and [`WatchDir`] resolve like any other [`DirPath`].
 	///
 	/// `#[component(on_insert = hook_ext::component_hook(|dir: &RoutesDir| DirPath::derive(&dir.src)))]`
-	pub fn derive(src: &RelPath) -> impl FnOnce(&mut EntityCommands) + use<> {
+	pub fn derive(src: &FwdPath) -> impl FnOnce(&mut EntityCommands) + use<> {
 		let src = src.clone();
 		move |entity| {
 			entity.insert(DirPath(src));
@@ -55,7 +55,7 @@ impl DirPath {
 /// external edit alike.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
-pub struct BlobPath(pub RelPath);
+pub struct BlobPath(pub FwdPath);
 
 impl BlobPath {
 	/// The `on_insert` hook body for a component declaring a file `path`
@@ -63,7 +63,7 @@ impl BlobPath {
 	/// so the component reads through a [`Blob`] like any other [`BlobPath`].
 	///
 	/// `#[component(on_insert = hook_ext::component_hook(|doc: &DocumentBlob| BlobPath::derive(&doc.path)))]`
-	pub fn derive(path: &RelPath) -> impl FnOnce(&mut EntityCommands) + use<> {
+	pub fn derive(path: &FwdPath) -> impl FnOnce(&mut EntityCommands) + use<> {
 		let path = path.clone();
 		move |entity| {
 			entity.insert(BlobPath(path));
@@ -327,12 +327,12 @@ mod test {
 		let store = BlobStore::temp();
 		let root = app
 			.world_mut()
-			.spawn((store.clone(), children![DirPath(RelPath::from("assets"))]))
+			.spawn((store.clone(), children![DirPath(fwd_path!("assets"))]))
 			.id();
 		app.update();
 		let child = child_of(app.world(), root);
 		let scoped = app.world().entity(child).get::<BlobStore>().unwrap();
-		scoped.subdir().xpect_eq(RelPath::from("assets"));
+		scoped.subdir().xpect_eq(fwd_path!("assets"));
 		// same backing store, just scoped
 		scoped.root_key().xpect_eq(store.root_key());
 	}
@@ -343,9 +343,7 @@ mod test {
 		let mut app = store_app();
 		let root = app
 			.world_mut()
-			.spawn((BlobStore::temp(), children![BlobPath(RelPath::from(
-				"notes.md"
-			))]))
+			.spawn((BlobStore::temp(), children![BlobPath(fwd_path!("notes.md"))]))
 			.id();
 		app.update();
 		let child = child_of(app.world(), root);
@@ -360,7 +358,7 @@ mod test {
 		let mut app = store_app();
 		let root = app
 			.world_mut()
-			.spawn(children![DirPath(RelPath::from("assets"))])
+			.spawn(children![DirPath(fwd_path!("assets"))])
 			.id();
 		app.update();
 		let child = child_of(app.world(), root);
@@ -374,7 +372,7 @@ mod test {
 			.get::<BlobStore>()
 			.unwrap()
 			.subdir()
-			.xpect_eq(RelPath::from("assets"));
+			.xpect_eq(fwd_path!("assets"));
 	}
 
 	/// A [`BlobPath`] beside its store resolves from that store, whether the
@@ -384,9 +382,9 @@ mod test {
 		let mut app = store_app();
 		let with = app
 			.world_mut()
-			.spawn((BlobStore::temp(), BlobPath(RelPath::from("a.md"))))
+			.spawn((BlobStore::temp(), BlobPath(fwd_path!("a.md"))))
 			.id();
-		let later = app.world_mut().spawn(BlobPath(RelPath::from("b.md"))).id();
+		let later = app.world_mut().spawn(BlobPath(fwd_path!("b.md"))).id();
 		app.update();
 		app.world().entity(with).get::<Blob>().xpect_some();
 		app.world().entity(later).get::<Blob>().xpect_none();
@@ -405,7 +403,7 @@ mod test {
 		let mut app = store_app();
 		let child = app
 			.world_mut()
-			.spawn(BlobPath(RelPath::from("notes.md")))
+			.spawn(BlobPath(fwd_path!("notes.md")))
 			.id();
 		app.update();
 		app.world().entity(child).get::<Blob>().xpect_none();
@@ -430,8 +428,8 @@ mod test {
 		let root = app
 			.world_mut()
 			.spawn((BlobStore::temp(), children![(
-				DirPath(RelPath::from("a")),
-				children![DirPath(RelPath::from("b"))]
+				DirPath(fwd_path!("a")),
+				children![DirPath(fwd_path!("b"))]
 			)]))
 			.id();
 		app.update();
@@ -442,7 +440,7 @@ mod test {
 			.get::<BlobStore>()
 			.unwrap()
 			.subdir()
-			.xpect_eq(RelPath::from("a/b"));
+			.xpect_eq(fwd_path!("a/b"));
 	}
 
 	/// Removing the backing store drops the scoped store a [`DirPath`] produced.
@@ -451,9 +449,7 @@ mod test {
 		let mut app = store_app();
 		let root = app
 			.world_mut()
-			.spawn((BlobStore::temp(), children![DirPath(RelPath::from(
-				"assets"
-			))]))
+			.spawn((BlobStore::temp(), children![DirPath(fwd_path!("assets"))]))
 			.id();
 		app.update();
 		let child = child_of(app.world(), root);
@@ -469,9 +465,7 @@ mod test {
 		let mut app = store_app();
 		let root = app
 			.world_mut()
-			.spawn((BlobStore::temp(), children![DirPath(RelPath::from(
-				"assets"
-			))]))
+			.spawn((BlobStore::temp(), children![DirPath(fwd_path!("assets"))]))
 			.id();
 		app.update();
 		app.world_mut().entity_mut(root).despawn();

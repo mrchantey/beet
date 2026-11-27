@@ -191,14 +191,14 @@ mod stalled_store_test {
 	impl BlobProvider for StalledStore {
 		fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 		/// Every path stalls, so a subdir view is the same store.
-		fn with_subdir(&self, _path: RelPath) -> Box<dyn BlobProvider> {
+		fn with_subdir(&self, _path: FwdPath) -> Box<dyn BlobProvider> {
 			Box::new(self.clone())
 		}
 		fn base(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 		fn root_key(&self) -> SmolStr { "stalled".into() }
 		fn insert(
 			&self,
-			_path: &RelPath,
+			_path: &FwdPath,
 			_body: Bytes,
 		) -> SendBoxedFuture<Result> {
 			self.started.fetch_add(1, Ordering::SeqCst);
@@ -211,7 +211,7 @@ mod stalled_store_test {
 
 		fn get_versioned(
 			&self,
-			_path: &RelPath,
+			_path: &FwdPath,
 		) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 			Box::pin(async { None.xok() })
 		}
@@ -219,7 +219,7 @@ mod stalled_store_test {
 		/// An event's row is a conditional write, which parks.
 		fn insert_if(
 			&self,
-			_path: &RelPath,
+			_path: &FwdPath,
 			_body: Bytes,
 			_condition: BlobCondition,
 		) -> SendBoxedFuture<Result<BlobVersion>> {
@@ -229,22 +229,22 @@ mod stalled_store_test {
 				bevybail!("stalled")
 			})
 		}
-		fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+		fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 			Box::pin(async { Vec::new().xok() })
 		}
-		fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+		fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 			let path = path.clone();
 			Box::pin(async move { bevybail!("no row at {path}") })
 		}
-		fn exists(&self, _path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+		fn exists(&self, _path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 			Box::pin(async { false.xok() })
 		}
-		fn remove(&self, _path: &RelPath) -> SendBoxedFuture<Result> {
+		fn remove(&self, _path: &FwdPath) -> SendBoxedFuture<Result> {
 			Box::pin(async { Ok(()) })
 		}
 		fn public_url(
 			&self,
-			_path: &RelPath,
+			_path: &FwdPath,
 		) -> SendBoxedFuture<Result<Option<String>>> {
 			Box::pin(async { None.xok() })
 		}

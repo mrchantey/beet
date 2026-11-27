@@ -153,7 +153,7 @@ pub struct Diagnostic {
 	/// Where the entity it is of was written, `routes/index.md:3:5`.
 	pub position: Option<SourcePosition>,
 	/// The route path this was found on, set by the per-route drivers.
-	pub route: Option<RelPath>,
+	pub route: Option<FwdPath>,
 }
 
 impl Diagnostic {
@@ -196,7 +196,7 @@ impl Diagnostic {
 	}
 
 	/// Tag this diagnostic with the route it was found on.
-	pub fn with_route(mut self, route: RelPath) -> Self {
+	pub fn with_route(mut self, route: FwdPath) -> Self {
 		self.route = Some(route);
 		self
 	}

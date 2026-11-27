@@ -63,7 +63,7 @@ impl TuiHost {
 		))
 		.insert_resource(pkg_config!());
 
-		let entry = store.get_media(&RelPath::from(entry)).await.unwrap();
+		let entry = store.get_media(&FwdPath::from(entry)).await.unwrap();
 		// the entry is built to be *driven*, not to boot: its `<CallOnReady>`
 		// would start the real stdio `TuiServer` inside the test process, giving
 		// the one `FixedPage` tree a second surface. That is not merely noisy —
@@ -316,7 +316,7 @@ impl TuiHost {
 		self.store
 			.get_document(
 				SchemaResolver::default().with_schemas(&registry),
-				&RelPath::from(path),
+				&FwdPath::from(path),
 			)
 			.await
 			.unwrap()

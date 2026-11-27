@@ -157,7 +157,7 @@ pub struct LocalBackend {
 impl Default for LocalBackend {
 	fn default() -> Self {
 		Self {
-			path: WsPath::new(".beet/infra").into(),
+			path: WsPath::from(fwd_path!(".beet/infra")).into(),
 		}
 	}
 }

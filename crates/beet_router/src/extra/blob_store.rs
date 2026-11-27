@@ -10,7 +10,7 @@ use beet_net::prelude::*;
 /// - extensionless path → serve `<path>/index.html` as HTML
 pub(crate) async fn serve_blob(
 	store: &BlobStore,
-	path: &RelPath,
+	path: &FwdPath,
 ) -> Result<Response> {
 	if path.extension().is_some() {
 		if let Some(url) = store.public_url(path).await? {
@@ -23,7 +23,7 @@ pub(crate) async fn serve_blob(
 		}
 	} else {
 		store
-			.get_media(&path.join("index.html"))
+			.get_media(&path.join(&fwd_path!("index.html")))
 			.await
 			.map(|media| Response::ok().with_media(media))
 	}
@@ -39,10 +39,10 @@ mod test {
 	async fn serve_blob_streams_file() {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("style.css"), "body { color: red; }")
+			.insert(&fwd_path!("style.css"), "body { color: red; }")
 			.await
 			.unwrap();
-		super::serve_blob(&store, &RelPath::from("style.css"))
+		super::serve_blob(&store, &fwd_path!("style.css"))
 			.await
 			.unwrap()
 			.text()
@@ -55,10 +55,10 @@ mod test {
 	async fn serve_blob_appends_index_html() {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("docs/index.html"), "<h1>Hello</h1>")
+			.insert(&fwd_path!("docs/index.html"), "<h1>Hello</h1>")
 			.await
 			.unwrap();
-		super::serve_blob(&store, &RelPath::from("docs"))
+		super::serve_blob(&store, &fwd_path!("docs"))
 			.await
 			.unwrap()
 			.text()

@@ -149,7 +149,7 @@ pub async fn TofuApply(
 			let artifact_path = AbsPath::new(artifact.artifact_path())?;
 			let bytes = fs_ext::read_async(artifact_path).await?;
 			let source_hash = artifact.compute_source_hash()?;
-			let artifact_key = client.ledger().artifact_key(label);
+			let artifact_key = client.ledger().artifact_key(label)?;
 
 			client
 				.upload_artifact(label, bytes, ArtifactEntry {

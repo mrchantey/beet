@@ -59,7 +59,7 @@ impl Secrets {
 	/// The label an undeclared or lone document answers to.
 	pub const DEFAULT_LABEL: &'static str = "secrets";
 	/// The file a document lives in by convention, beside an entry.
-	pub const DEFAULT_PATH: &'static str = "secrets.toml";
+	pub const DEFAULT_PATH: FwdPath = fwd_path!("secrets.toml");
 
 	/// The document at `path`, labelled by default.
 	pub fn new(path: impl AsRef<str>) -> Self {

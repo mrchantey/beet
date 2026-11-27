@@ -50,8 +50,11 @@ impl AnalyticsRollupRun {
 	}
 
 	/// Where a day's archive lives in the archive bucket.
-	pub fn archive_path(date: Date) -> RelPath {
-		RelPath::new(format!("analytics/events/{date}.db"))
+	///
+	/// # Errors
+	/// Errors when the date renders as no file name.
+	pub fn archive_path(date: Date) -> Result<FwdPath> {
+		fwd_path!("analytics/events").try_join(format!("{date}.db"))
 	}
 
 	/// Roll up, then archive, reporting the verified work.
@@ -149,7 +152,7 @@ impl AnalyticsRollupRun {
 		cfg_if! {
 			if #[cfg(feature = "sqlite")] {
 				let cold =
-					TableArchive::open(archive, &Self::archive_path(date))
+					TableArchive::open(archive, &Self::archive_path(date)?)
 						.await?;
 				let mut all = events;
 				all.extend(
@@ -201,7 +204,7 @@ impl AnalyticsRollupRun {
 		let rolled = self.store.last_rolled_day().await?;
 		let mut date = first;
 		while date < cutoff && rolled.is_some_and(|rolled| date <= rolled) {
-			let path = Self::archive_path(date);
+			let path = Self::archive_path(date)?;
 			let moved = TableArchive::new(
 				&self.store.events(),
 				AnalyticsEvent::day_scan(date),
@@ -404,7 +407,7 @@ mod test {
 				.unwrap();
 		let cold = Date::today().add_days(-40);
 		report.archived.xpect_eq(vec![SmolStr::from(
-			AnalyticsRollupRun::archive_path(cold).to_string(),
+			AnalyticsRollupRun::archive_path(cold).unwrap().to_string(),
 		)]);
 		report.retired.xpect_eq(1);
 		store.day(cold).await.unwrap().xpect_empty();
@@ -412,7 +415,7 @@ mod test {
 		Table::<AnalyticsEvent>::new(
 			TableArchive::open(
 				&archive,
-				&AnalyticsRollupRun::archive_path(cold),
+				&AnalyticsRollupRun::archive_path(cold).unwrap(),
 			)
 			.await
 			.unwrap(),

@@ -91,7 +91,7 @@ mod test {
 		let mut world = ScenePlugin::world();
 		let root = world.spawn_empty().id();
 		ParseContext::new(&mut world.entity_mut(root), &bytes)
-			.with_path(RelPath::new(path))
+			.with_path(FwdPath::new(path).unwrap())
 			.parse()
 			.unwrap();
 		let elements = world
@@ -299,7 +299,7 @@ mod test {
 	/// The message of the error `bytes`, the document at `path`, is.
 	fn refused(path: &str, bytes: MediaBytes) -> String {
 		ScenePlugin::parsers()
-			.read(&bytes, Some(&RelPath::new(path)))
+			.read(&bytes, Some(&FwdPath::new(path).unwrap()))
 			.unwrap_err()
 			.to_string()
 	}
@@ -389,7 +389,7 @@ mod test {
 		let source = DocParsers::of(&world)
 			.read(
 				&MediaBytes::new_bsx("<main>\n<p {Unknowable}/></main>"),
-				Some(&RelPath::new("a.bsx")),
+				Some(&fwd_path!("a.bsx")),
 			)
 			.unwrap();
 		let mut document = ParsedDocument::from(source.body().clone());
@@ -399,7 +399,7 @@ mod test {
 		DynamicTemplate::read(
 			&world,
 			Arc::new(DocumentSource::new(
-				Some(RelPath::new("a.bsx")),
+				Some(fwd_path!("a.bsx")),
 				source.bytes().clone(),
 				document,
 			)),

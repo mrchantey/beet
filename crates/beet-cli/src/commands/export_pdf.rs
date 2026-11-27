@@ -202,12 +202,12 @@ pub async fn ExportPdf(
 /// with its printed PDF. Reusing the session (navigating between routes) avoids a
 /// browser process per page.
 async fn export_pages(
-	paths: &[RelPath],
+	paths: &[FwdPath],
 	base: &str,
 	query: &str,
 	viewport: (u32, u32),
 	options: &PdfOptions,
-) -> Result<Vec<(RelPath, Vec<u8>)>> {
+) -> Result<Vec<(FwdPath, Vec<u8>)>> {
 	let mut page = Browser::new().await?;
 	page.set_viewport(viewport.0, viewport.1).await?;
 
@@ -224,7 +224,7 @@ async fn export_pages(
 /// Writes one PDF per route under `dir` as `<route>.pdf` (the home route as
 /// `index.pdf`), returning the count.
 async fn write_separate(
-	pages: Vec<(RelPath, Vec<u8>)>,
+	pages: Vec<(FwdPath, Vec<u8>)>,
 	dir: &AbsPath,
 ) -> Result<usize> {
 	let count = pages.len();
@@ -241,7 +241,7 @@ async fn write_separate(
 /// Merges the per-route PDFs into one document at `output`, in route order.
 #[cfg(feature = "pdf")]
 async fn write_concat(
-	pages: Vec<(RelPath, Vec<u8>)>,
+	pages: Vec<(FwdPath, Vec<u8>)>,
 	output: &AbsPath,
 ) -> Result<usize> {
 	let count = pages.len();
@@ -255,7 +255,7 @@ async fn write_concat(
 /// with guidance toward `--separate` or a `pdf`-enabled build.
 #[cfg(not(feature = "pdf"))]
 async fn write_concat(
-	_pages: Vec<(RelPath, Vec<u8>)>,
+	_pages: Vec<(FwdPath, Vec<u8>)>,
 	_output: &AbsPath,
 ) -> Result<usize> {
 	bevybail!(

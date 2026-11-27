@@ -43,7 +43,7 @@ pub struct CodegenFile {
 impl Default for CodegenFile {
 	fn default() -> Self {
 		Self {
-			output: WsPath::new("src/codegen/mod.rs").into_abs(),
+			output: WsPath::from(fwd_path!("src/codegen/mod.rs")).into_abs(),
 			pkg_name: None,
 			imports: default(),
 			items: default(),

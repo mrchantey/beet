@@ -201,7 +201,7 @@ async fn build_worker_world(
 /// request rebuilds (a safe, if slower, fallback).
 async fn head_version(store: &R2WorkersStore, path: &str) -> Option<String> {
 	store
-		.head_version(&RelPath::from(path))
+		.head_version(&FwdPath::from(path))
 		.await
 		.ok()
 		.flatten()

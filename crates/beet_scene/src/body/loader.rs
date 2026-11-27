@@ -23,7 +23,7 @@ pub struct TemplateLoader<'a> {
 	/// If set, spawned roots are parented under this entity.
 	entity: Option<Entity>,
 	/// The package path the document was read from, if it has one.
-	path: Option<RelPath>,
+	path: Option<FwdPath>,
 }
 
 impl<'a> TemplateLoader<'a> {
@@ -51,7 +51,7 @@ impl<'a> TemplateLoader<'a> {
 
 	/// Loads as the document at `path` of its package, so a [`DocPath`] it
 	/// holds resolves from there.
-	pub fn with_path(mut self, path: RelPath) -> Self {
+	pub fn with_path(mut self, path: FwdPath) -> Self {
 		self.path = Some(path);
 		self
 	}

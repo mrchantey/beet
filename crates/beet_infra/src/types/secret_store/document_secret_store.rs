@@ -13,24 +13,20 @@ use beet_net::prelude::*;
 #[reflect(Component, Default)]
 pub struct DocumentSecrets {
 	/// The document within its store, its format named by its extension.
-	pub path: RelPath,
+	pub path: FwdPath,
 }
 
 impl Default for DocumentSecrets {
 	fn default() -> Self {
 		Self {
-			path: RelPath::new(Secrets::DEFAULT_PATH),
+			path: Secrets::DEFAULT_PATH,
 		}
 	}
 }
 
 impl DocumentSecrets {
 	/// The declaration for the document at `path`.
-	pub fn new(path: impl AsRef<str>) -> Self {
-		Self {
-			path: RelPath::new(path),
-		}
-	}
+	pub fn new(path: impl Into<FwdPath>) -> Self { Self { path: path.into() } }
 }
 
 /// A [`SecretStore`] over one secrets document: every secret a record in
@@ -623,7 +619,7 @@ mod test {
 		let mut world = infra_world();
 		let root = stack_root(
 			&mut world,
-			DocumentSecrets::new("infra/secrets/app--prod.toml"),
+			DocumentSecrets::new(fwd_path!("infra/secrets/app--prod.toml")),
 		);
 		let consumer = world.spawn(ChildOf(root)).id();
 		world.flush();

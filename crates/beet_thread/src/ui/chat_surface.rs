@@ -507,7 +507,7 @@ mod test {
 			(
 				Thread::default(),
 				TableStore::new(InMemoryTableStore::new()),
-				MountThreadStore::new("group_chat"),
+				MountThreadStore::new(fwd_path!("group_chat")),
 				children![Actor::user()],
 			),
 		)
@@ -558,7 +558,7 @@ mod test {
 		count: usize,
 		load: usize,
 	) -> (App, Entity, Entity, std::time::Duration) {
-		let mut mount = MountThreadStore::new("threads");
+		let mut mount = MountThreadStore::new(fwd_path!("threads"));
 		mount.load = load;
 		let (mut app, surface, window) = serve_thread(
 			UVec2::new(48, 16),
@@ -582,7 +582,7 @@ mod test {
 				)
 			})
 			.collect();
-		ThreadStore::new(table, RelPath::new("threads"))
+		ThreadStore::new(table, fwd_path!("threads"))
 			.unwrap()
 			.store_thread(&stored, vec![Actor::user()], posts)
 			.await

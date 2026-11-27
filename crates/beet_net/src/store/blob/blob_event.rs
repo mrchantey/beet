@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 pub struct BlobEvent {
 	/// Path of the object relative to [`store`](Self::store), ie usable as
 	/// `store.get(&path)`.
-	pub path: RelPath,
+	pub path: FwdPath,
 	/// Handle to the originating store, so a subscriber can fetch bytes and so
 	/// routing can read its [`root_key`](BlobProvider::root_key) /
 	/// [`subdir`](BlobProvider::subdir).
@@ -34,14 +34,14 @@ pub enum BlobEventKind {
 
 impl BlobEvent {
 	/// Create a new [`BlobEvent`].
-	pub fn new(store: BlobStore, path: RelPath, kind: BlobEventKind) -> Self {
+	pub fn new(store: BlobStore, path: FwdPath, kind: BlobEventKind) -> Self {
 		Self { path, store, kind }
 	}
 
 	/// The event's location relative to its `root_key`, ie
 	/// `store.subdir().join(&path)`. This is the routing key compared against a
 	/// store's [`subdir`](BlobProvider::subdir).
-	pub fn root_relative_path(&self) -> RelPath {
+	pub fn root_relative_path(&self) -> FwdPath {
 		self.store.subdir().join(&self.path)
 	}
 }
@@ -49,7 +49,7 @@ impl BlobEvent {
 /// Separator-aware prefix test: `true` if `key` is `scope` or a child of it.
 ///
 /// An empty `scope` covers all keys. `a/b` never matches `a/bc`.
-pub(crate) fn key_covers(scope: &RelPath, key: &RelPath) -> bool {
+pub(crate) fn key_covers(scope: &FwdPath, key: &FwdPath) -> bool {
 	scope.is_empty()
 		|| key.as_str() == scope.as_str()
 		|| key
@@ -146,15 +146,15 @@ mod test {
 	#[beet_core::test]
 	fn key_covers_is_separator_aware() {
 		// empty scope covers all
-		key_covers(&RelPath::default(), &RelPath::new("a/b")).xpect_true();
+		key_covers(&FwdPath::default(), &fwd_path!("a/b")).xpect_true();
 		// exact match
-		key_covers(&RelPath::new("a/b"), &RelPath::new("a/b")).xpect_true();
+		key_covers(&fwd_path!("a/b"), &fwd_path!("a/b")).xpect_true();
 		// child
-		key_covers(&RelPath::new("a"), &RelPath::new("a/b")).xpect_true();
+		key_covers(&fwd_path!("a"), &fwd_path!("a/b")).xpect_true();
 		// sibling-prefix is not a cover
-		key_covers(&RelPath::new("a/b"), &RelPath::new("a/bc")).xpect_false();
+		key_covers(&fwd_path!("a/b"), &fwd_path!("a/bc")).xpect_false();
 		// unrelated
-		key_covers(&RelPath::new("a"), &RelPath::new("b")).xpect_false();
+		key_covers(&fwd_path!("a"), &fwd_path!("b")).xpect_false();
 	}
 
 	/// `did_change` / `matches_event` truth table across distinct instances,
@@ -163,10 +163,10 @@ mod test {
 	fn routing_truth_table() {
 		let base = BlobStore::temp();
 		let other = BlobStore::temp();
-		let sub = base.with_subdir(RelPath::new("dir"));
+		let sub = base.with_subdir(fwd_path!("dir"));
 		let ev = BlobEvent::new(
 			base.clone(),
-			RelPath::new("dir/x.txt"),
+			fwd_path!("dir/x.txt"),
 			BlobEventKind::Created,
 		);
 
@@ -175,17 +175,17 @@ mod test {
 		// the matching subdir store covers it
 		sub.did_change(&ev).xpect_true();
 		// a non-covering sibling subdir does not
-		base.with_subdir(RelPath::new("other"))
+		base.with_subdir(fwd_path!("other"))
 			.did_change(&ev)
 			.xpect_false();
 		// a different backing instance never matches
 		other.did_change(&ev).xpect_false();
 
 		// blob object-exact match
-		base.blob(RelPath::new("dir/x.txt"))
+		base.blob(fwd_path!("dir/x.txt"))
 			.matches_event(&ev)
 			.xpect_true();
-		base.blob(RelPath::new("dir/y.txt"))
+		base.blob(fwd_path!("dir/y.txt"))
 			.matches_event(&ev)
 			.xpect_false();
 	}
@@ -227,7 +227,7 @@ mod test {
 		// insert through the store (immediate + synchronous emit), then the next
 		// update drains the bus and propagates
 		async_ext::block_on(
-			BlobStore::new(store).insert(&RelPath::new("a.txt"), "a"),
+			BlobStore::new(store).insert(&fwd_path!("a.txt"), "a"),
 		)
 		.unwrap();
 		app.update();
@@ -253,9 +253,9 @@ mod test {
 		app.update();
 
 		let handle = BlobStore::new(store);
-		handle.insert(&RelPath::new("a.txt"), "a").await.unwrap();
+		handle.insert(&fwd_path!("a.txt"), "a").await.unwrap();
 		app.update();
-		handle.remove(&RelPath::new("a.txt")).await.unwrap();
+		handle.remove(&fwd_path!("a.txt")).await.unwrap();
 		app.update();
 
 		kinds

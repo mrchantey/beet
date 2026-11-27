@@ -90,7 +90,7 @@ impl ClientOrigin {
 }
 
 /// The default path of the country database, relative to the package store root.
-const COUNTRY_DB_PATH: &str = "assets/databases/country.mmdb";
+const COUNTRY_DB_PATH: FwdPath = fwd_path!("assets/databases/country.mmdb");
 
 /// Declares the country database an analytics surface looks its visitors up in:
 /// `<GeoIpDb/>`, spread on the router beside its [`AnalyticsConfig`].
@@ -106,13 +106,13 @@ const COUNTRY_DB_PATH: &str = "assets/databases/country.mmdb";
 #[reflect(Component, Default)]
 pub struct GeoIpDb {
 	/// The database path, relative to the nearest ancestor [`BlobStore`] root.
-	pub src: RelPath,
+	pub src: FwdPath,
 }
 
 impl Default for GeoIpDb {
 	fn default() -> Self {
 		Self {
-			src: RelPath::new(COUNTRY_DB_PATH),
+			src: COUNTRY_DB_PATH,
 		}
 	}
 }
@@ -174,7 +174,7 @@ impl GeoIp {
 	/// A declared-but-missing blob is a `warn!` yielding an empty [`GeoIp`] whose
 	/// lookups return `None`; a blob that is present but unparseable is an error,
 	/// since a corrupt database is a shipping mistake rather than a degraded mode.
-	pub async fn load(assets: &BlobStore, path: &RelPath) -> Result<Self> {
+	pub async fn load(assets: &BlobStore, path: &FwdPath) -> Result<Self> {
 		cfg_if! {
 			if #[cfg(feature = "geoip")] {
 				let Ok(bytes) = assets.get(path).await else {
@@ -346,7 +346,7 @@ mod test {
 	#[beet_core::test]
 	async fn missing_db_yields_empty_lookups() {
 		let assets = BlobStore::temp();
-		GeoIp::load(&assets, &RelPath::new(COUNTRY_DB_PATH))
+		GeoIp::load(&assets, &COUNTRY_DB_PATH)
 			.await
 			.unwrap()
 			.country_str("8.8.8.8")
@@ -359,7 +359,7 @@ mod test {
 	#[beet_core::test]
 	async fn corrupt_db_is_loud() {
 		let assets = BlobStore::temp();
-		let path = RelPath::new(COUNTRY_DB_PATH);
+		let path = COUNTRY_DB_PATH;
 		assets.insert(&path, "not an mmdb").await.unwrap();
 		GeoIp::load(&assets, &path)
 			.await
@@ -378,7 +378,7 @@ mod test {
 		let assets = BlobStore::new(FsStore::new(
 			AbsPath::new_workspace_rel(".").unwrap(),
 		));
-		let path = RelPath::new(COUNTRY_DB_PATH);
+		let path = COUNTRY_DB_PATH;
 		if !assets.exists(&path).await.unwrap() {
 			warn!(
 				"skipping: no {path} in this checkout, run `just site-shared pull` to hydrate it"

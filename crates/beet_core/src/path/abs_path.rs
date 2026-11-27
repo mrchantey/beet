@@ -62,8 +62,8 @@ impl AbsPath {
 
 	/// This path relative to `base`, [`None`] when `base` is neither this path
 	/// nor an ancestor of it.
-	pub fn strip_prefix(&self, base: &Self) -> Option<RelPath> {
-		self.0.strip_prefix(&base.0).map(RelPath::new)
+	pub fn strip_prefix(&self, base: &Self) -> Option<FwdPath> {
+		self.0.strip_prefix(&base.0).map(FwdPath::new_unchecked)
 	}
 
 	/// Borrow the inner [`SmolPath`].
@@ -165,10 +165,19 @@ mod std_ext {
 		/// Converts this absolute path to a workspace-relative path.
 		pub fn into_ws_path(&self) -> FsResult<WsPath> {
 			self.strip_prefix(&Self::workspace_root())
-				.map(WsPath::new)
+				.map(WsPath::from)
 				.ok_or_else(|| FsError::ExpectedWorkspaceRelative {
 					path: self.to_path_buf(),
 				})
+		}
+
+		/// A source file as the compiler names it, see [`FileSpan::path`]:
+		/// an absolute one as is, a relative one below the workspace root.
+		pub fn of_source_file(path: &SmolPath) -> Self {
+			match path.is_absolute() {
+				true => Self::new_unchecked(path.as_str()),
+				false => Self::workspace_root().join(path),
+			}
 		}
 
 		/// The workspace root as an [`AbsPath`], see [`fs_ext::workspace_root`].
@@ -238,8 +247,8 @@ mod std_ext {
 		where
 			D: serde::Deserializer<'de>,
 		{
-			let rel_path = SmolPath::deserialize(deserializer)?;
-			AbsPath::new(fs_ext::workspace_root().join(rel_path)).map_err(
+			let fwd_path = SmolPath::deserialize(deserializer)?;
+			AbsPath::new(fs_ext::workspace_root().join(fwd_path)).map_err(
 				|err| {
 					serde::de::Error::custom(format!(
 						"failed to create AbsPath: {}",
@@ -269,7 +278,7 @@ mod test {
 		let base = AbsPath::new_unchecked("/srv/site");
 		base.join("a/b.txt")
 			.strip_prefix(&base)
-			.xpect_eq(Some(RelPath::new("a/b.txt")));
+			.xpect_eq(Some(fwd_path!("a/b.txt")));
 		AbsPath::new_unchecked("/other")
 			.strip_prefix(&base)
 			.xpect_none();

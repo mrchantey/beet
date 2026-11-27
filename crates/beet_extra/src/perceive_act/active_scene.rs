@@ -29,7 +29,7 @@ use beet_scene::prelude::*;
 #[require(ActiveScene, SceneCatalog)]
 pub struct SceneRotation {
 	/// The scenes directory in the blob store.
-	pub dir: RelPath,
+	pub dir: FwdPath,
 	/// Perceive-act cycles between rotations.
 	pub every_cycles: u32,
 	/// Sequential vs random (shuffle-bag) order.
@@ -37,18 +37,18 @@ pub struct SceneRotation {
 	/// The scene to start on; falls back to the first discovered if absent/unknown.
 	pub initial: Option<SmolStr>,
 	/// Shown when a scene has no `images/` and when the model picks an unknown title.
-	pub fallback_image: RelPath,
+	pub fallback_image: FwdPath,
 }
 
 impl Default for SceneRotation {
 	fn default() -> Self {
 		Self {
-			dir: RelPath::from("assets/extra/perceive-act"),
+			dir: fwd_path!("assets/extra/perceive-act"),
 			every_cycles: 8,
 			order: SceneOrder::default(),
 			initial: Some(SmolStr::new("explorer")),
-			fallback_image: RelPath::from(
-				"assets/extra/perceive-act/explorer/images/joy.png",
+			fallback_image: fwd_path!(
+				"assets/extra/perceive-act/explorer/images/joy.png"
 			),
 		}
 	}
@@ -317,7 +317,9 @@ async fn apply_scene(
 		..
 	} = &gathered.rotation;
 	// read the scene's `main.bsx` and extract its `<ScenePrompt>` text.
-	let main_path = RelPath::from(format!("{dir}/{}/main.bsx", plan.name));
+	// the plan's scene name is a model's answer, so it is refused rather than
+	// read from outside the rotation's directory
+	let main_path = dir.try_join(format!("{}/main.bsx", plan.name))?;
 	let source =
 		String::from_utf8(gathered.store.get(&main_path).await?.to_vec())?;
 	let prompt = caller
@@ -390,7 +392,7 @@ fn extract_scene_prompt(world: &mut World, source: &str) -> Result<String> {
 /// that has a `main.bsx`.
 async fn discover_scenes(
 	store: &BlobStore,
-	dir: &RelPath,
+	dir: &FwdPath,
 ) -> Result<Vec<SmolStr>> {
 	let mut scenes: Vec<SmolStr> = store
 		.with_subdir(dir.clone())
@@ -413,13 +415,13 @@ async fn discover_scenes(
 /// missing dir yields a single option from the configured fallback image.
 async fn list_scene_images(
 	store: &BlobStore,
-	dir: &RelPath,
+	dir: &FwdPath,
 	name: &str,
-	fallback_image: &RelPath,
+	fallback_image: &FwdPath,
 ) -> Result<Vec<SceneImage>> {
-	let images_dir = RelPath::from(format!("{dir}/{name}/images"));
+	let images_dir = dir.try_join(format!("{name}/images"))?;
 	let mut files = store
-		.with_subdir(images_dir)
+		.with_subdir(images_dir.clone())
 		.list()
 		.await
 		.unwrap_or_default();
@@ -428,11 +430,14 @@ async fn list_scene_images(
 		.iter()
 		.map(|file| file.to_string())
 		.filter(|file| is_image_file(file))
-		.map(|file| SceneImage {
-			title: SmolStr::from(image_title(&file)),
-			url: to_url(&RelPath::from(format!("{dir}/{name}/images/{file}"))),
+		.map(|file| -> Result<SceneImage> {
+			SceneImage {
+				title: SmolStr::from(image_title(&file)),
+				url: to_url(&images_dir.try_join(&file)?),
+			}
+			.xok()
 		})
-		.collect();
+		.collect::<Result<_>>()?;
 	if images.is_empty() {
 		Ok(vec![SceneImage {
 			title: SmolStr::from(image_title(&fallback_image.to_string())),
@@ -480,7 +485,7 @@ fn image_title(file: &str) -> &str {
 
 /// A store-relative path to a served url (a leading slash), eg
 /// `assets/x/joy.png` -> `/assets/x/joy.png`.
-fn to_url(path: &RelPath) -> SmolStr { SmolStr::from(format!("/{path}")) }
+fn to_url(path: &FwdPath) -> SmolStr { SmolStr::from(format!("/{path}")) }
 
 #[cfg(test)]
 mod test {
@@ -585,29 +590,29 @@ mod test {
 	async fn discovers_scenes_and_images() {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("scenes/foo/main.bsx"), "<ScenePrompt/>")
+			.insert(&fwd_path!("scenes/foo/main.bsx"), "<ScenePrompt/>")
 			.await
 			.unwrap();
 		store
-			.insert(&RelPath::from("scenes/foo/images/happy.png"), vec![1u8])
+			.insert(&fwd_path!("scenes/foo/images/happy.png"), vec![1u8])
 			.await
 			.unwrap();
 		store
-			.insert(&RelPath::from("scenes/foo/images/sad.png"), vec![2u8])
+			.insert(&fwd_path!("scenes/foo/images/sad.png"), vec![2u8])
 			.await
 			.unwrap();
 		store
-			.insert(&RelPath::from("scenes/bar/main.bsx"), "<ScenePrompt/>")
+			.insert(&fwd_path!("scenes/bar/main.bsx"), "<ScenePrompt/>")
 			.await
 			.unwrap();
-		let dir = RelPath::from("scenes");
+		let dir = fwd_path!("scenes");
 		// only dirs with a main.bsx, sorted.
 		discover_scenes(&store, &dir)
 			.await
 			.unwrap()
 			.xpect_eq(vec![SmolStr::new("bar"), SmolStr::new("foo")]);
 		// images mapped to title (stem) + served url.
-		let fallback = RelPath::from("scenes/foo/images/happy.png");
+		let fallback = fwd_path!("scenes/foo/images/happy.png");
 		let images = list_scene_images(&store, &dir, "foo", &fallback)
 			.await
 			.unwrap();

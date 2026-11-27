@@ -107,19 +107,19 @@ impl BlobCondition {
 #[error("blob `{path}` was not as the write required")]
 pub struct BlobConflict {
 	/// The object written.
-	pub path: RelPath,
+	pub path: FwdPath,
 }
 
 impl BlobConflict {
 	/// The conflict at `path`, as a [`BevyError`].
-	pub fn at(path: &RelPath) -> BevyError {
+	pub fn at(path: &FwdPath) -> BevyError {
 		Self { path: path.clone() }.into()
 	}
 
 	/// [`BlobCondition::holds`], else the conflict at `path`.
 	pub fn check(
 		condition: &BlobCondition,
-		path: &RelPath,
+		path: &FwdPath,
 		found: Option<&BlobVersion>,
 	) -> Result {
 		match condition.holds(found) {
@@ -141,7 +141,7 @@ pub trait BlobProvider: StoreBackend {
 	fn box_clone(&self) -> Box<dyn BlobProvider>;
 
 	/// Returns a new provider scoped to the given subdirectory.
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider>;
+	fn with_subdir(&self, path: FwdPath) -> Box<dyn BlobProvider>;
 
 	/// The unscoped store at this store's root: the same backing with no subdir,
 	/// the one [`root_key`](Self::root_key) names. A watcher keys its events to it
@@ -163,9 +163,9 @@ pub trait BlobProvider: StoreBackend {
 	/// overrides this to re-root above.
 	fn rebase(
 		&self,
-		entry_name: &RelPath,
+		entry_name: &FwdPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobProvider>, RelPath)> {
+	) -> Result<(Box<dyn BlobProvider>, FwdPath)> {
 		if root.first_segment() == Some("..") {
 			bevybail!(
 				"entry `{entry_name}` declares a `<PackageRoot>` above the store \
@@ -175,7 +175,7 @@ pub trait BlobProvider: StoreBackend {
 				self.id()
 			);
 		}
-		let root = RelPath::new(root);
+		let root = FwdPath::new(root)?;
 		let entry_name = entry_name.strip_prefix(&root).ok_or_else(|| {
 			bevyhow!(
 				"entry `{entry_name}` is not under its declared store root \
@@ -199,7 +199,7 @@ pub trait BlobProvider: StoreBackend {
 
 	/// This store's `subdir` within its [`root_key`](Self::root_key), empty for
 	/// the root. Used for per-event routing.
-	fn subdir(&self) -> RelPath { RelPath::default() }
+	fn subdir(&self) -> FwdPath { FwdPath::default() }
 
 	/// The precise directory a native watcher should observe for this store, ie an
 	/// [`FsStore`]'s `effective_root` (base joined with subdir). `None` for a store
@@ -225,7 +225,7 @@ pub trait BlobProvider: StoreBackend {
 	/// [`did_change`](Self::did_change) is scope-covering). The test behind
 	/// [`Blob::matches_event`]; a composite store overrides it to answer for
 	/// its parts.
-	fn matches_object(&self, event: &BlobEvent, path: &RelPath) -> bool {
+	fn matches_object(&self, event: &BlobEvent, path: &FwdPath) -> bool {
 		self.root_key() == event.store.root_key()
 			&& self.subdir().join(path) == event.root_relative_path()
 	}
@@ -244,11 +244,11 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// store.insert(&RelPath::from("file.txt"), "content").await?;
+	/// store.insert(&fwd_path!("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result>;
+	fn insert(&self, path: &FwdPath, body: Bytes) -> SendBoxedFuture<Result>;
 
 	/// Insert the contents of a local file, for an object too large to hold
 	/// as [`Bytes`]. The default reads the file and inserts it; a filesystem
@@ -257,7 +257,7 @@ pub trait BlobProvider: StoreBackend {
 	#[cfg(feature = "std")]
 	fn insert_file(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		file: &AbsPath,
 	) -> SendBoxedFuture<Result> {
 		let this = self.box_clone();
@@ -281,7 +281,7 @@ pub trait BlobProvider: StoreBackend {
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>>;
+	fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>>;
 
 	/// The immediate children of one directory (the root for an empty
 	/// `path`), as names: a missing directory is empty. The default derives
@@ -296,14 +296,14 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// let listing = store.list_dir(&RelPath::from("2026")).await?;
+	/// let listing = store.list_dir(&fwd_path!("2026")).await?;
 	/// for month in listing.dirs {
 	/// 	println!("{month}");
 	/// }
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn list_dir(&self, path: &RelPath) -> SendBoxedFuture<Result<BlobDir>> {
+	fn list_dir(&self, path: &FwdPath) -> SendBoxedFuture<Result<BlobDir>> {
 		let this = self.box_clone();
 		let path = path.clone();
 		Box::pin(async move {
@@ -330,11 +330,11 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// let data = store.get(&RelPath::from("file.txt")).await?;
+	/// let data = store.get(&fwd_path!("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>>;
+	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>>;
 
 	/// Check if object exists in store.
 	///
@@ -344,11 +344,11 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// let exists = store.exists(&RelPath::from("file.txt")).await?;
+	/// let exists = store.exists(&fwd_path!("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>>;
+	fn exists(&self, path: &FwdPath) -> SendBoxedFuture<Result<bool>>;
 
 	/// Remove object from store.
 	///
@@ -358,11 +358,11 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// store.remove(&RelPath::from("file.txt")).await?;
+	/// store.remove(&fwd_path!("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result>;
+	fn remove(&self, path: &FwdPath) -> SendBoxedFuture<Result>;
 
 	/// Whether [`get_versioned`](Self::get_versioned),
 	/// [`insert_if`](Self::insert_if) and [`remove_if`](Self::remove_if) are
@@ -376,7 +376,7 @@ pub trait BlobProvider: StoreBackend {
 	/// conditional writes, which is the default.
 	fn get_versioned(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 		let refusal = self.refuse_conditional(path);
 		Box::pin(async move { Err(refusal) })
@@ -388,7 +388,7 @@ pub trait BlobProvider: StoreBackend {
 	/// conditional writes, which is the default.
 	fn insert_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		body: Bytes,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result<BlobVersion>> {
@@ -403,7 +403,7 @@ pub trait BlobProvider: StoreBackend {
 	/// conditional writes, which is the default.
 	fn remove_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result> {
 		let _ = condition;
@@ -412,7 +412,7 @@ pub trait BlobProvider: StoreBackend {
 	}
 
 	/// The refusal of a conditional write by a backend that cannot make one.
-	fn refuse_conditional(&self, path: &RelPath) -> BevyError {
+	fn refuse_conditional(&self, path: &FwdPath) -> BevyError {
 		bevyhow!(
 			"`{}` cannot write `{path}` conditionally: it has no conditional \
 			 writes",
@@ -425,7 +425,7 @@ pub trait BlobProvider: StoreBackend {
 	/// (S3's `HeadObject`) overrides it.
 	fn stat(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
 		let this = self.box_clone();
 		let path = path.clone();
@@ -443,7 +443,7 @@ pub trait BlobProvider: StoreBackend {
 	/// half of [`stat`](Self::stat), what a writer checks before trusting an
 	/// object at a content address (a write cut short leaves a shorter one).
 	/// The default stats; a filesystem answers from metadata.
-	fn size(&self, path: &RelPath) -> SendBoxedFuture<Result<Option<u64>>> {
+	fn size(&self, path: &FwdPath) -> SendBoxedFuture<Result<Option<u64>>> {
 		let this = self.box_clone();
 		let path = path.clone();
 		Box::pin(async move {
@@ -455,7 +455,7 @@ pub trait BlobProvider: StoreBackend {
 
 	/// Every object with its [`BlobStat`], what a mirror diffs. The default
 	/// lists then stats each object; S3 answers it from the listing alone.
-	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
+	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(FwdPath, BlobStat)>>> {
 		let this = self.box_clone();
 		Box::pin(async move {
 			let paths = this.list().await?;
@@ -481,7 +481,7 @@ pub trait BlobProvider: StoreBackend {
 	/// The links a listing reads through that name an empty or missing
 	/// directory, relative to this store: what a mirror refuses to publish as
 	/// nothing. None but on a filesystem whose links are followed.
-	fn empty_links(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn empty_links(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		Box::pin(async { Vec::new().xok() })
 	}
 
@@ -495,13 +495,13 @@ pub trait BlobProvider: StoreBackend {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// let url = store.public_url(&RelPath::from("file.txt")).await?;
+	/// let url = store.public_url(&fwd_path!("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	fn public_url(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<String>>>;
 }
 
@@ -531,63 +531,63 @@ impl StoreBackend for Box<dyn BlobProvider> {
 
 impl BlobProvider for Box<dyn BlobProvider> {
 	fn box_clone(&self) -> Box<dyn BlobProvider> { self.as_ref().box_clone() }
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
+	fn with_subdir(&self, path: FwdPath) -> Box<dyn BlobProvider> {
 		self.as_ref().with_subdir(path)
 	}
 	fn base(&self) -> Box<dyn BlobProvider> { self.as_ref().base() }
 	fn rebase(
 		&self,
-		entry_name: &RelPath,
+		entry_name: &FwdPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobProvider>, RelPath)> {
+	) -> Result<(Box<dyn BlobProvider>, FwdPath)> {
 		self.as_ref().rebase(entry_name, root)
 	}
 	fn root_key(&self) -> SmolStr { self.as_ref().root_key() }
-	fn subdir(&self) -> RelPath { self.as_ref().subdir() }
+	fn subdir(&self) -> FwdPath { self.as_ref().subdir() }
 	fn watch_dir(&self) -> Option<AbsPath> { self.as_ref().watch_dir() }
 	fn base_dir(&self) -> Option<AbsPath> { self.as_ref().base_dir() }
 	fn did_change(&self, event: &BlobEvent) -> bool {
 		self.as_ref().did_change(event)
 	}
-	fn matches_object(&self, event: &BlobEvent, path: &RelPath) -> bool {
+	fn matches_object(&self, event: &BlobEvent, path: &FwdPath) -> bool {
 		self.as_ref().matches_object(event, path)
 	}
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &FwdPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.as_ref().insert(path, body)
 	}
 	#[cfg(feature = "std")]
 	fn insert_file(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		file: &AbsPath,
 	) -> SendBoxedFuture<Result> {
 		self.as_ref().insert_file(path, file)
 	}
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		self.as_ref().list()
 	}
-	fn list_dir(&self, path: &RelPath) -> SendBoxedFuture<Result<BlobDir>> {
+	fn list_dir(&self, path: &FwdPath) -> SendBoxedFuture<Result<BlobDir>> {
 		self.as_ref().list_dir(path)
 	}
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.as_ref().get(path)
 	}
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 		self.as_ref().exists(path)
 	}
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &FwdPath) -> SendBoxedFuture<Result> {
 		self.as_ref().remove(path)
 	}
 	fn conditional_writes(&self) -> bool { self.as_ref().conditional_writes() }
 	fn get_versioned(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 		self.as_ref().get_versioned(path)
 	}
 	fn insert_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		body: Bytes,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result<BlobVersion>> {
@@ -595,29 +595,29 @@ impl BlobProvider for Box<dyn BlobProvider> {
 	}
 	fn remove_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result> {
 		self.as_ref().remove_if(path, condition)
 	}
 	fn stat(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
 		self.as_ref().stat(path)
 	}
-	fn size(&self, path: &RelPath) -> SendBoxedFuture<Result<Option<u64>>> {
+	fn size(&self, path: &FwdPath) -> SendBoxedFuture<Result<Option<u64>>> {
 		self.as_ref().size(path)
 	}
-	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
+	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(FwdPath, BlobStat)>>> {
 		self.as_ref().list_stats()
 	}
-	fn empty_links(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn empty_links(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		self.as_ref().empty_links()
 	}
 	fn public_url(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		self.as_ref().public_url(path)
 	}

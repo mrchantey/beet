@@ -51,7 +51,7 @@ impl BodyComponents {
 	pub fn insert(
 		body: &EntityBody,
 		entity: &mut EntityWorldMut,
-		document: Option<&RelPath>,
+		document: Option<&FwdPath>,
 	) -> Result {
 		if body.is_empty() {
 			return OK;
@@ -83,7 +83,7 @@ impl BodyComponents {
 			let mut component =
 				keys.deserialize(registration, &registry, value)?;
 			if let Some(document) = document {
-				DocPathResolver { document }.visit(component.as_mut());
+				DocPathResolver { document }.visit(component.as_mut())?;
 			}
 			reflect_component.insert(entity, component.as_ref(), &registry);
 		}

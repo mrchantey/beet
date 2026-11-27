@@ -213,7 +213,7 @@ mod test {
 "#;
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::new("cat.png"), CAT.to_vec())
+			.insert(&fwd_path!("cat.png"), CAT.to_vec())
 			.await
 			.unwrap();
 		let window = BsxParser::spawn(app.world_mut(), source).unwrap();

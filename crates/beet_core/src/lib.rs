@@ -300,6 +300,7 @@ pub mod prelude {
 	pub use crate::cross_log_noline;
 	#[cfg(feature = "std")]
 	pub use crate::dir;
+	pub use crate::fwd_path;
 	#[cfg(feature = "rand")]
 	pub use rand::RngExt;
 }

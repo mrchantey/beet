@@ -54,7 +54,7 @@ impl DynamicTemplate {
 	pub fn reflect_at(
 		world: &World,
 		body: &SceneBody,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> Result<Self> {
 		Self::reflect_document(world, body, Some(path))
 	}
@@ -77,7 +77,7 @@ impl DynamicTemplate {
 	pub fn reflect_document(
 		world: &World,
 		body: &SceneBody,
-		path: Option<&RelPath>,
+		path: Option<&FwdPath>,
 	) -> Result<Self> {
 		Self::reflect_placed(world, body, path, None)
 	}
@@ -87,7 +87,7 @@ impl DynamicTemplate {
 	fn reflect_placed(
 		world: &World,
 		body: &SceneBody,
-		path: Option<&RelPath>,
+		path: Option<&FwdPath>,
 		source: Option<&DocumentSource>,
 	) -> Result<Self> {
 		let app_registry = world
@@ -134,7 +134,7 @@ impl DynamicTemplate {
 			source: None,
 		};
 		if let Some(path) = path {
-			template.resolve_paths(path);
+			template.resolve_paths(path)?;
 		}
 		template.xok()
 	}

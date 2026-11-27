@@ -106,7 +106,7 @@ impl BlobProvider for StoreFork {
 	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
 	/// Both halves scope together, so keys keep corresponding.
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
+	fn with_subdir(&self, path: FwdPath) -> Box<dyn BlobProvider> {
 		Box::new(Self {
 			local: self.local.with_subdir(path.clone()),
 			upstream: self.upstream.with_subdir(path),
@@ -129,9 +129,9 @@ impl BlobProvider for StoreFork {
 	/// since keys that no longer correspond would silently shadow nothing.
 	fn rebase(
 		&self,
-		entry_name: &RelPath,
+		entry_name: &FwdPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobProvider>, RelPath)> {
+	) -> Result<(Box<dyn BlobProvider>, FwdPath)> {
 		let (upstream, upstream_entry) =
 			self.upstream.rebase(entry_name, root)?;
 		let (local, local_entry) = self.local.rebase(entry_name, root)?;
@@ -163,7 +163,7 @@ impl BlobProvider for StoreFork {
 		.into()
 	}
 
-	fn subdir(&self) -> RelPath { self.local.subdir() }
+	fn subdir(&self) -> FwdPath { self.local.subdir() }
 
 	/// The upstream's watch dir, else the local's: edits to either are edits
 	/// to what this store reads.
@@ -184,14 +184,14 @@ impl BlobProvider for StoreFork {
 	}
 
 	/// The object at `path`, keyed to this fork or to either half.
-	fn matches_object(&self, event: &BlobEvent, path: &RelPath) -> bool {
+	fn matches_object(&self, event: &BlobEvent, path: &FwdPath) -> bool {
 		(self.root_key() == event.store.root_key()
 			&& self.subdir().join(path) == event.root_relative_path())
 			|| self.local.matches_object(event, path)
 			|| self.upstream.matches_object(event, path)
 	}
 
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &FwdPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let write = BlobProvider::insert(&self.local, path, body);
 		let fork = self.clone();
 		Box::pin(async move {
@@ -202,7 +202,7 @@ impl BlobProvider for StoreFork {
 	}
 
 	/// The union, each key once, in order.
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		let local = self.local.list();
 		let upstream = self.upstream.list();
 		Box::pin(async move {
@@ -217,7 +217,7 @@ impl BlobProvider for StoreFork {
 		})
 	}
 
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 		let (local, upstream) = (self.local.clone(), self.upstream.clone());
 		let path = path.clone();
 		Box::pin(async move {
@@ -228,7 +228,7 @@ impl BlobProvider for StoreFork {
 		})
 	}
 
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 		let (local, upstream) = (self.local.clone(), self.upstream.clone());
 		let path = path.clone();
 		Box::pin(async move {
@@ -239,7 +239,7 @@ impl BlobProvider for StoreFork {
 		})
 	}
 
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &FwdPath) -> SendBoxedFuture<Result> {
 		let write = self.local.remove(path);
 		let fork = self.clone();
 		Box::pin(async move {
@@ -251,7 +251,7 @@ impl BlobProvider for StoreFork {
 
 	fn public_url(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		let (local, upstream) = (self.local.clone(), self.upstream.clone());
 		let path = path.clone();
@@ -281,7 +281,7 @@ mod test {
 			(&local, "shared.txt", "edited"),
 			(&local, "local.txt", "local"),
 		] {
-			store.insert(&RelPath::new(path), body).await.unwrap();
+			store.insert(&FwdPath::new(path).unwrap(), body).await.unwrap();
 		}
 		let fork =
 			BlobStore::new(StoreFork::new(local.clone(), upstream.clone()));
@@ -294,7 +294,7 @@ mod test {
 	async fn reads_local_first() {
 		let (fork, ..) = fork().await;
 		let read = async |path: &str| {
-			fork.get(&RelPath::new(path))
+			fork.get(&FwdPath::new(path).unwrap())
 				.await
 				.map(|bytes| String::from_utf8_lossy(&bytes).to_string())
 		};
@@ -302,11 +302,11 @@ mod test {
 		read("upstream.txt").await.unwrap().xpect_eq("upstream");
 		read("local.txt").await.unwrap().xpect_eq("local");
 		read("missing.txt").await.xpect_err();
-		fork.exists(&RelPath::new("upstream.txt"))
+		fork.exists(&fwd_path!("upstream.txt"))
 			.await
 			.unwrap()
 			.xpect_true();
-		fork.exists(&RelPath::new("missing.txt"))
+		fork.exists(&fwd_path!("missing.txt"))
 			.await
 			.unwrap()
 			.xpect_false();
@@ -317,21 +317,21 @@ mod test {
 	#[beet_core::test]
 	async fn writes_land_local() {
 		let (fork, local, upstream) = fork().await;
-		fork.insert(&RelPath::new("new.txt"), Bytes::from_static(b"new"))
+		fork.insert(&fwd_path!("new.txt"), Bytes::from_static(b"new"))
 			.await
 			.unwrap();
 		local
-			.exists(&RelPath::new("new.txt"))
+			.exists(&fwd_path!("new.txt"))
 			.await
 			.unwrap()
 			.xpect_true();
 		upstream
-			.exists(&RelPath::new("new.txt"))
+			.exists(&fwd_path!("new.txt"))
 			.await
 			.unwrap()
 			.xpect_false();
-		fork.remove(&RelPath::new("shared.txt")).await.unwrap();
-		fork.get(&RelPath::new("shared.txt"))
+		fork.remove(&fwd_path!("shared.txt")).await.unwrap();
+		fork.get(&fwd_path!("shared.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(Bytes::from_static(b"published"));
@@ -342,16 +342,16 @@ mod test {
 	async fn lists_the_union() {
 		let (fork, ..) = fork().await;
 		fork.list().await.unwrap().xpect_eq(vec![
-			RelPath::new("local.txt"),
-			RelPath::new("shared.txt"),
-			RelPath::new("upstream.txt"),
+			fwd_path!("local.txt"),
+			fwd_path!("shared.txt"),
+			fwd_path!("upstream.txt"),
 		]);
-		let scoped = fork.with_subdir(RelPath::new("docs"));
+		let scoped = fork.with_subdir(fwd_path!("docs"));
 		scoped
-			.insert(&RelPath::new("a.md"), Bytes::from_static(b"a"))
+			.insert(&fwd_path!("a.md"), Bytes::from_static(b"a"))
 			.await
 			.unwrap();
-		fork.exists(&RelPath::new("docs/a.md"))
+		fork.exists(&fwd_path!("docs/a.md"))
 			.await
 			.unwrap()
 			.xpect_true();
@@ -359,7 +359,7 @@ mod test {
 			.list()
 			.await
 			.unwrap()
-			.xpect_eq(vec![RelPath::new("a.md")]);
+			.xpect_eq(vec![fwd_path!("a.md")]);
 	}
 
 	/// Both halves rebase together through an entry's `<PackageRoot>`, so a key
@@ -373,12 +373,12 @@ mod test {
 		let (local, upstream) = (BlobStore::temp(), BlobStore::temp());
 		let fork =
 			BlobStore::new(StoreFork::new(local.clone(), upstream.clone()));
-		let scoped = fork.with_subdir(RelPath::from("docs"));
-		let blob = scoped.blob(RelPath::from("a.md"));
+		let scoped = fork.with_subdir(fwd_path!("docs"));
+		let blob = scoped.blob(fwd_path!("a.md"));
 		let event = |store: &BlobStore, path: &str| {
 			BlobEvent::new(
 				store.clone(),
-				RelPath::from(path),
+				FwdPath::new(path).unwrap(),
 				BlobEventKind::Changed,
 			)
 		};
@@ -401,7 +401,7 @@ mod test {
 		let local = BlobStore::temp();
 		let upstream = BlobStore::temp();
 		upstream
-			.insert(&RelPath::new("site/app/main.bsx"), "<Router/>")
+			.insert(&fwd_path!("site/app/main.bsx"), "<Router/>")
 			.await
 			.unwrap();
 		let fork = BlobStore::new(StoreFork::new(local, upstream));
@@ -409,15 +409,15 @@ mod test {
 			fork.rebase_package("site/app/main.bsx", "..").unwrap();
 		entry_name.xpect_eq("app/main.bsx");
 		rebased
-			.exists(&RelPath::new("app/main.bsx"))
+			.exists(&fwd_path!("app/main.bsx"))
 			.await
 			.unwrap()
 			.xpect_true();
 		rebased
-			.insert(&RelPath::new("app/fork.json"), Bytes::from_static(b"{}"))
+			.insert(&fwd_path!("app/fork.json"), Bytes::from_static(b"{}"))
 			.await
 			.unwrap();
-		fork.exists(&RelPath::new("site/app/fork.json"))
+		fork.exists(&fwd_path!("site/app/fork.json"))
 			.await
 			.unwrap()
 			.xpect_true();

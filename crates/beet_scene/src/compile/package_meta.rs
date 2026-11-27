@@ -10,7 +10,7 @@ use bevy_reflect::TypeRegistry;
 /// package's own, and each dependency's under its prefix.
 pub(super) struct SceneSet {
 	/// The record of every scene, as its document's path names it.
-	pub records: BTreeMap<RelPath, EntityBodyRecord>,
+	pub records: BTreeMap<FwdPath, EntityBodyRecord>,
 	/// The files, this package's and each dependency's under its prefix.
 	pub files: Files,
 }
@@ -19,7 +19,7 @@ impl SceneSet {
 	/// The scene meta `T` of the document at `path`.
 	fn meta<T: LexiconDef + DeserializeOwned>(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> Result<Option<T>> {
 		match self.records.get(path) {
 			Some(record) => record.try_get::<T>(),
@@ -28,7 +28,7 @@ impl SceneSet {
 	}
 
 	/// The paths `path` imports, an empty set for a plain file.
-	fn imports(&self, path: &RelPath) -> Result<Imports> {
+	fn imports(&self, path: &FwdPath) -> Result<Imports> {
 		self.meta::<Imports>(path).map(Option::unwrap_or_default)
 	}
 
@@ -111,9 +111,9 @@ impl SceneSet {
 
 	fn visit(
 		&self,
-		path: &RelPath,
-		stack: &mut Vec<RelPath>,
-		done: &mut BTreeSet<RelPath>,
+		path: &FwdPath,
+		stack: &mut Vec<FwdPath>,
+		done: &mut BTreeSet<FwdPath>,
 	) -> Result {
 		if done.contains(path) {
 			return Ok(());
@@ -141,7 +141,7 @@ impl SceneSet {
 	/// One [`LoadSet`] per document of this package: the document and its
 	/// closure through eager and preload edges, stopping at a lazy one, with
 	/// the union of every member's [`RequireCfg`].
-	pub fn load_sets(&self, documents: &[RelPath]) -> Result<LoadSets> {
+	pub fn load_sets(&self, documents: &[FwdPath]) -> Result<LoadSets> {
 		let mut sets = LoadSets::default();
 		for root in documents {
 			let mut set = LoadSet::default();
@@ -188,7 +188,7 @@ impl SceneSet {
 		&self,
 		world: &mut World,
 		registry: &TypeRegistry,
-		documents: &[RelPath],
+		documents: &[FwdPath],
 		meta: Entity,
 	) -> Result {
 		for document in documents {

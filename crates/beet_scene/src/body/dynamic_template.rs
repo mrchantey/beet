@@ -173,13 +173,16 @@ impl DynamicTemplate {
 	/// The documents this instantiates, as its [`Instance`]s name them: what
 	/// must be loaded for it to build whole. A held template's count, since
 	/// its holder builds it when it likes.
-	pub fn instances(&self) -> Vec<RelPath> {
+	///
+	/// # Errors
+	/// Errors when a reference climbs above the package.
+	pub fn instances(&self) -> Result<Vec<FwdPath>> {
 		let mut found = Vec::new();
 		for slot in self.slots() {
-			InstanceVisitor { found: &mut found }.visit(slot.value());
+			InstanceVisitor { found: &mut found }.visit(slot.value())?;
 		}
 		found.dedup();
-		found
+		found.xok()
 	}
 
 	/// The props the document declares, its [`Prop`] entities.
@@ -244,7 +247,7 @@ impl DynamicTemplate {
 
 	/// Rewrite every [`DocPath`] this holds package absolute, as the document
 	/// at `document`.
-	pub(super) fn resolve_paths(&mut self, document: &RelPath) {
+	pub(super) fn resolve_paths(&mut self, document: &FwdPath) -> Result {
 		for entity in &mut self.entities {
 			for slot in &mut entity.components {
 				let value = match slot {
@@ -252,9 +255,10 @@ impl DynamicTemplate {
 					| ComponentSlot::Resource(value) => value,
 					ComponentSlot::Template(template) => &mut template.patch,
 				};
-				DocPathResolver { document }.visit(value.as_mut());
+				DocPathResolver { document }.visit(value.as_mut())?;
 			}
 		}
+		Ok(())
 	}
 
 	/// Writes resources, then builds every entity onto its mapped real entity,
@@ -492,19 +496,19 @@ impl ComponentSlot {
 
 /// Collects the documents a reflected value's [`Instance`]s name.
 struct InstanceVisitor<'a> {
-	found: &'a mut Vec<RelPath>,
+	found: &'a mut Vec<FwdPath>,
 }
 
 impl InstanceVisitor<'_> {
-	fn visit(&mut self, value: &dyn PartialReflect) {
+	fn visit(&mut self, value: &dyn PartialReflect) -> Result {
 		if let Some(value) = value.try_as_reflect() {
 			if let Some(instance) = value.downcast_ref::<Instance>() {
-				self.found.push(instance.document.rel_path());
-				return;
+				self.found.push(instance.document.fwd_path()?);
+				return Ok(());
 			}
 			if let Some(held) = value.downcast_ref::<HeldTemplate>() {
-				self.found.extend(held.instances());
-				return;
+				self.found.extend(held.instances()?);
+				return Ok(());
 			}
 		}
 		match value.reflect_ref() {
@@ -512,80 +516,94 @@ impl InstanceVisitor<'_> {
 				for field in (0..value.field_len())
 					.filter_map(|index| value.field_at(index))
 				{
-					self.visit(field);
+					self.visit(field)?;
 				}
 			}
 			ReflectRef::TupleStruct(value) => {
 				for field in value.iter_fields() {
-					self.visit(field);
+					self.visit(field)?;
 				}
 			}
 			ReflectRef::List(value) => {
 				for item in value.iter() {
-					self.visit(item);
+					self.visit(item)?;
 				}
 			}
 			ReflectRef::Enum(value) => {
 				for field in value.iter_fields() {
-					self.visit(field.value());
+					self.visit(field.value())?;
 				}
 			}
 			_ => {}
 		}
+		Ok(())
 	}
 }
 
 /// Rewrites every [`DocPath`] of a reflected value package absolute.
 pub(super) struct DocPathResolver<'a> {
-	pub(super) document: &'a RelPath,
+	pub(super) document: &'a FwdPath,
 }
 
 impl DocPathResolver<'_> {
-	pub(super) fn visit(&self, value: &mut dyn PartialReflect) {
+	pub(super) fn visit(&self, value: &mut dyn PartialReflect) -> Result {
 		if let Some(value) = value.try_as_reflect_mut() {
 			if let Some(path) = value.downcast_mut::<DocPath>() {
-				*path = path.resolve(self.document).into();
-				return;
+				*path = path.resolve(self.document)?.into();
+				return Ok(());
 			}
 			// a held template is a document of its own, resolved as it builds
 			if let Some(held) = value.downcast_mut::<HeldTemplate>() {
 				held.set_document(self.document);
-				return;
+				return Ok(());
 			}
 		}
 		match value.reflect_mut() {
 			ReflectMut::Struct(value) => {
 				for index in 0..value.field_len() {
-					value.field_at_mut(index).map(|field| self.visit(field));
+					if let Some(field) = value.field_at_mut(index) {
+						self.visit(field)?;
+					}
 				}
 			}
 			ReflectMut::TupleStruct(value) => {
 				for index in 0..value.field_len() {
-					value.field_mut(index).map(|field| self.visit(field));
+					if let Some(field) = value.field_mut(index) {
+						self.visit(field)?;
+					}
 				}
 			}
 			ReflectMut::Tuple(value) => {
 				for index in 0..value.field_len() {
-					value.field_mut(index).map(|field| self.visit(field));
+					if let Some(field) = value.field_mut(index) {
+						self.visit(field)?;
+					}
 				}
 			}
 			ReflectMut::List(value) => {
 				for index in 0..value.len() {
-					value.get_mut(index).map(|item| self.visit(item));
+					if let Some(item) = value.get_mut(index) {
+						self.visit(item)?;
+					}
 				}
 			}
 			ReflectMut::Array(value) => {
 				for index in 0..value.len() {
-					value.get_mut(index).map(|item| self.visit(item));
+					if let Some(item) = value.get_mut(index) {
+						self.visit(item)?;
+					}
 				}
 			}
 			ReflectMut::Enum(value) => {
 				for index in 0..value.field_len() {
-					value.field_at_mut(index).map(|field| self.visit(field));
+					if let Some(field) = value.field_at_mut(index) {
+						self.visit(field)?;
+					}
 				}
 			}
 			_ => {}
 		}
+		Ok(())
 	}
 }
 

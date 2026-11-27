@@ -398,7 +398,7 @@ async fn long_chat_compacts_on_the_mock() {
 	let package = BlobStore::temp();
 	package
 		.insert(
-			&RelPath::new("templates/Compactor.bsx"),
+			&fwd_path!("templates/Compactor.bsx"),
 			mock(include_str!("../examples/thread/templates/Compactor.bsx")),
 		)
 		.await

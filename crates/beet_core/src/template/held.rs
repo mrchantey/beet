@@ -48,7 +48,7 @@ enum HeldKind {
 	Build(BuildFn),
 	/// A scene body, from a document, and the package path it was read from.
 	#[cfg(feature = "serde")]
-	Body(Arc<SceneBody>, Option<RelPath>),
+	Body(Arc<SceneBody>, Option<FwdPath>),
 }
 
 impl HeldTemplate {
@@ -75,7 +75,7 @@ impl HeldTemplate {
 
 	/// Resolve the references of a held body from the document at `document`.
 	#[cfg(feature = "serde")]
-	pub fn set_document(&mut self, document: &RelPath) {
+	pub fn set_document(&mut self, document: &FwdPath) {
 		if let HeldKind::Body(_, path) = &mut self.0 {
 			*path = Some(document.clone());
 		}
@@ -83,15 +83,18 @@ impl HeldTemplate {
 
 	/// The documents a held body instantiates, package absolute once its own
 	/// document is known.
+	///
+	/// # Errors
+	/// Errors when a reference climbs above the package.
 	#[cfg(feature = "serde")]
-	pub fn instances(&self) -> Vec<RelPath> {
+	pub fn instances(&self) -> Result<Vec<FwdPath>> {
 		let HeldKind::Body(body, path) = &self.0 else {
-			return Vec::new();
+			return Vec::new().xok();
 		};
 		body.instances()
 			.map(|document| match path {
 				Some(path) => document.resolve(path),
-				None => document.rel_path(),
+				None => document.fwd_path(),
 			})
 			.collect()
 	}
@@ -122,7 +125,7 @@ impl HeldTemplate {
 #[derive(Clone)]
 struct HeldBody {
 	body: Arc<SceneBody>,
-	path: Option<RelPath>,
+	path: Option<FwdPath>,
 }
 
 #[cfg(feature = "serde")]

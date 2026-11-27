@@ -45,7 +45,7 @@ pub async fn LambdaRestart(
 					stack.aws_region()?.clone(),
 					block.ident(&stack).primary_identifier().to_string(),
 					package_stores.get(entity)?.bucket_name()?,
-					block.code_key(&stacks.deploy_id()),
+					block.code_key(&stacks.deploy_id())?,
 				)
 					.xok()
 			},

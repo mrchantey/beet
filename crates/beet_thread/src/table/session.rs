@@ -219,7 +219,7 @@ mod test {
 		));
 		ThreadStore::new(
 			app.world().get::<TableStore>(root).unwrap().clone(),
-			RelPath::new("threads"),
+			fwd_path!("threads"),
 		)
 		.unwrap()
 		.store_thread(
@@ -241,7 +241,7 @@ mod test {
 		let mut window = app.world_mut().spawn((
 			ChildOf(root),
 			Thread::default(),
-			MountThreadStore::new("threads"),
+			MountThreadStore::new(fwd_path!("threads")),
 		));
 		for actor in actors.iter().cloned().map(actor) {
 			match actor.kind() {

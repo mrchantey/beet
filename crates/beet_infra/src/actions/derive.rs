@@ -122,8 +122,8 @@ mod test {
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
 
-	const SOURCE: &str = "notes.md";
-	const DERIVED: &str = "derived/notes.json";
+	const SOURCE: FwdPath = fwd_path!("notes.md");
+	const DERIVED: FwdPath = fwd_path!("derived/notes.json");
 
 	/// A derivation of [`DERIVED`] from [`SOURCE`], in whatever store it is
 	/// ensured in.
@@ -132,7 +132,7 @@ mod test {
 			Derivation::new(DERIVED),
 			Action::<BlobStore, EntityBody>::new_async(
 				async |cx: ActionContext<BlobStore>| {
-					let bytes = cx.input.get(&RelPath::new(SOURCE)).await?;
+					let bytes = cx.input.get(&FwdPath::new(SOURCE).unwrap()).await?;
 					EntityBody::default().with_typed(&Provenance::new([
 						ProvenanceSource::file(SOURCE, &bytes),
 					]))
@@ -147,7 +147,7 @@ mod test {
 	fn site(deployment: Deployment) -> (TempDir, World, Entity) {
 		let dir = TempDir::new_ws().unwrap();
 		let site = dir.path().join("site");
-		for path in [SOURCE, &format!("assets/{SOURCE}")] {
+		for path in [SOURCE.to_string(), format!("assets/{SOURCE}")] {
 			fs_ext::write(site.join(path), "# notes").unwrap();
 		}
 		let mut world =
@@ -160,7 +160,7 @@ mod test {
 	}
 
 	/// Whether the site dir under `dir` holds `path`.
-	fn exists(dir: &AbsPath, path: &str) -> bool {
+	fn exists(dir: &AbsPath, path: FwdPath) -> bool {
 		fs_ext::exists(dir.join(path)).unwrap()
 	}
 
@@ -205,13 +205,13 @@ mod test {
 		let (dir, mut world, root) = site(deployment.clone());
 		let elsewhere = BlobStore::temp();
 		elsewhere
-			.insert(&RelPath::new(SOURCE), "# elsewhere")
+			.insert(&FwdPath::new(SOURCE).unwrap(), "# elsewhere")
 			.await
 			.unwrap();
 		world.spawn((ChildOf(root), derivation()));
 		world.spawn((
 			ChildOf(root),
-			DirPath(RelPath::new("assets")),
+			DirPath(fwd_path!("assets")),
 			children![derivation()],
 		));
 		world.spawn((
@@ -236,15 +236,16 @@ mod test {
 			.work_directory(
 				&Stack::new("app").resolve(&PackageConfig::default()),
 			)
+			.unwrap()
 			.into_abs()
 			.join("package");
 		exists(&assembled, DERIVED).xpect_true();
-		exists(&assembled, &format!("assets/{DERIVED}")).xpect_true();
+		exists(&assembled, fwd_path!("assets").join(&DERIVED)).xpect_true();
 		let site = dir.path().join("site");
 		exists(&site, DERIVED).xpect_false();
-		exists(&site, &format!("assets/{DERIVED}")).xpect_false();
+		exists(&site, fwd_path!("assets").join(&DERIVED)).xpect_false();
 		elsewhere
-			.exists(&RelPath::new(DERIVED))
+			.exists(&FwdPath::new(DERIVED).unwrap())
 			.await
 			.unwrap()
 			.xpect_true();

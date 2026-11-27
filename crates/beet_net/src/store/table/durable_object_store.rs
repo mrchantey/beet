@@ -89,9 +89,13 @@ impl DurableObjectStore {
 			} else if #[cfg(feature = "sqlite")] {
 				match BootstrapConfig::get().service_access {
 					ServiceAccess::Local => {
-						let dir = self.dir.clone().unwrap_or_else(|| {
-							WsPath::new(format!("target/stores/{}", self.binding)).into()
-						});
+						let dir = match &self.dir {
+							Some(dir) => dir.clone(),
+							None => match ServiceAccess::local_store_dir(&self.binding) {
+								Ok(dir) => dir.into_abs(),
+								Err(err) => return self.refusing(&err.to_string()),
+							},
+						};
 						TableWireClient::new(PartitionHost::new(dir).transport())
 							.with_capabilities(Self::CAPABILITIES.to_vec())
 					}

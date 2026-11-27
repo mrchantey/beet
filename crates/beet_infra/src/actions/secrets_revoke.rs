@@ -304,7 +304,7 @@ mod tests {
 				Stack::new("mail").with_stage("prod"),
 				BlobStore::temp(),
 				PackageStore,
-				DocumentSecrets::new("store.toml"),
+				DocumentSecrets::new(fwd_path!("store.toml")),
 				children![Secrets::default(), Router::with_defaults()],
 			))
 			.id();

@@ -12,7 +12,7 @@ use web_sys::IdbTransactionMode;
 ///
 /// Suited to large binary payloads (ie ML model weights) that exceed the
 /// per-origin `localStorage` quota. Each store uses a dedicated database
-/// with a single object store keyed by [`RelPath`] strings.
+/// with a single object store keyed by [`FwdPath`] strings.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[component(on_insert = BlobStore::on_insert::<Self>)]
@@ -21,7 +21,7 @@ pub struct IndexedDbStore {
 	db_name: SmolStr,
 	/// Optional subdirectory prefix for all keys.
 	#[reflect(default)]
-	subdir: Option<RelPath>,
+	subdir: Option<FwdPath>,
 }
 
 const STORE_NAME: &str = "blobs";
@@ -36,12 +36,12 @@ impl IndexedDbStore {
 	}
 
 	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<FwdPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
 
-	fn effective_key(&self, path: &RelPath) -> String {
+	fn effective_key(&self, path: &FwdPath) -> String {
 		match &self.subdir {
 			Some(sub) => format!("{}/{}", sub, path),
 			None => path.to_string(),
@@ -245,7 +245,7 @@ impl StoreBackend for IndexedDbStore {
 impl BlobProvider for IndexedDbStore {
 	fn box_clone(&self) -> Box<dyn BlobProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobProvider> {
+	fn with_subdir(&self, path: FwdPath) -> Box<dyn BlobProvider> {
 		Box::new(IndexedDbStore {
 			db_name: self.db_name.clone(),
 			subdir: Some(match &self.subdir {
@@ -266,9 +266,9 @@ impl BlobProvider for IndexedDbStore {
 		format!("indexeddb:{}", self.db_name).into()
 	}
 
-	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
+	fn subdir(&self) -> FwdPath { self.subdir.clone().unwrap_or_default() }
 
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &FwdPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let db_name = self.db_name.clone();
 		let key = self.effective_key(path);
 		Box::pin(SendWrapper::new(async move {
@@ -290,7 +290,7 @@ impl BlobProvider for IndexedDbStore {
 		}))
 	}
 
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 		let db_name = self.db_name.clone();
 		let key = self.effective_key(path);
 		Box::pin(SendWrapper::new(async move {
@@ -308,7 +308,7 @@ impl BlobProvider for IndexedDbStore {
 		}))
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {
 		let db_name = self.db_name.clone();
 		let subdir_prefix = self.subdir.as_ref().map(|s| format!("{}/", s));
 		Box::pin(SendWrapper::new(async move {
@@ -323,20 +323,19 @@ impl BlobProvider for IndexedDbStore {
 			let req = store.get_all_keys().map_jserr()?;
 			let keys_val = await_idb_request(req).await?;
 			let keys: js_sys::Array = keys_val.unchecked_into();
-			let paths = (0..keys.length())
+			(0..keys.length())
 				.filter_map(|i| keys.get(i).as_string())
 				.filter_map(|key| match &subdir_prefix {
 					Some(p) => key
 						.strip_prefix(p.as_str())
-						.map(|rest| RelPath::new(rest)),
-					None => Some(RelPath::new(&key)),
+						.map(|rest| FwdPath::new(rest)),
+					None => Some(FwdPath::new(&key)),
 				})
-				.collect::<Vec<_>>();
-			paths.xok()
+				.collect()
 		}))
 	}
 
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 		let db_name = self.db_name.clone();
 		let key = self.effective_key(path);
 		Box::pin(SendWrapper::new(async move {
@@ -357,7 +356,7 @@ impl BlobProvider for IndexedDbStore {
 		}))
 	}
 
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &FwdPath) -> SendBoxedFuture<Result> {
 		let db_name = self.db_name.clone();
 		let key = self.effective_key(path);
 		let path = path.clone();
@@ -392,7 +391,7 @@ impl BlobProvider for IndexedDbStore {
 
 	fn get_versioned(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<(Bytes, BlobVersion)>>> {
 		let db_name = self.db_name.clone();
 		let key = self.effective_key(path);
@@ -411,7 +410,7 @@ impl BlobProvider for IndexedDbStore {
 	/// content's digest.
 	fn insert_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		body: Bytes,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result<BlobVersion>> {
@@ -433,7 +432,7 @@ impl BlobProvider for IndexedDbStore {
 
 	fn remove_if(
 		&self,
-		path: &RelPath,
+		path: &FwdPath,
 		condition: BlobCondition,
 	) -> SendBoxedFuture<Result> {
 		let db_name = self.db_name.clone();
@@ -456,7 +455,7 @@ impl BlobProvider for IndexedDbStore {
 
 	fn public_url(
 		&self,
-		_path: &RelPath,
+		_path: &FwdPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(SendWrapper::new(async move { None.xok() }))
 	}

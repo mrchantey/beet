@@ -230,7 +230,7 @@ mod test {
 			("SittingThread", SITTING_THREAD),
 		] {
 			store
-				.insert(&RelPath::new(format!("{name}.bsx")), source)
+				.insert(&FwdPath::new(format!("{name}.bsx")).unwrap(), source)
 				.await
 				.unwrap();
 		}
@@ -270,7 +270,7 @@ mod test {
 	fn thread_store(store: &BlobStore, path: &str) -> ThreadStore {
 		ThreadStore::new(
 			JsonTableStore::over(store.clone()).unwrap(),
-			RelPath::new(path),
+			FwdPath::new(path).unwrap(),
 		)
 		.unwrap()
 	}

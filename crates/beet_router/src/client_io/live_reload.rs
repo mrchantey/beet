@@ -74,7 +74,7 @@ pub(crate) struct NeedsReload {
 	pub structural: bool,
 	/// Every store path the burst changed, narrowing the content reload's
 	/// render diagnostics to the pages those files back.
-	pub changed: HashSet<RelPath>,
+	pub changed: HashSet<FwdPath>,
 }
 
 /// The async tail of the latest reload on a [`LiveReload`] root: settle the
@@ -202,7 +202,7 @@ fn subtree_pending(world: &mut World, root: Entity) -> bool {
 pub(crate) fn reload_site(
 	world: &mut World,
 	root: Entity,
-	changed: HashSet<RelPath>,
+	changed: HashSet<FwdPath>,
 ) {
 	if !world.entity(root).contains::<BlobStore>() {
 		warn!("live reload root {root} has no BlobStore");
@@ -245,7 +245,7 @@ pub(crate) fn reload_site(
 /// nothing specific changed.
 fn changed_routes(
 	world: &mut World,
-	changed: &HashSet<RelPath>,
+	changed: &HashSet<FwdPath>,
 ) -> Option<HashSet<Entity>> {
 	if changed.is_empty() {
 		return None;
@@ -342,7 +342,7 @@ mod test {
 				store,
 				Router::with_defaults(),
 				LiveReload::new(),
-				children![RoutesDir::new("routes")],
+				children![RoutesDir::new(fwd_path!("routes"))],
 			))
 			.flush()
 	}
@@ -356,7 +356,7 @@ mod test {
 		path: &str,
 		kind: BlobEventKind,
 	) {
-		world.trigger(BlobEvent::new(store.base(), RelPath::from(path), kind));
+		world.trigger(BlobEvent::new(store.base(), FwdPath::new(path).unwrap(), kind));
 	}
 
 	/// Run one frame (the reactions and the reload dispatch) and settle the
@@ -470,12 +470,12 @@ mod test {
 			}
 		}
 		blobs
-			.exists(&RelPath::new("chat.json"))
+			.exists(&fwd_path!("chat.json"))
 			.await
 			.unwrap()
 			.xpect_true();
 		blobs
-			.insert(&RelPath::new("routes/about.md"), "# About")
+			.insert(&fwd_path!("routes/about.md"), "# About")
 			.await
 			.unwrap();
 		tick_until(&mut world, |world| {
@@ -601,7 +601,7 @@ mod test {
 		// seed an initial route, then spawn the site over the same backing
 		let handle = BlobStore::new(store.clone());
 		handle
-			.insert(&RelPath::from("routes/index.md"), "# Home")
+			.insert(&fwd_path!("routes/index.md"), "# Home")
 			.await
 			.unwrap();
 		let root = spawn_site(&mut world, store);
@@ -618,7 +618,7 @@ mod test {
 		// add a route through the store: the in-memory watcher emits a `BlobEvent`,
 		// drained next update into the reload-on-change observer.
 		handle
-			.insert(&RelPath::from("routes/about.md"), "# About")
+			.insert(&fwd_path!("routes/about.md"), "# About")
 			.await
 			.unwrap();
 		// drain the event (PreUpdate) -> mark NeedsReload -> reload (Update), then
@@ -651,7 +651,7 @@ mod test {
 			.unwrap()
 			.entity;
 		let changed = |paths: &[&str]| {
-			paths.iter().map(|path| RelPath::from(*path)).collect()
+			paths.iter().map(|path| FwdPath::new(*path).unwrap()).collect()
 		};
 		changed_routes(&mut world, &changed(&["routes/index.md"]))
 			.xpect_eq(Some([home].into_iter().collect()));
@@ -754,7 +754,7 @@ mod test {
 				Router,
 				CardDeck,
 				LiveReload::new(),
-				children![RoutesDir::new("slides")],
+				children![RoutesDir::new(fwd_path!("slides"))],
 			))
 			.flush();
 		// the RoutesDir scan is async, so settle it before reading the tree
@@ -875,7 +875,7 @@ mod test {
 				Router,
 				CardDeck,
 				LiveReload::new(),
-				children![RoutesDir::new("slides")],
+				children![RoutesDir::new(fwd_path!("slides"))],
 			))
 			.flush();
 		// settle the async RoutesDir scan so the route tree exists before the
@@ -939,7 +939,7 @@ mod test {
 				FsStore::new(site_dir.clone()),
 				Router,
 				CardDeck,
-				children![RoutesDir::new("slides")],
+				children![RoutesDir::new(fwd_path!("slides"))],
 			))
 			.flush();
 		AsyncRunner::settle_async_tasks(app.world_mut()).await;

@@ -27,7 +27,7 @@ pub struct ParseContext<'a, 'w> {
 	pub bytes: &'a MediaBytes,
 	/// The document's path in its package, which a [`DocPath`] it holds
 	/// resolves from.
-	pub path: Option<RelPath>,
+	pub path: Option<FwdPath>,
 	/// The component the document's unsectioned metadata declares, the
 	/// registry's own by default ([`DocParsers::metadata_type`]).
 	pub metadata_type: Option<ReflectName>,
@@ -48,7 +48,7 @@ impl<'a, 'w> ParseContext<'a, 'w> {
 	}
 
 	/// Parse as the document at `path` of its package.
-	pub fn with_path(mut self, path: RelPath) -> Self {
+	pub fn with_path(mut self, path: FwdPath) -> Self {
 		self.path = Some(path);
 		self
 	}

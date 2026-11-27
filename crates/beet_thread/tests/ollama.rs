@@ -156,7 +156,7 @@ async fn compaction_refresh_on_a_local_model() {
 	let store = BlobStore::temp();
 	store
 		.insert(
-			&RelPath::new("Compactor.bsx"),
+			&fwd_path!("Compactor.bsx"),
 			r#"<RepeatWhileFunctionCallOutput>
 	<Thread {Sequence}>
 		<CompactInstructions/>

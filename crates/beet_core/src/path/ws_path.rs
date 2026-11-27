@@ -3,10 +3,10 @@ use core::ops::Deref;
 use core::str::FromStr;
 
 /// A location relative to the workspace root, usually the directory
-/// containing the main `Cargo.toml`: a cleaned [`SmolPath`] with any leading
-/// `/` stripped. When used as a component this indicates the entity
-/// represents a file or directory with the given path, which does **not**
-/// have to exist.
+/// containing the main `Cargo.toml`: a [`FwdPath`] below that root, so it
+/// never names anything outside the workspace. When used as a component this
+/// indicates the entity represents a file or directory with the given path,
+/// which does **not** have to exist.
 ///
 /// The type is `no_std`; resolving one to an [`AbsPath`]
 /// ([`into_abs`](Self::into_abs)) needs the workspace root and so `std`.
@@ -15,7 +15,8 @@ use core::str::FromStr;
 ///
 /// ```rust
 /// # use beet_core::prelude::*;
-/// let path = WsPath::new(file!());
+/// let path = WsPath::new(file!()).unwrap();
+/// WsPath::new("/etc/hosts").unwrap_err();
 /// ```
 #[derive(
 	Debug,
@@ -30,35 +31,53 @@ use core::str::FromStr;
 	Component,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(from = "SmolStr", into = "SmolStr"))]
-#[cfg_attr(feature = "tokens", derive(ToTokens), to_tokens(WsPath::new))]
-pub struct WsPath(SmolPath);
+#[cfg_attr(
+	feature = "serde",
+	serde(try_from = "SmolStr", into = "SmolStr")
+)]
+#[cfg_attr(feature = "tokens", derive(ToTokens), to_tokens(WsPath::from_fwd_path))]
+pub struct WsPath(FwdPath);
 
 impl WsPath {
-	/// Create a new [`WsPath`], a common use case is to use `file!()`
-	/// which is already relative to the workspace root.
-	pub fn new(path: impl AsRef<str>) -> Self {
-		Self(SmolPath::new(path.as_ref().trim_start_matches('/')))
+	/// Parse a path relative to the workspace root, ie `file!()`.
+	///
+	/// # Errors
+	/// Errors as [`FwdPath::new`]: on a leading `/`, or a `..` climbing out
+	/// of the workspace.
+	pub fn new(path: impl AsRef<str>) -> Result<Self> {
+		FwdPath::new(path).map(Self)
 	}
 
-	/// Append a path below this one, resolving any `..` segments.
-	pub fn join(&self, path: impl AsRef<str>) -> Self {
-		Self::new(self.0.join(path))
+	/// The workspace location `path` names below the root.
+	pub const fn from_fwd_path(path: FwdPath) -> Self { Self(path) }
+
+	/// The path `path` below this one, which can never climb out of it.
+	pub fn join(&self, path: &FwdPath) -> Self { Self(self.0.join(path)) }
+
+	/// [`join`](Self::join) a path parsed from text.
+	///
+	/// # Errors
+	/// Errors when `path` is rooted or climbs above this one.
+	pub fn try_join(&self, path: impl AsRef<str>) -> Result<Self> {
+		self.0.try_join(path).map(Self)
 	}
 
 	/// Returns the parent directory, or [`None`] at the workspace root.
 	pub fn parent(&self) -> Option<Self> { self.0.parent().map(Self) }
 
+	/// Borrow the path below the workspace root.
+	pub fn as_fwd_path(&self) -> &FwdPath { &self.0 }
+
 	/// Borrow the inner [`SmolPath`].
-	pub fn as_smol_path(&self) -> &SmolPath { &self.0 }
+	pub fn as_smol_path(&self) -> &SmolPath { self.0.as_smol_path() }
 
 	/// Consume into the inner [`SmolPath`].
-	pub fn into_smol_path(self) -> SmolPath { self.0 }
+	pub fn into_smol_path(self) -> SmolPath { self.0.into_smol_path() }
 }
 
 impl Deref for WsPath {
 	type Target = SmolPath;
-	fn deref(&self) -> &SmolPath { &self.0 }
+	fn deref(&self) -> &SmolPath { self.0.as_smol_path() }
 }
 
 impl core::fmt::Display for WsPath {
@@ -68,32 +87,39 @@ impl core::fmt::Display for WsPath {
 }
 
 impl FromStr for WsPath {
-	type Err = core::convert::Infallible;
-	fn from_str(val: &str) -> Result<Self, Self::Err> { Ok(Self::new(val)) }
+	type Err = BevyError;
+	fn from_str(val: &str) -> Result<Self> { Self::new(val) }
 }
 
-impl From<&str> for WsPath {
-	fn from(value: &str) -> Self { Self::new(value) }
+impl TryFrom<&str> for WsPath {
+	type Error = BevyError;
+	fn try_from(value: &str) -> Result<Self> { Self::new(value) }
 }
 
-impl From<String> for WsPath {
-	fn from(value: String) -> Self { Self::new(value) }
+impl TryFrom<String> for WsPath {
+	type Error = BevyError;
+	fn try_from(value: String) -> Result<Self> { Self::new(value) }
 }
 
-impl From<SmolStr> for WsPath {
-	fn from(value: SmolStr) -> Self { Self::new(value) }
+impl TryFrom<SmolStr> for WsPath {
+	type Error = BevyError;
+	fn try_from(value: SmolStr) -> Result<Self> { Self::new(value) }
+}
+
+impl From<FwdPath> for WsPath {
+	fn from(value: FwdPath) -> Self { Self(value) }
 }
 
 impl From<WsPath> for SmolStr {
-	fn from(value: WsPath) -> Self { value.0.into_smol_str() }
+	fn from(value: WsPath) -> Self { value.0.into() }
 }
 
 impl From<WsPath> for SmolPath {
-	fn from(value: WsPath) -> Self { value.0 }
+	fn from(value: WsPath) -> Self { value.0.into() }
 }
 
 impl From<&WsPath> for SmolPath {
-	fn from(value: &WsPath) -> Self { value.0.clone() }
+	fn from(value: &WsPath) -> Self { value.0.clone().into() }
 }
 
 impl AsRef<str> for WsPath {
@@ -101,7 +127,7 @@ impl AsRef<str> for WsPath {
 }
 
 impl AsRef<SmolPath> for WsPath {
-	fn as_ref(&self) -> &SmolPath { &self.0 }
+	fn as_ref(&self) -> &SmolPath { self.0.as_smol_path() }
 }
 
 // resolving against the workspace root is a std surface
@@ -141,20 +167,20 @@ mod test {
 	use crate::prelude::*;
 
 	#[crate::test]
-	fn cleans_and_strips_root() {
-		WsPath::new("Cargo.toml").as_str().xpect_eq("Cargo.toml");
+	fn cleans_and_refuses_what_leaves() {
+		WsPath::new("Cargo.toml").unwrap().as_str().xpect_eq("Cargo.toml");
 		WsPath::new("foo/../Cargo.toml")
+			.unwrap()
 			.as_str()
 			.xpect_eq("Cargo.toml");
-		WsPath::new("/crates/beet_core")
-			.as_str()
-			.xpect_eq("crates/beet_core");
+		WsPath::new("/crates/beet_core").unwrap_err();
+		WsPath::new("../elsewhere").unwrap_err();
 	}
 
 	#[crate::test]
 	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 	fn resolves_to_abs() {
-		WsPath::new(file!()).into_abs().xpect_eq(abs_file!());
+		WsPath::new(file!()).unwrap().into_abs().xpect_eq(abs_file!());
 		WsPath::new_cwd_rel("Cargo.toml")
 			.unwrap()
 			.as_str()

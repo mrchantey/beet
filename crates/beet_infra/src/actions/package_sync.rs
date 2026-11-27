@@ -120,7 +120,7 @@ mod test {
 					PackageAssemble::new(site.clone()).with_paths(paths),
 					children![DirCopy::new(
 						workspace.clone(),
-						"assets",
+						fwd_path!("assets"),
 						"databases/country.mmdb"
 					)]
 				),
@@ -134,14 +134,15 @@ mod test {
 			.work_directory(
 				&Stack::new("app").resolve(&PackageConfig::default()),
 			)
+			.unwrap()
 			.into_abs()
 			.join("package");
 		(document, assembled).xok()
 	}
 
 	fn sorted_stats(
-		mut stats: Vec<(RelPath, BlobStat)>,
-	) -> Vec<(RelPath, BlobStat)> {
+		mut stats: Vec<(FwdPath, BlobStat)>,
+	) -> Vec<(FwdPath, BlobStat)> {
 		stats.sort_by(|a, b| a.0.cmp(&b.0));
 		stats
 	}
@@ -159,9 +160,9 @@ mod test {
 		let mut published = document.list().await.unwrap();
 		published.sort();
 		published.xpect_eq(vec![
-			RelPath::new("assets/databases/country.mmdb"),
-			RelPath::new("main.bsx"),
-			RelPath::new("routes/index.md"),
+			fwd_path!("assets/databases/country.mmdb"),
+			fwd_path!("main.bsx"),
+			fwd_path!("routes/index.md"),
 		]);
 		sorted_stats(document.list_stats().await.unwrap()).xpect_eq(
 			sorted_stats(
@@ -182,7 +183,7 @@ mod test {
 		let (document, _) =
 			publish(&deployment, &site, &workspace).await.unwrap();
 		document
-			.exists(&RelPath::new("routes/index.md"))
+			.exists(&fwd_path!("routes/index.md"))
 			.await
 			.unwrap()
 			.xpect_false();
@@ -198,7 +199,7 @@ mod test {
 			.await
 			.unwrap();
 		document
-			.exists(&RelPath::new("target/debug/junk"))
+			.exists(&fwd_path!("target/debug/junk"))
 			.await
 			.unwrap()
 			.xpect_true();

@@ -39,7 +39,7 @@ impl<'a> ReferenceWalk<'a> {
 			// a held template is a document of its own, its references
 			// relative to where it was written
 			if let Some(held) = reflected.downcast_ref::<HeldTemplate>() {
-				for path in held.instances() {
+				for path in held.instances()? {
 					(self.found)(&DocPath::from(path), None)?;
 				}
 				return Ok(());

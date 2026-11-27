@@ -34,7 +34,7 @@ pub async fn SecretsRestore(
 	/// dir (`2026/09/15/010101Z.toml`); absent, the newest when the declared
 	/// path itself is not written.
 	#[param]
-	from: Option<RelPath>,
+	from: Option<FwdPath>,
 	/// Restore only these labels, comma separated; absent, every record.
 	#[param]
 	only: Option<String>,
@@ -112,7 +112,7 @@ impl SecretsRestore {
 	async fn source(
 		caller: &AsyncEntity,
 		selector: Option<&str>,
-		from: Option<&RelPath>,
+		from: Option<&FwdPath>,
 		store: &SecretStore,
 	) -> Result<SecretsHandle> {
 		let declared = SecretsHandle::resolve(caller, selector).await?;
