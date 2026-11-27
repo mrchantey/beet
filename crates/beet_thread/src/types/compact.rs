@@ -848,12 +848,11 @@ pub(crate) mod test {
 	pub(crate) const ANN: ActorId = ActorId::from_static("ann");
 	pub(crate) const COACH: ActorId = ActorId::from_static("coach");
 
-	/// A conversation and the store its compactors are documents of.
+	/// A conversation whose root holds the store its compactors are documents of.
 	pub(crate) struct Chat {
 		pub app: App,
 		pub root: Entity,
 		pub window: Entity,
-		pub store: BlobStore,
 	}
 
 	impl Chat {
@@ -929,7 +928,6 @@ pub(crate) mod test {
 				app,
 				root,
 				window,
-				store,
 			}
 		}
 
