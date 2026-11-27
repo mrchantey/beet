@@ -194,11 +194,12 @@ pub fn all_rules() -> Vec<Rule> {
 		// print utilities — gated behind `@media print`
 		print_hidden(),
 		page_break(),
-		// target forks — hide/show per target (eg the menu button's `☰`/`三`
-		// glyph spans); `terminal_only_shown` after its default so it wins ties
+		// target forks — hide/show per target (eg an icon's svg and glyph);
+		// `terminal_only_shown` after its default so it wins ties
 		terminal_hidden(),
 		terminal_only_hidden(),
 		terminal_only_shown(),
+		icon(),
 		// reduced motion — gated behind `@media (prefers-reduced-motion)`
 		reduced_motion(),
 		// interaction — shared hover affordance for buttons and links, plus the
@@ -386,9 +387,9 @@ mod tests {
 	}
 
 	/// The target-fork utilities serialize asymmetrically: the ungated
-	/// `terminal-only` default reaches CSS (so the web hides the `三` span),
-	/// while both `Terminal`-gated halves never do (so the web shows the `☰`
-	/// span untouched, and the terminal restore leaks nowhere).
+	/// `terminal-only` default reaches CSS (so the web hides an icon's glyph),
+	/// while both `Terminal`-gated halves never do (so the web shows its svg
+	/// untouched, and the terminal restore leaks nowhere).
 	#[beet_core::test]
 	fn target_fork_utilities_serialize_asymmetrically() {
 		let css = CssBuilder::default()

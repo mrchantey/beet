@@ -1,11 +1,11 @@
-//! `ThemeData` widget: the active [`Theme`] as json a page's scripts read.
+//! `ThemeData` widget: the active theme as json a page's scripts read.
 use crate::prelude::*;
 use crate::style::CssVariable;
 use crate::style::StyleQuery;
 use crate::widgets::BakedStylesheet;
 use beet_core::prelude::*;
 
-/// Emits the active [`Theme`] as `<script type="application/json"
+/// Emits the active [`ThemeTones`] as `<script type="application/json"
 /// id="beet-theme">`, for a page whose scripts draw in or edit the brand
 /// colours: a logo designer, a palette editor.
 ///
@@ -19,15 +19,14 @@ use beet_core::prelude::*;
 ///
 /// Only a page asking for it carries it: the tones are a few kilobytes.
 #[template(system)]
-pub fn ThemeData(theme: Res<Theme>, style: StyleQuery) -> Result<impl Bundle> {
+pub fn ThemeData(tones: Res<ThemeTones>, style: StyleQuery) -> Result<impl Bundle> {
 	use serde_json::Map;
 	use serde_json::Value as Json;
-	let palettes = ThemePalettes::new(&theme);
 	let names = style.variable_names(&BakedStylesheet::builder(false))?;
 	let keys = ThemePalette::ALL
 		.into_iter()
 		.map(|palette| {
-			let hex = palettes.key(palette).to_srgba().to_hex();
+			let hex = tones.key(palette).to_srgba().to_hex();
 			(palette.name().to_string(), Json::from(hex))
 		})
 		.collect::<Map<_, _>>();
@@ -35,7 +34,7 @@ pub fn ThemeData(theme: Res<Theme>, style: StyleQuery) -> Result<impl Bundle> {
 		.into_iter()
 		.map(|palette| (palette.name().to_string(), Json::Object(Map::new())))
 		.collect::<Map<_, _>>();
-	for (palette, tone, token) in ThemePalettes::tokens() {
+	for (palette, tone, token) in ThemeTones::tokens() {
 		if let Some(name) = names.get(&CssVariable::from_token_key(token.key()))
 			&& let Some(Json::Object(ramp)) = variables.get_mut(palette.name())
 		{
@@ -44,7 +43,7 @@ pub fn ThemeData(theme: Res<Theme>, style: StyleQuery) -> Result<impl Bundle> {
 	}
 	let json = serde_json::to_string(&serde_json::json!({
 		"keys": keys,
-		"tones": palettes.tones(),
+		"tones": &*tones,
 		"variables": variables,
 	}))?;
 	rsx! {

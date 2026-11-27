@@ -106,8 +106,15 @@ fn icon_links(icon_set: &IconSet) -> impl Bundle {
 		.links()
 		.into_iter()
 		.map(|link| {
+			let dark = link.dark_href.map(|href| href.to_string());
 			rsx! {
-				<link rel={link.rel} type={link.mime} sizes={link.sizes.to_string()} href={link.href.to_string()}/>
+				<link
+					rel={link.rel}
+					type={link.mime}
+					sizes={link.sizes.to_string()}
+					href={link.href.to_string()}
+					{Attribute::bundle_option("data-dark-href", dark)}
+				/>
 			}
 		})
 		.collect::<Vec<_>>();
@@ -655,13 +662,14 @@ mod test {
 			..default()
 		};
 
+		// production: an unlisted page is reachable by its link alone
 		let nodes = SidebarState::new("about")
 			.with_info(
 				"about",
 				SidebarInfo::of_page(
 					&page(RouteVisibility::Unlisted),
 					None,
-					false,
+					true,
 				),
 			)
 			.with_info(

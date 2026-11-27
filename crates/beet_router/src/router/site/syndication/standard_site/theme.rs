@@ -30,7 +30,7 @@ impl ThemeBasic {
 	/// lexicon names: [`Background`] the content background, [`OnBackground`]
 	/// its text, [`Primary`] links and buttons, [`OnPrimary`] the text on them.
 	///
-	/// The resolved tones rather than the [`Theme`] keys, since `OnPrimary` is
+	/// The resolved tones rather than the theme's keys, since `OnPrimary` is
 	/// contrast the palette derives and no brand declares. The light scheme
 	/// because a foreign reader renders the record on a surface of its own and
 	/// cannot know which scheme a visitor here would see.
@@ -39,9 +39,9 @@ impl ThemeBasic {
 	/// [`OnBackground`]: material::colors::OnBackground
 	/// [`Primary`]: material::colors::Primary
 	/// [`OnPrimary`]: material::colors::OnPrimary
-	pub fn from_theme(theme: &Theme) -> Result<Self> {
+	pub fn from_tones(tones: &ThemeTones) -> Result<Self> {
 		let color = |role: Token| {
-			theme
+			tones
 				.resolve(ColorScheme::Light, role)
 				.map(ThemeColorRgb::from)
 		};
@@ -89,11 +89,11 @@ mod test {
 	/// text, and the primary under its own contrast tone.
 	#[beet_core::test]
 	fn resolves_the_light_scheme() {
-		let theme = Theme::default();
-		let basic = ThemeBasic::from_theme(&theme).unwrap();
+		let tones = ThemeTones::default();
+		let basic = ThemeBasic::from_tones(&tones).unwrap();
 		let light = |role: Token| {
 			ThemeColorRgb::from(
-				theme.resolve(ColorScheme::Light, role).unwrap(),
+				tones.resolve(ColorScheme::Light, role).unwrap(),
 			)
 		};
 		basic

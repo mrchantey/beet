@@ -18,6 +18,13 @@ pub const FOOTER_SIDE: ClassName = ClassName::new_static("footer-side");
 /// A 12-column grid container with square row tracks (see [`grid`]).
 pub const GRID: ClassName = ClassName::new_static("grid");
 
+/// The viewport width at or below which the app bar's nav links hide (see
+/// [`app_bar_nav_hidden`]): a phone's, well under the sidebar's collapse, since
+/// the links fit beside the title long after the rail has gone.
+pub const APP_BAR_NAV_BREAKPOINT_PX: u32 = 480;
+/// The web app bar's height, whatever it holds (see [`app_bar_web`]).
+pub const APP_BAR_HEIGHT_REM: f32 = 3.5;
+
 // ── Rules ─────────────────────────────────────────────────────────────────────
 
 /// App bar / header - elevated surface suitable for navigation.
@@ -59,25 +66,33 @@ pub fn app_bar_terminal() -> Rule {
 		})
 }
 
-/// Web app bar - wraps onto extra rows if its content genuinely no longer fits
-/// on one line. Above the nav-collapse breakpoint (below it the nav links hide,
-/// see [`app_bar_nav_hidden`]) this only fires for a bar whose content outgrows
-/// a wide viewport, rather than overflowing the page width. Screen-gated: the
-/// terminal keeps its deliberately single-row app bar (see [`app_bar_terminal`]).
+/// Web app bar - one fixed height, [`APP_BAR_HEIGHT_REM`], its items centred
+/// in it with no vertical padding, so no child sets the bar's height: a nav
+/// button taller than the title line, or the nav hiding at
+/// [`APP_BAR_NAV_BREAKPOINT_PX`], leaves the bar where it was. Wraps onto
+/// extra rows only if its content genuinely no longer fits on one line,
+/// rather than overflowing the page width. Screen-gated: the terminal keeps
+/// its deliberately single-row app bar (see [`app_bar_terminal`]).
 pub fn app_bar_web() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Screen)
 		.with_selector(Selector::class(APP_BAR))
 		.with_value(common_props::FlexWrapProp, FlexWrap::Wrap)
+		.with_value(common_props::MinHeight, Length::Rem(APP_BAR_HEIGHT_REM))
+		.with_value(common_props::Padding, Spacing {
+			left: Length::Rem(1.5),
+			right: Length::Rem(1.5),
+			..Spacing::DEFAULT
+		})
 }
 
-/// App bar nav on narrow viewports - hidden at or below the sidebar collapse
-/// breakpoint on both targets, where navigation lives in the drawer behind the
+/// App bar nav on a phone - hidden at or below [`APP_BAR_NAV_BREAKPOINT_PX`]
+/// on both targets, where navigation lives in the drawer behind the
 /// [`MenuButton`](super::MENU_BUTTON) instead: a wrapped second row of header
 /// links would spend an already-small screen's height duplicating it.
 pub fn app_bar_nav_hidden() -> Rule {
 	Rule::new()
-		.with_media(MediaQuery::MaxWidth(super::SIDEBAR_BREAKPOINT_PX))
+		.with_media(MediaQuery::MaxWidth(APP_BAR_NAV_BREAKPOINT_PX))
 		.with_selector(Selector::class(APP_BAR_NAV))
 		.with_value(common_props::DisplayProp, Display::None)
 }
@@ -109,8 +124,7 @@ pub fn app_bar_nav_web() -> Rule {
 /// header's Docs/Blog/GitHub read comfortably beside the wordmark. Higher
 /// specificity than [`button_base`](super::button_base) (`.app-bar-nav .btn` vs
 /// `.btn`), so it overrides only the font-size and keeps the button's label
-/// weight, spacing, and line box - the line box is unchanged, so the bar's height
-/// is too.
+/// weight, spacing, and line box.
 pub fn app_bar_nav_link() -> Rule {
 	Rule::new()
 		.with_selector(Selector::descendant(

@@ -7,7 +7,8 @@
 //! Gated behind the `template` feature; rendering targets and styling come from
 //! the same DOM + rule machinery as parsed HTML.
 //!
-//! Grouped by what a widget *is*: [`controls`] the authored form controls,
+//! Grouped by what a widget *is*: [`Icon`] the line icons every control
+//! shares, [`controls`] the authored form controls,
 //! [`schema_ui`] the ones a schema generates, [`scene_editor`] the ones that
 //! edit the scene a page is, [`chrome`] the page frame, [`browser`] the
 //! web-target `<style>`/`<script>` emitters, and [`debug`] the ones that
@@ -59,6 +60,7 @@ mod chrome;
 mod code_snippet;
 mod controls;
 mod debug;
+mod icon;
 // `<Mermaid src>` reads through `beet_net`'s `BlobStore`.
 #[cfg(all(feature = "net", feature = "mermaid"))]
 mod mermaid;
@@ -81,6 +83,7 @@ pub use chrome::*;
 pub use code_snippet::*;
 pub use controls::*;
 pub use debug::*;
+pub use icon::*;
 #[cfg(all(feature = "net", feature = "mermaid"))]
 pub use mermaid::*;
 #[cfg(feature = "scene")]
@@ -95,3 +98,5 @@ pub(crate) use widget_plugin::widget_plugin;
 // A widget file authoring `<Button>` pins it the same way, with its own
 // `use crate::prelude::Button`, since two globs offering the name are ambiguous.
 pub use controls::button::Button;
+// `Icon` likewise, beside the window icon a bevy glob may bring
+pub use icon::Icon;

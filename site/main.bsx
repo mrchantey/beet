@@ -311,18 +311,20 @@ binary serves the records and the comments (`atproto`).
 		homepage="https://beet.org"
 		repository="https://github.com/mrchantey/beet"/>
 	<!-- the logo, drawn in the theme's tones by `scripts/logo.js` (the
-	     designer at /docs/design/logo loads the same file) and written into
-	     `site/assets/logo` by `<Derive/>`: `logo.svg` following the viewer's
-	     scheme, and `logo-light.svg` and `logo-dark.svg` for the layout to
-	     show by the page's. Declared before the icon set, which reads it. -->
-	<ScriptDerivation src="scripts/logo.js" call="BeetLogo.files" dir="assets/logo"/>
+	     designer at /docs/design/logo loads the same file), handed the
+	     `ThemeTones` resource, and written into `site/assets/logo` by
+	     `<Derive/>`: `logo.svg` following the viewer's scheme, and
+	     `logo-light.svg` and `logo-dark.svg` for the layout to show by the
+	     page's. Declared before the icon set, which reads it. -->
+	<ScriptDerivation src="scripts/logo.js" call="BeetLogo.files" dir="assets/logo" resources={["ThemeTones"]}/>
 	<!-- the site's icons, every size a browser or a PWA asks for derived from
 	     the one source image and written beside it in `site/assets/logo`
 	     by `<Derive/>`; `<Head>` links them from this declaration, and
 	     `beet check` fails a set that is missing or incomplete. The svg
-	     source is served as the favicon itself, so a tab follows the
-	     viewer's scheme. -->
-	<IconSet src="assets/logo/logo.svg"/>
+	     source is served as the favicon itself, and the dark drawing is
+	     swapped in while the system is dark, so a tab follows the browser
+	     chrome it sits in. -->
+	<IconSet src="assets/logo/logo.svg" dark="assets/logo/logo-dark.svg"/>
 	<!-- the tag vocabulary every page's metadata draws from, each tag earning
 	     its place by sitting on two or more posts; `beet check` fails a page
 	     carrying any other, or breaking a limit `DocMetaRules` carries -->

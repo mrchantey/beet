@@ -21,11 +21,11 @@ mod layout;
 mod route_index;
 #[cfg(feature = "std")]
 mod sidebar;
-// `<ServerIsland>`: a region of a page rendered live, and `<ServerIslands/>`,
-// the route answering each one
-// `<ScriptDerivation/>`: files a script derives from the brand colours
+// `<ScriptDerivation/>`: files a script derives from resources of the world
 #[cfg(all(feature = "std", feature = "scripting"))]
 mod script_derivation;
+// `<ServerIsland>`: a region of a page rendered live, and `<ServerIslands/>`,
+// the route answering each one
 #[cfg(feature = "std")]
 mod server_island;
 #[cfg(feature = "std")]

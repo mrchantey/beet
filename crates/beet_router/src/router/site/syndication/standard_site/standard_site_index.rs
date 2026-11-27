@@ -399,7 +399,7 @@ mod test {
 				homepage: Some(Url::coerce("https://beet.org")),
 				..default()
 			},
-			&Theme::default(),
+			&ThemeTones::default(),
 			None,
 		)
 		.unwrap();

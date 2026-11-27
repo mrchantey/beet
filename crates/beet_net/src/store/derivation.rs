@@ -68,12 +68,16 @@ use beet_core::prelude::*;
 /// local can hash it without fetching it again; one that practically never
 /// changes, like a video's poster frame, needs no `ttl`.
 ///
-/// What a producer reads off the world rather than from a file (a title a page
-/// declares in code, a theme colour) the declaration computes itself, as
-/// [`values`](Self::values) it keeps current. Each regeneration stamps them
-/// onto its provenance, so the file is stale once the declaration's values
-/// differ from the ones it was computed from, a value added or dropped
-/// included.
+/// What a producer reads off the world rather than from a file is a value. A
+/// resource it reads whole (the theme's tones, the package) it names among its
+/// [`resources`](Self::resources), each read and digested as the file's
+/// freshness is checked, so nothing keeps them current between checks, and the
+/// producer reads the very same serialized form
+/// ([`read_resources`](Self::read_resources)) as its input. Anything else (a
+/// title a page declares in code) the declaration computes itself, as
+/// [`values`](Self::values) it keeps current. Each regeneration stamps both onto
+/// its provenance, so the file is stale once the declaration's values differ
+/// from the ones it was computed from, a value added or dropped included.
 ///
 /// A file whose producer reads what a deploy must never depend on (a listing
 /// of a remote repo, say) names the verb that alone writes it
@@ -94,6 +98,10 @@ pub struct Derivation {
 	/// The values the declaration computes from the world, by name and
 	/// digest, stamped onto each regeneration's [`Provenance`].
 	pub values: Vec<ProvenanceValue>,
+	/// The resources the producer reads, each by the type path it is declared
+	/// by, short or full: read as the file's freshness is checked and stamped
+	/// as a value of that name.
+	pub resources: Vec<SmolStr>,
 	/// The verb that alone writes this file, ie `publish`, or `None` when any
 	/// ensure step may: `<Derive/>` skips a file one names, so a deploy
 	/// publishes it exactly as committed.
@@ -108,6 +116,7 @@ impl Derivation {
 			ttl: None,
 			inputs: Vec::new(),
 			values: Vec::new(),
+			resources: Vec::new(),
 			written_by: None,
 		}
 	}
@@ -122,6 +131,81 @@ impl Derivation {
 	pub fn with_value(mut self, value: ProvenanceValue) -> Self {
 		self.values.push(value);
 		self
+	}
+
+	/// This derivation reading the resource named `name`, a short or full type
+	/// path, see [`resources`](Self::resources).
+	pub fn with_resource(mut self, name: impl Into<SmolStr>) -> Self {
+		self.resources.push(name.into());
+		self
+	}
+
+	/// This derivation reading the resource `T`, see
+	/// [`resources`](Self::resources).
+	pub fn with_resource_type<T: TypePath>(self) -> Self {
+		self.with_resource(T::type_path())
+	}
+
+	/// Each declared [`resource`](Self::resources) as `world` holds it now,
+	/// serialized, by the name declaring it: a resource absent from the world
+	/// reads as [`Value::Null`], so its arrival changes the file's freshness.
+	///
+	/// # Errors
+	/// Errors when a name resolves to no registered resource.
+	pub fn read_resources(&self, world: &World) -> Result<Vec<(SmolStr, Value)>> {
+		let registry = world.resource::<AppTypeRegistry>().read();
+		self.resources
+			.iter()
+			.map(|name| {
+				let registration =
+					reflect_ext::carried_registration_by_name(&registry, name)
+						.ok_or_else(|| {
+							bevyhow!(
+								"derived file `{}` reads the resource `{name}`, which is no registered type",
+								self.path
+							)
+						})?;
+				let value = match reflect_ext::reflect_resource(world, registration)
+				{
+					Some(resource) => {
+						reflect_value_ext::reflect_to_value(resource.as_partial_reflect(), &registry)
+							.ok_or_else(|| {
+								bevyhow!("the resource `{name}` does not serialize")
+							})?
+					}
+					None => Value::Null,
+				};
+				(name.clone(), value).xok()
+			})
+			.collect()
+	}
+
+	/// This derivation with each of its resources read from `world` as a value.
+	fn with_resource_values(self, world: &World) -> Result<Self> {
+		self.read_resources(world)?.into_iter().try_fold(
+			self,
+			|derivation, (name, value)| {
+				derivation
+					.with_value(ProvenanceValue::new(
+						name,
+						&MediaType::Json.serialize(&value)?,
+					))
+					.xok()
+			},
+		)
+	}
+
+	/// The derivation `entity` declares, its resources read as values.
+	async fn declared_by(world: &AsyncWorld, entity: Entity) -> Result<Self> {
+		world
+			.with(move |world: &mut World| {
+				world
+					.get::<Self>(entity)
+					.cloned()
+					.ok_or_else(|| bevyhow!("entity {entity} declares no derivation"))?
+					.with_resource_values(world)
+			})
+			.await
 	}
 
 	/// This derivation written by `verb` alone, see
@@ -207,9 +291,7 @@ impl Derivation {
 		entity: Entity,
 		store: &BlobStore,
 	) -> Result<bool> {
-		world
-			.entity(entity)
-			.get_cloned::<Self>()
+		Self::declared_by(world, entity)
 			.await?
 			.regenerate(world.entity(entity), store, true)
 			.await
@@ -221,7 +303,7 @@ impl Derivation {
 		entity: Entity,
 		store: &BlobStore,
 	) -> Result<(Self, Freshness)> {
-		let derivation = world.entity(entity).get_cloned::<Self>().await?;
+		let derivation = Self::declared_by(world, entity).await?;
 		let digests = SourceDigests::new(world, store.clone()).await;
 		let freshness = derivation.freshness(store, &digests).await?;
 		(derivation, freshness).xok()
@@ -881,6 +963,46 @@ mod test {
 			.unwrap()
 			.xpect_eq(Freshness::Fresh);
 		runs.get().xpect_eq(3);
+	}
+
+	/// A resource the declaration reads, its stand-in for a theme.
+	#[derive(Debug, Clone, Resource, Reflect)]
+	#[reflect(Resource)]
+	struct Brand(String);
+
+	/// A declared resource is read as the file's freshness is checked, with
+	/// nothing keeping it current: the file is stale once it changes, or once
+	/// an absent one arrives, and the producer reads the same form.
+	#[beet_core::test]
+	async fn regenerates_a_changed_resource() {
+		let (mut world, entity, store, runs) = setup(
+			Derivation::new(DERIVED).with_resource_type::<Brand>(),
+			"text",
+		);
+		world.resource::<AppTypeRegistry>().write().register::<Brand>();
+		ensure(&mut world, entity, &store).await.unwrap();
+		ensure(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_eq(Freshness::Fresh);
+		let name = SmolStr::from(Brand::type_path());
+		world.insert_resource(Brand("green".into()));
+		ensure(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_eq(Freshness::Revalued(name.clone()));
+		world.resource_mut::<Brand>().0 = "red".into();
+		ensure(&mut world, entity, &store)
+			.await
+			.unwrap()
+			.xpect_eq(Freshness::Revalued(name.clone()));
+		runs.get().xpect_eq(3);
+		world
+			.get::<Derivation>(entity)
+			.unwrap()
+			.read_resources(&world)
+			.unwrap()
+			.xpect_eq(vec![(name, Value::Str("red".into()))]);
 	}
 
 	#[beet_core::test]

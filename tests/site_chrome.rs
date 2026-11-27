@@ -1,16 +1,18 @@
-//! The responsive sidebar drawer, driven in a real browser over a served
+//! The responsive site chrome, driven in a real browser over a served
 //! fixture: the [`PageHarness`] serves the real site chrome ([`SiteLayout`])
-//! around a stand-in for the home page's "Mind your step" card, and the test
-//! drives the [`MenuButton`] toggle at a phone viewport.
+//! around a stand-in for the home page's "Mind your step" card.
 //!
-//! Guards the drawer regression where the opened rail joined the container's
-//! flex row instead of overlaying it: `<main>` was squeezed to a ~100px sliver
-//! beside the 16rem rail, and the card's unshrinkable button row (centred by
-//! the main column) spilled under the rail and past the viewport edge.
+//! Guards two regressions:
+//! - the app bar changing height with what it holds: a nav button taller than
+//!   the title line grew the bar, so it jumped as the nav hid at a breakpoint.
+//! - the drawer: the opened rail joined the container's flex row instead of
+//!   overlaying it, so `<main>` was squeezed to a ~100px sliver beside the
+//!   16rem rail, and the card's unshrinkable button row (centred by the main
+//!   column) spilled under the rail and past the viewport edge.
 //!
 //! Run: chromedriver + chromium on PATH, then
 //! ```sh
-//! cargo test --test sidebar_drawer \
+//! cargo test --test site_chrome \
 //!   --features router,style,http_server,testing,webdriver -- --include-ignored
 //! ```
 beet::test_main!();
@@ -100,23 +102,66 @@ async fn nav_display(page: &Page) -> String {
 	.to_string()
 }
 
-#[beet_core::test(timeout_ms = 60_000)]
-#[ignore = "smoketest"]
-async fn drawer_overlays_content_on_mobile() {
-	let mut page = PageHarness::serve(
+/// The fixture served beside a driven browser.
+async fn serve() -> PageHarness {
+	PageHarness::serve(
 		(
 			RouterPlugin,
 			material::MaterialStylePlugin::default(),
 			// `SiteLayout`'s head/header read the site identity off this
-			// resource; the live serve pipeline seeds it, a fixture must too
+			// resource; the live serve pipeline seeds it, a fixture must too.
+			// A repository, so the nav holds a link button beside the toggle.
 			|app: &mut App| {
-				app.init_resource::<PackageConfig>();
+				app.insert_resource(PackageConfig {
+					repository: Some(Url::coerce("https://github.com/mrchantey/beet")),
+					..default()
+				});
 			},
 		),
 		site(),
 	)
 	.await
-	.unwrap();
+	.unwrap()
+}
+
+/// The app bar is one height at every width: whether the nav shows, the
+/// drawer's menu button shows, or neither, no child sets its height.
+#[beet_core::test(timeout_ms = 60_000)]
+#[ignore = "smoketest"]
+async fn app_bar_holds_its_height() {
+	let mut page = serve().await;
+	let expected = (classes::APP_BAR_HEIGHT_REM * 16.) as f64;
+	let nav_breakpoint = classes::APP_BAR_NAV_BREAKPOINT_PX;
+	let mut faults = Vec::new();
+	for width in [1280, 1000, 700, nav_breakpoint + 1, nav_breakpoint, 375] {
+		page.set_viewport(width, 800).await.unwrap();
+		page.goto("/").await.unwrap();
+		let height = page
+			.evaluate_value(
+				"document.querySelector('.app-bar').getBoundingClientRect().height",
+			)
+			.await
+			.unwrap()
+			.as_f64()
+			.unwrap();
+		if (height - expected).abs() > 0.5 {
+			faults.push(format!("{width}px: the app bar is {height}px, not {expected}px"));
+		}
+		// the nav links stay until a phone's width
+		let display = nav_display(&page).await;
+		let shown = width > nav_breakpoint;
+		if (display != "none") != shown {
+			faults.push(format!("{width}px: the nav is `{display}`"));
+		}
+	}
+	faults.xpect_empty();
+	page.kill().await.unwrap();
+}
+
+#[beet_core::test(timeout_ms = 60_000)]
+#[ignore = "smoketest"]
+async fn drawer_overlays_content_on_mobile() {
+	let mut page = serve().await;
 	// an iphone-ish viewport, well below the collapse breakpoint
 	page.set_viewport(375, 812).await.unwrap();
 	page.goto("/").await.unwrap();

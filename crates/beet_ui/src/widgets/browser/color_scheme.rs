@@ -44,13 +44,21 @@ pub fn ColorSchemeScript() -> impl Bundle {
 }
 
 /// A header button cycling the stored colour scheme through auto, light and
-/// dark, its icon naming the current one: a half filled circle, a sun or a
-/// moon, line drawn in the text colour rather than glyphs a font may lack.
-/// The click is bound by [`ColorSchemeScript`], which also swaps the icon, so
-/// it renders the auto icon and does nothing without the script, ie on the
+/// dark, its [`Icon`] naming the current one: [`Contrast`](IconName::Contrast),
+/// [`Sun`](IconName::Sun) or [`Moon`](IconName::Moon). It holds all three, the
+/// auto one shown, and [`ColorSchemeScript`] binds the click and shows the one
+/// naming the stored pin, so it does nothing without the script, ie on the
 /// terminal, where it is hidden.
 #[template]
 pub fn ColorSchemeToggle() -> impl Bundle {
+	let icon = |scheme: &'static str, name: IconName| {
+		rsx! {
+			<span
+				data-color-scheme-icon={scheme}
+				{Attribute::bundle_option("hidden", (scheme != "auto").then_some(""))}
+			><Icon name={name}/></span>
+		}
+	};
 	rsx! {
 		<button
 			type="button"
@@ -58,10 +66,9 @@ pub fn ColorSchemeToggle() -> impl Bundle {
 			aria-label="Toggle colour scheme"
 			title="Colour scheme: auto"
 			{Classes::new([classes::BTN, classes::BTN_TEXT, classes::TERMINAL_HIDDEN])}>
-			<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-				<circle cx="12" cy="12" r="9"/>
-				<path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/>
-			</svg>
+			{icon("auto", IconName::Contrast)}
+			{icon("light", IconName::Sun)}
+			{icon("dark", IconName::Moon)}
 		</button>
 	}
 }

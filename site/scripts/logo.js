@@ -17,8 +17,8 @@
 //
 // A classic script, no `import` or `export`, defining the one global
 // `BeetLogo`: the logo designer page loads it with `<script src>`, and the
-// entry's `<ScriptDerivation>` runs it to write the files `files` answers into
-// `assets/logo`. The hand drawn original is `assets/logo/logo-hand-drawn.jpg`.
+// entry's `<ScriptDerivation>` runs it, handed the `ThemeTones` resource, to
+// write the files `files` answers into `assets/logo`. The hand drawn original is `assets/logo/logo-hand-drawn.jpg`.
 const BeetLogo = (() => {
 	/** Every knob the logo has. */
 	const DEFAULTS = {
@@ -300,10 +300,11 @@ ${beetPaths}
 	/**
 	 * The files the site serves, each transparent and cropped to the art:
 	 * `logo.svg` following the viewer's scheme (the favicon), and
-	 * `logo-light.svg` and `logo-dark.svg` for a page to show by its own scheme.
-	 * The entry `<ScriptDerivation>` calls, handed the theme's `tones`.
+	 * `logo-light.svg` and `logo-dark.svg` for a page to show by its own scheme,
+	 * and the favicon for a dark system. The entry `<ScriptDerivation>` calls,
+	 * handed the theme's tones as the `ThemeTones` resource it declares.
 	 */
-	function files({ tones }, params = {}) {
+	function files({ ThemeTones: tones }, params = {}) {
 		const published = { ...params, backgroundOpacity: 0 };
 		return {
 			"logo.svg": svg({ ...published, mode: "auto" }, tones),

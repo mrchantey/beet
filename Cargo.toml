@@ -955,12 +955,12 @@ path = "tests/site_browser.rs"
 harness = false
 required-features = ["router", "json", "testing", "webdriver"]
 
-# the responsive sidebar drawer over a `PageHarness`-served `SiteLayout`
-# fixture: below the breakpoint the opened rail overlays the content instead of
-# squeezing it (the "Mind your step" card overflow regression).
+# the responsive site chrome over a `PageHarness`-served `SiteLayout` fixture:
+# the app bar holds one height at every width, and below the breakpoint the
+# opened rail overlays the content instead of squeezing it.
 [[test]]
-name = "sidebar_drawer"
-path = "tests/sidebar_drawer.rs"
+name = "site_chrome"
+path = "tests/site_chrome.rs"
 harness = false
 required-features = ["router", "style", "http_server", "testing", "webdriver"]
 

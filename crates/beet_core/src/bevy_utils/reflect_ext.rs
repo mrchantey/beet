@@ -172,6 +172,21 @@ pub fn registration_by_name<'a>(
 	matches.next().is_none().then_some(first)
 }
 
+/// The resource `registration` names as `world` holds it, `None` when absent
+/// or not a reflected resource. Resources are entity-backed components, so it
+/// is read through its [`ReflectComponent`] on the resource's entity.
+pub fn reflect_resource<'a>(
+	world: &'a World,
+	registration: &TypeRegistration,
+) -> Option<&'a dyn Reflect> {
+	registration.data::<ReflectResource>()?;
+	let component_id = world.components().get_id(registration.type_id())?;
+	let entity = world.resource_entities().get(component_id)?;
+	registration
+		.data::<ReflectComponent>()?
+		.reflect(world.get_entity(entity).ok()?)
+}
+
 /// [`registration_by_name`] for a name an entity carries, a tag or a scene
 /// body's key, so an ambiguous short path resolves in favour of its sole
 /// component or resource: a plain value type sharing the name (registered by

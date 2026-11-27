@@ -1,27 +1,27 @@
-//! Files a script derives from the brand colours, ie a logo drawn in svg.
+//! Files a script derives from resources of the world, ie a logo drawn in the
+//! brand colours.
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_ui::prelude::*;
-use serde::Serialize;
 use std::collections::BTreeMap;
 
 /// `<ScriptDerivation src="scripts/logo.js" call="BeetLogo.files"
-/// dir="assets/logo"/>`: the text files a script answers, derived into `dir`
-/// in the store this entity resolves by ancestry.
+/// dir="assets/logo" resources={["ThemeTones"]}/>`: the text files a script
+/// answers, derived into `dir` in the store this entity resolves by ancestry.
 ///
 /// `src` is a classic script, no `import` or `export`, so a page can load the
 /// very same file with `<script src>` and draw live what is derived here. Run
 /// as the body of the derivation, it is followed by `return <call>(input)`,
-/// the call answering an object of file name to text. Its `input` is
-/// [`ScriptDerivationInput`], the active [`Theme`]'s tones, so a script draws
-/// in the brand colours without carrying colour maths. It runs pure, with no
-/// `world` bridge, since a derived file depends on what its provenance names
-/// and nothing else.
+/// the call answering an object of file name to text. Its `input` holds each
+/// of `resources` by the name it is declared by, serialized as the world holds
+/// it ([`Derivation::read_resources`]), ie `input.ThemeTones.primary[40]`. It
+/// runs pure, with no `world` bridge, since a derived file depends on what its
+/// provenance names and nothing else.
 ///
 /// The declaration is its own producing action. Its [`Derivation`] is
 /// `<dir>/<src stem>.derived.json`, listing every file written, its input the
-/// script and its value the tones, so editing the script or the theme
+/// script and its resources the ones handed to it, read as the file's
+/// freshness is checked, so editing the script or a change to a resource
 /// regenerates the files at the next `<Derive/>`. Declare it before a
 /// declaration reading its files (an [`IconSet`](crate::prelude::IconSet)
 /// drawn from the svg), since `<Derive/>` ensures in document order.
@@ -39,14 +39,25 @@ pub async fn ScriptDerivation(
 	/// The directory the files are written into.
 	#[field]
 	dir: RelPath,
+	/// The resources the script is handed, each by a short or full type path.
+	#[field]
+	resources: Vec<SmolStr>,
 	cx: ActionContext<BlobStore>,
 ) -> Result<EntityBody> {
-	let declaration = ScriptDerivation { src, call, dir };
+	let declaration = ScriptDerivation {
+		src,
+		call,
+		dir,
+		resources,
+	};
 	let source = cx.input.get(&declaration.src).await?;
+	let derivation = declaration.derivation()?;
 	let input = cx
 		.world()
-		.with(|world: &mut World| ScriptDerivationInput::new(world))
-		.await;
+		.with(move |world: &mut World| derivation.read_resources(world))
+		.await?
+		.into_iter()
+		.collect::<Map>();
 	let body = format!(
 		"{{\n{}\nreturn {}(input);\n}}",
 		str::from_utf8(&source)?,
@@ -56,11 +67,9 @@ pub async fn ScriptDerivation(
 		world: false,
 		..default()
 	};
-	let files = Script::<ScriptDerivationInput, BTreeMap<String, String>>::new(
-		body,
-	)
-	.run(input, cx.world().clone(), &config)
-	.await?;
+	let files = Script::<Value, BTreeMap<String, String>>::new(body)
+		.run(Value::Map(input), cx.world().clone(), &config)
+		.await?;
 	let mut outputs = DerivationOutputs::default();
 	for (name, text) in files {
 		outputs
@@ -75,40 +84,21 @@ pub async fn ScriptDerivation(
 		.with_typed(&outputs)
 }
 
-/// What a [`ScriptDerivation`]'s script is handed as `input`.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ScriptDerivationInput {
-	/// Every tone of the active [`Theme`]'s palettes, `tones.primary[40]`.
-	pub tones: ThemeTones,
-}
-
-impl ScriptDerivationInput {
-	/// The input in `world`, its [`Theme`] or the default.
-	pub fn new(world: &World) -> Self {
-		let theme = world.get_resource::<Theme>().cloned().unwrap_or_default();
-		Self {
-			tones: ThemePalettes::new(&theme).tones(),
-		}
-	}
-}
-
 impl ScriptDerivation {
-	/// The value a derivation names the input by.
-	const VALUE: &str = "input";
-
-	/// The [`Derivation`] this declaration declares, computed from `input`.
-	pub fn derivation(&self, input: &ScriptDerivationInput) -> Result<Derivation> {
+	/// The [`Derivation`] this declaration declares.
+	pub fn derivation(&self) -> Result<Derivation> {
 		let stem = self
 			.src
 			.as_smol_path()
 			.file_stem()
 			.ok_or_else(|| bevyhow!("script `{}` has no file name", self.src))?;
-		Derivation::new(self.dir.join(format!("{stem}.derived.json")))
-			.with_input(self.src.clone())
-			.with_value(ProvenanceValue::new(
-				Self::VALUE,
-				&MediaType::Json.serialize(input)?,
-			))
+		self.resources
+			.iter()
+			.fold(
+				Derivation::new(self.dir.join(format!("{stem}.derived.json")))
+					.with_input(self.src.clone()),
+				|derivation, resource| derivation.with_resource(resource.clone()),
+			)
 			.xok()
 	}
 
@@ -127,51 +117,17 @@ impl ScriptDerivation {
 		self.dir.join(name).xok()
 	}
 
-	/// The hook landing this declaration's [`Derivation`] on its entity,
-	/// computed from the theme at hand; [`Self::refresh`] recomputes it when
-	/// the theme lands.
+	/// The hook landing this declaration's [`Derivation`] on its entity.
 	fn declare_derivation(&self) -> impl FnOnce(&mut EntityCommands) + use<> {
-		let declaration = self.clone();
-		move |entity: &mut EntityCommands| {
-			let id = entity.id();
-			entity.commands().queue(move |world: &mut World| {
-				Self::refresh_one(world, id, &declaration)
-			});
+		let derivation = self.derivation();
+		move |entity: &mut EntityCommands| match derivation {
+			Ok(derivation) => {
+				entity.insert(derivation);
+			}
+			Err(error) => entity.commands().queue(move |world: &mut World| {
+				world.handle_command_error::<Self>(error)
+			}),
 		}
-	}
-
-	/// Recompute every declaration's [`Derivation`] from the world's theme.
-	fn refresh(world: &mut World) -> Result {
-		let declarations = world
-			.query::<(Entity, &Self)>()
-			.iter(world)
-			.map(|(entity, declaration)| (entity, declaration.clone()))
-			.collect::<Vec<_>>();
-		for (entity, declaration) in declarations {
-			Self::refresh_one(world, entity, &declaration)?;
-		}
-		Ok(())
-	}
-
-	fn refresh_one(world: &mut World, entity: Entity, declaration: &Self) -> Result {
-		let derivation =
-			declaration.derivation(&ScriptDerivationInput::new(world))?;
-		if let Ok(mut entity) = world.get_entity_mut(entity) {
-			entity.insert(derivation);
-		}
-		Ok(())
-	}
-}
-
-impl TypeInstaller for ScriptDerivation {
-	/// Registers the declaration and recomputes each one's input when the
-	/// theme lands.
-	fn install(app: &mut App) {
-		app.register_type::<Self>().add_observer(
-			|_ev: On<Insert<Theme>>, mut commands: Commands| {
-				commands.queue(ScriptDerivation::refresh);
-			},
-		);
 	}
 }
 
@@ -184,19 +140,23 @@ mod test {
 
 	const SRC: &str = "scripts/swatch.js";
 
-	/// A world declaring a derivation of `script` into `out`, in a temp store.
+	/// A world with the theme's tones, declaring a derivation of `script` into
+	/// `out` handed them, in a temp store.
 	fn setup(script: &str) -> (World, Entity, BlobStore) {
-		let mut world = (AsyncPlugin, ScriptDerivation::install).into_world();
+		let mut world =
+			(AsyncPlugin, material::MaterialStylePlugin).into_world();
 		world.insert_resource(Theme {
 			primary: Some(Color::srgb_u8(0x00, 0x6c, 0x4f)),
 			..default()
 		});
+		world.flush();
 		let store = BlobStore::temp();
 		let entity = world
 			.spawn(ScriptDerivation {
 				src: SRC.into(),
 				call: "Swatch.files".into(),
 				dir: "out".into(),
+				resources: vec!["ThemeTones".into()],
 			})
 			.flush();
 		let inserted = store.clone();
@@ -224,7 +184,7 @@ mod test {
 	#[beet_core::test]
 	async fn derives_files_in_the_theme() {
 		let (mut world, entity, store) = setup(
-			"const Swatch = { files: (input) => ({ 'swatch.svg': `<rect fill=\"${input.tones.primary[40]}\"/>` }) };",
+			"const Swatch = { files: (input) => ({ 'swatch.svg': `<rect fill=\"${input.ThemeTones.primary[40]}\"/>` }) };",
 		);
 		ensure(&mut world, entity, &store)
 			.await
@@ -237,14 +197,13 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(Freshness::Fresh);
-		// a new theme is a new input
+		// a new theme is new tones, read as the freshness is checked
 		world.insert_resource(Theme::default());
 		world.flush();
 		ensure(&mut world, entity, &store)
 			.await
 			.unwrap()
-			.to_string()
-			.xpect_contains("input");
+			.xpect_eq(Freshness::Revalued("ThemeTones".into()));
 	}
 
 	#[beet_core::test]

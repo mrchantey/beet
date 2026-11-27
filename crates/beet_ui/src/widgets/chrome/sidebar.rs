@@ -102,13 +102,11 @@ pub fn SidebarScript() -> impl Bundle {
 /// `aria-controls` disclosure observer on the terminal. Place it in the
 /// header's leading slot, left of the title.
 ///
-/// One hamburger glyph per target, forked by the `terminal-hidden`/
-/// `terminal-only` utility classes: `☰` (U+2630) suits the web but is East
-/// Asian *ambiguous-width* — a CJK-configured terminal renders it two cells
-/// wide while the charcell engine paints one, smearing neighbours — and a
-/// terminal cannot scale it up via `font-size`. `三` (U+4E09) is unambiguously
-/// Wide: two cells on every terminal, three clean strokes, the largest
-/// single-line hamburger a char grid can draw.
+/// Its [`IconName::Menu`] icon is the Lucide line drawing on the web, matching
+/// the app bar's other icons, and `三` (U+4E09) in the terminal: unambiguously
+/// Wide, two cells on every terminal, three clean strokes, the largest
+/// single-line hamburger a char grid can draw, where `☰` (U+2630) is East Asian
+/// *ambiguous-width* and a CJK-configured terminal smears it over a neighbour.
 ///
 /// Classed as a text button like the app bar's other controls — plain
 /// surface foreground at rest, the shared hover affordance — rather than
@@ -122,8 +120,7 @@ pub fn MenuButton() -> impl Bundle {
 			aria-controls="sidebar"
 			aria-label="Toggle navigation"
 			{Classes::new([classes::BTN, classes::BTN_TEXT, classes::MENU_BUTTON])}>
-			<span {Classes::new([classes::TERMINAL_HIDDEN])}>"☰"</span>
-			<span {Classes::new([classes::TERMINAL_ONLY])}>"三"</span>
+			<Icon name=IconName::Menu/>
 		</button>
 	}
 }
@@ -429,8 +426,7 @@ mod test {
 
 	/// The menu button is responsive on the terminal exactly like the web:
 	/// hidden above the collapse breakpoint (90 columns), shown below it — and
-	/// with the terminal's wide `三` glyph, never the web's ambiguous-width
-	/// `☰`. Rendered beside a sibling so the wide case distinguishes "hidden"
+	/// with the terminal's wide `三` glyph, never the web's svg. Rendered beside a sibling so the wide case distinguishes "hidden"
 	/// from "empty buffer".
 	#[beet_core::test]
 	fn menu_button_follows_breakpoint() {
@@ -447,12 +443,10 @@ mod test {
 			.xpect_contains("Beet")
 			.xnot()
 			.xpect_contains("三");
-		// narrow: shown with the terminal glyph; the web `☰` span stays
+		// narrow: shown with the terminal glyph; the web svg stays
 		// terminal-hidden
 		render_plain_sized(40, template())
-			.xpect_contains("三")
-			.xnot()
-			.xpect_contains("☰");
+			.xpect_contains("三");
 	}
 
 	/// The entity of the sole `<nav>` element.

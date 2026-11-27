@@ -22,8 +22,9 @@ images, the light and dark files `main.bsx`'s `<ScriptDerivation>` draws, the
 page's scheme class showing one: an image cannot see the page it sits in, so
 one file following the OS would miss a scheme the visitor pinned. The nav
 carries the site's own links ahead of the repository link and the scheme
-toggle. The Docs link is `hidden`, like the unlisted pages it leads to: they
-serve to whoever holds a url, and nobody browsing the site is shown the way in.
+toggle. The Docs link is `hidden`, like the unlisted pages it leads to: in
+production they serve to whoever holds a url, and nobody browsing the site is
+shown the way in, though the sidebar lists them in every other stage.
 
 <Analytics/> injects the page-view beacon script on every page (web only; the
 runtime ignores the <script> on terminal targets, whose page views come from the

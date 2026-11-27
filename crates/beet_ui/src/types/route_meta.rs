@@ -62,7 +62,8 @@ pub enum RouteVisibility {
 	#[default]
 	Public,
 	/// Served and exported, but excluded from the sitemap, the feeds and the
-	/// search index, and marked `noindex` for crawlers.
+	/// search index, and marked `noindex` for crawlers. Browsable, ie in the
+	/// sidebar, everywhere but production ([`RouteMeta::is_browsable`]).
 	Unlisted,
 	/// Excluded from production entirely, whether exported or live-served.
 	Draft,
@@ -80,15 +81,13 @@ impl RouteMeta {
 	pub fn is_draft(&self) -> bool { self.visibility == RouteVisibility::Draft }
 
 	/// Whether a reader browsing the site finds the page, ie it appears in a
-	/// sidebar or a route index: an [`Unlisted`](RouteVisibility::Unlisted) page
-	/// is reachable by its link alone, and a [`Draft`](RouteVisibility::Draft)
-	/// is previewed everywhere but production, matching static export.
+	/// sidebar or a route index. Outside production every page is browsable,
+	/// so whoever works on the site can find what they are working on; in
+	/// production an [`Unlisted`](RouteVisibility::Unlisted) page is reachable
+	/// by its link alone, and a [`Draft`](RouteVisibility::Draft) not at all,
+	/// matching static export.
 	pub fn is_browsable(&self, is_prod: bool) -> bool {
-		match self.visibility {
-			RouteVisibility::Public => true,
-			RouteVisibility::Unlisted => false,
-			RouteVisibility::Draft => !is_prod,
-		}
+		!is_prod || self.visibility == RouteVisibility::Public
 	}
 
 	/// The sidebar label: explicit [`sidebar_label`](Self::sidebar_label), else

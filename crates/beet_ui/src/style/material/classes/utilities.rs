@@ -15,6 +15,8 @@ pub const PAGE_BREAK: ClassName = ClassName::new_static("page-break");
 // Target forks, styled by `@media` Terminal rules.
 pub const TERMINAL_HIDDEN: ClassName = ClassName::new_static("terminal-hidden");
 pub const TERMINAL_ONLY: ClassName = ClassName::new_static("terminal-only");
+/// An [`Icon`](crate::prelude::Icon)'s box.
+pub const ICON: ClassName = ClassName::new_static("icon");
 
 // ── Color utility classes ─────────────────────────────────────────────────────
 
@@ -56,12 +58,22 @@ pub fn page_break() -> Rule {
 /// Hides an element on the terminal alone: a `Terminal`-gated `display: none`
 /// never reaches the serialized CSS, so the web shows the element untouched.
 /// Pairs with [`terminal_only_hidden`]/[`terminal_only_shown`] for per-target
-/// content forks, eg the menu button's `☰`/`三` glyph spans.
+/// content forks, eg an [`Icon`](crate::prelude::Icon)'s svg and glyph.
 pub fn terminal_hidden() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TERMINAL_HIDDEN))
 		.with_media(MediaQuery::Terminal)
 		.with_value(common_props::DisplayProp, Display::None)
+}
+
+/// An [`Icon`](crate::prelude::Icon) on the web: a flex box, so its svg
+/// centres in the control holding it rather than sitting on the text
+/// baseline. Screen-gated: the terminal's glyph keeps inline flow.
+pub fn icon() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(ICON))
+		.with_media(MediaQuery::Screen)
+		.with_value(common_props::DisplayProp, Display::Flex)
 }
 
 /// The default half of the [`TERMINAL_ONLY`] pair: hidden everywhere. The

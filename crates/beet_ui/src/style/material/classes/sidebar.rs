@@ -203,20 +203,12 @@ pub fn sidebar_hidden() -> Rule {
 /// below the breakpoint via [`menu_button_visible`]. No horizontal padding, so
 /// it reads as a compact icon affordance flush against the title.
 pub fn menu_button() -> Rule {
-	// `icon_size` is the tuning knob: it's only the `font-size`, so it scales how
-	// large the web's `☰` glyph *draws*, not the button's box (the terminal's
-	// `三` span ignores it — a cell glyph can't scale). The box is the bare line
-	// box (line-height pinned to the title's, zero padding), so it's exactly the
-	// title's height and never taller than the app bar's other content. The bar is
-	// a centered flex row sized by its tallest child, so revealing the button below
-	// the breakpoint doesn't grow it - a larger glyph overflows into the bar's own
-	// padding instead. Nudge `icon_size` freely; keep it within ~1.75rem of the
-	// line box so the overflow stays inside that padding.
-	let icon_size = Length::Rem(2.);
+	// The box is the bare line box (line-height pinned to the title's, zero
+	// padding) around its [`Icon`](crate::prelude::Icon), so it's exactly the
+	// title's height and never taller than the app bar's other content.
 	Rule::new()
 		.with_selector(Selector::class(MENU_BUTTON))
 		.with_value(common_props::DisplayProp, Display::None)
-		.with_value(common_props::FontSize, icon_size)
 		.with_token(common_props::LineHeight, typography::LineHeightTitleLarge).unwrap()
 		.with_value(common_props::Padding, Spacing::DEFAULT)
 }

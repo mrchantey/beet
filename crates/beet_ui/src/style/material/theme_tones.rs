@@ -1,8 +1,16 @@
-//! The tonal palettes a [`Theme`] seeds, by name and tone, for consumers
-//! outside the cascade: a script drawing in the brand colours, a page editing
-//! them in the browser.
+//! [`ThemeTones`]: every tone of the palettes the active [`Theme`] seeds, the
+//! one place they are computed.
+//!
+//! The colour maths runs once per theme, as the theme lands, into the
+//! [`ThemeTones`] resource, and everything drawing in the brand colours reads
+//! it rather than recomputing: the `:root` tone declarations the css bake and
+//! the charcell cascade resolve, a role resolved outside the cascade
+//! ([`ThemeTones::resolve`]: a browser tint, a social card, a syndicated
+//! record), a page's scripts (`<ThemeData/>`) and a derived file's script (a
+//! logo drawn in the brand), which names the resource as its input.
 #![cfg_attr(rustfmt, rustfmt_skip)]
 use crate::prelude::*;
+use crate::style::material::themes;
 use crate::style::material::themes::MaterialColorExt;
 use crate::style::material::tones;
 use beet_core::prelude::*;
@@ -57,84 +65,131 @@ impl ThemePalette {
 	];
 }
 
-/// The seven tonal palettes a [`Theme`] seeds. Each key colour holds its own
-/// hue and chroma across its ramp, and an unset key falls back to the
-/// seed-derived [`CorePalette`], so a bare `<Theme color=../>` generates exactly
-/// the Material palette the seed always produced. The neutral key is split per
-/// mode: [`Theme::neutral_light`] seeds the light scheme's surfaces and the dark
-/// scheme's inverse surfaces, and [`Theme::neutral_dark`] the reverse.
-pub struct ThemePalettes {
-	primary: TonalPalette,
-	secondary: TonalPalette,
-	tertiary: TonalPalette,
-	neutral_light: TonalPalette,
-	neutral_dark: TonalPalette,
-	neutral_variant: TonalPalette,
-	error: TonalPalette,
+/// Every tone 0 to 100 of the seven tonal palettes the active [`Theme`] seeds,
+/// with each palette's key colour, kept current by [`MaterialStylePlugin`] as
+/// the theme changes.
+///
+/// Each key colour holds its own hue and chroma across its ramp, and an unset
+/// key falls back to the seed-derived [`CorePalette`], so a bare
+/// `<Theme color=../>` generates exactly the Material palette the seed always
+/// produced. The neutral key is split per mode: [`Theme::neutral_light`] seeds
+/// the light scheme's surfaces and the dark scheme's inverse surfaces, and
+/// [`Theme::neutral_dark`] the reverse.
+///
+/// Serializes as an object of hex ramps keyed by [`ThemePalette::name`] in
+/// [`ThemePalette::ALL`] order, so a script reads `tones.neutral_light[94]`,
+/// and the same theme serializes to the same bytes, so a derived file may name
+/// the resource as an input.
+#[derive(Debug, Clone, PartialEq, Resource, Reflect)]
+#[reflect(opaque)]
+#[reflect(Resource, Default, Serialize)]
+// a short stable path, since a derived file names its inputs by path
+#[type_path = "beet_ui"]
+pub struct ThemeTones(Vec<(ThemePalette, ThemeRamp)>);
+
+/// One palette's key colour and its every tone.
+#[derive(Debug, Clone, PartialEq)]
+struct ThemeRamp {
+	key: Color,
+	/// Tones 0 to 100, black to white.
+	tones: Vec<Color>,
 }
 
-impl ThemePalettes {
-	/// The palettes `theme` seeds.
+impl Default for ThemeTones {
+	fn default() -> Self { Self::new(&Theme::default()) }
+}
+
+impl ThemeTones {
+	/// The tones `theme` seeds.
 	pub fn new(theme: &Theme) -> Self {
 		let core = CorePalette::of(theme.color.to_argb());
 		// a key colour holds its own hue and chroma, rather than being pushed
 		// through a Material variant, so a low-chroma key (the cream, a tinted
 		// ink) keeps the cast it was picked for.
-		let key = |color: Option<Color>, seeded: TonalPalette| match color {
-			Some(color) => TonalPalette::from_hct(color.to_argb().into()),
-			None => seeded,
+		let seeded = |palette: ThemePalette| -> (Option<Color>, &TonalPalette) {
+			match palette {
+				ThemePalette::Primary => (theme.primary, &core.primary),
+				ThemePalette::Secondary => (theme.secondary, &core.secondary),
+				ThemePalette::Tertiary => (theme.tertiary, &core.tertiary),
+				ThemePalette::NeutralLight => (theme.neutral_light, &core.neutral),
+				ThemePalette::NeutralDark => (theme.neutral_dark, &core.neutral),
+				ThemePalette::NeutralVariant => (theme.neutral_variant, &core.neutral_variant),
+				ThemePalette::Error => (theme.error, &core.error),
+			}
 		};
-		Self {
-			primary: key(theme.primary, core.primary),
-			secondary: key(theme.secondary, core.secondary),
-			tertiary: key(theme.tertiary, core.tertiary),
-			neutral_light: key(theme.neutral_light, core.neutral),
-			neutral_dark: key(theme.neutral_dark, core.neutral),
-			neutral_variant: key(theme.neutral_variant, core.neutral_variant),
-			error: key(theme.error, core.error),
-		}
-	}
-
-	/// The colour of `palette` at `tone`, 0 black to 100 white.
-	pub fn tone(&self, palette: ThemePalette, tone: u8) -> Color {
-		Color::from_argb(self.palette(palette).tone(tone.min(100) as i32))
-	}
-
-	/// The key colour seeding `palette`: the theme's own where it sets one,
-	/// else the one the seed derived.
-	pub fn key(&self, palette: ThemePalette) -> Color {
-		Color::from_argb(self.palette(palette).key_color().into())
-	}
-
-	fn palette(&self, palette: ThemePalette) -> &TonalPalette {
-		match palette {
-			ThemePalette::Primary => &self.primary,
-			ThemePalette::Secondary => &self.secondary,
-			ThemePalette::Tertiary => &self.tertiary,
-			ThemePalette::NeutralLight => &self.neutral_light,
-			ThemePalette::NeutralDark => &self.neutral_dark,
-			ThemePalette::NeutralVariant => &self.neutral_variant,
-			ThemePalette::Error => &self.error,
-		}
-	}
-
-	/// Every tone of every palette as hex, the form a script reads.
-	pub fn tones(&self) -> ThemeTones {
-		ThemeTones(
+		Self(
 			ThemePalette::ALL
 				.into_iter()
 				.map(|palette| {
-					let ramp = (0..=100)
-						.map(|tone| SmolStr::from(self.tone(palette, tone).to_srgba().to_hex()))
-						.collect();
-					(palette, ramp)
+					let ramp = match seeded(palette) {
+						(Some(key), _) => TonalPalette::from_hct(key.to_argb().into()),
+						(None, seeded) => seeded.clone(),
+					};
+					(palette, ThemeRamp {
+						key: Color::from_argb(ramp.key_color().into()),
+						tones: (0..=100).map(|tone| Color::from_argb(ramp.tone(tone))).collect(),
+					})
 				})
 				.collect(),
 		)
 	}
 
+	/// The colour of `palette` at `tone`, 0 black to 100 white.
+	pub fn tone(&self, palette: ThemePalette, tone: u8) -> Color {
+		self.ramp(palette).tones[tone.min(100) as usize]
+	}
+
+	/// The key colour seeding `palette`: the theme's own where it sets one,
+	/// else the one the seed derived.
+	pub fn key(&self, palette: ThemePalette) -> Color { self.ramp(palette).key }
+
+	fn ramp(&self, palette: ThemePalette) -> &ThemeRamp {
+		self.0
+			.iter()
+			.find(|(held, _)| *held == palette)
+			.map(|(_, ramp)| ramp)
+			.expect("tones hold every palette")
+	}
+
+	/// The colour `role` takes in `scheme`, ie [`colors::Background`] of the
+	/// light scheme: the scheme's tone for that role, read exactly as the
+	/// cascade reads it.
+	///
+	/// For a consumer outside the cascade, ie a syndicated record naming the
+	/// site's colours, which has no element to resolve against.
+	///
+	/// # Errors
+	/// Errors when `role` is not a colour role of the scheme.
+	///
+	/// [`colors::Background`]: crate::style::material::colors::Background
+	pub fn resolve(&self, scheme: ColorScheme, role: impl Into<Token>) -> Result<Color> {
+		let roles = match scheme {
+			ColorScheme::Light => themes::light_scheme(),
+			ColorScheme::Dark => themes::dark_scheme(),
+		};
+		match roles.get(&role.into())? {
+			TokenValue::Token(tone) => Rule::new()
+				.with_extend(self.declarations())
+				.get_typed::<Color>(tone),
+			TokenValue::Value(value) => value.into_typed::<Color>(),
+		}
+	}
+
+	/// The `:root` tone declarations: every token of [`Self::tokens`] at its
+	/// palette's tone.
+	pub(crate) fn declarations(&self) -> Vec<(TokenKey, TokenValue)> {
+		Self::tokens()
+			.into_iter()
+			.fold(Rule::new(), |rule, (palette, tone, token)| {
+				rule.with_value_untyped(token, self.tone(palette, tone))
+					.expect("a colour serializes")
+			})
+			.into_iter()
+			.collect()
+	}
+
 	/// Every tone token the cascade declares, with the palette and tone it
-	/// holds: the `:root` tones `from_theme` bakes.
+	/// holds.
 	pub fn tokens() -> Vec<(ThemePalette, u8, Token)> {
 		use ThemePalette::*;
 		macro_rules! ramp {
@@ -154,19 +209,13 @@ impl ThemePalettes {
 	}
 }
 
-/// Every tone 0 to 100 of each [`ThemePalette`] as hex, serialized as an
-/// object keyed by [`ThemePalette::name`] in [`ThemePalette::ALL`] order, so a script
-/// reads `tones.neutral_light[94]`. The same theme serializes to the same
-/// bytes, so a derived file may name it as a value.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ThemeTones(pub Vec<(ThemePalette, Vec<SmolStr>)>);
-
 impl Serialize for ThemeTones {
 	fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
 		use serde::ser::SerializeMap;
 		let mut map = serializer.serialize_map(Some(self.0.len()))?;
 		for (palette, ramp) in &self.0 {
-			map.serialize_entry(palette.name(), ramp)?;
+			let hex = ramp.tones.iter().map(|tone| tone.to_srgba().to_hex()).collect::<Vec<_>>();
+			map.serialize_entry(palette.name(), &hex)?;
 		}
 		map.end()
 	}
@@ -174,7 +223,6 @@ impl Serialize for ThemeTones {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
 	use crate::style::material::*;
 	use beet_core::prelude::*;
 
@@ -187,7 +235,7 @@ mod test {
 			neutral_light: Some(Color::srgb_u8(0xf4, 0xee, 0xde)),
 			..default()
 		};
-		let tones = serde_json::to_value(ThemePalettes::new(&theme).tones()).unwrap();
+		let tones = serde_json::to_value(ThemeTones::new(&theme)).unwrap();
 		tones["primary"][40].as_str().unwrap().xpect_eq("#006C4F");
 		tones["neutral_light"][94].as_str().unwrap().xpect_eq("#F4EEDE");
 		tones["error"].as_array().unwrap().len().xpect_eq(101);

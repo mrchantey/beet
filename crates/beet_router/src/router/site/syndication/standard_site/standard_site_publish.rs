@@ -132,15 +132,15 @@ impl StandardSitePublish {
 		{
 			icon.upload(&publishing.pds).await?;
 		}
-		let theme = world
+		let tones = world
 			.with(|world: &mut World| {
-				world.get_resource::<Theme>().cloned().unwrap_or_default()
+				world.get_resource::<ThemeTones>().cloned().unwrap_or_default()
 			})
 			.await;
 		let record = StandardSitePublication::from_declaration(
 			&publishing.declaration,
 			&publishing.package,
-			&theme,
+			&tones,
 			icon.map(|icon| icon.blob_ref),
 		)?;
 		let url = publishing.url.clone();

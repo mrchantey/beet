@@ -2,8 +2,10 @@
 //!
 //! `<IconSet src="assets/logo/logo.png"/>` at an entry's top level is the
 //! whole declaration. Each output is a derived file whose provenance is the
-//! source image's digest and nothing else, so a changed source regenerates the
-//! set and an unchanged one costs one hash.
+//! source images' digests and the two resources it reads, the theme's
+//! [`ThemeTones`] (the padding and the manifest's colours) and the
+//! [`PackageConfig`] (the manifest's name), so a changed source or a rebrand
+//! regenerates the set and an unchanged one costs a hash each.
 //!
 //! # The set
 //!
@@ -12,13 +14,32 @@
 //!
 //! | file | what asks for it |
 //! | --- | --- |
-//! | `favicon.ico` | holding 16, 32 and 48, for a browser that still asks for `/favicon.ico` by convention |
+//! | `favicon.ico` | holding 16, 32 and 48, the tab's raster for a browser without svg favicons, and for one asking for `/favicon.ico` by convention |
 //! | `favicon.svg` | emitted only when the source is itself svg, so it scales rather than being traced |
-//! | `icon-16.png`, `icon-32.png` | the tab and the bookmark bar |
+//! | `favicon-dark.svg` | emitted only for a `dark` svg, below |
 //! | `icon-180.png` | `apple-touch-icon`, the iOS home screen, padded like the maskable icon since iOS fills transparency black and rounds the corners itself |
 //! | `icon-192.png`, `icon-512.png` | the web app manifest, the Android home screen and the splash |
 //! | `icon-512-maskable.png` | the `maskable` purpose, below |
-//! | `site.webmanifest` | lists the three png sizes Android reads with their purposes, and carries the name the entry's `PackageConfig` declares and, since a manifest names one colour, the light tint `<Head>` reads off the `Theme` resource for its light `theme-color` and its `msapplication-TileColor` (the light scheme `Primary` tone, `ThemeTints` beside `Theme`, where both read it) |
+//! | `site.webmanifest` | lists the three png sizes Android reads with their purposes, and carries the name the entry's `PackageConfig` declares and, since a manifest names one colour, the light tint `<Head>` reads off the `ThemeTones` resource for its light `theme-color` and its `msapplication-TileColor` (the light scheme `Primary` tone, `ThemeTints`, where both read it) |
+//!
+//! # The links
+//!
+//! The head links the ico declared `32x32`, then the svg, then the apple touch
+//! icon. Declared as one exact size, the ico is no better a match for a tab
+//! than the svg, so a browser drawing svg favicons takes the svg: a raster
+//! listed at the tab's own sizes (a 16 and a 32 png) wins it instead, and the
+//! favicon stops following anything the svg does.
+//!
+//! # Dark
+//!
+//! A favicon sits in the browser's chrome, which follows the system's scheme,
+//! not a scheme the page pins. An svg can follow it itself with a
+//! `prefers-color-scheme` rule, but a browser rasterises its favicon once and
+//! holds it, so `<IconSet dark="assets/logo/logo-dark.svg"/>` names the drawing
+//! for a dark system too: written beside the set as `favicon-dark.svg` and
+//! linked as the svg link's `data-dark-href`, which the colour scheme script
+//! (`ColorSchemeScript`) swaps in while the system is dark, a new url the
+//! browser fetches and draws afresh.
 //!
 //! # Maskable
 //!
@@ -75,15 +96,22 @@ pub async fn IconSet(
 	/// The source image, a raster at least 512 square or an svg.
 	#[field]
 	src: RelPath,
+	/// The favicon for a dark system, an svg, see the module docs.
+	#[field]
+	dark: Option<RelPath>,
 	cx: ActionContext<BlobStore>,
 ) -> Result<EntityBody> {
-	let icon_set = IconSet { src };
+	let icon_set = IconSet { src, dark };
 	let bytes = cx.input.get(&icon_set.src).await?;
-	let (theme, package) = cx
+	let dark = match &icon_set.dark {
+		Some(dark) => Some(cx.input.get(dark).await?.to_vec()),
+		None => None,
+	};
+	let (tones, package) = cx
 		.world()
 		.with(|world: &mut World| {
 			(
-				world.get_resource::<Theme>().cloned().unwrap_or_default(),
+				world.get_resource::<ThemeTones>().cloned().unwrap_or_default(),
 				world
 					.get_resource::<PackageConfig>()
 					.cloned()
@@ -93,9 +121,9 @@ pub async fn IconSet(
 		.await;
 	cfg_if! {
 		if #[cfg(feature = "site_images")] {
-			icon_set.derive(&cx.input, &bytes, &theme, &package).await
+			icon_set.derive(&cx.input, &bytes, dark, &tones, &package).await
 		} else {
-			let _ = (bytes, theme, package);
+			let _ = (bytes, dark, tones, package);
 			bevybail!(
 				"deriving the icon set from `{}` needs the `site_images` feature",
 				icon_set.src
@@ -115,6 +143,8 @@ pub struct IconLink {
 	pub sizes: SmolStr,
 	/// The url the file serves at.
 	pub href: SmolStr,
+	/// The url of its twin for a dark system, the `dark` favicon.
+	pub dark_href: Option<SmolStr>,
 }
 
 impl IconSet {
@@ -124,6 +154,10 @@ impl IconSet {
 	const FAVICON_ICO: &str = "favicon.ico";
 	/// The vector favicon, an svg source copied verbatim.
 	const FAVICON_SVG: &str = "favicon.svg";
+	/// The vector favicon for a dark system, the `dark` svg copied verbatim.
+	const FAVICON_DARK_SVG: &str = "favicon-dark.svg";
+	/// The size the head declares the ico at, see the module docs.
+	const ICO_LINKED: u32 = 32;
 	/// The sizes `favicon.ico` holds.
 	const ICO_SIZES: [u32; 3] = [16, 32, 48];
 	/// The web app manifest.
@@ -134,11 +168,31 @@ impl IconSet {
 	const APPLE_TOUCH: u32 = 180;
 
 	/// The set derived from `src`.
-	pub fn new(src: impl Into<RelPath>) -> Self { Self { src: src.into() } }
+	pub fn new(src: impl Into<RelPath>) -> Self {
+		Self {
+			src: src.into(),
+			dark: None,
+		}
+	}
 
-	/// The [`Derivation`] this set declares: its document beside the source.
+	/// This set with `dark` as the favicon for a dark system.
+	pub fn with_dark(self, dark: impl Into<RelPath>) -> Self {
+		Self {
+			dark: Some(dark.into()),
+			..self
+		}
+	}
+
+	/// The [`Derivation`] this set declares: its document beside the source,
+	/// reading the sources and the module docs' resources.
 	pub fn derivation(&self) -> Derivation {
-		Derivation::new(self.path(Self::DOCUMENT)).with_input(self.src.clone())
+		self.dark.iter().fold(
+			Derivation::new(self.path(Self::DOCUMENT))
+				.with_input(self.src.clone())
+				.with_resource_type::<ThemeTones>()
+				.with_resource_type::<PackageConfig>(),
+			|derivation, dark| derivation.with_input(dark.clone()),
+		)
 	}
 
 	/// The store path of the 512, unpadded, which a standard.site publication
@@ -146,48 +200,44 @@ impl IconSet {
 	pub fn publication_icon(&self) -> RelPath { self.png(Self::LARGEST) }
 
 	/// Whether the source is svg, which adds `favicon.svg` to the set.
-	pub fn is_svg(&self) -> bool {
-		self.src
-			.as_smol_path()
+	pub fn is_svg(&self) -> bool { Self::is_svg_path(&self.src) }
+
+	/// Whether `path` names an svg.
+	fn is_svg_path(path: &RelPath) -> bool {
+		path.as_smol_path()
 			.extension()
 			.is_some_and(|ext| ext.eq_ignore_ascii_case("svg"))
 	}
 
-	/// The icon links a document head carries for the set, the vector first
-	/// so a browser that reads it prefers it.
+	/// The icon links a document head carries for the set, in the order the
+	/// module docs give.
 	pub fn links(&self) -> Vec<IconLink> {
 		let link = |rel, mime, sizes: String, path: RelPath| IconLink {
 			rel,
 			mime,
 			sizes: sizes.into(),
 			href: Self::href(&path),
+			dark_href: None,
 		};
-		let mut links = Vec::new();
-		if self.is_svg() {
-			links.push(link(
-				"icon",
-				"image/svg+xml",
-				"any".into(),
-				self.path(Self::FAVICON_SVG),
-			));
-		}
-		links.push(link(
+		let mut links = vec![link(
 			"icon",
 			"image/x-icon",
-			Self::ICO_SIZES
-				.iter()
-				.map(|size| format!("{size}x{size}"))
-				.collect::<Vec<_>>()
-				.join(" "),
+			format!("{0}x{0}", Self::ICO_LINKED),
 			self.path(Self::FAVICON_ICO),
-		));
-		for size in [16, 32] {
-			links.push(link(
-				"icon",
-				"image/png",
-				format!("{size}x{size}"),
-				self.png(size),
-			));
+		)];
+		if self.is_svg() {
+			links.push(IconLink {
+				dark_href: self
+					.dark
+					.is_some()
+					.then(|| Self::href(&self.path(Self::FAVICON_DARK_SVG))),
+				..link(
+					"icon",
+					"image/svg+xml",
+					"any".into(),
+					self.path(Self::FAVICON_SVG),
+				)
+			});
 		}
 		links.push(link(
 			"apple-touch-icon",
@@ -231,7 +281,7 @@ impl IconSet {
 #[cfg(feature = "site_images")]
 impl IconSet {
 	/// The unpadded png sizes, each `icon-<size>.png`.
-	const PNG_SIZES: [u32; 4] = [16, 32, 192, 512];
+	const PNG_SIZES: [u32; 2] = [192, 512];
 	/// The padded 512 for the `maskable` purpose.
 	const MASKABLE: &str = "icon-512-maskable.png";
 	/// The maskable safe zone, as a fraction of the width.
@@ -243,13 +293,14 @@ impl IconSet {
 		&self,
 		store: &BlobStore,
 		bytes: &[u8],
-		theme: &Theme,
+		dark: Option<Vec<u8>>,
+		tones: &ThemeTones,
 		package: &PackageConfig,
 	) -> Result<EntityBody> {
-		let background = theme
+		let background = tones
 			.resolve(ColorScheme::Light, material::colors::Background)?
 			.to_srgba();
-		let tints = ThemeTints::new(theme)?;
+		let tints = ThemeTints::new(tones)?;
 		let (icon_set, source) = (self.clone(), bytes.to_vec());
 		let rasters = async_ext::unblock(move || {
 			icon_set.rasters(&source, background.to_u8_array())
@@ -264,6 +315,20 @@ impl IconSet {
 				.write(store, self.path(Self::FAVICON_SVG), bytes.to_vec())
 				.await?;
 		}
+		let mut sources =
+			vec![ProvenanceSource::file(self.src.clone(), bytes)];
+		if let (Some(path), Some(dark)) = (&self.dark, dark) {
+			if !self.is_svg() || !Self::is_svg_path(path) {
+				bevybail!(
+					"icon set `{}`: a `dark` favicon is an svg beside an svg source, not `{path}`",
+					self.src
+				);
+			}
+			sources.push(ProvenanceSource::file(path.clone(), &dark));
+			outputs
+				.write(store, self.path(Self::FAVICON_DARK_SVG), dark)
+				.await?;
+		}
 		outputs
 			.write(
 				store,
@@ -272,10 +337,7 @@ impl IconSet {
 			)
 			.await?;
 		EntityBody::default()
-			.with_typed(&Provenance::new([ProvenanceSource::file(
-				self.src.clone(),
-				bytes,
-			)]))?
+			.with_typed(&Provenance::new(sources))?
 			.with_typed(&outputs)
 	}
 
@@ -503,9 +565,22 @@ mod test {
 		IconSource::encode_png(&image).unwrap()
 	}
 
+	/// A world holding the resources a set reads, the theme's tones and the
+	/// package.
+	fn icon_world() -> World {
+		let mut world =
+			(AsyncPlugin, material::MaterialStylePlugin).into_world();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<PackageConfig>();
+		world.init_resource::<PackageConfig>();
+		world
+	}
+
 	/// A world declaring the set from [`SRC`] in a temp store holding `source`.
 	fn setup(source: Vec<u8>) -> (World, Entity, BlobStore) {
-		let mut world = AsyncPlugin.into_world();
+		let mut world = icon_world();
 		let store = BlobStore::temp();
 		let entity = world.spawn(IconSet::new(SRC)).flush();
 		let inserted = store.clone();
@@ -563,8 +638,6 @@ mod test {
 			.map(|output| output.path.to_string())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![
-				"branding/icon-16.png",
-				"branding/icon-32.png",
 				"branding/icon-192.png",
 				"branding/icon-512.png",
 				"branding/icon-180.png",
@@ -600,19 +673,35 @@ mod test {
 		(outputs(&store).await != first).xpect_true();
 	}
 
+	/// A rebrand regenerates the set, whose padding and manifest wear the
+	/// theme, though no source changed.
+	#[beet_core::test]
+	async fn regenerates_a_rebrand() {
+		let (mut world, entity, store) = setup(png(512, 512, 0));
+		ensure(&mut world, entity, &store).await;
+		world.insert_resource(Theme {
+			primary: Some(Color::srgb_u8(0xaa, 0x22, 0x00)),
+			..default()
+		});
+		world.flush();
+		ensure(&mut world, entity, &store)
+			.await
+			.xpect_eq(Freshness::Revalued(ThemeTones::type_path().into()));
+	}
+
 	#[beet_core::test]
 	async fn restores_a_deleted_icon() {
 		let (mut world, entity, store) = setup(png(512, 512, 0));
 		ensure(&mut world, entity, &store).await;
-		let icon = RelPath::new("branding/icon-16.png");
+		let icon = RelPath::new("branding/icon-192.png");
 		store.remove(&icon).await.unwrap();
 		ensure(&mut world, entity, &store)
 			.await
 			.xpect_eq(Freshness::OutputMissing(icon.clone()));
-		image(&store, "branding/icon-16.png")
+		image(&store, "branding/icon-192.png")
 			.await
 			.dimensions()
-			.xpect_eq((16, 16));
+			.xpect_eq((192, 192));
 	}
 
 	/// The maskable and apple touch icons pad the art onto the theme's
@@ -621,7 +710,7 @@ mod test {
 	async fn pads_the_cropped_icons() {
 		let (mut world, entity, store) = setup(png(512, 512, 0));
 		ensure(&mut world, entity, &store).await;
-		let background = Theme::default()
+		let background = ThemeTones::default()
 			.resolve(ColorScheme::Light, material::colors::Background)
 			.unwrap()
 			.to_srgba()
@@ -687,7 +776,7 @@ mod test {
 	#[beet_core::test]
 	async fn derives_an_svg_source() {
 		const SVG: &str = "branding/logo.svg";
-		let mut world = AsyncPlugin.into_world();
+		let mut world = icon_world();
 		let store = BlobStore::temp();
 		store
 			.insert(
@@ -702,7 +791,7 @@ mod test {
 		// letterboxed: transparent above the art, red within it
 		icon.get_pixel(256, 10).0[3].xpect_eq(0);
 		icon.get_pixel(256, 256).0.xpect_eq([255, 0, 0, 255]);
-		IconSet::new(SVG).links()[0]
+		IconSet::new(SVG).links()[1]
 			.href
 			.xpect_eq("/branding/favicon.svg");
 		store
@@ -710,5 +799,43 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_true();
+	}
+
+	/// A `dark` svg is written beside the set and linked as the svg link's
+	/// twin, the ico linked first at one exact size so the svg wins the tab.
+	#[beet_core::test]
+	async fn links_a_dark_favicon() {
+		const SVG: &str = "branding/logo.svg";
+		const DARK: &str = "branding/logo-dark.svg";
+		let svg = |fill: &str| {
+			format!(
+				r#"<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg"><rect width="512" height="512" fill="{fill}"/></svg>"#
+			)
+		};
+		let mut world = icon_world();
+		let store = BlobStore::temp();
+		store.insert(&RelPath::new(SVG), svg("#fff")).await.unwrap();
+		store.insert(&RelPath::new(DARK), svg("#000")).await.unwrap();
+		let icon_set = IconSet::new(SVG).with_dark(DARK);
+		let entity = world.spawn(icon_set.clone()).flush();
+		ensure(&mut world, entity, &store).await;
+		store
+			.get(&RelPath::new("branding/favicon-dark.svg"))
+			.await
+			.unwrap()
+			.xpect_eq(svg("#000").into_bytes());
+		let links = icon_set.links();
+		(links[0].mime, links[0].sizes.as_str())
+			.xpect_eq(("image/x-icon", "32x32"));
+		links[1]
+			.dark_href
+			.clone()
+			.xpect_eq(Some("/branding/favicon-dark.svg".into()));
+		// a changed dark drawing regenerates the set
+		store.insert(&RelPath::new(DARK), svg("#111")).await.unwrap();
+		ensure(&mut world, entity, &store)
+			.await
+			.to_string()
+			.xpect_eq(format!("file `{DARK}` changed"));
 	}
 }

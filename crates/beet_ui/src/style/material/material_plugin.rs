@@ -10,16 +10,16 @@ use beet_core::prelude::*;
 /// `<Theme color=../>` generates a whole palette from one brand colour. A brand
 /// that has picked its own key colours overrides them individually, and the
 /// neutral key is split per mode so a light scheme can be cream while its dark
-/// twin is a near-black of its own (see [`themes::from_theme`]). The scheme is
+/// twin is a near-black of its own (see [`ThemeTones`]). The scheme is
 /// the session default a non-html target (the terminal) falls back to when a
 /// request pins none, eg seeded from a `--color-scheme` CLI argument by the live
 /// TUI.
 ///
 /// Declared in markup as `<Theme color="#006c4f" secondary="#f028a8"/>` — the
 /// resolver patches the live resource exactly like `<PackageConfig/>` — or
-/// inserted in Rust. A change re-runs [`rebuild_theme_tones`], rewriting the
-/// `:root` tone declarations so both the web CSS bake and the charcell cascade
-/// recolour from the same keys.
+/// inserted in Rust. A change recomputes [`ThemeTones`], whose change rewrites
+/// the `:root` tone declarations, so the web CSS bake, the charcell cascade and
+/// every reader of the tones recolour from the same keys.
 ///
 /// Always present once [`MaterialStylePlugin`] is added (it `init_resource`s the
 /// default), so consumers read `Res<Theme>` directly.
@@ -72,34 +72,6 @@ impl Default for Theme {
 	}
 }
 
-impl Theme {
-	/// The colour `role` takes in `scheme`, ie [`colors::Background`] of the
-	/// light scheme: the scheme's tone for that role, read from this theme's
-	/// palettes exactly as the `:root` bake reads it.
-	///
-	/// For a consumer outside the cascade, ie a syndicated record naming the
-	/// site's colours, which has no element to resolve against.
-	///
-	/// # Errors
-	/// Errors when `role` is not a colour role of the scheme.
-	pub fn resolve(
-		&self,
-		scheme: ColorScheme,
-		role: impl Into<Token>,
-	) -> Result<Color> {
-		let roles = match scheme {
-			ColorScheme::Light => themes::light_scheme(),
-			ColorScheme::Dark => themes::dark_scheme(),
-		};
-		match roles.get(&role.into())? {
-			TokenValue::Token(tone) => Rule::new()
-				.with_extend(themes::from_theme(self))
-				.get_typed::<Color>(tone),
-			TokenValue::Value(value) => value.into_typed::<Color>(),
-		}
-	}
-}
-
 /// The colours a browser tints its own chrome with, ie the mobile address bar,
 /// one per scheme, as hex.
 ///
@@ -116,10 +88,10 @@ pub struct ThemeTints {
 }
 
 impl ThemeTints {
-	/// The tints `theme` resolves to.
-	pub fn new(theme: &Theme) -> Result<Self> {
+	/// The tints `tones` resolve to.
+	pub fn new(tones: &ThemeTones) -> Result<Self> {
 		let hex = |scheme: ColorScheme, role: Token| -> Result<SmolStr> {
-			theme
+			tones
 				.resolve(scheme, role)?
 				.to_srgba()
 				.to_hex()
@@ -143,8 +115,9 @@ pub struct MaterialStylePlugin;
 impl Plugin for MaterialStylePlugin {
 	fn build(&self, app: &mut App) {
 		app.install_types::<CssPlugin>()
-			.register_type::<Theme>()
-			.init_resource::<Theme>();
+			.register_type::<(Theme, ThemeTones)>()
+			.init_resource::<Theme>()
+			.add_observer(derive_on_insert);
 		// Extend the existing rule set rather than replacing it, so the prose
 		// `default_element_rules` seeded by `StylePlugin` (em → italic, h1 →
 		// bold, code/a → inline, …) survive alongside the Material rules. The
@@ -160,45 +133,67 @@ impl Plugin for MaterialStylePlugin {
 			.get_resource_or_init::<CssTokenMap>()
 			.extend(default_token_map());
 
-		// Derive the `:root` tones from `Theme` and rewrite them on every change
-		// (insert or a late `<Theme>` patch). Two trigger schedules, one source
-		// of truth (`from_theme(&Theme)`):
+		// Derive `ThemeTones` from `Theme`, then the `:root` tones from
+		// `ThemeTones`, on every change: an insert or a late `<Theme>` patch
+		// derives at once (`derive_on_insert`), so a derived file naming the
+		// tones reads them current, and a mutation in place at the next of two
+		// schedules, one source of truth (`ThemeTones`):
 		// - `PostParseTree` before the cascade reads the rule set — recolours the
 		//   charcell render (every terminal render runs this schedule on demand).
 		// - `PreUpdate` — recolours a pure-web build, whose HTML/CSS bake does not
 		//   run `PostParseTree`, before the first request reads the rule set.
-		app.add_systems(
-			PostParseTree,
-			rebuild_theme_tones
-				.before(ResolveStylesSet)
-				.run_if(resource_changed::<Theme>),
-		)
-		.add_systems(
-			PreUpdate,
-			rebuild_theme_tones.run_if(resource_changed::<Theme>),
-		);
-		// seed the tones now from the same system, so the rule set carries them
+		let tones = || {
+			(
+				derive_theme_tones.run_if(resource_changed::<Theme>),
+				rebuild_theme_tones.run_if(resource_changed::<ThemeTones>),
+			)
+				.chain()
+		};
+		app.add_systems(PostParseTree, tones().before(ResolveStylesSet))
+			.add_systems(PreUpdate, tones());
+		// seed the tones now from the same systems, so the rule set carries them
 		// immediately — before any schedule runs (eg a `with_state` style query,
 		// or a web bake reading the rule set on the very first request).
-		app.world_mut()
-			.run_system_cached(rebuild_theme_tones)
-			.unwrap();
+		app.world_mut().run_system_cached(derive_theme_tones).unwrap();
+		app.world_mut().run_system_cached(rebuild_theme_tones).unwrap();
 	}
 }
 
-/// Rewrite the `:root` palette tones from the live [`Theme`] keys.
-///
-/// [`themes::from_theme`] is the only colour-dependent piece of the `:root`
-/// default; this writes its ~95 tone declarations into the default rule, keyed
-/// by token so it overwrites in place (idempotent — the scheme/opacity/
-/// typography keys are untouched). Runs whenever [`Theme`] changes.
-pub(crate) fn rebuild_theme_tones(
+/// Compute [`ThemeTones`] from the live [`Theme`] keys, leaving an unchanged
+/// result untouched so nothing downstream re-runs.
+fn derive_theme_tones(
+	mut commands: Commands,
 	theme: Res<Theme>,
+	tones: Option<ResMut<ThemeTones>>,
+) {
+	let derived = ThemeTones::new(&theme);
+	match tones {
+		Some(mut tones) => {
+			tones.set_if_neq(derived);
+		}
+		None => commands.insert_resource(derived),
+	}
+}
+
+/// [`derive_theme_tones`] the moment a [`Theme`] is inserted, a `<Theme>`
+/// patch included.
+fn derive_on_insert(_ev: On<Insert<Theme>>, mut commands: Commands) {
+	commands.run_system_cached(derive_theme_tones);
+}
+
+/// Rewrite the `:root` palette tones from the live [`ThemeTones`].
+///
+/// The tones are the only colour-dependent piece of the `:root` default; this
+/// writes their ~95 tone declarations into the default rule, keyed by token so
+/// it overwrites in place (idempotent — the scheme/opacity/typography keys are
+/// untouched). Runs whenever [`ThemeTones`] changes.
+pub(crate) fn rebuild_theme_tones(
+	tones: Res<ThemeTones>,
 	mut rules: ResMut<RuleSet>,
 ) {
 	rules
 		.default_rule_mut()
-		.push_declarations(Rule::new().with_extend(themes::from_theme(&theme)));
+		.push_declarations(Rule::new().with_extend(tones.declarations()));
 }
 
 pub(crate) fn default_token_map() -> CssTokenMap {
@@ -274,7 +269,7 @@ mod tests {
 	/// every assertion below compares a resolved role against.
 	fn tone(theme: &Theme, key: impl Into<Token>) -> Color {
 		Rule::new()
-			.with_extend(themes::from_theme(theme))
+			.with_extend(ThemeTones::new(theme).declarations())
 			.get_typed::<Color>(&key.into())
 			.unwrap()
 	}
@@ -287,30 +282,37 @@ mod tests {
 	#[beet_core::test]
 	fn resolves_a_role_per_scheme() {
 		let theme = seeded(Color::srgb(0.5, 0.0, 1.0));
-		theme
+		let theme_tones = ThemeTones::new(&theme);
+		theme_tones
 			.resolve(ColorScheme::Light, colors::OnPrimary)
 			.unwrap()
 			.xpect_eq(tone(&theme, tones::Primary100));
-		theme
+		theme_tones
 			.resolve(ColorScheme::Dark, colors::OnPrimary)
 			.unwrap()
 			.xpect_eq(tone(&theme, tones::Primary20));
 	}
 
-	/// Setting [`Theme::color`] and running [`rebuild_theme_tones`] rewrites the
-	/// `:root` palette tones to exactly `from_theme(that theme)`, and a different
-	/// seed yields different tones.
+	/// Inserting a [`Theme`] derives its [`ThemeTones`] at once, and rebuilding
+	/// rewrites the `:root` palette tones to exactly that theme's, and a
+	/// different seed yields different tones.
 	#[beet_core::test]
 	fn theme_recolors_root_tones() {
 		let violet = seeded(Color::srgb(0.5, 0.0, 1.0));
 		let mut world = MaterialStylePlugin::world();
 		world.insert_resource(violet.clone());
+		world.flush();
+		world
+			.resource::<ThemeTones>()
+			.clone()
+			.xpect_eq(ThemeTones::new(&violet));
 		world.run_system_cached(rebuild_theme_tones).unwrap();
 
 		world.with_state::<Res<RuleSet>, _>(|rules| {
 			let root = rules.default_rule();
 			// every tone the seed produces is resident in the `:root` default
-			themes::from_theme(&violet)
+			ThemeTones::new(&violet)
+				.declarations()
 				.iter()
 				.all(|(key, _)| root.contains_key(key))
 				.xpect_true();

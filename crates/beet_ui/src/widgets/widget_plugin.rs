@@ -4,6 +4,7 @@ use super::browser::*;
 use super::chrome::*;
 use super::controls::*;
 use super::debug::*;
+use super::icon::Icon;
 use super::schema_ui::*;
 use super::toast::ToastPlugin;
 use crate::prelude::RuleSet;
@@ -52,7 +53,7 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		MenuButton,
 		Table,
 	)>()
-	.install_types::<(RepositoryLink, ColorSchemeToggle)>();
+	.install_types::<(RepositoryLink, ColorSchemeToggle, Icon)>();
 	// a baked `<Stylesheet/>` follows rules registered after it baked; gated on
 	// a sheet existing, as a sheet only bakes where the style resources are
 	// (a world without them, ie a bare markdown parse, has no `StyleQuery`)

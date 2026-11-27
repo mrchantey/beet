@@ -55,7 +55,7 @@ impl StandardSitePublication {
 	pub fn from_declaration(
 		declaration: &StandardSitePub,
 		package: &PackageConfig,
-		theme: &Theme,
+		tones: &ThemeTones,
 		icon: Option<BlobRef>,
 	) -> Result<Self> {
 		Self {
@@ -63,7 +63,7 @@ impl StandardSitePublication {
 			name: declaration.name.clone(),
 			description: declaration.description.clone(),
 			icon,
-			basic_theme: Some(ThemeBasic::from_theme(theme)?),
+			basic_theme: Some(ThemeBasic::from_tones(tones)?),
 			labels: SelfLabels::from_values(declaration.labels.iter().cloned()),
 			preferences: Some(PublicationPreferences {
 				show_in_discover: declaration.show_in_discover,
@@ -117,7 +117,7 @@ mod test {
 				..harvest()
 			},
 			&package("https://beet.org"),
-			&Theme::default(),
+			&ThemeTones::default(),
 			Some(BlobRef::of(ICON, MediaType::Png)),
 		)
 		.unwrap()
@@ -145,7 +145,7 @@ mod test {
 					..harvest()
 				},
 				&package(homepage),
-				&Theme::default(),
+				&ThemeTones::default(),
 				None,
 			)
 			.unwrap()
@@ -162,7 +162,7 @@ mod test {
 		StandardSitePublication::from_declaration(
 			&harvest(),
 			&PackageConfig::default(),
-			&Theme::default(),
+			&ThemeTones::default(),
 			None,
 		)
 		.unwrap_err()

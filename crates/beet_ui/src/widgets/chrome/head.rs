@@ -22,7 +22,7 @@
 //! `DocMeta`), so `omit_title` drops this widget's own `<title>` to keep
 //! exactly one in the document.
 //!
-//! The brand tint is read off the [`Theme`] resource, the palette the page's
+//! The brand tint is read off the [`ThemeTones`] resource, the tones the page's
 //! own css bakes from, so the browser chrome and the page cannot disagree: a
 //! `theme-color` per scheme the OS prefers, each naming its `data-scheme` so
 //! [`ColorSchemeScript`] can point the browser at a scheme the page pins, and the light one
@@ -45,7 +45,7 @@ use beet_core::prelude::*;
 ///
 /// The social card renders only when the caller, the page or [`PackageConfig`]
 /// names one, so an app that has no card gets the small summary preview rather
-/// than a broken image, and the theme colour only in a world with a [`Theme`].
+/// than a broken image, and the theme colour only in a world with [`ThemeTones`].
 #[template(system)]
 pub fn Head(
 	#[prop] fixed_scale: bool,
@@ -84,7 +84,7 @@ pub fn Head(
 	#[prop]
 	social_image_alt: Option<String>,
 	pkg_config: Res<PackageConfig>,
-	theme: Option<Res<Theme>>,
+	tones: Option<Res<ThemeTones>>,
 ) -> Result<impl Bundle> {
 	// every PWA/application value names the site, sourced from the package config.
 	let title = pkg_config.title.clone();
@@ -110,7 +110,7 @@ pub fn Head(
 	let social_image = social_image
 		.or_else(|| meta.social_image_url())
 		.or_else(|| pkg_config.social_image.clone());
-	let tints = theme.map(|theme| ThemeTints::new(&theme)).transpose()?;
+	let tints = tones.map(|tones| ThemeTints::new(&tones)).transpose()?;
 	// a dated page is an ARTICLE to a crawler and to a link preview, which is
 	// what earns it a byline and a date in a search result; the `article:*`
 	// block hangs off that same fact rather than off a second switch.

@@ -243,10 +243,10 @@ fn head_marks_noindex() {
 #[beet_core::test]
 fn head_tints_with_the_theme() {
 	let mut world = layout_world();
-	world.insert_resource(Theme {
+	world.insert_resource(ThemeTones::new(&Theme {
 		color: Srgba::hex("#006c4f").unwrap().into(),
 		..default()
-	});
+	}));
 	let root = world.spawn_template(rsx! { <Head/> }).unwrap().id();
 	render_html(&mut world, root)
 		.as_str()

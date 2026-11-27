@@ -14,7 +14,10 @@
 // A `?color-scheme=light|dark` query param pins the scheme for the page,
 // mirroring the CLI `--color-scheme` flag on the terminal target, over any
 // stored pin. A `[data-color-scheme-toggle]` button cycles the stored pin
-// through auto, light and dark.
+// through auto, light and dark, showing whichever of its
+// `[data-color-scheme-icon]` children names the pin. A favicon link with a
+// `data-dark-href` twin follows the system's scheme alone, as the browser
+// chrome it sits in does.
 //
 // `globalThis.beetPreferences` is the document's api for a page's scripts:
 // `read()`/`write(body)` the scene body, `setScheme("light" | "dark" | null)`,
@@ -31,18 +34,6 @@
 	const SCENE = STORE + "scene.json";
 	const TONES = STORE + "tones.css";
 	const CYCLE = { auto: "light", light: "dark", dark: "auto" };
-	// line icons in the text colour, the auto one matching the toggle's markup
-	const icon = (body) =>
-		`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
-	const ICONS = {
-		auto: icon(
-			'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/>',
-		),
-		light: icon(
-			'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
-		),
-		dark: icon('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
-	};
 
 	// a store file as text, `null` when absent or unreadable (storage denied)
 	function readFile(key) {
@@ -133,6 +124,18 @@
 		}
 	}
 
+	// a favicon sits in the browser's chrome, which follows the system, so it
+	// follows the system too, never a pinned scheme: an icon link with a
+	// `data-dark-href` twin wears it while the system is dark, a new url the
+	// browser fetches and draws afresh rather than its held raster
+	function followSystemIcons() {
+		for (const link of document.querySelectorAll("link[rel~=icon][data-dark-href]")) {
+			link.dataset.lightHref ??= link.getAttribute("href");
+			const href = media.matches ? link.dataset.darkHref : link.dataset.lightHref;
+			if (link.getAttribute("href") !== href) link.setAttribute("href", href);
+		}
+	}
+
 	function applyTones() {
 		const css = readFile(TONES);
 		let style = document.getElementById("beet-preferences-tones");
@@ -145,14 +148,15 @@
 		style.textContent = css;
 	}
 
+	// each toggle shows the icon of the stored pin, one of the three it holds
 	function labelToggles() {
 		const stored = storedScheme() ?? "auto";
 		for (const toggle of document.querySelectorAll("[data-color-scheme-toggle]")) {
-			if (toggle.dataset.colorSchemeToggle !== stored) {
-				toggle.innerHTML = ICONS[stored];
-				toggle.dataset.colorSchemeToggle = stored;
-			}
+			toggle.dataset.colorSchemeToggle = stored;
 			toggle.title = `Colour scheme: ${stored}`;
+			for (const icon of toggle.querySelectorAll("[data-color-scheme-icon]")) {
+				icon.hidden = icon.dataset.colorSchemeIcon !== stored;
+			}
 		}
 	}
 
@@ -206,7 +210,10 @@
 	};
 	globalThis.setColorScheme = setScheme;
 
-	media.addEventListener("change", apply);
+	media.addEventListener("change", () => {
+		apply();
+		followSystemIcons();
+	});
 	// another tab wrote the document
 	globalThis.addEventListener("storage", (event) => {
 		if (event.key === null || event.key.startsWith(STORE)) changed();
@@ -216,6 +223,9 @@
 		const next = CYCLE[storedScheme() ?? "auto"];
 		setScheme(next === "auto" ? null : next);
 	});
-	document.addEventListener("DOMContentLoaded", labelToggles);
+	document.addEventListener("DOMContentLoaded", () => {
+		labelToggles();
+		followSystemIcons();
+	});
 	apply();
 })();

@@ -127,19 +127,6 @@ fn fixed_roles() -> Rule {
 		.with_token(colors::OnTertiaryFixedVariant, tones::Tertiary30).unwrap()
 }
 
-/// Returns color values for every palette tone in a [`Theme`], each tone
-/// token of [`ThemePalettes::TOKENS`] at its palette's tone.
-pub(crate) fn from_theme(theme: &Theme) -> Vec<(TokenKey, TokenValue)> {
-	let palettes = ThemePalettes::new(theme);
-	ThemePalettes::tokens()
-		.into_iter()
-		.fold(Rule::new(), |rule, (palette, tone, token)| {
-			rule.with_value_untyped(token, palettes.tone(palette, tone))
-				.expect("a colour serializes")
-		})
-		.into_iter().collect()
-}
-
 /// Returns default opacity scalar values.
 pub(crate) fn default_opacities() -> Vec<(TokenKey, TokenValue)> {
 	Rule::new()

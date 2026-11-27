@@ -51,11 +51,11 @@
 //! it answered ([`ProvenanceSource::Url`], counted unchanged since nothing
 //! local can hash it without fetching it again). Beside the files, the
 //! declaration computes a value per card from what the card draws off the
-//! world (the page's title, credit line, description and media url) and one
-//! for the frame
-//! (the site title, description, homepage and `Theme`), so a page declared in
-//! code or a rebrand regenerates the set like an edited file
-//! ([`ProvenanceValue`]). A page added is a value the document was not
+//! world (the page's title, credit line, description and media url), and
+//! names the two resources the frame is drawn from, the theme's [`ThemeTones`]
+//! and the [`PackageConfig`] (the site title, description and homepage),
+//! read as the set's freshness is checked, so a page declared in code or a
+//! rebrand regenerates the set like an edited file ([`ProvenanceValue`]). A page added is a value the document was not
 //! computed from and a page removed one it no longer declares, so both
 //! regenerate too, and the removed page's card is pruned as a superseded
 //! output. One document rather than one per page: a regeneration redraws
@@ -131,11 +131,14 @@ impl SocialCards {
 	pub fn new(font: impl Into<RelPath>) -> Self { Self { font: font.into() } }
 
 	/// The [`Derivation`] this set declares, its document in `assets/og`
-	/// naming the font; the logo, the pages and the values join it as the
-	/// world names them ([`refresh_inputs`](Self::refresh_inputs)).
+	/// naming the font and the resources the frame is drawn from; the logo,
+	/// the pages and their values join it as the world names them
+	/// ([`refresh_inputs`](Self::refresh_inputs)).
 	pub fn derivation(&self) -> Derivation {
 		Derivation::new(RelPath::new(Self::DIR).join(Self::DOCUMENT))
 			.with_input(self.font.clone())
+			.with_resource_type::<ThemeTones>()
+			.with_resource_type::<PackageConfig>()
 	}
 
 	/// The store path of the card for the page at route `path`.
@@ -206,15 +209,14 @@ impl SocialCards {
 
 impl TypeInstaller for SocialCards {
 	/// Registers the declaration and refreshes each set's inputs whenever
-	/// something a card draws lands: a route tree, a page's metadata, the
-	/// logo, the theme or the package.
+	/// something a card names lands: a route tree, a page's metadata or the
+	/// logo. The resources the frame is drawn from need none, being read as
+	/// the set's freshness is checked.
 	fn install(app: &mut App) {
 		app.register_type::<Self>()
 			.add_observer(queue_refresh::<RouteTree>)
 			.add_observer(queue_refresh::<DocMeta>)
-			.add_observer(queue_refresh::<IconSet>)
-			.add_observer(queue_refresh::<Theme>)
-			.add_observer(queue_refresh::<PackageConfig>);
+			.add_observer(queue_refresh::<IconSet>);
 	}
 }
 
@@ -308,11 +310,10 @@ impl CardText {
 }
 
 /// What a [`SocialCards`] set reads off the world: its pages, each with the
-/// file it was discovered from, the logo and the theme.
+/// file it was discovered from, and the logo.
 #[derive(SystemParam)]
 struct SocialCardsQuery<'w, 's> {
 	syndication: SyndicationQuery<'w, 's>,
-	theme: Option<Res<'w, Theme>>,
 	blobs: Query<'w, 's, &'static Blob>,
 	stores: AncestorQuery<'w, 's, &'static BlobStore>,
 	icon_sets: Query<'w, 's, &'static IconSet>,
@@ -349,21 +350,11 @@ impl SocialCardsQuery<'_, '_> {
 	}
 
 	/// The values the set at `cards` draws off the world, as far as it can
-	/// name them now: the frame, then each card's text and media url, named
-	/// by the card's path. A value is the drawn fields joined, so it changes
-	/// exactly when the drawing could.
+	/// name them now: each card's text and media url, named by the card's
+	/// path. A value is the drawn fields joined, so it changes exactly when
+	/// the drawing could.
 	fn values(&self, cards: Entity) -> Vec<ProvenanceValue> {
-		let package = self.syndication.package();
-		let homepage = package.homepage.as_ref().map(Url::to_string);
-		let theme =
-			format!("{:?}", self.theme.as_deref().cloned().unwrap_or_default());
-		let frame = Self::value("frame", [
-			Some(package.title.as_str()),
-			Some(package.description.as_str()),
-			homepage.as_deref(),
-			Some(theme.as_str()),
-		]);
-		let pages = self.pages(cards).into_iter().flatten().map(|(page, _)| {
+		self.pages(cards).into_iter().flatten().map(|(page, _)| {
 			let card = SocialCards::card(&page.path);
 			// a poster url is only ever a video's, so the url implies the badge
 			let media = page.meta.social_image_url().map(|url| url.to_string());
@@ -374,8 +365,8 @@ impl SocialCardsQuery<'_, '_> {
 				page.meta.description.as_deref(),
 				media.as_deref(),
 			])
-		});
-		core::iter::once(frame).chain(pages).collect()
+		})
+		.collect()
 	}
 
 	/// The value `name` over `fields`, each delimited so no two sets of
@@ -444,8 +435,8 @@ struct CardSet {
 	pages: Vec<CardPage>,
 	/// The logo, the world's [`IconSet`].
 	logo: Option<IconSet>,
-	/// The palette the frame is drawn in.
-	theme: Theme,
+	/// The tones the frame is drawn in.
+	tones: ThemeTones,
 	/// The site title, the homepage and the fallback description.
 	package: PackageConfig,
 }
@@ -479,7 +470,7 @@ impl CardSet {
 				})
 				.collect(),
 			logo: logo?,
-			theme: world.get_resource::<Theme>().cloned().unwrap_or_default(),
+			tones: world.get_resource::<ThemeTones>().cloned().unwrap_or_default(),
 			package: world
 				.get_resource::<PackageConfig>()
 				.cloned()
@@ -550,7 +541,7 @@ impl CardSet {
 					.xmap(|logo| super::icon_set::IconSource::encode_png(&logo))
 			})
 			.transpose()?;
-		let palette = CardPalette::new(&self.theme)?;
+		let palette = CardPalette::new(&self.tones)?;
 		self.pages
 			.iter()
 			.zip(media)
@@ -906,7 +897,7 @@ impl CardLayout {
 	}
 }
 
-/// The tones a card is drawn in, the light scheme of the site's [`Theme`].
+/// The tones a card is drawn in, the light scheme of the site's [`ThemeTones`].
 #[cfg(feature = "site_images")]
 struct CardPalette {
 	/// The frame.
@@ -923,10 +914,10 @@ struct CardPalette {
 
 #[cfg(feature = "site_images")]
 impl CardPalette {
-	/// The light tones of `theme`.
-	fn new(theme: &Theme) -> Result<Self> {
+	/// The light tones of `tones`.
+	fn new(tones: &ThemeTones) -> Result<Self> {
 		let hex = |role: Token| -> Result<String> {
-			theme
+			tones
 				.resolve(ColorScheme::Light, role)?
 				.to_srgba()
 				.to_hex()
@@ -1266,8 +1257,13 @@ mod test {
 	/// A world whose `PackageConfig` names the site, the reactions running
 	/// so an edited file refreshes its route.
 	fn world() -> World {
-		let mut world =
-			(MinimalPlugins, AsyncPlugin, RouterPlugin).into_world();
+		let mut world = (
+			MinimalPlugins,
+			AsyncPlugin,
+			RouterPlugin,
+			material::MaterialStylePlugin,
+		)
+			.into_world();
 		world.insert_resource(PackageConfig {
 			title: "Beet".into(),
 			description: "An Atmospheric OS for homegrown tech".into(),
@@ -1405,7 +1401,7 @@ mod test {
 	}
 
 	/// A page declared in code has no file to track, so its drawn text is a
-	/// value, as is the frame a rebrand redraws.
+	/// value, and a rebrand redraws the frame from the tones it reads.
 	#[beet_core::test]
 	async fn regenerates_a_page_declared_in_code() {
 		let (mut world, cards, store) = setup(&two_pages()).await;
@@ -1438,7 +1434,7 @@ mod test {
 		settle(&mut world).await;
 		ensure(&mut world, cards, &store)
 			.await
-			.xpect_eq(Freshness::Revalued("frame".into()));
+			.xpect_eq(Freshness::Revalued(ThemeTones::type_path().into()));
 	}
 
 	/// A page added since the set was derived is a source the document was
@@ -1503,7 +1499,7 @@ mod test {
 			.0
 			.xpect_eq(RED);
 		// below the slot and right of the text column, the frame alone
-		let background = Theme::default()
+		let background = ThemeTones::default()
 			.resolve(ColorScheme::Light, material::colors::Background)
 			.unwrap()
 			.to_srgba()
@@ -1604,7 +1600,7 @@ mod test {
 	#[beet_core::test]
 	fn credits_the_page() {
 		let font = CardFont::new(FONT.to_vec()).unwrap();
-		let palette = CardPalette::new(&Theme::default()).unwrap();
+		let palette = CardPalette::new(&ThemeTones::default()).unwrap();
 		let svg = |meta: DocMeta, media: Option<CardMedia>| {
 			let page = CardPage {
 				path: RelPath::new("post"),

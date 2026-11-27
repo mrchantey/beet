@@ -68,8 +68,6 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::style::material::ThemePalette;
 	#[cfg(feature = "style")]
-	pub use crate::style::material::ThemePalettes;
-	#[cfg(feature = "style")]
 	pub use crate::style::material::ThemeTints;
 	#[cfg(feature = "style")]
 	pub use crate::style::material::ThemeTones;
