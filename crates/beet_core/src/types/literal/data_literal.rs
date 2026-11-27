@@ -150,8 +150,8 @@ pub struct BindingExpr {
 	/// entity, or a reserved well-known entity (`BuildRoot`, `SnippetRoot`,
 	/// `PageRoot`, `Router`). Only [`BindingSource::Comp`] carries one.
 	pub selector: Option<SmolStr>,
-	/// The short type path of the bound resource/component, eg `PackageConfig`.
-	pub type_path: Option<SmolStr>,
+	/// The bound resource or component, as written, eg `PackageConfig`.
+	pub bound_type: Option<ReflectName>,
 	/// The field path within the source, eg `count`, `user.name`.
 	pub field_path: FieldPath,
 	/// The `=init` initializer literal, `@doc` only.
@@ -164,7 +164,7 @@ impl BindingExpr {
 		Self {
 			source: BindingSource::Doc,
 			selector: None,
-			type_path: None,
+			bound_type: None,
 			field_path: field_path.into_field_path(),
 			init: None,
 		}

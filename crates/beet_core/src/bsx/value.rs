@@ -146,7 +146,7 @@ pub(crate) fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
 		None
 	};
 	// `@res`/`@comp`/`@entity` lead with a `ShortTypePath.` segment.
-	let type_path = match source {
+	let bound_type = match source {
 		BindingSource::Res | BindingSource::Comp => {
 			let type_path = cursor.take_while(|ch| {
 				ch.is_alphanumeric() || ch == '_' || ch == ':'
@@ -159,7 +159,7 @@ pub(crate) fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
 					"`@{source_name}:` is missing its field path, expected a `Type.field` path"
 				);
 			}
-			Some(SmolStr::from(type_path))
+			Some(ReflectName::new(type_path))
 		}
 		BindingSource::Doc | BindingSource::Prop => None,
 	};
@@ -177,7 +177,7 @@ pub(crate) fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
 	BindingExpr {
 		source,
 		selector,
-		type_path,
+		bound_type,
 		field_path,
 		init,
 	}
@@ -462,7 +462,7 @@ mod test {
 		let parsed = binding("@doc:count");
 		parsed.source.xpect_eq(BindingSource::Doc);
 		parsed.selector.xpect_eq(None);
-		parsed.type_path.xpect_eq(None);
+		parsed.bound_type.xpect_eq(None);
 		parsed.field_path.to_string().xpect_eq("count".to_string());
 		parsed.init.xpect_eq(None);
 	}
@@ -483,7 +483,7 @@ mod test {
 	fn res_binding() {
 		let parsed = binding("@res:PackageConfig.title");
 		parsed.source.xpect_eq(BindingSource::Res);
-		parsed.type_path.xpect_eq(Some("PackageConfig".into()));
+		parsed.bound_type.xpect_eq(Some(ReflectName::new("PackageConfig")));
 		parsed.field_path.to_string().xpect_eq("title".to_string());
 	}
 
@@ -492,7 +492,7 @@ mod test {
 		let parsed = binding("@entity:myref::Bar.boo");
 		parsed.source.xpect_eq(BindingSource::Comp);
 		parsed.selector.xpect_eq(Some("myref".into()));
-		parsed.type_path.xpect_eq(Some("Bar".into()));
+		parsed.bound_type.xpect_eq(Some(ReflectName::new("Bar")));
 		parsed.field_path.to_string().xpect_eq("boo".to_string());
 	}
 
@@ -501,14 +501,14 @@ mod test {
 		let parsed = binding("@entity:PageRoot::DocMeta.title");
 		parsed.source.xpect_eq(BindingSource::Comp);
 		parsed.selector.xpect_eq(Some("PageRoot".into()));
-		parsed.type_path.xpect_eq(Some("DocMeta".into()));
+		parsed.bound_type.xpect_eq(Some(ReflectName::new("DocMeta")));
 		parsed.field_path.to_string().xpect_eq("title".to_string());
 	}
 
 	#[crate::test]
 	fn comp_binding_nested_field() {
 		let parsed = binding("@comp:Bar.style.width");
-		parsed.type_path.xpect_eq(Some("Bar".into()));
+		parsed.bound_type.xpect_eq(Some(ReflectName::new("Bar")));
 		parsed
 			.field_path
 			.to_string()
@@ -519,7 +519,7 @@ mod test {
 	fn prop_binding() {
 		let parsed = binding("@prop:title");
 		parsed.source.xpect_eq(BindingSource::Prop);
-		parsed.type_path.xpect_eq(None);
+		parsed.bound_type.xpect_eq(None);
 		parsed.field_path.to_string().xpect_eq("title".to_string());
 	}
 
@@ -559,6 +559,6 @@ mod test {
 			panic!("expected binding item");
 		};
 		parsed.source.xpect_eq(BindingSource::Comp);
-		parsed.type_path.clone().xpect_eq(Some("Bar".into()));
+		parsed.bound_type.clone().xpect_eq(Some(ReflectName::new("Bar")));
 	}
 }

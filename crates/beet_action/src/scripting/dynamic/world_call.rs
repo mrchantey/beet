@@ -38,19 +38,19 @@ pub enum WorldOp {
 	Get {
 		/// The entity, in [`entity_id`](super::entity_id) form.
 		entity: String,
-		/// The component identifier.
-		component: String,
+		/// The component, as the script named it.
+		component: ReflectName,
 	},
 	/// `await world.entities(component)`, replying with the ids of every entity
 	/// carrying it.
 	Entities {
-		/// The component identifier.
-		component: String,
+		/// The component, as the script named it.
+		component: ReflectName,
 	},
 	/// `await world.schema(component)`, replying with a structural description.
 	Schema {
-		/// The component identifier.
-		component: String,
+		/// The component, as the script named it.
+		component: ReflectName,
 	},
 	/// `await world.spawn(components)`, replying with the new entity's id.
 	Spawn {
@@ -61,8 +61,8 @@ pub enum WorldOp {
 	Insert {
 		/// The entity, in [`entity_id`](super::entity_id) form.
 		entity: String,
-		/// The component identifier.
-		component: String,
+		/// The component, as the script named it.
+		component: ReflectName,
 		/// The component's value.
 		value: Value,
 	},
@@ -70,8 +70,8 @@ pub enum WorldOp {
 	Remove {
 		/// The entity, in [`entity_id`](super::entity_id) form.
 		entity: String,
-		/// The component identifier.
-		component: String,
+		/// The component, as the script named it.
+		component: ReflectName,
 	},
 	/// `await world.despawn(entity)`, replying with no value.
 	Despawn {
@@ -505,7 +505,7 @@ mod test {
 			id: 1,
 			op: WorldOp::Remove {
 				entity: "42v1".to_string(),
-				component: "Name".to_string(),
+				component: ReflectName::new("Name"),
 			},
 		})
 		.unwrap()

@@ -25,7 +25,7 @@ use bevy::ecs::reflect::ReflectComponent;
 use bevy::ecs::reflect::ReflectResource;
 
 /// Binds this entity's [`Value`] to a field of a reflected resource, by the
-/// resource's short type path and a field path within it.
+/// resource's name and a field path within it.
 ///
 /// Standalone `(Value::default(), ResourceFieldRef::new("Theme", "contrast"))`
 /// mirrors the resource field into the [`Value`]; co-locate a [`FieldRef`] to
@@ -34,8 +34,9 @@ use bevy::ecs::reflect::ReflectResource;
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ResourceFieldRef {
-	/// The target resource's short type path, eg `PackageConfig`.
-	pub resource: SmolStr,
+	/// The target resource, resolved as a tag is, so markup may write it short,
+	/// eg `PackageConfig`.
+	pub resource: ReflectName,
 	/// The field path within the resource, eg `title` or `style.width`. Empty
 	/// binds the whole resource value.
 	pub field: SmolStr,
@@ -44,13 +45,25 @@ pub struct ResourceFieldRef {
 impl ResourceFieldRef {
 	/// Bind to `resource`'s `field`.
 	pub fn new(
-		resource: impl Into<SmolStr>,
+		resource: impl Into<ReflectName>,
 		field: impl Into<SmolStr>,
 	) -> Self {
 		Self {
 			resource: resource.into(),
 			field: field.into(),
 		}
+	}
+
+	/// Bind to `T`'s `field`, naming the resource by the type itself, so a
+	/// rename follows and a misspelt field fails here rather than syncing
+	/// nothing.
+	///
+	/// # Errors
+	/// Errors when `field` is not a field path of `T`.
+	pub fn of<T: bevy::reflect::Typed>(field: impl Into<SmolStr>) -> Result<Self> {
+		let field = field.into();
+		reflect_value_ext::validate_field_path(T::type_info(), &field)?;
+		Self::new(ReflectName::of::<T>(), field).xok()
 	}
 
 	/// The `GetPath` access string for the bound field, ie `.field.path` (empty
@@ -134,15 +147,15 @@ pub(crate) fn sync_resource_field_bindings(world: &mut World) {
 #[derive(Default, Resource, Deref, DerefMut)]
 struct ResourceBindingCache(reflect_value_ext::BindingTickCache);
 
-/// Resolve a resource short type path to its backing [`ReflectComponent`]
-/// (resources are entity-backed components) and [`ComponentId`], caching the id.
+/// Resolve a resource name to its backing [`ReflectComponent`] (resources are
+/// entity-backed components) and [`ComponentId`], caching the id.
 fn resolve_resource<'a>(
 	world: &World,
 	registry: &'a bevy::reflect::TypeRegistry,
 	cache: &mut ResourceBindingCache,
-	resource: &SmolStr,
+	resource: &ReflectName,
 ) -> Option<(&'a ReflectComponent, ComponentId)> {
-	let registration = registry.get_with_short_type_path(resource)?;
+	let registration = resource.carried_registration(registry)?;
 	// require ReflectResource so a plain component cannot be bound as a resource.
 	registration.data::<ReflectResource>()?;
 	let reflect_component = registration.data::<ReflectComponent>()?;

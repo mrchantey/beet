@@ -1527,6 +1527,7 @@ mod test {
 	#[cfg(all(feature = "http", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn fetches_a_remote_poster_once() {
+		use beet_action::prelude::*;
 		use std::sync::atomic::AtomicUsize;
 		use std::sync::atomic::Ordering;
 		let fetches = std::sync::Arc::new(AtomicUsize::new(0));

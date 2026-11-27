@@ -55,6 +55,18 @@ impl ReflectName {
 			.or_else(|| reflect_ext::registration_by_name(registry, self))
 	}
 
+	/// [`registration`](Self::registration) for a type an entity carries, so
+	/// an ambiguous short name resolves to its sole component or resource, see
+	/// [`reflect_ext::carried_registration_by_name`].
+	pub fn carried_registration<'a>(
+		&self,
+		registry: &'a TypeRegistry,
+	) -> Option<&'a TypeRegistration> {
+		registry
+			.get_with_type_path(self.as_str())
+			.or_else(|| reflect_ext::carried_registration_by_name(registry, self))
+	}
+
 	/// Whether this names the type at `path`, by its full path or the short
 	/// one a document wrote.
 	pub fn names(&self, path: &TypePathTable) -> bool {

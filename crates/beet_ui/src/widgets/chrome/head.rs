@@ -227,7 +227,7 @@ fn site_name_attr(title: &SmolStr) -> impl Bundle {
 	return Attribute::bundle_with(
 		"content",
 		value,
-		ResourceFieldRef::new("PackageConfig", "title"),
+		ResourceFieldRef::new(ReflectName::of::<PackageConfig>(), "title"),
 	);
 	#[cfg(not(feature = "json"))]
 	return Attribute::bundle("content", value);

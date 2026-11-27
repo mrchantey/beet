@@ -83,7 +83,7 @@ impl ReflectFieldRef {
 		field: impl Into<SmolStr>,
 	) -> Result<Self> {
 		let field = field.into();
-		validate_field_path(T::type_info(), &field)?;
+		reflect_value_ext::validate_field_path(T::type_info(), &field)?;
 		Self::new(ReflectName::new(T::type_info().type_path()), field).xok()
 	}
 
@@ -97,36 +97,6 @@ impl ReflectFieldRef {
 	/// The `GetPath` access string for the bound field, ie `.field.path` (empty
 	/// for the whole component).
 	fn access(&self) -> String { reflect_value_ext::field_access(&self.field) }
-}
-
-/// Walk a dot-separated field path through `info`, erroring at the first segment
-/// its type does not declare.
-///
-/// An empty path binds the whole component value, so it always passes. The walk
-/// stops accepting once a segment's type is not a struct (a collection index, an
-/// opaque type): what it can check, it checks.
-fn validate_field_path(
-	info: &'static bevy::reflect::TypeInfo,
-	field: &str,
-) -> Result<()> {
-	use bevy::reflect::TypeInfo;
-	let mut info = info;
-	for segment in field.split('.').filter(|segment| !segment.is_empty()) {
-		let TypeInfo::Struct(struct_info) = info else {
-			return Ok(());
-		};
-		let Some(named) = struct_info.field(segment) else {
-			bevybail!(
-				"`{}` declares no field `{segment}`, so the binding `{field}` would sync nothing",
-				struct_info.type_path_table().short_path()
-			);
-		};
-		match named.type_info() {
-			Some(next) => info = next,
-			None => return Ok(()),
-		}
-	}
-	Ok(())
 }
 
 /// Bidirectionally sync every [`ReflectFieldRef`]'s [`Value`] with its bound
@@ -226,7 +196,7 @@ struct ComponentBindingCache {
 	reserved_targets: HashMap<Entity, Entity>,
 }
 
-/// Resolve a component short type path to its [`ReflectComponent`] and
+/// Resolve a component name to its [`ReflectComponent`] and
 /// [`ComponentId`], caching the id.
 fn resolve_component<'a>(
 	world: &World,
@@ -236,11 +206,8 @@ fn resolve_component<'a>(
 ) -> Option<(&'a ReflectComponent, ComponentId)> {
 	let registration = component.registration(registry)?;
 	let reflect_component = registration.data::<ReflectComponent>()?;
-	let component_id = cache.component_id(
-		world,
-		&SmolStr::new(component.as_str()),
-		registration.type_id(),
-	)?;
+	let component_id =
+		cache.component_id(world, component, registration.type_id())?;
 	Some((reflect_component, component_id))
 }
 

@@ -1,5 +1,5 @@
-//! Shared reflect-serde bridges between a [`Value`] and a reflected field,
-//! used by the [`ReflectFieldRef`] and [`ResourceFieldRef`] binding syncs.
+//! Shared reflect helpers for the [`ReflectFieldRef`] and [`ResourceFieldRef`]
+//! binding syncs: the reflect-serde bridges and the field path check.
 //!
 //! The bound source is always a component under the hood (resources are
 //! entity-backed), so both syncs funnel through the same pair of helpers: a
@@ -13,33 +13,63 @@ use bevy::ecs::reflect::ReflectComponent;
 use bevy::reflect::GetPath;
 use core::any::TypeId;
 
+/// Walk a dot-separated field path through `info`, erroring at the first segment
+/// its type does not declare.
+///
+/// An empty path binds the whole value, so it always passes. The walk
+/// stops accepting once a segment's type is not a struct (a collection index, an
+/// opaque type): what it can check, it checks.
+pub(crate) fn validate_field_path(
+	info: &'static bevy::reflect::TypeInfo,
+	field: &str,
+) -> Result<()> {
+	use bevy::reflect::TypeInfo;
+	let mut info = info;
+	for segment in field.split('.').filter(|segment| !segment.is_empty()) {
+		let TypeInfo::Struct(struct_info) = info else {
+			return Ok(());
+		};
+		let Some(named) = struct_info.field(segment) else {
+			bevybail!(
+				"`{}` declares no field `{segment}`, so the binding `{field}` would sync nothing",
+				struct_info.type_path_table().short_path()
+			);
+		};
+		match named.type_info() {
+			Some(next) => info = next,
+			None => return Ok(()),
+		}
+	}
+	Ok(())
+}
+
 /// Tracks the previous sync pass tick and caches resolved [`ComponentId`]s
-/// keyed by short type path: the shared shape of the binding sync cache
+/// keyed by the name a binding wrote: the shared shape of the binding sync cache
 /// resources ([`ReflectFieldRef`] and [`ResourceFieldRef`] each keep their own,
 /// the syncs run at different points so the `last_run` snapshots differ).
 #[derive(Default)]
 pub(crate) struct BindingTickCache {
 	/// The `world.change_tick()` snapshot of the previous sync pass.
 	pub last_run: Tick,
-	/// Resolved [`ComponentId`] per short type path.
-	pub ids: HashMap<SmolStr, ComponentId>,
+	/// Resolved [`ComponentId`] per name.
+	pub ids: HashMap<ReflectName, ComponentId>,
 }
 
 impl BindingTickCache {
-	/// Get or resolve the [`ComponentId`] for `type_path`, caching on success.
+	/// Get or resolve the [`ComponentId`] for `name`, caching on success.
 	/// `None` until the type has been registered with the world (eg inserted at
 	/// least once), retried next pass.
 	pub fn component_id(
 		&mut self,
 		world: &World,
-		type_path: &SmolStr,
+		name: &ReflectName,
 		type_id: TypeId,
 	) -> Option<ComponentId> {
-		match self.ids.get(type_path) {
+		match self.ids.get(name) {
 			Some(component_id) => Some(*component_id),
 			None => {
 				let component_id = world.components().get_id(type_id)?;
-				self.ids.insert(type_path.clone(), component_id);
+				self.ids.insert(name.clone(), component_id);
 				Some(component_id)
 			}
 		}

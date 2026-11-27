@@ -98,10 +98,10 @@ pub struct Derivation {
 	/// The values the declaration computes from the world, by name and
 	/// digest, stamped onto each regeneration's [`Provenance`].
 	pub values: Vec<ProvenanceValue>,
-	/// The resources the producer reads, each by the type path it is declared
-	/// by, short or full: read as the file's freshness is checked and stamped
-	/// as a value of that name.
-	pub resources: Vec<SmolStr>,
+	/// The resources the producer reads, each by the name it is declared by,
+	/// short or full: read as the file's freshness is checked and stamped as a
+	/// value of that name.
+	pub resources: Vec<ReflectName>,
 	/// The verb that alone writes this file, ie `publish`, or `None` when any
 	/// ensure step may: `<Derive/>` skips a file one names, so a deploy
 	/// publishes it exactly as committed.
@@ -133,9 +133,9 @@ impl Derivation {
 		self
 	}
 
-	/// This derivation reading the resource named `name`, a short or full type
-	/// path, see [`resources`](Self::resources).
-	pub fn with_resource(mut self, name: impl Into<SmolStr>) -> Self {
+	/// This derivation reading the resource named `name`, see
+	/// [`resources`](Self::resources).
+	pub fn with_resource(mut self, name: impl Into<ReflectName>) -> Self {
 		self.resources.push(name.into());
 		self
 	}
@@ -143,7 +143,7 @@ impl Derivation {
 	/// This derivation reading the resource `T`, see
 	/// [`resources`](Self::resources).
 	pub fn with_resource_type<T: TypePath>(self) -> Self {
-		self.with_resource(T::type_path())
+		self.with_resource(ReflectName::of::<T>())
 	}
 
 	/// Each declared [`resource`](Self::resources) as `world` holds it now,
@@ -152,19 +152,25 @@ impl Derivation {
 	///
 	/// # Errors
 	/// Errors when a name resolves to no registered resource.
-	pub fn read_resources(&self, world: &World) -> Result<Vec<(SmolStr, Value)>> {
+	pub fn read_resources(
+		&self,
+		world: &World,
+	) -> Result<Vec<(ReflectName, Value)>> {
 		let registry = world.resource::<AppTypeRegistry>().read();
 		self.resources
 			.iter()
 			.map(|name| {
-				let registration =
-					reflect_ext::carried_registration_by_name(&registry, name)
-						.ok_or_else(|| {
-							bevyhow!(
-								"derived file `{}` reads the resource `{name}`, which is no registered type",
-								self.path
-							)
-						})?;
+				let registration = name
+					.carried_registration(&registry)
+					.filter(|registration| {
+						registration.data::<ReflectResource>().is_some()
+					})
+					.ok_or_else(|| {
+						bevyhow!(
+							"derived file `{}` reads the resource `{name}`, which is no registered resource",
+							self.path
+						)
+					})?;
 				let value = match reflect_ext::reflect_resource(world, registration)
 				{
 					Some(resource) => {
@@ -985,17 +991,17 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(Freshness::Fresh);
-		let name = SmolStr::from(Brand::type_path());
+		let name = ReflectName::of::<Brand>();
 		world.insert_resource(Brand("green".into()));
 		ensure(&mut world, entity, &store)
 			.await
 			.unwrap()
-			.xpect_eq(Freshness::Revalued(name.clone()));
+			.xpect_eq(Freshness::Revalued(name.clone().into()));
 		world.resource_mut::<Brand>().0 = "red".into();
 		ensure(&mut world, entity, &store)
 			.await
 			.unwrap()
-			.xpect_eq(Freshness::Revalued(name.clone()));
+			.xpect_eq(Freshness::Revalued(name.clone().into()));
 		runs.get().xpect_eq(3);
 		world
 			.get::<Derivation>(entity)

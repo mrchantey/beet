@@ -12,7 +12,8 @@ use std::collections::BTreeMap;
 /// `src` is a classic script, no `import` or `export`, so a page can load the
 /// very same file with `<script src>` and draw live what is derived here. Run
 /// as the body of the derivation, it is followed by `return <call>(input)`,
-/// the call answering an object of file name to text. Its `input` holds each
+/// the call answering an object of file path, relative to `dir`, to text. Its
+/// `input` holds each
 /// of `resources` by the name it is declared by, serialized as the world holds
 /// it ([`Derivation::read_resources`]), ie `input.ThemeTones.primary[40]`. It
 /// runs pure, with no `world` bridge, since a derived file depends on what its
@@ -41,7 +42,7 @@ pub async fn ScriptDerivation(
 	dir: RelPath,
 	/// The resources the script is handed, each by a short or full type path.
 	#[field]
-	resources: Vec<SmolStr>,
+	resources: Vec<ReflectName>,
 	cx: ActionContext<BlobStore>,
 ) -> Result<EntityBody> {
 	let declaration = ScriptDerivation {
@@ -57,6 +58,7 @@ pub async fn ScriptDerivation(
 		.with(move |world: &mut World| derivation.read_resources(world))
 		.await?
 		.into_iter()
+		.map(|(name, value)| (SmolStr::from(name), value))
 		.collect::<Map>();
 	let body = format!(
 		"{{\n{}\nreturn {}(input);\n}}",
@@ -67,13 +69,13 @@ pub async fn ScriptDerivation(
 		world: false,
 		..default()
 	};
-	let files = Script::<Value, BTreeMap<String, String>>::new(body)
+	let files = Script::<Value, BTreeMap<RelPath, String>>::new(body)
 		.run(Value::Map(input), cx.world().clone(), &config)
 		.await?;
 	let mut outputs = DerivationOutputs::default();
-	for (name, text) in files {
+	for (path, text) in files {
 		outputs
-			.write(&cx.input, declaration.output(&name)?, text.into_bytes())
+			.write(&cx.input, declaration.output(&path)?, text.into_bytes())
 			.await?;
 	}
 	EntityBody::default()
@@ -102,19 +104,18 @@ impl ScriptDerivation {
 			.xok()
 	}
 
-	/// The store path of the file `name` the script answered, refusing a name
-	/// reaching outside `dir`.
-	fn output(&self, name: &str) -> Result<RelPath> {
-		if name.is_empty()
-			|| name.starts_with('.')
-			|| name.contains(['/', '\\'])
-		{
+	/// The store path of the file at `path` in `dir` the script answered. A
+	/// [`RelPath`] holds no `..` above its root, so it cannot reach outside
+	/// `dir`, and an empty one, ie `../`, names no file.
+	fn output(&self, path: &RelPath) -> Result<RelPath> {
+		if path.as_str().is_empty() {
 			bevybail!(
-				"script `{}` answered the file `{name}`: a file name is one plain path segment",
-				self.src
+				"script `{}` answered a file with no path within `{}`",
+				self.src,
+				self.dir
 			);
 		}
-		self.dir.join(name).xok()
+		self.dir.join(path).xok()
 	}
 
 	/// The hook landing this declaration's [`Derivation`] on its entity.
@@ -207,13 +208,29 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn refuses_a_path_outside_its_dir() {
+	async fn keeps_its_files_within_its_dir() {
+		let (mut world, entity, store) = setup(
+			"const Swatch = { files: () => ({ '../escape.svg': '', 'icons/a.svg': '' }) };",
+		);
+		ensure(&mut world, entity, &store).await.unwrap();
+		for path in ["out/escape.svg", "out/icons/a.svg"] {
+			store.exists(&RelPath::new(path)).await.unwrap().xpect_true();
+		}
+		store
+			.exists(&RelPath::new("escape.svg"))
+			.await
+			.unwrap()
+			.xpect_false();
+	}
+
+	#[beet_core::test]
+	async fn refuses_a_file_with_no_path() {
 		let (mut world, entity, store) =
-			setup("const Swatch = { files: () => ({ '../escape.svg': '' }) };");
+			setup("const Swatch = { files: () => ({ '..': '' }) };");
 		ensure(&mut world, entity, &store)
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("one plain path segment");
+			.xpect_contains("a file with no path");
 	}
 }

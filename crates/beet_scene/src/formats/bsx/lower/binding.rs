@@ -71,7 +71,7 @@ impl Lowering<'_> {
 			),
 			BindingSource::Res => {
 				self.seed_value(key)?;
-				self.insert(key, &Self::resource_ref(binding))
+				self.insert(key, &Self::resource_ref(binding)?)
 			}
 			BindingSource::Comp => {
 				self.seed_value(key)?;
@@ -82,8 +82,9 @@ impl Lowering<'_> {
 					}
 					(None, None) => CompTarget::This,
 				};
+				let component = Self::bound_type(binding)?;
 				self.insert_linked(key, |keys| {
-					Self::component_ref(binding, target, keys)
+					Self::component_ref(binding, component, target, keys)
 				})
 			}
 		}
@@ -119,38 +120,47 @@ impl Lowering<'_> {
 				})
 			}
 			BindingSource::Res => {
-				self.insert(&key, &Self::resource_ref(binding))
+				self.insert(&key, &Self::resource_ref(binding)?)
 			}
 			BindingSource::Comp => {
 				let target = match &binding.selector {
 					Some(name) => self.selector(name)?,
 					None => CompTarget::Entity(site.clone()),
 				};
+				let component = Self::bound_type(binding)?;
 				self.insert_linked(&key, |keys| {
-					Self::component_ref(binding, target, keys)
+					Self::component_ref(binding, component, target, keys)
 				})
 			}
 		}
 	}
 
-	/// The resource field an `@res` binding names.
-	fn resource_ref(binding: &BindingExpr) -> ResourceFieldRef {
-		ResourceFieldRef::new(
-			binding.type_path.clone().unwrap_or_default(),
-			binding.field_path.to_string(),
-		)
+	/// The resource or component an `@res` or `@comp` binding names, which its
+	/// parse requires.
+	fn bound_type(binding: &BindingExpr) -> Result<ReflectName> {
+		binding.bound_type.clone().ok_or_else(|| {
+			bevyhow!("the binding `{}` names no type", binding.field_path)
+		})
 	}
 
-	/// The component field an `@comp` binding names, on `target`.
+	/// The resource field an `@res` binding names.
+	fn resource_ref(binding: &BindingExpr) -> Result<ResourceFieldRef> {
+		ResourceFieldRef::new(
+			Self::bound_type(binding)?,
+			binding.field_path.to_string(),
+		)
+		.xok()
+	}
+
+	/// The `component` field an `@comp` binding names, on `target`.
 	fn component_ref(
 		binding: &BindingExpr,
+		component: ReflectName,
 		target: CompTarget,
 		keys: &mut KeySentinels,
 	) -> ReflectFieldRef {
-		let mut field = ReflectFieldRef::new(
-			binding.type_path.clone().unwrap_or_default(),
-			binding.field_path.to_string(),
-		);
+		let mut field =
+			ReflectFieldRef::new(component, binding.field_path.to_string());
 		field.target = match target {
 			CompTarget::This => BindingTarget::This,
 			CompTarget::Entity(key) => BindingTarget::Entity(keys.entity(key)),
