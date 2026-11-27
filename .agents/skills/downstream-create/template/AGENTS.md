@@ -10,7 +10,7 @@ Downstream deltas from the inherited conventions:
 
 - Depend on the `beet` facade, never the individual crates: external `#[action]`/`#[template]` macro expansions emit `beet::` paths, which only resolve against the facade. Direct bevy paths go through `beet::exports::bevy`.
 - Tests use `#[beet::test]` and `beet::test_main!()`, the facade re-exports of the beet_core harness; the `test_main!` invocation is `#[cfg(test)]` gated so a plain build does not need the facade's `testing` feature.
-- Behavior beet should own goes upstream in `../beet`, left unstaged there for review.
+- A downstream need alone is no reason to add to beet: upstream only what beet's existing model already wants, saying which concept it extends, in `../beet`, left unstaged there for review.
 
 ## Commands
 

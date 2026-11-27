@@ -116,7 +116,11 @@ pub struct ThreadEntryParams {
 /// One request entering a thread: the request's parts, which fill the
 /// mount's path, its [`ThreadEntryParams`], and the message it posts, if
 /// any.
-#[derive(Debug, Default, Clone)]
+///
+/// [`Thread::enter`] keeps it on the window, so the window's behavior reads
+/// the request it was entered with by ancestry, ie
+/// `AncestorQuery<&ThreadEntry>` and [`Self::parts`].
+#[derive(Debug, Default, Clone, Component)]
 pub struct ThreadEntry {
 	/// The parts of the request entering.
 	parts: RequestParts,
@@ -148,6 +152,9 @@ impl ThreadEntry {
 
 	/// The params of the request entering.
 	pub fn params(&self) -> &ThreadEntryParams { &self.params }
+
+	/// The parts of the request entering.
+	pub fn parts(&self) -> &RequestParts { &self.parts }
 
 	/// Post `message` once the thread is entered, each `{param}` filled from
 	/// the request, authored by `actor`, else the first User actor the scene
@@ -405,7 +412,7 @@ impl Thread {
 	///    scene authors that is not of kind System and no other window holds
 	///    ([`PresentActors`]), then the request's message if the entry carries
 	///    one, and write them. A thread created here records the last post of
-	///    its seed ([`Thread::seed`]).
+	///    its seed ([`Thread::seed`]). The window keeps `entry`.
 	///
 	/// A thread mounting no store persists nothing, so every entry creates
 	/// it. A branch enters with its parent's history up to the branch point,
@@ -587,6 +594,7 @@ impl Thread {
 					PresentActors::new(present),
 					synced,
 					record,
+					entry,
 				));
 				flush.xok()
 			})
@@ -632,6 +640,21 @@ mod test {
 		seed: impl Bundle,
 		request: Request,
 	) -> Result<(Thread, ThreadRecords)> {
+		let (app, thread) = entered(store, mount, seed, request).await?;
+		(
+			app.world().get::<Thread>(thread).unwrap().clone(),
+			app.world().get::<ThreadRecords>(thread).unwrap().clone(),
+		)
+			.xok()
+	}
+
+	/// [`enter`], answering the app and the entered window.
+	async fn entered(
+		store: &BlobStore,
+		mount: MountThreadStore,
+		seed: impl Bundle,
+		request: Request,
+	) -> Result<(App, Entity)> {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
 			.install_types::<ThreadPlugin>();
@@ -665,11 +688,7 @@ mod test {
 				ThreadStore::flush(&world.entity(thread)).await
 			})
 			.await?;
-		(
-			app.world().get::<Thread>(thread).unwrap().clone(),
-			app.world().get::<ThreadRecords>(thread).unwrap().clone(),
-		)
-			.xok()
+		(app, thread).xok()
 	}
 
 	/// A mount at `path`.
@@ -704,6 +723,26 @@ mod test {
 			RelPath::new(path),
 		)
 		.unwrap()
+	}
+
+	/// The window keeps the entry it was entered with, so its behavior reads
+	/// the request's params.
+	#[beet_core::test]
+	async fn the_window_keeps_its_entry() {
+		let (app, thread) = entered(
+			&BlobStore::temp(),
+			mount("threads/{claim}"),
+			Post::spawn("be brief"),
+			request(&[("claim", "per-weekend")]),
+		)
+		.await
+		.unwrap();
+		app.world()
+			.get::<ThreadEntry>(thread)
+			.unwrap()
+			.parts()
+			.get_param("claim")
+			.xpect_eq(Some("per-weekend"));
 	}
 
 	/// A continued thread reads no seed file and calls no seed route: both

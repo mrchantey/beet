@@ -117,11 +117,14 @@ impl BlobSync {
 			self.assert_mirrorable().await?;
 		}
 		let source = self.covered(&self.source).await?;
-		let dest = self
-			.covered(&self.dest)
-			.await?
-			.into_iter()
-			.collect::<HashMap<_, _>>();
+		// a destination not yet made holds nothing, so a restore into a fresh
+		// directory lands there rather than failing to list it
+		let dest = match self.dest.store_exists().await? {
+			true => self.covered(&self.dest).await?,
+			false => Vec::new(),
+		}
+		.into_iter()
+		.collect::<HashMap<_, _>>();
 		// what to copy: absent from the destination, or present but different
 		let mut report = BlobSyncReport {
 			dry_run: self.dry_run,
@@ -253,6 +256,28 @@ mod test {
 
 	fn paths(paths: &[&str]) -> Vec<RelPath> {
 		paths.iter().map(RelPath::new).collect()
+	}
+
+	/// A filesystem destination not yet made is empty, so a dry run reports
+	/// everything and a run creates it.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[beet_core::test]
+	async fn syncs_into_a_missing_directory() {
+		let source = seeded(&[("a.txt", "a"), ("dir/b.txt", "b")]).await;
+		let root = TempDir::new_ws().unwrap();
+		let dest =
+			BlobStore::new(FsStore::new(root.join("restore/rainbow-cat")));
+		BlobSync::new(source.clone(), dest.clone())
+			.with_dry_run(true)
+			.run()
+			.await
+			.unwrap()
+			.copied
+			.xpect_eq(paths(&["a.txt", "dir/b.txt"]));
+		BlobSync::new(source, dest.clone()).run().await.unwrap();
+		let mut listed = dest.list().await.unwrap();
+		listed.sort();
+		listed.xpect_eq(paths(&["a.txt", "dir/b.txt"]));
 	}
 
 	/// A fresh destination receives everything, and a second run of the same

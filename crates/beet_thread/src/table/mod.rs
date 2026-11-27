@@ -218,7 +218,9 @@
 //!    message if the entry carries one.
 //!
 //! A seed source is resolved by the entry creating its thread and by nothing
-//! else, so building a template reads no file and calls no route.
+//! else, so building a template reads no file and calls no route. The window
+//! keeps the [`ThreadEntry`] it was entered with, so its behavior reads the
+//! request too, ie the param naming what the thread is about.
 //!
 //! A request's message belongs to the request:
 //! `ThreadRoute{source:Document(".."), message:"review {document}", actor:"ann"}`, each
