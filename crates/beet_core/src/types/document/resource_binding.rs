@@ -60,7 +60,9 @@ impl ResourceFieldRef {
 	///
 	/// # Errors
 	/// Errors when `field` is not a field path of `T`.
-	pub fn of<T: bevy::reflect::Typed>(field: impl Into<SmolStr>) -> Result<Self> {
+	pub fn of<T: bevy::reflect::Typed>(
+		field: impl Into<SmolStr>,
+	) -> Result<Self> {
 		let field = field.into();
 		reflect_value_ext::validate_field_path(T::type_info(), &field)?;
 		Self::new(ReflectName::of::<T>(), field).xok()

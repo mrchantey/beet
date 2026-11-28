@@ -19,7 +19,10 @@ use beet_core::prelude::*;
 ///
 /// Only a page asking for it carries it: the tones are a few kilobytes.
 #[template(system)]
-pub fn ThemeData(tones: Res<ThemeTones>, style: StyleQuery) -> Result<impl Bundle> {
+pub fn ThemeData(
+	tones: Res<ThemeTones>,
+	style: StyleQuery,
+) -> Result<impl Bundle> {
 	let names = style.variable_names(&BakedStylesheet::builder(false))?;
 	let tokens = ThemeTones::tokens();
 	let mut keys = Map::default();
@@ -30,9 +33,11 @@ pub fn ThemeData(tones: Res<ThemeTones>, style: StyleQuery) -> Result<impl Bundl
 			.iter()
 			.filter(|(held, ..)| *held == palette)
 			.filter_map(|(_, tone, token)| {
-				names
-					.get(&CssVariable::from_token_key(token.key()))
-					.map(|name| (tone.to_string().into(), Value::str(name.to_string())))
+				names.get(&CssVariable::from_token_key(token.key())).map(
+					|name| {
+						(tone.to_string().into(), Value::str(name.to_string()))
+					},
+				)
 			})
 			.collect::<Map>();
 		variables.insert(palette.name(), ramp);

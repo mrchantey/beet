@@ -56,12 +56,12 @@ pub use article_header::*;
 pub use help::*;
 #[cfg(feature = "std")]
 pub use icon_set::*;
-#[cfg(all(feature = "std", feature = "scripting"))]
-pub use script_derivation::*;
 #[cfg(feature = "std")]
 pub use layout::*;
 #[cfg(feature = "std")]
 pub use route_index::*;
+#[cfg(all(feature = "std", feature = "scripting"))]
+pub use script_derivation::*;
 #[cfg(feature = "std")]
 pub use server_island::*;
 #[cfg(feature = "std")]

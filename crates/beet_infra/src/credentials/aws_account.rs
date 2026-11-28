@@ -238,10 +238,7 @@ impl AwsAccount {
 			Some(guard) => guard,
 			None => {
 				let guard = calls
-					.create_policy(
-						Self::MEMBER_GUARD,
-						&Self::member_guard(),
-					)
+					.create_policy(Self::MEMBER_GUARD, &Self::member_guard())
 					.await?;
 				report.push(format!("policy {} created", Self::MEMBER_GUARD));
 				guard
@@ -258,10 +255,7 @@ impl AwsAccount {
 		let management = calls.management_id().await?;
 		report.push(
 			calls
-				.ensure_agent_read(
-					Self::AGENT_READ_POLICY,
-					&Self::agent_read(),
-				)
+				.ensure_agent_read(Self::AGENT_READ_POLICY, &Self::agent_read())
 				.await?,
 		);
 		// 3b. the Identity Center instance's operator group and permission
@@ -1752,12 +1746,17 @@ mod test {
 			aws_seam::ok(r#"{"Policy":{"PolicySummary":{"Id":"p-guard"}}}"#)
 		});
 		calls
-			.create_policy(AwsAccount::MEMBER_GUARD, &AwsAccount::member_guard())
+			.create_policy(
+				AwsAccount::MEMBER_GUARD,
+				&AwsAccount::member_guard(),
+			)
 			.await
 			.unwrap()
 			.xpect_eq(SmolStr::new("p-guard"));
 		let asked = log.lock().unwrap()[0].clone();
-		asked.target.xpect_eq("AWSOrganizationsV20161128.CreatePolicy");
+		asked
+			.target
+			.xpect_eq("AWSOrganizationsV20161128.CreatePolicy");
 		Value::parse_json(asked.json()["Content"].as_str().unwrap())
 			.unwrap()
 			.xpect_eq(AwsAccount::member_guard());

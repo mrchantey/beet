@@ -458,8 +458,7 @@ mod test {
 			.xpect_contains("三");
 		// narrow: shown with the terminal glyph; the web svg stays
 		// terminal-hidden
-		render_plain_sized(40, template())
-			.xpect_contains("三");
+		render_plain_sized(40, template()).xpect_contains("三");
 	}
 
 	/// The entity of the sole `<nav>` element.

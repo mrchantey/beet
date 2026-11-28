@@ -62,9 +62,9 @@ impl ReflectName {
 		&self,
 		registry: &'a TypeRegistry,
 	) -> Option<&'a TypeRegistration> {
-		registry
-			.get_with_type_path(self.as_str())
-			.or_else(|| reflect_ext::carried_registration_by_name(registry, self))
+		registry.get_with_type_path(self.as_str()).or_else(|| {
+			reflect_ext::carried_registration_by_name(registry, self)
+		})
 	}
 
 	/// Whether this names the type at `path`, by its full path or the short

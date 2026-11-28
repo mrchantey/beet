@@ -331,9 +331,7 @@ mod test {
 		let report = sync.run().await.unwrap();
 		report.removed.xpect_eq(Vec::<RelPath>::new());
 		report.kept.xpect_eq(paths(&["stale.txt"]));
-		report
-			.to_string()
-			.xpect_contains("kept 1 the source lacks");
+		report.to_string().xpect_contains("kept 1 the source lacks");
 		dest.exists(&RelPath::new("stale.txt"))
 			.await
 			.unwrap()

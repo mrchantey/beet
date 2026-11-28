@@ -167,7 +167,8 @@ impl SshHost {
 
 	/// The sshd drop-in, ordered first: sshd takes the first value of each
 	/// keyword it reads, so these beat the distribution's defaults.
-	pub const SSHD_DROP_IN: &'static str = "/etc/ssh/sshd_config.d/00-beet.conf";
+	pub const SSHD_DROP_IN: &'static str =
+		"/etc/ssh/sshd_config.d/00-beet.conf";
 
 	/// The key exchanges the box's sshd offers, most preferred first, the
 	/// post-quantum hybrids leading. A distribution's crypto policy can leave

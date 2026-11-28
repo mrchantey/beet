@@ -483,7 +483,9 @@ mod test {
 	fn res_binding() {
 		let parsed = binding("@res:PackageConfig.title");
 		parsed.source.xpect_eq(BindingSource::Res);
-		parsed.bound_type.xpect_eq(Some(ReflectName::new("PackageConfig")));
+		parsed
+			.bound_type
+			.xpect_eq(Some(ReflectName::new("PackageConfig")));
 		parsed.field_path.to_string().xpect_eq("title".to_string());
 	}
 
@@ -501,7 +503,9 @@ mod test {
 		let parsed = binding("@entity:PageRoot::DocMeta.title");
 		parsed.source.xpect_eq(BindingSource::Comp);
 		parsed.selector.xpect_eq(Some("PageRoot".into()));
-		parsed.bound_type.xpect_eq(Some(ReflectName::new("DocMeta")));
+		parsed
+			.bound_type
+			.xpect_eq(Some(ReflectName::new("DocMeta")));
 		parsed.field_path.to_string().xpect_eq("title".to_string());
 	}
 
@@ -559,6 +563,9 @@ mod test {
 			panic!("expected binding item");
 		};
 		parsed.source.xpect_eq(BindingSource::Comp);
-		parsed.bound_type.clone().xpect_eq(Some(ReflectName::new("Bar")));
+		parsed
+			.bound_type
+			.clone()
+			.xpect_eq(Some(ReflectName::new("Bar")));
 	}
 }

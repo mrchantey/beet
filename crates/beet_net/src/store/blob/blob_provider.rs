@@ -12,7 +12,8 @@ pub struct BlobStat {
 	/// The object's size in bytes.
 	pub size: u64,
 	/// The MD5 hex digest, `None` where the backend cannot answer one (an S3
-	/// multipart upload's etag is not an MD5).
+	/// multipart object no beet upload recorded one for, see
+	/// `S3Store`).
 	pub md5: Option<SmolStr>,
 }
 

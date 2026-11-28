@@ -134,7 +134,10 @@ impl StandardSitePublish {
 		}
 		let tones = world
 			.with(|world: &mut World| {
-				world.get_resource::<ThemeTones>().cloned().unwrap_or_default()
+				world
+					.get_resource::<ThemeTones>()
+					.cloned()
+					.unwrap_or_default()
 			})
 			.await;
 		let record = StandardSitePublication::from_declaration(

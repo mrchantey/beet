@@ -208,7 +208,9 @@ impl Derivation {
 				world
 					.get::<Self>(entity)
 					.cloned()
-					.ok_or_else(|| bevyhow!("entity {entity} declares no derivation"))?
+					.ok_or_else(|| {
+						bevyhow!("entity {entity} declares no derivation")
+					})?
 					.with_resource_values(world)
 			})
 			.await
@@ -985,7 +987,10 @@ mod test {
 			Derivation::new(DERIVED).with_resource_type::<Brand>(),
 			"text",
 		);
-		world.resource::<AppTypeRegistry>().write().register::<Brand>();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<Brand>();
 		ensure(&mut world, entity, &store).await.unwrap();
 		ensure(&mut world, entity, &store)
 			.await

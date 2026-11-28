@@ -111,7 +111,10 @@ pub async fn IconSet(
 		.world()
 		.with(|world: &mut World| {
 			(
-				world.get_resource::<ThemeTones>().cloned().unwrap_or_default(),
+				world
+					.get_resource::<ThemeTones>()
+					.cloned()
+					.unwrap_or_default(),
 				world
 					.get_resource::<PackageConfig>()
 					.cloned()
@@ -315,8 +318,7 @@ impl IconSet {
 				.write(store, self.path(Self::FAVICON_SVG), bytes.to_vec())
 				.await?;
 		}
-		let mut sources =
-			vec![ProvenanceSource::file(self.src.clone(), bytes)];
+		let mut sources = vec![ProvenanceSource::file(self.src.clone(), bytes)];
 		if let (Some(path), Some(dark)) = (&self.dark, dark) {
 			if !self.is_svg() || !Self::is_svg_path(path) {
 				bevybail!(
@@ -815,7 +817,10 @@ mod test {
 		let mut world = icon_world();
 		let store = BlobStore::temp();
 		store.insert(&RelPath::new(SVG), svg("#fff")).await.unwrap();
-		store.insert(&RelPath::new(DARK), svg("#000")).await.unwrap();
+		store
+			.insert(&RelPath::new(DARK), svg("#000"))
+			.await
+			.unwrap();
 		let icon_set = IconSet::new(SVG).with_dark(DARK);
 		let entity = world.spawn(icon_set.clone()).flush();
 		ensure(&mut world, entity, &store).await;
@@ -832,7 +837,10 @@ mod test {
 			.clone()
 			.xpect_eq(Some("/branding/favicon-dark.svg".into()));
 		// a changed dark drawing regenerates the set
-		store.insert(&RelPath::new(DARK), svg("#111")).await.unwrap();
+		store
+			.insert(&RelPath::new(DARK), svg("#111"))
+			.await
+			.unwrap();
 		ensure(&mut world, entity, &store)
 			.await
 			.to_string()
