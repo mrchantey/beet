@@ -85,6 +85,12 @@ impl BodyComponents {
 			if let Some(document) = document {
 				DocPathResolver { document }.visit(component.as_mut())?;
 			}
+			if !reflect_component.contains(&*entity) {
+				reflect_ext::assert_constructible(
+					component.as_ref(),
+					registration,
+				)?;
+			}
 			reflect_component.insert(entity, component.as_ref(), &registry);
 		}
 		OK

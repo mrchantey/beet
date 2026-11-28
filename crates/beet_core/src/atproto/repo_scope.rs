@@ -8,13 +8,15 @@ use crate::prelude::*;
 /// A package's space is of type [`SpaceRef::PACKAGE`] keyed by the package's
 /// name, `at://<did>/space/org.beet.space.package/<name>`.
 #[derive(
-	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 pub struct SpaceRef {
 	/// The modality, ie [`SpaceRef::PACKAGE`].
 	pub r#type: Nsid,
-	/// The space's key within its type: a package's name for a package space.
-	pub key: SmolStr,
+	/// The space's key within its type, keyed as an rkey is since it is a
+	/// segment of every address in the space: a package's name for a package
+	/// space.
+	pub key: Rkey,
 }
 
 impl SpaceRef {
@@ -22,21 +24,27 @@ impl SpaceRef {
 	/// package of an account.
 	pub const PACKAGE: Nsid = Nsid::new_static("org.beet.space.package");
 
-	/// The space of `type` keyed `key`, refusing a key that is empty or holds
-	/// a character an rkey may not, since it is a segment of every address in
-	/// the space.
-	pub fn new(r#type: Nsid, key: impl Into<SmolStr>) -> Result<Self> {
-		let key = key.into();
-		Rkey::parse(&key).map_err(|err| {
-			bevyhow!("`{key}` is no space key, keyed as an rkey is: {err}")
-		})?;
-		Self { r#type, key }.xok()
+	/// The space of `type` keyed `key`.
+	pub fn new(r#type: Nsid, key: Rkey) -> Self { Self { r#type, key } }
+
+	/// The space of `type` keyed by the text `key`.
+	///
+	/// # Errors
+	/// Errors when `key` is empty or holds a character an rkey may not.
+	pub fn parse(r#type: Nsid, key: &str) -> Result<Self> {
+		Rkey::parse(key)
+			.map_err(|err| {
+				bevyhow!("`{key}` is no space key, keyed as an rkey is: {err}")
+			})?
+			.xmap(|key| Self::new(r#type, key))
+			.xok()
 	}
 
 	/// The space of the package `name`.
-	pub fn package(name: impl Into<SmolStr>) -> Result<Self> {
-		Self::new(Self::PACKAGE, name)
-	}
+	///
+	/// # Errors
+	/// Errors as [`parse`](Self::parse).
+	pub fn package(name: &str) -> Result<Self> { Self::parse(Self::PACKAGE, name) }
 }
 
 impl core::fmt::Display for SpaceRef {

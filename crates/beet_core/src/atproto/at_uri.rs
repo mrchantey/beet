@@ -20,7 +20,7 @@ use crate::prelude::*;
 /// uri.scope().xpect_eq(RepoScope::Public);
 /// ```
 #[derive(
-	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(try_from = "SmolStr", into = "SmolStr"))]
@@ -80,7 +80,7 @@ impl AtUri {
 			] => Self::scoped(
 				Did::parse(did)?,
 				RepoScope::space(
-					SpaceRef::new(Nsid::parse(r#type)?, *key)?,
+					SpaceRef::parse(Nsid::parse(r#type)?, key)?,
 					Did::parse(author)?,
 				),
 				Nsid::parse(collection)?,

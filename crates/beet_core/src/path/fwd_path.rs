@@ -169,8 +169,8 @@ impl FwdPath {
 	pub fn into_smol_path(self) -> SmolPath { self.0 }
 }
 
-/// A path known at compile time, checked as it compiles: the literal must be
-/// canonical, see [`FwdPath::is_canonical`].
+/// A path known at compile time, checked as it compiles: the literal, or the
+/// `&'static str` constant, must be canonical, see [`FwdPath::is_canonical`].
 ///
 /// ```
 /// # use beet_core::prelude::*;
@@ -184,10 +184,10 @@ impl FwdPath {
 /// ```
 #[macro_export]
 macro_rules! fwd_path {
-	($path:literal) => {{
+	($path:expr) => {{
 		const _: () = ::core::assert!(
 			$crate::prelude::FwdPath::is_canonical($path),
-			"a `fwd_path!` literal is canonical: no leading or trailing `/`, and no empty, `.` or `..` segment"
+			"a `fwd_path!` path is canonical: no leading or trailing `/`, and no empty, `.` or `..` segment"
 		);
 		$crate::prelude::FwdPath::from_canonical($path)
 	}};

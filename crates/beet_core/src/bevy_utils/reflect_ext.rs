@@ -40,6 +40,49 @@ pub fn clone_reflect_value(
 		.xok()
 }
 
+/// Refuse `value` where bevy's reflected insert would panic: a partial value
+/// of a type with no `#[reflect(Default)]` or `#[reflect(FromWorld)]` to fill
+/// the fields it lacks, which [`ReflectFromReflect`] cannot build whole. A
+/// type whose fields have no meaningful default, ie a `Did`, has none either,
+/// so every field without `#[reflect(default)]` must be present.
+///
+/// # Errors
+///
+/// Errors naming the type and the fields `value` lacks.
+pub fn assert_constructible(
+	value: &dyn PartialReflect,
+	registration: &TypeRegistration,
+) -> Result {
+	use bevy_ecs::reflect::ReflectFromWorld;
+	use bevy_reflect::ReflectRef;
+	use bevy_reflect::std_traits::ReflectDefault;
+	if registration.data::<ReflectDefault>().is_some()
+		|| registration.data::<ReflectFromWorld>().is_some()
+		|| registration
+			.data::<ReflectFromReflect>()
+			.is_some_and(|from_reflect| from_reflect.from_reflect(value).is_some())
+	{
+		return OK;
+	}
+	let absent = match (registration.type_info(), value.reflect_ref()) {
+		(TypeInfo::Struct(info), ReflectRef::Struct(value)) => info
+			.iter()
+			.filter(|field| value.field(field.name()).is_none())
+			.map(|field| format!("`{}`", field.name()))
+			.collect::<Vec<_>>(),
+		_ => Vec::new(),
+	};
+	bevybail!(
+		"`{}` has no default to complete it from, so it names every field \
+		 without `#[reflect(default)]`, absent: {}",
+		registration.type_info().type_path_table().short_path(),
+		match absent.is_empty() {
+			true => "none, but a field could not be built".to_string(),
+			false => absent.join(", "),
+		}
+	)
+}
+
 /// The `Some` variant's inner [`TypeInfo`] when `info` is an `Option<T>`, else
 /// `None`.
 ///

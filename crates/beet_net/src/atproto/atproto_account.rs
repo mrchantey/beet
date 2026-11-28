@@ -20,22 +20,25 @@ use beet_core::prelude::*;
 /// The did is the identity and the handle the name it is known by; a handle
 /// can move, so every address written names the did. `secret` names the env
 /// var holding an app password (a `secrets.toml` record with `role =
-/// "env_var"`); without one the repo reads and refuses every write.
-#[derive(
-	Debug, Default, Clone, PartialEq, Eq, Get, SetWith, Component, Reflect,
-)]
-#[reflect(Component, Default)]
+/// "env_var"`); without one the repo reads and refuses every write. A did has
+/// no default, so neither has an account: a tag names at least its handle and
+/// did.
+#[derive(Debug, Clone, PartialEq, Eq, Get, SetWith, Component, Reflect)]
+#[reflect(Component)]
 pub struct AtprotoAccount {
 	/// The name the account is known by, ie `pete.beet.org`.
 	handle: SmolStr,
 	/// The account's permanent identity.
 	did: Did,
 	/// The name a person reads, matched against a page's author.
+	#[reflect(default)]
 	display_name: SmolStr,
 	/// The env var holding the account's app password.
 	#[set_with(unwrap_option, into)]
+	#[reflect(default)]
 	secret: Option<SmolStr>,
 	/// Repost every announcement this account contributed to.
+	#[reflect(default)]
 	auto_repost: bool,
 }
 

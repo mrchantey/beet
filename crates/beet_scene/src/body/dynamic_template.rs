@@ -886,9 +886,6 @@ fn patch_resource(
 	patch: &dyn PartialReflect,
 	registry: &TypeRegistry,
 ) -> Result {
-	use bevy::ecs::reflect::ReflectFromWorld;
-	use bevy_reflect::ReflectFromReflect;
-	use bevy_reflect::std_traits::ReflectDefault;
 	let registration = type_registration(registry, patch)?;
 	let reflect_resource = reflect_resource(registry, patch)?;
 	let component_id = reflect_resource.register_component(world);
@@ -897,17 +894,7 @@ fn patch_resource(
 		return OK;
 	}
 	// inserting an unconstructible type panics, so it is refused here
-	let constructible = registration.data::<ReflectDefault>().is_some()
-		|| registration.data::<ReflectFromWorld>().is_some()
-		|| registration.data::<ReflectFromReflect>().is_some_and(
-			|from_reflect| from_reflect.from_reflect(patch).is_some(),
-		);
-	if !constructible {
-		let type_path = registration.type_info().type_path();
-		bevybail!(
-			"the resource `{type_path}` is not in the world and cannot be constructed from its fields, add `#[reflect(Default)]` or insert the resource first"
-		);
-	}
+	reflect_ext::assert_constructible(patch, registration)?;
 	// created by the document: its scene's teardown, and only that scene's,
 	// removes the resource with it
 	let root = world.get_resource::<TemplateBuildRoot>().map(|root| **root);
@@ -960,6 +947,13 @@ pub(super) fn apply_value(
 
 	if is_clone_ignored(world, reflect_component) {
 		return OK;
+	}
+	// a patch over a component the entity holds needs no construction
+	if !reflect_component.contains(world.entity(entity)) {
+		reflect_ext::assert_constructible(
+			value,
+			type_registration(registry, value)?,
+		)?;
 	}
 	// `RelationshipHookMode::Run` so applying `ChildOf` rebuilds the parent's
 	// ordered `Children`, the children-order contract.

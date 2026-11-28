@@ -435,24 +435,6 @@ pub fn derive_set_with(
 	getset::set_with::impl_set_with(input)
 }
 
-/// The conversions a validated string newtype shares, for a tuple struct over
-/// one `SmolStr` whose type supplies `parse(&str) -> Result<Self>`, the only
-/// way in, so every value holds the invariants `parse` checks.
-///
-/// Generates `as_str`, `Display` and `AsRef<str>` over the text, `FromStr` and
-/// `TryFrom<SmolStr>` through `parse`, and `From<Self> for SmolStr`. Serde
-/// rides the last two, so a deserialized value is validated like a parsed one:
-/// pair the derive with `#[serde(try_from = "SmolStr", into = "SmolStr")]`.
-///
-/// ```ignore
-/// #[derive(StringPrimitive, Serialize, Deserialize)]
-/// #[serde(try_from = "SmolStr", into = "SmolStr")]
-/// pub struct Nsid(SmolStr);
-///
-/// impl Nsid {
-///     pub fn parse(text: &str) -> Result<Self> { .. }
-/// }
-/// ```
 /// Derive `LexiconDef`, a type's name in a record: its NSID, the lexicon its crate
 /// exports under then `#` and the type name camel cased.
 ///
@@ -476,6 +458,25 @@ pub fn derive_lexicon_def(
 	lexicon_def::impl_lexicon_def(input)
 }
 
+/// The conversions a validated string newtype shares, for a tuple struct over
+/// one `SmolStr` whose type supplies `parse(&str) -> Result<Self>`, the only
+/// way in, so every value holds the invariants `parse` checks.
+///
+/// Generates `as_str`, `Display` and `AsRef<str>` over the text, `FromStr` and
+/// `TryFrom<SmolStr>` through `parse`, and `From<Self> for SmolStr`. Serde
+/// rides the last two, so a deserialized value is validated like a parsed one:
+/// pair the derive with `#[serde(try_from = "SmolStr", into = "SmolStr")]`.
+/// Never derive a `Default` that `parse` refuses, ie the empty text.
+///
+/// ```ignore
+/// #[derive(StringPrimitive, Serialize, Deserialize)]
+/// #[serde(try_from = "SmolStr", into = "SmolStr")]
+/// pub struct Nsid(SmolStr);
+///
+/// impl Nsid {
+///     pub fn parse(text: &str) -> Result<Self> { .. }
+/// }
+/// ```
 #[proc_macro_derive(StringPrimitive)]
 pub fn derive_string_primitive(
 	input: proc_macro::TokenStream,

@@ -221,9 +221,9 @@ pub struct Scenes(pub BTreeMap<FwdPath, SceneRef>);
 /// record, which is pure content shared by any number of branches and
 /// releases.
 #[derive(
-	Debug, Default, Clone, PartialEq, Eq, Reflect, Serialize, Deserialize,
+	Debug, Clone, PartialEq, Eq, Reflect, Serialize, Deserialize,
 )]
-#[reflect(Default, Serialize, Deserialize)]
+#[reflect(Serialize, Deserialize)]
 pub struct SceneRef {
 	/// The scene record as it was, what a loader verifies a fetch against.
 	pub record: StrongRef,

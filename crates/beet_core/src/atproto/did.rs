@@ -17,7 +17,6 @@ use crate::prelude::*;
 /// ```
 #[derive(
 	Debug,
-	Default,
 	Clone,
 	PartialEq,
 	Eq,

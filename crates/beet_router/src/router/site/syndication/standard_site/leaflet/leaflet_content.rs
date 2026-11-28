@@ -244,7 +244,7 @@ pub struct AspectRatio {
 }
 
 /// `pub.leaflet.blocks.website`: a link card.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "$type", rename = "pub.leaflet.blocks.website")]
 pub struct WebsiteBlock {
 	/// The page the card links.
@@ -255,7 +255,7 @@ pub struct WebsiteBlock {
 }
 
 /// `pub.leaflet.blocks.iframe`: an embedded page.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "$type", rename = "pub.leaflet.blocks.iframe")]
 pub struct IframeBlock {
 	/// The embedded page.

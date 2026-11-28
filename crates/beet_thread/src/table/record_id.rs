@@ -103,7 +103,6 @@ tid_id!(
 /// default the actor's name in kebab-case ([`Self::from_name`]).
 #[derive(
 	Debug,
-	Default,
 	Clone,
 	PartialEq,
 	Eq,
@@ -116,7 +115,7 @@ tid_id!(
 )]
 #[serde(transparent)]
 #[reflect(opaque)]
-#[reflect(Debug, Default, PartialEq, Hash, Serialize, Deserialize)]
+#[reflect(Debug, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ActorId(Rkey);
 
 impl ActorId {

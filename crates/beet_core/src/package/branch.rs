@@ -43,7 +43,6 @@ impl Branch {
 /// branch's current cid is no longer this one.
 #[derive(
 	Debug,
-	Default,
 	Clone,
 	PartialEq,
 	Eq,
@@ -53,7 +52,7 @@ impl Branch {
 	Serialize,
 	Deserialize,
 )]
-#[reflect(Component, Default, LexiconDef, Serialize, Deserialize)]
+#[reflect(Component, LexiconDef, Serialize, Deserialize)]
 pub struct SourceBranch(pub StrongRef);
 
 impl SourceBranch {

@@ -1631,3 +1631,43 @@ fn required_field_present_succeeds() {
 		.required
 		.xpect_eq(7);
 }
+
+/// A component whose field has no meaningful default, ie a [`Did`], so the
+/// type has none either: its tag names every field not `#[reflect(default)]`.
+#[derive(Component, Reflect, Clone, PartialEq, Debug)]
+#[reflect(Component)]
+struct NoDefault {
+	did: Did,
+	#[reflect(default)]
+	count: u32,
+}
+
+#[beet_core::test]
+fn no_default_builds_from_its_fields() {
+	let mut world = world();
+	register::<NoDefault>(&mut world);
+	let root = spawn_bsx(
+		&mut world,
+		r#"<NoDefault did="did:plc:aaaaaaaaaaaaaaaaaaaaaaaa"/>"#,
+	);
+	world
+		.entity(root)
+		.get::<NoDefault>()
+		.unwrap()
+		.did
+		.as_str()
+		.xpect_eq("did:plc:aaaaaaaaaaaaaaaaaaaaaaaa");
+}
+
+#[beet_core::test]
+fn no_default_missing_field_errors() {
+	let mut world = world();
+	register::<NoDefault>(&mut world);
+	let body = BsxParser::body(&world, "<NoDefault count=\"1\"/>").unwrap();
+	world
+		.spawn_template(body)
+		.map(|_| ())
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("absent: `did`");
+}

@@ -10,7 +10,7 @@ use crate::prelude::*;
 /// ```json
 /// {"$type":"blob","ref":{"$link":"bafkrei.."},"mimeType":"image/png","size":1234}
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, LexiconDef)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect, LexiconDef)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
 	feature = "serde",

@@ -17,7 +17,7 @@ use crate::prelude::*;
 ///
 /// Serialized as `{rkey, value}`, the pair itself: a repo writes the body
 /// alone at the key, which is the write's business, not the pair's.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref, DerefMut)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rkeyed<T> {
 	rkey: Rkey,

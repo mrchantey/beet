@@ -17,8 +17,8 @@ use beet_net::prelude::*;
 )]
 #[reflect(Serialize, Deserialize, Component)]
 pub struct Actor {
-	/// The row's key, never in its body.
-	#[serde(skip)]
+	/// The row's key, never written in its body, read from the key.
+	#[serde(skip_serializing)]
 	id: ActorId,
 	/// The name of the actor used when building context
 	name: String,
@@ -80,10 +80,9 @@ impl ActorId {
 impl TableStoreRow for Actor {
 	fn table_name() -> SmolStr { "actor".into() }
 	fn key(&self) -> TableKey { self.id.clone().into() }
-	fn from_row(key: &TableKey, row: Row) -> Result<Self> {
-		let mut actor = row.into_serde::<Self>()?;
-		actor.id = ActorId::parse(key)?;
-		actor.xok()
+	fn from_row(key: &TableKey, mut row: Row) -> Result<Self> {
+		row.insert("id", Value::from(key.as_str()));
+		row.into_serde()
 	}
 }
 

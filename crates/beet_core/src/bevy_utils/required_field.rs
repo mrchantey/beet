@@ -9,6 +9,11 @@ use crate::prelude::*;
 /// is verified present first, and an absent one is a build error naming the
 /// type and field.
 ///
+/// A type with no meaningful default, ie one holding a [`Did`], derives no
+/// `Default` instead of a placeholder: every field without
+/// `#[reflect(default)]` is then required, see
+/// [`reflect_ext::assert_constructible`].
+///
 /// Not a params concern: a request params type reads its required set from
 /// its field types (anything that is not a `bool`, `Option` or `Vec`), see
 /// [`MultiMapReflectExt`].

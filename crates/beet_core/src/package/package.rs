@@ -239,9 +239,9 @@ pub struct Dependencies(pub BTreeMap<PackageName, Dependency>);
 /// branch's package record for `#branch`, or for a path within one source
 /// directory that package's package record.
 #[derive(
-	Debug, Default, Clone, PartialEq, Eq, Reflect, Serialize, Deserialize,
+	Debug, Clone, PartialEq, Eq, Reflect, Serialize, Deserialize,
 )]
-#[reflect(Default, Serialize, Deserialize)]
+#[reflect(Serialize, Deserialize)]
 pub struct ResolvedDependency {
 	/// The account it lives in.
 	pub did: Did,

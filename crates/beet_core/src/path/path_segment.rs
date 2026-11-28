@@ -134,12 +134,16 @@ impl PathSegment {
 /// accepts as a template's values.
 ///
 /// Implement it only for a type whose every value renders so, ie a number, a
-/// uuid or a date, never one with an empty or free-form value.
+/// uuid, a date or an atproto identifier, never one with an empty or
+/// free-form value.
 pub trait SegmentText: core::fmt::Display {}
 
 impl SegmentText for PathSegment {}
 impl SegmentText for Date {}
 impl SegmentText for Tid {}
+impl SegmentText for Rkey {}
+impl SegmentText for Nsid {}
+impl SegmentText for Did {}
 #[cfg(feature = "uuid")]
 impl SegmentText for uuid::Uuid {}
 impl SegmentText for u8 {}

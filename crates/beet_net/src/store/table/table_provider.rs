@@ -349,7 +349,6 @@ impl From<&TableSpec> for TableSpec {
 /// segment, a database file name, a Durable Object's name.
 #[derive(
 	Debug,
-	Default,
 	Clone,
 	PartialEq,
 	Eq,

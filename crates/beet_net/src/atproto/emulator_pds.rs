@@ -70,8 +70,10 @@ impl EmulatorPds {
 
 	const RECORDS: FwdPath = fwd_path!("records");
 	const BLOBS: FwdPath = fwd_path!("blobs");
+	/// The directory of every space, named as its at uri segment.
+	const SPACES: FwdPath = fwd_path!(RepoScope::SPACE_SEGMENT);
 	/// The author directory of the account's own repo in a space.
-	const SELF_AUTHOR: &'static str = "self";
+	const SELF_AUTHOR: PathSegment = path_segment!("self");
 
 	/// The public repo of `did` laid out in `store`, its records in DAG-CBOR.
 	pub fn new(did: Did, store: BlobStore) -> Self {
@@ -85,23 +87,19 @@ impl EmulatorPds {
 	}
 
 	/// This account's repo `scope`, laid out beneath the same root.
-	///
-	/// # Errors
-	/// Errors when a space's type or key is no path segment.
-	pub fn with_scope(&self, scope: RepoScope) -> Result<Self> {
+	pub fn with_scope(&self, scope: RepoScope) -> Self {
 		let store = match &scope {
 			RepoScope::Public => self.root.clone(),
 			RepoScope::Space { space, author } => {
-				self.root.with_subdir(FwdPath::new(format!(
-					"{}/{}/{}/{}",
-					RepoScope::SPACE_SEGMENT,
-					space.r#type,
-					space.key,
-					match author == &self.did {
-						true => Self::SELF_AUTHOR,
-						false => author.as_str(),
-					}
-				))?)
+				self.root.with_subdir(
+					Self::SPACES
+						.join_segment(&PathSegment::of(&space.r#type))
+						.join_segment(&PathSegment::of(&space.key))
+						.join_segment(&match author == &self.did {
+							true => Self::SELF_AUTHOR,
+							false => PathSegment::of(author),
+						}),
+				)
 			}
 		};
 		Self {
@@ -109,13 +107,12 @@ impl EmulatorPds {
 			store,
 			..self.clone()
 		}
-		.xok()
 	}
 
 	/// A repo in a fresh in-memory store, answering for [`Self::TEST_DID`].
 	pub fn temp() -> Self {
 		Self::new(
-			Did::parse(Self::TEST_DID).unwrap_or_default(),
+			Did::parse(Self::TEST_DID).expect("the test did is a did:plc"),
 			BlobStore::temp(),
 		)
 	}
@@ -327,7 +324,7 @@ impl PdsProvider for EmulatorPds {
 	fn scope(&self) -> &RepoScope { &self.scope }
 
 	fn scoped(&self, scope: RepoScope) -> Result<Box<dyn PdsProvider>> {
-		let scoped: Box<dyn PdsProvider> = Box::new(self.with_scope(scope)?);
+		let scoped: Box<dyn PdsProvider> = Box::new(self.with_scope(scope));
 		scoped.xok()
 	}
 

@@ -20,7 +20,6 @@ use sha2::Sha256;
 /// ```
 #[derive(
 	Debug,
-	Default,
 	Clone,
 	PartialEq,
 	Eq,

@@ -100,7 +100,7 @@ impl FeedPost {
 
 /// `app.bsky.feed.post#replyRef`: where a reply sits, the thread's first
 /// post and the one it answers.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReplyRef {
 	/// The thread's first post.
 	pub root: StrongRef,

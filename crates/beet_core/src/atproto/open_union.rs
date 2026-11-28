@@ -20,7 +20,7 @@ use crate::prelude::*;
 /// member.r#type().as_str().xpect_eq("app.bsky.embed.external");
 /// member.fields().get("uri").unwrap().as_str().unwrap().xpect_eq("https://beet.org");
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
+#[derive(Debug, Clone, PartialEq, Eq, Reflect)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(try_from = "Value", into = "Value"))]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
