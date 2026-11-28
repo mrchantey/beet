@@ -48,6 +48,8 @@ impl Plugin for CliCommandsPlugin {
 		app.register_type::<AnalyticsReport>()
 			.register_type::<Check>()
 			.register_type::<Compile>()
+			.register_type::<Release>()
+			.register_type::<Publish>()
 			.register_type::<ExportStatic>()
 			.register_type::<RunWasm>()
 			.register_type::<BuildWasm>()

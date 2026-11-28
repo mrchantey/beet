@@ -48,7 +48,10 @@ pub fn Header(
 fn site_title(title: &SmolStr) -> impl Bundle {
 	let value = Value::new(title);
 	#[cfg(feature = "json")]
-	return (value, ResourceFieldRef::new(ReflectName::of::<PackageConfig>(), "title"));
+	return (
+		value,
+		ResourceFieldRef::new(ReflectName::of::<PackageConfig>(), "title"),
+	);
 	#[cfg(not(feature = "json"))]
 	return value;
 }

@@ -9,7 +9,7 @@
 //!   world, what parses a document onto an entity, loads one, saves one and
 //!   edits one.
 //! - [`compile`]: a branch of a package compiled into scenes and a package
-//!   record, under the `compile` feature.
+//!   record, released and published, under the `compile` feature.
 //! - `instance`: an [`Instance`](beet_core::prelude::Instance) names another
 //!   document of its package. Activating it loads the target through the parser
 //!   its format selects, holds it as data

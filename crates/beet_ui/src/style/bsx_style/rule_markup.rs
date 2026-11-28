@@ -374,7 +374,10 @@ mod test {
 	#[beet_core::test]
 	fn tag_resolves_beside_the_data_rule() {
 		let mut world = MaterialStylePlugin::world();
-		world.resource::<AppTypeRegistry>().write().register::<Rule>();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<Rule>();
 		let before = world.resource::<RuleSet>().rules().count();
 		let body =
 			BsxParser::body(&world, r#"<Rule class="probe" display=Flex/>"#)

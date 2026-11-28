@@ -94,6 +94,8 @@ stays, an inert tag in a lean build.
 	<BuildWasm/>
 	<Check/>
 	<Compile/>
+	<Release/>
+	<Publish/>
 	<AnalyticsReport/>
 	<ExportStatic/>
 	<ExportPdf/>

@@ -354,19 +354,23 @@ impl SocialCardsQuery<'_, '_> {
 	/// path. A value is the drawn fields joined, so it changes exactly when
 	/// the drawing could.
 	fn values(&self, cards: Entity) -> Vec<ProvenanceValue> {
-		self.pages(cards).into_iter().flatten().map(|(page, _)| {
-			let card = SocialCards::card(&page.path);
-			// a poster url is only ever a video's, so the url implies the badge
-			let media = page.meta.social_image_url().map(|url| url.to_string());
-			let credit = page.meta.credit_line();
-			Self::value(card.as_str(), [
-				page.meta.title.as_deref(),
-				credit.as_deref(),
-				page.meta.description.as_deref(),
-				media.as_deref(),
-			])
-		})
-		.collect()
+		self.pages(cards)
+			.into_iter()
+			.flatten()
+			.map(|(page, _)| {
+				let card = SocialCards::card(&page.path);
+				// a poster url is only ever a video's, so the url implies the badge
+				let media =
+					page.meta.social_image_url().map(|url| url.to_string());
+				let credit = page.meta.credit_line();
+				Self::value(card.as_str(), [
+					page.meta.title.as_deref(),
+					credit.as_deref(),
+					page.meta.description.as_deref(),
+					media.as_deref(),
+				])
+			})
+			.collect()
 	}
 
 	/// The value `name` over `fields`, each delimited so no two sets of
@@ -470,7 +474,10 @@ impl CardSet {
 				})
 				.collect(),
 			logo: logo?,
-			tones: world.get_resource::<ThemeTones>().cloned().unwrap_or_default(),
+			tones: world
+				.get_resource::<ThemeTones>()
+				.cloned()
+				.unwrap_or_default(),
 			package: world
 				.get_resource::<PackageConfig>()
 				.cloned()

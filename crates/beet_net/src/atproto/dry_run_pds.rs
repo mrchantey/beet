@@ -6,9 +6,9 @@ use bytes::Bytes;
 
 /// A [`PdsProvider`] over another repo that keeps every write in memory:
 /// reads fall through to the repo beneath unless this run wrote or deleted
-/// the record, a blob uploads nowhere, its reference computed locally. So a
-/// dry run is the real run against a dry repo, and each of its steps reads
-/// what the steps before it would have written.
+/// the record, and a blob uploads nowhere, kept in memory so a later step
+/// can read it back. So a dry run is the real run against a dry repo, and
+/// each of its steps reads what the steps before it would have written.
 ///
 /// [`Pds::dry`] makes one, and a [`ConvergeReport`] over one words its lines
 /// as what a run would do.
@@ -36,6 +36,8 @@ pub struct DryRunPds {
 	/// What this run wrote (`Some`) or deleted (`None`), by scope, collection
 	/// and rkey, shared by every scope of the run.
 	writes: Arc<RwLock<HashMap<(RepoScope, Nsid, Rkey), Option<RecordEntry>>>>,
+	/// What this run uploaded, by scope and cid.
+	blobs: Arc<RwLock<HashMap<(RepoScope, Cid), Bytes>>>,
 }
 
 impl DryRunPds {
@@ -47,6 +49,7 @@ impl DryRunPds {
 		Self {
 			repo,
 			writes: default(),
+			blobs: default(),
 		}
 	}
 
@@ -133,6 +136,7 @@ impl PdsProvider for DryRunPds {
 		let scoped: Box<dyn PdsProvider> = Box::new(Self {
 			repo: self.repo.scoped(scope)?,
 			writes: self.writes.clone(),
+			blobs: self.blobs.clone(),
 		});
 		scoped.xok()
 	}
@@ -150,12 +154,22 @@ impl PdsProvider for DryRunPds {
 		&self,
 		collection: Nsid,
 		record: Rkeyed<AtprotoValue>,
+		precondition: Precondition,
 	) -> SendBoxedFuture<Result<StrongRef>> {
 		let this = self.clone();
 		Box::pin(async move {
 			let rkey = record.rkey().clone();
+			let uri = this.repo.uri(&collection, &rkey);
+			// checked against what the run has written over the repo
+			if precondition != Precondition::Any {
+				let found = this
+					.get(collection.clone(), rkey.clone())
+					.await?
+					.map(|entry| entry.cid);
+				RecordConflict::check(&precondition, &uri, found.as_ref())?;
+			}
 			let entry = RecordEntry {
-				uri: this.repo.uri(&collection, &rkey),
+				uri,
 				cid: record.cid(),
 				value: record.into_value(),
 			};
@@ -188,7 +202,27 @@ impl PdsProvider for DryRunPds {
 		mime_type: MediaType,
 	) -> SendBoxedFuture<Result<BlobRef>> {
 		let blob = BlobRef::of(&bytes, mime_type);
+		self.blobs
+			.write()
+			.unwrap_or_else(bevy::platform::sync::PoisonError::into_inner)
+			.insert((self.repo.scope().clone(), blob.cid.clone()), bytes);
 		Box::pin(async move { blob.xok() })
+	}
+
+	fn get_blob(&self, cid: Cid) -> SendBoxedFuture<Result<Option<Bytes>>> {
+		let uploaded = self
+			.blobs
+			.read()
+			.unwrap_or_else(bevy::platform::sync::PoisonError::into_inner)
+			.get(&(self.repo.scope().clone(), cid.clone()))
+			.cloned();
+		let repo = self.repo.clone();
+		Box::pin(async move {
+			match uploaded {
+				Some(bytes) => Ok(Some(bytes)),
+				None => repo.get_blob(&cid).await,
+			}
+		})
 	}
 }
 

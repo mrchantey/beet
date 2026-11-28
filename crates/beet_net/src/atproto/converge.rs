@@ -220,6 +220,59 @@ impl Pds {
 		report.xok()
 	}
 
+	/// Write `record` at its rkey unless the record there already has its
+	/// cid, first uploading each blob it references, read from `from` and
+	/// verified: a byte for byte copy, so the copy's cid is the original's and
+	/// the two are known to agree by comparing cids. The write is conditional
+	/// on what was read, so a record moved meanwhile is a [`RecordConflict`]
+	/// rather than a lost write. What it did is pushed onto `report`.
+	pub async fn converge_copy(
+		&self,
+		from: &Pds,
+		collection: &Nsid,
+		record: Rkeyed<AtprotoValue>,
+		report: &mut ConvergeReport,
+	) -> Result<StrongRef> {
+		let cid = record.cid();
+		let existing = self.get_record(collection, record.rkey()).await?;
+		if let Some(existing) = &existing
+			&& existing.cid == cid
+		{
+			report.unchanged.push(existing.strong_ref());
+			return existing.strong_ref().xok();
+		}
+		for blob in record.blob_refs() {
+			let bytes = from.get_blob(&blob.cid).await?.ok_or_else(|| {
+				bevyhow!(
+					"{} references blob {}, which {} does not hold",
+					self.uri(collection, record.rkey()),
+					blob.cid,
+					from.describe()
+				)
+			})?;
+			self.upload_blob(bytes, blob.mime_type.clone()).await?;
+		}
+		let precondition =
+			existing.as_ref().map_or(Precondition::Absent, |existing| {
+				Precondition::Matches(existing.cid.clone())
+			});
+		let written =
+			self.put_record_if(collection, record, precondition).await?;
+		if written.cid != cid {
+			bevybail!(
+				"{} stored {} as {}, not the {cid} it copied",
+				self.describe(),
+				written.uri,
+				written.cid
+			);
+		}
+		match existing {
+			Some(_) => report.updated.push(written.clone()),
+			None => report.created.push(written.clone()),
+		}
+		written.xok()
+	}
+
 	/// Whether `existing` already holds `wanted`, both read through `T`. A
 	/// body that does not read as a `T` at all differs.
 	fn same<T: AtprotoRecord>(
@@ -344,6 +397,51 @@ pub(crate) mod test {
 		let space = public.space(SpaceRef::package("site").unwrap()).unwrap();
 		converge_suite(&space).await;
 		public.list::<Doc>().await.unwrap().xpect_empty();
+	}
+
+	/// A record copied out of a space with its blob keeps its cid, a second
+	/// copy is unchanged, and a copy deleted by hand is copied again.
+	#[beet_core::test]
+	async fn copies_a_record_byte_for_byte() {
+		let public = Pds::temp();
+		let space = public.space(SpaceRef::package("site").unwrap()).unwrap();
+		let blob = space.upload_blob("png", MediaType::Png).await.unwrap();
+		let collection = Doc::COLLECTION;
+		let rkey = Rkey::parse("aaa").unwrap();
+		let original = space
+			.put_record(
+				&collection,
+				Rkeyed::new(
+					rkey.clone(),
+					value!({ "image": (Value::from_serde(&blob).unwrap()) })
+						.try_into()
+						.unwrap(),
+				),
+			)
+			.await
+			.unwrap();
+		let copy = async || {
+			let record = space
+				.get_record(&collection, &rkey)
+				.await
+				.unwrap()
+				.unwrap()
+				.into_rkeyed();
+			let mut report = ConvergeReport::default();
+			public
+				.converge_copy(&space, &collection, record, &mut report)
+				.await
+				.unwrap()
+				.cid
+				.xpect_eq(original.cid.clone());
+			report
+		};
+		copy().await.created.len().xpect_eq(1);
+		public.get_blob(&blob.cid).await.unwrap().xpect_some();
+		copy().await.is_noop().xpect_true();
+		public.delete_record(&collection, &rkey).await.unwrap();
+		public.get_blob(&blob.cid).await.unwrap().xpect_none();
+		copy().await.created.len().xpect_eq(1);
 	}
 
 	/// A dry run's report carries the cid the write would produce.

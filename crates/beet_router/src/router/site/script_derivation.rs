@@ -89,17 +89,17 @@ pub async fn ScriptDerivation(
 impl ScriptDerivation {
 	/// The [`Derivation`] this declaration declares.
 	pub fn derivation(&self) -> Result<Derivation> {
-		let stem = self
-			.src
-			.as_smol_path()
-			.file_stem()
-			.ok_or_else(|| bevyhow!("script `{}` has no file name", self.src))?;
+		let stem = self.src.as_smol_path().file_stem().ok_or_else(|| {
+			bevyhow!("script `{}` has no file name", self.src)
+		})?;
 		self.resources
 			.iter()
 			.fold(
 				Derivation::new(self.dir.join(format!("{stem}.derived.json")))
 					.with_input(self.src.clone()),
-				|derivation, resource| derivation.with_resource(resource.clone()),
+				|derivation, resource| {
+					derivation.with_resource(resource.clone())
+				},
 			)
 			.xok()
 	}
@@ -191,9 +191,11 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(Freshness::Missing);
-		str::from_utf8(&store.get(&RelPath::new("out/swatch.svg")).await.unwrap())
-			.unwrap()
-			.xpect_eq("<rect fill=\"#006C4F\"/>");
+		str::from_utf8(
+			&store.get(&RelPath::new("out/swatch.svg")).await.unwrap(),
+		)
+		.unwrap()
+		.xpect_eq("<rect fill=\"#006C4F\"/>");
 		ensure(&mut world, entity, &store)
 			.await
 			.unwrap()
@@ -214,7 +216,11 @@ mod test {
 		);
 		ensure(&mut world, entity, &store).await.unwrap();
 		for path in ["out/escape.svg", "out/icons/a.svg"] {
-			store.exists(&RelPath::new(path)).await.unwrap().xpect_true();
+			store
+				.exists(&RelPath::new(path))
+				.await
+				.unwrap()
+				.xpect_true();
 		}
 		store
 			.exists(&RelPath::new("escape.svg"))

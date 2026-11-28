@@ -96,7 +96,7 @@ pub use saver::*;
 pub use scene_document::SceneDocument;
 pub use scene_document::SceneFork;
 pub(crate) use scene_document::sync_scene_documents;
-#[cfg(feature = "bsx")]
+#[cfg(any(feature = "bsx", feature = "compile"))]
 pub(crate) use scene_reflect::EntityKeys;
 pub(crate) use scene_reflect::KeySentinels;
 pub use scene_source::*;

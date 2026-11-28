@@ -561,7 +561,7 @@ impl PackageSource {
 }
 
 #[cfg(all(test, feature = "bsx"))]
-mod test {
+pub(super) mod test {
 	use crate::prelude::*;
 	use alloc::collections::BTreeMap;
 	use beet_core::prelude::*;
@@ -657,7 +657,10 @@ mod test {
 		world
 	}
 
-	async fn source(files: &[(&str, &str)]) -> BlobStore {
+	/// A source directory holding `files`.
+	pub(in crate::compile) async fn source(
+		files: &[(&str, &str)],
+	) -> BlobStore {
 		let source = BlobStore::temp();
 		for (path, text) in files {
 			source
@@ -668,7 +671,8 @@ mod test {
 		source
 	}
 
-	fn compiler(source: &BlobStore) -> PackageCompiler {
+	/// A compiler over `source`'s own PDS, with the test plugin's types.
+	pub(in crate::compile) fn compiler(source: &BlobStore) -> PackageCompiler {
 		PackageCompiler::new(
 			DocParsers::of(&world()),
 			PackageCompiler::local_pds(source),
@@ -682,7 +686,9 @@ mod test {
 	}
 
 	/// Every file of `store` and its bytes, in path order.
-	async fn snapshot(store: &BlobStore) -> Vec<(RelPath, Vec<u8>)> {
+	pub(in crate::compile) async fn snapshot(
+		store: &BlobStore,
+	) -> Vec<(RelPath, Vec<u8>)> {
 		let mut files = store
 			.get_all()
 			.await

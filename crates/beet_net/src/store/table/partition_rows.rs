@@ -42,7 +42,8 @@ impl PartitionRows {
 		// only a precondition on the row reads its cid
 		if *write.precondition() != Precondition::Any {
 			let found = self.get(table, key)?;
-			write.precondition().check(
+			TableError::check(
+				write.precondition(),
 				&table.name,
 				key,
 				found.as_ref().map(StoredRow::cid),

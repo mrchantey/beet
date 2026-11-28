@@ -288,8 +288,7 @@ impl SqlTable {
 		precondition: &Precondition,
 	) -> Result {
 		if !self.exists(sql)? {
-			return precondition
-				.check(&self.name, key, None)
+			return TableError::check(precondition, &self.name, key, None)
 				.map_err(BevyError::from);
 		}
 		let ident = &self.ident;
@@ -301,9 +300,13 @@ impl SqlTable {
 				)?;
 				Ok(())
 			}
-			Precondition::Absent => precondition
-				.check(&self.name, key, self.current_cid(sql, key)?.as_ref())
-				.map_err(BevyError::from),
+			Precondition::Absent => TableError::check(
+				precondition,
+				&self.name,
+				key,
+				self.current_cid(sql, key)?.as_ref(),
+			)
+			.map_err(BevyError::from),
 			Precondition::Matches(expected) => match sql.execute(
 				&format!("DELETE FROM {ident} WHERE key = ?1 AND cid = ?2"),
 				&[
@@ -334,7 +337,8 @@ impl SqlTable {
 				Some(current) => current.clone(),
 				None => table.current_cid(sql, write.key())?,
 			};
-			write.precondition().check(
+			TableError::check(
+				write.precondition(),
 				&table.name,
 				write.key(),
 				current.as_ref(),

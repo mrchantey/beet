@@ -60,11 +60,14 @@ impl ColorScheme {
 	/// The scheme an element resolves in by the classes of the tree: the
 	/// nearest scheme class on `el` or its `ancestors` (nearest first), `None`
 	/// for a tree carrying neither.
-	pub fn nearest(el: &ElementView, ancestors: &[ElementView]) -> Option<Self> {
+	pub fn nearest(
+		el: &ElementView,
+		ancestors: &[ElementView],
+	) -> Option<Self> {
 		core::iter::once(el).chain(ancestors).find_map(|view| {
-			[Self::Light, Self::Dark]
-				.into_iter()
-				.find(|scheme| view.contains_class(&scheme.class().as_selector()))
+			[Self::Light, Self::Dark].into_iter().find(|scheme| {
+				view.contains_class(&scheme.class().as_selector())
+			})
 		})
 	}
 

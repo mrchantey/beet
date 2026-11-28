@@ -209,10 +209,11 @@ impl RuleSet {
 					query.matches(*media.medium(), *media.viewport())
 				}) && !(media.scheme().is_some() && Self::is_scheme_rule(rule))
 					&& rule.scheme().is_none_or(|scheme| {
-						media.scheme().or_else(|| ColorScheme::nearest(el, ancestors))
+						media
+							.scheme()
+							.or_else(|| ColorScheme::nearest(el, ancestors))
 							== Some(scheme)
-					})
-					&& rule.selector().matches(el, ancestors)
+					}) && rule.selector().matches(el, ancestors)
 			})
 			.map(|(index, _)| index)
 			.collect()
