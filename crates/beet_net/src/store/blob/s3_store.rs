@@ -12,6 +12,9 @@ use bytes::Bytes;
 /// etag is no MD5, so the upload records the body's MD5 as object metadata
 /// and a [`BlobStat`] reads it back. An object another tool uploaded in parts
 /// has no recorded digest, so a mirror copies it once and compares it after.
+/// A local file moves a part at a time both ways
+/// ([`BlobProvider::insert_file`], [`BlobProvider::get_file`]), so a
+/// transfer holds one part in memory whatever the object's size.
 #[derive(Debug, Clone, Component, Reflect, Get)]
 #[reflect(Component)]
 #[component(on_insert = BlobStore::on_insert::<Self>)]
@@ -65,7 +68,7 @@ impl S3Store {
 	pub const DEFAULT_PART_SIZE: u64 = 64 * 1024 * 1024;
 	/// The most parts S3 takes in one upload; a body that would need more
 	/// sends larger parts.
-	const MAX_PARTS: usize = 10_000;
+	const MAX_PARTS: u64 = 10_000;
 	/// The metadata header holding an object's MD5 hex digest, written on a
 	/// multipart upload, whose etag carries none.
 	const MD5_METADATA: &str = "x-amz-meta-md5";
@@ -253,6 +256,23 @@ impl S3Store {
 		}
 	}
 
+	/// The 404 a missing `key` answers, naming it.
+	fn not_found(key: &str) -> BevyError {
+		HttpError::new(
+			StatusCode::NOT_FOUND,
+			format!("object not found: {key}"),
+		)
+		.into()
+	}
+
+	/// `PutObject` of `body` to `key`, in this store's storage class.
+	async fn put_object(&self, key: &str, body: Bytes) -> Result {
+		let request =
+			AwsRequest::put("PutObject", Self::key_path(key)).with_body(body);
+		self.send(self.in_storage_class(request)).await?;
+		().xok()
+	}
+
 	/// `request` in this store's storage class, where it names one.
 	fn in_storage_class(&self, request: AwsRequest) -> AwsRequest {
 		match &self.storage_class {
@@ -265,8 +285,9 @@ impl S3Store {
 
 	/// The size of each part of an upload of `len` bytes, the store's part
 	/// size unless that would need more than S3's part limit.
-	fn part_size_for(&self, len: usize) -> usize {
-		(self.part_size.unwrap_or(Self::DEFAULT_PART_SIZE) as usize)
+	fn part_size_for(&self, len: u64) -> u64 {
+		self.part_size
+			.unwrap_or(Self::DEFAULT_PART_SIZE)
 			.max(len.div_ceil(Self::MAX_PARTS))
 	}
 
@@ -274,15 +295,12 @@ impl S3Store {
 	/// object's [`Self::MD5_METADATA`] so a mirror can still compare it. A
 	/// failed part or completion aborts the upload, so no orphaned parts are
 	/// stored.
-	async fn insert_parts(&self, key: &str, body: Bytes) -> Result {
+	async fn insert_parts(&self, key: &str, body: UploadBody) -> Result {
 		let path = Self::key_path(key);
 		// 1. open the upload, recording the whole body's digest
 		let open = AwsRequest::post("CreateMultipartUpload", &path)
 			.with_flag("uploads")
-			.with_header(
-				Self::MD5_METADATA,
-				digest_ext::hex::<md5::Md5>(&body),
-			);
+			.with_header(Self::MD5_METADATA, body.md5().await?);
 		let upload_id = self
 			.send_xml(self.in_storage_class(open))
 			.await?
@@ -293,7 +311,7 @@ impl S3Store {
 			})?;
 		// 2. send every part, then join them
 		let sent = async {
-			let etags = self.send_parts(&path, &upload_id, body).await?;
+			let etags = self.send_parts(&path, &upload_id, &body).await?;
 			self.complete_parts(key, &path, &upload_id, &etags).await
 		}
 		.await;
@@ -308,21 +326,26 @@ impl S3Store {
 		sent
 	}
 
-	/// Each part of `body` by `UploadPart`, answering their etags in order.
+	/// Each part of `body` by `UploadPart`, one in memory at a time,
+	/// answering their etags in order.
 	async fn send_parts(
 		&self,
 		path: &str,
 		upload_id: &str,
-		body: Bytes,
+		body: &UploadBody,
 	) -> Result<Vec<SmolStr>> {
-		let part_size = self.part_size_for(body.len());
+		let len = body.len();
+		let part_size = self.part_size_for(len);
 		let mut etags = Vec::new();
-		for (index, start) in (0..body.len()).step_by(part_size).enumerate() {
-			let end = (start + part_size).min(body.len());
+		for (index, offset) in (0..len).step_by(part_size as usize).enumerate()
+		{
+			let part = body
+				.part(offset, part_size.min(len - offset) as usize)
+				.await?;
 			let request = AwsRequest::put("UploadPart", path)
 				.with_query("partNumber", (index + 1).to_string())
 				.with_query("uploadId", upload_id)
-				.with_body(body.slice(start..end));
+				.with_body(part);
 			let response = self.send(request).await?;
 			etags.push(Self::version_of(&response, path)?.as_str().into());
 		}
@@ -361,6 +384,67 @@ impl S3Store {
 			);
 		}
 		().xok()
+	}
+
+	/// `key` written to `file` by ranged `GetObject`s of the part size, each
+	/// appended as it lands, so one part is in memory at a time. Every range
+	/// after the first names the etag the first answered, so an object
+	/// replaced mid download fails rather than tears.
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	async fn get_ranges(&self, key: &str, file: &AbsPath) -> Result {
+		let path = Self::key_path(key);
+		let part_size = self.part_size.unwrap_or(Self::DEFAULT_PART_SIZE);
+		// the file starts empty, which is all an empty object writes
+		fs_ext::write(file, [])?;
+		let mut offset = 0;
+		let mut etag: Option<String> = None;
+		loop {
+			let request = AwsRequest::get("GetObject", &path).with_header(
+				"range",
+				format!("bytes={offset}-{}", offset + part_size - 1),
+			);
+			let request = match &etag {
+				Some(etag) => request.with_header("if-match", etag),
+				None => request,
+			};
+			let response = match self.send(request).await {
+				Ok(response) => response,
+				// no range of an empty object is satisfiable
+				Err(err)
+					if offset == 0 && AwsError::is(&err, &["InvalidRange"]) =>
+				{
+					return ().xok();
+				}
+				Err(err) if AwsError::is(&err, &["NoSuchKey", "NotFound"]) => {
+					return Err(Self::not_found(key));
+				}
+				Err(err) => return Err(err),
+			};
+			// `bytes <first>-<last>/<total>`
+			let total = response
+				.headers()
+				.first_raw("content-range")
+				.and_then(|range| range.rsplit('/').next())
+				.and_then(|total| total.parse::<u64>().ok())
+				.ok_or_else(|| {
+					bevyhow!("s3 answered a range of `{key}` with no total")
+				})?;
+			if etag.is_none() {
+				etag = response
+					.headers()
+					.first_raw("etag")
+					.map(ToString::to_string);
+			}
+			let part = response.body.into_bytes().await?;
+			let received = part.len() as u64;
+			offset += received;
+			let file = file.clone();
+			async_ext::unblock(move || fs_ext::append(&file, part)).await?;
+			// an empty part ends it too, so a short answer never loops
+			if offset >= total || received == 0 {
+				return ().xok();
+			}
+		}
 	}
 
 	/// The region requests go to: this store's, else the launch's, else
@@ -756,13 +840,40 @@ impl BlobProvider for S3Store {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
-			if body.len() > this.part_size_for(body.len()) {
-				return this.insert_parts(&key, body).await;
+			let len = body.len() as u64;
+			match len > this.part_size_for(len) {
+				true => this.insert_parts(&key, UploadBody::Bytes(body)).await,
+				false => this.put_object(&key, body).await,
 			}
-			let request = AwsRequest::put("PutObject", Self::key_path(&key))
-				.with_body(body);
-			this.send(this.in_storage_class(request)).await?;
-			().xok()
+		})
+	}
+
+	/// A file above [`S3Store::part_size`] goes up a part at a time read
+	/// from disk, so it never passes through memory whole.
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	fn insert_file(
+		&self,
+		path: &RelPath,
+		file: &AbsPath,
+	) -> SendBoxedFuture<Result> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
+		let file = file.clone();
+		Box::pin(async move {
+			let len = fs_ext::file_size(&file)?;
+			match len > this.part_size_for(len) {
+				true => {
+					this.insert_parts(&key, UploadBody::File {
+						path: file,
+						len,
+					})
+					.await
+				}
+				false => {
+					let body = fs_ext::read_async(&file).await?;
+					this.put_object(&key, body.into()).await
+				}
+			}
 		})
 	}
 
@@ -840,14 +951,31 @@ impl BlobProvider for S3Store {
 			{
 				Ok(response) => response.body.into_bytes().await,
 				Err(err) if AwsError::is(&err, &["NoSuchKey", "NotFound"]) => {
-					Err(HttpError::new(
-						StatusCode::NOT_FOUND,
-						format!("object not found: {key}"),
-					)
-					.into())
+					Err(Self::not_found(&key))
 				}
 				Err(err) => Err(err),
 			}
+		})
+	}
+
+	/// Ranged `GetObject`s a part at a time, see [`S3Store::part_size`]; a
+	/// failed download removes the partial file.
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	fn get_file(
+		&self,
+		path: &RelPath,
+		file: &AbsPath,
+	) -> SendBoxedFuture<Result> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
+		let file = file.clone();
+		Box::pin(async move {
+			let fetched = this.get_ranges(&key, &file).await;
+			if fetched.is_err() {
+				// nothing to remove where the first write failed
+				fs_ext::remove(&file).ok();
+			}
+			fetched
 		})
 	}
 
@@ -1009,6 +1137,62 @@ impl BlobProvider for S3Store {
 	}
 }
 
+/// What a multipart upload reads its parts from.
+enum UploadBody {
+	/// A body in memory, each part a slice of it.
+	Bytes(Bytes),
+	/// A local file, each part read from disk as it is sent.
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	File { path: AbsPath, len: u64 },
+}
+
+impl UploadBody {
+	/// The whole body's length.
+	fn len(&self) -> u64 {
+		match self {
+			Self::Bytes(bytes) => bytes.len() as u64,
+			#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+			Self::File { len, .. } => *len,
+		}
+	}
+
+	/// The whole body's MD5 hex digest, a file's read in chunks.
+	async fn md5(&self) -> Result<String> {
+		match self {
+			Self::Bytes(bytes) => digest_ext::hex::<md5::Md5>(bytes).xok(),
+			#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+			Self::File { path, .. } => {
+				let path = path.clone();
+				async_ext::unblock(move || {
+					digest_ext::hex_file::<md5::Md5>(&path)
+				})
+				.await?
+				.xok()
+			}
+		}
+	}
+
+	/// The `len` bytes from `offset`.
+	async fn part(&self, offset: u64, len: usize) -> Result<Bytes> {
+		match self {
+			Self::Bytes(bytes) => {
+				let start = offset as usize;
+				bytes.slice(start..start + len).xok()
+			}
+			#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+			Self::File { path, .. } => {
+				let path = path.clone();
+				async_ext::unblock(move || {
+					fs_ext::read_range(&path, offset, len)
+				})
+				.await?
+				.xmap(Bytes::from)
+				.xok()
+			}
+		}
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -1037,21 +1221,31 @@ mod test {
 		.await;
 	}
 
+	/// The test bucket under `subdir`, its parts the 5 MiB S3's minimum.
+	fn multipart_store(subdir: &str) -> BlobStore {
+		BlobStore::new(
+			S3Store::new("beet--test--store", "us-west-2")
+				.with_subdir(subdir)
+				.with_part_size(5 * 1024 * 1024),
+		)
+	}
+
+	/// 11 MiB, three parts of [`multipart_store`].
+	fn large_body() -> Bytes {
+		(0..11 * 1024 * 1024)
+			.map(|index| (index % 251) as u8)
+			.collect::<Vec<_>>()
+			.xmap(Bytes::from)
+	}
+
 	/// A body above the part size goes up in parts, and its stat, by
 	/// `HeadObject` and by listing, still carries its MD5, so a mirror
 	/// skips it next time.
 	#[beet_core::test(timeout_ms = 300_000)]
 	#[ignore = "hits remote s3"]
 	async fn multipart_keeps_its_md5() {
-		let store = BlobStore::new(
-			S3Store::new("beet--test--store", "us-west-2")
-				.with_subdir("multipart")
-				.with_part_size(5 * 1024 * 1024),
-		);
-		let body = (0..11 * 1024 * 1024)
-			.map(|index| (index % 251) as u8)
-			.collect::<Vec<_>>()
-			.xmap(Bytes::from);
+		let store = multipart_store("multipart");
+		let body = large_body();
 		let path = RelPath::new("large.bin");
 		store.insert(&path, body.clone()).await.unwrap();
 		let stat = BlobStat::of(&body);
@@ -1067,6 +1261,47 @@ mod test {
 			.xpect_eq(vec![(path.clone(), stat)]);
 		store.get(&path).await.unwrap().xpect_eq(body);
 		store.remove(&path).await.unwrap();
+	}
+
+	/// A file above the part size goes up and comes back a part at a time,
+	/// keeping its MD5; an empty object comes back as an empty file, and a
+	/// missing one as a 404 leaving no file.
+	#[beet_core::test(timeout_ms = 300_000)]
+	#[ignore = "hits remote s3"]
+	async fn files_stream_by_part() {
+		let store = multipart_store("multipart-files");
+		let dir = TempDir::new_ws().unwrap();
+		let body = large_body();
+		let source = dir.path().join("large.bin");
+		fs_ext::write(&source, &body).unwrap();
+		let large = RelPath::new("large.bin");
+		store.insert_file(&large, &source).await.unwrap();
+		store
+			.stat(&large)
+			.await
+			.unwrap()
+			.xpect_eq(Some(BlobStat::of(&body)));
+		let fetched = dir.path().join("fetched/large.bin");
+		store.get_file(&large, &fetched).await.unwrap();
+		fs_ext::read(&fetched).unwrap().xpect_eq(body.to_vec());
+
+		let empty = RelPath::new("empty.bin");
+		store.insert(&empty, Bytes::new()).await.unwrap();
+		let fetched_empty = dir.path().join("empty.bin");
+		store.get_file(&empty, &fetched_empty).await.unwrap();
+		fs_ext::read(&fetched_empty).unwrap().xpect_empty();
+
+		let missing = dir.path().join("missing.bin");
+		store
+			.get_file(&RelPath::new("missing.bin"), &missing)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("not found");
+		fs_ext::exists(&missing).unwrap().xpect_false();
+
+		store.remove(&large).await.unwrap();
+		store.remove(&empty).await.unwrap();
 	}
 
 	/// The store suite against a local S3 server (SeaweedFS's gateway on

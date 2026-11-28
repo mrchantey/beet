@@ -362,6 +362,37 @@ pub async fn read_async(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
 	}
 }
 
+/// Reads `len` bytes of a file from `offset`, fewer where the file ends
+/// first, so a large file is read a part at a time rather than whole.
+pub fn read_range(
+	path: impl AsRef<Path>,
+	offset: u64,
+	len: usize,
+) -> FsResult<Vec<u8>> {
+	let path = path.as_ref();
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			// the runner's fs reads whole files only
+			let bytes = fs_ext::read(path)?;
+			let start = (offset as usize).min(bytes.len());
+			let end = start.saturating_add(len).min(bytes.len());
+			bytes[start..end].to_vec().xok()
+		} else {
+			use std::io::Read;
+			use std::io::Seek;
+			let mut file =
+				fs::File::open(path).map_err(|err| FsError::io(path, err))?;
+			file.seek(std::io::SeekFrom::Start(offset))
+				.map_err(|err| FsError::io(path, err))?;
+			let mut bytes = Vec::with_capacity(len);
+			file.take(len as u64)
+				.read_to_end(&mut bytes)
+				.map_err(|err| FsError::io(path, err))?;
+			bytes.xok()
+		}
+	}
+}
+
 /// Reads a file as a UTF-8 string.
 pub fn read_to_string(path: impl AsRef<Path>) -> FsResult<String> {
 	fs_ext::read(path.as_ref()).and_then(|bytes| {
@@ -527,6 +558,34 @@ pub fn write(path: impl AsRef<Path>, data: impl AsRef<[u8]>) -> FsResult {
 		} else {
 			fs::write(path, data).map_err(|err| FsError::io(path, err))?;
 			Ok(())
+		}
+	}
+}
+
+/// Append to a file, creating it and its directory where missing, so a
+/// large file is written a part at a time.
+pub fn append(path: impl AsRef<Path>, data: impl AsRef<[u8]>) -> FsResult {
+	let path = path.as_ref();
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			// the runner's fs writes whole files only
+			let mut bytes = match fs_ext::exists(path)? {
+				true => fs_ext::read(path)?,
+				false => Vec::new(),
+			};
+			bytes.extend_from_slice(data.as_ref());
+			fs_ext::write(path, bytes)
+		} else {
+			use std::io::Write;
+			if let Some(parent) = path.parent() {
+				fs_ext::create_dir_all(parent)?;
+			}
+			fs::OpenOptions::new()
+				.create(true)
+				.append(true)
+				.open(path)
+				.and_then(|mut file| file.write_all(data.as_ref()))
+				.map_err(|err| FsError::io(path, err))
 		}
 	}
 }
@@ -843,5 +902,23 @@ mod test {
 		let mb = fs_ext::read_media(fs_ext::test_dir().join("mod.rs")).unwrap();
 		mb.media_type().xpect_eq(MediaType::Rust);
 		mb.bytes().len().xpect_greater_than(10);
+	}
+
+	/// A file appended a part at a time reads back by range, the last range
+	/// short where the file ends.
+	#[cfg(feature = "uuid")]
+	#[crate::test]
+	fn append_then_read_range() {
+		let dir = TempDir::new_ws().unwrap();
+		let path = dir.path().join("nested/parts.bin");
+		fs_ext::append(&path, b"abc").unwrap();
+		fs_ext::append(&path, b"defg").unwrap();
+		fs_ext::read(&path).unwrap().xpect_eq(b"abcdefg".to_vec());
+		fs_ext::read_range(&path, 2, 3)
+			.unwrap()
+			.xpect_eq(b"cde".to_vec());
+		fs_ext::read_range(&path, 5, 10)
+			.unwrap()
+			.xpect_eq(b"fg".to_vec());
 	}
 }

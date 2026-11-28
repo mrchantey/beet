@@ -211,13 +211,6 @@ impl BlobStore {
 		self.provider.insert(path, body.into()).await
 	}
 
-	/// Insert the contents of a local file without holding it in memory, see
-	/// [`BlobProvider::insert_file`].
-	#[cfg(feature = "std")]
-	pub async fn insert_file(&self, path: &RelPath, file: &AbsPath) -> Result {
-		self.provider.insert_file(path, file).await
-	}
-
 	/// Insert object, failing if it already exists.
 	///
 	/// # Example
@@ -333,6 +326,25 @@ impl BlobProvider for BlobStore {
 	}
 	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.provider.get(path)
+	}
+	#[cfg(feature = "std")]
+	fn insert_file(
+		&self,
+		path: &RelPath,
+		file: &AbsPath,
+	) -> SendBoxedFuture<Result> {
+		self.provider.insert_file(path, file)
+	}
+	#[cfg(feature = "std")]
+	fn get_file(
+		&self,
+		path: &RelPath,
+		file: &AbsPath,
+	) -> SendBoxedFuture<Result> {
+		self.provider.get_file(path, file)
+	}
+	fn local_path(&self, path: &RelPath) -> Option<AbsPath> {
+		self.provider.local_path(path)
 	}
 	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		self.provider.exists(path)

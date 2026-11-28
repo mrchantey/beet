@@ -10,7 +10,9 @@ use beet_core::prelude::*;
 /// directly. Both ends are read through
 /// [`list_stats`](BlobProvider::list_stats), so an object whose size and
 /// digest already match is never re-sent: on S3 one listing answers every
-/// stat, which is what keeps a content-only sync of a large tree quick.
+/// stat, which is what keeps a content-only sync of a large tree quick. A
+/// copy to or from a local directory streams through the file, so an object
+/// of any size fits in memory.
 ///
 /// The defaults are the conservative ones: additive. `delete` opts into a true
 /// mirror, where objects absent from the source are removed so the destination
@@ -88,6 +90,26 @@ impl BlobSync {
 		}
 	}
 
+	/// Copy `path` from the source to the destination. Where either end is a
+	/// local directory the copy streams through its file
+	/// ([`BlobProvider::insert_file`], [`BlobProvider::get_file`]), so an
+	/// object of any size passes through memory a part at a time; between
+	/// two remote ends it is read whole.
+	async fn copy(&self, path: &RelPath) -> Result {
+		cfg_if! {
+			if #[cfg(feature = "std")] {
+				if let Some(file) = self.source.local_path(path) {
+					return self.dest.insert_file(path, &file).await;
+				}
+				if let Some(file) = self.dest.local_path(path) {
+					return self.source.get_file(path, &file).await;
+				}
+			}
+		}
+		let bytes = self.source.get(path).await?;
+		self.dest.insert(path, bytes).await
+	}
+
 	/// Refuse to mirror a source that would empty the destination.
 	async fn assert_mirrorable(&self) -> Result {
 		if self.source.store_is_empty().await? {
@@ -145,10 +167,7 @@ impl BlobSync {
 		if !self.dry_run {
 			async_ext::try_join_all_bounded(
 				self.concurrency,
-				report.copied.iter().map(|path| async move {
-					let bytes = self.source.get(path).await?;
-					self.dest.insert(path, bytes).await
-				}),
+				report.copied.iter().map(|path| self.copy(path)),
 			)
 			.await?;
 		}
