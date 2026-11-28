@@ -1,6 +1,6 @@
-//! The record family: [`BranchRecord`], [`PackageRecord`], [`SceneRecord`] and
-//! [`EntityRecord`], each an [`EntityBodyRecord`] whose identity components
-//! derive its rkey.
+//! The record family: [`BranchRecord`], [`PackageRecord`], [`ReleaseRecord`],
+//! [`SceneRecord`], [`EntityRecord`] and [`HomeRecord`], each an
+//! [`EntityBodyRecord`] whose identity components derive its rkey.
 use beet_core::prelude::*;
 
 /// Declare a record type over an [`EntityBodyRecord`]: serialized as the body
@@ -101,6 +101,35 @@ entity_record! {
 }
 
 entity_record! {
+	/// `org.beet.release`: a package record frozen under its version, rkey
+	/// `<package>:<version>`, ie `todos:1.2.3`, `todos:1.2.3-alpha.3`. The
+	/// package record's body copied whole, every component untouched, so a
+	/// release and its package record differ in collection and identity
+	/// alone and nothing is recompiled. Created in the package's space and
+	/// never put, so a version cannot be rewritten; the newest with no
+	/// prerelease is also copied whole to `<package>:latest`, the one mutable
+	/// rkey. Its cid commits to the whole version: [`Scenes`] names each scene
+	/// by strong ref and [`Files`] every blob. [`PackageReleaser`] writes it.
+	ReleaseRecord,
+	collection: "org.beet.release",
+	required: [Provenance, Package, SourceBranch],
+	optional: [
+		Branch,
+		Scenes,
+		Files,
+		Exports,
+		Dependencies,
+		ExportRuntimes,
+		RequireCfg,
+		LoadSets,
+	],
+	rkey: |body| {
+		let package = body.get::<Package>()?;
+		Rkey::parse(&format!("{}:{}", package.name, package.version))
+	},
+}
+
+entity_record! {
 	/// `org.beet.scene`: one document compiled, keyed by content, rkey the cid
 	/// of its body's blob, postcard bytes of a [`SceneBody`]. Two branches or
 	/// releases whose document did not change point at the same record, so
@@ -139,6 +168,23 @@ entity_record! {
 		body.get::<Provenance>()
 			.map(|provenance| Rkey::from(Tid::from(provenance.created)))
 	},
+}
+
+entity_record! {
+	/// `org.beet.home`: the account's home package by name, one per account,
+	/// rkey `self`, in the public repo. `@handle` alone resolves the handle,
+	/// its did, this record, then `<package>:latest`. Written only by a
+	/// publish asked to (`beet publish --as-home`), never implicitly.
+	HomeRecord,
+	collection: "org.beet.home",
+	required: [Provenance, Home],
+	optional: [],
+	rkey: |_| Rkey::parse(HomeRecord::RKEY),
+}
+
+impl HomeRecord {
+	/// The one rkey a home record lives at.
+	pub const RKEY: &'static str = "self";
 }
 
 #[cfg(test)]

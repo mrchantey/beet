@@ -141,15 +141,23 @@ impl SpaceWriter {
 		})?;
 		let record = T::accept(body)?;
 		let value = AtprotoValue::from(record.body().clone());
-		if let Some(existing) = existing
-			&& existing.cid == value.cid()
-		{
-			self.unchanged.push(existing.strong_ref());
-			return existing.strong_ref().xok();
-		}
+		let precondition = match existing {
+			Some(existing) if existing.cid == value.cid() => {
+				self.unchanged.push(existing.strong_ref());
+				return existing.strong_ref().xok();
+			}
+			Some(existing) => Precondition::Matches(existing.cid),
+			None => Precondition::Absent,
+		};
+		// conditional on what was read, so a concurrent compile is refused
+		// rather than overwritten
 		let written = self
 			.space
-			.put_record(&T::COLLECTION, Rkeyed::new(rkey, value))
+			.put_record_if(
+				&T::COLLECTION,
+				Rkeyed::new(rkey, value),
+				precondition,
+			)
 			.await?;
 		self.written.push(written.clone());
 		written.xok()

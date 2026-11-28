@@ -73,6 +73,7 @@ impl Plugin for TemplatePlugin {
 			.register_type::<ExportRuntimes>()
 			.register_type::<Branch>()
 			.register_type::<SourceBranch>()
+			.register_type::<Home>()
 			.register_type::<Files>()
 			.register_type::<Imports>()
 			.register_type::<Props>()

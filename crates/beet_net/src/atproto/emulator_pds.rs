@@ -193,6 +193,7 @@ impl EmulatorPds {
 		&self,
 		collection: Nsid,
 		record: Rkeyed<AtprotoValue>,
+		precondition: Precondition,
 	) -> Result<StrongRef> {
 		let record = record.try_map(|body| body.into_record(&collection))?;
 		let uri = self.uri(&collection, record.rkey());
@@ -206,12 +207,71 @@ impl EmulatorPds {
 			}
 		}
 		let path = self.record_path(&collection, record.rkey())?;
+		let condition = self.precondition(&uri, &path, &precondition).await?;
 		let dropped = self.dropped_blobs(&path, &referenced).await?;
-		self.store
-			.insert(&path, self.storage_format.serialize(&*record)?)
-			.await?;
+		let bytes = self.storage_format.serialize(&*record)?;
+		match condition {
+			BlobCondition::Any => self.store.insert(&path, bytes).await?,
+			condition => {
+				if let Err(err) =
+					self.store.insert_if(&path, bytes.into(), condition).await
+				{
+					// the record moved between the check and the write
+					if err.downcast_ref::<BlobConflict>().is_none() {
+						return Err(err);
+					}
+					return Err(RecordConflict {
+						found: self.read(&path).await?.map(|value| value.cid()),
+						uri,
+						expected: precondition,
+					}
+					.into());
+				}
+			}
+		}
 		self.release(dropped).await?;
 		StrongRef::new(uri, record.cid()).xok()
+	}
+
+	/// Check `precondition` against the record at `path`, answering the
+	/// condition the write then makes on the stored object, so a store with
+	/// conditional writes checks and writes as one step. A store without them
+	/// checks before the write, which holds for one writer.
+	async fn precondition(
+		&self,
+		uri: &AtUri,
+		path: &FwdPath,
+		precondition: &Precondition,
+	) -> Result<BlobCondition> {
+		if *precondition == Precondition::Any {
+			return BlobCondition::Any.xok();
+		}
+		let decode = |bytes: &Bytes| -> Result<Cid> {
+			self.storage_format
+				.deserialize::<AtprotoValue>(bytes)?
+				.cid()
+				.xok()
+		};
+		if !self.store.conditional_writes() {
+			let found = self.read(path).await?.map(|value| value.cid());
+			RecordConflict::check(precondition, uri, found.as_ref())?;
+			return BlobCondition::Any.xok();
+		}
+		match self.store.get_versioned(path).await? {
+			Some((bytes, version)) => {
+				RecordConflict::check(
+					precondition,
+					uri,
+					Some(&decode(&bytes)?),
+				)?;
+				BlobCondition::Matches(version)
+			}
+			None => {
+				RecordConflict::check(precondition, uri, None)?;
+				BlobCondition::Absent
+			}
+		}
+		.xok()
 	}
 
 	async fn delete(&self, collection: Nsid, rkey: Rkey) -> Result {
@@ -341,9 +401,12 @@ impl PdsProvider for EmulatorPds {
 		&self,
 		collection: Nsid,
 		record: Rkeyed<AtprotoValue>,
+		precondition: Precondition,
 	) -> SendBoxedFuture<Result<StrongRef>> {
 		let this = self.clone();
-		Box::pin(async move { this.put(collection, record).await })
+		Box::pin(
+			async move { this.put(collection, record, precondition).await },
+		)
 	}
 
 	fn delete_record(
@@ -370,6 +433,17 @@ impl PdsProvider for EmulatorPds {
 	) -> SendBoxedFuture<Result<BlobRef>> {
 		let this = self.clone();
 		Box::pin(async move { this.upload(bytes, mime_type).await })
+	}
+
+	fn get_blob(&self, cid: Cid) -> SendBoxedFuture<Result<Option<Bytes>>> {
+		let store = self.store.clone();
+		Box::pin(async move {
+			let path = Self::blob_path(&cid);
+			match store.exists(&path).await? {
+				true => store.get(&path).await?.xmap(Some).xok(),
+				false => Ok(None),
+			}
+		})
 	}
 }
 
@@ -666,6 +740,63 @@ mod test {
 			pds.delete_record(&collection(), &rkey("missing"))
 				.await
 				.unwrap();
+		}
+	}
+
+	/// A create refuses a taken rkey and a swap a moved record, naming both
+	/// cids, here and through a dry run over the repo alike.
+	#[beet_core::test]
+	async fn writes_under_a_precondition() {
+		let repos = emulators().into_iter().map(Pds::new);
+		let dry = emulators()
+			.into_iter()
+			.map(|emulator| Pds::new(emulator).dry());
+		for pds in repos.chain(dry) {
+			let first = pds
+				.put_record_if(
+					&collection(),
+					record("a", value!({ "n": 1 })),
+					Precondition::Absent,
+				)
+				.await
+				.unwrap();
+			let refused = pds
+				.put_record_if(
+					&collection(),
+					record("a", value!({ "n": 2 })),
+					Precondition::Absent,
+				)
+				.await
+				.unwrap_err();
+			RecordConflict::of(&refused)
+				.unwrap()
+				.found
+				.clone()
+				.xpect_eq(Some(first.cid.clone()));
+			let second = pds
+				.put_record_if(
+					&collection(),
+					record("a", value!({ "n": 2 })),
+					Precondition::Matches(first.cid.clone()),
+				)
+				.await
+				.unwrap();
+			pds.put_record_if(
+				&collection(),
+				record("a", value!({ "n": 3 })),
+				Precondition::Matches(first.cid.clone()),
+			)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains(first.cid.as_str())
+			.xpect_contains(second.cid.as_str());
+			pds.get_record(&collection(), &rkey("a"))
+				.await
+				.unwrap()
+				.unwrap()
+				.cid
+				.xpect_eq(second.cid);
 		}
 	}
 }

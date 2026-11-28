@@ -141,10 +141,26 @@ impl Pds {
 		collection: &Nsid,
 		record: Rkeyed<AtprotoValue>,
 	) -> Result<StrongRef> {
+		self.put_record_if(collection, record, Precondition::Any)
+			.await
+	}
+
+	/// [`put_record`](Self::put_record) when `precondition` holds of the
+	/// record at its rkey, checked and written as one step: atproto's
+	/// `swapRecord`, [`Precondition::Absent`] a create and
+	/// [`Precondition::Matches`] a swap. A [`RecordConflict`] when it does not
+	/// hold.
+	pub async fn put_record_if(
+		&self,
+		collection: &Nsid,
+		record: Rkeyed<AtprotoValue>,
+		precondition: Precondition,
+	) -> Result<StrongRef> {
 		self.provider
 			.put_record(
 				collection.clone(),
 				record.try_map(|body| body.into_record(collection))?,
+				precondition,
 			)
 			.await
 	}
@@ -178,6 +194,23 @@ impl Pds {
 		self.provider.upload_blob(bytes.into(), mime_type).await
 	}
 
+	/// The bytes of the blob `cid`, `None` when this repo holds none, verified
+	/// against `cid` before they are answered: bytes hashing to another cid
+	/// are an error naming both.
+	pub async fn get_blob(&self, cid: &Cid) -> Result<Option<Bytes>> {
+		let Some(bytes) = self.provider.get_blob(cid.clone()).await? else {
+			return Ok(None);
+		};
+		let found = Cid::new(cid.codec(), &bytes);
+		if &found != cid {
+			bevybail!(
+				"{} answered blob {cid} with bytes hashing to {found}",
+				self.describe()
+			);
+		}
+		Ok(Some(bytes))
+	}
+
 	/// The `T` at `rkey`, `None` when there is none.
 	pub async fn get<T: AtprotoRecord>(
 		&self,
@@ -194,9 +227,20 @@ impl Pds {
 		&self,
 		record: &Rkeyed<T>,
 	) -> Result<StrongRef> {
-		self.put_record(
+		self.put_if(record, Precondition::Any).await
+	}
+
+	/// Write `record` at its rkey when `precondition` holds, see
+	/// [`put_record_if`](Self::put_record_if).
+	pub async fn put_if<T: AtprotoRecord>(
+		&self,
+		record: &Rkeyed<T>,
+		precondition: Precondition,
+	) -> Result<StrongRef> {
+		self.put_record_if(
 			&T::COLLECTION,
 			record.as_ref().try_map(AtprotoValue::from_serde)?,
+			precondition,
 		)
 		.await
 	}
@@ -216,9 +260,9 @@ impl Pds {
 /// An account's repo backend, see [`Pds`].
 ///
 /// No `create_record`: the client mints every rkey, so a record never exists
-/// without one and nothing waits on the PDS to mint. Reads need no
-/// credential; a write a provider cannot authorize is an error naming what is
-/// missing.
+/// without one and nothing waits on the PDS to mint, and a create is the one
+/// write under [`Precondition::Absent`]. Reads need no credential; a write a
+/// provider cannot authorize is an error naming what is missing.
 pub trait PdsProvider: 'static + Send + Sync {
 	/// A boxed clone, so a default method can own the provider across an
 	/// await.
@@ -249,11 +293,13 @@ pub trait PdsProvider: 'static + Send + Sync {
 		rkey: Rkey,
 	) -> SendBoxedFuture<Result<Option<RecordEntry>>>;
 
-	/// See [`Pds::put_record`]; `record` already carries its `$type`.
+	/// See [`Pds::put_record_if`]; `record` already carries its `$type`.
+	/// A failed `precondition` is a [`RecordConflict`].
 	fn put_record(
 		&self,
 		collection: Nsid,
 		record: Rkeyed<AtprotoValue>,
+		precondition: Precondition,
 	) -> SendBoxedFuture<Result<StrongRef>>;
 
 	/// See [`Pds::delete_record`].
@@ -275,6 +321,46 @@ pub trait PdsProvider: 'static + Send + Sync {
 		bytes: Bytes,
 		mime_type: MediaType,
 	) -> SendBoxedFuture<Result<BlobRef>>;
+
+	/// See [`Pds::get_blob`], which verifies what this answers.
+	fn get_blob(&self, cid: Cid) -> SendBoxedFuture<Result<Option<Bytes>>>;
+}
+
+/// A write whose [`Precondition`] did not hold of the record at its rkey:
+/// the error a create against an existing record, or a swap against a moved
+/// one, is. Recover it from a [`BevyError`] with [`RecordConflict::of`].
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[error("conflict at {uri}: expected {expected}, found {}", Precondition::describe_found(found.as_ref()))]
+pub struct RecordConflict {
+	/// The record written.
+	pub uri: AtUri,
+	/// What the write required.
+	pub expected: Precondition,
+	/// The cid there instead, `None` for no record.
+	pub found: Option<Cid>,
+}
+
+impl RecordConflict {
+	/// `precondition` checked against `found`, the cid of the record at
+	/// `uri`, else the conflict naming what was found.
+	pub fn check(
+		precondition: &Precondition,
+		uri: &AtUri,
+		found: Option<&Cid>,
+	) -> Result {
+		match precondition.holds(found) {
+			true => Ok(()),
+			false => Err(Self {
+				uri: uri.clone(),
+				expected: precondition.clone(),
+				found: found.cloned(),
+			}
+			.into()),
+		}
+	}
+
+	/// The conflict `err` carries, if it is one.
+	pub fn of(err: &BevyError) -> Option<&Self> { err.downcast_ref::<Self>() }
 }
 
 /// One record as a package stores it: its address, its cid and its body, the

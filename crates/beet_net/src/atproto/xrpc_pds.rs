@@ -190,25 +190,56 @@ impl XrpcPds {
 		.xok()
 	}
 
+	/// `putRecord`, its `swapRecord` the precondition: absent for
+	/// [`Precondition::Any`], `null` for [`Precondition::Absent`] (create
+	/// only) and the cid for [`Precondition::Matches`]; the protocol's
+	/// `InvalidSwap` is a [`RecordConflict`].
 	async fn put(
 		&self,
 		collection: Nsid,
 		record: Rkeyed<AtprotoValue>,
+		precondition: Precondition,
 	) -> Result<StrongRef> {
-		let body = PutRecord {
-			address: RecordAddress {
-				repo: &self.did,
-				collection: &collection,
-				rkey: record.rkey(),
-			},
-			record: &record,
+		let address = RecordAddress {
+			repo: &self.did,
+			collection: &collection,
+			rkey: record.rkey(),
 		};
-		self.call("com.atproto.repo.putRecord", true, |url| {
-			Request::post(url).with_json_body(&body)?.xok()
-		})
-		.await?
-		.json::<StrongRef>()
-		.await
+		let swap_record = match &precondition {
+			Precondition::Any => None,
+			Precondition::Absent => Some(None),
+			Precondition::Matches(cid) => Some(Some(cid)),
+		};
+		let body = PutRecord {
+			address,
+			record: &record,
+			swap_record,
+		};
+		match self
+			.call("com.atproto.repo.putRecord", true, |url| {
+				Request::post(url).with_json_body(&body)?.xok()
+			})
+			.await
+		{
+			Ok(response) => response.json::<StrongRef>().await,
+			Err(err) if XrpcError::is(&err, "InvalidSwap") => {
+				Err(RecordConflict {
+					uri: AtUri::scoped(
+						self.did.clone(),
+						RepoScope::Public,
+						collection.clone(),
+						record.rkey().clone(),
+					),
+					expected: precondition,
+					found: self
+						.get(collection.clone(), record.rkey().clone())
+						.await?
+						.map(|entry| entry.cid),
+				}
+				.into())
+			}
+			Err(err) => Err(err),
+		}
 	}
 
 	async fn delete(&self, collection: Nsid, rkey: Rkey) -> Result {
@@ -252,6 +283,24 @@ impl XrpcPds {
 				return records.xok();
 			}
 		}
+	}
+
+	/// `com.atproto.sync.getBlob`, `None` for the protocol's `BlobNotFound`.
+	async fn blob(&self, cid: Cid) -> Result<Option<Bytes>> {
+		match self
+			.call("com.atproto.sync.getBlob", false, |url| {
+				Request::get(url)
+					.with_param("did", self.did.as_str())
+					.with_param("cid", cid.as_str())
+					.xok()
+			})
+			.await
+		{
+			Ok(response) => response.bytes().await?.xmap(Some),
+			Err(err) if XrpcError::is(&err, "BlobNotFound") => None,
+			Err(err) => return Err(err),
+		}
+		.xok()
 	}
 
 	async fn upload(
@@ -308,9 +357,12 @@ impl PdsProvider for XrpcPds {
 		&self,
 		collection: Nsid,
 		record: Rkeyed<AtprotoValue>,
+		precondition: Precondition,
 	) -> SendBoxedFuture<Result<StrongRef>> {
 		let this = self.clone();
-		Box::pin(async move { this.put(collection, record).await })
+		Box::pin(
+			async move { this.put(collection, record, precondition).await },
+		)
 	}
 
 	fn delete_record(
@@ -337,6 +389,11 @@ impl PdsProvider for XrpcPds {
 	) -> SendBoxedFuture<Result<BlobRef>> {
 		let this = self.clone();
 		Box::pin(async move { this.upload(bytes, mime_type).await })
+	}
+
+	fn get_blob(&self, cid: Cid) -> SendBoxedFuture<Result<Option<Bytes>>> {
+		let this = self.clone();
+		Box::pin(async move { this.blob(cid).await })
 	}
 }
 
@@ -402,6 +459,9 @@ struct PutRecord<'a> {
 	#[serde(flatten)]
 	address: RecordAddress<'a>,
 	record: &'a AtprotoValue,
+	/// Absent for no condition, `null` for create only.
+	#[serde(rename = "swapRecord", skip_serializing_if = "Option::is_none")]
+	swap_record: Option<Option<&'a Cid>>,
 }
 
 #[derive(Deserialize)]

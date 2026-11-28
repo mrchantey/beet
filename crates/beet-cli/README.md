@@ -25,6 +25,8 @@ site (eg `examples/beetmania`) declares its own servers and commands in markup, 
 | `build-wasm` | Build a wasm module and its bindings |
 | `check` | Lint a no-code site's routes |
 | `compile` | Compile a package's branch into its scene records and package record, in the package's space under the package store's `.beet/pds/` (`--branch`; the launch's `--package` selects the package store) |
+| `release` | Compile, then freeze the package record as a release at its version in the package's space, never rewritten (`--branch`) |
+| `publish` | Release, then copy the release byte for byte to the account's public repo with its scenes and blobs (`--branch`, `--as-home` for the home record, `--dry-run`) |
 | `export-static` | Render a no-code site to its `dist/` |
 | `export-pdf` | Render a route to PDF |
 | `store-sync` | Sync one store into another, any two store uris |

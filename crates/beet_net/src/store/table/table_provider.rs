@@ -27,9 +27,9 @@ use serde::Serialize;
 /// An atproto PDS maps onto this surface with record tables only: a
 /// partition is an atproto repo, a table a collection (any other name refused), a key
 /// an rkey. [`get_row`](Self::get_row) is `getRecord`;
-/// [`put_row`](Self::put_row) is `putRecord` with `swapRecord` for
-/// [`Precondition::Matches`] and `createRecord` for
-/// [`Precondition::Absent`]; [`remove_row`](Self::remove_row) is
+/// [`put_row`](Self::put_row) is `putRecord` with `swapRecord`, the cid for
+/// [`Precondition::Matches`] and `null` for [`Precondition::Absent`], as
+/// `XrpcPds` writes a record; [`remove_row`](Self::remove_row) is
 /// `deleteRecord` with `swapRecord`; [`scan_rows`](Self::scan_rows) is
 /// `listRecords` with its cursor and `reverse`, end bounds applied client
 /// side. [`apply`](Self::apply) is `applyWrites` guarded by `swapCommit`
@@ -138,60 +138,6 @@ pub trait TableProvider: StoreBackend {
 	}
 }
 
-/// What a write requires of the row already at its key, the atproto
-/// `swapRecord` semantics: checked and applied as one step, so two writers
-/// never silently erase each other.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Precondition {
-	/// Whatever is there, including nothing.
-	#[default]
-	Any,
-	/// Nothing is there.
-	Absent,
-	/// The row there has exactly this cid.
-	Matches(Cid),
-}
-
-impl Precondition {
-	/// Whether this holds of the row whose cid is `found`, `None` for no row.
-	pub fn holds(&self, found: Option<&Cid>) -> bool {
-		match (self, found) {
-			(Self::Any, _) => true,
-			(Self::Absent, found) => found.is_none(),
-			(Self::Matches(expected), Some(found)) => expected == found,
-			(Self::Matches(_), None) => false,
-		}
-	}
-
-	/// [`holds`](Self::holds), else the conflict naming what was found.
-	pub fn check(
-		&self,
-		table: &str,
-		key: &TableKey,
-		found: Option<&Cid>,
-	) -> Result<(), TableError> {
-		match self.holds(found) {
-			true => Ok(()),
-			false => Err(TableError::Conflict {
-				table: table.into(),
-				key: key.clone(),
-				expected: self.clone(),
-				found: found.cloned(),
-			}),
-		}
-	}
-}
-
-impl core::fmt::Display for Precondition {
-	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		match self {
-			Self::Any => write!(f, "any row"),
-			Self::Absent => write!(f, "no row"),
-			Self::Matches(cid) => write!(f, "row {cid}"),
-		}
-	}
-}
-
 /// An optional capability a table backend may lack, asked of it with
 /// [`TableProvider::supports`].
 #[derive(
@@ -227,7 +173,7 @@ impl core::fmt::Display for Capability {
 #[derive(Debug, Clone, PartialEq, thiserror::Error, Serialize, Deserialize)]
 pub enum TableError {
 	/// A write's [`Precondition`] did not hold.
-	#[error("conflict at `{table}/{key}`: expected {expected}, found {}", found.as_ref().map_or("no row".to_string(), |cid| format!("row {cid}")))]
+	#[error("conflict at `{table}/{key}`: expected {expected}, found {}", Precondition::describe_found(found.as_ref()))]
 	Conflict {
 		/// The table written.
 		table: SmolStr,
@@ -274,6 +220,25 @@ impl TableError {
 
 	/// The table error `err` carries, if it is one.
 	pub fn of(err: &BevyError) -> Option<&Self> { err.downcast_ref::<Self>() }
+
+	/// `precondition` checked against `found`, the cid of the row at `key`
+	/// in `table`, else the conflict naming what was found.
+	pub fn check(
+		precondition: &Precondition,
+		table: &str,
+		key: &TableKey,
+		found: Option<&Cid>,
+	) -> Result<(), Self> {
+		match precondition.holds(found) {
+			true => Ok(()),
+			false => Err(Self::Conflict {
+				table: table.into(),
+				key: key.clone(),
+				expected: precondition.clone(),
+				found: found.cloned(),
+			}),
+		}
+	}
 
 	/// Whether `err` is a failed precondition, the error a read-modify-write
 	/// retries on.
