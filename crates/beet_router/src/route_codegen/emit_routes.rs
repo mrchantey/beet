@@ -234,7 +234,7 @@ fn emit_blob_route(
 	});
 	quote! {
 		(
-			route::new(#path, BlobPage::new(#store_path)),
+			route::new(#path, BlobPage::new(fwd_path!(#store_path))),
 			HttpMethod::Get,
 			ExportStrategy::Static,
 			PageRoute,
