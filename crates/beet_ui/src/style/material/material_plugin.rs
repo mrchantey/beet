@@ -154,8 +154,12 @@ impl Plugin for MaterialStylePlugin {
 		// seed the tones now from the same systems, so the rule set carries them
 		// immediately — before any schedule runs (eg a `with_state` style query,
 		// or a web bake reading the rule set on the very first request).
-		app.world_mut().run_system_cached(derive_theme_tones).unwrap();
-		app.world_mut().run_system_cached(rebuild_theme_tones).unwrap();
+		app.world_mut()
+			.run_system_cached(derive_theme_tones)
+			.unwrap();
+		app.world_mut()
+			.run_system_cached(rebuild_theme_tones)
+			.unwrap();
 	}
 }
 

@@ -89,17 +89,17 @@ pub async fn ScriptDerivation(
 impl ScriptDerivation {
 	/// The [`Derivation`] this declaration declares.
 	pub fn derivation(&self) -> Result<Derivation> {
-		let stem = self
-			.src
-			.as_smol_path()
-			.file_stem()
-			.ok_or_else(|| bevyhow!("script `{}` has no file name", self.src))?;
+		let stem = self.src.as_smol_path().file_stem().ok_or_else(|| {
+			bevyhow!("script `{}` has no file name", self.src)
+		})?;
 		self.resources
 			.iter()
 			.fold(
 				Derivation::new(self.dir.try_join(format!("{stem}.derived.json"))?)
 					.with_input(self.src.clone()),
-				|derivation, resource| derivation.with_resource(resource.clone()),
+				|derivation, resource| {
+					derivation.with_resource(resource.clone())
+				},
 			)
 			.xok()
 	}

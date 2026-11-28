@@ -924,11 +924,7 @@ pub(crate) mod test {
 			let window = BsxParser::spawn(app.world_mut(), source).unwrap();
 			app.world_mut().entity_mut(window).insert(ChildOf(root));
 			request_test::enter(&mut app, window).await;
-			Self {
-				app,
-				root,
-				window,
-			}
+			Self { app, root, window }
 		}
 
 		/// The behavior entity of `actor`.

@@ -287,7 +287,8 @@ impl StoreMirror {
 			.collect::<Vec<_>>()
 			.join(", ");
 		if report.kept.len() > SHOWN {
-			listed.push_str(&format!(", and {} more", report.kept.len() - SHOWN));
+			listed
+				.push_str(&format!(", and {} more", report.kept.len() - SHOWN));
 		}
 		format!(
 			"{} holds {} object(s) {} does not: {listed}. Sync them the other \

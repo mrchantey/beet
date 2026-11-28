@@ -111,7 +111,10 @@ pub async fn IconSet(
 		.world()
 		.with(|world: &mut World| {
 			(
-				world.get_resource::<ThemeTones>().cloned().unwrap_or_default(),
+				world
+					.get_resource::<ThemeTones>()
+					.cloned()
+					.unwrap_or_default(),
 				world
 					.get_resource::<PackageConfig>()
 					.cloned()
@@ -312,8 +315,7 @@ impl IconSet {
 				.write(store, self.path(&Self::FAVICON_SVG), bytes.to_vec())
 				.await?;
 		}
-		let mut sources =
-			vec![ProvenanceSource::file(self.src.clone(), bytes)];
+		let mut sources = vec![ProvenanceSource::file(self.src.clone(), bytes)];
 		if let (Some(path), Some(dark)) = (&self.dark, dark) {
 			if !self.is_svg() || !Self::is_svg_path(path) {
 				bevybail!(

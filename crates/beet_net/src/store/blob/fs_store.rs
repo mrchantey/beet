@@ -82,6 +82,14 @@ impl FsStore {
 	fn resolve_path(&self, route: &FwdPath) -> AbsPath {
 		self.effective_root().join(route)
 	}
+
+	/// `from` copied to `to` on the blocking pool.
+	fn copy_file(from: AbsPath, to: AbsPath) -> SendBoxedFuture<Result> {
+		Box::pin(async move {
+			async_ext::unblock(move || fs_ext::copy(&from, &to)).await?;
+			().xok()
+		})
+	}
 }
 
 /// The locks a conditional write holds while it checks then writes a file,
@@ -250,18 +258,20 @@ impl BlobProvider for FsStore {
 		path: &FwdPath,
 		file: &AbsPath,
 	) -> SendBoxedFuture<Result> {
-		let path = self.resolve_path(path);
-		let file = file.clone();
-		Box::pin(async move {
-			cfg_if! {
-				if #[cfg(all(feature = "fs", not(target_arch = "wasm32")))] {
-					async_ext::unblock(move || fs_ext::copy(&file, &path)).await?;
-				} else {
-					fs_ext::copy(&file, &path)?;
-				}
-			}
-			().xok()
-		})
+		Self::copy_file(file.clone(), self.resolve_path(path))
+	}
+
+	/// The reverse of [`insert_file`](Self::insert_file), the same copy.
+	fn get_file(
+		&self,
+		path: &FwdPath,
+		file: &AbsPath,
+	) -> SendBoxedFuture<Result> {
+		Self::copy_file(self.resolve_path(path), file.clone())
+	}
+
+	fn local_path(&self, path: &FwdPath) -> Option<AbsPath> {
+		Some(self.resolve_path(path))
 	}
 
 	fn list(&self) -> SendBoxedFuture<Result<Vec<FwdPath>>> {

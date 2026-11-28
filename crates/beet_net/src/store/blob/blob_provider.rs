@@ -12,7 +12,8 @@ pub struct BlobStat {
 	/// The object's size in bytes.
 	pub size: u64,
 	/// The MD5 hex digest, `None` where the backend cannot answer one (an S3
-	/// multipart upload's etag is not an MD5).
+	/// multipart object no beet upload recorded one for, see
+	/// `S3Store`).
 	pub md5: Option<SmolStr>,
 }
 
@@ -336,6 +337,33 @@ pub trait BlobProvider: StoreBackend {
 	/// ```
 	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>>;
 
+	/// Write the object at `path` to the local file `file`, for an object
+	/// too large to hold as [`Bytes`]. The default gets it and writes it; a
+	/// filesystem backend copies it, and S3 fetches it a part at a time. A
+	/// local file is a std concept, so the method is too.
+	#[cfg(feature = "std")]
+	fn get_file(
+		&self,
+		path: &FwdPath,
+		file: &AbsPath,
+	) -> SendBoxedFuture<Result> {
+		let this = self.box_clone();
+		let path = path.clone();
+		let file = file.clone();
+		Box::pin(async move {
+			fs_ext::write_async(&file, this.get(&path).await?).await?;
+			().xok()
+		})
+	}
+
+	/// The local file `path` names, for a store on this machine's
+	/// filesystem, so a copy to or from it can stream through
+	/// [`insert_file`](Self::insert_file) and [`get_file`](Self::get_file).
+	fn local_path(&self, path: &FwdPath) -> Option<AbsPath> {
+		let _ = path;
+		None
+	}
+
 	/// Check if object exists in store.
 	///
 	/// # Example
@@ -571,6 +599,17 @@ impl BlobProvider for Box<dyn BlobProvider> {
 	}
 	fn get(&self, path: &FwdPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.as_ref().get(path)
+	}
+	#[cfg(feature = "std")]
+	fn get_file(
+		&self,
+		path: &FwdPath,
+		file: &AbsPath,
+	) -> SendBoxedFuture<Result> {
+		self.as_ref().get_file(path, file)
+	}
+	fn local_path(&self, path: &FwdPath) -> Option<AbsPath> {
+		self.as_ref().local_path(path)
 	}
 	fn exists(&self, path: &FwdPath) -> SendBoxedFuture<Result<bool>> {
 		self.as_ref().exists(path)

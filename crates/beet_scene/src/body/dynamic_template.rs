@@ -668,7 +668,8 @@ fn build_entity(
 						patch.xok()
 					})
 					.transpose()?;
-				let patch = mapped.as_deref().unwrap_or(deferred.patch.as_ref());
+				let patch =
+					mapped.as_deref().unwrap_or(deferred.patch.as_ref());
 				// build the deferred template into a context scoped to this
 				// entity, sharing the reference map so cross-entity refs resolve.
 				// SAFETY: only used to acquire the mapped entity for a scoped build.
@@ -812,7 +813,10 @@ fn references(value: &dyn PartialReflect) -> usize {
 /// Remap every entity `value` holds through `mapper`, for a reflected value
 /// no `map_entities` covers, ie a template's props. A map's entries stay as
 /// they are, since reflection offers no way to rewrite them in place.
-fn map_entities_in(value: &mut dyn PartialReflect, mapper: &mut dyn EntityMapper) {
+fn map_entities_in(
+	value: &mut dyn PartialReflect,
+	mapper: &mut dyn EntityMapper,
+) {
 	if let Some(entity) = value.try_downcast_mut::<Entity>() {
 		*entity = mapper.get_mapped(*entity);
 		return;
@@ -841,12 +845,16 @@ fn map_entities_in(value: &mut dyn PartialReflect, mapper: &mut dyn EntityMapper
 		}
 		ReflectMut::List(value) => {
 			for index in 0..value.len() {
-				value.get_mut(index).map(|item| map_entities_in(item, mapper));
+				value
+					.get_mut(index)
+					.map(|item| map_entities_in(item, mapper));
 			}
 		}
 		ReflectMut::Array(value) => {
 			for index in 0..value.len() {
-				value.get_mut(index).map(|item| map_entities_in(item, mapper));
+				value
+					.get_mut(index)
+					.map(|item| map_entities_in(item, mapper));
 			}
 		}
 		ReflectMut::Enum(value) => {

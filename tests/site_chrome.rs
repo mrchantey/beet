@@ -113,7 +113,9 @@ async fn serve() -> PageHarness {
 			// A repository, so the nav holds a link button beside the toggle.
 			|app: &mut App| {
 				app.insert_resource(PackageConfig {
-					repository: Some(Url::coerce("https://github.com/mrchantey/beet")),
+					repository: Some(Url::coerce(
+						"https://github.com/mrchantey/beet",
+					)),
 					..default()
 				});
 			},
@@ -145,7 +147,9 @@ async fn app_bar_holds_its_height() {
 			.as_f64()
 			.unwrap();
 		if (height - expected).abs() > 0.5 {
-			faults.push(format!("{width}px: the app bar is {height}px, not {expected}px"));
+			faults.push(format!(
+				"{width}px: the app bar is {height}px, not {expected}px"
+			));
 		}
 		// the nav links stay until a phone's width
 		let display = nav_display(&page).await;
