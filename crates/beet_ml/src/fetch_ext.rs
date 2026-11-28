@@ -12,7 +12,7 @@ use beet_net::prelude::*;
 /// HTTP and written back to the cache before returning.
 pub async fn fetch_bytes(url: &str) -> Result<Vec<u8>> {
 	let store = cache_store()?;
-	let key = cache_key(url)?;
+	let key = cache_key(url);
 
 	if store.exists(&key).await.unwrap_or(false) {
 		log::info!("fetch_bytes: cache hit ({url})");
@@ -43,6 +43,6 @@ fn cache_store() -> Result<BlobStore> {
 }
 
 /// Hash the URL to keep cache keys short and filesystem-safe.
-fn cache_key(url: &str) -> Result<FwdPath> {
-	FwdPath::new(format!("{:016x}.bin", fs_ext::hash_string(url)))
+fn cache_key(url: &str) -> FwdPath {
+	path_segment!("{:016x}.bin", fs_ext::hash_string(url)).into()
 }

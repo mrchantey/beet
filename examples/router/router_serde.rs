@@ -35,7 +35,7 @@
 use beet::prelude::*;
 use serde::Serialize;
 
-const WORLD_SERDE_FILE: &str = "examples/router/router_serde.json";
+const WORLD_SERDE_FILE: FwdPath = fwd_path!("examples/router/router_serde.json");
 
 fn main() -> AppExit {
 	App::new()
@@ -75,7 +75,7 @@ struct GreetRequest {
 
 fn setup(async_commands: AsyncCommands) {
 	let store = BlobStore::new(FsStore::new(WsPath::default()));
-	let path = FwdPath::new(WORLD_SERDE_FILE);
+	let path = WORLD_SERDE_FILE;
 	// the process request, read once: its `--new` picks which scene loads,
 	// then the loaded server serves it
 	let request = Request::from_cli_args(CliArgs::parse_env());

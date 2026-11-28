@@ -317,7 +317,7 @@ mod test {
 		let root = spawn_syndication_router_with(
 			&mut world,
 			(store, Layout::document(fwd_path!("HeadLayout.bsx"))),
-			rsx! { <StandardSitePub path={fwd_path!("blog")} name="The Full Moon Harvest"/> },
+			rsx! { <StandardSitePub path="blog" name="The Full Moon Harvest"/> },
 		);
 		TemplatePending::settle_owned(&mut world).await;
 		(world, root)

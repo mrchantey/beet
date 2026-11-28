@@ -115,6 +115,22 @@ impl FwdPath {
 		}
 	}
 
+	/// The entry `segment` directly below this path.
+	pub fn join_segment(&self, segment: &PathSegment) -> Self {
+		self.join(&segment.clone().into())
+	}
+
+	/// This path's parent and last segment, [`None`] for the empty path.
+	pub fn split_last(&self) -> Option<(Self, PathSegment)> {
+		let last = self.last_segment()?;
+		(
+			self.parent().unwrap_or_default(),
+			// every segment of a clean path within its container is a plain one
+			PathSegment::new_unchecked(last),
+		)
+			.xsome()
+	}
+
 	/// [`join`](Self::join) a path parsed from text, see [`new`](Self::new).
 	///
 	/// # Errors
@@ -218,14 +234,6 @@ impl TryFrom<&Path> for FwdPath {
 	type Error = BevyError;
 	fn try_from(value: &Path) -> Result<Self> {
 		Self::new(value.to_string_lossy())
-	}
-}
-
-/// A uuid's text, hex and dashes, is always one plain segment.
-#[cfg(feature = "uuid")]
-impl From<uuid::Uuid> for FwdPath {
-	fn from(value: uuid::Uuid) -> Self {
-		Self(SmolPath::new_unchecked(value.to_string()))
 	}
 }
 

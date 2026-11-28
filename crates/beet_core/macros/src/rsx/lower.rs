@@ -252,12 +252,27 @@ fn tokenize_component(el: &RsxElement, tag: &str) -> TokenStream {
 					continue;
 				}
 				let field = syn::Ident::new(&key, attr.key.span());
-				// a flag attribute is `true`
-				let val = attr
-					.value_expr()
-					.map(|val| quote! { #val })
-					.unwrap_or_else(|| quote! { true });
-				fields.push(quote! { __props.#field = (#val).into_prop(); });
+				match attr.value_expr() {
+					// a string literal is a type the field's `FromLit` reads
+					// as a constant, so a path prop checks it as it builds
+					Some(syn::Expr::Lit(syn::ExprLit {
+						lit: syn::Lit::Str(lit),
+						..
+					})) => fields.push(quote! {
+						__props.#field = {
+							struct __Lit;
+							impl StaticStr for __Lit {
+								const TEXT: &'static str = #lit;
+							}
+							FromLit::from_lit::<__Lit>()
+						};
+					}),
+					Some(val) => fields
+						.push(quote! { __props.#field = (#val).into_prop(); }),
+					// a flag attribute is `true`
+					None => fields
+						.push(quote! { __props.#field = (true).into_prop(); }),
+				}
 			}
 			RsxAttr::Spread(block) => {
 				spreads.push(quote! { (#block).into_snippet_bundle() });

@@ -102,9 +102,11 @@ impl Template for Snippet {
 /// wrap (core already has `From<T> for Option<T>`) and could never pin a float
 /// literal, since `f32: From<f64>` does not exist.
 ///
-/// A string literal reaches any [`StrProp`] field, so `label="hi"` fills a
-/// [`SmolStr`], [`String`] or [`Url`] prop, or an `Option` of one; anything
-/// else is spelled as in plain Rust.
+/// A string expression reaches any [`StrProp`] field, so `label={name}` fills
+/// a [`SmolStr`], [`String`] or [`Url`] prop, or an `Option` of one; a string
+/// *literal* lowers through [`FromLit`] instead, which also fills a path prop
+/// and checks it as the code builds. Anything else is spelled as in plain
+/// Rust.
 pub trait IntoProp<F> {
 	/// Convert into the field type `F`.
 	fn into_prop(self) -> F;
@@ -136,6 +138,82 @@ pub trait StrProp: for<'a> From<&'a str> {}
 impl StrProp for SmolStr {}
 impl StrProp for String {}
 impl StrProp for Url {}
+
+/// A string literal as a type, ie `"blog"` in `<Pub path="blog"/>`: the
+/// `rsx!` lowering declares one per literal prop, so the field's [`FromLit`]
+/// sees the text as a constant and may check it as the code builds.
+pub trait StaticStr {
+	/// The literal's text.
+	const TEXT: &'static str;
+}
+
+/// A prop type an `rsx!` string literal fills, built from the literal
+/// `L`: every [`StrProp`] takes any text, while a path type refuses text that
+/// is not one, failing the build rather than the render.
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// struct Blog;
+/// impl StaticStr for Blog {
+/// 	const TEXT: &'static str = "blog";
+/// }
+/// FwdPath::from_lit::<Blog>().xpect_eq(fwd_path!("blog"));
+/// ```
+///
+/// ```compile_fail
+/// # use beet_core::prelude::*;
+/// struct Escape;
+/// impl StaticStr for Escape {
+/// 	const TEXT: &'static str = "../escape";
+/// }
+/// let _ = FwdPath::from_lit::<Escape>();
+/// ```
+pub trait FromLit: Sized {
+	/// This type from the literal `L`.
+	fn from_lit<L: StaticStr>() -> Self;
+}
+
+impl<T: StrProp> FromLit for T {
+	fn from_lit<L: StaticStr>() -> Self { T::from(L::TEXT) }
+}
+
+impl<T: FromLit> FromLit for Option<T> {
+	fn from_lit<L: StaticStr>() -> Self { Some(T::from_lit::<L>()) }
+}
+
+impl FromLit for &'static str {
+	fn from_lit<L: StaticStr>() -> Self { L::TEXT }
+}
+
+impl FromLit for FwdPath {
+	fn from_lit<L: StaticStr>() -> Self {
+		const {
+			assert!(
+				FwdPath::is_canonical(L::TEXT),
+				"a `FwdPath` prop literal is canonical: no leading or trailing `/`, and no empty, `.` or `..` segment"
+			)
+		};
+		FwdPath::from_canonical(L::TEXT)
+	}
+}
+
+impl FromLit for WsPath {
+	fn from_lit<L: StaticStr>() -> Self {
+		WsPath::from_fwd_path(FwdPath::from_lit::<L>())
+	}
+}
+
+impl FromLit for PathSegment {
+	fn from_lit<L: StaticStr>() -> Self {
+		const {
+			assert!(
+				PathSegment::is_canonical(L::TEXT),
+				"a `PathSegment` prop literal is one plain segment: never empty, no `/` or `\\`, and neither `.` nor `..`"
+			)
+		};
+		PathSegment::from_canonical(L::TEXT)
+	}
+}
 
 /// Lift `self` into a [`Bundle`] for an `rsx!` markup position (text, `{expr}`,
 /// attribute value, child list). The marker `M` disambiguates the blanket impls,

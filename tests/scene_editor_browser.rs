@@ -47,7 +47,7 @@ const SCENE: &str = "scene_editor/scene.bsx";
 /// The fork, as the entry names it: the server writes it into its store on
 /// its first boot and publishes it, the browser writes it into its own store
 /// on the first edit.
-const FORK: &str = "scene_editor/scene.json";
+const FORK: FwdPath = fwd_path!("scene_editor/scene.json");
 /// What the entry's store must hold: the entry, the authored scene, the
 /// document shell, and the wasm runtime its page boots (through the `wasm/`
 /// links to the build output).
@@ -296,9 +296,9 @@ impl SceneHost {
 	async fn published(&self) -> Value {
 		let store = &self.store;
 		poll_ext::poll_async(async || {
-			match store.exists(&FwdPath::from(FORK)).await? {
+			match store.exists(&FORK).await? {
 				true => store
-					.get(&FwdPath::from(FORK))
+					.get(&FORK)
 					.await
 					.map(ControlFlow::Break),
 				false => Ok(ControlFlow::Continue(())),

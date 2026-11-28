@@ -291,7 +291,7 @@ mod test {
 			.await
 			.unwrap();
 		let root = spawn_syndication_router(&mut world, rsx! {
-			<SocialCards font={fwd_path!("fonts/inter.ttf")}/>
+			<SocialCards font="fonts/inter.ttf"/>
 		});
 		world
 			.entity_mut(root)

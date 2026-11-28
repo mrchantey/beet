@@ -144,9 +144,7 @@ impl EmulatorPds {
 		Self::RECORDS.try_join(format!("{collection}/{rkey}{}", self.suffix()))
 	}
 
-	fn blob_path(cid: &Cid) -> Result<FwdPath> {
-		Self::BLOBS.try_join(cid.to_string())
-	}
+	fn blob_path(cid: &Cid) -> FwdPath { Self::BLOBS.join(&cid.into()) }
 
 	/// The body stored at `path`, `None` when there is none.
 	async fn read(&self, path: &FwdPath) -> Result<Option<AtprotoValue>> {
@@ -203,7 +201,7 @@ impl EmulatorPds {
 		let uri = self.uri(&collection, record.rkey());
 		let referenced = Self::blob_cids(&record);
 		for blob in &referenced {
-			if !self.store.exists(&Self::blob_path(blob)?).await? {
+			if !self.store.exists(&Self::blob_path(blob)).await? {
 				bevybail!(
 					"{uri} references blob {blob}, which was never uploaded \
 					 to this repo"
@@ -257,7 +255,7 @@ impl EmulatorPds {
 		mime_type: MediaType,
 	) -> Result<BlobRef> {
 		let blob = BlobRef::of(&bytes, mime_type);
-		let path = Self::blob_path(&blob.cid)?;
+		let path = Self::blob_path(&blob.cid);
 		if !self.store.exists(&path).await? {
 			self.store.insert(&path, bytes).await?;
 		}
@@ -304,7 +302,7 @@ impl EmulatorPds {
 		let mut released = candidates.into_iter().collect::<Vec<_>>();
 		released.sort();
 		for cid in &released {
-			self.store.remove(&Self::blob_path(cid)?).await?;
+			self.store.remove(&Self::blob_path(cid)).await?;
 		}
 		released.xok()
 	}

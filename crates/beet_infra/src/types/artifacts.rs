@@ -111,7 +111,7 @@ impl ArtifactLedger {
 
 	/// The key prefix holding everything one version owns: its document, its
 	/// ledger and each artifact binary it published.
-	pub fn version_prefix(uuid: &Uuid) -> FwdPath { FwdPath::from(*uuid) }
+	pub fn version_prefix(uuid: &Uuid) -> FwdPath { PathSegment::of(uuid).into() }
 	/// The mirror root of one version's document, the uri a process boots
 	/// from: `<id>/package`.
 	pub fn version_package_dir(uuid: &Uuid) -> FwdPath {

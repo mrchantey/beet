@@ -2,7 +2,8 @@
 //!
 //! Built on [`alloc`] and [`SmolStr`] rather than [`std::path`]: the
 //! unopinionated [`SmolPath`] and the three newtypes over it, a [`FwdPath`]
-//! location within a container that never leaves it, an [`AbsPath`] filesystem location and a
+//! location within a container that never leaves it (one of its plain
+//! segments a [`PathSegment`]), an [`AbsPath`] filesystem location and a
 //! [`WsPath`] workspace-relative location, plus the [`Url`] a request is
 //! routed by, the verbatim [`Uri`] a stored field holds, and the
 //! [`path_ext::clean`] cleaner. Resolving a path against
@@ -13,6 +14,7 @@
 mod abs_path;
 mod doc_path;
 mod fwd_path;
+mod path_segment;
 pub mod path_ext;
 mod smol_path;
 mod uri;
@@ -22,6 +24,7 @@ mod ws_path;
 pub use abs_path::*;
 pub use doc_path::*;
 pub use fwd_path::*;
+pub use path_segment::*;
 pub use smol_path::*;
 pub use uri::*;
 pub use url::*;

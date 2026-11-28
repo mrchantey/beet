@@ -766,7 +766,7 @@ impl ThreadStore {
 				let Some(bytes) = post.file_bytes(file.index()) else {
 					continue;
 				};
-				let path = Self::blob_path(file.blob())?;
+				let path = Self::blob_path(file.blob());
 				if !blobs.exists(&path).await? {
 					blobs.insert(&path, bytes.clone()).await?;
 				}
@@ -778,14 +778,14 @@ impl ThreadStore {
 	/// Read the bytes of `blob` from the blob store.
 	pub async fn read_blob(&self, blob: &BlobRef) -> Result<Bytes> {
 		match &self.blobs {
-			Some(blobs) => blobs.get(&Self::blob_path(blob)?).await,
+			Some(blobs) => blobs.get(&Self::blob_path(blob)).await,
 			None => bevybail!("no blob store holds the bytes of {}", blob.cid),
 		}
 	}
 
 	/// Where the bytes of `blob` live, as a PDS keeps them.
-	fn blob_path(blob: &BlobRef) -> Result<FwdPath> {
-		fwd_path!("blobs").try_join(blob.cid.to_string())
+	fn blob_path(blob: &BlobRef) -> FwdPath {
+		fwd_path!("blobs").join(&(&blob.cid).into())
 	}
 
 	/// Apply `writes` as one batch, in chunks only past the backend's limit.

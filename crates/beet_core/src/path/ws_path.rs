@@ -15,7 +15,7 @@ use core::str::FromStr;
 ///
 /// ```rust
 /// # use beet_core::prelude::*;
-/// let path = WsPath::new(file!()).unwrap();
+/// let path = WsPath::new("crates/beet_core/Cargo.toml").unwrap();
 /// WsPath::new("/etc/hosts").unwrap_err();
 /// ```
 #[derive(

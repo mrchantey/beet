@@ -19,7 +19,7 @@ pub async fn seeded_store(dir: &str, paths: &[&str]) -> BlobStore {
 		BlobStore::new(FsStore::new(AbsPath::new_workspace_rel(dir).unwrap()));
 	let store = BlobStore::temp();
 	for path in paths {
-		let path = FwdPath::from(*path);
+		let path = FwdPath::new(*path).unwrap();
 		let bytes = disk.get(&path).await.unwrap();
 		store.insert(&path, bytes).await.unwrap();
 	}

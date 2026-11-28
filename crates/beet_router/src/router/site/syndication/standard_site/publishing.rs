@@ -146,10 +146,10 @@ impl Publishing {
 		let Some(store) = &self.cards else {
 			return Ok(None);
 		};
-		let own = SocialCards::card(page)?;
+		let own = SocialCards::card(page);
 		let path = match store.exists(&own).await? {
 			true => own,
-			false => SocialCards::card(&default())?,
+			false => SocialCards::card(&default()),
 		};
 		DerivedImage::read(store, &path).await?.xmap(Some).xok()
 	}
@@ -364,9 +364,10 @@ impl PublishingQuery<'_, '_> {
 			.icon_sets
 			.iter()
 			.next()
-			.map(|(icon_entity, icon_set)| -> Result<_> {
-				(self.stores.get(icon_entity)?.clone(), icon_set.publication_icon()?)
-					.xok()
+			.map(|(icon_entity, icon_set)| {
+				self.stores
+					.get(icon_entity)
+					.map(|store| (store.clone(), icon_set.publication_icon()))
 			})
 			.transpose()?;
 		let cards = self
@@ -434,9 +435,8 @@ pub(super) mod test {
 		/// [`Site::new`] at `homepage`, its publication in `publisher`.
 		pub async fn with(homepage: &str, publisher: Pds) -> Self {
 			let store = BlobStore::temp();
-			let icon = IconSet::new(fwd_path!("assets/logo/logo.png"))
-				.publication_icon()
-				.unwrap();
+			let icon =
+				IconSet::new(fwd_path!("assets/logo/logo.png")).publication_icon();
 			store.insert(&icon, png(512, 512)).await.unwrap();
 			store
 				.insert(&FwdPath::new(CARD).unwrap(), png(1200, 630))
@@ -454,9 +454,9 @@ pub(super) mod test {
 				&mut world,
 				(store.clone(), Layout::document(fwd_path!("HeadLayout.bsx"))),
 				rsx! {
-					<StandardSitePub path={fwd_path!("blog")} name="The Full Moon Harvest"/>
-					<IconSet src={fwd_path!("assets/logo/logo.png")}/>
-					<SocialCards font={fwd_path!("assets/fonts/Inter.ttf")}/>
+					<StandardSitePub path="blog" name="The Full Moon Harvest"/>
+					<IconSet src="assets/logo/logo.png"/>
+					<SocialCards font="assets/fonts/Inter.ttf"/>
 					<Redirect path="blog/full-stack" redirect="/blog/full-stack-bevy"/>
 				},
 			);

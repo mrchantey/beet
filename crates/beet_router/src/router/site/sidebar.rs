@@ -78,7 +78,7 @@ pub fn RouteHead(
 		.is_ok_and(|route| route.visibility == RouteVisibility::Unlisted);
 	let icons = match icon_sets.iter().collect::<Vec<_>>().as_slice() {
 		[] => None,
-		[icon_set] => Some(icon_links(icon_set)?),
+		[icon_set] => Some(icon_links(icon_set)),
 		_ => bevybail!(
 			"more than one `IconSet` declared: a site has one set of icons"
 		),
@@ -101,9 +101,9 @@ pub fn RouteHead(
 }
 
 /// The `<link>`s naming `icon_set`'s icons and its web app manifest.
-fn icon_links(icon_set: &IconSet) -> Result<impl Bundle> {
+fn icon_links(icon_set: &IconSet) -> impl Bundle {
 	let icons = icon_set
-		.links()?
+		.links()
 		.into_iter()
 		.map(|link| {
 			let dark = link.dark_href.map(|href| href.to_string());
@@ -123,7 +123,6 @@ fn icon_links(icon_set: &IconSet) -> Result<impl Bundle> {
 		{icons}
 		<link rel="manifest" href=manifest/>
 	}
-	.xok()
 }
 
 /// The bound text child of the route `<title>`: a [`Value`] seeded with the

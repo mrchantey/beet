@@ -209,7 +209,7 @@ async fn counter_clicks_update_count() {
 	host.step_until("Beets eaten today: 1");
 }
 
-/// Clicking the sidebar `counter` link (labelled by its path segment) navigates
+/// Clicking the sidebar `Counter` link (labelled by its path segment) navigates
 /// the TUI to the counter page, the navigate-by-click path against the markup-built
 /// `RouteSidebar`.
 #[beet::test]
@@ -218,9 +218,9 @@ async fn nav_link_click_navigates() {
 	// homepage loaded: gate on the hero's "Browse the recipes" link (plain ASCII; the
 	// hero `<h1>` itself now renders fullwidth).
 	host.step_until("Browse the recipes");
-	// the sidebar grows a link per route, labelled by its last path segment
-	// (`counter.bsx` -> "counter"); click it to navigate.
-	let (col, row) = host.cell_of("counter");
+	// the sidebar grows a link per route, labelled by its last path segment in
+	// title case (`counter.bsx` -> "Counter"); click it to navigate.
+	let (col, row) = host.cell_of("Counter");
 	host.click(col, row);
 	host.step_until("Beets eaten today: 0");
 	// navigated away: the homepage's "Browse the recipes" link is gone.
@@ -253,7 +253,7 @@ async fn narrow_viewport_stays_interactive() {
 async fn button_click_after_navigate() {
 	let mut host = SiteHost::new(UVec2::new(120, 64), "/").await;
 	host.step_until("Browse the recipes");
-	let (col, row) = host.cell_of("counter");
+	let (col, row) = host.cell_of("Counter");
 	host.click(col, row);
 	host.step_until("Beets eaten today: 0");
 

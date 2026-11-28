@@ -195,10 +195,7 @@ impl IconSet {
 
 	/// The store path of the 512, unpadded, which a standard.site publication
 	/// carries as its icon.
-	///
-	/// # Errors
-	/// Errors only when the size names no file, which a number never does.
-	pub fn publication_icon(&self) -> Result<FwdPath> { self.png(Self::LARGEST) }
+	pub fn publication_icon(&self) -> FwdPath { self.png(Self::LARGEST) }
 
 	/// Whether the source is svg, which adds `favicon.svg` to the set.
 	pub fn is_svg(&self) -> bool { Self::is_svg_path(&self.src) }
@@ -212,7 +209,7 @@ impl IconSet {
 
 	/// The icon links a document head carries for the set, in the order the
 	/// module docs give.
-	pub fn links(&self) -> Result<Vec<IconLink>> {
+	pub fn links(&self) -> Vec<IconLink> {
 		let link = |rel, mime, sizes: String, path: FwdPath| IconLink {
 			rel,
 			mime,
@@ -244,9 +241,9 @@ impl IconSet {
 			"apple-touch-icon",
 			"image/png",
 			format!("{0}x{0}", Self::APPLE_TOUCH),
-			self.png(Self::APPLE_TOUCH)?,
+			self.png(Self::APPLE_TOUCH),
 		));
-		links.xok()
+		links
 	}
 
 	/// The url the web app manifest serves at.
@@ -263,8 +260,8 @@ impl IconSet {
 	}
 
 	/// The unpadded png of `size`.
-	fn png(&self, size: u32) -> Result<FwdPath> {
-		self.path(&FwdPath::new(format!("icon-{size}.png"))?).xok()
+	fn png(&self, size: u32) -> FwdPath {
+		self.path(&path_segment!("icon-{}.png", size).into())
 	}
 
 	/// The hook landing this set's [`Derivation`] on its entity.
@@ -352,10 +349,10 @@ impl IconSet {
 		let source = IconSource::decode(self, bytes)?;
 		let mut rasters = Self::PNG_SIZES
 			.iter()
-			.map(|size| (self.png(*size)?, source.png(*size)?).xok())
+			.map(|size| (self.png(*size), source.png(*size)?).xok())
 			.collect::<Result<Vec<_>>>()?;
 		rasters.push((
-			self.png(Self::APPLE_TOUCH)?,
+			self.png(Self::APPLE_TOUCH),
 			source.padded(Self::APPLE_TOUCH, background)?,
 		));
 		rasters.push((
@@ -761,7 +758,6 @@ mod test {
 		let icon_set = IconSet::new(SRC);
 		for href in icon_set
 			.links()
-			.unwrap()
 			.into_iter()
 			.map(|link| link.href)
 			.chain([icon_set.manifest_href()])
@@ -792,7 +788,7 @@ mod test {
 		// letterboxed: transparent above the art, red within it
 		icon.get_pixel(256, 10).0[3].xpect_eq(0);
 		icon.get_pixel(256, 256).0.xpect_eq([255, 0, 0, 255]);
-		IconSet::new(SVG).links().unwrap()[1]
+		IconSet::new(SVG).links()[1]
 			.href
 			.xpect_eq("/branding/favicon.svg");
 		store
@@ -825,7 +821,7 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(svg("#000").into_bytes());
-		let links = icon_set.links().unwrap();
+		let links = icon_set.links();
 		(links[0].mime, links[0].sizes.as_str())
 			.xpect_eq(("image/x-icon", "32x32"));
 		links[1]

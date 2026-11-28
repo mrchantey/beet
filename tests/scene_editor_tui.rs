@@ -29,7 +29,7 @@ const SCENE: &str = "scene_editor/scene.bsx";
 /// The document shell the entry wraps its page in.
 const SHELL: &str = "templates/EditorShell.bsx";
 /// The fork, as the entry names it: absent until the first boot writes it.
-const FORK: &str = "scene_editor/scene.json";
+const FORK: FwdPath = fwd_path!("scene_editor/scene.json");
 /// A viewport tall enough for the page and the open editor, so no case
 /// scrolls.
 const SIZE: UVec2 = UVec2::new(120, 60);
@@ -97,7 +97,7 @@ impl SceneHost {
 
 	/// The fork as the store holds it: the record of the session.
 	async fn fork(&self) -> Value {
-		let bytes = self.store.get(&FwdPath::from(FORK)).await.unwrap();
+		let bytes = self.store.get(&FORK).await.unwrap();
 		json_ext::from_slice(&bytes).unwrap()
 	}
 

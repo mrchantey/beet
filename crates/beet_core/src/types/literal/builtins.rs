@@ -547,7 +547,7 @@ mod test {
 		.xpect_eq(Some(fwd_path!("docs/plan.docx")));
 		parse::<WsPath>(Value::str("assets/x"))
 			.unwrap()
-			.xpect_eq(Some(WsPath::from(fwd_path!("assets/x")).unwrap()));
+			.xpect_eq(Some(WsPath::from(fwd_path!("assets/x"))));
 		parse::<WsPath>(Value::str("/assets/x")).unwrap_err();
 		parse::<Duration>(Value::str("50ms"))
 			.unwrap()
@@ -660,6 +660,6 @@ mod test {
 	fn parses_a_workspace_relative_path() {
 		parse::<AbsPath>(Value::str("assets"))
 			.unwrap()
-			.xpect_eq(Some(WsPath::from(fwd_path!("assets")).unwrap().into_abs()));
+			.xpect_eq(Some(WsPath::from(fwd_path!("assets")).into_abs()));
 	}
 }

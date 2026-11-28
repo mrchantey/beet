@@ -141,20 +141,15 @@ impl SocialCards {
 			.with_resource_type::<PackageConfig>()
 	}
 
-	/// The store path of the card for the page at route `path`.
-	///
-	/// # Errors
-	/// Errors only when the card's name is no path, which a route's never is.
-	pub fn card(path: &FwdPath) -> Result<FwdPath> {
-		Self::DIR.try_join(Self::card_name(path))
-	}
-
-	/// The card's file name below [`DIR`](Self::DIR), the route's path with
-	/// `.png` appended, the root's `index.png`.
-	fn card_name(path: &FwdPath) -> String {
-		match path.as_str() {
-			"" => "index.png".into(),
-			path => format!("{path}.png"),
+	/// The store path of the card for the page at route `path`: the route's
+	/// path with `.png` appended below [`DIR`](Self::DIR), the root's
+	/// `index.png`.
+	pub fn card(path: &FwdPath) -> FwdPath {
+		match path.split_last() {
+			Some((parent, last)) => Self::DIR
+				.join(&parent)
+				.join_segment(&path_segment!("{}.png", last)),
+			None => Self::DIR.join_segment(&path_segment!("index.png")),
 		}
 	}
 
@@ -263,7 +258,7 @@ impl SocialCardQuery<'_, '_> {
 		let package = self.syndication.package();
 		SocialCards::previewed(&listed, route)
 			.and_then(|page| {
-				let href = IconSet::href(&SocialCards::card(&page.path).ok()?);
+				let href = IconSet::href(&SocialCards::card(&page.path));
 				let url = package.absolute_url(&href).ok()?;
 				Some((url, CardText::new(&page.meta, package).alt()))
 			})
@@ -363,7 +358,7 @@ impl SocialCardsQuery<'_, '_> {
 	/// the drawing could.
 	fn values(&self, cards: Entity) -> Vec<ProvenanceValue> {
 		self.pages(cards).into_iter().flatten().map(|(page, _)| {
-			let card = format!("{}/{}", SocialCards::DIR, SocialCards::card_name(&page.path));
+			let card = SocialCards::card(&page.path);
 			// a poster url is only ever a video's, so the url implies the badge
 			let media = page.meta.social_image_url().map(|url| url.to_string());
 			let credit = page.meta.credit_line();
@@ -559,7 +554,7 @@ impl CardSet {
 					.transpose()?;
 				let card = Card::new(&font, &self.package, page, media)?
 					.render(&font, &palette, logo.as_deref())?;
-				(SocialCards::card(&page.path)?, card).xok()
+				(SocialCards::card(&page.path), card).xok()
 			})
 			.collect()
 	}

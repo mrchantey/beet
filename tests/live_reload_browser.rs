@@ -129,9 +129,9 @@ async fn probe_fill(page: &Page) -> Result<String> {
 		"getComputedStyle(document.querySelector('.probe')).backgroundColor",
 	)
 	.await?
-	.as_str()
-	.map(str::to_string)
-	.ok_or_else(|| bevyhow!("fill is not a string"))
+	.as_str()?
+	.to_string()
+	.xok()
 }
 
 /// Poll `read` until it yields a value other than `previous`, returning it:
@@ -232,9 +232,9 @@ async fn reloads_on_theme_edit() {
 			"getComputedStyle(document.documentElement).getPropertyValue('--material-tones-primary40').trim()",
 		)
 		.await?
-		.as_str()
-		.map(str::to_string)
-		.ok_or_else(|| bevyhow!("tone is not a string"))
+		.as_str()?
+		.to_string()
+		.xok()
 	};
 	let before = tone().await.unwrap();
 	before.is_empty().xpect_false();

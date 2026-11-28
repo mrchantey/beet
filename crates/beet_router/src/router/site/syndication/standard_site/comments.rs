@@ -333,7 +333,7 @@ mod test {
 			&mut world,
 			(store, Layout::document(fwd_path!("CommentsLayout.bsx")), app_view),
 			rsx! {
-				<StandardSitePub path={fwd_path!("blog")} name="The Full Moon Harvest"/>
+				<StandardSitePub path="blog" name="The Full Moon Harvest"/>
 				<ServerIslands/>
 			},
 		);

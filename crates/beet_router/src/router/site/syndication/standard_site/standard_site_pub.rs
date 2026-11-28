@@ -31,6 +31,20 @@ use beet_net::prelude::*;
 /// `standard_site_extra` feature's Leaflet is off in a served binary) still
 /// builds, the def resolving where the publish step renders it.
 ///
+/// In `rsx!` its [`path`](Self::path) is a literal checked as the code builds:
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_router::prelude::*;
+/// let _ = rsx! { <StandardSitePub path="blog" name="Harvest"/> };
+/// ```
+///
+/// ```compile_fail
+/// # use beet_core::prelude::*;
+/// # use beet_router::prelude::*;
+/// let _ = rsx! { <StandardSitePub path="../blog" name="Harvest"/> };
+/// ```
+///
 /// [`Router`]: crate::prelude::Router
 #[action]
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
