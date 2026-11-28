@@ -19,7 +19,7 @@ use bytes::Bytes;
 /// # async_ext::block_on(async {
 /// let pds = Pds::temp();
 /// let dry = pds.dry();
-/// let collection = Nsid::new_static("com.example.note");
+/// let collection = nsid!("com.example.note");
 /// let rkey = Rkey::parse("first").unwrap();
 /// dry.put_record(&collection, Rkeyed::new(rkey.clone(), value!({ "text": "hi" }).try_into()?))
 /// 	.await?;
@@ -228,7 +228,7 @@ mod test {
 		)
 	}
 
-	const NOTES: Nsid = Nsid::new_static("com.example.note");
+	const NOTES: Nsid = nsid!("com.example.note");
 
 	/// A listing reads the repo beneath with this run's writes and deletes
 	/// laid over it, in rkey order, and the repo beneath is untouched.

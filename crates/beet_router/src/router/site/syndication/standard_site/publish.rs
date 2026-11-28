@@ -475,7 +475,7 @@ mod test {
 	#[beet_core::test]
 	async fn resolves_the_content_format_when_publishing() {
 		let (mut world, router) = site().await;
-		let unknown = Nsid::new_static("com.example.unknown");
+		let unknown = nsid!("com.example.unknown");
 		let body = BsxParser::body(
 			&world,
 			r#"<StandardSitePub path="blog" name="Harvest" content="com.example.unknown"/>"#,

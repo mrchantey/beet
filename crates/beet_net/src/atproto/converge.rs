@@ -153,7 +153,7 @@ impl Pds {
 	/// 	text: String,
 	/// }
 	/// impl AtprotoRecord for Note {
-	/// 	const COLLECTION: Nsid = Nsid::new_static("com.example.note");
+	/// 	const COLLECTION: Nsid = nsid!("com.example.note");
 	/// }
 	/// # async_ext::block_on(async {
 	/// let pds = Pds::temp();
@@ -251,7 +251,7 @@ pub(crate) mod test {
 	}
 
 	impl AtprotoRecord for Doc {
-		const COLLECTION: Nsid = Nsid::new_static("com.example.doc");
+		const COLLECTION: Nsid = nsid!("com.example.doc");
 	}
 
 	/// `rkey` paired with its document.

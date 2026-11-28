@@ -301,6 +301,8 @@ pub mod prelude {
 	#[cfg(feature = "std")]
 	pub use crate::dir;
 	pub use crate::fwd_path;
+	pub use crate::nsid;
+	pub use crate::rkey;
 	pub use crate::path_segment;
 	#[cfg(feature = "rand")]
 	pub use rand::RngExt;

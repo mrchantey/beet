@@ -119,10 +119,15 @@ tid_id!(
 pub struct ActorId(Rkey);
 
 impl ActorId {
-	/// An id from text written in the source, for a constant; each
-	/// constant's test parses it.
-	pub const fn from_static(text: &'static str) -> Self {
-		Self(Rkey::from_static(text))
+	/// The rule an id keeps, an [`Rkey`]'s, see [`Rkey::check`].
+	pub const fn check(text: &str) -> Result<(), &'static str> {
+		Rkey::check(text)
+	}
+
+	/// An id from text [`check`](Self::check) passed, see [`actor_id!`].
+	#[doc(hidden)]
+	pub const fn from_canonical(text: &'static str) -> Self {
+		Self(Rkey::from_canonical(text))
 	}
 
 	/// Parse an id, refusing anything an [`Rkey`] refuses.
@@ -188,6 +193,33 @@ impl std::fmt::Display for ActorId {
 impl std::str::FromStr for ActorId {
 	type Err = BevyError;
 	fn from_str(text: &str) -> Result<Self> { Self::parse(text) }
+}
+
+/// An [`ActorId`] known at compile time, its text a literal or a
+/// `&'static str` constant checked as it compiles.
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_thread::prelude::*;
+/// const COACH: ActorId = actor_id!("coach");
+/// COACH.as_str().xpect_eq("coach");
+/// ```
+///
+/// ```compile_fail
+/// # use beet_core::prelude::*;
+/// # use beet_thread::prelude::*;
+/// actor_id!("Ann Smith");
+/// ```
+#[macro_export]
+macro_rules! actor_id {
+	($text:expr) => {{
+		const _: () = if let ::core::result::Result::Err(reason) =
+			$crate::prelude::ActorId::check($text)
+		{
+			::core::panic!("{}", reason)
+		};
+		$crate::prelude::ActorId::from_canonical($text)
+	}};
 }
 
 #[cfg(test)]

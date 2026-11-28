@@ -6,7 +6,7 @@ use crate::prelude::*;
 /// `org.beet.core#provenance`; without one, its `main`.
 ///
 /// The collection of a record type and the key of a component in a record, so
-/// it is const constructible through [`Nsid::new_static`].
+/// it is const constructible through [`nsid!`].
 ///
 /// ```
 /// # use beet_core::prelude::*;
@@ -36,58 +36,72 @@ impl Nsid {
 	/// The longest nsid the protocol allows, fragment excluded.
 	pub const MAX_LEN: usize = 317;
 
-	/// A const nsid from a literal, unchecked: for a `COLLECTION` or a def's
-	/// key, each covered by a test that parses it.
-	pub const fn new_static(nsid: &'static str) -> Self {
-		Self(SmolStr::new_static(nsid))
+	/// Parse an nsid with an optional `#def` fragment.
+	///
+	/// # Errors
+	/// Errors as [`check`](Self::check) refuses.
+	pub fn parse(text: &str) -> Result<Self> {
+		match Self::check(text) {
+			Ok(()) => Self(SmolStr::new(text)).xok(),
+			Err(reason) => bevybail!("nsid `{text}` {reason}"),
+		}
 	}
 
-	/// Parse an nsid with an optional `#def` fragment.
-	pub fn parse(text: &str) -> Result<Self> {
-		let (nsid, fragment) = match text.split_once('#') {
-			Some((nsid, fragment)) => (nsid, Some(fragment)),
-			None => (text, None),
-		};
-		if nsid.len() > Self::MAX_LEN {
-			bevybail!(
-				"nsid `{text}` is longer than {} characters",
-				Self::MAX_LEN
+	/// The rule an nsid keeps, the one [`parse`](Self::parse) and [`nsid!`]
+	/// check, else which part `text` breaks: a reversed domain of at least
+	/// two segments, a name, then an optional `#` fragment naming a def.
+	pub const fn check(text: &str) -> Result<(), &'static str> {
+		let bytes = text.as_bytes();
+		let mut hash = bytes.len();
+		let mut index = 0;
+		while index < bytes.len() {
+			if bytes[index] == b'#' {
+				hash = index;
+				break;
+			}
+			index += 1;
+		}
+		if hash > Self::MAX_LEN {
+			return Err("is longer than the 317 characters an nsid may hold");
+		}
+		// each `.` ends a domain segment, the end of the nsid its name
+		let mut start = 0;
+		let mut domains = 0;
+		let mut index = 0;
+		while index <= hash {
+			if index == hash {
+				if !Self::is_name(bytes, start, hash) {
+					return Err("has an invalid name: 1 to 63 letters and \
+						digits starting with a letter");
+				}
+			} else if bytes[index] == b'.' {
+				if !Self::is_domain(bytes, start, index, domains == 0) {
+					return Err("has an invalid domain segment: 1 to 63 \
+						letters, digits or `-`, neither starting nor ending \
+						with `-`, the first not starting with a digit");
+				}
+				domains += 1;
+				start = index + 1;
+			}
+			index += 1;
+		}
+		if domains < 2 {
+			return Err(
+				"needs a reversed domain and a name, ie `com.example.thing`",
 			);
 		}
-		let segments = nsid.split('.').collect::<Vec<_>>();
-		let Some((name, authority)) = segments.split_last() else {
-			bevybail!("nsid `{text}` is empty");
-		};
-		if authority.len() < 2 {
-			bevybail!(
-				"nsid `{text}` needs a reversed domain and a name, ie \
-				 `com.example.thing`"
-			);
+		if hash < bytes.len() && !Self::is_name(bytes, hash + 1, bytes.len())
+		{
+			return Err("has an invalid fragment: 1 to 63 letters and digits \
+				starting with a letter");
 		}
-		for (i, segment) in authority.iter().enumerate() {
-			let valid = (1..=63).contains(&segment.len())
-				&& segment
-					.bytes()
-					.all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-				&& !segment.starts_with('-')
-				&& !segment.ends_with('-')
-				&& !(i == 0
-					&& segment.starts_with(|c: char| c.is_ascii_digit()));
-			if !valid {
-				bevybail!(
-					"nsid `{text}` has an invalid domain segment `{segment}`"
-				);
-			}
-		}
-		for segment in core::iter::once(*name).chain(fragment) {
-			if !Self::is_name(segment) {
-				bevybail!(
-					"nsid `{text}` has an invalid name `{segment}`: letters \
-					 and digits starting with a letter"
-				);
-			}
-		}
-		Self(SmolStr::new(text)).xok()
+		Ok(())
+	}
+
+	/// An nsid from text [`check`](Self::check) passed, see [`nsid!`].
+	#[doc(hidden)]
+	pub const fn from_canonical(text: &'static str) -> Self {
+		Self(SmolStr::new_static(text))
 	}
 
 	/// The reversed domain authority, ie `site.standard` of
@@ -116,11 +130,74 @@ impl Nsid {
 		self.0.split('#').next().unwrap_or_default()
 	}
 
-	fn is_name(segment: &str) -> bool {
-		(1..=63).contains(&segment.len())
-			&& segment.starts_with(|c: char| c.is_ascii_alphabetic())
-			&& segment.bytes().all(|byte| byte.is_ascii_alphanumeric())
+	/// Whether `bytes[start..end]` is a name: 1 to 63 letters and digits
+	/// starting with a letter.
+	const fn is_name(bytes: &[u8], start: usize, end: usize) -> bool {
+		if end <= start || end - start > 63 || !bytes[start].is_ascii_alphabetic()
+		{
+			return false;
+		}
+		let mut index = start;
+		while index < end {
+			if !bytes[index].is_ascii_alphanumeric() {
+				return false;
+			}
+			index += 1;
+		}
+		true
 	}
+
+	/// Whether `bytes[start..end]` is a domain segment: 1 to 63 letters,
+	/// digits or `-`, neither starting nor ending with `-`, and the `first`
+	/// not starting with a digit.
+	const fn is_domain(
+		bytes: &[u8],
+		start: usize,
+		end: usize,
+		first: bool,
+	) -> bool {
+		if end <= start
+			|| end - start > 63
+			|| bytes[start] == b'-'
+			|| bytes[end - 1] == b'-'
+			|| (first && bytes[start].is_ascii_digit())
+		{
+			return false;
+		}
+		let mut index = start;
+		while index < end {
+			if !(bytes[index].is_ascii_alphanumeric() || bytes[index] == b'-') {
+				return false;
+			}
+			index += 1;
+		}
+		true
+	}
+}
+
+/// An [`Nsid`] known at compile time, its text a literal or a `&'static str`
+/// constant checked as it compiles.
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// const POST: Nsid = nsid!("app.bsky.feed.post");
+/// POST.name().xpect_eq("post");
+/// ```
+///
+/// ```compile_fail
+/// # use beet_core::prelude::*;
+/// nsid!("beet.org");
+/// ```
+#[macro_export]
+macro_rules! nsid {
+	($text:expr) => {{
+		const _: () = if let ::core::result::Result::Err(reason) =
+			$crate::prelude::Nsid::check($text)
+		{
+			::core::panic!("{}", reason)
+		};
+		$crate::prelude::Nsid::from_canonical($text)
+	}};
 }
 
 #[cfg(test)]
@@ -139,7 +216,14 @@ mod test {
 
 	#[crate::test]
 	fn rejects_malformed() {
-		Nsid::parse("com.example").unwrap_err();
+		Nsid::parse("com.example")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("reversed domain");
+		Nsid::parse(&format!("{}.example.foo", "a".repeat(320)))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("longer than");
 		Nsid::parse("com.example.foo-bar").unwrap_err();
 		Nsid::parse("com.example.3foo").unwrap_err();
 		Nsid::parse("1com.example.foo").unwrap_err();

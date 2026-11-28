@@ -13,7 +13,7 @@ use crate::prelude::*;
 /// ```
 /// # use beet_core::prelude::*;
 /// let member = OpenUnion::new(
-/// 	Nsid::new_static("app.bsky.embed.external"),
+/// 	nsid!("app.bsky.embed.external"),
 /// 	value!({ "uri": "https://beet.org" }),
 /// )
 /// .unwrap();
@@ -129,7 +129,7 @@ mod test {
 			.to_string()
 			.xpect_contains("$type");
 		OpenUnion::new(
-			Nsid::new_static("com.example.a"),
+			nsid!("com.example.a"),
 			value!({ "$type": "com.example.b" }),
 		)
 		.unwrap_err()

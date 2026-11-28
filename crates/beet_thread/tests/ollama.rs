@@ -193,19 +193,19 @@ async fn compaction_refresh_on_a_local_model() {
 		})
 		.await
 		.unwrap();
-	let ann = ActorId::from_static("ann");
+	let ann = actor_id!("ann");
 	let coach = app
 		.world_mut()
 		.query::<(Entity, &ActorRef)>()
 		.iter(app.world())
-		.find(|(_, actor)| actor.0 == ActorId::from_static("coach"))
+		.find(|(_, actor)| actor.0 == actor_id!("coach"))
 		.unwrap()
 		.0;
 	let say = |app: &mut App, text: &str| -> Post {
 		let mut entity = app.world_mut().entity_mut(window);
 		let thread = entity.get::<Thread>().unwrap().id();
 		let post = AgentPost::new_text(
-			ActorId::from_static("ann"),
+			actor_id!("ann"),
 			thread,
 			text,
 			PostStatus::Completed,

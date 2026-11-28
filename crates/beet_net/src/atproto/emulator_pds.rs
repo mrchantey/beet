@@ -378,7 +378,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	fn collection() -> Nsid { Nsid::new_static("com.example.card") }
+	fn collection() -> Nsid { nsid!("com.example.card") }
 	fn rkey(key: &str) -> Rkey { Rkey::parse(key).unwrap() }
 
 	/// A fresh repo in each storage format this build can write: DAG-CBOR,
@@ -651,7 +651,7 @@ mod test {
 				.unwrap();
 			}
 			pds.put_record(
-				&Nsid::new_static("com.example.other"),
+				&nsid!("com.example.other"),
 				record("z", value!({})),
 			)
 			.await

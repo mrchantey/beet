@@ -68,13 +68,13 @@ impl Actor {
 
 impl ActorId {
 	/// The id of [`Actor::system`].
-	pub const SYSTEM: Self = Self::from_static("system");
+	pub const SYSTEM: Self = actor_id!("system");
 	/// The id of [`Actor::developer`].
-	pub const DEVELOPER: Self = Self::from_static("developer");
+	pub const DEVELOPER: Self = actor_id!("developer");
 	/// The id of [`Actor::user`].
-	pub const USER: Self = Self::from_static("user");
+	pub const USER: Self = actor_id!("user");
 	/// The id of [`Actor::agent`].
-	pub const AGENT: Self = Self::from_static("agent");
+	pub const AGENT: Self = actor_id!("agent");
 }
 
 impl TableStoreRow for Actor {
@@ -140,24 +140,6 @@ impl ActorKind {
 			ActorKind::Developer => "developer",
 			ActorKind::User => "human",
 			ActorKind::Agent => "agent",
-		}
-	}
-}
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
-
-	#[beet_core::test]
-	fn builtin_ids_parse() {
-		for id in [
-			ActorId::SYSTEM,
-			ActorId::DEVELOPER,
-			ActorId::USER,
-			ActorId::AGENT,
-		] {
-			ActorId::parse(id.as_str()).unwrap().xpect_eq(id);
 		}
 	}
 }

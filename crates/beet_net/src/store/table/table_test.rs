@@ -72,7 +72,7 @@ pub struct Note {
 }
 
 impl AtprotoRecord for Note {
-	const COLLECTION: Nsid = Nsid::new_static("com.example.note");
+	const COLLECTION: Nsid = nsid!("com.example.note");
 }
 
 /// A record body naming another collection than its own.
@@ -84,7 +84,7 @@ pub struct Mislabeled {
 }
 
 impl AtprotoRecord for Mislabeled {
-	const COLLECTION: Nsid = Nsid::new_static("com.example.note");
+	const COLLECTION: Nsid = nsid!("com.example.note");
 }
 
 /// Values in ascending order, every kind an index holds, ties across

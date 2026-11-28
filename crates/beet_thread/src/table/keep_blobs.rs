@@ -122,7 +122,7 @@ mod test {
 		}
 		let robot = request_test::actor_entity(
 			&mut app,
-			&ActorId::from_static("robot"),
+			&actor_id!("robot"),
 		);
 
 		for turn in 0..TURNS {
@@ -130,7 +130,7 @@ mod test {
 			let thread = entity.get::<Thread>().unwrap().id();
 			entity.get_mut::<ThreadRecords>().unwrap().upsert_post(
 				AgentPost::new_media(
-					ActorId::from_static("camera"),
+					actor_id!("camera"),
 					thread,
 					MediaType::Png,
 					vec![turn as u8; 1024],

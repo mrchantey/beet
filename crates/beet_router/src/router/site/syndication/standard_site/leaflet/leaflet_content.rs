@@ -12,7 +12,7 @@ pub struct LeafletContent {
 
 impl LeafletContent {
 	/// The def a document's `content` names this format by.
-	pub const NSID: Nsid = Nsid::new_static("pub.leaflet.content");
+	pub const NSID: Nsid = nsid!("pub.leaflet.content");
 }
 
 /// `pub.leaflet.pages.linearDocument`: one page, its blocks top to bottom.
@@ -323,21 +323,21 @@ impl LeafletFacetFeature {
 	pub fn nsid(&self) -> Nsid {
 		match self {
 			Self::Link { .. } => {
-				Nsid::new_static("pub.leaflet.richtext.facet#link")
+				nsid!("pub.leaflet.richtext.facet#link")
 			}
-			Self::Bold => Nsid::new_static("pub.leaflet.richtext.facet#bold"),
+			Self::Bold => nsid!("pub.leaflet.richtext.facet#bold"),
 			Self::Italic => {
-				Nsid::new_static("pub.leaflet.richtext.facet#italic")
+				nsid!("pub.leaflet.richtext.facet#italic")
 			}
-			Self::Code => Nsid::new_static("pub.leaflet.richtext.facet#code"),
+			Self::Code => nsid!("pub.leaflet.richtext.facet#code"),
 			Self::Highlight => {
-				Nsid::new_static("pub.leaflet.richtext.facet#highlight")
+				nsid!("pub.leaflet.richtext.facet#highlight")
 			}
 			Self::Underline => {
-				Nsid::new_static("pub.leaflet.richtext.facet#underline")
+				nsid!("pub.leaflet.richtext.facet#underline")
 			}
 			Self::Strikethrough => {
-				Nsid::new_static("pub.leaflet.richtext.facet#strikethrough")
+				nsid!("pub.leaflet.richtext.facet#strikethrough")
 			}
 			Self::Unknown(member) => member.r#type().clone(),
 		}

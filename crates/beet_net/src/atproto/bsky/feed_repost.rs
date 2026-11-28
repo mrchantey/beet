@@ -17,7 +17,7 @@ pub struct FeedRepost {
 }
 
 impl AtprotoRecord for FeedRepost {
-	const COLLECTION: Nsid = Nsid::new_static("app.bsky.feed.repost");
+	const COLLECTION: Nsid = nsid!("app.bsky.feed.repost");
 }
 
 impl FeedRepost {

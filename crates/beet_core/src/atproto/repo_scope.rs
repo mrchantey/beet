@@ -22,7 +22,7 @@ pub struct SpaceRef {
 impl SpaceRef {
 	/// The type every package's space shares, so one consent covers every
 	/// package of an account.
-	pub const PACKAGE: Nsid = Nsid::new_static("org.beet.space.package");
+	pub const PACKAGE: Nsid = nsid!("org.beet.space.package");
 
 	/// The space of `type` keyed `key`.
 	pub fn new(r#type: Nsid, key: Rkey) -> Self { Self { r#type, key } }

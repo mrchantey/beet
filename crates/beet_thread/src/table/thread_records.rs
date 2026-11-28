@@ -1243,7 +1243,7 @@ mod test {
 		world.spawn((Thread::default(), children![
 			Actor::new("Ann", ActorKind::User).unwrap(),
 			Actor::new_with_id(
-				ActorId::from_static("ann"),
+				actor_id!("ann"),
 				"Annie",
 				ActorKind::User,
 			),
@@ -1261,7 +1261,7 @@ mod test {
 	#[beet_core::test]
 	fn upsert_appends_then_replaces() {
 		let thread = ThreadId::now();
-		let author = ActorId::from_static("author");
+		let author = actor_id!("author");
 		let mut records = ThreadRecords::new();
 		records.insert_actor(Actor::new_with_id(
 			author.clone(),
@@ -1294,8 +1294,8 @@ mod test {
 	#[beet_core::test]
 	fn model_order_pairs_each_call_with_its_output() {
 		let thread = ThreadId::now();
-		let person = ActorId::from_static("person");
-		let agent = ActorId::from_static("agent");
+		let person = actor_id!("person");
+		let agent = actor_id!("agent");
 		let mut records = ThreadRecords::new();
 		records.insert_actor(Actor::new_with_id(
 			person.clone(),
@@ -1476,7 +1476,7 @@ mod test {
 			.unwrap()
 			.xpect_eq(ActorId::AGENT);
 		records
-			.author(Some(&ActorId::from_static("nobody")))
+			.author(Some(&actor_id!("nobody")))
 			.unwrap_err();
 	}
 }

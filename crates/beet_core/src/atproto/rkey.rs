@@ -30,35 +30,72 @@ impl Rkey {
 	pub const MAX_LEN: usize = 512;
 
 	/// The key of a one-per-repo record, ie a profile.
-	pub const SELF: Self = Self::from_static("self");
-
-	/// An rkey from text written in the source, for a constant: unchecked,
-	/// so each constant's test parses its text ([`Self::parse`]).
-	pub const fn from_static(text: &'static str) -> Self {
-		Self(SmolStr::new_static(text))
-	}
+	pub const SELF: Self = rkey!("self");
 
 	/// Parse an rkey, refusing any character a repo path could not hold.
+	///
+	/// # Errors
+	/// Errors as [`check`](Self::check) refuses.
 	pub fn parse(text: &str) -> Result<Self> {
-		if !(1..=Self::MAX_LEN).contains(&text.len()) {
-			bevybail!(
-				"rkey `{text}` must be 1 to {} characters",
-				Self::MAX_LEN
-			);
+		match Self::check(text) {
+			Ok(()) => Self(SmolStr::new(text)).xok(),
+			Err(reason) => bevybail!("rkey `{text}` {reason}"),
 		}
-		if text == "." || text == ".." {
-			bevybail!("rkey `{text}` is a relative path segment");
-		}
-		if let Some(char) = text.chars().find(|char| {
-			!(char.is_ascii_alphanumeric()
-				|| matches!(char, '.' | '_' | ':' | '~' | '-'))
-		}) {
-			bevybail!(
-				"rkey `{text}` contains `{char}`: only `A-Za-z0-9._:~-` are allowed"
-			);
-		}
-		Self(SmolStr::new(text)).xok()
 	}
+
+	/// The rule an rkey keeps, the one [`parse`](Self::parse) and [`rkey!`]
+	/// check, else which part `text` breaks.
+	pub const fn check(text: &str) -> Result<(), &'static str> {
+		let bytes = text.as_bytes();
+		if bytes.is_empty() || bytes.len() > Self::MAX_LEN {
+			return Err("must be 1 to 512 characters");
+		}
+		if matches!(bytes, [b'.'] | [b'.', b'.']) {
+			return Err("is a relative path segment");
+		}
+		let mut index = 0;
+		while index < bytes.len() {
+			let byte = bytes[index];
+			if !(byte.is_ascii_alphanumeric()
+				|| matches!(byte, b'.' | b'_' | b':' | b'~' | b'-'))
+			{
+				return Err("holds a character outside `A-Za-z0-9._:~-`");
+			}
+			index += 1;
+		}
+		Ok(())
+	}
+
+	/// An rkey from text [`check`](Self::check) passed, see [`rkey!`].
+	#[doc(hidden)]
+	pub const fn from_canonical(text: &'static str) -> Self {
+		Self(SmolStr::new_static(text))
+	}
+}
+
+/// An [`Rkey`] known at compile time, its text a literal or a `&'static str`
+/// constant checked as it compiles.
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// const PROFILE: Rkey = rkey!("self");
+/// PROFILE.as_str().xpect_eq("self");
+/// ```
+///
+/// ```compile_fail
+/// # use beet_core::prelude::*;
+/// rkey!("a/b");
+/// ```
+#[macro_export]
+macro_rules! rkey {
+	($text:expr) => {{
+		const _: () = if let ::core::result::Result::Err(reason) =
+			$crate::prelude::Rkey::check($text)
+		{
+			::core::panic!("{}", reason)
+		};
+		$crate::prelude::Rkey::from_canonical($text)
+	}};
 }
 
 impl From<Tid> for Rkey {
@@ -77,15 +114,9 @@ mod test {
 		Rkey::parse("a b")
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("` `");
+			.xpect_contains("outside `A-Za-z0-9._:~-`");
 		Rkey::parse(&"a".repeat(513)).unwrap_err();
 		Rkey::parse("nsid:app.bsky.feed.post~1").unwrap();
 	}
 
-	#[crate::test]
-	fn constants_parse() {
-		Rkey::parse(Rkey::SELF.as_str())
-			.unwrap()
-			.xpect_eq(Rkey::SELF);
-	}
 }

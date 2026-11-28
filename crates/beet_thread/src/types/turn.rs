@@ -298,7 +298,7 @@ mod test {
 		let seed = seed.map(String::from);
 		(
 			Actor::new_with_id(
-				ActorId::from_static("actor-1"),
+				actor_id!("actor-1"),
 				"Person",
 				ActorKind::User,
 			),
@@ -321,7 +321,7 @@ mod test {
 	) -> impl Bundle {
 		(
 			Actor::new_with_id(
-				ActorId::from_static(id),
+				ActorId::parse(id).unwrap(),
 				"Agent",
 				ActorKind::Agent,
 			),
@@ -431,7 +431,7 @@ mod test {
 		let id = entity.get::<Thread>().unwrap().id();
 		entity.get_mut::<ThreadRecords>().unwrap().upsert_post(
 			AgentPost::new_text(
-				ActorId::from_static("actor-1"),
+				actor_id!("actor-1"),
 				id,
 				text,
 				PostStatus::Completed,
@@ -452,7 +452,7 @@ mod test {
 		app.world_mut()
 			.query::<(Entity, &ActorRef)>()
 			.iter(app.world())
-			.find(|(_, actor)| actor.0 == ActorId::from_static(id))
+			.find(|(_, actor)| actor.0 == ActorId::parse(id).unwrap())
 			.unwrap()
 			.0
 	}
@@ -487,7 +487,7 @@ mod test {
 		records
 			.model_posts(
 				&records.shown(..),
-				&ActorId::from_static("agent-2"),
+				&actor_id!("agent-2"),
 				None,
 			)
 			.iter()

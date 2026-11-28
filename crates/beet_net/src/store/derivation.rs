@@ -1127,7 +1127,7 @@ mod test {
 		let store = BlobStore::temp();
 		let pds = Pds::temp();
 		world.spawn(pds.clone());
-		let collection = Nsid::new_static("org.example.note");
+		let collection = nsid!("org.example.note");
 		let rkey = Rkey::parse("self").unwrap();
 		let put = async |text: &str| {
 			let body = value!({ "text": text }).try_into().unwrap();

@@ -224,7 +224,7 @@ mod test {
 				Thread::default(),
 				MountThreadStore::new(RECORDS),
 				children![Actor::new_with_id(
-					ActorId::from_static(id),
+					ActorId::parse(id).unwrap(),
 					name,
 					ActorKind::User,
 				)],
@@ -293,8 +293,8 @@ mod test {
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn reload_continues_without_duplicating() {
 		let store = BlobStore::temp();
-		let system = ActorId::from_static("actor-1");
-		let agent = ActorId::from_static("actor-2");
+		let system = actor_id!("actor-1");
+		let agent = actor_id!("actor-2");
 
 		run_once(&store, system.clone(), agent.clone());
 		stored_threads(&store).await.xpect_eq(1);
@@ -310,8 +310,8 @@ mod test {
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn a_direct_call_enters_before_running() {
 		let store = BlobStore::temp();
-		let system = ActorId::from_static("actor-3");
-		let agent = ActorId::from_static("actor-4");
+		let system = actor_id!("actor-3");
+		let agent = actor_id!("actor-4");
 
 		// seed the store through a normal start: the system seed plus one reply
 		run_once(&store, system.clone(), agent.clone());

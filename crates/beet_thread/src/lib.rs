@@ -17,6 +17,7 @@ mod types;
 pub mod ui;
 
 pub mod prelude {
+	pub use crate::actor_id;
 	pub use crate::o11s;
 	pub use crate::partial::*;
 	#[cfg(feature = "agent")]

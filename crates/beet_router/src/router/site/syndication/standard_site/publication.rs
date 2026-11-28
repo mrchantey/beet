@@ -40,7 +40,7 @@ pub struct StandardSitePublication {
 }
 
 impl AtprotoRecord for StandardSitePublication {
-	const COLLECTION: Nsid = Nsid::new_static("site.standard.publication");
+	const COLLECTION: Nsid = nsid!("site.standard.publication");
 }
 
 impl StandardSitePublication {

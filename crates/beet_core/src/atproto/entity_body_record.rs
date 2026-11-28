@@ -15,7 +15,7 @@ use alloc::collections::BTreeMap;
 ///
 /// ```
 /// # use beet_core::prelude::*;
-/// let mut body = EntityBodyRecord::new(Nsid::new_static("org.beet.entity"));
+/// let mut body = EntityBodyRecord::new(nsid!("org.beet.entity"));
 /// body.insert(&Provenance::default()).unwrap();
 /// body.get::<Provenance>().unwrap().xpect_eq(Provenance::default());
 /// let value = AtprotoValue::from(body.clone());
@@ -234,9 +234,9 @@ mod test {
 	#[crate::test]
 	fn writes_flat_and_sorted() {
 		let mut body =
-			EntityBodyRecord::new(Nsid::new_static("org.beet.entity"));
+			EntityBodyRecord::new(nsid!("org.beet.entity"));
 		body.insert_value(
-			Nsid::new_static("com.example.plugin#zed"),
+			nsid!("com.example.plugin#zed"),
 			value!({ "scale": 0.5 }).try_into().unwrap(),
 		);
 		body.insert(&Provenance {

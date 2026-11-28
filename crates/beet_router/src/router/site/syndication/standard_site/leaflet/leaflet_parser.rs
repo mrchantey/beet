@@ -276,13 +276,13 @@ enum LeafletDef {
 	Iframe,
 }
 
-const TEXT: Nsid = Nsid::new_static("pub.leaflet.blocks.text");
-const IMAGE: Nsid = Nsid::new_static("pub.leaflet.blocks.image");
+const TEXT: Nsid = nsid!("pub.leaflet.blocks.text");
+const IMAGE: Nsid = nsid!("pub.leaflet.blocks.image");
 const UNORDERED_LIST: Nsid =
-	Nsid::new_static("pub.leaflet.blocks.unorderedList");
-const ORDERED_LIST: Nsid = Nsid::new_static("pub.leaflet.blocks.orderedList");
+	nsid!("pub.leaflet.blocks.unorderedList");
+const ORDERED_LIST: Nsid = nsid!("pub.leaflet.blocks.orderedList");
 const UNORDERED_LIST_ITEM: Nsid =
-	Nsid::new_static("pub.leaflet.blocks.unorderedList#listItem");
+	nsid!("pub.leaflet.blocks.unorderedList#listItem");
 
 impl LeafletDef {
 	const ALL: [Self; 14] = [
@@ -306,26 +306,26 @@ impl LeafletDef {
 		match self {
 			Self::Content => LeafletContent::NSID,
 			Self::LinearDocument => {
-				Nsid::new_static("pub.leaflet.pages.linearDocument")
+				nsid!("pub.leaflet.pages.linearDocument")
 			}
 			Self::Text => TEXT,
-			Self::Header => Nsid::new_static("pub.leaflet.blocks.header"),
+			Self::Header => nsid!("pub.leaflet.blocks.header"),
 			Self::Blockquote => {
-				Nsid::new_static("pub.leaflet.blocks.blockquote")
+				nsid!("pub.leaflet.blocks.blockquote")
 			}
-			Self::Code => Nsid::new_static("pub.leaflet.blocks.code"),
+			Self::Code => nsid!("pub.leaflet.blocks.code"),
 			Self::HorizontalRule => {
-				Nsid::new_static("pub.leaflet.blocks.horizontalRule")
+				nsid!("pub.leaflet.blocks.horizontalRule")
 			}
 			Self::UnorderedList => UNORDERED_LIST,
 			Self::OrderedList => ORDERED_LIST,
 			Self::UnorderedListItem => UNORDERED_LIST_ITEM,
 			Self::OrderedListItem => {
-				Nsid::new_static("pub.leaflet.blocks.orderedList#listItem")
+				nsid!("pub.leaflet.blocks.orderedList#listItem")
 			}
 			Self::Image => IMAGE,
-			Self::Website => Nsid::new_static("pub.leaflet.blocks.website"),
-			Self::Iframe => Nsid::new_static("pub.leaflet.blocks.iframe"),
+			Self::Website => nsid!("pub.leaflet.blocks.website"),
+			Self::Iframe => nsid!("pub.leaflet.blocks.iframe"),
 		}
 	}
 }

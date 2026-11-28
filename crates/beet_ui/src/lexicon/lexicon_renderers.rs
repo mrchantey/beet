@@ -140,7 +140,7 @@ mod test {
 	}
 
 	impl LexiconRenderer for Plain {
-		fn nsid(&self) -> Nsid { Nsid::new_static(self.nsid) }
+		fn nsid(&self) -> Nsid { Nsid::parse(self.nsid).unwrap() }
 
 		fn render(&mut self, cx: &mut RenderContext) -> Result<OpenUnion> {
 			let mut text = PlainTextRenderer::default();
@@ -163,10 +163,10 @@ mod test {
 	struct Liar;
 
 	impl LexiconRenderer for Liar {
-		fn nsid(&self) -> Nsid { Nsid::new_static("com.example.liar") }
+		fn nsid(&self) -> Nsid { nsid!("com.example.liar") }
 
 		fn render(&mut self, _cx: &mut RenderContext) -> Result<OpenUnion> {
-			OpenUnion::new(Nsid::new_static("com.example.other"), value!({}))
+			OpenUnion::new(nsid!("com.example.other"), value!({}))
 		}
 	}
 
@@ -262,7 +262,7 @@ mod test {
 			.xpect_eq(Value::from("last"));
 		// replaced, not registered beside it, and sorted with the built-ins
 		world.resource::<LexiconRenderers>().available().xpect_eq(
-			[Nsid::new_static("com.example.a")]
+			[nsid!("com.example.a")]
 				.into_iter()
 				// the built-in, installed with the scene serializer
 				.chain(cfg!(feature = "scene").then_some(SceneBody::NSID))

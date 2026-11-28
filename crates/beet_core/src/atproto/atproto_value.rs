@@ -56,7 +56,7 @@ pub struct AtprotoValue(Value);
 
 impl AtprotoValue {
 	/// The def a float crosses into the data model as.
-	pub const FLOAT: Nsid = Nsid::new_static("org.beet.core#float");
+	pub const FLOAT: Nsid = nsid!("org.beet.core#float");
 
 	/// A value read off the network, already in the data model, refused when
 	/// it breaks a rule: a float or a raw byte string anywhere (no wire form
@@ -436,7 +436,7 @@ mod test {
 
 	#[crate::test]
 	fn types_a_record_body() {
-		let collection = Nsid::new_static("com.example.note");
+		let collection = nsid!("com.example.note");
 		AtprotoValue::try_from(value!({ "text": "hi" }))
 			.unwrap()
 			.into_record(&collection)

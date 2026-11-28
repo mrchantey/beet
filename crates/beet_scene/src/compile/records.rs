@@ -23,7 +23,7 @@ macro_rules! entity_record {
 		}
 
 		impl AtprotoRecord for $name {
-			const COLLECTION: Nsid = Nsid::new_static($collection);
+			const COLLECTION: Nsid = nsid!($collection);
 		}
 
 		impl EntityCollection for $name {
@@ -192,7 +192,7 @@ mod test {
 			.with(&BlobRef::of(b"body", MediaType::Postcard))
 			.unwrap();
 		body.insert_value(
-			Nsid::new_static("com.example.plugin#route"),
+			nsid!("com.example.plugin#route"),
 			value!({ "scale": 0.5 }).try_into().unwrap(),
 		);
 		let record = SceneRecord::accept(body).unwrap();

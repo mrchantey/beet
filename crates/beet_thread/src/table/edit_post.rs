@@ -322,8 +322,8 @@ mod test {
 	use beet_net::prelude::*;
 	use std::sync::Arc;
 
-	const ANN: ActorId = ActorId::from_static("ann");
-	const BOB: ActorId = ActorId::from_static("bob");
+	const ANN: ActorId = actor_id!("ann");
+	const BOB: ActorId = actor_id!("bob");
 
 	/// An app over a table store at `root`.
 	fn app() -> (App, Entity) {
@@ -755,7 +755,7 @@ mod test {
 	}
 
 	#[cfg(feature = "agent")]
-	const COACH: ActorId = ActorId::from_static("coach");
+	const COACH: ActorId = actor_id!("coach");
 
 	/// Push `post` to `window`'s records, answering it.
 	fn push(app: &mut App, window: Entity, post: Post) -> Post {

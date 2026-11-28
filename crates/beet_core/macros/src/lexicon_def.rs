@@ -28,7 +28,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	Ok(quote! {
 		impl #impl_generics #beet_core::prelude::LexiconDef for #ident #type_generics #where_clause {
 			const NSID: #beet_core::prelude::Nsid =
-				#beet_core::prelude::Nsid::new_static(#nsid);
+				#beet_core::prelude::nsid!(#nsid);
 		}
 	})
 }

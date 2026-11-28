@@ -665,14 +665,14 @@ mod test {
 				children![(Thread::default(), mount, children![
 					(
 						Actor::new_with_id(
-							ActorId::from_static("actor-1"),
+							actor_id!("actor-1"),
 							"System",
 							ActorKind::System,
 						),
 						children![seed],
 					),
 					Actor::new_with_id(
-						ActorId::from_static("actor-2"),
+						actor_id!("actor-2"),
 						"Person",
 						ActorKind::User,
 					),

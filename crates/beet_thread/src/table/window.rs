@@ -227,7 +227,7 @@ mod test {
 			Thread::default(),
 			MountThreadStore::new(fwd_path!("threads")),
 			children![Actor::new_with_id(
-				ActorId::from_static("actor-1"),
+				actor_id!("actor-1"),
 				"Person",
 				ActorKind::User,
 			)],
@@ -235,7 +235,7 @@ mod test {
 		if agent {
 			window.with_child((
 				Actor::new_with_id(
-					ActorId::from_static("actor-2"),
+					actor_id!("actor-2"),
 					"Agent",
 					ActorKind::Agent,
 				),
@@ -269,7 +269,7 @@ mod test {
 	/// The person of every window.
 	fn person() -> Actor {
 		Actor::new_with_id(
-			ActorId::from_static("actor-1"),
+			actor_id!("actor-1"),
 			"Person",
 			ActorKind::User,
 		)
@@ -324,7 +324,7 @@ mod test {
 		let id = entity.get::<Thread>().unwrap().id();
 		entity.get_mut::<ThreadRecords>().unwrap().upsert_post(
 			AgentPost::new_text(
-				ActorId::from_static("actor-1"),
+				actor_id!("actor-1"),
 				id,
 				text,
 				PostStatus::Completed,
@@ -400,7 +400,7 @@ mod test {
 		enter(&mut app, second).await.unwrap();
 		let id = app.world().get::<Thread>(first).unwrap().id();
 		let mut streaming = AgentPost::new_text(
-			ActorId::from_static("actor-1"),
+			actor_id!("actor-1"),
 			id,
 			"hel",
 			PostStatus::InProgress,
@@ -572,8 +572,8 @@ mod test {
 				.map(|post| post.author().clone())
 				.collect::<Vec<_>>()
 				.xpect_eq(vec![
-					ActorId::from_static("actor-1"),
-					ActorId::from_static("actor-2"),
+					actor_id!("actor-1"),
+					actor_id!("actor-2"),
 				]);
 		}
 	}

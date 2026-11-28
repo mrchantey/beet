@@ -503,7 +503,7 @@ mod test {
 					.into_iter()
 					.flat_map(|cause| {
 						["author", "editor", "agent"].map(|actor| {
-							(ActorId::from_static(actor), Some(cause.clone()))
+							(ActorId::parse(actor).unwrap(), Some(cause.clone()))
 						})
 					})
 					.collect::<Vec<_>>(),

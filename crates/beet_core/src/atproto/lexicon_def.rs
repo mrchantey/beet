@@ -87,10 +87,6 @@ mod test {
 			.xpect_eq("org.beet.core#loadSetsLike");
 		Thing::NSID.as_str().xpect_eq("com.example.plugin#thing");
 		Record::NSID.as_str().xpect_eq("com.example.record");
-		// every derived name is a valid nsid
-		for nsid in [LoadSetsLike::NSID, Thing::NSID, Record::NSID] {
-			Nsid::parse(nsid.as_str()).unwrap();
-		}
 	}
 
 	#[crate::test]

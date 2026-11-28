@@ -31,7 +31,7 @@ use core::fmt;
 /// # use beet_net::prelude::*;
 /// # async_ext::block_on(async {
 /// let pds = Pds::temp();
-/// let collection = Nsid::new_static("com.example.note");
+/// let collection = nsid!("com.example.note");
 /// let rkey = Rkey::parse("first").unwrap();
 /// let written = pds
 /// 	.put_record(&collection, Rkeyed::new(rkey.clone(), value!({ "text": "hi" }).try_into()?))

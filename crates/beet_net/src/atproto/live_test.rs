@@ -17,7 +17,7 @@ const BEET_ORG: &str = "did:plc:vgxy56shhs3t3b2mu2avizjf";
 #[beet_core::test(timeout_ms = 30_000)]
 async fn a_live_record_cid_matches() {
 	let entry = Pds::new(XrpcPds::new(Did::parse(BEET_ORG).unwrap()))
-		.get_record(&Nsid::new_static("app.bsky.actor.profile"), &Rkey::SELF)
+		.get_record(&nsid!("app.bsky.actor.profile"), &Rkey::SELF)
 		.await
 		.unwrap()
 		.unwrap();
@@ -54,7 +54,7 @@ async fn resolves_live_handles() {
 async fn a_read_only_repo_refuses_writes() {
 	Pds::new(XrpcPds::new(Did::parse(BEET_ORG).unwrap()))
 		.put_record(
-			&Nsid::new_static("com.example.doc"),
+			&nsid!("com.example.doc"),
 			Rkeyed::new(
 				Rkey::parse("never").unwrap(),
 				value!({}).try_into().unwrap(),

@@ -222,7 +222,7 @@ mod test {
 		ThreadRecords::reduce_now(app.world_mut());
 		let agent = request_test::actor_entity(
 			&mut app,
-			&ActorId::from_static("looker"),
+			&actor_id!("looker"),
 		);
 		(app, window, agent)
 	}
@@ -233,7 +233,7 @@ mod test {
 		let thread = window.get::<Thread>().unwrap().id();
 		window.get_mut::<ThreadRecords>().unwrap().upsert_post(
 			AgentPost::new_media(
-				ActorId::from_static("ann"),
+				actor_id!("ann"),
 				thread,
 				MediaType::Png,
 				bytes.to_vec(),

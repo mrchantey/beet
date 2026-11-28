@@ -417,7 +417,7 @@ async fn long_chat_compacts_on_the_mock() {
 		.world_mut()
 		.query_once::<(Entity, &ActorRef)>()
 		.into_iter()
-		.find(|(_, actor)| actor.0 == ActorId::from_static("agent"))
+		.find(|(_, actor)| actor.0 == actor_id!("agent"))
 		.unwrap()
 		.0;
 	// a person says enough for the agent's context to pass `at`
@@ -426,7 +426,7 @@ async fn long_chat_compacts_on_the_mock() {
 		let thread = entity.get::<Thread>().unwrap().id();
 		entity.get_mut::<ThreadRecords>().unwrap().upsert_post(
 			AgentPost::new_text(
-				ActorId::from_static("user"),
+				actor_id!("user"),
 				thread,
 				format!("TURN-{turn} {}", "a long thought ".repeat(60)),
 				PostStatus::Completed,
@@ -440,7 +440,7 @@ async fn long_chat_compacts_on_the_mock() {
 	}
 	let records = app.world().get::<ThreadRecords>(window).unwrap();
 	let compaction = records
-		.compaction(&ActorId::from_static("agent"))
+		.compaction(&actor_id!("agent"))
 		.unwrap()
 		.clone();
 	compaction
@@ -450,7 +450,7 @@ async fn long_chat_compacts_on_the_mock() {
 		.xpect_eq("THE-SUMMARY");
 	let shown = records.shown(..);
 	let read = records
-		.model_posts(&shown, &ActorId::from_static("agent"), None)
+		.model_posts(&shown, &actor_id!("agent"), None)
 		.into_iter()
 		.map(|item| match item {
 			ModelPost::Note(note) => note,

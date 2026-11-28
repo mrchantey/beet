@@ -12,7 +12,7 @@ pub struct EmbedExternal {
 
 impl EmbedExternal {
 	/// The def a post's `embed` union names this member by.
-	pub const NSID: Nsid = Nsid::new_static("app.bsky.embed.external");
+	pub const NSID: Nsid = nsid!("app.bsky.embed.external");
 
 	/// The card for `external`.
 	pub fn new(external: External) -> Self { Self { external } }

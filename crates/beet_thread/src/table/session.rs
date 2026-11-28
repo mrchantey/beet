@@ -141,9 +141,9 @@ mod test {
 	const DAY: i64 = 24 * HOUR;
 	/// How long ago the stored thread of [`away`] was last posted in.
 	const AWAY: i64 = 2 * DAY + 3 * HOUR + MINUTE;
-	const PERSON: ActorId = ActorId::from_static("person");
-	const COACH: ActorId = ActorId::from_static("coach");
-	const EDITOR: ActorId = ActorId::from_static("editor");
+	const PERSON: ActorId = actor_id!("person");
+	const COACH: ActorId = actor_id!("coach");
+	const EDITOR: ActorId = actor_id!("editor");
 
 	#[beet_core::test]
 	fn gaps_read_in_two_units() {
@@ -482,7 +482,7 @@ mod test {
 			let mut window = app.world_mut().entity_mut(window);
 			let thread = window.get::<Thread>().unwrap().id();
 			let mut records = window.get_mut::<ThreadRecords>().unwrap();
-			let other = ActorId::from_static("other");
+			let other = actor_id!("other");
 			records.insert_actor(Actor::system());
 			records.insert_actor(Actor::new_with_id(
 				other.clone(),

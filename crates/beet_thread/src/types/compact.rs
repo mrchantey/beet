@@ -845,8 +845,8 @@ pub(crate) mod test {
 	#[require(Action<(), Outcome> = Action::new_async(bail))]
 	struct Bail;
 
-	pub(crate) const ANN: ActorId = ActorId::from_static("ann");
-	pub(crate) const COACH: ActorId = ActorId::from_static("coach");
+	pub(crate) const ANN: ActorId = actor_id!("ann");
+	pub(crate) const COACH: ActorId = actor_id!("coach");
 
 	/// A conversation whose root holds the store its compactors are documents of.
 	pub(crate) struct Chat {
@@ -1610,7 +1610,7 @@ pub(crate) mod test {
 	/// bounds nothing of the other's context.
 	#[beet_core::test]
 	async fn two_agents_compact_apart() {
-		let mentor = ActorId::from_static("mentor");
+		let mentor = actor_id!("mentor");
 		let mut chat = Chat::of(r#"<Thread {(Sequence, MountThreadStore{path:"chat"})}>
 	<CreateActor name="Ann" kind="User"/>
 	<CreateActor name="Coach" kind="Agent" {(MockPostStreamer{custom_response:"ok"}, Compact{template:Document("Fixed.bsx"), at:200, keep:60})}/>

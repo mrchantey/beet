@@ -142,7 +142,7 @@ impl PartialEq for SceneBody {
 impl SceneBody {
 	/// The def a scene body is as an atproto lexicon object, the `$type` a
 	/// structured document carries to say it is one.
-	pub const NSID: Nsid = Nsid::new_static("org.beet.scene#body");
+	pub const NSID: Nsid = nsid!("org.beet.scene#body");
 
 	/// Whether `value` is a body: an object whose `$type` names one.
 	pub fn is_body(value: &Value) -> bool {

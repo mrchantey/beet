@@ -83,7 +83,7 @@ pub struct StandardSiteDocument {
 }
 
 impl AtprotoRecord for StandardSiteDocument {
-	const COLLECTION: Nsid = Nsid::new_static("site.standard.document");
+	const COLLECTION: Nsid = nsid!("site.standard.document");
 }
 
 impl StandardSiteDocument {
@@ -267,7 +267,7 @@ mod test {
 			text_content: Some("One language.\nOne paradigm.".into()),
 			content: Some(
 				OpenUnion::new(
-					Nsid::new_static("pub.leaflet.content"),
+					nsid!("pub.leaflet.content"),
 					value!({ "pages": [] }),
 				)
 				.unwrap(),

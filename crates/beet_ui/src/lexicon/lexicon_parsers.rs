@@ -158,7 +158,7 @@ mod test {
 	struct List;
 
 	impl LexiconParser for List {
-		fn nsid(&self) -> Nsid { Nsid::new_static("com.example.list") }
+		fn nsid(&self) -> Nsid { nsid!("com.example.list") }
 
 		fn parse(&mut self, mut cx: LexiconParseContext) -> Result {
 			cx.entity.insert(Element::new("ul"));
@@ -181,7 +181,7 @@ mod test {
 	struct Item(&'static str);
 
 	impl LexiconParser for Item {
-		fn nsid(&self) -> Nsid { Nsid::new_static("com.example.item") }
+		fn nsid(&self) -> Nsid { nsid!("com.example.item") }
 
 		fn parse(&mut self, cx: LexiconParseContext) -> Result {
 			let text = cx.member.fields().get("text")?.as_str()?.to_string();
@@ -272,7 +272,7 @@ mod test {
 			.xpect_eq("last x\n");
 		// replaced, not registered beside it, and sorted with the built-ins
 		world.resource::<LexiconParsers>().available().xpect_eq(
-			[Nsid::new_static("com.example.item")]
+			[nsid!("com.example.item")]
 				.into_iter()
 				// the built-in, installed with the scene serializer
 				.chain(cfg!(feature = "scene").then_some(SceneBody::NSID))
@@ -295,7 +295,7 @@ mod test {
 			&mut world,
 			entity,
 			&RequestParts::default(),
-			&Nsid::new_static("com.example.poll"),
+			&nsid!("com.example.poll"),
 		)
 		.unwrap()
 		.xmap(Value::from)
