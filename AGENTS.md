@@ -71,7 +71,7 @@ Situational cheatsheets, read before touching the subsystem:
 - unit tests belong at the bottom of the file; the need for integration tests is rare
 - Quality over quantity, only test what needs testing (not accessors or builders). No `test` prefix: `adds_numbers`, not `test_adds_numbers`.
 - Matchers chain: `some().long().chain().xpect_contains("foo").xnot().xpect_contains("bar")`. They never replace `.unwrap()`/`.unwrap_err()` when you just want the value.
-- scene tests: `scene_ext::test_world()` (the minimal scene plugin set), insert required resources, then `world.spawn_scene(rsx!{ <div/> }).unwrap()`
+- scene tests: `ScenePlugin::world()` (any plugin set's `world()`, ie `<(ScenePlugin, DocumentPlugin)>::world()`), insert required resources, then `world.spawn_template(rsx!{ <div/> }).unwrap()`
 - by default only test files are logged; use `--log-cases` to see individual cases
 - site docs: `cargo run -p beet-cli -- check site` lints every route after a change under `site/`.
 

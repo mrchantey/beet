@@ -94,6 +94,14 @@ pub(crate) enum TestFail {
 		/// starving it, often the cause rather than this test.
 		stalls: Vec<RunnerStall>,
 	},
+	/// The test passed, but code it ran faulted outside its catch scope: a
+	/// panic in a task it spawned, or an error its world's default handler
+	/// only logged.
+	#[cfg(all(feature = "std", feature = "testing"))]
+	Escaped {
+		/// Each escape's payload and location.
+		escapes: Vec<String>,
+	},
 }
 
 impl TestFail {
@@ -140,6 +148,18 @@ impl Into<TestOutcome> for TestSkip {
 impl TestOutcome {
 	/// Returns `true` if this is a fail outcome.
 	pub fn is_fail(&self) -> bool { matches!(self, TestOutcome::Fail(_)) }
+
+	/// A pass becomes a fail when anything escaped in the test's `scope`.
+	#[cfg(all(feature = "std", feature = "testing"))]
+	pub fn with_escapes(self, scope: TestScope) -> Self {
+		match self {
+			TestOutcome::Pass => match PanicContext::escaped_in(scope) {
+				escapes if escapes.is_empty() => TestOutcome::Pass,
+				escapes => TestFail::Escaped { escapes }.into(),
+			},
+			other => other,
+		}
+	}
 
 	/// Returns `true` if this is a skip outcome.
 	pub fn is_skip(&self) -> bool { matches!(self, TestOutcome::Skip(_)) }

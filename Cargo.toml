@@ -264,6 +264,14 @@ rusqlite = { version = "0.40", default-features = false, features = ["bundled", 
 # the deflate an Office part is stored under (`beet_ui`'s `ooxml`): pure rust
 # (`miniz_oxide`) rather than a zlib link, so it builds on every target.
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+# zstd, under `beet_core`'s `jsonl` (`jsonl_ext`'s `.jsonl.zst`). The C library
+# natively (default-features off drops the legacy formats and the dictionary
+# builder) and `ruzstd`, the pure-rust port of the same format, on wasm: its
+# encoder only reaches the fastest level, so the C library carries the archive
+# grade levels where it can build. `zstdmt` lets the slow level spread a large
+# object over every core.
+zstd = { version = "0.14", default-features = false, features = ["zstdmt"] }
+ruzstd = { version = "0.9", default-features = false, features = ["std", "hash"] }
 # The zip an Office file is (`beet_ui`'s `ooxml` package, `OpcPackage`): only
 # deflate, through the pure rust `flate2` above, so it builds on every target;
 # the other codecs and encryption an Office file never uses stay off.
@@ -406,6 +414,8 @@ serde = ["beet_core/serde", "beet_action?/serde", "beet_net?/serde", "beet_route
 nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
 json = ["serde", "beet_core/json", "beet_net?/json", "beet_scene?/json", "beet_router?/json"]
+# JSONL, a JSON value per line, and its zstd compressed `.jsonl.zst`.
+jsonl = ["json", "beet_core/jsonl"]
 # Canonical DAG-CBOR through `MediaType::DagCbor`, and with it the atproto data
 # model's providers and records: the `Pds` family and `<AtprotoAccount/>`
 # (`beet_net`), the standard.site records (`beet_router`). No network.

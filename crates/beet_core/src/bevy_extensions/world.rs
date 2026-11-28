@@ -118,8 +118,18 @@ pub impl World {
 		err: BevyError,
 		location: &'static Location<'static>,
 	) {
+		let name = format!("{}\nat {:?}", TypeName::of::<F>(), location);
+		// under the test runner an error the default handler only logs fails
+		// the test that raised it; a panicking one the hook records, and a
+		// world with a handler of its own has handled it
+		#[cfg(feature = "testing")]
+		if matches!(err.severity(), bevy::ecs::error::Severity::Error)
+			&& !self.contains_resource::<bevy::ecs::error::FallbackErrorHandler>()
+		{
+			PanicContext::record_unhandled(format!("{name}: {err}"));
+		}
 		self.fallback_error_handler()(err.into(), ErrorContext::Command {
-			name: format!("{}\nat {:?}", TypeName::of::<F>(), location).into(),
+			name: name.into(),
 		});
 	}
 

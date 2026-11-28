@@ -171,6 +171,9 @@ serde = [
 # Plaintext (de)serialization for `MediaType::Text` via serde_plain.
 serde_plain = ["serde", "dep:serde_plain"]
 json = ["serde"]
+# JSONL, a JSON value per line (`MediaType::Jsonl`, `jsonl_ext`), and its zstd
+# compressed `.jsonl.zst`, each through its target table below.
+jsonl = ["std", "json", "dep:zstd", "dep:ruzstd"]
 postcard = ["serde", "dep:postcard"]
 # TOML through `MediaType::Toml`'s serde dispatch, values only.
 toml = ["serde", "dep:toml"]
@@ -338,7 +341,14 @@ notify = { version = "8", optional = true }
 notify-debouncer-full = { version = "0.7", optional = true }
 ctrlc = { version = "3", optional = true }
 
+# the zstd C library, `jsonl`'s native backend. Hosted targets only: a bare
+# metal build (`target_os = "none"`) has no libc for it to compile against.
+[target.'cfg(all(not(target_arch = "wasm32"), not(target_os = "none")))'.dependencies]
+zstd = { workspace = true, optional = true }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+# the pure-rust zstd, `jsonl`'s backend where the C library cannot build.
+ruzstd = { workspace = true, optional = true }
 # force getrandom 0.3's `wasm_js` (WebCrypto) backend into the graph. The wasm
 # rustflags select that backend unconditionally (see `.cargo/config.toml`), so any
 # wasm build with getrandom anywhere in its graph — ahash pulls 0.3 even when

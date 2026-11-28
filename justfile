@@ -406,8 +406,15 @@ test-core-wasm *args:
 # The facade feature set `beet_esp` builds for the ESP32-S3 must keep every beet
 # crate std-free. A host build links std regardless, so a feature that drags in a
 # `std` (ie a non-weak `beet_ui/..` forward reaching the std-only `beet_ui`) only
-# fails on bare metal; resolving the target graph catches it without the esp
-# toolchain. Proc macros run on the host, so their std is excluded.
+# fails on bare metal. Two checks, neither needing the esp toolchain:
+# - resolving the target graph names a beet crate's `std` turned on (proc macros
+#   run on the host, so their std is excluded);
+# - compiling the set for `thumbv7em-none-eabihf`, a bare-metal target with a
+#   prebuilt `core`, catches std-only code inside a crate (ie `f64::fract`) and
+#   fails on any warning. `quickjs`/`scripting` are left out of it: they compile
+#   QuickJS's C sources, which need the target's C toolchain, and `beet_esp`'s
+#   own `check-all` builds them. getrandom's `custom` backend is selected as the
+#   firmware selects it, its entropy symbol only needed at link.
 check-embedded:
 	#!/usr/bin/env bash
 	set -euo pipefail
@@ -415,6 +422,12 @@ check-embedded:
 	tree="cargo tree -p beet --no-default-features --features $features --target xtensa-esp32s3-none-elf -e features,normal,no-proc-macro"
 	if $tree | grep -E 'beet[a-z_]* feature "std"'; then
 		echo "the embedded feature set enables a beet crate's std, trace it with: $tree -i <crate>"
+		exit 1
+	fi
+	rust_features=embedded,bevy_color,scene,json,net,action,mdns,rand,router_embedded,sockets,testing_embedded
+	log=$(RUSTFLAGS='--cfg getrandom_backend="custom"' cargo check -p beet --no-default-features --features $rust_features --target thumbv7em-none-eabihf 2>&1) || { echo "$log"; exit 1; }
+	if grep -E '^(warning|error)' <<<"$log" | grep -v 'future version of Rust'; then
+		echo "$log"
 		exit 1
 	fi
 	echo "PASS check-embedded"

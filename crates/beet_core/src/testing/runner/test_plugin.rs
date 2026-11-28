@@ -127,6 +127,8 @@ impl Plugin for TestPlugin {
 					// in turn, so the second sees the slots the first took
 					run_tests_series,
 					run_non_send_tests_series,
+					#[cfg(all(feature = "std", feature = "testing"))]
+					fail_late_escapes,
 					insert_suite_outcome,
 					log_case_outcomes,
 					log_file_outcomes,

@@ -307,17 +307,32 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// Call `entity`, dropping the call after a few milliseconds, then settle
-	/// long enough for anything still running to land.
-	async fn drop_call(world: &mut World, entity: Entity) {
+	/// Call `entity`, dropping the call once `deepest` has one in flight, then
+	/// settle long enough for anything still running to land.
+	async fn drop_call(world: &mut World, entity: Entity, deepest: Entity) {
 		world
 			.run_async_then(move |world| async move {
-				async_ext::timeout(
-					Duration::from_millis(5),
-					world.entity(entity).call::<(), Outcome>(()),
+				let in_flight = async {
+					while !world
+						.entity(deepest)
+						.get::<ActionCalls, _>(|calls| !calls.is_empty())
+						.await
+						.unwrap_or(false)
+					{
+						time_ext::sleep_millis(1).await;
+					}
+				};
+				futures_lite::future::or(
+					async {
+						world.entity(entity).call::<(), Outcome>(()).await.xmap(Some)
+					},
+					async {
+						in_flight.await;
+						None
+					},
 				)
 				.await
-				.xpect_err();
+				.xpect_none();
 			})
 			.await;
 		test_support::settle(world, 80).await;
@@ -330,7 +345,7 @@ mod test {
 		let entity = world
 			.spawn(test_support::sleep_then_set(30, landed.clone()))
 			.id();
-		drop_call(&mut world, entity).await;
+		drop_call(&mut world, entity, entity).await;
 		landed.get().xpect_false();
 		world.get::<ActionCalls>(entity).unwrap().len().xpect_eq(0);
 	}
@@ -350,7 +365,7 @@ mod test {
 				},
 			))
 			.id();
-		drop_call(&mut world, outer).await;
+		drop_call(&mut world, outer, inner).await;
 		landed.get().xpect_false();
 		world.get::<ActionCalls>(inner).unwrap().len().xpect_eq(0);
 	}

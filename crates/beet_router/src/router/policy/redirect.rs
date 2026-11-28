@@ -132,9 +132,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-	use bevy::ecs::error::ErrorContext;
-	use bevy::ecs::error::FallbackErrorHandler;
-	use std::sync::Mutex;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
@@ -251,9 +248,8 @@ mod test {
 	fn collision_with_real_route_errors() {
 		let mut world = router_world();
 		// the rebuild raises through the command error handler, which panics by
-		// default; swap in the recorder so the message can be asserted.
-		*LAST_ERROR.lock().unwrap() = None;
-		world.insert_resource(FallbackErrorHandler(record_error));
+		// default; record it so the message can be asserted.
+		RaisedErrors::record(&mut world);
 		let root = world.spawn(Router).flush();
 		world
 			.spawn_template(Snippet::from_bundle((ChildOf(root), rsx! {
@@ -269,21 +265,8 @@ mod test {
 			PageRoute,
 		));
 		world.flush();
-		LAST_ERROR
-			.lock()
-			.unwrap()
-			.clone()
-			.unwrap()
+		RaisedErrors::take()
+			.join("\n")
 			.xpect_contains("Duplicate route");
-	}
-
-	/// The message the [`collision_with_real_route_errors`] handler swallowed. A
-	/// [`FallbackErrorHandler`] is a bare fn pointer with nowhere to capture, so
-	/// it lands here.
-	static LAST_ERROR: Mutex<Option<String>> = Mutex::new(None);
-
-	/// Records a raised command error instead of panicking on it.
-	fn record_error(err: BevyError, _: ErrorContext) {
-		*LAST_ERROR.lock().unwrap() = Some(err.to_string());
 	}
 }

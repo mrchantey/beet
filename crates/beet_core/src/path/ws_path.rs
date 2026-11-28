@@ -15,8 +15,11 @@ use core::str::FromStr;
 ///
 /// ```rust
 /// # use beet_core::prelude::*;
-/// let path = WsPath::new("crates/beet_core/Cargo.toml").unwrap();
+/// // a path below the root, as `file!()` names a source file
+/// WsPath::new("crates/beet_core/src/lib.rs").unwrap();
+/// // never one outside it
 /// WsPath::new("/etc/hosts").unwrap_err();
+/// WsPath::new("../elsewhere").unwrap_err();
 /// ```
 #[derive(
 	Debug,

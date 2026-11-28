@@ -9,6 +9,11 @@ pub mod test_ext;
 mod test_fut;
 pub use test_desc_ext::*;
 pub use test_fut::*;
+/// Errors a test expects raised through a world's error handler.
+#[cfg(all(feature = "std", feature = "testing"))]
+mod raised_errors;
+#[cfg(all(feature = "std", feature = "testing"))]
+pub use raised_errors::*;
 /// Panic handling utilities.
 pub mod panic_ext;
 /// Utilities for testing panics across file boundaries.

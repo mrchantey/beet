@@ -563,6 +563,9 @@ impl AsyncSpawner {
 		Fut: 'static + MaybeSend + Future<Output = ()>,
 	{
 		let task = AsyncTask::new();
+		// a test's fault on whatever thread polls this is still that test's
+		#[cfg(feature = "testing")]
+		let fut = TestScope::propagate(fut);
 		let fut: SpawnFut = Box::pin(self.count(task.wrap(fut)));
 		match &self.0.backend {
 			#[cfg(feature = "std")]
@@ -591,6 +594,8 @@ impl AsyncSpawner {
 		Fut: 'static + Future<Output = ()>,
 	{
 		let task = AsyncTask::new();
+		#[cfg(feature = "testing")]
+		let fut = TestScope::propagate(fut);
 		let fut: SpawnLocalFut = Box::pin(self.count(task.wrap(fut)));
 		match &self.0.backend {
 			#[cfg(feature = "std")]
@@ -1193,7 +1198,15 @@ pub impl AsyncWorld {
 		err: BevyError,
 		location: &'static Location<'static>,
 	) -> impl Future<Output = ()> + Send {
+		// raised here, handled wherever the world drains its queue
+		#[cfg(feature = "testing")]
+		let scope = TestScope::current();
 		self.with(move |world| {
+			#[cfg(feature = "testing")]
+			TestScope::enter(scope, || {
+				world.handle_command_error_with_location::<F>(err, location)
+			});
+			#[cfg(not(feature = "testing"))]
 			world.handle_command_error_with_location::<F>(err, location);
 		})
 	}

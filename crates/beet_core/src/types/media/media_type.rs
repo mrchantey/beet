@@ -35,6 +35,8 @@ pub enum MediaType {
 	Xml,
 	/// `application/json`
 	Json,
+	/// `application/jsonl`, one JSON value per line (`jsonl_ext`)
+	Jsonl,
 	/// `application/manifest+json` — the web app manifest a `<link
 	/// rel="manifest">` names.
 	WebManifest,
@@ -170,6 +172,7 @@ pub enum MediaType {
 impl MediaType {
 	// ── Canonical strings ──────────────────────────────────────────
 	const JSON: &'static str = "application/json";
+	const JSONL: &'static str = "application/jsonl";
 	const POSTCARD: &'static str = "application/vnd.postcard";
 	const DAG_CBOR: &'static str = "application/vnd.ipld.dag-cbor";
 	const TEXT: &'static str = "text/plain";
@@ -259,6 +262,8 @@ impl MediaType {
 			val if val.contains(Self::XLSX) => MediaType::Xlsx,
 			val if val.contains(Self::PPTX) => MediaType::Pptx,
 			val if val.contains(Self::WEB_MANIFEST) => MediaType::WebManifest,
+			// before json, whose name is a prefix of it
+			val if val.contains(Self::JSONL) => MediaType::Jsonl,
 			val if val.contains(Self::JSON) => MediaType::Json,
 			val if val.contains(Self::POSTCARD) => MediaType::Postcard,
 			val if val.contains(Self::DAG_CBOR) => MediaType::DagCbor,
@@ -355,7 +360,8 @@ impl MediaType {
 			"html" | "htm" => MediaType::Html,
 			"css" => MediaType::Css,
 			"js" | "mjs" | "cjs" => MediaType::Javascript,
-			"json" | "jsonl" | "geojson" => MediaType::Json,
+			"json" | "geojson" => MediaType::Json,
+			"jsonl" => MediaType::Jsonl,
 			"webmanifest" => MediaType::WebManifest,
 			"xml" | "xsl" | "xsd" => MediaType::Xml,
 			"url" => MediaType::Url,
@@ -426,6 +432,7 @@ impl MediaType {
 			MediaType::Css => Some("css"),
 			MediaType::Javascript => Some("js"),
 			MediaType::Json => Some("json"),
+			MediaType::Jsonl => Some("jsonl"),
 			MediaType::WebManifest => Some("webmanifest"),
 			MediaType::Xml => Some("xml"),
 			MediaType::Markdown => Some("md"),
@@ -510,6 +517,7 @@ impl MediaType {
 			MediaType::Html => Self::HTML,
 			MediaType::Xml => Self::XML,
 			MediaType::Json => Self::JSON,
+			MediaType::Jsonl => Self::JSONL,
 			MediaType::WebManifest => Self::WEB_MANIFEST,
 			MediaType::Postcard => Self::POSTCARD,
 			MediaType::DagCbor => Self::DAG_CBOR,
@@ -573,12 +581,13 @@ impl MediaType {
 		}
 	}
 
-	/// Whether this is a structured serde format, ie json, postcard, toml or
-	/// DAG-CBOR.
+	/// Whether this is a structured serde format, ie json, jsonl, postcard,
+	/// toml or DAG-CBOR.
 	pub fn is_serializable(&self) -> bool {
 		matches!(
 			self,
 			MediaType::Json
+				| MediaType::Jsonl
 				| MediaType::Postcard
 				| MediaType::Toml
 				| MediaType::DagCbor
@@ -606,6 +615,7 @@ impl MediaType {
 				| MediaType::Html
 				| MediaType::Xml
 				| MediaType::Json
+				| MediaType::Jsonl
 				| MediaType::WebManifest
 				| MediaType::Markdown
 				| MediaType::Mdx
@@ -703,6 +713,9 @@ mod test {
 	fn from_content_type_json() {
 		MediaType::from_content_type("application/json")
 			.xpect_eq(MediaType::Json);
+		// json's name is a prefix of jsonl's
+		MediaType::from_content_type("application/jsonl")
+			.xpect_eq(MediaType::Jsonl);
 	}
 
 	#[crate::test]
@@ -785,6 +798,7 @@ mod test {
 		MediaType::from_extension("css").xpect_eq(MediaType::Css);
 		MediaType::from_extension("js").xpect_eq(MediaType::Javascript);
 		MediaType::from_extension("json").xpect_eq(MediaType::Json);
+		MediaType::from_extension("jsonl").xpect_eq(MediaType::Jsonl);
 		// the manifest type must not be swallowed by the `json` substring match
 		MediaType::from_extension("webmanifest")
 			.xpect_eq(MediaType::WebManifest);

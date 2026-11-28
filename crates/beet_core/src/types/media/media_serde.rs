@@ -12,7 +12,7 @@
 //! # }
 //! ```
 //!
-//! Each format rides its own feature (`json`, `toml`, `postcard`,
+//! Each format rides its own feature (`json`, `jsonl`, `toml`, `postcard`,
 //! `serde_plain`, `dag_cbor`), and a build without it answers the same
 //! "feature is required" error from every caller, so a disabled format fails
 //! identically everywhere. Why RON is none of them is written once, in
@@ -154,6 +154,7 @@ impl MediaType {
 	/// |----------------------|----------|-----------------|
 	/// | `Text`               | plain    | `serde_plain`   |
 	/// | `Json`               | JSON     | `json`          |
+	/// | `Jsonl`              | JSON, a value per line | `jsonl` |
 	/// | `Toml`               | TOML     | `toml`          |
 	/// | `Yaml`               | YAML, frontmatter's subset | `serde` |
 	/// | `DagCbor`            | DAG-CBOR | `dag_cbor`      |
@@ -197,6 +198,20 @@ impl MediaType {
 						let _ = (value, options);
 						bevybail!(
 							"The `json` feature is required for JSON serialization"
+						)
+					}
+				}
+			}
+			MediaType::Jsonl => {
+				cfg_if! {
+					if #[cfg(feature = "jsonl")] {
+						// one compact line per value, so pretty is moot
+						let _ = options;
+						jsonl_ext::serialize(value)
+					} else {
+						let _ = (value, options);
+						bevybail!(
+							"The `jsonl` feature is required for JSONL serialization"
 						)
 					}
 				}
@@ -283,6 +298,7 @@ impl MediaType {
 	/// |----------------------|----------|-----------------|
 	/// | `Text`               | plain    | `serde_plain`   |
 	/// | `Json`               | JSON     | `json`          |
+	/// | `Jsonl`              | JSON, a value per line | `jsonl` |
 	/// | `Toml`               | TOML     | `toml`          |
 	/// | `Yaml`               | YAML, frontmatter's subset | `serde` |
 	/// | `DagCbor`            | DAG-CBOR | `dag_cbor`      |
@@ -317,6 +333,18 @@ impl MediaType {
 						let _ = bytes;
 						bevybail!(
 							"The `json` feature is required for JSON deserialization"
+						)
+					}
+				}
+			}
+			MediaType::Jsonl => {
+				cfg_if! {
+					if #[cfg(feature = "jsonl")] {
+						jsonl_ext::deserialize(bytes)
+					} else {
+						let _ = bytes;
+						bevybail!(
+							"The `jsonl` feature is required for JSONL deserialization"
 						)
 					}
 				}

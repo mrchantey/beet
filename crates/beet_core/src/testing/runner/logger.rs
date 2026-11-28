@@ -197,6 +197,18 @@ pub(super) fn log_suite_outcome(
 				}
 			}
 		}
+		if !outcome.unattributed().is_empty() {
+			out.push(String::new());
+			out.push(
+				TermStyle::red()
+					.or_plain(color)
+					.paint("Faults outside every test, which fail the suite:"),
+			);
+			out.extend(
+				outcome.unattributed().iter().map(|text| format!("- {text}")),
+			);
+			out.push(String::new());
+		}
 		out.push(run_stats(outcome, config));
 		crate::cross_log!("\n{}\n", out.join("\n"));
 	}
@@ -380,6 +392,15 @@ fn fail_reason(outcome: &TestFail, color: bool) -> String {
 					)
 				}));
 			}
+			lines.join("\n")
+		}
+		#[cfg(all(feature = "std", feature = "testing"))]
+		TestFail::Escaped { escapes } => {
+			let mut lines = vec![bold.paint(
+				"Passed, but faulted outside its catch scope (a spawned task, \
+				 an unhandled error):",
+			)];
+			lines.extend(escapes.iter().map(|text| format!("- {text}")));
 			lines.join("\n")
 		}
 	}

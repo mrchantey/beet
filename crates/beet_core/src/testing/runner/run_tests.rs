@@ -174,6 +174,12 @@ fn run_test(
 	}
 	let should_panic = test.should_panic;
 	let started = Instant::now();
+	// the test's own code runs in its scope, so a fault it causes outside its
+	// catch scope (a spawned task, an unhandled error) fails it
+	#[cfg(all(feature = "std", feature = "testing"))]
+	let scope = TestScope::new();
+	#[cfg(all(feature = "std", feature = "testing"))]
+	let func = move || TestScope::enter(Some(scope), func);
 	// a sync test runs to its end here, on the thread every test shares
 	let TestRunResult {
 		maybe_async,
@@ -184,15 +190,21 @@ fn run_test(
 	commands
 		.entity(entity)
 		.insert((params, TestRunning { started }));
+	#[cfg(all(feature = "std", feature = "testing"))]
+	commands.entity(entity).insert(scope);
 
 	match maybe_async {
 		MaybeAsync::Sync(panic_result) => {
 			let outcome =
 				TestOutcome::from_panic_result(panic_result, should_panic);
+			#[cfg(all(feature = "std", feature = "testing"))]
+			let outcome = outcome.with_escapes(scope);
 			commands.entity(entity).insert(outcome);
 			Started::Sync.xok()
 		}
 		MaybeAsync::Async(panic_result_fut) => {
+			#[cfg(all(feature = "std", feature = "testing"))]
+			let panic_result_fut = scope.scope(panic_result_fut);
 			let panic_result_fut =
 				stalls.watch(test.name.as_slice(), panic_result_fut);
 			// a world task: the test future is `!Send`, so it cannot ride a
@@ -201,6 +213,8 @@ fn run_test(
 				let result = panic_result_fut.await;
 				let outcome =
 					TestOutcome::from_panic_result(result, should_panic);
+				#[cfg(all(feature = "std", feature = "testing"))]
+				let outcome = outcome.with_escapes(scope);
 				// Don't clobber a `TestOutcome` already set this frame (eg a
 				// timeout); a test that finishes after timing out stays a timeout.
 				world

@@ -36,6 +36,9 @@ mod into_option;
 /// JSON text for any serde type, through beet's own reader and writer.
 #[cfg(feature = "serde")]
 pub mod json_ext;
+/// JSONL, one JSON value per line, and its zstd compressed form.
+#[cfg(feature = "jsonl")]
+pub mod jsonl_ext;
 mod type_filter;
 // LazyPool is built on async_lock (std-only).
 #[cfg(feature = "rand")]
@@ -47,6 +50,9 @@ mod line_col;
 mod once_value;
 #[cfg(any(feature = "std", feature = "testing_embedded"))]
 mod panic_context;
+/// The test a thread runs code for, followed into the tasks it spawns.
+#[cfg(all(feature = "std", feature = "testing"))]
+mod test_scope;
 /// Poll a function until it finishes or a deadline expires.
 #[cfg(feature = "std")]
 pub mod poll_ext;
@@ -108,6 +114,8 @@ pub use line_col::*;
 pub use once_value::*;
 #[cfg(any(feature = "std", feature = "testing_embedded"))]
 pub(crate) use panic_context::*;
+#[cfg(all(feature = "std", feature = "testing"))]
+pub use test_scope::*;
 #[cfg(feature = "rand")]
 pub use secure_random::*;
 pub use timestamp::*;

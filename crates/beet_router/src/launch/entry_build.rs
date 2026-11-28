@@ -722,8 +722,20 @@ mod test {
 			.iter(&world)
 			.count();
 		calls.xpect_eq(2);
-		AsyncRunner::settle_async_tasks(&mut world).await;
-		world.resource::<Messages<AppExit>>().len().xpect_eq(calls);
+		// frame by frame rather than a settle, which stops at the first exit
+		// while the other root's call may still be running, read through a
+		// cursor since the message buffer drops what two updates have passed
+		let mut cursor = world.resource::<Messages<AppExit>>().get_cursor();
+		let mut exits = 0;
+		for _ in 0..1_000 {
+			exits += cursor.read(world.resource::<Messages<AppExit>>()).count();
+			if exits >= calls {
+				break;
+			}
+			world.update_local();
+			AsyncRunner::tick(&world).await;
+		}
+		exits.xpect_eq(calls);
 	}
 
 	/// The entry's declared document lands in the process environment as the

@@ -534,12 +534,15 @@ mod test {
 			.xpect_none();
 	}
 
+	/// A future that never finishes, so the timer is the only one ready: a
+	/// finite sleep races the timer whenever the runner's thread is held past
+	/// both, and `race` picks between ready futures at random.
 	#[crate::test]
 	async fn timeout_exceeds_timeout() {
-		async_ext::timeout(Duration::from_millis(10), async {
-			time_ext::sleep(Duration::from_millis(1000)).await;
-			42
-		})
+		async_ext::timeout(
+			Duration::from_millis(10),
+			futures_lite::future::pending::<u32>(),
+		)
 		.await
 		.unwrap_err()
 		.xpect_eq(async_ext::TimeoutError);

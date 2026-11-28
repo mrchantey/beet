@@ -41,14 +41,28 @@ thread_local! {
 static INITIALIZED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
 /// Panics that escaped every catch scope (or were swallowed by a task runner
-/// before reaching one), stamped with the instant they fired. Attribution under
-/// concurrent tests is genuinely ambiguous, so timeout reports include the
-/// entries from their window unattributed rather than guessing an owner. The
-/// buffer is never drained: concurrent suites each read the window they
-/// observed via [`PanicContext::escaped_since`].
-#[cfg(feature = "std")]
-static ESCAPED: std::sync::Mutex<Vec<(Instant, String)>> =
+/// before reaching one) and unhandled errors, each stamped with the instant it
+/// fired and the [`TestScope`] it fired in, so the runner fails the test that
+/// caused it. The buffer is never drained: concurrent suites each read the
+/// window they observed.
+#[cfg(all(feature = "std", any(feature = "testing", feature = "testing_embedded")))]
+static ESCAPED: std::sync::Mutex<Vec<Escape>> =
 	std::sync::Mutex::new(Vec::new());
+
+/// One entry of the escape buffer, kept only where the runner reads it.
+#[cfg(all(feature = "std", any(feature = "testing", feature = "testing_embedded")))]
+struct Escape {
+	/// When it fired.
+	at: Instant,
+	/// Its payload and location.
+	text: String,
+	/// The test whose code it fired in, `None` outside every test.
+	#[cfg(feature = "testing")]
+	scope: Option<TestScope>,
+	/// Fired inside a [`TestScope::expect_escapes`] scope.
+	#[cfg(feature = "testing")]
+	expected: bool,
+}
 
 /// Cross-platform method for capturing panic info, including in
 /// non-unwind contexts like wasm. See [`Self::catch`]
@@ -252,6 +266,11 @@ impl PanicContext {
 	}
 
 	/// `payload at location`, with a placeholder for a non-string payload.
+	#[cfg(any(
+		feature = "testing",
+		feature = "testing_embedded",
+		target_arch = "wasm32"
+	))]
 	fn describe(payload: Option<String>, location: Option<FileSpan>) -> String {
 		let payload =
 			payload.unwrap_or_else(|| "opaque panic payload".to_string());
@@ -264,20 +283,33 @@ impl PanicContext {
 	/// Formats and appends an escaped panic to the suite-wide buffer.
 	///
 	/// No-op until [`Self::init`] has installed the test hook, so a production
-	/// app with panicking tasks never grows the buffer.
+	/// app with panicking tasks never grows the buffer, and outside a test
+	/// build, which has no runner to read it.
 	fn buffer_escaped(payload: Option<String>, location: Option<FileSpan>) {
 		if INITIALIZED.get().is_none() {
 			return;
 		}
-		let text = Self::describe(payload, location);
-		// stamped before the lock: a panic inside the guard's scope would
-		// re-enter this hook and deadlock (panic, on a single-threaded target)
-		// on the lock it is still holding
-		let entry = (Instant::now(), text);
-		ESCAPED
-			.lock()
-			.unwrap_or_else(std::sync::PoisonError::into_inner)
-			.push(entry);
+		cfg_if! {
+			if #[cfg(any(feature = "testing", feature = "testing_embedded"))] {
+				// stamped before the lock: a panic inside the guard's scope
+				// would re-enter this hook and deadlock (panic, on a single
+				// threaded target) on the lock it is still holding
+				let entry = Escape {
+					at: Instant::now(),
+					text: Self::describe(payload, location),
+					#[cfg(feature = "testing")]
+					scope: TestScope::current(),
+					#[cfg(feature = "testing")]
+					expected: TestScope::expecting(),
+				};
+				ESCAPED
+					.lock()
+					.unwrap_or_else(std::sync::PoisonError::into_inner)
+					.push(entry);
+			} else {
+				let _ = (payload, location);
+			}
+		}
 	}
 
 	/// Records a panic a task runner caught after it escaped every test catch
@@ -300,19 +332,44 @@ impl PanicContext {
 		}
 	}
 
-	/// Escaped panics recorded at or after `start`, ie a timeout report's
-	/// window. Cloned rather than drained: attribution is ambiguous, so
-	/// concurrent suites each report the window they observed.
+	/// Every escape recorded at or after `start`, expected or not, ie a
+	/// timeout report's window.
 	#[cfg(any(feature = "testing", feature = "testing_embedded"))]
 	pub fn escaped_since(start: Instant) -> Vec<String> {
+		Self::escapes(|escape| escape.at >= start)
+	}
+
+	/// The unexpected escapes fired in `scope`, which fail its test.
+	#[cfg(feature = "testing")]
+	pub fn escaped_in(scope: TestScope) -> Vec<String> {
+		Self::escapes(|escape| !escape.expected && escape.scope == Some(scope))
+	}
+
+	/// The unexpected escapes fired outside every test at or after `start`,
+	/// which fail the suite.
+	#[cfg(feature = "testing")]
+	pub fn unattributed_since(start: Instant) -> Vec<String> {
+		Self::escapes(|escape| {
+			!escape.expected && escape.scope.is_none() && escape.at >= start
+		})
+	}
+
+	/// The text of every buffered escape matching `filter`.
+	#[cfg(any(feature = "testing", feature = "testing_embedded"))]
+	fn escapes(filter: impl Fn(&Escape) -> bool) -> Vec<String> {
 		ESCAPED
 			.lock()
 			.unwrap_or_else(std::sync::PoisonError::into_inner)
 			.iter()
-			.filter(|(at, _)| *at >= start)
-			.map(|(_, text)| text.clone())
+			.filter(|escape| filter(escape))
+			.map(|escape| escape.text.clone())
 			.collect()
 	}
+
+	/// Records an error raised through a world's default error handler that
+	/// did not panic, so the test whose code raised it fails.
+	#[cfg(feature = "testing")]
+	pub fn record_unhandled(text: String) { Self::buffer_escaped(Some(text), None); }
 }
 
 /// Result of running code that may panic.
@@ -416,11 +473,13 @@ mod tests {
 	#[crate::test]
 	fn buffers_swallowed_panics() {
 		let start = Instant::now();
-		let line = line!() + 2;
-		PanicContext::catch(|| {
-			std::panic::catch_unwind(|| panic!("swallowed pizza")).ok();
-			PanicContext::record_swallowed(None);
-			Ok(())
+		let line = line!() + 3;
+		TestScope::expect_escapes(|| {
+			PanicContext::catch(|| {
+				std::panic::catch_unwind(|| panic!("swallowed pizza")).ok();
+				PanicContext::record_swallowed(None);
+				Ok(())
+			})
 		})
 		.xpect_eq(PanicResult::Ok);
 		PanicContext::escaped_since(start)
@@ -439,16 +498,38 @@ mod tests {
 		// ensure the hook is installed
 		PanicContext::catch(|| Ok(())).xpect_eq(PanicResult::Ok);
 		let start = Instant::now();
-		std::thread::spawn(|| panic!("thread pizza"))
-			.join()
-			.unwrap_err()
-			.xmap(|payload| display_ext::try_downcast_str(payload.as_ref()))
-			.xpect_eq(Some("thread pizza".to_string()));
+		TestScope::expect_escapes(|| {
+			std::thread::spawn(|| panic!("thread pizza")).join()
+		})
+		.unwrap_err()
+		.xmap(|payload| display_ext::try_downcast_str(payload.as_ref()))
+		.xpect_eq(Some("thread pizza".to_string()));
 		PanicContext::escaped_since(start)
 			.iter()
 			.filter(|text| text.contains("thread pizza"))
 			.count()
 			.xpect_eq(1);
+	}
+
+	/// An escape in a test's scope fails that test, one outside every scope
+	/// fails the suite, and an expected one fails neither.
+	#[crate::test]
+	fn attributes_escapes_to_their_scope() {
+		let start = Instant::now();
+		let scope = TestScope::new();
+		let escape = |text: &str| {
+			PanicContext::record_unhandled(text.to_string());
+		};
+		TestScope::expect_escapes(|| escape("excused"));
+		TestScope::enter(Some(scope), || {
+			escape("scoped");
+			TestScope::expect_escapes(|| escape("scoped but excused"));
+		});
+		PanicContext::escaped_in(scope).xpect_eq(vec!["scoped".to_string()]);
+		PanicContext::unattributed_since(start)
+			.iter()
+			.any(|text| text.contains("excused"))
+			.xpect_false();
 	}
 
 	#[crate::test]

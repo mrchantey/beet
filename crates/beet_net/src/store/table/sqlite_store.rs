@@ -176,6 +176,14 @@ impl SqliteStore {
 		.await
 	}
 
+	/// Create `table` and its indexes if missing, as its first write would,
+	/// so a view or a query over it reads empty rather than failing on an
+	/// absent table. SQL's own concern, like [`execute`](Self::execute).
+	pub async fn ensure_table(&self, table: impl Into<TableSpec>) -> Result {
+		let table = table.into();
+		self.run(move |conn| SqlTable::new(&table)?.ensure(conn)).await
+	}
+
 	/// Run a query, each row a [`Value::Map`] keyed by column name. The SQL
 	/// twin of [`execute`](Self::execute), see there.
 	pub async fn query(&self, sql: &str) -> Result<Vec<Value>> {
@@ -604,6 +612,24 @@ mod test {
 	async fn table() {
 		let (_dir, store) = temp_store();
 		table_test::run(TableStore::new(store)).await;
+	}
+
+	/// An ensured table reads empty to SQL before its first write.
+	#[beet_core::test]
+	async fn ensured_table_reads_empty() {
+		let (_dir, store) = temp_store();
+		store
+			.query("SELECT key FROM notes")
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("no such table");
+		store.ensure_table("notes").await.unwrap();
+		store
+			.query("SELECT key FROM notes")
+			.await
+			.unwrap()
+			.xpect_empty();
 	}
 
 	/// The component lands its table store and no blob store.

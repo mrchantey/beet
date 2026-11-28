@@ -10,7 +10,7 @@ pub(crate) fn exit_on_suite_outcome(
 	>,
 ) -> Result {
 	if let Some((_entity, config, outcome)) = finished.iter().next() {
-		let exit = if config.watch || outcome.num_fail() == 0 {
+		let exit = if config.watch || !outcome.is_fail() {
 			AppExit::Success
 		} else {
 			AppExit::error()

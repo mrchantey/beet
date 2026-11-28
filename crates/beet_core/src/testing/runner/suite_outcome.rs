@@ -7,6 +7,9 @@ pub(crate) struct SuiteOutcome {
 	num_pass: usize,
 	num_skip: usize,
 	num_fail: usize,
+	/// Escapes outside every test during the suite's run, which fail the
+	/// suite since no test can own them.
+	unattributed: Vec<String>,
 }
 
 impl SuiteOutcome {
@@ -18,6 +21,12 @@ impl SuiteOutcome {
 	pub fn num_fail(&self) -> usize { self.num_fail }
 	/// number of tests that were run (not skipped)
 	pub fn num_ran(&self) -> usize { self.num_pass + self.num_fail }
+	/// Escapes outside every test during the suite's run.
+	pub fn unattributed(&self) -> &[String] { &self.unattributed }
+	/// Whether a test failed or anything escaped outside every test.
+	pub fn is_fail(&self) -> bool {
+		self.num_fail > 0 || !self.unattributed.is_empty()
+	}
 	/// Creates a new outcome by tallying pass/skip/fail counts from the given tests.
 	pub fn new(tests: &[(&Test, &TestOutcome)]) -> Self {
 		let mut num_pass = 0;
@@ -34,6 +43,7 @@ impl SuiteOutcome {
 			num_pass,
 			num_skip,
 			num_fail,
+			unattributed: Vec::new(),
 		}
 	}
 }
@@ -43,8 +53,8 @@ pub(crate) fn insert_suite_outcome(
 	mut commands: Commands,
 	// matches runners even if the config was not just added
 	runners: Populated<
-		(Entity, Option<&Children>),
-		(With<TestRunnerConfig>, Without<SuiteOutcome>),
+		(Entity, &TestRunnerConfig, Option<&Children>),
+		Without<SuiteOutcome>,
 	>,
 	// listener query, running this system on a match
 	_listener: Populated<
@@ -59,9 +69,11 @@ pub(crate) fn insert_suite_outcome(
 	all_finished: Query<(&Test, &TestOutcome)>,
 	still_running: Query<(), (With<Test>, Without<TestOutcome>)>,
 ) {
-	for (entity, children) in runners {
+	for (entity, config, children) in runners {
 		let Some(children) = children else {
-			commands.entity(entity).insert(SuiteOutcome::new(&[]));
+			commands
+				.entity(entity)
+				.insert(SuiteOutcome::new(&[]).with_unattributed(config));
 			continue;
 		};
 
@@ -76,9 +88,50 @@ pub(crate) fn insert_suite_outcome(
 			.iter()
 			.filter_map(|child| all_finished.get(child).ok())
 			.collect::<Vec<_>>();
-		commands
-			.entity(entity)
-			.insert(SuiteOutcome::new(&all_finished));
+		commands.entity(entity).insert(
+			SuiteOutcome::new(&all_finished).with_unattributed(config),
+		);
+	}
+}
+
+/// A task can outlive its test and fault after the test passed: once every
+/// test of a suite has finished, fail each pass whose scope escaped since.
+#[cfg(all(feature = "std", feature = "testing"))]
+pub(crate) fn fail_late_escapes(
+	runners: Query<&Children, (With<TestRunnerConfig>, Without<SuiteOutcome>)>,
+	still_running: Query<(), (With<Test>, Without<TestOutcome>)>,
+	mut tests: Query<(&mut TestOutcome, &TestScope)>,
+) {
+	for children in runners {
+		if children.iter().any(|child| still_running.contains(child)) {
+			continue;
+		}
+		for child in children.iter() {
+			if let Ok((mut outcome, scope)) = tests.get_mut(child)
+				&& *outcome == TestOutcome::Pass
+			{
+				*outcome = TestOutcome::Pass.with_escapes(*scope);
+			}
+		}
+	}
+}
+
+impl SuiteOutcome {
+	/// Collect the escapes outside every test since `config`'s suite started.
+	fn with_unattributed(self, config: &TestRunnerConfig) -> Self {
+		cfg_if! {
+			if #[cfg(all(feature = "std", feature = "testing"))] {
+				Self {
+					unattributed: PanicContext::unattributed_since(
+						config.started(),
+					),
+					..self
+				}
+			} else {
+				let _ = config;
+				self
+			}
+		}
 	}
 }
 

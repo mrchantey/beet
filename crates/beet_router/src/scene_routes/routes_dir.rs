@@ -788,19 +788,8 @@ mod test {
 	/// stands down rather than raising its failed read of the missing file.
 	#[beet_core::test]
 	async fn removed_file_rescans_the_dir() {
-		use bevy::ecs::error::BevyError;
-		use bevy::ecs::error::ErrorContext;
-		use bevy::ecs::error::FallbackErrorHandler;
-		use core::sync::atomic::AtomicUsize;
-		use core::sync::atomic::Ordering;
-		/// Errors this test's world raised, read by this test alone.
-		static RAISED: AtomicUsize = AtomicUsize::new(0);
-		fn count(_: BevyError, _: ErrorContext) {
-			RAISED.fetch_add(1, Ordering::SeqCst);
-		}
-
 		let mut world = reactive_world();
-		world.insert_resource(FallbackErrorHandler(count));
+		RaisedErrors::record(&mut world);
 		let (inner, handle) =
 			reactive_fixture(&[("index.md", "# Home"), ("about.md", "# About")])
 				.await;
@@ -816,7 +805,7 @@ mod test {
 			.unwrap()
 			.entity;
 		let blob = world.get::<Blob>(about).unwrap().clone();
-		handle.remove(&RelPath::from("about.md")).await.unwrap();
+		handle.remove(&fwd_path!("about.md")).await.unwrap();
 		// the refresh the removal triggers, run before the rescan it races
 		RoutesDir::refresh_route(&mut world, about, blob);
 		react(&mut world).await;
@@ -824,7 +813,7 @@ mod test {
 			.unwrap()
 			.find(&["about"])
 			.xpect_none();
-		RAISED.load(Ordering::SeqCst).xpect_eq(0);
+		RaisedErrors::take().xpect_empty();
 	}
 
 	/// Write a routes dir fixture in a fresh [`TempDir`], returning it beside a
@@ -1252,6 +1241,7 @@ mod test {
 	#[beet_core::test]
 	async fn unresolvable_declaration_does_not_take_the_dir_down() {
 		let mut world = router_world();
+		RaisedErrors::record(&mut world);
 		let root = spawn_routes(
 			&mut world,
 			memory_fixture(&[
@@ -1271,6 +1261,10 @@ mod test {
 		tree.find(&["good"]).is_some().xpect_true();
 		tree.find(&["bad_meta"]).is_none().xpect_true();
 		tree.find(&["bad_markup"]).is_none().xpect_true();
+		// the scan raises one error naming both, beside spawning the good one
+		RaisedErrors::take()
+			.join("\n")
+			.xpect_contains("2 discovered route(s) failed to spawn");
 		// the dir records both, and `beet check` reports each as an error of
 		// its own rather than only through links to the missing pages
 		let dir = world.entity(root).get::<Children>().unwrap()[0];
